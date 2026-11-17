@@ -560,6 +560,7 @@ const FORMATOS_PARAMETRO = {
   situacao: /^(Reprovada|Desistiu)$/, // "Reprovar (com o motivo)" na ficha: abre o Editar já com a situação
   pagina: /^\d{1,5}$/, // página de uma lista longa (Histórico)
   quem: /^[^\s<>"']{3,200}$/, antes: /^\d{1,12}$/, // tela Acessos: e-mail da pessoa e "ver os mais antigos"
+  gmail: /^[a-z-]{1,20}$/, // Dados e backup: aviso da volta do Google ao conectar o Gmail (AVISOS_VOLTA_GMAIL de nuvem/worker.mjs)
 };
 
 /** Devolve só os parâmetros no formato esperado (os conhecidos fora do formato somem; a tela usa o padrão). */

@@ -10,44 +10,46 @@ Marque com `[x]` o que for concluindo.
 
 | # | O que falta | Quem faz | Tempo |
 |---|---|---|---|
-| 1 | Envio de e-mail pelo Gmail (o "Enviar agora" e os avisos por e-mail dependem dele) | você, no Google e no Cloudflare | 30 min |
-| 2 | Aviso no celular (ficha pela internet) | você, no Cloudflare | 10 min |
+| 1 | Envio de e-mail pelo Gmail (o "Enviar agora" e os avisos por e-mail dependem dele): o botão **Conectar o Gmail** está pronto (17/11); falta você ligar | você, no Google e no Cloudflare | 30 min |
+| ~~2~~ | ~~Aviso no celular (ficha pela internet)~~ **concluído em 17/11** | — | — |
 | 3 | Teste da ficha pela internet com uma pessoa de verdade | você + um conhecido | 20 min |
 | 4 | Conferências no celular: falta só o "Enviar agora" (depois do Gmail); ícone e caução da troca conferidos em 15/11 | você | 5 min |
 | 5 | Banco C6 (boleto e extrato automáticos) | o C6 liberar as chaves | depende do C6 |
 | 6 | Decisões que estão com você | você / contador | — |
 | 7 | Aceitar a PR #231 (traz esta lista) | você | 1 min |
 | 8 | Lembretes com data | você | — |
-| 9 | Programa no PC: instalado em 16/11; falta só a limpeza da chave antiga a partir de 17/11 (item 9e, passo 3) | você | 5 min |
+| ~~9~~ | ~~Programa no PC~~ **concluído em 17/11** (instalado em 16/11; chave antiga apagada em 17/11, item 9e) | — | — |
 | 11 | Mutirão de 16/11: conferências e regra de limite feitas em 16/11; a 2ª rodada entrou no mutirão 3000 (item 13) | Claude | — |
 | 13 | Mutirão 3000 (16–17/11): 366 erros confirmados, correções nas PRs #267–#283; conferências e decisões suas no item 13 | você + Claude | 20 min |
 
-**Próximos passos (combinado em 16/11, fim do dia):** (1) aceitar a PR #264 e fazer o **Testar o aviso** no celular (item 2); (2) **Claude:** fazer o botão **Conectar o Gmail** ("Entrar com o Google", item 1) e depois ligar o Gmail com o dono; (3) **17/11 ou depois:** item 9e, passo 3 (apagar a chave antiga, se `ultima-atualizacao.txt` estiver com `ok`); (4) item 3, teste da ficha com um conhecido. Em 16/12: CBS 2027.
+**Próximos passos (atualizado em 17/11):** já feitos: o aviso no celular (item 2), a limpeza da chave antiga do PC (item 9e) e o botão **Conectar o Gmail** (item 1, feito pelo Claude). Agora: (1) aceitar a PR do botão do Gmail e **ligar o Gmail** (item 1, passo a passo em `LIGAR_GMAIL.md`; posso fazer junto com você no navegador); (2) conferir o **Enviar agora** com anexos (item 4); (3) item 3, teste da ficha com um conhecido; (4) conferências do mutirão 3000 (item 13). Em 16/12: CBS 2027.
 
 ---
 
 ## 1. Ligar o envio de e-mail pelo Gmail  `[ ]`
 
-**Decisão do dono em 16/11: "Entrar com o Google".** O passo 4 abaixo (rodar `node tools/gmail-token.mjs` no computador e colar o código no Cloudflare) vira um botão no sistema: **Conectar o Gmail → escolher a conta → Permitir**, como em qualquer site. É o mesmo caminho do produto para vender (cada cliente só clica; ver `ESTUDO_PRODUTO_COMERCIAL.md`, seção 6). **Falta (Claude, próxima sessão):** fazer o botão (a nuvem guarda a autorização, cifrada, e renova sozinha; Desconectar; mostra a conta ligada). Depois, com o dono: passos 1 a 3 (projeto e credencial no Google, tipo **Aplicativo da Web**, com o endereço de retorno que o sistema mostrar), 5 a 7 e o botão. **Não cadastrar cartão** no Google Cloud: o "teste gratuito"/faturamento que ele oferece não é preciso, a Gmail API é gratuita. Descartado por ora: mandar pelo serviço do produto com o endereço do cliente ("alias": só com domínio próprio e linhas no DNS).
+**Decisão do dono em 16/11: "Entrar com o Google".** **Feito em 17/11 (Claude):** o botão **Conectar o Gmail** em **Dados e backup → E-mail pelo Gmail** (só administrador): **Conectar o Gmail → escolher a conta → Permitir**, como em qualquer site. A nuvem guarda a autorização cifrada (nunca no banco nem no navegador), renova sozinha, mostra a conta ligada e tem **Desconectar**. Não precisa mais rodar nada no computador nem colar código no Cloudflare. É o mesmo caminho do produto para vender (cada cliente só clica; ver `ESTUDO_PRODUTO_COMERCIAL.md`, seção 6). **Falta você** (com o Claude junto no navegador, se quiser). **Não cadastrar cartão** no Google Cloud: o "teste gratuito"/faturamento que ele oferece não é preciso, a Gmail API é gratuita. Descartado por ora: mandar pelo serviço do produto com o endereço do cliente ("alias": só com domínio próprio e linhas no DNS).
 
 **Por que importa:** sem isto, o botão **Enviar agora** fica desligado (só "Copiar texto" e "Abrir no Gmail") e **os e-mails automáticos da ficha pela internet não saem** (para a pessoa: "recebemos seus dados", "falta documento", "pronta para assinar"; para a equipe: "chegou documento"). É o primeiro a fazer.
 
-Leva uns 30 minutos, uma vez só. Precisa da conta Gmail da empresa, do computador com o projeto e do painel do Cloudflare. O passo a passo completo está em `LIGAR_GMAIL.md`; o resumo:
+Leva uns 30 minutos, uma vez só, no computador. Precisa da conta Gmail da empresa e do painel do Cloudflare. O passo a passo completo está em `LIGAR_GMAIL.md`; o resumo:
 
 1. **Google Cloud** (<https://console.cloud.google.com>, entrando com a conta Gmail da empresa): Novo projeto `ERP Imoveis` → APIs e serviços → Biblioteca → **Gmail API** → Ativar.
 2. **Tela de permissão OAuth**: tipo **Externo**, nome `ERP Imoveis`, e-mail da própria conta → em Público, **Publicar app** (se ficar em "Teste", para de funcionar em 7 dias).
-3. **Credenciais** → Criar credenciais → **ID do cliente OAuth** → tipo **App para computador** → copie o **Client ID** e o **Client Secret**.
-4. No computador, na pasta do projeto: `node tools/gmail-token.mjs` → cole os dois → o navegador abre: entre com a conta da empresa → "Avançado" → "Acessar ERP Imoveis" → **Permitir** → copie o **GMAIL_REFRESH_TOKEN** que aparece. (Não cole aqui no chat.)
+3. **Credenciais** → Criar credenciais → **ID do cliente OAuth** → tipo **Aplicativo da Web** → em "URIs de redirecionamento autorizados" cole `https://erp.ankjck.com.br/api/email/google/retorno` (o sistema mostra este endereço, com botão Copiar, em Dados e backup → E-mail pelo Gmail) → copie o **Client ID** e o **Client Secret**. (Não cole aqui no chat.)
+4. **Cloudflare** → Workers & Pages → erp-boletos → Settings → Variables and secrets (quadro de cima) → Add, tipo **Secret**: `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REMETENTE` = `administracao@ankjck.com.br`, `GMAIL_NOME` = `Administradora` (e, se quiser cópia oculta de tudo, `GMAIL_CCO`) → Deploy.
 5. **Remetente** `administracao@ankjck.com.br`: Gmail → Configurações → Contas e importação → **Enviar e-mail como** → adicionar, nome `Administradora`, confirmar pelo código que chega.
 6. **SPF** (para não cair no spam): Cloudflare → `ankjck.com.br` → DNS → no TXT `v=spf1 ...` acrescente `include:_spf.google.com` antes do `~all` (nunca dois registros `v=spf1`).
-7. **Cloudflare** → Workers & Pages → erp-boletos → Settings → Variables and secrets (quadro de cima) → Add, todos tipo **Secret**: `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, `GMAIL_REMETENTE` = `administracao@ankjck.com.br`, `GMAIL_NOME` = `Administradora` (e, se quiser cópia oculta de tudo, `GMAIL_CCO`) → Deploy.
+7. **No sistema** (no computador, no Chrome): Dados e backup → E-mail pelo Gmail → **Conectar o Gmail** → escolha a conta da empresa → "Avançado" → "Acessar ERP Imoveis" → marque a permissão de enviar e-mail → **Permitir**. Volta sozinho para o sistema com "Gmail conectado" e a caixa mostra "Ligado: os e-mails saem pela conta …".
 8. **Teste:** abra uma ficha → botão de e-mail → **Enviar agora** para o seu próprio e-mail. Deve chegar com o PDF anexado e o remetente "Administradora".
 
 Se quiser, faço os passos 1 a 3 e 5 a 7 junto com você no navegador (você entra na conta; eu não digito senhas).
 
 ---
 
-## 2. Ligar o aviso no celular  `[ ]`
+## 2. Ligar o aviso no celular  `[x]` (conferido pelo dono em 17/11)
+
+**17/11, conferido pelo dono:** aplicativo instalado de verdade no S23 (Chrome → Instalar aplicativo), **Desligar → Ligar** e o aviso de um documento mandado por link de teste tocou. O histórico abaixo fica só como registro.
 
 **16/11:** chaves cadastradas no Cloudflare e aviso ligado no celular do dono (Samsung S23 Ultra, Android; passos 1 a 6). PR #263 (aceita) corrigiu a ficha; mesmo assim **nada tocou** (nem dados, nem documento, nem desistência): o envio do aviso falha em silêncio. PR #264: a nuvem limpa as chaves (espaço, quebra de linha, "NOME=" colados juntos, suspeita principal) e o botão **Testar o aviso** diz na tela onde está o erro. **16/11, depois da #264: o "Testar o aviso" funcionou** (as chaves coladas eram o defeito). Na mesma PR seguinte: o aviso mostra a logo escolhida em Empresas e, na barra de cima do Android, uma casinha (o Android só aceita silhueta de uma cor: figura colorida vira quadrado branco). **Falta o dono:** instalar como aplicativo de verdade (Chrome → ⋮ → **Instalar aplicativo**, não "Adicionar à tela inicial"), abrir pelo ícone e, numa ficha, **Desligar** → **Ligar**: assim o aviso sai com o nome do sistema (não o endereço do site) e, ao tocar, abre o aplicativo (não o navegador); depois mandar um documento por um link de teste e ver se toca. Antes: no celular, fechar e abrir o aplicativo → ficha → **Desligar neste aparelho** → **Ligar** → **Testar o aviso** → mandar ao Claude a mensagem que aparece. Conferir também no S23: Configurações → Aplicativos → o aplicativo (ou o Chrome) → Notificações ligadas e Bateria "Sem restrições"; Bateria → Limites de uso em segundo plano: fora de "Apps em suspensão". Histórico: No teste o celular não tocou: a ficha nova herdou o arquivo de uma ficha de teste antiga com o mesmo número, e o aviso só toca no primeiro documento; na mesma hora o "Documento inválido" barrava o documento com foto e a renda. Os dois foram corrigidos na PR "Ficha pela internet: documentos aceitos e link sem herança". **Falta (depois do merge):** apagar `Documentos\chaves-aviso.txt` (e da lixeira), se ainda não apagou; gerar um link novo numa ficha de teste, mandar um documento e conferir se o celular toca.
 
@@ -156,12 +158,12 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 
 ## 8. Lembretes com data
 
-- **08/11/2027**: vence a chave do atualizador do PC (`atualizador-pc`) — só se o computador ainda não foi ligado com o crachá (item 9e; depois dele, a chave é apagada). O Cloudflare manda e-mail antes. Para renovar: Zero Trust → Access controls → **Service credentials** → `atualizador-pc` → **Refresh**.
+- ~~**08/11/2027**: vence a chave do atualizador do PC (`atualizador-pc`)~~ **Não vale mais (17/11):** a chave foi apagada no Cloudflare (item 9e, passo 3); o computador entra com o crachá. Se o Cloudflare mandar e-mail sobre ela, pode ignorar.
 - **15/12/2026**: prazo do Senado para a alíquota final da CBS. **Em 16/12/2026** retomar o item CBS 2027 (item 6): conferir a alíquota aprovada e falar com o contador antes de mudar a aba Impostos.
 
 ---
 
-## 9. Programa no PC e pastas dos inquilinos (pedidos do dono em 14/11)  `[ ]`
+## 9. Programa no PC e pastas dos inquilinos (pedidos do dono em 14/11)  `[x]` (concluído em 17/11)
 
 **Explicado em 15/11** (pedido do dono: clicar num ícone, abrir o sistema e ver no Windows, em pastas, os documentos e comprovantes de cada inquilino, atualizados sozinhos com a nuvem).
 
@@ -181,12 +183,12 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
   - Tela da pasta com caixinhas, **Ver a capa e imprimir tudo** (capa + documentos numa impressão só; depois "Saiu tudo certo?") e **Já está tudo em papel**. Fora da pasta: NF, comprovantes, boletos, WhatsApp, documentos de renda e Serasa, fotos da vistoria, apólices e e-mails.
   - **Troca de titular:** passo 1 com o que falta da pasta do anterior e a caixinha "Pus a pasta de fulano dentro".
   - **Falta você (depois do merge):** abrir **Dados e backup → Arquivo impresso** e, para cada inquilino, conferir a pasta de papel: o que já está nela, marque e use "Já está tudo em papel"; o que falta, "Ver a capa e imprimir tudo". Termo do acordo: no boleto do acordo, "Termo para assinar" gera o termo (inquilino, fiadores e 2 testemunhas assinam) e "anexar o termo assinado" guarda o assinado; enquanto faltar, o Painel avisa. Arquivo posto à mão na pasta do inquilino (ex.: notificação) aparece no Painel na abertura seguinte do sistema.
-- [ ] **9e. Programa do PC sem chave de serviço** (feito em 15/11, etapa 1 da proposta de licença; falta você, depois do merge, ~15 min): o computador entra com o **seu e-mail e senha do sistema** e recebe um "crachá" que só lê, guardado cifrado pelo Windows; aparece em **Usuários → Aparelhos ligados** com o botão **Desligar**. **Atenção (15/11, correção):** a conta da senha passou a ser feita no computador (o Cloudflare recusaria a conta no servidor), então só o programa novo entra: use o `.exe` desta versão ou os arquivos novos de `atualizador-pc/`; o programa antigo avisa "este programa do computador é antigo".
+- [x] **9e. Programa do PC sem chave de serviço** (feito em 15/11, etapa 1 da proposta de licença; concluído pelo dono em 17/11): o computador entra com o **seu e-mail e senha do sistema** e recebe um "crachá" que só lê, guardado cifrado pelo Windows; aparece em **Usuários → Aparelhos ligados** com o botão **Desligar**. **Atenção (15/11, correção):** a conta da senha passou a ser feita no computador (o Cloudflare recusaria a conta no servidor), então só o programa novo entra: use o `.exe` desta versão ou os arquivos novos de `atualizador-pc/`; o programa antigo avisa "este programa do computador é antigo".
   1. [x] (feito em 16/11; teste deu a mensagem certa) No Cloudflare, criar a regra **Bypass** do caminho `erp.ankjck.com.br/api/aparelho` (passo a passo em `nuvem/README.md`, "Programa do PC: regra Bypass no Access"). Teste: abrir `https://erp.ankjck.com.br/api/aparelho/saude` sem login mostra "Este computador não está ligado ao sistema".
   2. Copiar para `C:\Users\Julio\Documents\Imoveis chave\atualizador-pc` os arquivos novos (`atualizador.mjs`, `ligar.mjs`, `ligar-computador.cmd`) e dar dois cliques em `ligar-computador.cmd`: abre uma página no navegador; e-mail, senha e a pasta (já vem preenchida) → **Ligar**.
-  3. No dia seguinte, com `ok` em `ultima-atualizacao.txt`: apagar o `.env` dessa pasta e, no Cloudflare, a chave de serviço `atualizador-pc`, a política "Atualizador" e o segredo `SERVICOS` do Worker (o lembrete de 08/11/2027 deixa de valer).
+  3. [x] (feito pelo dono em 17/11: `.env` apagado, chave de serviço `atualizador-pc`, política "Atualizador" e segredo `SERVICOS` apagados no Cloudflare; o lembrete de 08/11/2027 do item 8 deixa de valer) No dia seguinte, com `ok` em `ultima-atualizacao.txt`: apagar o `.env` dessa pasta e, no Cloudflare, a chave de serviço `atualizador-pc`, a política "Atualizador" e o segredo `SERVICOS` do Worker.
   - **Etapa 2: programa num arquivo só, sem instalar o Node** (feito em 15/11; falta você, depois do merge, ~5 min). Pode fazer no lugar do passo 2 acima (ou depois dele: o computador já ligado continua ligado):
-    - [x] **Instalado pelo dono em 16/11** (`.exe`; 1ª rodada 16/11 13:04 UTC: `ok`, `arquivos=298`). Falta o passo 3 acima a partir de 17/11.
+    - [x] **Instalado pelo dono em 16/11** (`.exe`; 1ª rodada 16/11 13:04 UTC: `ok`, `arquivos=298`). Passo 3 acima feito em 17/11.
     1. Uns 10 minutos depois do merge, baixe `Instalar-Administracao-de-Imoveis.exe` em https://github.com/juliocpfh/erp-boletos/releases/tag/programa-pc (uns 90 MB; o GitHub gera sozinho).
     2. Dois cliques. No aviso azul "O Windows protegeu o computador" (o programa não tem assinatura, como combinado no item 11 da proposta): **Mais informações → Executar assim mesmo**. Se perguntar "Deseja permitir?", **Sim**.
     3. Ele cria as três tarefas (20h, ao entrar e de hora em hora, no lugar das antigas), liga o computador se ainda não estiver ligado (página do navegador: e-mail, senha, pasta) e faz a primeira atualização. Deve terminar com **Pronto**.

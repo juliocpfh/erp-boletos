@@ -40,6 +40,49 @@ export async function emailLigado() {
   return (await estadoEmail()).ligado;
 }
 
+/**
+ * Situação completa para a caixa "E-mail pelo Gmail" (Dados e backup), sempre perguntada de novo:
+ * { ligado, remetente, origem ('conta' | 'segredo' | 'simulado' | null), conta, cliente, retorno, ligado_em?, ilegivel? }.
+ * Sem a nuvem ou sem resposta: null.
+ */
+export async function situacaoGmail() {
+  if (local()) return null;
+  try {
+    const r = await cfg.buscar(`${cfg.base}email/estado`, { cache: 'no-store', credentials: 'same-origin', signal: limiteDeTempo(TEMPO_ESTADO) });
+    if (!r.ok || r.redirected || !ehJson(r)) return null;
+    const d = await r.json();
+    estadoGuardado = { ligado: d.ligado === true, remetente: typeof d.remetente === 'string' ? d.remetente : null };
+    return d && typeof d === 'object' ? d : null;
+  } catch { return null; }
+}
+
+/** POST de ligar/desligar (só administrador; a nuvem confere). Erro vira C.ErroUsuario com a mensagem da nuvem. */
+async function pedirGmail(rota) {
+  if (local() || !cfg.online()) throw new C.ErroUsuario('Sem internet: tente de novo quando a conexão voltar.');
+  let r;
+  try {
+    r = await cfg.buscar(`${cfg.base}email/google/${rota}`, {
+      method: 'POST', cache: 'no-store', credentials: 'same-origin', signal: limiteDeTempo(TEMPO_ESTADO),
+      headers: { 'Content-Type': 'application/json', 'X-Sistema': 'imoveis' }, body: '{}',
+    });
+  } catch { throw new C.ErroUsuario('Sem internet: tente de novo quando a conexão voltar.'); }
+  if (r.redirected || !ehJson(r)) throw new C.ErroUsuario('Seu acesso pela internet venceu. Recarregue a página para entrar de novo (código no e-mail).');
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new C.ErroUsuario(d.erro || `Erro ${r.status} na nuvem.`);
+  estadoGuardado = null;
+  return d;
+}
+
+/** "Conectar o Gmail": o endereço da tela de permissão do Google (a tela leva o navegador para lá). */
+export async function enderecoParaConectar() {
+  const { url } = await pedirGmail('conectar');
+  if (typeof url !== 'string' || !url.startsWith('https://accounts.google.com/')) throw new C.ErroUsuario('A nuvem não devolveu o endereço do Google.');
+  return url;
+}
+
+/** "Desconectar": apaga a autorização na nuvem e a retira no Google. Devolve { havia, revogado, segredo_antigo }. */
+export const desconectarGmail = () => pedirGmail('desconectar');
+
 /** Blob → base64 (sem o "data:…," do começo), aos pedaços para não estourar a pilha. */
 export async function base64DoBlob(blob) {
   const bytes = new Uint8Array(await blob.arrayBuffer());

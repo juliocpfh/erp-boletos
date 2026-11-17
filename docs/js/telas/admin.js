@@ -12,6 +12,7 @@ import { caixaConfigBanco, caixaContaDosBoletos } from './banco-c6.js';
 import { caixaConfigBanco2 } from './banco.js';
 import { CADASTROS } from './cadastros.js';
 import { botao, buscarComLimite, carregarParte, d, etiqueta, item, link, opera, ordenar, tabelaHistorico } from './comum.js';
+import { caixaGmailHtml } from './emails.js';
 import { caixaIcone } from './icone.js';
 
 // --------------------------------------------------------------------------
@@ -239,7 +240,8 @@ function lembreteZipNuvem() {
 }
 const LEMBRETE_ZIP_DIAS = 7;
 
-export async function telaDados() {
+/** `q.gmail`: aviso da volta do Google ao conectar o Gmail (caixaGmailHtml). */
+export async function telaDados(q = {}) {
   // cópias em conflito são coisa do OneDrive (modo pasta): na nuvem não existem
   const conflitos = E.nuvem ? [] : await S.copiasEmConflito(E.pasta);
   let modeloProprio = false;
@@ -291,6 +293,7 @@ export async function telaDados() {
       ${botao('limparAnexosSoltos', 'Procurar arquivos sem lançamento')}</div>` : ''}
     <div class="cartao"><h2>Modelos de contrato</h2><p>Textos usados nos botões <b>Gerar contrato</b> (residencial, não residencial e os que você criar) e <b>Gerar termo aditivo</b> (troca do vencimento e troca de inquilino) do inquilino.</p>${link('#/modelos-contrato', 'Ver e editar os modelos')}</div>
     <div class="cartao"><h2>Modelos de e-mail</h2><p>Um e-mail para cada etapa da ficha, da entrada e da saída do inquilino, e o informe anual do Imposto de Renda (botão <b>✉ E-mail</b> em cada etapa).</p>${link('#/modelos-email', 'Ver e editar os modelos de e-mail')}</div>
+    ${await caixaGmailHtml(q.gmail)}
     <div class="cartao"><h2>Modelo Excel da NF</h2>
       <p>${modeloProprio ? `${etiqueta('Modelo próprio', 'ok')} usando o arquivo enviado (${S.PASTA_MODELOS}/${S.MODELO_FATURA}).` : 'Usando o modelo padrão do sistema (uma NF por empresa, com os dados do cadastro de Empresas).'}</p>
       <p class="suave">Para trocar, envie um .xlsx com uma aba por empresa no mesmo desenho. Os dados são preenchidos nas mesmas células da planilha original (peça ao técnico se precisar do detalhe).</p>

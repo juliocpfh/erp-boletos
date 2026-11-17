@@ -129,6 +129,7 @@ Pesquisa feita em 11/11/2026 (bancos e concorrentes pela internet; o resto pela 
 - cada cliente só clica em **Conectar meu Gmail → escolhe a conta → Permitir** (uns 30 segundos); o e-mail sai da conta dele e fica em "Enviados"; ele tira a permissão quando quiser na conta Google;
 - o console do Google oferece "teste gratuito"/faturamento: **não é preciso** (a Gmail API é gratuita; não cadastrar cartão).
 - Descartado por ora (16/11): mandar pelo serviço de e-mail do produto com o endereço do cliente (o "alias"). Funciona só com domínio próprio (o cliente cola 2 ou 3 linhas no DNS); com @gmail.com/@hotmail.com o Google e a Microsoft barram. Fica como alternativa futura.
+- **Feito em 17/11:** o botão **Conectar o Gmail** (Dados e backup → E-mail pelo Gmail), com a autorização guardada cifrada na nuvem de cada cliente (`LIGAR_GMAIL.md`). Para vender falta só o aplicativo do Google em nome do produto, verificado (hoje cada nuvem usa a credencial dos seus segredos `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET`), e o endereço de retorno de cada cliente cadastrado nele.
 
 ## 7. Caminho sugerido
 

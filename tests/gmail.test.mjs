@@ -150,7 +150,7 @@ const corpoEmail = JSON.stringify({ para: 'inquilino@exemplo.com.br', assunto: '
 test('Worker sem os segredos: estado desligado e envio recusado com mensagem clara', async () => {
   const e = await pedir({}, 'GET', '/api/email/estado');
   assert.equal(e.status, 200);
-  assert.deepEqual(await e.json(), { ligado: false, remetente: null });
+  assert.deepEqual(await e.json(), { ligado: false, remetente: null, origem: null, conta: null, cliente: false, retorno: `${BASE}/api/email/google/retorno` });
   const r = await pedir({}, 'POST', '/api/email/enviar', corpoEmail);
   assert.equal(r.status, 503);
   assert.equal((await r.json()).erro, 'O envio pelo Gmail ainda não foi ligado.');
@@ -160,7 +160,7 @@ test('Worker com os segredos: envia pelo Google; exige o cabeçalho do sistema, 
   G.esquecerToken(); W.esquecerPapeis();
   const g = googleFalso();
   const e = await pedir(SEGREDOS, 'GET', '/api/email/estado');
-  assert.deepEqual(await e.json(), { ligado: true, remetente: 'administracao@exemplo.com.br' });
+  assert.deepEqual(await e.json(), { ligado: true, remetente: 'administracao@exemplo.com.br', origem: 'segredo', conta: null, cliente: true, retorno: `${BASE}/api/email/google/retorno` });
   const r = await pedir(SEGREDOS, 'POST', '/api/email/enviar', corpoEmail, g.buscar);
   assert.equal(r.status, 200);
   assert.deepEqual(await r.json(), { ok: true, id: 'msg-1' });
