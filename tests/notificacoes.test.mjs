@@ -129,7 +129,7 @@ test('cancelar a 2ª (ou excluir o rascunho) devolve a 1ª à espera', () => {
   assert.equal(n1.reiterada_por, null);
 });
 
-test('multa: valor digitado vai ao próximo boleto do aluguel (fora da NF); retirar tira; o boleto no banco não muda', () => {
+test('multa: valor digitado vai ao próximo boleto do aluguel (fora da NF); retirar tira; o boleto no banco não muda', async () => {
   const { d, c } = base();
   const n = notificar(d, c);
   assert.throws(() => R.gerarMultaNotificacao(d, n.id, 200000, 'j', '2026-12-03'), /depois do prazo/, 'rascunho não gera multa');
@@ -147,6 +147,12 @@ test('multa: valor digitado vai ao próximo boleto do aluguel (fora da NF); reti
   assert.equal(cb.outros, 150000);
   assert.equal(cb.outros_descricao, 'Multa por descumprimento da notificação de 17/11/2026');
   assert.equal(R.totais(cb).a_pagar_sem_desconto, 350000, 'R$ 2.000,00 + R$ 1.500,00');
+  // decisão do dono (17/11/2026): sem multa nem juros de atraso sobre a multa da notificação: base R$ 2.000,00, não R$ 3.500,00
+  assert.equal(R.totais(cb).base_multa, 200000, 'multa e juros do atraso só sobre o aluguel');
+  const C = await import('../docs/js/calculos.js');
+  const atraso = C.liquidar(cb, '2026-12-20');
+  assert.ok(cb.multa_percentual > 0, 'boleto com multa de atraso');
+  assert.equal(atraso.multa, Math.round(200000 * cb.multa_percentual / 100), 'multa de atraso sobre R$ 2.000,00');
   assert.match(R.dadosBoleto(d, cb).descricao, /MULTA NOTIF\. 17\/11\/2026 RS1\.500,00|MULTA NOTIF\. 17\/11\/2026 R\$ ?1\.500,00/);
   assert.ok(R.dadosBoleto(d, cb).descricao.length <= R.LIMITE_DESCRICAO_BOLETO);
   assert.throws(() => R.ajustarBoleto(d, cb.id, 0, '', 'j'), /Retirar a multa/, 'o "Tirar ajuste" não apaga a multa');
