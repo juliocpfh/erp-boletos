@@ -1,8 +1,21 @@
 # O que ainda falta no sistema (e como fazer)
 
-Situação em 17/11/2026. Tudo o que foi feito até hoje está no ar (até a PR #303: mutirão 3000, Gmail por "Entrar com o Google", notificações ao inquilino, régua em Boletos e abrir a pasta no Explorer).
+Situação em 17/11/2026 (fim do dia). Tudo o que foi feito até hoje está no ar até a PR #308: mutirão 3000, botão "Conectar o Gmail" (#299), notificações ao inquilino (#300/#301), régua em Boletos (#302), abrir a pasta no Explorer (#303), ficha com registro de quem conferiu (#304), NF com aviso de texto cortado e Excel por empresa (#305), melhorias pequenas (#306: Hoje/Ontem, inadimplência por faixa, 2ª via com o valor do dia, status embaixo dos botões), sem ANK fixa e Internet "Não tem" no contrato novo (#307) e publicação pelo GitHub Actions (#308). **Em aceite:** #309 (Pix devolvido e baixa só pelo identificador), a PR da limpeza técnica e a PR do programa do PC desinstalável.
 
 Marque com `[x]` o que for concluindo.
+
+## Para confirmar na sequência (dono)
+
+1. [ ] Abrir o sistema no computador e no celular depois da troca da publicação (17/11) e ver se abre normal. Na 1ª vez ele baixa tudo de novo (pode demorar um pouco mais).
+2. [ ] Aceitar as PRs em aceite: #309, a da limpeza técnica e a do programa do PC desinstalável.
+3. [ ] Depois do merge do desinstalar: baixar o `.exe` novo, rodar uma vez e conferir em Configurações → Aplicativos que aparece "Administração de Imóveis" (item 9).
+4. [ ] Ligar o Gmail com o Claude (item 1).
+5. [ ] Ficha pela internet com um conhecido (item 3).
+6. [ ] Contador: informe do IR (D5), DIMOB e numeração da NF por empresa (item 6).
+7. [ ] Quando o C6 liberar: chaves + boleto de teste (decidir o corte do texto e conferir o desconto) (item 5).
+8. [ ] Depois do C6 no ar: rever a sugestão do tipo de despesa pela descrição (ex.: SANEPAR → Água).
+9. [ ] Quando acontecer: NF 16/30 (próximo inquilino com entrada no meio do mês) e troca de senha → religar o PC (item 13).
+10. [ ] 16/12/2026: CBS 2027 (item 6).
 
 **Como usar (para o Claude, depois de um /clear):** o dono vai responder item por item, na ordem da tabela. A cada resposta: anote aqui o que ele decidiu (com a data), marque `[x]` no que foi concluído, leve a decisão de regra de negócio para `DECISOES.md` e, se virar mudança no sistema, confirme antes com um exemplo em reais e datas.
 
@@ -10,23 +23,25 @@ Marque com `[x]` o que for concluindo.
 
 | # | O que falta | Quem faz | Tempo |
 |---|---|---|---|
-| 1 | Envio de e-mail pelo Gmail (o "Enviar agora" e os avisos por e-mail dependem dele): o botão **Conectar o Gmail** está pronto (17/11); falta você ligar | você, no Google e no Cloudflare | 30 min |
+| 1 | Envio de e-mail pelo Gmail (o "Enviar agora" e os avisos por e-mail dependem dele): o botão **Conectar o Gmail** está no ar (#299); é o **próximo a fazer com o Claude** | você + Claude, no Google e no Cloudflare | 30 min |
 | ~~2~~ | ~~Aviso no celular (ficha pela internet)~~ **concluído em 17/11** | — | — |
-| 3 | Teste da ficha pela internet com uma pessoa de verdade | você + um conhecido | 20 min |
+| 3 | Teste da ficha pela internet com uma pessoa de verdade (depois do Gmail) | você + um conhecido | 20 min |
 | 4 | Conferências no celular: falta só o "Enviar agora" (depois do Gmail); ícone e caução da troca conferidos em 15/11 | você | 5 min |
-| 5 | Banco C6 (boleto e extrato automáticos) | o C6 liberar as chaves | depende do C6 |
-| 6 | Decisões que estão com você | você / contador | — |
-| 7 | Aceitar a PR #231 (traz esta lista) | você | 1 min |
+| 5 | Banco C6 (boleto e extrato automáticos): cobrado por e-mail em 17/11, aguardando as chaves | o C6 liberar as chaves | depende do C6 |
+| 6 | Decisões que estão com você: abertas só D5 (IR), DIMOB, numeração da NF por empresa, CBS 2027 e corte do texto do boleto; as outras decididas em 17/11 | você / contador | — |
+| ~~7~~ | ~~Aceitar a PR #231~~ aceita em 14/11 | — | — |
 | 8 | Lembretes com data | você | — |
-| ~~9~~ | ~~Programa no PC~~ **concluído em 17/11** (instalado em 16/11; chave antiga apagada em 17/11, item 9e) | — | — |
+| 9 | Programa no PC: concluído; "Abrir a pasta no Explorer" funciona (17/11); falta só o `.exe` novo depois do merge do desinstalar | você | 5 min |
 | 11 | Mutirão de 16/11: conferências e regra de limite feitas em 16/11; a 2ª rodada entrou no mutirão 3000 (item 13) | Claude | — |
-| 13 | Mutirão 3000 (16–17/11): 366 erros confirmados, correções nas PRs #267–#283; conferências e decisões suas no item 13 | você + Claude | 20 min |
+| 13 | Mutirão 3000 (16–17/11): 366 erros confirmados; 314 corrigidos no inventário de 17/11 (até #303) e mais correções em #304–#309 e nas PRs em aceite; faltam NF 16/30 e troca de senha (quando acontecerem) | você + Claude | — |
 
-**Próximos passos (atualizado em 17/11):** já feitos: o aviso no celular (item 2), a limpeza da chave antiga do PC (item 9e) e o botão **Conectar o Gmail** (item 1, feito pelo Claude). Agora: (1) aceitar a PR do botão do Gmail e **ligar o Gmail** (item 1, passo a passo em `LIGAR_GMAIL.md`; posso fazer junto com você no navegador); (2) conferir o **Enviar agora** com anexos (item 4); (3) item 3, teste da ficha com um conhecido; (4) conferências do mutirão 3000 (item 13). Em 16/12: CBS 2027.
+**Próximos passos (atualizado em 17/11, fim do dia):** siga a lista **"Para confirmar na sequência"** acima. O próximo trabalho com o Claude é **ligar o Gmail** (item 1, passo a passo em `LIGAR_GMAIL.md`; faço junto com você no navegador) e, depois, o teste da ficha com um conhecido (item 3). Em 16/12: CBS 2027.
 
 ---
 
 ## 1. Ligar o envio de e-mail pelo Gmail  `[ ]`
+
+**17/11, fim do dia:** o botão está no ar (PR #299 aceita). É o **próximo a fazer com o Claude**.
 
 **Decisão do dono em 16/11: "Entrar com o Google".** **Feito em 17/11 (Claude):** o botão **Conectar o Gmail** em **Dados e backup → E-mail pelo Gmail** (só administrador): **Conectar o Gmail → escolher a conta → Permitir**, como em qualquer site. A nuvem guarda a autorização cifrada (nunca no banco nem no navegador), renova sozinha, mostra a conta ligada e tem **Desconectar**. Não precisa mais rodar nada no computador nem colar código no Cloudflare. É o mesmo caminho do produto para vender (cada cliente só clica; ver `ESTUDO_PRODUTO_COMERCIAL.md`, seção 6). **Falta você** (com o Claude junto no navegador, se quiser). **Não cadastrar cartão** no Google Cloud: o "teste gratuito"/faturamento que ele oferece não é preciso, a Gmail API é gratuita. Descartado por ora: mandar pelo serviço do produto com o endereço do cliente ("alias": só com domínio próprio e linhas no DNS).
 
@@ -86,6 +101,8 @@ Quando alguém manda a ficha pelo link, a equipe recebe **e-mail** (depois do it
 
 ## 3. Testar a ficha pela internet com uma pessoa de verdade  `[ ]`
 
+**17/11:** fica para **depois do Gmail** (item 1), para os e-mails da ficha já saírem no teste.
+
 Foi testado no computador, numa cópia do sistema. Falta um teste completo no endereço real e num celular de outra pessoa.
 
 **Passo a passo (com um conhecido, ficha de teste)**
@@ -124,13 +141,15 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 **Situação:** o sistema já está pronto para emitir boleto no C6, puxar o extrato e propor pagamentos. Falta o C6 liberar as chaves da API. A "ponte" (programa que fala com o banco) ainda não está instalada em computador nenhum. Ela só é instalada quando as chaves chegarem.
 
 **O que fazer agora**
-1. Cobrar o C6 **por escrito** (chat do C6 Empresas ou o gerente): "Preciso das credenciais da API de boletos (Bolepix) como Cliente Final, para sistema próprio". **14/11:** e-mail pronto em `EMAIL_C6_CREDENCIAIS.md` (todos os módulos, as duas empresas), para enviar a `homologacaoapi@c6bank.com` do e-mail de cadastro de cada empresa.
+1. Cobrar o C6 **por escrito** (chat do C6 Empresas ou o gerente): "Preciso das credenciais da API de boletos (Bolepix) como Cliente Final, para sistema próprio". **14/11:** e-mail pronto em `EMAIL_C6_CREDENCIAIS.md` (todos os módulos, as duas empresas), para enviar a `homologacaoapi@c6bank.com` do e-mail de cadastro de cada empresa. **17/11: cobrado por e-mail pelo dono; aguardando as chaves.**
 2. **Não** escolha um "Parceiro" de outra empresa na tela "Integrações via API" do Web Banking: daria acesso a um terceiro.
 3. Quando o C6 mandar o ClientId, o ClientSecret e a pasta do certificado, me chame. A instalação segue `documentacao/LIGAR_C6.md`. **Nunca cole essas chaves no chat.**
 
 **Ao instalar a ponte (desde o mutirão 3000, PR #280):** no `.env` da ponte, `ORIGENS=https://erp.ankjck.com.br`; se usar o Tunnel do Cloudflare, também `HOSTS=banco.ankjck.com.br` (sem isso a ponte recusa o Tunnel e o webhook). A ponte não sobe com a senha do exemplo: escolha uma frase própria com 20+ caracteres. Numa conta de produção, boleto com desconto só sai depois de marcar "Conferi o desconto no boleto de teste (sandbox)" (o C6 tem o tipo de desconto "por dia", que daria desconto demais).
 
-**Decisão que fica para esse dia:** a descrição do boleto no C6 corta em 100 caracteres e as instruções em 4 linhas de 80. Diga se o corte automático serve.
+**Decisão que fica para esse dia (dono, 17/11: decidir com o boleto de teste):** a descrição do boleto no C6 corta em 100 caracteres e as instruções em 4 linhas de 80. Com o boleto de teste (sandbox) na mão, diga se o corte automático serve.
+
+**Também depois do C6 no ar:** rever a sugestão do **tipo** de despesa pela descrição do extrato (ex.: SANEPAR → Água). Desde 17/11 (PR #309) nada liga sozinho por valor, data ou nome: só pelo identificador (código do boleto, Pix do próprio boleto, código do Pix devolvido).
 
 ---
 
@@ -141,7 +160,14 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 | **D5, informe do IR** (pendente com o contador em 14/11) | Perguntar ao contador se o informe anual separa IPTU, seguro, multa e juros, mês a mês. Hoje mostra só o aluguel. **15/11:** mensagem enviada ao contador (junto com a DIMOB e a data do informe); aguardando a resposta. | já |
 | **DIMOB** (pendente com o contador em 14/11) | Confirmar com o contador a entrega da DIMOB (empresa com patrimônio próprio pode ser obrigada). | já |
 | ~~**Feriados sem banco**~~ | **Decidido em 14/11:** Carnaval e Corpus Christi contam como dia sem banco (o sistema já fazia assim). | feito |
-| **Prazos da conferência do banco** | Confirmar os prazos de 45 dias e de 7 dias usados na conferência do extrato. | quando o C6 entrar |
+| **Numeração da NF por empresa** (aberto em 17/11) | Perguntar ao contador se cada empresa (ANK e JCK) precisa da sua própria numeração contínua de NF. | já |
+| **Corte do texto do boleto no C6** | Descrição de 100 letras e instruções em 4 linhas de 80: **decidido em 17/11 que se decide com o boleto de teste** (item 5). | quando o C6 liberar |
+| ~~**Prazos da conferência do banco**~~ | **Decidido em 17/11:** não há mais prazo de 45 dias nem de 7 dias para ligar sozinho. Só liga sozinho com o identificador igual (código de barras/nosso número, Pix do próprio boleto, código do Pix devolvido); Pix feito à mão e parcela de IPTU citada no extrato são sempre "vincular manualmente"; pagamento adiantado a empresa devolve. Contas lançadas à mão: candidatas do mês anterior e do mês da saída (saída em 17/11 → de 01/10 a 30/11). PR #309. | feito |
+| ~~**Devolução de Pix ao inquilino**~~ | **Decidido em 17/11:** a devolução fica ligada ao boleto e o recebido volta ao devido; a NF não muda (boleto de R$ 2.000,00 pago duas vezes, devolução de R$ 2.000,00 → R$ 2.000,00 recebidos, NF de R$ 2.000,00). PR #309. | feito |
+| ~~**Internet no contrato novo**~~ | **Decidido em 17/11:** vem "Não tem/Não se aplica" e pode ser mudada (só a Internet). PR #307. | feito |
+| ~~**Retomada do imóvel abandonado**~~ | **Decidido em 17/11:** a cláusula fica no modelo; a retomada é feita com ata notarial e inventário do que foi abandonado. | feito |
+| ~~**`restaurarGarantiaHerdada`**~~ | **Decidido em 17/11:** pode sair se não for mais usada (PR da limpeza técnica, em aceite). | feito |
+| ~~**Publicar pelo GitHub Actions**~~ | **Decidido e feito em 17/11** (PR #308; fonte do Pages trocada às 13:41 UTC), só pela rapidez. Para voltar, o comando está em `DECISOES.md`. | feito |
 | ~~**Pasta do OneDrive**~~ | **Decidido em 14/11:** aposentada (não é mais usada; backup seguro no disco C, copiado todo dia para o HD externo). Guardar uma última cópia no HD externo e apagar do OneDrive (e da lixeira do OneDrive). | feito |
 | **CBS 2027** (aguardando desde 14/11; **retomar em 16/12/2026**) | O imposto novo substitui o PIS/COFINS em 2027. Exemplo: aluguel residencial de R$ 3.000,00 paga cerca de R$ 81,00 (hoje R$ 109,50). Antes de mudar a aba Impostos: alíquota final do Senado (até 15/12/2026); com o contador, se algum contrato antigo fica nos 3,65%; e se o aluguel passa a ser "valor + CBS". | depois de **15/12/2026** |
 | **NF pelo governo (2027)** | Quando o governo definir o sistema da NF, ela passa a sair ao identificar o pagamento no extrato. | quando sair a regra |
@@ -163,7 +189,7 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 
 ---
 
-## 9. Programa no PC e pastas dos inquilinos (pedidos do dono em 14/11)  `[x]` (concluído em 17/11; novo em 17/11: ligar o botão "Abrir a pasta no Explorer", 9b)
+## 9. Programa no PC e pastas dos inquilinos (pedidos do dono em 14/11)  `[x]` (concluído em 17/11; "Abrir a pasta no Explorer" funcionando em 17/11; falta só o `.exe` novo depois do merge do desinstalar, 9f)
 
 **Explicado em 15/11** (pedido do dono: clicar num ícone, abrir o sistema e ver no Windows, em pastas, os documentos e comprovantes de cada inquilino, atualizados sozinhos com a nuvem).
 
@@ -176,7 +202,7 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 - [x] **9a. Ícone que abre o sistema** (instalado pelo dono em 15/11; você faz, não precisa programar): no Chrome, em `erp.ankjck.com.br`, menu ⋮ → **Transmitir, salvar e compartilhar → Instalar página como app** (no Edge: **Aplicativos → Instalar este site como aplicativo**). Fica um ícone na área de trabalho e na barra de tarefas; abre em janela própria e funciona mesmo com o site, o Cloudflare ou a internet fora do ar, com os dados da última vez que o sistema foi aberto naquele aparelho.
 - [x] **9b. Cópia aberta dos arquivos no computador** (feito em 15/11): subpasta **`Arquivos dos imoveis`** dentro de `C:\Users\Julio\Imoveis` (a pasta do backup seguro), sem cifrar, como no sistema (imóvel → Inquilinos → pessoa). Abrir, imprimir e copiar à vontade; o que for posto ou mudado lá não vai para o sistema. Atualiza sozinha: (A) logo depois de anexar, apagar ou mover neste computador; (B) de hora em hora pelo atualizador do PC; (C) botão **Atualizar a pasta agora** em Dados e backup → Backup seguro. Decisões do dono: sem BitLocker (só ele usa o computador, com senha, e antivírus sempre atualizado); risco de exposição e LGPD aceitos.
   - **Feito em 15/11** (atualizador copiado, tarefa instalada; 1ª rodada: `arquivos=298`). Era: copiar os arquivos novos do atualizador para `C:\Users\Julio\Documents\Imoveis chave\atualizador-pc` (`atualizador.mjs`, `instalar-tarefa.cmd`, `desinstalar-tarefa.cmd`, `rodar-escondido.vbs`; o `.env` fica) e rodar `instalar-tarefa.cmd` **como administrador**. Posso fazer a cópia para você. Depois, conferir: aparece a pasta `Arquivos dos imoveis` e o `ultima-atualizacao.txt` termina com `arquivos=…`.
-  - [ ] **Abrir a pasta no Explorer** (pedido do dono em 17/11; feito pelo Claude na mesma data). Em Dados e backup → Backup seguro → "Cópia aberta dos arquivos" (só no computador, não aparece no celular): botão **Abrir a pasta no Explorer**, que abre `C:\Users\Julio\Imoveis\Arquivos dos imoveis`, e **Copiar o caminho**, de reserva. O navegador não deixa um site abrir pastas do computador; por isso quem abre é o programa do PC, que passa a se registrar no Windows (só para o seu usuário, sem pedir administrador) e sempre abre essa pasta, nunca outra, seja quem for que chame. **Falta você, depois do merge (uns 5 minutos):**
+  - [x] **Abrir a pasta no Explorer** (pedido do dono em 17/11; feito pelo Claude na mesma data; **17/11: programa novo instalado e o botão funciona**; o `.exe` que estava em Downloads era o de 16/11: sempre baixe de novo do link abaixo). Em Dados e backup → Backup seguro → "Cópia aberta dos arquivos" (só no computador, não aparece no celular): botão **Abrir a pasta no Explorer**, que abre `C:\Users\Julio\Imoveis\Arquivos dos imoveis`, e **Copiar o caminho**, de reserva. O navegador não deixa um site abrir pastas do computador; por isso quem abre é o programa do PC, que passa a se registrar no Windows (só para o seu usuário, sem pedir administrador) e sempre abre essa pasta, nunca outra, seja quem for que chame. **Falta você, depois do merge (uns 5 minutos):**
     1. Uns 10 minutos depois do merge, baixe o `Instalar-Administracao-de-Imoveis.exe` novo em https://github.com/juliocpfh/erp-boletos/releases/tag/programa-pc e dê dois cliques (como em 16/11: aviso azul → **Mais informações → Executar assim mesmo**). Ele se copia por cima, liga o botão e termina com **Pronto**. Não pede a senha de novo.
     2. No sistema, Dados e backup → Backup seguro → **Abrir a pasta no Explorer**. Na primeira vez o Chrome pergunta se pode abrir o programa: marque **Sempre permitir** e clique em **Abrir**. Abre a pasta `Arquivos dos imoveis`.
     3. O caminho completo (e o botão **Copiar o caminho**) aparece na tela depois que o programa novo atualizar a pasta (ele já faz isso no passo 1; recarregue a página). Se o programa não achar a pasta, aparece uma janelinha dizendo o que fazer; sem o programa novo, o botão não faz nada.
@@ -199,6 +225,7 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
     4. Confira `ultima-atualizacao.txt` com `ok`. Depois de um dia certo, a pasta `Imoveis chave\atualizador-pc` e o Node podem ser apagados do computador.
     - Testado em 15/11 com o `.exe` de verdade: ajuda, versão, aviso de computador não ligado, atualização completa contra uma nuvem de teste (crachá cifrado pelo Windows) e a rodada sem janela. **Não testado** (não dava sem mexer no seu Windows): criar as tarefas de verdade, a pergunta "Deseja permitir?" e o aviso azul. Se algo falhar, a janela diz o quê; o jeito antigo (Node) continua funcionando.
     - Continua faltando: assinatura (antes do primeiro cliente de fora), o programa se atualizar sozinho e o link para baixar dentro do sistema.
+- [ ] **9f. Programa do PC desinstalável** (pedido do dono em 17/11; PR em aceite): desinstalar pelos Aplicativos do Windows e por um botão no sistema. **Falta você, depois do merge (5 min):** uns 10 minutos depois, baixe o `Instalar-Administracao-de-Imoveis.exe` novo em https://github.com/juliocpfh/erp-boletos/releases/tag/programa-pc e rode uma vez (aviso azul → **Mais informações → Executar assim mesmo**). Depois, em **Configurações → Aplicativos**, confira que aparece "Administração de Imóveis". Não precisa desinstalar: é só para ver que está lá.
 
 ## 10. Anexar a contra-vistoria de entrada  `[x]` (feito em 15/11)
 
@@ -245,16 +272,16 @@ Revisão em 8 frentes (regras, banco C6, segurança, dados, telas, teste de pont
 **Decisões suas (16–17/11), já aplicadas:** Pix pago depois do vencimento com o valor de desconto perde o desconto e a diferença (mais multa e juros) vai ao boleto seguinte; boleto pago pelo código de barras e creditado em até 3 dias úteis não é atraso; pagamento a menos fica "Paga em parte" e a diferença vai ao boleto seguinte; índice negativo mantém o aluguel; renovação negociada pergunta o mês a partir do qual vale; todo mês conta 30 dias (entrada em 15/02 = 16/30); NF do mês incompleto com quantidade "16/30"; ficha reprovada ou desistência tem os dados pessoais apagados no prazo dos documentos; exclusão grande com dupla confirmação digitando APAGAR; formulário alterado pergunta "Sair sem salvar?"; link da ficha aparece uma vez só (reenviar gera outro).
 
 **Conferir no uso (5 min cada):**
-- [ ] Uma NF de aluguel proporcional: quantidade "16/30", unitário do mês inteiro, total proporcional. (Só dá para conferir no próximo inquilino com entrada no meio do mês.)
+- [ ] Uma NF de aluguel proporcional: quantidade "16/30", unitário do mês inteiro, total proporcional. (Só dá para conferir no próximo inquilino com entrada no meio do mês; continua aberto em 17/11.)
 - [x] Sair e entrar de novo: pede o código do login da internet de novo (normal agora). (Conferido 17/11.)
-- [ ] Trocar a senha de um usuário: os computadores ligados pelo programa do PC desse usuário precisam ser ligados de novo.
+- [ ] Trocar a senha de um usuário: os computadores ligados pelo programa do PC desse usuário precisam ser ligados de novo. (Conferir quando acontecer.)
 - [x] Painel: alertas mostram 5 de cada tipo e "Ver todos". (Conferido 17/11.)
 
-**Falta você (Cloudflare, opcional):** pôr `DONO_EMAIL` nas variáveis do Worker (com a nuvem vazia, só esse e-mail faz a primeira carga); criar o aplicativo do Access para `vendas.ankjck.com.br`.
+**Falta você (Cloudflare, opcional; continua aberto em 17/11):** pôr `DONO_EMAIL` nas variáveis do Worker (com a nuvem vazia, só esse e-mail faz a primeira carga); criar o aplicativo do Access para `vendas.ankjck.com.br`.
 
 **Decisões que ficaram com você:**
-- Devolução de Pix ao inquilino: o valor pago do boleto diminui (e a NF?) ou fica como está e a devolução só aparece no extrato?
-- Publicar o site pelo GitHub Actions (permite o aplicativo baixar só os arquivos que mudaram).
+- ~~Devolução de Pix ao inquilino~~ **decidido em 17/11:** a devolução fica ligada ao boleto, o recebido volta ao devido e a NF não muda (PR #309, em aceite; ver item 6).
+- ~~Publicar o site pelo GitHub Actions~~ **decidido e feito em 17/11** (PR #308).
 - Impedimentos de venda que são projetos grandes (vários clientes no mesmo sistema, login próprio, proprietário de terceiros com repasse, DIMOB, importar planilha, outros bancos, portal do inquilino, assinatura eletrônica): ver `MUTIRAO_3000.md`, frente "mercado".
 
 **2ª rodada do mutirão 3000 (17/11), na `main` pelas PRs #285–#298:** tela **Gestão** (Financeiro, com PDF); **régua de cobrança** (Boletos → botão "E-mails da régua", no alto da tela; até 17/11 ficava em Financeiro: prepara 3 dias antes, no dia, 3 e 10 dias depois; só envia os que o administrador marcar e autorizar, com a regra `regua_envio` ligada); **banco automático** (avisos do C6, ligação pelo código do Pix, extrato CSV com conferência do saldo, Saúde do banco); **primeiros passos** e botão "?" nas telas; 192 mensagens de erro em português simples; **LGPD**: backups da nuvem cifrados, tela **Acessos**, "Dados de uma pessoa" (ZIP pelo CPF) e "Apagar tudo desta pessoa" só 10 anos depois do fim do contrato; lixeira de anexos (30 dias) e cópia de cada hora do backup seguro (2 dias). Decisões de 17/11 aplicadas: conflito fica com o valor já gravado na nuvem; troca de titular esperando o termo não apaga mais a saída; caução R$ 0,00 de propósito fica; Desfazer volta a alteração inteira, com prévia dos boletos que mudam. Parte 3 de dados (PR #298): a nuvem passa só os campos mudados, a fila sem internet grava cada lote uma vez, a gravação copia só as tabelas que usa (no banco grande, de ~215 ms para ~5 ms) e recusas ligadas aparecem juntas em Conflitos.
@@ -263,8 +290,8 @@ Revisão em 8 frentes (regras, banco C6, segurança, dados, telas, teste de pont
 - [x] Abrir o sistema uma vez no computador do administrador com o backup seguro ligado (o backup da nuvem passa a sair cifrado; "Voltar para este dia" pede a senha do backup). (17/11: reconheceu ao entrar.)
 - [x] Financeiro → Gestão: números do mês e o PDF. (17/11: tudo ok.)
 - [x] E-mails da régua: a lista do dia, tudo desmarcado. (Conferido 17/11; a pedido do dono, o botão "E-mails da régua" passou de Financeiro para o alto da tela **Boletos**; o "← Boletos" da régua volta para lá.)
-- [ ] Notificações ao inquilino (PR #300, depois do aceite): conferir no celular a caixa Notificações ao inquilino, abrir uma notificação e o Gerar multa depois do prazo (no computador já foi testado).
-- [ ] Gmail (PR #299): aceitar e ligar com o Claude (item 1).
+- [x] Notificações ao inquilino (PR #300): conferir no celular a caixa Notificações ao inquilino, abrir uma notificação e o Gerar multa depois do prazo (no computador já foi testado). (17/11: no celular, tudo funciona.)
+- [ ] Gmail (PR #299, aceita): ligar com o Claude (item 1).
 
 **Relatório do trabalho para o contratante:** https://claude.ai/artifact/FNTqKJrMNp8sZGYywrmyHt
 
@@ -272,5 +299,6 @@ Revisão em 8 frentes (regras, banco C6, segurança, dados, telas, teste de pont
 
 - "Movimentações sem destino" em Financeiro e Banco: fica como está até o C6 entrar em uso.
 - Fechar o mês travando alterações, foto pela câmera e canal do inquilino: descartados ou adiados por você em 07/11.
-- Abertura na nuvem sem copiar o banco e a nuvem usando menos memória (desempenho, itens 14 e 15 do mutirão 3000): ficaram de fora por segurança. A correção automática dos dados antigos (`normalizar`) mexe no próprio banco; dividir o banco entre "como está na nuvem" e "o que a tela vê" faria essas correções sumirem do que vai para a nuvem. O ganho é pequeno (~65 ms ao abrir).
+- Abertura na nuvem sem copiar o banco e a nuvem usando menos memória (desempenho, itens 14 e 15 do mutirão 3000): ficaram de fora por segurança. A correção automática dos dados antigos (`normalizar`) mexe no próprio banco; dividir o banco entre "como está na nuvem" e "o que a tela vê" faria essas correções sumirem do que vai para a nuvem. O ganho é pequeno (~65 ms ao abrir). **Aceito pelo dono em 17/11:** "mais seguro e um pouco mais demorado, ok".
+- Ligação automática de pagamento por valor, data ou nome do pagador: **descartada pelo dono em 17/11** (risco de erro e de fraude). Só liga sozinho com o identificador igual; o resto é "vincular manualmente" (PR #309).
 - Régua de cobrança: em 17/11 o dono pediu que ela prepare os e-mails, mas **nada é enviado sem a autorização dele** (2ª rodada do mutirão 3000).
