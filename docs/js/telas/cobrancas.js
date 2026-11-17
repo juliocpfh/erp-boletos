@@ -22,8 +22,8 @@ import { formNfExterna } from './faturas.js';
  */
 function formPagamento(cb) {
   const emDia = `<label class="check-mini" title="Pagou até o vencimento e o banco só compensou depois: sem multa e juros, com desconto"><input type="checkbox" name="em_dia" value="1"> pagou em dia</label>`;
-  return `<form data-form="pagamento" data-id="${cb.id}" class="pagamento"><label>Dia em que o dinheiro entrou na conta</label><input type="date" name="data" value="${C.hojeIso()}">
-    <label>Pagou em (se atrasou)</label><input type="date" name="pagou" title="Opcional: dia em que o inquilino pagou. Em branco: o dia em que o dinheiro entrou">
+  return `<form data-form="pagamento" data-id="${cb.id}" class="pagamento"><label>Dia em que o dinheiro entrou na conta</label><input type="date" name="data" value="${C.hojeIso()}">${F.atalhosData()}
+    <label>Pagou em (se atrasou)</label><input type="date" name="pagou" title="Opcional: dia em que o inquilino pagou. Em branco: o dia em que o dinheiro entrou">${F.atalhosData()}
     <label>Valor recebido (opcional)</label><input name="valor" inputmode="decimal" data-dinheiro placeholder="0,00">${emDia}<button>Confirmar pagamento</button></form>
     <p class="suave">O dia em que o dinheiro entrou na conta é a data de emissão da NF, e pode ser alguns dias depois do pagamento. Marque "pagou em dia" quando o inquilino pagou até o vencimento (${dataBr(cb.vencimento)}${C.limitePagamento(cb.vencimento) !== cb.vencimento ? `, que não é dia útil: vale até ${dataBr(C.limitePagamento(cb.vencimento))}` : ''}) e o banco compensou depois: sem multa e juros. Se atrasou de verdade, o banco já cobra multa e juros no boleto e a NF sai com esse valor a mais; informe o dia em que pagou para os juros baterem com o banco.</p>`;
 }
@@ -70,7 +70,7 @@ function caixaBaixaLote(lista, hoje) {
       <div class="cabecalho"><div><b>Vencimento ${dataBr(v)}</b> ${C.vencido(v, hoje) ? etiqueta('vencido', 'perigo') : ''} <span class="suave">${xs.length} em aberto · ${reais(xs.reduce((t, x) => t + x.t.a_pagar_pontual, 0))}</span></div>
         <label class="check-mini"><input type="checkbox" data-marcar-grupo> marcar todos deste vencimento</label></div>
       <div class="lista-baixa">${xs.map((x) => `<label class="check-mini"><input type="checkbox" name="ids" value="${x.cb.id}"> ${esc(x.i.nome)} · ${esc(x.c.inquilino_nome)} · ${reais(x.t.a_pagar_pontual)}</label>`).join('')}</div>
-      <div class="acoes">entraram em <input type="date" name="data" value="${hoje}" style="width:auto">
+      <div class="acoes">entraram em <input type="date" name="data" value="${hoje}" style="width:auto">${F.atalhosData()}
         ${C.vencido(v, hoje) ? `<label class="check-mini" title="Pagaram depois do vencimento: multa e juros até o dia em que pagaram"><input type="checkbox" name="atrasado" value="1" data-mostra="pagou-${v}"> pagaram atrasado, em</label> <input type="date" name="pagou" value="${hoje}" style="width:auto" data-grupo-mostra="pagou-${v}" hidden>` : ''}
         <button class="pequeno">Confirmar os marcados</button></div></form>`).join('')}
     <p class="suave">Sem "pagaram atrasado", a baixa é como pagos em dia (sem multa e juros). Valor recebido diferente do previsto: confirme um a um, pelo botão da linha.</p></details>`;
@@ -346,6 +346,7 @@ export function telaCobranca(cb) {
         ${opera() ? botao('estornar', 'Desfazer pagamento', { id: cb.id }, 'perigo pequeno', validas.length ? 'Desfazer o pagamento? A NF será cancelada e o número não será reaproveitado.' : 'Desfazer o pagamento?') : ''}`
       : R.emAcordo(cb) ? '<p class="suave">Boleto em acordo: não se cobra mais. O pagamento é registrado nos boletos do acordo.</p>'
       : `<p>Se for pago hoje (${dataBr(C.hojeIso())}): <b>${reais(sim.valor_devido)}</b>${sim.pontual ? '' : R.ehComplementoCaucao(cb) ? ` (${sim.dias_atraso} dias de atraso, sem multa e juros)` : ` (${sim.dias_atraso} dias de atraso: multa ${pct(cb.multa_percentual)} = ${reais(sim.multa)}; juros ${pct(cb.juros_mensal_percentual)} a.m. = ${reais(sim.juros)})`}${R.ehComplementoCaucao(cb) ? ' · sem NF (complemento da caução)' : ` · nota fiscal ${reais(sim.valor_nf)}`}</p>
+        ${R.segundaVia(d(), cb, C.hojeIso()) ? `<p class="acoes">${botao('segundaVia', '2ª via com o valor de hoje', { id: cb.id }, 'secundario')}<span class="suave">Valor com multa e juros até hoje e o texto pronto para o inquilino (não emite boleto novo no banco).</span></p>` : ''}
         ${opera() && R.aCobrar(cb) ? formPagamento(cb) : ''}
         ${opera() ? `<p class="acoes" style="margin-top:10px">${botao('lembrete', C.vencido(cb.vencimento, C.hojeIso()) ? 'Cobrar o inquilino (texto pronto)' : 'Lembrar o inquilino (texto pronto)', { id: cb.id }, 'secundario')}<span class="suave">E-mail, WhatsApp ou copiar; o texto muda se já venceu.</span></p>` : ''}`}</div>
     ${R.emAcordo(cb) ? '' : caixaBancoC6(cb)}

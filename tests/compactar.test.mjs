@@ -120,7 +120,12 @@ test('compactar os que já estão no sistema: mesmo nome, mesmo lugar; documento
   };
   const r = await CP.compactarTodos(raiz, {
     ler: async (h) => { if (h.name === 'ja-pequena.png') throw new Error('arquivo mudou no meio da leitura'); return h.getFile(); },
-    gravar: async (dir, nome, arq) => { gravados.push([dir.name, nome, arq.size]); },
+    gravar: async (dir, nome, arq, partes) => {
+      gravados.push([dir.name, nome, arq.size]);
+      // as pastas desde a raiz: a tela acha a ficha do documento do link e guarda o resumo do compactado antes da troca
+      if (nome.startsWith('link-')) assert.deepEqual(partes, [CP.PASTA_FICHAS, 'Bruno Teste']);
+      if (nome === 'rg.jpg') assert.deepEqual(partes, ['Imovel 1', 'Inquilinos', 'Ana Teste']);
+    },
     compactar,
     conferido: (pastaFicha, nome) => pastaFicha === 'Bruno Teste' && nome === 'link-rg-2026-11-16-ef34ab.jpg',
     aoAndar: (x) => andamento.push(x),

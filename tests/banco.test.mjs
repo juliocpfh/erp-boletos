@@ -51,7 +51,7 @@ test('normalizar cria config_banco com contas e o campo banco nos boletos antigo
 test('sem contas: integração indisponível com a explicação de aguardar as chaves', () => {
   const { d } = base();
   assert.equal(R.bancoAtivo(d), false);
-  assert.match(R.motivoBancoInativo(d), /Aguardando as chaves da API do C6/);
+  assert.match(R.motivoBancoInativo(d), /Aguardando as chaves de acesso do C6/);
   assert.throws(() => R.salvarConfigBanco(d, { ativo: true }, 'teste'), /pelo menos uma conta/);
   assert.equal(R.contaEmissora(d), null);
 });

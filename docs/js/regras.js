@@ -4,9 +4,9 @@ import * as alertas from './alertas.js';
 import * as AI from './arquivo-impresso.js';
 import { soDigitos } from './c6-comum.js';
 import * as C from './calculos.js';
-import { camposAntigosDaEmpresa, dadoDaEmpresa, locadorasDoContrato, modelosDe, resultadoVistoriaSaida, TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR, vistoriaDeEntrada } from './contratos.js';
+import { camposAntigosDaEmpresa, companhiaDoImovel, dadoDaEmpresa, locadorasDoContrato, modelosDe, nomeCurtoCompanhia, resultadoVistoriaSaida, TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR, vistoriaDeEntrada } from './contratos.js';
 import * as CR from './config-regras.js';
-import { SITUACOES_CONTA } from './formularios.js';
+import * as F from './formularios.js';
 import * as M from './mapa-c6.js';
 import { CLAUSULAS_FCI, GARANTIA_NOVA_TROCA, atualizarTextoModelo } from './modelos-contrato.js';
 
@@ -19,17 +19,33 @@ export const TABELAS = {
   renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'NF avulsa',
   reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino', notificacoes: 'Notificação ao inquilino', fichas: 'Ficha em análise',
   indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', despesas: 'Conta paga por nós', ganhos_airbnb: 'Ganho do Airbnb', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', guias_impostos: 'Guia de imposto',
-  modelos_email: 'Modelo de e-mail', envios_email: 'E-mail enviado',
+  modelos_email: 'Modelo de e-mail', envios_email: 'E-mail enviado', taxas_poupanca: 'Taxas da poupança do Banco Central (um mês)',
   regua_emails: 'E-mail da régua de cobrança (autorizado ou não)',
   movimentacoes_banco: 'Movimentação bancária', pagamentos_banco: 'Pagamento pelo banco', adiamentos_alerta: 'Adiamento de alerta', alertas_desligados: 'Alerta desligado', acordos: 'Acordo de dívida', pastas_fisicas: 'Pasta física (arquivo impresso)', config_regras: 'Regra do sistema', versoes_regras: 'Versão salva das regras', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
 
 /** Quem paga cada conta prevista no contrato (a mesma lista do formulário, `SITUACOES_CONTA`). Só "por conta do inquilino" entra no boleto (IPTU e seguro). */
-export const SITUACOES = SITUACOES_CONTA;
+export const SITUACOES = F.SITUACOES_CONTA;
 
-/** Listas de opções que o usuário pode editar (incluir e remover itens). */
+/**
+ * Concessionárias que vêm na lista de um banco novo, pelo Estado da sede da empresa (Empresas). Até 2026-11-17 era sempre a
+ * do Paraná, que continua o padrão (também sem empresa cadastrada). Estado fora da tabela: as companhias de energia e de água
+ * do cadastro da empresa, pelo nome curto, e o condomínio. Ex.: empresa em SP com "Enel Distribuição São Paulo (ENEL)" e
+ * "Companhia de Saneamento Básico do Estado de São Paulo (SABESP)" → ['Enel', 'Sabesp', 'Condomínio'].
+ */
+export const CONCESSIONARIAS_POR_UF = { PR: ['Copel', 'Sanepar', 'Supergasbras', 'Condomínio'] };
+export function concessionariasPadrao(d) {
+  if (!d || !(d.emitentes || []).some((e) => e.ativo !== false)) return [...CONCESSIONARIAS_POR_UF.PR];
+  const uf = String(dadoDaEmpresa(d, {}, 'uf_sede') || '').trim().toUpperCase();
+  if (CONCESSIONARIAS_POR_UF[uf]) return [...CONCESSIONARIAS_POR_UF[uf]];
+  const daEmpresa = ['energia', 'agua'].map((q) => nomeCurtoCompanhia(dadoDaEmpresa(d, {}, `${q}_concessionaria`))).filter(Boolean);
+  if (daEmpresa.length) return [...new Set([...daEmpresa, 'Condomínio'])];
+  return uf ? ['Condomínio'] : [...CONCESSIONARIAS_POR_UF.PR];
+}
+
+/** Listas de opções que o usuário pode editar (incluir e remover itens). ``padraoDe``: a lista inicial depende do banco. */
 export const LISTAS = {
-  concessionarias: { nome: 'concessionárias', padrao: ['Copel', 'Sanepar', 'Supergasbras', 'Condomínio'] },
+  concessionarias: { nome: 'concessionárias', padrao: CONCESSIONARIAS_POR_UF.PR, padraoDe: concessionariasPadrao },
   indices: { nome: 'índices de correção', padrao: ['IGP-M', 'IPCA', 'IGP-M/IPCA (o maior)', 'INPC', 'IVAR', 'IGP-DI', 'Poupança'] },
 };
 
@@ -75,7 +91,11 @@ export function normalizar(d) {
   const vazio = bancoVazio();
   for (const [k, v] of Object.entries(vazio)) if (d[k] === undefined) d[k] = v;
   CR.usarRegras(d); // regras escolhidas pelo administrador (as contas abaixo já usam)
-  for (const [k, l] of Object.entries(LISTAS)) if (!Array.isArray(d.listas[k])) d.listas[k] = [...l.padrao];
+  // lista que depende da empresa (concessionárias): num banco novo só é gravada depois de cadastrada a primeira empresa
+  // (até lá, ``lista`` devolve a do Paraná sem gravar); banco que já tem a lista fica como está
+  for (const [k, l] of Object.entries(LISTAS)) {
+    if (!Array.isArray(d.listas[k]) && (!l.padraoDe || d.emitentes.length)) d.listas[k] = [...(l.padraoDe ? l.padraoDe(d) : l.padrao)];
+  }
   // integração com o banco (C6, boleto com Pix): configuração com todos os campos e cada boleto com o campo ``banco`` (nulo = não emitido)
   d.config_banco = { ...CONFIG_BANCO_PADRAO, ...(d.config_banco && typeof d.config_banco === 'object' ? d.config_banco : {}) };
   // a senha e o endereço da ponte passaram a ficar só no navegador: saem do JSON compartilhado
@@ -307,7 +327,7 @@ function migrarAirbnb(d) {
 // --------------------------------------------------------------------------
 // Listas editáveis (concessionárias, índices)
 // --------------------------------------------------------------------------
-export const lista = (d, nome) => d.listas[nome] || LISTAS[nome].padrao;
+export const lista = (d, nome) => d.listas[nome] || (LISTAS[nome].padraoDe ? LISTAS[nome].padraoDe(d) : LISTAS[nome].padrao);
 
 /** Onde um item da lista é usado (para não remover algo que está vinculado). */
 export function usoDoItem(d, nome, valor) {
@@ -401,7 +421,51 @@ function proximoCodigo(d, tabela) {
   return maior + 1;
 }
 
+/**
+ * Campos de dinheiro (centavos inteiros) de cada tabela. ``TABELAS`` não diz o tipo dos campos; o que já diz é o formulário de
+ * cada cadastro (``formularios.js``, tipo "dinheiro"; os virtuais não são gravados). Só esses são conferidos ao gravar.
+ * Formulário novo de cadastro com dinheiro: entra aqui. Montado na 1ª gravação.
+ */
+const FORMULARIOS_DA_TABELA = () => ({
+  imoveis: [F.IMOVEL], solicitacoes: [F.SOLICITACAO], reformas: [F.REFORMA], ressarcimentos: [F.RESSARCIMENTO], contratos: [F.CONTRATO],
+  fichas: [F.FICHA_RENDA, F.FICHA_FIM], correcoes: [F.CORRECAO], seguros: [F.SEGURO], iptus: [F.IPTU], aplicacoes: [F.APLICACAO],
+  depositos_garantia: [F.DEPOSITO_GARANTIA], correcoes_garantia: [F.CORRECAO_GARANTIA], devolucoes_garantia: [F.DEVOLUCAO_GARANTIA],
+  renovacoes: [F.RENOVACAO], encerramentos: [F.ENCERRAMENTO], avulsas: [F.AVULSA], cobrancas: [F.COBRANCA],
+});
+let camposDinheiro = null;
+/** ``{ tabela: Map(campo → rótulo) }`` dos campos em centavos (ver ``FORMULARIOS_DA_TABELA``). */
+export function camposDeDinheiro() {
+  if (!camposDinheiro) {
+    camposDinheiro = {};
+    for (const [t, forms] of Object.entries(FORMULARIOS_DA_TABELA())) {
+      const m = new Map();
+      for (const c of forms.flat()) if (c && c.nome && c.tipo === 'dinheiro' && !c.virtual && !m.has(c.nome)) m.set(c.nome, String(c.rotulo || c.nome).replace(/\s*\*$/, ''));
+      camposDinheiro[t] = m;
+    }
+  }
+  return camposDinheiro;
+}
+
+/**
+ * Confere, antes de gravar, que os campos de dinheiro estão em centavos inteiros (vazio vale: null, undefined ou '').
+ * Ex.: "10,5" (texto) ou 10.5 num campo de centavos → erro na tela, nada é gravado. ``atual``: o registro de antes
+ * (só confere o que muda, para não travar um registro antigo por um campo que ninguém mexeu).
+ */
+export function conferirCentavos(tabela, dados, atual = null) {
+  const campos = camposDeDinheiro()[tabela];
+  if (!campos || !dados) return;
+  for (const [k, rotulo] of campos) {
+    if (!Object.prototype.hasOwnProperty.call(dados, k)) continue;
+    const v = dados[k];
+    if (v === null || v === undefined || v === '' || Number.isSafeInteger(v)) continue;
+    if (atual && (atual[k] === v || String(atual[k] ?? '') === String(v))) continue; // não mudou
+    const mostrar = String(v).slice(0, 30);
+    throw new C.ErroUsuario(`Valor inválido em "${rotulo}" (${TABELAS[tabela]}): "${mostrar}". Use reais com centavos, ex.: 1.250,50. Nada foi gravado.`);
+  }
+}
+
 export function inserir(d, tabela, dados, usuario, descricao, { historico = true } = {}) {
+  conferirCentavos(tabela, dados);
   d.seq[tabela] = proximoCodigo(d, tabela);
   const r = { id: d.seq[tabela], ...dados };
   d[tabela].push(r);
@@ -412,6 +476,7 @@ export function inserir(d, tabela, dados, usuario, descricao, { historico = true
 export function atualizar(d, tabela, id, dados, usuario, descricao) {
   const r = buscar(d, tabela, id);
   if (!r) throw new Error(`${TABELAS[tabela]} não encontrado`);
+  conferirCentavos(tabela, dados, r);
   const mudancas = {};
   const texto = (x) => (x === undefined || x === null ? '' : typeof x === 'object' ? JSON.stringify(x) : String(x));
   for (const [k, novo] of Object.entries(dados)) {
@@ -431,7 +496,7 @@ export function atualizar(d, tabela, id, dados, usuario, descricao) {
 // Desfazer alterações pelo histórico (só administrador): sempre da mais recente para a mais antiga, campo a campo.
 // Boletos, pagamentos, NFs e usuários ficam de fora (têm botões próprios); a pasta não volta (a pasta no disco não muda).
 // --------------------------------------------------------------------------
-const SEM_DESFAZER = new Set(['cobrancas', 'faturas', 'recebimentos', 'avulsas', 'usuarios', 'banco', 'listas', 'fechamentos', 'arquivos', 'movimentacoes_banco', 'pagamentos_banco', 'acordos', 'config_regras', 'versoes_regras']);
+const SEM_DESFAZER = new Set(['taxas_poupanca', 'cobrancas', 'faturas', 'recebimentos', 'avulsas', 'usuarios', 'banco', 'listas', 'fechamentos', 'arquivos', 'movimentacoes_banco', 'pagamentos_banco', 'acordos', 'config_regras', 'versoes_regras']);
 const CAMPOS_SEM_DESFAZER = new Set(['pasta']);
 /** Campos de pagamento que, ligados ao banco (extrato ou pagamento pelo C6), só se desfazem pela tela Banco. */
 const CAMPOS_PAGAMENTO_BANCO = { despesas: ['data_pagamento', 'movimentacao_id', 'pagamento_banco_id', 'comprovante'], guias_impostos: ['paga_em', 'movimentacao_id', 'pagamento_banco_id'], iptus: ['pagas', 'data_quitacao'] };
@@ -2716,6 +2781,49 @@ export function contratosDaDesistencia(d, { fichaId = null, contratoId = null })
 }
 
 /**
+ * Conferências dos documentos do link da ficha (`fichas.conferencias_link`, por nome do arquivo; telas/fichas.js).
+ * ``novas``: { nome: registro } (conferir-pdf.js `registroDaConferencia`, com o resumo SHA-256, quem e quando); a que já
+ * estiver guardada fica (outro aparelho pode ter conferido e compactado antes). Devolve quantas entraram.
+ */
+export function guardarConferenciasDoLink(d, fichaId, novas, usuario) {
+  const f = buscar(d, 'fichas', fichaId);
+  if (!f) return 0;
+  const atuais = f.conferencias_link || {};
+  const entram = Object.fromEntries(Object.entries(novas || {}).filter(([nome]) => !atuais[nome]));
+  const n = Object.keys(entram).length;
+  if (n) atualizar(d, 'fichas', fichaId, { conferencias_link: { ...atuais, ...entram } }, usuario, `Conferência guardada de ${n} documento(s) mandado(s) pelo link`);
+  return n;
+}
+
+/**
+ * A compactação trocou o documento do link já conferido: guarda o resumo SHA-256 do arquivo novo (`sha256_compactado`) junto
+ * da conferência, que continua sendo a do original. Grave ANTES de trocar o arquivo: se a troca falhar, o original ainda
+ * bate com `sha256`. ``resumos``: { nome: sha256 do compactado }. Devolve quantas foram anotadas.
+ */
+export function registrarCompactacaoDoLink(d, fichaId, resumos, usuario, em = new Date().toISOString()) {
+  const f = buscar(d, 'fichas', fichaId);
+  if (!f || !f.conferencias_link) return 0;
+  const lista = { ...f.conferencias_link };
+  let n = 0;
+  for (const [nome, sha] of Object.entries(resumos || {})) {
+    if (!lista[nome] || !sha) continue;
+    lista[nome] = { ...lista[nome], sha256_compactado: sha, compactado_em: em };
+    n += 1;
+  }
+  if (n) atualizar(d, 'fichas', fichaId, { conferencias_link: lista }, usuario, `${n} documento(s) do link compactado(s) depois da conferência (resumo do arquivo novo guardado)`);
+  return n;
+}
+
+/** Tira a conferência guardada de um documento do link (o arquivo mudou depois dela): a tela confere de novo o de agora. */
+export function refazerConferenciaDoLink(d, fichaId, nome, usuario) {
+  const f = buscar(d, 'fichas', fichaId);
+  if (!f || !(f.conferencias_link || {})[nome]) return false;
+  const { [nome]: antiga, ...resto } = f.conferencias_link; // eslint-disable-line no-unused-vars
+  atualizar(d, 'fichas', fichaId, { conferencias_link: resto }, usuario, `Conferência de "${nome}" refeita: o arquivo tinha mudado depois da conferência`);
+  return true;
+}
+
+/**
  * Desistência antes de assinar (pedido do dono, 2026-11-13): o interessado não segue. A ficha fica "Desistiu", com a
  * reserva para devolver por inteiro (devolução registrada depois, com data e comprovante, como na reprovada), e os
  * contratos feitos dela e ainda não assinados são cancelados (apagados com os boletos não pagos). Contrato sem ficha
@@ -2782,13 +2890,21 @@ export function excluirContrato(d, contratoId, usuario, descricao) {
 
 /** Relógios que o contrato tem: o que está como "Não tem" fica de fora; sem a informação, água e energia (gás só se tiver). */
 export const relogiosDoContrato = (c) => RELOGIOS.map(([k]) => k).filter((k) => (c[`conta_${k}`] ? c[`conta_${k}`] !== SITUACOES[2] : k !== 'gas'));
+/** A leitura dos relógios é obrigatória na vistoria e na saída? (regra do administrador; padrão: sim, como sempre foi) */
+export const leituraObrigatoria = () => CR.regra('leitura_relogios_obrigatoria') !== false;
+/** Relógios cuja leitura é obrigatória: os do contrato com a regra ligada (padrão); com ela desligada, nenhum. */
+export const relogiosObrigatorios = (c) => (leituraObrigatoria() ? relogiosDoContrato(c) : []);
 
-/** Leitura de entrada ou de saída do inquilino (uma só por momento): cria ou atualiza. ``valores``: { agua, energia, gas }. */
+/**
+ * Leitura de entrada ou de saída do inquilino (uma só por momento): cria ou atualiza. ``valores``: { agua, energia, gas }.
+ * Com a leitura opcional (regra desligada) e tudo em branco, não cria leitura vazia (devolve null).
+ */
 export function gravarLeitura(d, c, momento, data, valores, usuario) {
-  const falta = relogiosDoContrato(c).filter((k) => !String(valores[k] || '').trim());
+  const falta = relogiosObrigatorios(c).filter((k) => !String(valores[k] || '').trim());
   if (falta.length) throw new Error(`Informe a leitura do relógio de ${falta.map((k) => RELOGIOS.find(([x]) => x === k)[1]).join(' e ')} (${momento.toLocaleLowerCase('pt-BR')}).`);
   const dados = { agua: valores.agua || '', energia: valores.energia || '', gas: valores.gas || '' };
   const atual = d.leituras.find((l) => l.contrato_id === c.id && l.momento === momento);
+  if (!atual && !RELOGIOS.some(([k]) => String(dados[k]).trim())) return null;
   if (atual) return atualizar(d, 'leituras', atual.id, { ...dados, data, imovel_id: c.imovel_id || null }, usuario, `${momento}: ${textoLeitura(dados)}`);
   return registrarLeitura(d, { imovel_id: c.imovel_id || null, contrato_id: c.id, data, momento, ...dados, observacoes: '' }, usuario);
 }
@@ -2842,7 +2958,8 @@ export function encerrarContrato(d, contratoId, dados, usuario) {
   const leitura = separarLeitura(dados);
   if (d.encerramentos.some((e) => e.contrato_id === c.id)) throw new Error('A saída deste inquilino já foi registrada.');
   if (dados.data_saida < c.data_entrada) throw new Error('A saída não pode ser antes da entrada.');
-  // a leitura da saída é obrigatória e é a mesma da vistoria de saída (uma só): sem digitar aqui, vale a da vistoria
+  // a leitura da saída é obrigatória (regra leitura_relogios_obrigatoria; desligada, pode ficar em branco) e é a mesma da
+  // vistoria de saída (uma só): sem digitar aqui, vale a da vistoria
   if (leitura || !leituraDo(d, c.id, 'Saída do inquilino')) gravarLeitura(d, c, 'Saída do inquilino', dados.data_saida, leitura || {}, usuario);
   const calc = calcularEncerramento(dados.garantia_valor, dados.indice_percentual, dados.debitos, dados.fci_credito, dados.fci_danos);
   const r = inserir(d, 'encerramentos', { contrato_id: c.id, ...dados, ...calc }, usuario,
@@ -4101,10 +4218,25 @@ export function registrarContraVistoria(d, contratoId, { data, arquivo }, usuari
 /** Inquilino novo para a rotina: entrou há até 6 meses (ou ainda vai entrar). */
 export const rotinaRecente = (c, hoje = C.hojeIso()) => !c.data_entrada || c.data_entrada >= C.somarMesesData(hoje, -6);
 
-/** Nome da concessionária da conta no imóvel: a dos protocolos já registrados, a da lista ou a padrão (ex.: Sanepar). */
-function concessionariaDaConta(d, c, re, padrao) {
-  const t = d.titularidades.filter((x) => x.imovel_id === c.imovel_id && re.test(x.concessionaria || '')).sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')))[0];
-  return (t && t.concessionaria) || lista(d, 'concessionarias').find((x) => re.test(x)) || padrao;
+/**
+ * Nome curto da companhia de água ou de energia do imóvel (ou da empresa, Empresas). Ex.: "… (SABESP)" → "Sabesp"; '' nas outras
+ * contas. Serve para reconhecer o protocolo e dar o nome da etapa fora do Paraná (as expressões de CONTAS_ENTRADA são as daqui).
+ */
+const companhiaCurtaDaConta = (d, c, k) => (['agua', 'energia'].includes(k) ? nomeCurtoCompanhia(companhiaDoImovel(d, c, buscar(d, 'imoveis', c.imovel_id), k)) : '');
+/** Reconhece o protocolo da conta ``k`` pelo nome da concessionária: a expressão de sempre ou o nome curto da companhia do cadastro. */
+function reconheceConta(d, c, k, re) {
+  const curta = companhiaCurtaDaConta(d, c, k).toLocaleLowerCase('pt-BR');
+  return (nome) => re.test(nome || '') || (!!curta && String(nome || '').toLocaleLowerCase('pt-BR').includes(curta));
+}
+
+/**
+ * Nome da concessionária da conta no imóvel: a dos protocolos já registrados, a da lista, a do cadastro (água e energia) ou a
+ * padrão (ex.: Sanepar).
+ */
+function concessionariaDaConta(d, c, re, padrao, k = '') {
+  const ok = k ? reconheceConta(d, c, k, re) : (x) => re.test(x || '');
+  const t = d.titularidades.filter((x) => x.imovel_id === c.imovel_id && ok(x.concessionaria)).sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')))[0];
+  return (t && t.concessionaria) || lista(d, 'concessionarias').find((x) => re.test(x)) || (k && companhiaCurtaDaConta(d, c, k)) || padrao;
 }
 
 /**
@@ -4207,7 +4339,8 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
     avaliar[k] = () => {
       const sit = c[campo];
       if (soInquilino ? sit !== SITUACOES[0] : [SITUACOES[1], SITUACOES[2]].includes(sit)) return null;
-      const t = d.titularidades.filter((x) => x.contrato_id === c.id && x.tipo !== 'Volta para o proprietário' && re.test(x.concessionaria || ''))
+      const ok = reconheceConta(d, c, k, re);
+      const t = d.titularidades.filter((x) => x.contrato_id === c.id && x.tipo !== 'Volta para o proprietário' && ok(x.concessionaria))
         .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')))[0];
       if (!t) return undefined;
       const prot = t.protocolo ? `protocolo ${t.protocolo}` : 'sem protocolo';
@@ -4223,7 +4356,7 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
     const auto = avaliar[chave]();
     if (auto === null && !doc) continue; // não se aplica
     const conta = CONTAS_ENTRADA.find(([k]) => k === chave);
-    const concessionaria = conta ? concessionariaDaConta(d, c, conta[4], conta[3]) : null;
+    const concessionaria = conta ? concessionariaDaConta(d, c, conta[4], conta[3], conta[0]) : null;
     const nome = chave === 'garantia' ? ({ 'Caução': 'Depósito da caução', 'Depósito garantia': 'Depósito de garantia', Fiador: 'Assinatura do fiador',
       'Fiador + depósito': 'Depósito de garantia e assinatura do fiador', 'Seguro fiança': 'Apólice do seguro fiança' })[c.garantia_tipo] || 'Garantia (tipo não informado)'
       : concessionaria ? `${titulo} (${concessionaria})` : titulo;
@@ -4293,6 +4426,53 @@ function alertaRotinaEntrada(d, c, hoje) {
   return { nivel: 'aviso', tipo: 'Rotina de entrada', ancora: 'rotina',
     texto: [docs && `Documentos: ${docs.texto}`,
       contas.length && `Falta efetivar a troca de titularidade: ${contas.map((e) => `${e.titulo.replace(/^Transferência d[aoe] /, '')}${e.situacao === 'andamento' ? ` (${e.texto})` : ''}`).join('; ')}.`].filter(Boolean).join(' ') };
+}
+
+/**
+ * Guarda as taxas da poupança trazidas do Banco Central (poupanca.js, pedido do dono de 17/11): um registro por mês em
+ * ``taxas_poupanca`` ({ mes: 'AAAA-MM', taxas: { 'AAAA-MM-DD': % } }). Taxa já guardada nunca é trocada (a mesma conta dá
+ * sempre o mesmo resultado). Uma linha só no histórico. Devolve quantos dias entraram.
+ * Ex.: { '2026-10-10': 0.5936, '2026-11-10': 0.6 } → registros de 2026-10 e 2026-11.
+ */
+export function guardarTaxasPoupanca(d, novas, usuario) {
+  const porMes = new Map();
+  for (const [dia, t] of Object.entries(novas || {})) {
+    if (!C.dataValida(dia) || !Number.isFinite(t)) continue;
+    if (!porMes.has(dia.slice(0, 7))) porMes.set(dia.slice(0, 7), []);
+    porMes.get(dia.slice(0, 7)).push([dia, t]);
+  }
+  let n = 0;
+  for (const [mes, lista] of [...porMes].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const r = d.taxas_poupanca.find((x) => x.mes === mes);
+    const faltam = lista.filter(([dia]) => !(r && Number.isFinite((r.taxas || {})[dia])));
+    if (!faltam.length) continue;
+    n += faltam.length;
+    const taxas = Object.fromEntries([...Object.entries((r && r.taxas) || {}), ...faltam].sort((a, b) => a[0].localeCompare(b[0])));
+    if (r) r.taxas = taxas;
+    else inserir(d, 'taxas_poupanca', { mes, taxas }, usuario, null, { historico: false });
+  }
+  if (n) registrar(d, usuario, 'Inclusão', 'taxas_poupanca', null, `Taxas da poupança do Banco Central guardadas (${n} dia(s))`, null, {}, false);
+  return n;
+}
+
+const tamanhosVistos = new WeakMap();
+/**
+ * Tamanho dos dados (Dados e backup, pedido do dono de 17/11): bytes do banco inteiro como fica gravado (JSON), cada tabela
+ * com o nº de registros e os bytes (da maior para a menor em registros), as linhas do histórico e os anexos ligados a
+ * lançamentos (``arquivosReferenciados``; os anexados à mão nas caixas de arquivos não entram). Calculado uma vez por banco
+ * (cada gravação monta outro objeto). Ex.: { bytes: 2.411.520, historico: { registros: 5.200, bytes: 1.300.000 },
+ * tabelas: [{ tabela: 'faturas', nome: 'NF', registros: 1.800, bytes: 540.000 }, …], anexos: 640 }.
+ */
+export function tamanhoDoBanco(d) {
+  if (tamanhosVistos.has(d)) return tamanhosVistos.get(d);
+  const medir = (x) => new TextEncoder().encode(JSON.stringify(x ?? null)).length;
+  const tabelas = Object.keys(d).filter((k) => Array.isArray(d[k]) && k !== 'historico')
+    .map((k) => ({ tabela: k, nome: TABELAS[k] || k, registros: d[k].length, bytes: medir(d[k]) }))
+    .sort((a, b) => b.registros - a.registros || b.bytes - a.bytes || a.nome.localeCompare(b.nome, 'pt-BR'));
+  const r = { bytes: medir(d), historico: { registros: (d.historico || []).length, bytes: medir(d.historico || []) }, tabelas,
+    registros: tabelas.reduce((s, t) => s + t.registros, 0), anexos: arquivosReferenciados(d).length };
+  tamanhosVistos.set(d, r);
+  return r;
 }
 
 /**
@@ -4898,7 +5078,49 @@ export const centavosParaReais = (c) => Number((Math.round(c || 0) / 100).toFixe
 export const reaisParaCentavos = (v) => C.arred(Number(String(v ?? 0).replace(',', '.')) * 100);
 
 export const configBanco = (d) => ({ ...CONFIG_BANCO_PADRAO, ...(d.config_banco || {}), contas: ((d.config_banco || {}).contas || []).map((x) => ({ ...CONTA_BANCO_PADRAO, ...x,
-  notificar: { ...CONTA_BANCO_PADRAO.notificar, ...((x && x.notificar) || {}) }, negativacao: { ...CONTA_BANCO_PADRAO.negativacao, ...((x && x.negativacao) || {}) } })) });
+  notificar: { ...CONTA_BANCO_PADRAO.notificar, ...((x && x.notificar) || {}) }, negativacao: { ...CONTA_BANCO_PADRAO.negativacao, ...((x && x.negativacao) || {}) } })),
+  ...(Array.isArray((d.config_banco || {}).contas_arquivo) ? { contas_arquivo: d.config_banco.contas_arquivo.map((x) => ({ ...x })) } : {}) });
+
+/**
+ * Contas de outros bancos, sem a ponte (mutirão 3000, venda 17): só recebem o extrato por arquivo (OFX ou CSV baixado no site ou
+ * no aplicativo do banco), com as mesmas conferências de saldo e de lançamento repetido. Ficam em ``config_banco.contas_arquivo``
+ * (campo que só existe depois da primeira conta assim: banco sem ele = nenhuma), cada uma { id, apelido, emitente_id, banco }.
+ * Ex.: { id: 'itau', apelido: 'Itaú', emitente_id: 2, banco: 'Itaú' }. Não emitem boleto, não pagam e não falam com a ponte.
+ */
+export const contasSoArquivo = (d) => (Array.isArray((d.config_banco || {}).contas_arquivo) ? d.config_banco.contas_arquivo : []);
+export const contaSoArquivo = (d, contaId) => contasSoArquivo(d).find((x) => x.id === contaId) || null;
+/** Todas as contas que recebem extrato: as do C6 (ponte) e as de outros bancos (só arquivo). */
+export const contasDoExtrato = (d) => [...((d.config_banco || {}).contas || []), ...contasSoArquivo(d)];
+
+/** Inclui ou altera uma conta de outro banco (só extrato por arquivo). ``id`` em branco: sai do apelido (ex.: "Itaú" → "itau"). */
+export function salvarContaArquivo(d, dados, usuario) {
+  const cfg = configBanco(d);
+  const apelido = String(dados.apelido || '').trim();
+  const id = limparId(dados.id) || limparId(C.semAcento(apelido));
+  if (!id) throw new C.ErroUsuario('Dê um apelido à conta (ex.: Itaú).');
+  const emitenteId = dados.emitente_id ? Number(dados.emitente_id) : null;
+  if (!emitenteId || !buscar(d, 'emitentes', emitenteId)) throw new C.ErroUsuario('Escolha a empresa dona da conta.');
+  if (cfg.contas.some((x) => x.id === id)) throw new C.ErroUsuario(`O código "${id}" já é de uma conta do C6. Use outro apelido ou código.`);
+  const atuais = cfg.contas_arquivo || [];
+  const antes = atuais.find((x) => x.id === id) || null;
+  const conta = { ...(antes || {}), id, apelido: apelido || id.toUpperCase(), emitente_id: emitenteId, banco: String(dados.banco || '').trim().slice(0, 60) };
+  cfg.contas_arquivo = antes ? atuais.map((x) => (x.id === id ? conta : x)) : [...atuais, conta];
+  d.config_banco = cfg;
+  registrar(d, usuario, antes ? 'Alteração' : 'Inclusão', 'banco', null, `Conta de outro banco "${conta.apelido}" (${id}, extrato por arquivo) ${antes ? 'alterada' : 'incluída'}`, { conta: { de: antes, para: conta } });
+  return conta;
+}
+
+/** Tira uma conta de outro banco. Com extrato já importado nela, não tira (as movimentações ficariam sem conta). */
+export function excluirContaArquivo(d, contaId, usuario) {
+  const cfg = configBanco(d);
+  const conta = (cfg.contas_arquivo || []).find((x) => x.id === contaId);
+  if (!conta) throw new C.ErroUsuario('Conta não encontrada.');
+  const n = (d.movimentacoes_banco || []).filter((m) => m.conta_id === contaId).length;
+  if (n) throw new C.ErroUsuario(`A conta ${conta.apelido} tem ${n} movimentação(ões) importada(s): não dá para tirar (o extrato ficaria sem conta).`);
+  cfg.contas_arquivo = cfg.contas_arquivo.filter((x) => x.id !== contaId);
+  d.config_banco = cfg;
+  registrar(d, usuario, 'Exclusão', 'banco', null, `Conta de outro banco "${conta.apelido}" (${contaId}) tirada`, { conta: { de: conta, para: null } });
+}
 
 export const contaBanco = (d, contaId) => configBanco(d).contas.find((x) => x.id === contaId) || null;
 
@@ -4911,7 +5133,7 @@ export function bancoAtivo(d) {
 /** Por que os botões do banco estão desabilitados (texto do ``title``); vazio quando a configuração compartilhada está pronta. */
 export function motivoBancoInativo(d) {
   const cfg = configBanco(d);
-  if (!cfg.contas.length) return 'Aguardando as chaves da API do C6: cadastre as contas em Dados e backup (Banco C6)';
+  if (!cfg.contas.length) return 'Aguardando as chaves de acesso do C6: cadastre as contas em Dados e backup (Banco C6)';
   if (!cfg.ativo) return 'Integração com o C6 desligada: ative em Dados e backup (Banco C6)';
   return '';
 }
@@ -4937,6 +5159,7 @@ export function salvarContaBanco(d, dados, usuario) {
   const cfg = configBanco(d);
   const id = limparId(dados.id);
   if (!id) throw new Error('Informe o identificador da conta na ponte (só letras e números, ex.: ank).');
+  if (contasSoArquivo(d).some((x) => x.id === id)) throw new C.ErroUsuario(`O código "${id}" já é de uma conta de outro banco (extrato por arquivo). Use outro código.`);
   const emitenteId = dados.emitente_id ? Number(dados.emitente_id) : null;
   if (!emitenteId || !buscar(d, 'emitentes', emitenteId)) throw new Error('Escolha a empresa dona da conta.');
   const outra = cfg.contas.find((x) => x.id !== id && x.emitente_id === emitenteId);
@@ -6734,6 +6957,29 @@ export function inadimplencia(d, hoje = C.hojeIso(), { historico: comHistorico =
   return { devedores, historico, total: devedores.reduce((s, x) => s + x.total, 0), totalHoje: devedores.reduce((s, x) => s + x.totalHoje, 0) };
 }
 
+/** Faixas de atraso da Inadimplência (pedido do dono de 17/11): até quantos dias cada uma vai (a última não tem fim). */
+export const FAIXAS_ATRASO = [{ ate: 30, nome: 'Até 30 dias' }, { ate: 60, nome: '31 a 60 dias' }, { ate: 90, nome: '61 a 90 dias' }, { ate: Infinity, nome: 'Mais de 90 dias' }];
+
+/**
+ * Boletos vencidos por tempo de atraso, a partir dos devedores de ``inadimplencia`` (que já usa ``aCobrar`` e ``C.vencido``):
+ * em cada faixa, os boletos, os inquilinos (cada um conta uma vez por faixa), o valor do boleto e o do dia (multa e juros por
+ * ``C.liquidar`` até hoje). Ex.: boleto de R$ 1.200,00 vencido há 45 dias → "31 a 60 dias": 1 boleto, R$ 1.200,00 em aberto e
+ * R$ 1.242,00 hoje (multa 2% e juros 1% ao mês). Devolve [{ nome, ate, boletos, inquilinos, valor, valorHoje }].
+ */
+export function faixasDeAtraso(devedores) {
+  const faixas = FAIXAS_ATRASO.map((f) => ({ ...f, boletos: 0, contratos: new Set(), valor: 0, valorHoje: 0 }));
+  for (const x of devedores || []) {
+    for (const b of x.boletos) {
+      const f = faixas.find((y) => b.dias <= y.ate);
+      f.boletos += 1;
+      f.contratos.add(x.contrato.id);
+      f.valor += b.valor;
+      f.valorHoje += b.hojeValor;
+    }
+  }
+  return faixas.map(({ contratos, ...f }) => ({ ...f, inquilinos: contratos.size }));
+}
+
 /**
  * Régua de cobrança (rotina D8, dono em 2026-11-07): só um aviso do que fazer, nada é enviado sozinho.
  * A partir do dia de atraso do boleto mais antigo: 1 → lembrete por e-mail; 10 → ligar; 30 → avaliar a negativação.
@@ -7067,7 +7313,8 @@ export const decodificarIdContador = (id) => {
   return { emitenteId: Math.floor(Number(id) / 1000000), comp: `${resto.slice(0, 4)}-${resto.slice(4)}` };
 };
 
-export const contaBancaria = (d, contaId) => ((d.config_banco || {}).contas || []).find((c) => c.id === contaId) || null;
+// as do C6 e as de outros bancos (só extrato por arquivo): o extrato, o saldo e os comprovantes valem para as duas
+export const contaBancaria = (d, contaId) => contasDoExtrato(d).find((c) => c.id === contaId) || null;
 export const apelidoDaConta = (d, contaId) => {
   const c = contaBancaria(d, contaId);
   if (!c) return String(contaId || '').toUpperCase();
@@ -7145,8 +7392,7 @@ export function rotuloDoComprovante(d, x) {
  * 07/11/2026, extrato buscado em 01/11 vale; em 30/10, não) e pagamentos enviados sem confirmação.
  */
 export function pendenciasBancoDoMes(d, mes, hoje = C.hojeIso()) {
-  const cfg = d.config_banco || {};
-  const contas = cfg.contas || [];
+  const contas = contasDoExtrato(d); // as do C6 e as de outros bancos (extrato por arquivo)
   const fim = C.limitesCompetencia(mes)[1];
   const mesFechado = fim < hoje;
   const ate = mesFechado ? fim : C.somarDias(hoje, -CR.regra('dias_extrato_recente'));
@@ -7276,17 +7522,22 @@ export const assinaturaLembrete = (d, c) => dadoDaEmpresa(d, c, 'assinatura_mens
  * texto diz até quando pode pagar sem multa. Traz o Pix copia e cola e a linha digitável quando o boleto foi emitido no banco.
  * Ex.: boleto de 10/2026 (R$ 1.218,50 em dia) vencendo em 10/11; em 07/11 → "vence em 10/11/2026 … R$ 1.218,50".
  */
-export function textoLembrete(d, cb, hoje = C.hojeIso()) {
+/** De quem e de que é o boleto, para os textos ao inquilino: { c, i, nome (apelido ou 1º nome), oQue ("do aluguel de 10/2026"), onde (" (Casa 3)") }. */
+function boletoNoTexto(d, cb) {
   const c = buscar(d, 'contratos', cb.contrato_id);
   const i = c ? buscar(d, 'imoveis', c.imovel_id) : null;
+  const nome = (c && (c.inquilino_apelido || c.inquilino_nome.split(' ')[0])) || '';
+  const oQue = ehComplementoCaucao(cb) ? 'do complemento da caução'
+    : ehParcelaAcordo(cb) ? `da parcela ${cb.acordo_parcela || ''} do acordo (${cb.acordo_referente || ''})`.replace(/  +/g, ' ') : `do aluguel de ${C.compBr(cb.competencia)}`;
+  return { c, i, nome, oQue, onde: i ? ` (${i.nome})` : '' };
+}
+
+export function textoLembrete(d, cb, hoje = C.hojeIso()) {
+  const { c, nome, oQue, onde } = boletoNoTexto(d, cb);
   const t = totais(cb);
   const limite = C.limitePagamento(cb.vencimento);
   const adiado = limite !== cb.vencimento;
   const fase = limite > hoje ? 'antes' : limite === hoje ? 'dia' : 'atrasado';
-  const nome = (c && (c.inquilino_apelido || c.inquilino_nome.split(' ')[0])) || '';
-  const oQue = ehComplementoCaucao(cb) ? 'do complemento da caução'
-    : ehParcelaAcordo(cb) ? `da parcela ${cb.acordo_parcela || ''} do acordo (${cb.acordo_referente || ''})`.replace(/  +/g, ' ') : `do aluguel de ${C.compBr(cb.competencia)}`;
-  const onde = i ? ` (${i.nome})` : '';
   const linhas = [`Olá, ${nome}!`, ''];
   const bonificacao = cb.desconto ? ' (já com a bonificação de pontualidade)' : '';
   // vencimento em sábado, domingo ou feriado: pode pagar sem multa até o próximo dia útil
@@ -7312,6 +7563,34 @@ export function textoLembrete(d, cb, hoje = C.hojeIso()) {
   linhas.push('', 'Qualquer dúvida, estamos à disposição.', ...(assinatura ? ['', assinatura] : []));
   const assunto = fase === 'atrasado' ? `Boleto ${oQue} em aberto${onde}` : `Lembrete: boleto ${oQue}${onde} vence em ${C.dataBr(cb.vencimento)}`;
   return { fase, assunto, texto: linhas.join('\n'), email: (c && c.inquilino_email) || '', telefone: ((c && c.inquilino_telefone) || '').replace(/\D/g, '') };
+}
+
+/**
+ * 2ª via com o valor do dia (pedido do dono de 17/11), para o boleto vencido e ainda a cobrar (``aCobrar`` e ``C.vencido``;
+ * senão null): o valor para pagar em ``hoje`` com multa e juros por ``C.liquidar`` e o texto pronto ao inquilino. Não emite
+ * boleto novo no banco: só calcula e escreve. Ex.: boleto de R$ 1.200,00 que venceu em 10/10/2026, em 24/11/2026 (45 dias):
+ * multa 2% = R$ 24,00, juros 1% ao mês = R$ 18,00 → R$ 1.242,00.
+ * Devolve { dias, original, multa, juros, valor, assunto, texto, email, telefone } (centavos).
+ */
+export function segundaVia(d, cb, hoje = C.hojeIso()) {
+  if (!cb || !aCobrar(cb) || !C.vencido(cb.vencimento, hoje)) return null;
+  const { c, nome, oQue, onde } = boletoNoTexto(d, cb);
+  const r = C.liquidar(cb, hoje);
+  const original = r.valor_devido - r.multa - r.juros;
+  const linhas = [`Olá, ${nome}!`, '', `Segue a 2ª via do boleto ${oQue}${onde}, que venceu em ${C.dataBr(cb.vencimento)} (${r.dias_atraso} dia(s) de atraso), com o valor atualizado para pagamento hoje, ${C.dataBr(hoje)}:`, ''];
+  linhas.push(`Valor do boleto: ${C.reais(original)}`);
+  if (r.multa) linhas.push(`Multa (${C.pct(cb.multa_percentual)}): ${C.reais(r.multa)}`);
+  if (r.juros) linhas.push(`Juros (${C.pct(cb.juros_mensal_percentual)} ao mês, ${r.dias_atraso} dia(s)): ${C.reais(r.juros)}`);
+  linhas.push(`Total para pagar hoje: ${C.reais(r.valor_devido)}`, '', 'Este valor vale para pagamento hoje. Em outro dia ele muda: se for pagar depois, nos avise para atualizarmos.',
+    'Se o pagamento já foi feito, por favor desconsidere esta mensagem e, se possível, nos envie o comprovante.');
+  const b = cb.banco || null;
+  if (b && b.pix_copia_cola) linhas.push('', 'Pix copia e cola:', b.pix_copia_cola);
+  if (b && b.linha_digitavel) linhas.push('', `Linha digitável do boleto: ${b.linha_digitavel}`);
+  const assinatura = assinaturaLembrete(d, c);
+  linhas.push('', 'Qualquer dúvida, estamos à disposição.', ...(assinatura ? ['', assinatura] : []));
+  return { dias: r.dias_atraso, original, multa: r.multa, juros: r.juros, valor: r.valor_devido,
+    assunto: `2ª via: boleto ${oQue}${onde} com o valor de ${C.dataBr(hoje)}`, texto: linhas.join('\n'),
+    email: (c && c.inquilino_email) || '', telefone: ((c && c.inquilino_telefone) || '').replace(/\D/g, '') };
 }
 
 // --------------------------------------------------------------------------
@@ -7445,7 +7724,8 @@ export function roteiroSaida(d, c, hoje = C.hojeIso()) {
   const vist = vistoriasDo(d, c.id).find((v) => v.tipo === 'Saída') || null;
   const leitura = leituraDo(d, c.id, 'Saída do inquilino');
   const titularidade = alertaTitularidade(d, c, hoje);
-  const contasOk = !titularidade && !!leitura;
+  // leitura opcional (regra desligada): a etapa fecha só com a titularidade
+  const contasOk = !titularidade && (!!leitura || !leituraObrigatoria());
   const e = encerramentoDo(d, c.id);
   const garantiaAntes = valorGarantia(d, c);
   const comp = C.competenciaDe(c.data_saida);
@@ -7482,7 +7762,7 @@ export function roteiroSaida(d, c, hoje = C.hojeIso()) {
     { chave: 'chaves', titulo: 'Devolução das chaves (termo assinado)', feito: !!termo || (saiu && !!e && semTermoAntigo),
       detalhe: termo ? `chaves devolvidas em ${C.dataBr(c.data_saida)}; termo de devolução assinado ✓` : saiu ? `chaves devolvidas em ${C.dataBr(c.data_saida)}${e && semTermoAntigo ? '; acertada sem termo (saída de antes do termo de devolução)' : '; falta anexar o termo de devolução assinado'}` : `prevista para ${C.dataBr(c.data_saida)}` },
     { chave: 'contas', titulo: 'Contas: titularidade de volta ao proprietário e leitura final', feito: contasOk,
-      detalhe: [titularidade ? 'falta o protocolo da volta da titularidade' : 'titularidade de volta ✓', leitura ? 'leitura da saída ✓' : 'falta a leitura dos relógios na saída'].join(' · ') },
+      detalhe: [titularidade ? 'falta o protocolo da volta da titularidade' : 'titularidade de volta ✓', leitura ? 'leitura da saída ✓' : leituraObrigatoria() ? 'falta a leitura dos relógios na saída' : 'sem a leitura dos relógios (não é obrigatória)'].join(' · ') },
     { chave: 'calculo', titulo: 'Cálculo final (garantia corrigida, débitos, FCI)', feito: !!e, detalhe: e ? `${e.saldo >= 0 ? 'a devolver' : 'a cobrar'} ${C.reais(Math.abs(e.saldo))}` : saiu ? 'pendente' : 'depois da saída' },
     { chave: 'garantia', titulo: 'Devolução da garantia (ou cobrança do saldo)', ...garantia },
     { chave: 'boleto', titulo: `Último boleto (aluguel de ${C.compBr(comp)}, proporcional)`, feito: !!ultimo && (!!ultimo.data_pagamento || quitadoNaSaida(ultimo)) && !abertos.length,

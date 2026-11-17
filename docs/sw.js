@@ -13,6 +13,10 @@
 // e ficar guardada como se fosse da versão nova, com os módulos de outra).
 // 1ª visita: a página ainda não passa pelo service worker (ele chega depois dela); a instalação guarda a página, os módulos que
 // ela usa (lidos do index.html e dos import de cada módulo), ADIADOS e EXTRAS, para o aplicativo abrir sem internet logo depois.
+// Lista de resumos (resumos.json, gerada na publicação por tools/publicar-site.mjs): na versão nova, cada arquivo guardado
+// cujo conteúdo tem o mesmo resumo (SHA-256) da lista passa para a versão nova sem ir ao site; só os diferentes são baixados
+// (antes, cada publicação fazia o aparelho baixar tudo de novo). Sem a lista (publicação antiga, pela branch) ou com ela velha
+// ou ilegível: baixa tudo, como antes.
 // Sem internet: usa a cópia. Em localhost (desenvolvimento) confere arquivo a arquivo, porque lá a data do index.html não muda
 // (mas guarda ADIADOS e EXTRAS também, para o teste sem internet mostrar quando falta um).
 const CACHE = 'imoveis-telas-v3'; // a cópia em uso: uma versão completa
@@ -45,6 +49,7 @@ const ADIADOS = ['js/exportar.js', 'js/regras-texto.js', 'js/visualizador.js', '
 // O que o navegador pede por fora dos módulos (manifest do aplicativo e ícones): guardado também, para não falhar sem internet
 const EXTRAS = ['manifest.webmanifest', 'icones/erp-192.png', 'icones/erp-512.png', 'icones/aviso-96.png'];
 const PARALELO = 6; // downloads ao mesmo tempo na instalação
+const RESUMOS = 'resumos.json'; // lista da publicação: caminho de cada arquivo → resumo SHA-256 (hex) do conteúdo publicado
 
 self.addEventListener('install', (ev) => {
   self.skipWaiting();
@@ -113,6 +118,56 @@ function buscarDaVersao(url, versao = marca) {
   const u = new URL(url);
   u.searchParams.set('v', versao);
   return fetch(u.href, { cache: 'reload', credentials: 'same-origin' });
+}
+
+/**
+ * A lista de resumos da versão `versao` (caminho → resumo), ou null: sem lista (publicação pela branch, 404), de outra versão
+ * (cópia velha num cache do caminho), ilegível, sem internet ou fora do prazo. Sem ela, tudo é baixado de novo, como antes.
+ */
+async function resumosPublicados(versao) {
+  try {
+    const r = await comPrazo(buscarDaVersao(new URL(RESUMOS, self.location.href).href, versao), LIMITE_CONFERENCIA);
+    if (!normal(r) || !daVersao(r, versao)) return null;
+    const lista = (await r.json())?.arquivos;
+    return lista && typeof lista === 'object' ? lista : null;
+  } catch { return null; }
+}
+
+const BASE = new URL('./', self.location.href);
+/** Caminho do arquivo como está na lista ('js/app.js'), ou null (outro site, com ?…, fora da pasta do aplicativo). */
+function caminhoNaLista(url) {
+  const u = new URL(url);
+  if (u.origin !== BASE.origin || u.search || !u.pathname.startsWith(BASE.pathname)) return null;
+  try { return decodeURIComponent(u.pathname.slice(BASE.pathname.length)) || null; } catch { return null; }
+}
+
+async function resumoDe(conteudo) {
+  const h = new Uint8Array(await crypto.subtle.digest('SHA-256', conteudo));
+  return Array.from(h, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Versão nova com lista de resumos: tira de `p` (o que seria baixado de novo) cada arquivo da cópia em uso cujo conteúdo já é
+ * o da versão nova, e devolve esses arquivos prontos para a versão nova, marcados com a data dela (para valerem como "desta
+ * versão" em daVersao: não vão ao site nem nesta abertura nem no segundo plano). Sem lista: nada muda (baixa tudo).
+ */
+async function iguaisNaNova(c, p, publicada) {
+  const lista = p.size ? await resumosPublicados(publicada) : null;
+  const iguais = [];
+  if (!lista) return iguais;
+  for (const url of [...p.keys()]) {
+    const caminho = caminhoNaLista(url);
+    if (!caminho || typeof lista[caminho] !== 'string') continue;
+    const r = await c.match(url);
+    if (!r) continue;
+    const conteudo = await r.arrayBuffer();
+    if ((await resumoDe(conteudo)) !== lista[caminho].toLowerCase()) continue;
+    const cabecalhos = new Headers(r.headers);
+    cabecalhos.set('last-modified', publicada);
+    iguais.push([url, new Response(conteudo, { status: r.status, statusText: r.statusText, headers: cabecalhos })]);
+    p.delete(url);
+  }
+  return iguais;
 }
 
 // import estático de um módulo ('./x.js' ou '../x.js'; o import() das partes adiadas fica de fora: elas estão em ADIADOS)
@@ -283,8 +338,11 @@ async function conferirVersao(doSite) {
     }
     if (n) await caches.delete(NOVA); // o que tinha chegado era de outra versão
     n = null;
-    if (p.size) {
+    // lista de resumos da publicação: o que não mudou passa direto para a versão nova, sem ir ao site
+    const iguais = await iguaisNaNova(c, p, publicada);
+    if (p.size || iguais.length) {
       n = await caches.open(NOVA);
+      for (const [url, r] of iguais) await n.put(url, r);
       await n.put(PENDENTES, new Response(JSON.stringify(Object.fromEntries(p))));
       await n.put(MARCA, new Response(publicada)); // por último: NOVA com MARCA sempre tem a lista do que falta
     } else {
@@ -433,6 +491,12 @@ async function arquivo(req) {
   if (modo === 'copia' && !pendentes.has(req.url)) {
     const guardada = await emUso(req);
     if (guardada) return guardada;
+  }
+  // versão nova que já entrou em uso nesta abertura (a troca pode acontecer antes de a página pedir tudo, quando quase nada
+  // mudou): a cópia em uso já é a desta versão, sem ir ao site de novo
+  if (modo !== 'copia' && marca && !atualizando && !pendentes.has(req.url)) {
+    const guardada = await emUso(req);
+    if (guardada && daVersao(guardada)) return guardada;
   }
   if (atualizando && !pendentes.has(req.url)) {
     const chegou = await naNova(req);

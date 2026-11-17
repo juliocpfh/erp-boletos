@@ -5,6 +5,7 @@ import * as S from '../armazenamento.js';
 import * as C from '../calculos.js';
 import { dataBr, pct, reais } from '../calculos.js';
 import { esc } from '../formularios.js';
+import * as P from '../poupanca.js';
 import * as R from '../regras.js';
 import * as AI from '../arquivo-impresso.js';
 
@@ -29,6 +30,12 @@ export const situacao = (s) => etiqueta(s, { 'Paga em dia': 'ok', 'Paga com atra
 export const item = (rotulo, valor) => `<div><div class="rotulo">${esc(rotulo)}</div><div class="valor">${valor}</div></div>`;
 
 export const opera = () => podeUsuario('operador');
+
+/**
+ * Poupança da garantia (poupanca.js): as taxas já guardadas no banco e o que grava as que vierem do Banco Central (só quem
+ * lança grava; quem só consulta usa as trazidas só nesta sessão). Ex.: ``P.poupancaDaGarantia(movimentos, ate, fetch, taxasDaPoupanca())``.
+ */
+export const taxasDaPoupanca = () => ({ guardadas: P.taxasGuardadas(E.d), guardar: opera() ? (novas) => alterar((db) => R.guardarTaxasPoupanca(db, novas, login())) : null });
 
 /**
  * Parte do programa que só carrega quando é usada (planilha/PDF de tudo, regras em texto, passagem para a nuvem):

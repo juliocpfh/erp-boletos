@@ -3,7 +3,7 @@ import { podeUsuario } from '../app.js';
 import * as AJ from '../ajuda.js';
 import * as C from '../calculos.js';
 import { compBr, dataBr, reais } from '../calculos.js';
-import { esc } from '../formularios.js';
+import { atalhosData, esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { botao, buscar, d, etiqueta, link, opera } from './comum.js';
 
@@ -35,7 +35,7 @@ function agruparPorNumero(faturas) {
 /** "Já emitida fora do sistema": número e data de emissão de uma NF feita antes/fora da plataforma. */
 export const formNfExterna = (tipo, id, data) => `<details class="nf-externa"><summary class="link-botao">Já emitida</summary>
   <form data-form="nfExterna" data-tipo="${tipo}" data-id="${id}" class="acoes"><input type="number" name="numero" min="1" placeholder="nº da NF" style="width:110px">
-  <input type="date" name="emissao" value="${data}" title="Data de emissão da NF" style="width:150px"><button class="pequeno">Registrar</button></form></details>`;
+  <input type="date" name="emissao" value="${data}" title="Data de emissão da NF" style="width:150px">${atalhosData()}<button class="pequeno">Registrar</button></form></details>`;
 
 export const siglaEmpresa = (e) => (e.aba_modelo || e.nome.split(/\s+/)[0]).toLocaleUpperCase('pt-BR');
 

@@ -15,12 +15,19 @@ import { alterarApagandoAnexos, botao, buscar, caixaArquivos, d, etiqueta, link,
 // --------------------------------------------------------------------------
 // Configuração e atalhos
 // --------------------------------------------------------------------------
-const TITULO_AGUARDANDO = 'Aguardando as chaves da API do C6';
+const TITULO_AGUARDANDO = 'Aguardando as chaves de acesso do C6';
 /** Ação do banco com o banco ainda desligado: o que dizer a quem clicou. */
+/** Ação da ponte numa conta de outro banco (só extrato por arquivo). */
+const SO_ARQUIVO = 'Esta conta é de outro banco, que não fala com o sistema: o extrato entra só pelo arquivo OFX ou CSV (botão "Importar o extrato").';
 const BANCO_DESLIGADO = 'O banco ainda não está ligado ao sistema (faltam as chaves do C6). Peça ao administrador para ligar em Dados e backup → Banco.';
 const config = () => d().config_banco || {};
 const contas = () => config().contas || [];
-const contaDe = (id) => contas().find((c) => c.id === id) || null;
+/** Contas de outros bancos (sem a ponte): só recebem o extrato por arquivo OFX ou CSV (R.contasSoArquivo). */
+const contasArquivo = () => R.contasSoArquivo(d());
+const soArquivo = (id) => !!R.contaSoArquivo(d(), id);
+const contaDe = (id) => contas().find((c) => c.id === id) || R.contaSoArquivo(d(), id) || null;
+/** "conta no C6" ou "conta no Itaú (extrato por arquivo)". */
+const ondeConta = (id) => { const a = R.contaSoArquivo(d(), id); return a ? `conta no ${a.banco || 'outro banco'} (extrato por arquivo)` : 'conta no C6'; };
 const bancoAtivo = () => !!config().ativo && contas().length > 0;
 const movs = () => d().movimentacoes_banco || [];
 const pagamentos = () => d().pagamentos_banco || [];
@@ -41,7 +48,15 @@ const registroDe = (tabela, id) => (tabela === 'pagamentos_banco' ? pag(id) : mo
 const valorHtml = (m) => `<span class="mov-${m.tipo}">${m.tipo === 'entrada' ? '+' : '−'} ${reais(m.valor)}</span>`;
 const precisaComprovante = (m) => !!m.classificacao && !SEM_COMPROVANTE.includes(m.classificacao);
 const temComprovante = (x) => !!(x.comprovante || x.comprovante_contador);
-const sugestaoDe = (m) => (m.classificacao ? null : Z.sugerirDestino(d(), m, Z.indiceDaTela(d())));
+/**
+ * Sugestão de destino da movimentação. Conta de outro banco (só arquivo): o arquivo não traz o código do boleto, então a entrada
+ * que parece aluguel nunca liga sozinha nem vem marcada (decisão do dono em 2026-11-17): fica só o aviso "vincular manualmente".
+ */
+const sugestaoDe = (m) => {
+  if (m.classificacao) return null;
+  const s = Z.sugerirDestino(d(), m, Z.indiceDaTela(d()));
+  return s && soArquivo(m.conta_id) && (s.classificacao === 'boleto' || s.cobranca_id) ? { manual: true } : s;
+};
 const centavosDoBanco = (x) => { try { return Z.centavosDoC6(x); } catch { return 0; } };
 
 /** Botão que fala com a ponte: desligado (com o motivo) enquanto o banco não está configurado em Dados e backup. */
@@ -51,8 +66,10 @@ const botaoPonte = (acao, texto, dados = {}, cls = 'secundario pequeno') => (ban
 /** Estado só da tela (não vai para o banco de dados): saldos consultados e a conferência de boletos pagos. */
 const estado = { saldos: {}, conferencia: null, avisos: null, saudePonte: null, saudePonteEm: 0, saudePonteErro: '' };
 
-const avisoNaoConfigurado = () => `<div class="alerta aviso" id="banco-nao-configurado"><b>O banco ainda não está ligado.</b> As chaves da API do C6 são configuradas em <a href="#/dados">Dados e backup</a> (caixa "Banco (C6)").
+const avisoNaoConfigurado = () => `<div class="alerta aviso" id="banco-nao-configurado"><b>O banco ainda não está ligado.</b> As chaves de acesso do C6 são configuradas em <a href="#/dados">Dados e backup</a> (caixa "Banco (C6)").
   Até lá, os botões que falam com o banco ficam desligados; o que já foi importado continua aqui.</div>`;
+/** Conta de outro banco (sem a ponte): de onde vem o extrato e por que as entradas não se ligam sozinhas aos boletos. */
+const avisoContaArquivo = (a) => `<div class="alerta info" id="conta-arquivo"><b>Conta no ${esc(a.banco || 'outro banco')}: extrato por arquivo.</b> Este banco não fala com o sistema: baixe o extrato em OFX (ou CSV) no site ou no aplicativo do banco e importe aqui. O sistema confere o saldo do arquivo e não deixa entrar o mesmo lançamento duas vezes. O arquivo não traz o código do boleto: as entradas que parecem aluguel não se ligam sozinhas; vincule cada uma em "Dar destino".</div>`;
 const avisoPagamentosDesligados = () => `<div class="alerta aviso"><b>Os pagamentos pelo banco estão desligados.</b> O administrador liga em <a href="#/dados?ir=config-banco2">Dados e backup → Banco: conciliação e pagamentos</a>. Enquanto isso, as contas são pagas fora do sistema e só o extrato é conferido aqui.</div>`;
 
 // --------------------------------------------------------------------------
@@ -60,7 +77,7 @@ const avisoPagamentosDesligados = () => `<div class="alerta aviso"><b>Os pagamen
 // --------------------------------------------------------------------------
 export function telaBanco(rota) {
   if (rota.partes[1] === 'pagamentos') return telaPagamentosBanco();
-  const lista = contas();
+  const lista = [...contas(), ...contasArquivo()];
   const contasVistas = [...new Set([...lista.map((c) => c.id), ...movs().map((m) => m.conta_id)])];
   if (!contasVistas.length) {
     return `<h1>Banco</h1>${avisoNaoConfigurado()}
@@ -81,17 +98,18 @@ export function telaBanco(rota) {
   const saldo = estado.saldos[conta];
   const e = emitenteDaConta(conta);
   const importadoAte = R.extratoImportadoAte(d(), conta);
+  const arquivo = R.contaSoArquivo(d(), conta); // conta de outro banco: só o extrato por arquivo, sem a ponte
   const filtroLink = (k, t) => `<a class="botao ${filtro === k ? '' : 'secundario'} pequeno" href="${url({ filtro: k })}">${t}</a>`;
   return `<div class="cabecalho"><h1>Banco</h1><div class="acoes">${link('#/banco/pagamentos', 'Pagamentos pelo banco', 'botao secundario')}</div></div>
-    ${bancoAtivo() ? '' : avisoNaoConfigurado()}
-    <div class="abas">${contasVistas.map((id) => `<a href="${url({ conta: id })}" class="${id === conta ? 'ativo' : ''}">${esc(nomeConta(id))} · conta no C6</a>`).join('')}</div>
+    ${arquivo ? avisoContaArquivo(arquivo) : bancoAtivo() ? '' : avisoNaoConfigurado()}
+    <div class="abas">${contasVistas.map((id) => `<a href="${url({ conta: id })}" class="${id === conta ? 'ativo' : ''}">${esc(nomeConta(id))} · ${esc(ondeConta(id))}</a>`).join('')}</div>
     <div class="cabecalho"><h2>${imovelFiltro ? `Movimentações de ${esc(imovelFiltro.nome)}` : `Extrato de ${compBr(mes)}`}</h2>
       <div class="acoes">${imovelFiltro ? link(`#/banco?conta=${conta}&mes=${mes}`, 'Ver por mês', 'botao secundario')
     : `${link(url({ mes: C.somarMeses(mes, -1) }), `← ${compBr(C.somarMeses(mes, -1))}`, 'botao secundario')}
       <form data-form="ir" data-ir="banco" class="acoes"><input type="hidden" name="conta" value="${esc(conta)}"><input type="month" name="mes" value="${mes}" style="width:160px"><button class="secundario">Ir</button></form>
       ${link(url({ mes: C.somarMeses(mes, 1) }), `${compBr(C.somarMeses(mes, 1))} →`, 'botao secundario')}`}</div></div>
-    <div class="acoes" style="margin-bottom:12px">${opera() ? botaoPonte('buscarExtrato', `Buscar extrato de ${compBr(mes)} no banco`, { conta, mes }, 'botao') : ''} ${botaoPonte('saldoBanco', 'Ver saldo', { conta })}
-      ${opera() && contaDe(conta) ? `<label class="botao secundario pequeno enviar" title="Enquanto a ponte não tem as chaves do C6: no app do C6, exporte o extrato em OFX (ou CSV) e escolha o arquivo aqui">📄 Importar arquivo OFX ou CSV do app do C6<input type="file" accept=".ofx,.csv,application/x-ofx,text/csv,text/plain" data-acao-arquivo="importarOfx" data-conta="${esc(conta)}" hidden></label>` : ''}
+    <div class="acoes" style="margin-bottom:12px">${arquivo ? '' : `${opera() ? botaoPonte('buscarExtrato', `Buscar extrato de ${compBr(mes)} no banco`, { conta, mes }, 'botao') : ''} ${botaoPonte('saldoBanco', 'Ver saldo', { conta })}`}
+      ${opera() && contaDe(conta) ? `<label class="botao secundario pequeno enviar" title="${arquivo ? `No site ou no aplicativo do ${esc(arquivo.banco || 'banco')}, exporte o extrato em OFX (ou CSV) e escolha o arquivo aqui` : 'Enquanto a ponte não tem as chaves do C6: no app do C6, exporte o extrato em OFX (ou CSV) e escolha o arquivo aqui'}">📄 ${arquivo ? `Importar o extrato do ${esc(arquivo.banco || 'banco')} (arquivo OFX ou CSV)` : 'Importar arquivo OFX ou CSV do app do C6'}<input type="file" accept=".ofx,.csv,application/x-ofx,text/csv,text/plain" data-acao-arquivo="importarOfx" data-conta="${esc(conta)}" hidden></label>` : ''}
       ${saldo ? `<span>Saldo em ${esc(nomeConta(conta))}: <b>${reais(saldo.valor)}</b> <span class="suave">(${esc(saldo.quando)})</span></span>` : ''}
       ${importadoAte ? `<span class="suave">extrato importado até ${dataBr(importadoAte)}</span>` : ''}</div>
     ${htmlConferenciaSaldo(conta)}
@@ -102,12 +120,12 @@ export function telaBanco(rota) {
       <div class="cartao"><div class="grande ${semDestino ? 'texto-aviso' : ''}">${semDestino}</div>sem destino</div>
       <div class="cartao"><div class="grande ${semComprovante ? 'texto-aviso' : ''}">${semComprovante}</div>sem comprovante</div></div>
     <div class="acoes" style="margin-bottom:8px">${filtroLink('todas', `Todas (${doMes.length})`)} ${filtroLink('sem_destino', `Só sem destino (${semDestino})`)} ${filtroLink('sem_comprovante', `Só sem comprovante (${semComprovante})`)}
-      ${opera() && !imovelFiltro ? botaoPonte('gerarComprovantesMes', `Gerar comprovantes de ${compBr(mes)} que ainda não têm${semComprovante ? ` (${semComprovante})` : ''}`, { conta, mes }) : ''}
+      ${opera() && !imovelFiltro && !arquivo ? botaoPonte('gerarComprovantesMes', `Gerar comprovantes de ${compBr(mes)} que ainda não têm${semComprovante ? ` (${semComprovante})` : ''}`, { conta, mes }) : ''}
       ${e && !imovelFiltro ? link(url({ ir: 'pasta-contador' }), 'Abrir pasta do contador deste mês') : ''}</div>
     <div class="cartao rolagem" id="movimentacoes"><table class="cobrancas responsiva banco"><tr><th>Data</th><th>Movimentação</th><th class="n">Valor</th><th>Destino</th><th>Comprovante</th><th></th></tr>
-      ${filtradas.map(linhaMovimentacao).join('') || `<tr><td colspan="6" class="suave">${doMes.length ? 'Nenhuma movimentação com este filtro.' : `Nenhuma movimentação importada em ${compBr(mes)}. Clique em "Buscar extrato".`}</td></tr>`}</table>
+      ${filtradas.map(linhaMovimentacao).join('') || `<tr><td colspan="6" class="suave">${doMes.length ? 'Nenhuma movimentação com este filtro.' : `Nenhuma movimentação importada em ${compBr(mes)}. ${arquivo ? 'Importe o arquivo do extrato (OFX ou CSV).' : 'Clique em "Buscar extrato".'}`}</td></tr>`}</table>
       <p class="suave">${AJUDA_BANCO}</p></div>
-    ${imovelFiltro ? '' : caixaConferirBoletos(conta, mes)}
+    ${imovelFiltro || arquivo ? '' : caixaConferirBoletos(conta, mes)}
     ${imovelFiltro ? '' : caixaSaudeBanco()}
     ${imovelFiltro || !e ? '' : caixaPastaContador(e, mes)}${iniciarRotinasDoBanco()}`;
 }
@@ -243,10 +261,10 @@ function caixaSaudeBanco() {
   const problemas = [];
   const linhaConta = (c) => {
     const p = ponte[c.id];
-    const cert = !p ? '<span class="suave">certificado e token: a ponte ainda não respondeu</span>'
+    const cert = !p ? '<span class="suave">certificado e entrada no banco: a ponte ainda não respondeu</span>'
       : p.simulado ? etiqueta('ponte em modo simulado', 'aviso')
         : `${p.certificado_valido_ate ? `certificado válido até ${dataBr(p.certificado_valido_ate)}${p.certificado_dias !== null && p.certificado_dias <= 30 ? ` ${etiqueta(p.certificado_dias < 0 ? 'vencido' : `vence em ${p.certificado_dias} dia(s)`, 'perigo')}` : ''}` : p.certificado === 'faltando' ? etiqueta('falta o certificado', 'perigo') : 'certificado: sem data'}
-          · último token ${p.token === 'falhou' ? `${etiqueta('falhou', 'perigo')} <span class="suave">${esc(p.erro_token || '')}</span>` : p.ultimo_token_em ? C.dataHoraBr(p.ultimo_token_em) : 'ainda não pedido'}`;
+          · última entrada no banco ${p.token === 'falhou' ? `${etiqueta('falhou', 'perigo')} <span class="suave">${esc(p.erro_token || '')}</span>` : p.ultimo_token_em ? C.dataHoraBr(p.ultimo_token_em) : 'ainda não feita'}`;
     if (p && !p.simulado && ((p.certificado_dias !== null && p.certificado_dias <= 30) || p.token === 'falhou' || p.certificado === 'faltando')) problemas.push(c.id);
     const atrasado = !!c.importado_ate && c.importado_ate < C.somarDias(C.hojeIso(), -8);
     if (atrasado) problemas.push(`extrato ${c.id}`);
@@ -285,6 +303,7 @@ function descreverSugestao(s) {
 
 function destinoHtml(m, sugestao) {
   if (!m.classificacao) {
+    if (sugestao && sugestao.manual) return `${etiqueta('sem destino', 'aviso')}<br><span class="banco-sugestao">pode ser o pagamento de um boleto: vincular manualmente (botão "Dar destino")</span>`;
     return `${etiqueta('sem destino', 'aviso')}${sugestao && sugestao.classificacao ? `<br><span class="banco-sugestao">parece: ${esc(descreverSugestao(sugestao))}</span>${opera() ? ` ${botao('usarSugestao', 'Usar sugestão', { id: m.id })}` : ''}` : ''}`;
   }
   const partes = [etiqueta(ROTULO_CURTO[m.classificacao] || rotuloDe(Z.CLASSIFICACOES, m.classificacao), m.classificacao === 'ignorar' ? 'neutra' : 'destino')];
@@ -342,7 +361,8 @@ function descreverPasta(p) {
 /** A ponte gera o comprovante a partir do lançamento do extrato: a movimentação tem a referência (Z.referenciaNoBanco); o pagamento, só se já foi confirmado pelo extrato. */
 function lancamentoDaPonte(x, tabela) {
   if (tabela === 'pagamentos_banco') { const m = x.movimentacao_id ? movs().find((y) => y.id === x.movimentacao_id) : null; return m ? { conta: m.conta_id, referencia: Z.referenciaNoBanco(m), data: m.data } : null; }
-  return x.id_externo ? { conta: x.conta_id, referencia: Z.referenciaNoBanco(x), data: x.data } : null;
+  // conta de outro banco: a ponte não tem como gerar o comprovante (anexa-se o PDF do banco)
+  return x.id_externo && !soArquivo(x.conta_id) ? { conta: x.conta_id, referencia: Z.referenciaNoBanco(x), data: x.data } : null;
 }
 
 function comprovanteHtml(x, tabela = 'movimentacoes_banco') {
@@ -624,7 +644,7 @@ export function caixaConfigBanco2() {
   if (!podeUsuario('admin')) return '';
   const cfg = { ...R.CONFIG_BANCO_FASE2, ...config() };
   return `<div class="cartao" id="config-banco2"><h2>Banco: conciliação e pagamentos</h2>
-    <p class="suave">Como o extrato do C6 é casado com os boletos, onde ficam os comprovantes e se o sistema pode preparar pagamentos (que só acontecem depois da aprovação no app do C6). As chaves da API e as contas ficam na caixa "Banco (C6)". Os prazos (quantos dias depois do vencimento a entrada ainda casa com o boleto, pagamento adiantado, alerta) ficam em ${link('#/regras', 'Regras do sistema', '')}.</p>
+    <p class="suave">Como o extrato do C6 é casado com os boletos, onde ficam os comprovantes e se o sistema pode preparar pagamentos (que só acontecem depois da aprovação no app do C6). As chaves de acesso e as contas ficam na caixa "Banco (C6)". Os prazos (quantos dias depois do vencimento a entrada ainda casa com o boleto, pagamento adiantado, alerta) ficam em ${link('#/regras', 'Regras do sistema', '')}.</p>
     <form data-form="configBanco2" class="formulario">
       <div class="check largo"><label><input type="checkbox" name="permitir_pagamentos" value="1" ${cfg.permitir_pagamentos ? 'checked' : ''}> Permitir preparar pagamentos pelo banco (caixa "Pagar pelo banco" nas contas do imóvel)</label></div>
       <div><label>Limite por pagamento (R$)</label><input name="limite_pagamento" data-dinheiro inputmode="decimal" value="${cfg.limite_pagamento ? esc(reais(cfg.limite_pagamento, false)) : ''}" placeholder="sem limite"><div class="ajuda">Em branco ou 0,00 = sem limite. Ex.: 5.000,00 recusa um pagamento de R$ 5.000,01.</div></div>
@@ -725,7 +745,8 @@ async function janelaDestino(m, inicialDe = null) {
       sel('despesa').innerHTML = opcoes(ds.map((x) => [x.id, `${x.tipo} de ${compBr(x.competencia)} · ${reais(x.valor)} · paga em ${dataBr(x.data_pagamento)}${x.valor === m.valor ? ' ★ mesmo valor' : ''}`]), s.despesa_id || (ds.find((x) => x.valor === m.valor) || {}).id, '— lançar agora');
       const bs = boletosAbertos(imovelId, m);
       sel('boleto').innerHTML = opcoes(bs.map(({ cb, previsto, jaPago }) => { const c = buscar('contratos', cb.contrato_id); return [cb.id, `${compBr(cb.competencia)} · ${c ? c.inquilino_nome : ''} · ${jaPago ? `já pago em ${dataBr(cb.data_pagamento)}: só ligar esta entrada` : `vence ${dataBr(cb.vencimento)}`} · ${reais(previsto)}${previsto === m.valor && !jaPago ? ' ★ mesmo valor' : ''}`]; }),
-        s.cobranca_id || (bs.length && !bs.some((x) => x.jaPago) ? (bs.find((x) => x.previsto === m.valor) || { cb: {} }).cb.id : null), '— nenhum');
+        // conta de outro banco (arquivo sem o código do boleto): nada vem marcado, o usuário escolhe (decisão do dono em 2026-11-17)
+        s.cobranca_id || (!soArquivo(m.conta_id) && bs.length && !bs.some((x) => x.jaPago) ? (bs.find((x) => x.previsto === m.valor) || { cb: {} }).cb.id : null), '— nenhum');
       const ips = d().iptus.filter((p) => !imovelId || p.imovel_id === imovelId).sort((a, b) => b.ano - a.ano || b.id - a.id);
       sel('iptu').innerHTML = opcoes(ips.map((p) => { const i = buscar('imoveis', p.imovel_id); return [p.id, `${p.ano}${!imovelId && i ? ` · ${i.nome}` : ''}`]; }), s.iptu ? s.iptu.id : (ips[0] || {}).id, ips.length ? '' : '— nenhum IPTU cadastrado');
       encherTipos();
@@ -897,6 +918,7 @@ async function conferirAntesDeCancelar(pags) {
 // --------------------------------------------------------------------------
 export const ACOES_BANCO = {
   async buscarExtrato({ conta, mes }) {
+    if (soArquivo(conta)) throw new C.ErroUsuario(SO_ARQUIVO);
     if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode buscar o extrato. Peça ao administrador, se precisar.');
     if (!bancoAtivo()) throw new C.ErroUsuario(BANCO_DESLIGADO);
     const [inicio, fim] = C.limitesCompetencia(mes);
@@ -952,6 +974,7 @@ export const ACOES_BANCO = {
   },
 
   async saldoBanco({ conta }) {
+    if (soArquivo(conta)) throw new C.ErroUsuario(SO_ARQUIVO);
     if (!bancoAtivo()) throw new C.ErroUsuario(BANCO_DESLIGADO);
     const s = await P.saldoDaConta(conta);
     // em destaque o saldo de verdade (available); total_available soma o limite de crédito do banco
@@ -1050,6 +1073,7 @@ export const ACOES_BANCO = {
 
   /** Gera pela ponte, de uma vez, os comprovantes do mês que ainda faltam (entradas e saídas com destino). */
   async gerarComprovantesMes({ conta, mes }) {
+    if (soArquivo(conta)) throw new C.ErroUsuario(SO_ARQUIVO);
     if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode guardar comprovantes.');
     if (!bancoAtivo()) throw new C.ErroUsuario(BANCO_DESLIGADO);
     const doMes = movs().filter((m) => m.conta_id === conta && String(m.data).slice(0, 7) === mes);
@@ -1108,11 +1132,12 @@ export const ACOES_BANCO = {
     const refs = [...new Set(((r && r.notificacoes) || []).map((n) => n.external_reference_id).filter(Boolean))];
     const ids = refs.map((ref) => d().cobrancas.find((cb) => cb.banco && cb.banco.id_externo === ref)).filter(Boolean).map((cb) => cb.id);
     estado.avisos = { conta, desde, total: ((r && r.notificacoes) || []).length, ids };
-    aviso(refs.length ? `${refs.length} boleto(s) com aviso do banco desde ${dataBr(desde)}.` : `Nenhum aviso do banco desde ${dataBr(desde)} (o aviso só chega se a ponte tiver um endereço público e o webhook cadastrado).`, 'info');
+    aviso(refs.length ? `${refs.length} boleto(s) com aviso do banco desde ${dataBr(desde)}.` : `Nenhum aviso do banco desde ${dataBr(desde)} (o aviso só chega se a ponte tiver um endereço na internet e estiver cadastrada no C6 para receber os avisos: peça ao técnico).`, 'info');
     await mostrar();
   },
 
   async conferirBoletosBanco({ conta, mes }) {
+    if (soArquivo(conta)) throw new C.ErroUsuario(SO_ARQUIVO);
     if (!bancoAtivo()) throw new C.ErroUsuario(BANCO_DESLIGADO);
     const [de, fim] = C.limitesCompetencia(mes);
     const r = await P.boletosPagos(conta, de, fim < C.hojeIso() ? fim : C.hojeIso());

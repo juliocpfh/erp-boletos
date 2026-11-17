@@ -164,6 +164,11 @@ export const DEFINICOES_REGRAS = [
     explica: 'Ao anexar, o sistema diminui sozinho as fotos e os PDFs escaneados, sem perguntar e sem guardar o original. Ex.: foto do RG de 4 MB → cerca de 400 KB; PDF escaneado de 10 páginas com 12 MB → cerca de 1,5 MB, ainda legível. PDF com texto (gerado pelo banco, por um sistema ou pelo Word) fica como está, e PDF com assinatura digital (gov.br, ICP-Brasil, banco) nunca é mexido. Os documentos que a pessoa manda pelo link da ficha são compactados depois que chegam: quando a ficha é aberta, o sistema primeiro faz a conferência de montagem (que olha dentro do arquivo como ele chegou), guarda o resultado na ficha e só então compacta. Os que já estavam no sistema: botão "Compactar os anexos" em Dados e backup.',
     consequencia: 'Não: os arquivos são guardados como chegaram (ocupam mais espaço e demoram mais para abrir no celular). Os que já foram compactados não voltam ao tamanho de antes.',
     lei: 'Sem lei: rotina. O documento assinado digitalmente não é mexido porque qualquer mudança no arquivo invalida a assinatura (MP 2.200-2/2001 e Lei 14.063/2020).' },
+  // mutirão 3000 (venda 49, 2026-11-17): era obrigatória fixa no código; o padrão continua obrigatória
+  { chave: 'leitura_relogios_obrigatoria', grupo: 'rotina', rotulo: 'Leitura dos relógios (água, energia e gás) obrigatória na vistoria', tipo: 'simnao', padrao: true,
+    explica: 'Sim (padrão): a vistoria de entrada, a de saída e o cálculo final da saída só salvam com a leitura de cada relógio que o contrato tem (o que está "Não tem" fica de fora; sem a informação, água e energia). A etapa "Contas" da saída só fecha com a leitura da saída. Ex.: vistoria de saída em 30/11/2026 sem a leitura da água → o sistema pede "Informe a leitura do relógio de água". Não: a leitura continua na vistoria e no cálculo final, mas pode ficar em branco (quem não usa relógio próprio ou cobra a conta por rateio).',
+    consequencia: 'Não: sem a leitura não há prova do consumo até a entrega das chaves; conta de água ou luz que chegar depois, com consumo do inquilino, fica mais difícil de cobrar dele (e o proprietário pode acabar pagando). Leituras já gravadas não mudam.',
+    lei: LI + ', art. 23, VIII (o inquilino paga a água, a luz e o gás que consumir) e art. 23, III (devolver o imóvel no estado em que recebeu); Código de Processo Civil, art. 373, I (quem cobra precisa provar: a leitura no dia da entrega é a prova do consumo). A lei não obriga a leitura: é prova.' },
   { chave: 'dias_ficha_parada', grupo: 'rotina', rotulo: 'Ficha pela internet: avisar link sem resposta depois de (dias)', tipo: 'inteiro', padrao: 2, min: 1, max: 7,
     explica: 'Link da ficha mandado e sem nenhum dado ou documento depois deste número de dias vira alerta no Painel, com o botão "Lembrar". O link vale 7 dias.',
     consequencia: 'Só muda o alerta: nada é mandado sem alguém apertar o botão.', lei: 'Sem lei: rotina.' },
@@ -241,6 +246,20 @@ export const DEFINICOES_REGRAS = [
 
 const POR_CHAVE = new Map(DEFINICOES_REGRAS.map((x) => [x.chave, x]));
 export const definicaoRegra = (chave) => POR_CHAVE.get(chave) || null;
+
+const paraBusca = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+/**
+ * Busca da tela Regras do sistema (pedido do dono de 17/11): as chaves das regras cujo nome, explicação, consequência, lei ou
+ * opções têm todas as palavras digitadas, sem ligar para acento nem maiúscula. Busca vazia: todas.
+ * Ex.: "caucao reajuste" → as regras que falam da caução e do reajuste (como "A caução acompanha o reajuste").
+ */
+export function buscarRegras(termo) {
+  const palavras = paraBusca(termo).split(/\s+/).filter(Boolean);
+  return DEFINICOES_REGRAS.filter((x) => {
+    const texto = paraBusca([x.rotulo, x.explica, x.consequencia, x.lei, ...(x.opcoes || []).flat()].join(' '));
+    return palavras.every((p) => texto.includes(p));
+  }).map((x) => x.chave);
+}
 
 /** As regras do dono, fixas no código: o "padrão de fábrica" do sistema. */
 export const PADRAO_SISTEMA = Object.freeze(Object.fromEntries(DEFINICOES_REGRAS.map((x) => [x.chave, x.padrao])));

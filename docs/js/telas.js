@@ -84,6 +84,7 @@ export const TELAS = {
     ligarFichaOnline(raiz);
     ligarRegua(raiz);
     ligarIndiceBancoCentral(raiz);
+    if (raiz.querySelector('[data-busca-regras]')) parteAdiada('regras').then((m) => m.ligarBuscaRegras(raiz)).catch(() => {}); // só na tela das regras (já carregada)
     ligarPastaImpressao(raiz).catch((e) => aviso(`Pasta física: ${e.message}`, 'erro'));
     // campos que aparecem conforme outro campo (garantia, tipo de inquilino, prazo, IPTU à vista)
     const regras = [...raiz.querySelectorAll('[data-mostrar-se]')];

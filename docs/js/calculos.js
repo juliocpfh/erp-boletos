@@ -117,6 +117,15 @@ export function dataHoraBr(quando) {
 /** Data e hora de agora: "09/11/2026, 19:37:05". */
 export const agoraBr = () => dataHoraBr(Date.now());
 
+/** Tamanho de arquivo em texto: 1.572.864 bytes → "1,5 MB"; 3.000 → "3 KB" (mínimo 1 KB; nada: "0 KB"); 2 GB → "2,0 GB". */
+export function tamanhoTexto(bytes) {
+  const b = Number(bytes) || 0;
+  if (b <= 0) return '0 KB';
+  if (b >= 1073741824) return `${(b / 1073741824).toFixed(1).replace('.', ',')} GB`;
+  if (b >= 1048576) return `${(b / 1048576).toFixed(1).replace('.', ',')} MB`;
+  return `${Math.max(1, Math.round(b / 1024))} KB`;
+}
+
 export function compBr(comp) {
   return comp ? `${comp.slice(5, 7)}/${comp.slice(0, 4)}` : '-';
 }
