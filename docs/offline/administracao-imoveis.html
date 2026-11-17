@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-xVqxSqTLyR6fccLwGeQ2sbLfveDevdEZAtqAiFyJlz4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-S+V4i1WkDB/zJ0UfZpHRixSIE7hUU3MM+KEIGpQrBxM='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="4c3d489a79e14958">
+<meta name="fontes" content="617568f37b93e67e">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -14433,7 +14433,7 @@ ${xref}
 
 1. FORMATOS
 - Dinheiro é guardado em centavos inteiros. Datas aparecem como dia/mês/ano. Competência = mês de uso do imóvel (ex.: 10/2026).
-- Empresas: ANK e JCK. Cada imóvel tem um percentual entre elas, usado para dividir as NFs. Nos documentos do inquilino (contrato, vistoria, recibo, carta) só a ANK aparece como locadora.
+- Empresas: as cadastradas em Empresas. Cada imóvel tem um percentual entre elas, usado para dividir as NFs. Nos documentos do inquilino (contrato, vistoria, recibo, carta, e-mails) aparece como locadora só a empresa marcada em "Assina os documentos do inquilino" (sem nenhuma marcada, as empresas do imóvel).
 - CPF e CNPJ são conferidos pelos dígitos, só como ajuda: se falhar, avisa, mas não é grave.
 
 2. CONTRATO
@@ -14544,11 +14544,11 @@ ${xref}
 - Backup diário (na nuvem: 30 dias no servidor, com "Backups da nuvem" para baixar ou voltar a um dia), ZIP com os anexos e backup seguro cifrado numa segunda pasta, só do administrador (também na nuvem).
 
 16. BANCO E CONCILIAÇÃO (C6)
-- As duas contas (ANK e JCK) têm extrato separado, buscado pelo programa "Ponte C6" no computador. Cada lançamento do banco entra uma vez só (pela chave "reference" do C6); buscar de novo não duplica. O extrato é pedido em janelas de até 30 dias.
+- Cada conta bancária (uma por empresa) tem extrato separado, buscado pelo programa "Ponte C6" no computador. Cada lançamento do banco entra uma vez só (pela chave "reference" do C6); buscar de novo não duplica. O extrato é pedido em janelas de até 30 dias.
 - Cada movimentação precisa de um destino: conta do imóvel (água, luz, gás, condomínio, internet, outra), aluguel recebido (boleto), IPTU pago na prefeitura, imposto da empresa, tarifa do banco, transferência entre as nossas contas, outro ou ignorar. O sistema sugere o destino (matrícula/UC cadastrada no imóvel, valor do boleto, descrição, última movimentação igual), mas nada é gravado sem alguém confirmar.
-- Dar destino "conta do imóvel" cria a conta em "Contas pagas por nós" com o valor e a data do extrato (em qualquer imóvel); desfazer o destino exclui a conta criada (e os comprovantes guardados). IPTU marca a parcela paga pelo proprietário; a transferência liga as duas pontas (ANK e JCK) para não virar conta duas vezes.
+- Dar destino "conta do imóvel" cria a conta em "Contas pagas por nós" com o valor e a data do extrato (em qualquer imóvel); desfazer o destino exclui a conta criada (e os comprovantes guardados). IPTU marca a parcela paga pelo proprietário; a transferência liga as duas pontas (a conta que enviou e a que recebeu) para não virar conta duas vezes.
 - Aluguel: a entrada do extrato (ou a lista de pagos do Bolepix) confirma o pagamento do boleto com a data em que o dinheiro entrou (data contábil). Valor diferente do previsto segue o fluxo de divergência (NF digitada com justificativa). Boleto já pago não é confirmado de novo; desfazer o pagamento devolve a movimentação a "sem destino".
-- Comprovante: PDF do banco com nome padrão "AAAA-MM-DD Empresa Imóvel Conta Valor" (ex.: "2026-11-05 ANK Loja 1 Agua 123,45.pdf"), sem acento, modelo editável em Dados e backup. Guardado na pasta do imóvel ("Contas pagas/ano"; IPTU em "IPTU (guias)/ano") e numa cópia para o contador ("_Contador/Empresa/AAAA-MM").
+- Comprovante: PDF do banco com nome padrão "AAAA-MM-DD Empresa Imóvel Conta Valor" (ex.: "2026-11-05 Empresa Loja 1 Agua 123,45.pdf"), sem acento, modelo editável em Dados e backup. Guardado na pasta do imóvel ("Contas pagas/ano"; IPTU em "IPTU (guias)/ano") e numa cópia para o contador ("_Contador/Empresa/AAAA-MM").
 - Pagamentos pelo banco: nunca automáticos. Alguém prepara (rascunho) e o banco lê os códigos; o administrador confere e aprova numa janela só, digitando o valor total ("Aprovar e enviar"), o pedido vai ao C6 como lote e é aprovado no app do banco por quem tem poderes (duas confirmações ao todo: uma aqui, outra no app). Cancelar antes do envio tira o item do lote lido pelo banco; pagamento enviado que o C6 cancelou ou recusou sem avisar, o administrador marca com "Foi cancelado no C6". Boleto (código de barras), Pix copia e cola ou chave Pix; limite por pagamento e liga/desliga em Dados e backup. Pago, a conta do imóvel é lançada (ou marcada) com a data do pagamento e o comprovante; a saída no extrato confirma e fecha o ciclo.
 - Boleto emitido no C6: valor cheio do aluguel, com o desconto da bonificação válido até o vencimento (valor fixo; prazo configurável). Multa e juros sobre o valor cheio, como o sistema já calcula. Quem paga atrasado perde o desconto — isso não é multa.
 - Notificação ao pagador (e-mail/SMS) automática e personalizável por conta e por contrato. Negativação disponível, só pelo administrador, com confirmação dupla.
@@ -16617,7 +16617,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       <div class="largo"><label class="check-mini"><input type="radio" name="modo" value="escolher" ${cfg4.modo_conta_boleto === "escolher" ? "checked" : ""}> Escolher a empresa boleto a boleto</label>
         <div class="ajuda">Ao emitir, o sistema pergunta sempre a conta, mesmo quando o imóvel tem uma só empresa (ela já vem marcada; senão, a padrão). Em "Emitir todos do mês", pergunta uma vez para o lote.</div></div>
       <div class="acoes" style="align-self:end"><button class="secundario">Salvar</button></div></form>
-      <p class="suave">Decisão de 2026-11-05: por orientação do contador, os boletos saem pela ANK e a JCK recebe o repasse depois; a opção de escolher um a um fica disponível.</p>` : '<p class="suave">Nenhuma conta bancária cadastrada ainda: cadastre as contas em <a href="#/dados?ir=banco">Dados e backup → Banco (C6)</a>.</p>'}</div>`;
+      <p class="suave">Com a empresa padrão, todos os boletos saem pela conta dela, mesmo quando o imóvel é dividido com outra empresa.</p>` : '<p class="suave">Nenhuma conta bancária cadastrada ainda: cadastre as contas em <a href="#/dados?ir=banco">Dados e backup → Banco (C6)</a>.</p>'}</div>`;
   }
   function caixaConfigBanco() {
     if (!podeUsuario("admin")) return "";
@@ -16634,7 +16634,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     };
     return `<div class="cartao" id="banco"><div class="cabecalho"><h2>Banco (C6) — boleto com Pix</h2><div>${situacao2}</div></div>
     <p>Emite os boletos (com QR Code Pix) direto na conta do C6, pelo botão <b>Emitir no C6</b> da tela Boletos. Como o banco exige certificado digital, o site fala com uma <b>ponte</b>: um programinha que roda no computador de quem emite (pasta <code>ponte-c6</code> do programa, veja o README dela). As chaves do banco ficam só na ponte, nunca aqui.</p>
-    <p class="suave">Até as chaves chegarem, a ponte pode rodar em <b>modo simulado</b>: os botões funcionam e devolvem boletos fictícios, para treinar. Qual empresa emite os boletos (padrão ${emissora ? esc(emissora.apelido) : "ANK"}, ou escolher um a um) se define em <a href="#/empresas?ir=conta-boletos">Empresas</a>.</p>
+    <p class="suave">Até as chaves chegarem, a ponte pode rodar em <b>modo simulado</b>: os botões funcionam e devolvem boletos fictícios, para treinar. Qual empresa emite os boletos (${emissora ? `padrão ${esc(emissora.apelido)}` : "a padrão"}, ou escolher um a um) se define em <a href="#/empresas?ir=conta-boletos">Empresas</a>.</p>
     <form data-form="configBanco" class="formulario">
       <div><label>Endereço da ponte (neste computador)</label><input name="ponte_url" value="${esc(ponteLocal().configurada ? ponteLocal().ponte_url : "")}" placeholder="http://localhost:8765"><div class="ajuda">Mostrado quando a ponte é ligada (node servidor.mjs)</div></div>
       <div><label>Senha da ponte (neste computador)</label><input type="password" name="senha_ponte" value="${esc(ponteLocal().senha_ponte)}" autocomplete="off"><div class="ajuda">A mesma de PONTE_SENHA no .env da ponte</div></div>
@@ -16646,14 +16646,14 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     <div class="rolagem"><table><tr><th>Identificador na ponte</th><th>Apelido</th><th>Empresa dona da conta</th><th>Ambiente</th><th>Chave Pix</th><th>Avisos ao inquilino</th><th>Negativação</th><th></th></tr>
       ${cfg4.contas.map((x) => `<tr><td><code>${esc(x.id)}</code></td><td><b>${esc(x.apelido)}</b>${(emissora || {}).id === x.id ? ` ${etiqueta("padrão dos boletos", "info")}` : ""}</td><td>${nomeEmp(x.emitente_id)}</td><td>${x.ambiente === "producao" ? "Produção" : etiqueta("Sandbox (teste)", "aviso")}<br><span class="suave">carteira ${esc(carteiraDaConta(x))}</span></td>
         <td>${x.chave_pix ? esc(x.chave_pix) : '<span class="suave">sem Pix</span>'}</td><td>${esc(resumoNotif(x))}</td><td>${x.negativacao.ativa ? `${x.negativacao.dias_atraso} dias de atraso` : '<span class="suave">desligada</span>'}</td>
-        <td class="n nw">${botao("testarContaC6", "Testar conexão", { conta: x.id })} ${botao("editarContaBanco", "Editar", { conta: x.id })} ${botao("excluirContaBanco", "Tirar", { conta: x.id }, "perigo pequeno", `Tirar a conta "${x.apelido}" da integração?`)}</td></tr>`).join("") || '<tr><td colspan="8" class="suave">Nenhuma conta cadastrada. Cadastre abaixo uma conta por empresa (ex.: ANK e JCK), com o mesmo identificador usado no .env da ponte (CONTAS=ank,jck).</td></tr>'}</table></div>
+        <td class="n nw">${botao("testarContaC6", "Testar conexão", { conta: x.id })} ${botao("editarContaBanco", "Editar", { conta: x.id })} ${botao("excluirContaBanco", "Tirar", { conta: x.id }, "perigo pequeno", `Tirar a conta "${x.apelido}" da integração?`)}</td></tr>`).join("") || '<tr><td colspan="8" class="suave">Nenhuma conta cadastrada. Cadastre abaixo uma conta por empresa, com o mesmo identificador configurado na ponte (linha CONTAS do arquivo .env dela; ex.: CONTAS=loja1,loja2).</td></tr>'}</table></div>
     <details id="nova-conta-banco" class="caixa-historico"><summary><b>Incluir ou alterar uma conta</b> <span class="suave">· clique para expandir</span></summary>
     <form data-form="contaBanco" class="formulario" style="margin-top:10px">
-      <div><label>Identificador na ponte</label><input name="id" placeholder="ank" required pattern="[A-Za-z0-9_\\-]+"><div class="ajuda">Só letras e números; igual ao da ponte</div></div>
-      <div><label>Apelido</label><input name="apelido" placeholder="ANK"></div>
+      <div><label>Identificador na ponte</label><input name="id" placeholder="loja1" required pattern="[A-Za-z0-9_\\-]+"><div class="ajuda">Só letras e números; igual ao da ponte</div></div>
+      <div><label>Apelido</label><input name="apelido" placeholder="Loja 1"></div>
       <div><label>Empresa dona da conta</label><select name="emitente_id" required><option value=""></option>${emitentes.map((e) => `<option value="${e.id}">${esc(e.nome)}</option>`).join("")}</select></div>
-      <div><label>Ambiente</label><select name="ambiente"><option value="sandbox">Sandbox (teste do banco)</option><option value="producao">Produção (cobranças de verdade)</option></select></div>
-      <div><label>Carteira (billing_scheme)</label><input name="carteira" placeholder="automática" inputmode="numeric"><div class="ajuda">Em branco: 21 no sandbox, 15 em produção</div></div>
+      <div><label>Ambiente</label><select name="ambiente"><option value="sandbox">Teste do banco (sandbox): não cobra de verdade</option><option value="producao">Cobrança de verdade (produção)</option></select></div>
+      <div><label>Carteira de cobrança</label><input name="carteira" placeholder="automática" inputmode="numeric"><div class="ajuda">Número que o banco informa. Em branco: 21 no teste, 15 na cobrança de verdade</div></div>
       <div><label>Chave Pix aleatória da conta (para o QR Code)</label><input name="chave_pix" placeholder="chave aleatória cadastrada no C6"><div class="ajuda">Só chave aleatória (EVP). Em branco: boleto sem Pix</div></div>
       <div><label>Baixar sozinho após o vencimento (dias)</label><input name="dias_baixa" type="number" min="0" value="${padrao.dias_baixa}"><div class="ajuda">0 = o boleto fica aberto até cancelar</div></div>
       <div><label>Desconto de pontualidade vale até (dias antes do vencimento)</label><input name="desconto_dias_antes" type="number" min="0" value="${padrao.desconto_dias_antes}"><div class="ajuda">0 = até o dia do vencimento</div></div>
@@ -23274,7 +23274,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
   function caixaFichaOnline(f) {
     if (!opera() || fichaSemContrato(f) || f.documentos_no_contrato) return "";
     const titulo2 = "<h2>Ficha pela internet</h2>";
-    if (!E.nuvem) return `<div class="cartao">${titulo2}<p class="suave">Só no sistema na nuvem (erp.ankjck.com.br): o interessado e o fiador recebem um link para preencher os dados, mandar os documentos e a ficha assinada.</p></div>`;
+    if (!E.nuvem) return `<div class="cartao">${titulo2}<p class="suave">Só no sistema pela internet (na nuvem): o interessado e o fiador recebem um link para preencher os dados, mandar os documentos e a ficha assinada.</p></div>`;
     const linhas2 = pessoasDaFicha(f).map((p2) => {
       const l = (f.links_ficha || {})[p2];
       const valido = linkValido(f, p2);
@@ -25954,7 +25954,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     <div class="cartao"><h2>Modelos de contrato</h2><p>Textos usados nos botões <b>Gerar contrato</b> (residencial, não residencial e os que você criar) e <b>Gerar termo aditivo</b> (troca do vencimento e troca de inquilino) do inquilino.</p>${link("#/modelos-contrato", "Ver e editar os modelos")}</div>
     <div class="cartao"><h2>Modelos de e-mail</h2><p>Um e-mail para cada etapa da ficha, da entrada e da saída do inquilino, e o informe anual do Imposto de Renda (botão <b>✉ E-mail</b> em cada etapa).</p>${link("#/modelos-email", "Ver e editar os modelos de e-mail")}</div>
     <div class="cartao"><h2>Modelo Excel da NF</h2>
-      <p>${modeloProprio ? `${etiqueta("Modelo próprio", "ok")} usando o arquivo enviado (${PASTA_MODELOS}/${MODELO_FATURA}).` : "Usando o modelo padrão, igual à planilha LOJA1 (abas ANK e JCK)."}</p>
+      <p>${modeloProprio ? `${etiqueta("Modelo próprio", "ok")} usando o arquivo enviado (${PASTA_MODELOS}/${MODELO_FATURA}).` : "Usando o modelo padrão do sistema (uma NF por empresa, com os dados do cadastro de Empresas)."}</p>
       <p class="suave">Para trocar, envie um .xlsx com uma aba por empresa no mesmo desenho. Os dados são preenchidos nas mesmas células da planilha original (B3 a B6, L4, L5, E10, L10, E11, E12, G16, F22, K22).</p>
       ${opera() ? `<form data-form="modeloExcel" class="acoes"><input type="file" name="modelo" accept=".xlsx" style="max-width:380px"><button class="secundario">Enviar modelo</button>${modeloProprio ? botao("removerModelo", "Voltar ao modelo padrão", {}, "perigo pequeno", "Voltar ao modelo padrão?") : ""}</form>` : ""}</div>`;
   }
