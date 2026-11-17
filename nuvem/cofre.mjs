@@ -109,6 +109,12 @@ export const MAX_EMAILS_DIA = 150;
 export const DIAS_ACESSOS = { padrao: 180, min: 30, max: 730 };
 export const MAX_ACESSOS_POR_ENVIO = 200;
 /**
+ * Linha do histórico de "Apagar tudo desta pessoa" (10 anos depois do fim do último contrato; docs/js/pessoa.js, ACAO_APAGAR):
+ * vinda do administrador, o cofre apaga também o que guarda desses registros (esquecerApagados) e manda os aparelhos baixarem
+ * tudo de novo (log 'refazer'), para a cópia deles também sair.
+ */
+export const ACAO_APAGAR_PESSOA = 'Apagar pessoa (LGPD)';
+/**
  * Chaves de negócio que não repetem (dois aparelhos fazendo a mesma coisa antes de um ver o do outro, ou um deles sem internet):
  * registro novo com a mesma chave de um que já está na nuvem é recusado, e o lote inteiro volta (como código repetido; a tela
  * mostra em Conflitos). `so`: só os registros que contam (o boleto do complemento da caução e as parcelas de acordo não são o
@@ -405,7 +411,8 @@ export class Cofre {
     if (!Number.isSafeInteger(d) || d < 0) throw new ErroCofre(400, 'Parâmetro "desde" inválido.');
     const menor = Number(this.q('SELECT MIN(seq) AS m FROM log')[0]?.m || 0);
     const ultimo = this.ultimoSeq();
-    if (d > ultimo || (menor && d < menor - 1) || this.q("SELECT 1 AS x FROM log WHERE seq > ? AND tipo = 'importacao' LIMIT 1", d).length) return { refazer: true, seq: ultimo };
+    // carga, substituição ou limpeza do histórico (LGPD: 'refazer'): o aparelho baixa tudo de novo e a cópia velha dele sai
+    if (d > ultimo || (menor && d < menor - 1) || this.q("SELECT 1 AS x FROM log WHERE seq > ? AND tipo IN ('importacao', 'refazer') LIMIT 1", d).length) return { refazer: true, seq: ultimo };
     const linhas = this.q('SELECT seq, tipo, tabela, id, dados, por, em FROM log WHERE seq > ? ORDER BY seq LIMIT ?', d, limite);
     return {
       seq: linhas.length ? linhas[linhas.length - 1].seq : d,
@@ -465,6 +472,8 @@ export class Cofre {
         contarCota();
         const resultados = []; const novosConflitos = [];
         for (const op of lote.ops) resultados.push(this.aplicarOp(op, email, quem, novosConflitos));
+        // "Apagar tudo desta pessoa" do administrador: depois das exclusões do lote, sai também o que o cofre guarda delas
+        if (quem.papel === 'admin') for (const op of lote.ops) if (op?.op === 'historico' && op.entrada?.acao === ACAO_APAGAR_PESSOA) this.esquecerApagados(op.entrada.detalhes, email);
         // exclusão em grupo (contrato e boletos, imóvel e despesas…) é tudo ou nada: um registro disputado segura o lote inteiro,
         // senão a nuvem apagaria uma parte e deixaria, por exemplo, boleto sem contrato (mutirão 3000, item 2)
         const disputados = novosConflitos.filter((c) => c.tipo === 'exclusao');
@@ -936,6 +945,36 @@ export class Cofre {
   }
 
   /**
+   * "Apagar tudo desta pessoa": { registros: [{tabela, id}] excluídos, limpos: [{tabela, id}] com os campos dela vazios, contratos: [id] }.
+   * Dos excluídos (só os que não existem mais) saem as linhas do histórico, as cópias na fila, a cópia de excluído e os conflitos;
+   * dos contratos, também as linhas do histórico dos lançamentos dele; dos limpos, os campos que saíram (limparRastros).
+   * O aviso de exclusão na fila fica (o aparelho atrasado ainda precisa saber que o registro saiu). Devolve quantas linhas saíram.
+   */
+  esquecerApagados(det, email) {
+    const lista = (v) => (Array.isArray(v) ? v : []).filter((x) => x && typeof x.tabela === 'string' && /^[a-z][a-z0-9_]{0,39}$/.test(x.tabela) && Number.isSafeInteger(Number(x.id))).slice(0, 20000);
+    const existe = (t, id) => this.q('SELECT 1 AS x FROM registros WHERE tabela = ? AND id = ?', t, id).length > 0;
+    let n = 0;
+    const apagar = (consulta, ...p) => { n += this.q(`SELECT COUNT(*) AS n FROM ${consulta}`, ...p)[0].n; this.sql.exec(`DELETE FROM ${consulta}`, ...p); };
+    const doRegistro = "json_extract(dados, '$.tabela') = ? AND CAST(json_extract(dados, '$.registro_id') AS INTEGER) = ?";
+    for (const { tabela, id } of lista(det?.registros)) {
+      const i = Number(id);
+      if (existe(tabela, i)) continue;
+      apagar(`historico WHERE ${doRegistro}`, tabela, i);
+      apagar(`log WHERE tipo = 'historico' AND ${doRegistro}`, tabela, i);
+      apagar("log WHERE tipo = 'registro' AND tabela = ? AND id = ?", tabela, i);
+      apagar('excluidos WHERE tabela = ? AND id = ?', tabela, i);
+      apagar('conflitos WHERE tabela = ? AND reg_id = ?', tabela, String(i));
+    }
+    for (const id of (Array.isArray(det?.contratos) ? det.contratos : []).map(Number).filter((x) => Number.isSafeInteger(x) && !existe('contratos', x))) {
+      apagar("historico WHERE CAST(json_extract(dados, '$.contrato_id') AS INTEGER) = ?", id);
+      apagar("log WHERE tipo = 'historico' AND CAST(json_extract(dados, '$.contrato_id') AS INTEGER) = ?", id);
+    }
+    for (const { tabela, id } of lista(det?.limpos)) n += this.limparRastros(tabela, Number(id));
+    this.registrarLog('refazer', null, null, undefined, email);
+    return n;
+  }
+
+  /**
    * Fichas reprovadas ou com desistência que já tiveram os dados pessoais apagados nos aparelhos (dados_apagados_em) e ainda
    * não na nuvem: limpa os rastros (limparRastros) e marca a ficha com `historico_limpo_em` (vai para os aparelhos pela fila).
    * Roda na faxina diária. Devolve os códigos das fichas limpas.
@@ -956,6 +995,7 @@ export class Cofre {
       });
       feitas.push(f.id);
     }
+    if (feitas.length) this.registrarLog('refazer', null, null, undefined, por); // os aparelhos baixam de novo: a cópia velha do histórico deles sai
     return feitas;
   }
 
