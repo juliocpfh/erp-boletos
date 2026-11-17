@@ -9,7 +9,7 @@ import { Aparelhos, ErroAparelho } from './aparelhos.mjs';
 export const FORMATO = 'imoveis-v1';
 export const MAX_OPS = 2000;
 export const MAX_REGISTRO = 1024 * 1024; // um registro (a logo tem ~270 KB)
-export const MAX_FAIXA = 1000;
+export const MAX_FAIXA = 20000; // uma importação grande pede a faixa do tamanho dela antes de gravar (nuvem.js reservarFaixas)
 export const DIAS_LOG = 60; // aparelho parado há mais tempo baixa tudo de novo
 export const MANTER_BACKUPS = 30;
 export const MANTER_SUBSTITUICOES = 5; // cópias "antes-da-substituicao" guardadas
@@ -40,11 +40,36 @@ export const SO_ADMIN = {
   tabela: ['emitentes', 'config_regras', 'versoes_regras'],
 };
 const NOMES_PROIBIDOS = ['__proto__', 'constructor', 'prototype'];
+/**
+ * Chaves de negócio que não repetem (dois aparelhos fazendo a mesma coisa antes de um ver o do outro, ou um deles sem internet):
+ * registro novo com a mesma chave de um que já está na nuvem é recusado, e o lote inteiro volta (como código repetido; a tela
+ * mostra em Conflitos). `so`: só os registros que contam (o boleto do complemento da caução e as parcelas de acordo não são o
+ * aluguel do mês: boletoDoMes/ehBoletoAvulso de regras.js); `usa`: campos que `so` lê. Chave com campo vazio não conta.
+ */
+export const CHAVES_UNICAS = {
+  cobrancas: { campos: ['contrato_id', 'competencia'], usa: ['caucao_complemento', 'acordo_parcela_de'], so: (r) => !(Number(r.caucao_complemento) > 0) && !r.acordo_parcela_de, nome: 'O boleto do aluguel deste contrato neste mês' },
+  movimentacoes_banco: { campos: ['conta_id', 'id_externo'], nome: 'Este lançamento do extrato' },
+  correcoes: { campos: ['contrato_id', 'data_vigencia'], nome: 'A correção do aluguel deste contrato nesta data' },
+  encerramentos: { campos: ['contrato_id'], nome: 'O cálculo final da saída deste contrato' },
+  leituras: { campos: ['contrato_id', 'momento'], so: (r) => ['Entrada do inquilino', 'Saída do inquilino'].includes(r.momento), nome: 'A leitura dos relógios deste momento do contrato' },
+  guias_impostos: { campos: ['emitente_id', 'imposto', 'periodo'], nome: 'A guia deste imposto, empresa e período' },
+};
+/** Chave de negócio de um registro (texto) ou null (tabela sem chave, registro que não conta ou campo vazio). */
+export function chaveUnica(tabela, r) {
+  const def = Object.hasOwn(CHAVES_UNICAS, tabela) ? CHAVES_UNICAS[tabela] : null;
+  if (!def || !r || (def.so && !def.so(r))) return null;
+  const v = def.campos.map((c) => r[c]);
+  return v.some((x) => x === null || x === undefined || x === '') ? null : JSON.stringify(v);
+}
 /** Tabelas que existem sempre (mesmo antes do primeiro registro): uma mudança "raiz" com esse nome trocaria a tabela inteira. */
 const TABELAS_SEMPRE = ['usuarios', ...SO_ADMIN.tabela];
 
 export class ErroCofre extends Error {
   constructor(status, mensagem, extra = {}) { super(mensagem); this.status = status; this.extra = extra; }
+}
+/** Lote que exclui vários registros juntos (ex.: o contrato e os boletos dele) e esbarrou num registro mudado em outro aparelho. */
+class ExclusaoEmGrupo extends Error {
+  constructor(disputados) { super('exclusão em grupo disputada'); this.disputados = disputados; }
 }
 
 /** JSON com as chaves em ordem: dois valores iguais dão o mesmo texto. */
@@ -106,6 +131,31 @@ export class Cofre {
       CREATE INDEX IF NOT EXISTS conflitos_abertos ON conflitos (tabela, reg_id, campo) WHERE resolvido_em IS NULL;`);
     // os dois últimos índices entram também em cofre que já existia (IF NOT EXISTS: roda a cada abertura sem repetir)
     this.maiorOrdem = null; // maior `ordem` de registros, guardada durante um lote (proximaOrdem)
+    this.chaves = new Map(); // chaves únicas já lidas no lote: tabela → { porChave, porId }
+  }
+
+  /** Chaves únicas (CHAVES_UNICAS) dos registros de uma tabela, lidas uma vez por lote (json_extract: sem abrir o registro inteiro). */
+  chavesDe(tabela) {
+    if (!Object.hasOwn(CHAVES_UNICAS, tabela)) return null;
+    let m = this.chaves.get(tabela);
+    if (!m) {
+      const def = CHAVES_UNICAS[tabela];
+      const campos = [...new Set([...def.campos, ...(def.usa || [])])];
+      m = { porChave: new Map(), porId: new Map() };
+      for (const l of this.q(`SELECT id, ${campos.map((c) => `json_extract(dados, '$.${c}') AS ${c}`).join(', ')} FROM registros WHERE tabela = ?`, tabela)) this.anotarChave(m, tabela, l.id, l);
+      this.chaves.set(tabela, m);
+    }
+    return m;
+  }
+
+  anotarChave(m, tabela, id, r) {
+    const velha = m.porId.get(id);
+    if (velha !== undefined && m.porChave.get(velha) === id) m.porChave.delete(velha);
+    m.porId.delete(id);
+    const k = r ? chaveUnica(tabela, r) : null;
+    if (k === null) return;
+    m.porId.set(id, k);
+    if (!m.porChave.has(k)) m.porChave.set(k, id);
   }
 
   /** Ordem do próximo registro novo: lê a maior uma vez por lote (não a cada registro) e segue contando na memória. */
@@ -248,7 +298,12 @@ export class Cofre {
 
   conflitosAbertos() {
     return this.q('SELECT id, tipo, tabela, reg_id, campo, atual, por_atual, proposto, por_proposto, em FROM conflitos WHERE resolvido_em IS NULL ORDER BY id')
-      .map((c) => ({ ...c, atual: c.atual === null ? null : JSON.parse(c.atual), proposto: c.proposto === null ? null : JSON.parse(c.proposto) }));
+      .map((c) => {
+        let proposto = c.proposto === null ? null : JSON.parse(c.proposto);
+        // lote em disputa: aos aparelhos vai só o resumo (a gravação inteira fica no cofre para a escolha)
+        if (c.tipo === 'lote' && proposto) proposto = { lote: proposto.lote, mudancas: (proposto.ops || []).filter((o) => o.op !== 'historico').length, excluidos: (proposto.ops || []).filter((o) => o.op === 'excluir').length };
+        return { ...c, atual: c.atual === null ? null : JSON.parse(c.atual), proposto };
+      });
   }
 
   // -------------------------------------------------------------------------
@@ -267,19 +322,54 @@ export class Cofre {
     if (this.vazio()) throw new ErroCofre(409, 'A nuvem ainda não tem dados: faça a carga inicial.');
     const quem = this.exigir(email, 'consulta');
     if (quem.papel === 'consulta' && !this.soProprioAcesso(lote.ops, quem)) throw new ErroCofre(403, 'Seu usuário não pode fazer isso.');
-    return this.transacao(() => {
-      this.maiorOrdem = null; // cada lote lê a maior ordem de novo (lote desfeito por erro não deixa número velho)
-      const resultados = []; const novosConflitos = [];
-      for (const op of lote.ops) resultados.push(this.aplicarOp(op, email, quem, novosConflitos));
-      if (lote.ops.length) {
-        this.controle('revisao', Number(this.controle('revisao') || 0) + 1);
-        this.controle('atualizado_em', this.agora());
-        this.controle('atualizado_por', email);
-      }
-      const resposta = { ok: true, seq: this.ultimoSeq(), resultados, conflitos: novosConflitos };
-      this.sql.exec('INSERT INTO lotes (lote, resposta, em) VALUES (?, ?, ?)', lote.id, JSON.stringify(resposta), this.agora());
-      return resposta;
+    const emGrupo = lote.ops.filter((o) => o?.op !== 'historico').length > 1 && lote.ops.some((o) => o?.op === 'excluir');
+    try {
+      return this.transacao(() => {
+        this.maiorOrdem = null; // cada lote lê a maior ordem de novo (lote desfeito por erro não deixa número velho)
+        this.chaves = new Map(); // chaves únicas (CHAVES_UNICAS) conferidas neste lote
+        const resultados = []; const novosConflitos = [];
+        for (const op of lote.ops) resultados.push(this.aplicarOp(op, email, quem, novosConflitos));
+        // exclusão em grupo (contrato e boletos, imóvel e despesas…) é tudo ou nada: um registro disputado segura o lote inteiro,
+        // senão a nuvem apagaria uma parte e deixaria, por exemplo, boleto sem contrato (mutirão 3000, item 2)
+        const disputados = novosConflitos.filter((c) => c.tipo === 'exclusao');
+        if (emGrupo && disputados.length) throw new ExclusaoEmGrupo(disputados.map((c) => ({ tabela: c.tabela, id: Number(c.reg_id) })));
+        return this.fecharLote(lote, email, resultados, novosConflitos);
+      });
+    } catch (e) {
+      if (!(e instanceof ExclusaoEmGrupo)) throw e;
+      return this.transacao(() => this.loteEmDisputa(lote, email, e.disputados));
+    }
+  }
+
+  fecharLote(lote, email, resultados, novosConflitos) {
+    if (lote.ops.length) {
+      this.controle('revisao', Number(this.controle('revisao') || 0) + 1);
+      this.controle('atualizado_em', this.agora());
+      this.controle('atualizado_por', email);
+    }
+    const resposta = { ok: true, seq: this.ultimoSeq(), resultados, conflitos: novosConflitos };
+    this.sql.exec('INSERT INTO lotes (lote, resposta, em) VALUES (?, ?, ?)', lote.id, JSON.stringify(resposta), this.agora());
+    return resposta;
+  }
+
+  /**
+   * Nada do lote vale: vira um conflito só ("lote"), com a gravação inteira guardada. O administrador escolhe "excluir"
+   * (aplica o lote todo, como se ninguém tivesse mudado nada) ou "manter" (descarta o lote todo).
+   */
+  loteEmDisputa(lote, email, disputados) {
+    const principal = lote.ops.filter((o) => o?.op === 'excluir').at(-1); // excluirContrato apaga o contrato por último
+    const atual = disputados.map(({ tabela, id }) => {
+      const r = this.q('SELECT dados, meta FROM registros WHERE tabela = ? AND id = ?', tabela, id)[0];
+      return { tabela, id, dados: r ? JSON.parse(r.dados) : null, por: r ? this.ultimoAutor(r.meta) : null };
     });
+    let conflito;
+    try {
+      conflito = this.abrirConflito('lote', principal.tabela, principal.id, '*', atual, atual[0]?.por || null, { lote: lote.id, ops: lote.ops }, email);
+    } catch (e) {
+      if (e instanceof ErroCofre && e.status === 413) throw new ErroCofre(409, 'Esta exclusão mexe em registros que outro aparelho mudou: nada foi excluído. Atualize a página e exclua de novo.');
+      throw e;
+    }
+    return this.fecharLote(lote, email, lote.ops.map(() => ({ ok: false, conflito: true })), [conflito]);
   }
 
   /**
@@ -324,10 +414,18 @@ export class Cofre {
         if (igual(JSON.parse(atual.dados), dados)) return { ok: true, repetido: true };
         throw new ErroCofre(409, `Código ${id} já usado em ${tabela} (aparelho sem faixa de códigos?).`);
       }
+      const chaves = this.chavesDe(tabela);
+      if (chaves) {
+        const k = chaveUnica(tabela, dados); const outro = k === null ? undefined : chaves.porChave.get(k);
+        if (outro !== undefined && outro !== id) {
+          throw new ErroCofre(409, `${CHAVES_UNICAS[tabela].nome} já existe na nuvem (código ${outro}), feito em outro aparelho. Nada desta gravação entrou: confira o que já está lá antes de fazer de novo.`, { repetido: { tabela, id: outro } });
+        }
+      }
       if (!this.q('SELECT 1 AS x FROM tabelas WHERE nome = ?', tabela).length) this.sql.exec('INSERT INTO tabelas (nome, proximo) VALUES (?, ?)', tabela, id + 1);
       const meta = Object.fromEntries(Object.keys(dados).map((c) => [c, { por: email, em: this.agora() }]));
       this.sql.exec('INSERT INTO registros (tabela, id, dados, meta, ordem) VALUES (?, ?, ?, ?, ?)', tabela, id, texto(dados), JSON.stringify(meta), this.proximaOrdem());
       this.sql.exec('UPDATE tabelas SET proximo = MAX(proximo, ?) WHERE nome = ?', id + 1, tabela);
+      if (chaves) this.anotarChave(chaves, tabela, id, dados);
       this.registrarLog('registro', tabela, id, dados, email);
       return { ok: true };
     }
@@ -384,6 +482,7 @@ export class Cofre {
         mudou = true; conflito = true;
       }
       if (mudou) {
+        if (this.chaves.has(tabela)) this.anotarChave(this.chaves.get(tabela), tabela, id, dados);
         this.sql.exec('UPDATE registros SET dados = ?, meta = ? WHERE tabela = ? AND id = ?', texto(dados), JSON.stringify(meta), tabela, id);
         this.registrarLog('registro', tabela, id, dados, email);
       }
@@ -425,6 +524,7 @@ export class Cofre {
   excluirRegistro(tabela, id, dados, email) {
     this.sql.exec('INSERT INTO excluidos (tabela, id, dados, por, em) VALUES (?, ?, ?, ?, ?)', tabela, id, texto(dados), email, this.agora());
     this.sql.exec('DELETE FROM registros WHERE tabela = ? AND id = ?', tabela, id);
+    if (this.chaves.has(tabela)) this.anotarChave(this.chaves.get(tabela), tabela, id, null);
     this.registrarLog('exclusao', tabela, id, undefined, email);
   }
 
@@ -471,6 +571,17 @@ export class Cofre {
         if (!['excluir', 'manter'].includes(escolha)) throw new ErroCofre(400, 'Escolha "excluir" ou "manter".');
         const r = this.q('SELECT dados FROM registros WHERE tabela = ? AND id = ?', c.tabela, id)[0];
         if (escolha === 'excluir' && r) this.excluirRegistro(c.tabela, id, JSON.parse(r.dados), email);
+        fechar([c.id]);
+      } else if (c.tipo === 'lote') {
+        if (!['excluir', 'manter'].includes(escolha)) throw new ErroCofre(400, 'Escolha "excluir" (vale a gravação inteira) ou "manter" (nada dela vale).');
+        if (escolha === 'excluir') {
+          const quem = this.exigir(email, 'admin'); const novos = [];
+          this.maiorOrdem = null; this.chaves = new Map();
+          for (const op of JSON.parse(c.proposto || '{}').ops || []) {
+            const { base, ...semBase } = op; // vale como se ninguém tivesse mudado os registros
+            this.aplicarOp(op.op === 'excluir' ? semBase : op, email, quem, novos);
+          }
+        }
         fechar([c.id]);
       } else if (c.tipo === 'excluido') {
         if (!['manter_excluido', 'recriar'].includes(escolha)) throw new ErroCofre(400, 'Escolha "manter_excluido" ou "recriar".');

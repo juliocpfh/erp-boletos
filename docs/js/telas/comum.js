@@ -429,13 +429,30 @@ export async function alterarApagandoAnexos(fn) {
   const antes = R.arquivosReferenciados(d()).map((a) => ({ ...a, pasta: chavePasta(a.escopo, a.id) }));
   // contrato excluído junto (ex.: excluir o contrato): a pasta dele é achada pelo registro de antes
   const contratos = new Map(d().contratos.map((c) => [c.id, c]));
+  const loteAntes = E.nuvem?.ultimoLote;
   const r = await alterar(fn);
   const emUso = anexosEmUso();
   const soltos = antes.filter((a) => a.pasta && !emUso.has(`${a.pasta}|${a.nome}`))
     .filter((a, n, l) => l.findIndex((b) => b.pasta === a.pasta && b.nome === a.nome) === n)
     .map((a) => (escopoDoContrato(a.escopo) && !buscar('contratos', a.id) ? { ...a, contrato: contratos.get(Number(a.id)) || null } : a));
+  // nuvem: o arquivo só sai do R2 depois que a nuvem confirmar a exclusão (lote recusado ou em conflito: o registro continua)
+  const lote = E.nuvem?.ultimoLote;
+  if (soltos.length && lote && lote !== loteAntes && E.nuvem.pendentes.some((l) => l.id === lote)) {
+    await E.nuvem.guardarAposConfirmar(lote, { soltos });
+    return r;
+  }
   await apagarAnexos(soltos, 'Arquivo apagado junto com o lançamento');
   return r;
+}
+
+/** Nuvem: apaga os anexos guardados por `alterarApagandoAnexos` quando o lote foi confirmado e eles continuam sem uso. */
+export async function apagarAnexosConfirmados() {
+  if (!E.nuvem) return 0;
+  const { confirmados } = await E.nuvem.prontosAposConfirmar();
+  if (!confirmados.length) return 0;
+  const emUso = anexosEmUso();
+  const lista = confirmados.flatMap((x) => x.soltos || []).filter((a) => !emUso.has(`${a.pasta}|${a.nome}`));
+  return lista.length ? apagarAnexos(lista, 'Arquivo apagado junto com o lançamento') : 0;
 }
 
 /**

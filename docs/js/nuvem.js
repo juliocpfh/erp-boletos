@@ -10,6 +10,8 @@ export const CONTADORES = ['proxima_fatura'];
 export const MAX_SESSOES = 10;
 const FAIXA = 1000; // códigos reservados por tabela para este aparelho
 const RESERVA_MINIMA = 200; // abaixo disso, pede uma faixa nova quando tiver internet
+/** Maior faixa que a nuvem entrega de uma vez (MAX_FAIXA de nuvem/cofre.mjs; tests/sincronia.test.mjs confere). */
+export const MAX_FAIXA = 20000;
 
 /** Erro que o usuário entende (aparece na tela, não vai ao console), como C.ErroUsuario. */
 export class ErroNuvem extends Error {
@@ -245,7 +247,7 @@ export class Sincronia {
     this.agrupar = agrupar; this.tabelas = new Set(tabelas);
     this.base = null; this.pendentes = []; this.faixas = {}; this.recusas = []; this.conflitos = [];
     this.aparelho = null; this.n = 0; this.online = true; this.enviando = null; this.vista = null; this.externo = false;
-    this.envioMarcado = null; this.semFaixas = false;
+    this.envioMarcado = null; this.semFaixas = false; this.ultimoLote = null;
     this.geracao = 0; // anda toda vez que a vista deixa de valer (base, fila ou faixas mudaram)
     this.normalizarMexeuNoHistorico = false;
     this.puxando = Promise.resolve(); // um puxar de cada vez (dois aplicariam as mesmas mudanças duas vezes)
@@ -304,8 +306,50 @@ export class Sincronia {
   /** `seq` da tela: o da nuvem, com o próximo código de cada faixa deste aparelho. */
   seqDaVista() {
     const seq = { ...(this.base?.seq || {}) };
-    for (const [t, f] of Object.entries(this.faixas)) if (f.proximo <= f.fim) seq[t] = f.proximo - 1;
+    // faixa acabada: o próximo código fica depois dela (nunca volta para dentro dela nem para a de outro aparelho); a gravação
+    // que usar esse código pede uma faixa nova antes (faltaDeFaixa)
+    for (const [t, f] of Object.entries(this.faixas)) seq[t] = f.proximo <= f.fim ? f.proximo - 1 : Math.max(Number(seq[t]) || 0, f.fim);
     return seq;
+  }
+
+  /**
+   * Tabelas em que a gravação criou registros com código além da faixa deste aparelho (ex.: importar 1.100 lançamentos com
+   * 1.000 códigos reservados): { tabela: quantos registros novos a gravação tem nela }. null = tudo dentro das faixas.
+   * Sem esta conferência, os códigos a mais seriam os da faixa de outro aparelho e a nuvem recusaria a parte com eles.
+   */
+  faltaDeFaixa(ops) {
+    const novos = {}; const fora = new Set();
+    for (const o of ops) {
+      if (o.op !== 'inserir') continue;
+      novos[o.tabela] = (novos[o.tabela] || 0) + 1;
+      const f = this.faixas[o.tabela];
+      if (f && o.id > f.fim) fora.add(o.tabela);
+    }
+    return fora.size ? Object.fromEntries([...fora].map((t) => [t, novos[t]])) : null;
+  }
+
+  /**
+   * Pede à nuvem, antes de gravar, uma faixa do tamanho da gravação grande (`falta` de faltaDeFaixa). Sem internet não dá:
+   * a gravação é recusada com o aviso (nada foi gravado), em vez de usar os códigos de outro aparelho.
+   */
+  async reservarFaixas(falta) {
+    const novas = {};
+    for (const [t, n] of Object.entries(falta)) {
+      const quantidade = Math.max(FAIXA, n + RESERVA_MINIMA);
+      if (quantidade > MAX_FAIXA) throw new ErroNuvem(`Esta gravação cria ${n} registros de uma vez, mais do que a nuvem reserva (${MAX_FAIXA - RESERVA_MINIMA}). Divida em partes menores. Nada foi gravado.`);
+      let r;
+      try { r = await this.api('POST', 'faixa', { tabela: t, quantidade }); } catch (e) {
+        if (passageiro(e)) throw new ErroNuvem(`Esta gravação cria ${n} registros novos e os códigos reservados para este aparelho não bastam. Conecte à internet e faça de novo (o sistema reserva mais códigos sozinho). Nada foi gravado.`, 0);
+        throw e;
+      }
+      novas[t] = { proximo: r.inicio, fim: r.fim };
+    }
+    await this.trava(async () => {
+      await this.releFila();
+      this.faixas = juntarFaixas(this.faixas, novas);
+      await this.guardar.gravar('faixas', this.faixas);
+    });
+    this.invalidar();
   }
 
   /**
@@ -383,7 +427,22 @@ export class Sincronia {
   /** Grava uma mudança feita na tela: `fn(copia)` como em alterar (app.js). Sem internet, entra na fila. */
   async alterar(fn) {
     if (!this.base) throw new ErroNuvem('Os dados ainda não foram carregados.');
-    let comContador = false;
+    for (let tentativa = 0; ; tentativa += 1) {
+      const { resultado, comContador, falta } = await this.alterarUmaVez(fn);
+      if (falta) {
+        // gravação maior que a faixa: pede uma faixa do tamanho dela e refaz (`fn` roda de novo sobre a cópia, como na NF)
+        if (tentativa) throw new ErroNuvem('Não deu para reservar códigos para esta gravação. Tente de novo. Nada foi gravado.');
+        await this.reservarFaixas(falta);
+        continue;
+      }
+      if (comContador) return this.alterarComContador(fn);
+      this.enviarDepois();
+      return resultado;
+    }
+  }
+
+  async alterarUmaVez(fn) {
+    let comContador = false; let falta = null;
     // a trava vale do "ler a fila" ao "gravar a fila": outra aba no meio daria o mesmo código a registros novos
     const resultado = await this.trava(async () => {
       await this.releFila();
@@ -393,20 +452,22 @@ export class Sincronia {
       const r = fn(depois);
       const ops = diferencas(antes, depois);
       if (ops.some(ehContador)) { comContador = true; return undefined; }
+      falta = this.faltaDeFaixa(ops);
+      if (falta) return undefined;
       const faixas = canon(this.faixas);
       this.avancarFaixas(depois.seq || {});
       if (!ops.length) {
         if (canon(this.faixas) !== faixas) { await this.guardar.gravar('faixas', this.faixas); if (this.vista) this.vista.seq = this.seqDaVista(); }
         return r;
       }
-      this.pendentes.push(this.novoLote(ops));
+      const lote = this.novoLote(ops);
+      this.pendentes.push(lote);
       await this.gravarFila();
+      this.ultimoLote = lote.id;
       this.trocarVista(depois, geracao);
       return r;
     });
-    if (comContador) return this.alterarComContador(fn);
-    this.enviarDepois();
-    return resultado;
+    return { resultado, comContador, falta };
   }
 
   /**
@@ -423,19 +484,26 @@ export class Sincronia {
       try { await this.sincronizar({ exigirInternet: true }); } catch (e) {
         throw passageiro(e) ? new ErroNuvem('A NF só é numerada com internet. Conecte e tente de novo.') : e;
       }
-      const { resultado, lote } = await this.trava(async () => {
+      const { resultado, lote, falta } = await this.trava(async () => {
         await this.releFila();
         if (this.pendentes.length) throw new ErroNuvem('Ainda há mudanças esperando para ir à nuvem. Tente de novo em instantes.');
         const antes = this.atual();
         const depois = copiar(antes);
         const r = fn(depois);
         const ops = diferencas(antes, depois);
+        const falta = this.faltaDeFaixa(ops);
+        if (falta) return { falta };
         this.avancarFaixas(depois.seq || {});
         const l = this.novoLote(ops);
         await this.guardar.gravar('n', this.n);
         await this.guardar.gravar('faixas', this.faixas); // os códigos usados aqui não voltam para outra gravação
         return { resultado: r, lote: l };
       });
+      if (falta) {
+        if (tentativa >= 3) throw new ErroNuvem('Não deu para reservar códigos para esta gravação. Tente de novo. Nada foi gravado.');
+        await this.reservarFaixas(falta);
+        continue tentativas;
+      }
       const [primeira, ...resto] = dividirLote(lote); // o número da NF vai na 1ª parte
       const meus = chavesDosLotes([lote]);
       let gravou = false; let puxou = false; let duvida = null;
@@ -638,6 +706,37 @@ export class Sincronia {
       const antes = this.pendentes.length;
       this.pendentes = this.pendentes.filter((x) => !inteiros.has(x.id));
       if (this.pendentes.length !== antes) { await this.guardar.gravar('pendentes', this.pendentes); this.invalidar(); }
+    });
+  }
+
+  /**
+   * Algo para fazer só depois que a nuvem confirmar um lote (ex.: apagar do R2 os anexos que ficaram sem uso: se o lote for
+   * recusado ou virar conflito, o registro continua e o arquivo não pode ter sumido). `dados` vai guardado no aparelho.
+   */
+  async guardarAposConfirmar(lote, dados) {
+    await this.trava(async () => {
+      const lista = (await this.guardar.ler('apos-confirmar')) || [];
+      lista.push({ lote, dados });
+      await this.guardar.gravar('apos-confirmar', lista);
+    });
+  }
+
+  /** O que foi guardado para depois da confirmação e já pode sair: { confirmados, recusados } (os dados de cada um). */
+  async prontosAposConfirmar() {
+    const vazio = { confirmados: [], recusados: [] };
+    if (!((await this.guardar.ler('apos-confirmar')) || []).length) return vazio;
+    return this.trava(async () => {
+      await this.releFila();
+      const lista = (await this.guardar.ler('apos-confirmar')) || [];
+      const naFila = new Set(this.pendentes.map((l) => l.id));
+      const recusados = new Set(((await this.guardar.ler('recusas')) || this.recusas).map((r) => r.lote));
+      const ficam = []; const r = { confirmados: [], recusados: [] };
+      for (const x of lista) {
+        if (naFila.has(x.lote)) ficam.push(x);
+        else (recusados.has(x.lote) ? r.recusados : r.confirmados).push(x.dados);
+      }
+      if (ficam.length !== lista.length) await this.guardar.gravar('apos-confirmar', ficam);
+      return r;
     });
   }
 

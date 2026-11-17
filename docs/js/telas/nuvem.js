@@ -61,6 +61,13 @@ export async function telaConflitos() {
         <td>${esc(valorTexto(c.proposto))}<br><span class="suave">${esc(c.por_proposto || '')} · ${esc(quando(c.em))}</span></td>
         <td>${pode ? `${botao('resolverConflito', 'Fica o 1º', { conflito: c.id, escolha: 'atual' }, 'secundario pequeno')} ${botao('resolverConflito', 'Fica o 2º', { conflito: c.id, escolha: 'proposto' }, 'secundario pequeno')}` : ''}</td></tr>`;
     }
+    if (c.tipo === 'lote') {
+      // exclusão em grupo (ex.: o contrato e os boletos dele) que esbarrou em registro mudado em outro aparelho: nada dela valeu
+      const mudados = (Array.isArray(c.atual) ? c.atual : []).map((x) => nomeDoRegistro({ tabela: x.tabela, reg_id: String(x.id) })).join('; ');
+      const n = Number(c.proposto?.excluidos) || 0;
+      return `<tr><td>${esc(nomeDoRegistro(c))}</td><td colspan="3">${esc(`${c.por_proposto || 'Alguém'} excluiu este registro junto com ${Math.max(0, n - 1)} outro(s), mas ${c.por_atual || 'outra pessoa'} tinha mudado antes: ${mudados}. Nada da exclusão valeu ainda (${quando(c.em)}).`)}</td>
+        <td>${pode ? `${botao('resolverConflito', 'Excluir tudo', { conflito: c.id, escolha: 'excluir' }, 'secundario pequeno', 'Excluir o registro e todos os que iam junto, apesar da mudança feita no outro aparelho?')} ${botao('resolverConflito', 'Manter tudo', { conflito: c.id, escolha: 'manter' }, 'secundario pequeno')}` : ''}</td></tr>`;
+    }
     const [a, b, txt] = c.tipo === 'exclusao'
       ? ['excluir', 'manter', `${c.por_proposto || 'Alguém'} excluiu, mas ${c.por_atual || 'outra pessoa'} tinha mudado antes`]
       : ['manter_excluido', 'recriar', `${c.por_proposto || 'Alguém'} mudou, mas ${c.por_atual || 'outra pessoa'} tinha excluído antes`];
