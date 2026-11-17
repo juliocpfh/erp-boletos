@@ -957,15 +957,34 @@ export class Sincronia {
   /**
    * Reserva códigos para cada tabela (para criar registros sem internet sem repetir com outro aparelho), inclusive as que ainda
    * não têm nenhum registro (tabela nova: dois aparelhos sem internet criariam o código 1). Usuário de consulta não cria
-   * registros: a nuvem recusa (403) e não se pede mais nesta sessão.
+   * registros: a nuvem recusa (403) e não se pede mais nesta sessão. As que faltam vão num pedido só (no primeiro acesso são
+   * todas, ~60: antes, um pedido por tabela); nuvem de antes desta versão (400 no pedido de várias) → uma por vez, como antes.
+   * Chamada de novo enquanto o pedido anda (a abertura e a sincronia juntas): espera o mesmo, sem reservar duas vezes.
    */
-  async garantirFaixas() {
+  garantirFaixas() {
+    if (!this.pedindoFaixas) this.pedindoFaixas = this.pedirFaixas().finally(() => { this.pedindoFaixas = null; });
+    return this.pedindoFaixas;
+  }
+
+  async pedirFaixas() {
     if (this.semFaixas) return;
     const novas = {};
+    const faltam = [...this.tabelasConhecidas()].filter((t) => { const f = this.faixas[t]; return !f || f.fim - f.proximo + 1 < RESERVA_MINIMA; });
+    if (!faltam.length) return;
     try {
-      for (const t of this.tabelasConhecidas()) {
-        const f = this.faixas[t];
-        if (f && f.fim - f.proximo + 1 >= RESERVA_MINIMA) continue;
+      let juntas = null;
+      try {
+        const r = await this.api('POST', 'faixa', { tabelas: Object.fromEntries(faltam.map((t) => [t, FAIXA])) });
+        juntas = Array.isArray(r && r.faixas) ? r.faixas : null;
+      } catch (e) {
+        if (e.status === 403) { this.semFaixas = true; return; }
+        if (e.status !== 400) throw e;
+      }
+      if (juntas) {
+        for (const x of juntas) novas[x.tabela] = { proximo: x.inicio, fim: x.fim };
+        return;
+      }
+      for (const t of faltam) {
         let r;
         try { r = await this.api('POST', 'faixa', { tabela: t, quantidade: FAIXA }); } catch (e) {
           if (e.status === 403) { this.semFaixas = true; break; }
