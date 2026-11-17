@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-krNrnZrr5G1pTbbBTDB5NkqbM6dzpUnSZXGzYnwy4y4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-rjuPxXSmu93Ei9j4W3JOd0SjBDzp3EpMXZuSBGrdTi0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="c675a5f7a744000d">
+<meta name="fontes" content="3b54a47484c7e406">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -16203,18 +16203,18 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     const raiz = await E.pasta.getDirectoryHandle(PASTA_ARQUIVOS, { create: true });
     if (escopo === "ficha") {
       const f = buscar2("fichas", id);
-      if (!f) throw new Error("Ficha não encontrada.");
+      if (!f) throw new ErroUsuario("Esta ficha não existe mais (pode ter sido excluída por outra pessoa). Atualize a página.");
       return subpasta(raiz, [PASTA_FICHAS2, f.pasta || nomePastaFicha(f)], criar);
     }
     if (escopoDoContrato(escopo)) {
       const c = contrato || buscar2("contratos", id);
-      if (!c) throw new Error("Inquilino não encontrado.");
+      if (!c) throw new ErroUsuario("Este inquilino não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.");
       return subpasta(raiz, [...pastaPaiContrato(c), c.pasta || nomePastaContrato(c), ...SUB_DO_ESCOPO[escopo] ? [SUB_DO_ESCOPO[escopo]] : []], criar);
     }
     if (escopo === "contador") {
       const { emitenteId, comp } = decodificarIdContador2(Number(id));
       const e = buscar2("emitentes", emitenteId);
-      if (!e) throw new Error("Empresa da conta bancária não encontrada.");
+      if (!e) throw new ErroUsuario("A empresa desta conta bancária não existe mais. Confira em Empresas.");
       return subpasta(raiz, [pastaContador2(), e.nome, comp], criar);
     }
     const i = buscar2("imoveis", imovelDoEscopo(escopo, id));
@@ -19480,11 +19480,11 @@ ${xref}
   }
   async function guardarComprovante(x, tabela, nomeBase, blob, origem, { avisar = true } = {}) {
     const base = limparNome(semAcento(nomeBase).replace(/\.pdf$/i, "").trim());
-    if (!base || base === "sem nome") throw new Error("Dê um nome ao comprovante.");
+    if (!base || base === "sem nome") throw new ErroUsuario("Escreva um nome para o comprovante antes de guardar.");
     const arquivo = () => new File([blob], `${base}.pdf`, { type: "application/pdf" });
     const p2 = pastaDoComprovante(d(), x);
     const c = config().copiar_para_contador !== false ? pastaContador(d(), x) : null;
-    if (!p2 && !c) throw new Error("Não há pasta para guardar: a movimentação não tem imóvel e a conta não está ligada a uma empresa (Dados e backup → Banco).");
+    if (!p2 && !c) throw new ErroUsuario("Não há pasta para guardar: a movimentação não tem imóvel e a conta não está ligada a uma empresa (Dados e backup → Banco).");
     const comprovante2 = p2 ? await salvarArquivo(await pastaDoEscopo(p2.escopo, p2.id), arquivo()) : null;
     const contador = c ? await salvarArquivo(await pastaDoEscopo(c.escopo, c.id), arquivo()) : null;
     await alterar((db) => registrarComprovante(db, x.id, { nome_arquivo: base, comprovante: comprovante2, comprovante_contador: contador, origem }, login(), tabela));
@@ -19521,15 +19521,15 @@ ${xref}
   }
   async function pdfDaJanela(r) {
     if (r.origem === "ponte") {
-      if (!bancoAtivo2()) throw new Error(TITULO_AGUARDANDO);
+      if (!bancoAtivo2()) throw new ErroUsuario(BANCO_DESLIGADO);
       try {
         return await baixarComprovantePonte(r.lanc.conta, r.lanc.referencia, r.lanc.data);
       } catch (e) {
         throw new Error(`Não consegui gerar o comprovante pelo banco agora (${e.message}). Você pode anexar o PDF do computador: clique de novo em "Nomear e guardar" e escolha "Anexar um PDF".`);
       }
     }
-    if (!r.arquivo || !r.arquivo.size) throw new Error("Escolha o arquivo PDF do comprovante.");
-    if (!/\.pdf$/i.test(r.arquivo.name) && r.arquivo.type !== "application/pdf") throw new Error("O comprovante precisa ser um PDF.");
+    if (!r.arquivo || !r.arquivo.size) throw new ErroUsuario("Escolha o arquivo PDF do comprovante.");
+    if (!/\.pdf$/i.test(r.arquivo.name) && r.arquivo.type !== "application/pdf") throw new ErroUsuario("O comprovante precisa ser um PDF.");
     return r.arquivo;
   }
   function linhaMovimentacao(m) {
@@ -19929,7 +19929,7 @@ ${xref}
       }
     }
   }
-  var TITULO_AGUARDANDO, config, contas, contaDe, bancoAtivo2, movs, pagamentos, nomeConta, emitenteDaConta, pastaContador3, rotuloDe, ROTULO_CURTO, SEM_COMPROVANTE2, SEM_IMOVEL, mov, pag, registroDe, valorHtml, precisaComprovante, temComprovante, sugestaoDe, centavosDoBanco, botaoPonte, estado, avisoNaoConfigurado, avisoPagamentosDesligados, CHAVE_AVISOS, INTERVALO_AVISOS_MS, MAX_RECONSULTAS, lidosAte, guardarLidos, lendoAvisos, ultimaLeituraAvisos, relogioAvisos, avisosAoAbrir, AJUDA_BANCO, irmaoDe, comComprovante, AVISO_APROVACAO, CODIGO_PAG, PENDENTES, etiquetaSituacao, CABECALHO_PAG, opcoes, despesasSemExtrato, ondeFoiDiferenca, pagamentosDoLote, ACOES_BANCO, FORMULARIOS_BANCO;
+  var TITULO_AGUARDANDO, BANCO_DESLIGADO, config, contas, contaDe, bancoAtivo2, movs, pagamentos, nomeConta, emitenteDaConta, pastaContador3, rotuloDe, ROTULO_CURTO, SEM_COMPROVANTE2, SEM_IMOVEL, mov, pag, registroDe, valorHtml, precisaComprovante, temComprovante, sugestaoDe, centavosDoBanco, botaoPonte, estado, avisoNaoConfigurado, avisoPagamentosDesligados, CHAVE_AVISOS, INTERVALO_AVISOS_MS, MAX_RECONSULTAS, lidosAte, guardarLidos, lendoAvisos, ultimaLeituraAvisos, relogioAvisos, avisosAoAbrir, AJUDA_BANCO, irmaoDe, comComprovante, AVISO_APROVACAO, CODIGO_PAG, PENDENTES, etiquetaSituacao, CABECALHO_PAG, opcoes, despesasSemExtrato, ondeFoiDiferenca, pagamentosDoLote, ACOES_BANCO, FORMULARIOS_BANCO;
   var init_banco2 = __esm({
     "docs/js/telas/banco.js"() {
       init_app();
@@ -19943,6 +19943,7 @@ ${xref}
       init_regras();
       init_comum();
       TITULO_AGUARDANDO = "Aguardando as chaves da API do C6";
+      BANCO_DESLIGADO = "O banco ainda não está ligado ao sistema (faltam as chaves do C6). Peça ao administrador para ligar em Dados e backup → Banco.";
       config = () => d().config_banco || {};
       contas = () => config().contas || [];
       contaDe = (id) => contas().find((c) => c.id === id) || null;
@@ -19964,12 +19965,12 @@ ${xref}
       SEM_IMOVEL = ["tarifa", "transferencia", "ignorar", "imposto", "airbnb"];
       mov = (id) => {
         const m = movs().find((x) => x.id === Number(id));
-        if (!m) throw new Error("Movimentação não encontrada.");
+        if (!m) throw new ErroUsuario("Esta movimentação não existe mais (pode ter sido apagada por outra pessoa). Atualize a página.");
         return m;
       };
       pag = (id) => {
         const p2 = pagamentos().find((x) => x.id === Number(id));
-        if (!p2) throw new Error("Pagamento não encontrado.");
+        if (!p2) throw new ErroUsuario("Este pagamento não existe mais (pode ter sido apagado por outra pessoa). Atualize a página.");
         return p2;
       };
       registroDe = (tabela, id) => tabela === "pagamentos_banco" ? pag(id) : mov(id);
@@ -20035,11 +20036,11 @@ ${xref}
       pagamentosDoLote = (grupo2) => pagamentos().filter((p2) => p2.grupo_id === grupo2 && ["rascunho", "aguardando_aprovacao"].includes(p2.situacao));
       ACOES_BANCO = {
         async buscarExtrato({ conta, mes }) {
-          if (!opera()) throw new Error("Seu usuário não pode importar o extrato.");
-          if (!bancoAtivo2()) throw new Error(`${TITULO_AGUARDANDO}: configure o banco em Dados e backup.`);
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode buscar o extrato. Peça ao administrador, se precisar.");
+          if (!bancoAtivo2()) throw new ErroUsuario(BANCO_DESLIGADO);
           const [inicio, fim] = limitesCompetencia(mes);
           const ate = fim < hojeIso() ? fim : hojeIso();
-          if (inicio > ate) throw new Error(`${compBr(mes)} ainda não começou.`);
+          if (inicio > ate) throw new ErroUsuario(`${compBr(mes)} ainda não começou.`);
           const anterior = extratoImportadoAte(d(), conta);
           const de = anterior && anterior < somarDias(inicio, -1) && anterior >= somarDias(inicio, -62) ? somarDias(anterior, 1) : inicio;
           const r = await extratoDaConta(conta, de, ate);
@@ -20052,7 +20053,7 @@ ${xref}
          * do arquivo, o período e a quantidade; lançamentos já importados (mesmo FITID) não entram de novo.
          */
         async importarOfx({ conta }, el) {
-          if (!opera()) throw new Error("Seu usuário não pode importar o extrato.");
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode buscar o extrato. Peça ao administrador, se precisar.");
           const arquivo = el && el.files && el.files[0];
           if (!arquivo) return;
           try {
@@ -20086,7 +20087,7 @@ ${xref}
           }
         },
         async saldoBanco({ conta }) {
-          if (!bancoAtivo2()) throw new Error(TITULO_AGUARDANDO);
+          if (!bancoAtivo2()) throw new ErroUsuario(BANCO_DESLIGADO);
           const s = await saldoDaConta(conta);
           const comLimite = s.total_available !== void 0 && s.available !== void 0 && s.available !== s.total_available ? centavosDoBanco(s.total_available) : null;
           estado.saldos[conta] = { valor: centavosDoBanco(s.available ?? s.total_available ?? 0), quando: `consultado ${agoraBr()}${comLimite !== null ? ` · com o limite do banco: ${reais(comLimite)} (o limite não é dinheiro da conta)` : ""}` };
@@ -20095,7 +20096,7 @@ ${xref}
         },
         /** Administrador: a diferença do saldo foi explicada (ex.: lançamento antigo de antes do sistema); o saldo do banco vira o novo ponto de partida. */
         async aceitarSaldoBanco({ conta }) {
-          if (!podeUsuario("admin")) throw new Error("Só o administrador muda o ponto de partida da conferência do saldo.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador muda o ponto de partida da conferência do saldo. Peça a ele.");
           const u = ((d().saldos_banco || {})[conta] || {}).ultima;
           const ok = await janela({
             titulo: "Usar o saldo do banco como ponto de partida",
@@ -20110,7 +20111,7 @@ ${xref}
         },
         /** Conferência do saldo: apaga a cópia de um lançamento importado em dobro (sem destino nem comprovante) e confere de novo. */
         async apagarCopiaRepetida({ id }) {
-          if (!opera()) throw new Error("Seu usuário não pode mexer no extrato.");
+          if (!opera()) throw new ErroUsuario("Seu usuário não pode mexer no extrato. Peça ao administrador.");
           const m = mov(id);
           const ok = await janela({
             titulo: "Apagar a cópia repetida",
@@ -20124,10 +20125,10 @@ ${xref}
         },
         /** Painel de saúde: consulta a ponte agora (certificado, último token). */
         async conferirSaudeBanco() {
-          if (!bancoAtivo2()) throw new Error(TITULO_AGUARDANDO);
+          if (!bancoAtivo2()) throw new ErroUsuario(TITULO_AGUARDANDO);
           estado.saudePonteEm = Date.now();
           await conferirSaudePonte();
-          if (estado.saudePonteErro) throw new Error(`A ponte não respondeu: ${estado.saudePonteErro}`);
+          if (estado.saudePonteErro) throw new ErroUsuario(`A ponte do banco não respondeu (${estado.saudePonteErro}). Confira se o computador da ponte está ligado e tente de novo.`);
         },
         async darDestino({ id }) {
           const m = mov(id);
@@ -20137,7 +20138,7 @@ ${xref}
         async usarSugestao({ id }) {
           const m = mov(id);
           const s = sugestaoDe(m);
-          if (!s || !s.classificacao) throw new Error("Não há sugestão para esta movimentação.");
+          if (!s || !s.classificacao) throw new ErroUsuario("Esta movimentação não tem mais sugestão (a tela mudou). Atualize a página e escolha o destino à mão.");
           if (s.pagamento_banco_id) {
             await alterar((db) => marcarPagoPeloExtrato(db, s.pagamento_banco_id, m.id, login()));
             aviso("Pagamento pelo banco confirmado pelo extrato.");
@@ -20163,7 +20164,7 @@ ${xref}
         /** Troca o comprovante gerado (ou anexado antes) pelo PDF oficial do banco, com o mesmo nome: o anterior é apagado da pasta. */
         async trocarComprovante({ id, tabela = "movimentacoes_banco" }) {
           const onde = ondeEstaComprovante(registroDe(tabela, id), tabela);
-          if (!onde) throw new Error('Este lançamento ainda não tem comprovante: use "Nomear e guardar".');
+          if (!onde) throw new ErroUsuario('Este lançamento ainda não tem comprovante: use "Nomear e guardar".');
           const x = registroDe(tabela, id);
           const nome = String(onde.nome).replace(/\.pdf$/i, "").replace(/ \(\d+\)$/, "");
           const r = await janelaComprovante(x, tabela, { soManual: true, nomeFixo: nome });
@@ -20180,8 +20181,8 @@ ${xref}
         },
         /** Gera pela ponte, de uma vez, os comprovantes do mês que ainda faltam (entradas e saídas com destino). */
         async gerarComprovantesMes({ conta, mes }) {
-          if (!opera()) throw new Error("Seu usuário não pode guardar comprovantes.");
-          if (!bancoAtivo2()) throw new Error(TITULO_AGUARDANDO);
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode guardar comprovantes.");
+          if (!bancoAtivo2()) throw new ErroUsuario(BANCO_DESLIGADO);
           const doMes = movs().filter((m) => m.conta_id === conta && String(m.data).slice(0, 7) === mes);
           const semDestino = doMes.filter((m) => !m.classificacao).length;
           const faltam = doMes.filter((m) => precisaComprovante(m) && !comComprovante(m) && m.id_externo);
@@ -20207,8 +20208,8 @@ ${xref}
         async confirmarBoletoPeloBanco({ id, cobranca }) {
           const m = mov(id);
           const cb = buscar2("cobrancas", Number(cobranca));
-          if (!cb) throw new Error("Boleto não encontrado.");
-          if (cb.data_pagamento) throw new Error("Este boleto já está pago.");
+          if (!cb) throw new ErroUsuario("Este boleto não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.");
+          if (cb.data_pagamento) throw new ErroUsuario("Este boleto já está pago: nada a fazer.");
           const c = buscar2("contratos", cb.contrato_id);
           const previsto = previstoNoPagamento(cb, m.data).valor_devido;
           const r = await janela({
@@ -20237,7 +20238,7 @@ ${xref}
         },
         /** Lê os avisos que o banco mandou à ponte (webhook) e mostra os boletos a reconsultar. Nada é registrado aqui. */
         async avisosDoBanco({ conta }) {
-          if (!bancoAtivo2()) throw new Error(TITULO_AGUARDANDO);
+          if (!bancoAtivo2()) throw new ErroUsuario(BANCO_DESLIGADO);
           const desde = somarDias(hojeIso(), -30);
           const r = await avisosDoBanco(conta, desde);
           const refs = [...new Set((r && r.notificacoes || []).map((n) => n.external_reference_id).filter(Boolean))];
@@ -20247,7 +20248,7 @@ ${xref}
           await mostrar();
         },
         async conferirBoletosBanco({ conta, mes }) {
-          if (!bancoAtivo2()) throw new Error(TITULO_AGUARDANDO);
+          if (!bancoAtivo2()) throw new ErroUsuario(BANCO_DESLIGADO);
           const [de, fim] = limitesCompetencia(mes);
           const r = await boletosPagos(conta, de, fim < hojeIso() ? fim : hojeIso());
           const pagos = Array.isArray(r) ? r : r && (r.boletos || r.content) || [];
@@ -20257,10 +20258,10 @@ ${xref}
           await mostrar();
         },
         async lerNoBanco({ ids }) {
-          if (!opera()) throw new Error("Seu usuário não pode preparar pagamentos.");
-          if (!bancoAtivo2()) throw new Error(TITULO_AGUARDANDO);
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode preparar pagamentos.");
+          if (!bancoAtivo2()) throw new ErroUsuario(BANCO_DESLIGADO);
           const pags = String(ids).split(",").map((x) => pag(x)).filter((p2) => PENDENTES.includes(p2.situacao));
-          if (!pags.length) throw new Error("Nenhum pagamento para o banco ler.");
+          if (!pags.length) throw new ErroUsuario("Não há pagamento para o banco ler: lance as contas a pagar primeiro.");
           await lerNoBanco(pags[0].conta_id, pags);
           await mostrar();
         },
@@ -20269,11 +20270,11 @@ ${xref}
          * registrado. A outra confirmação é no app do C6 (duas ao todo, decisão do dono em 2026-11-07).
          */
         async enviarGrupoAprovacao({ conta, grupo: grupo2 }) {
-          if (!podeUsuario("admin")) throw new Error("Só o administrador envia pagamentos para aprovação.");
-          if (!bancoAtivo2()) throw new Error(TITULO_AGUARDANDO);
-          if (!config().permitir_pagamentos) throw new Error("Os pagamentos pelo banco estão desligados em Dados e backup → Banco: conciliação e pagamentos.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador envia pagamentos para aprovação.");
+          if (!bancoAtivo2()) throw new ErroUsuario(BANCO_DESLIGADO);
+          if (!config().permitir_pagamentos) throw new ErroUsuario("Os pagamentos pelo banco estão desligados em Dados e backup → Banco: conciliação e pagamentos.");
           const pags = pagamentosDoLote(grupo2);
-          if (!pags.length) throw new Error("Nenhum pagamento deste lote está pronto para enviar (prepare de novo).");
+          if (!pags.length) throw new ErroUsuario("Nenhum pagamento deste lote está pronto para enviar (prepare de novo).");
           const { items } = await itensDoGrupo(conta, grupo2);
           const { prontos, jaNoBanco, comErro } = separarParaEnvio(pags, items || []);
           if (jaNoBanco.length) {
@@ -20281,7 +20282,7 @@ ${xref}
             aviso(`${jaNoBanco.length} pagamento(s) já tinha(m) chegado ao banco: a situação foi atualizada para "Enviado ao banco". Aprove no aplicativo do C6.`, "aviso");
             if (!prontos.length) return mostrar();
           }
-          if (!prontos.length) throw new Error("Nenhum item foi validado pelo banco. Confira os códigos e prepare de novo.");
+          if (!prontos.length) throw new ErroUsuario("Nenhum item foi validado pelo banco. Confira os códigos e prepare de novo.");
           const passados = prontos.filter((p2) => p2.data_pagamento && p2.data_pagamento < hojeIso());
           if (passados.length) throw new ErroUsuario(`${passados.length} pagamento(s) deste lote está(ão) com a data de pagamento já passada (${passados.map((p2) => `${esc(p2.tipo_conta || "")} ${reais(p2.valor)} em ${dataBr(p2.data_pagamento)}`).join("; ")}). Descarte e prepare de novo com a data de hoje ou depois. Nada foi enviado ao banco.`);
           const total = prontos.reduce((t, p2) => t + p2.valor, 0);
@@ -20335,7 +20336,7 @@ ${xref}
         },
         /** Administrador: o pagamento enviado foi cancelado (ou recusado) no C6 e o banco não avisou; aqui passa a "Cancelado" e sai do alerta. */
         async canceladoNoBanco({ id }) {
-          if (!podeUsuario("admin")) throw new Error("Só o administrador marca um pagamento como cancelado no banco.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador marca um pagamento como cancelado no banco.");
           const p2 = pag(id);
           const r = await janela({
             titulo: "Foi cancelado no C6",
@@ -20353,7 +20354,7 @@ ${xref}
           await mostrar();
         },
         async atualizarSituacaoPagamento({ conta, grupo: grupo2 }) {
-          if (!bancoAtivo2()) throw new Error(TITULO_AGUARDANDO);
+          if (!bancoAtivo2()) throw new ErroUsuario(BANCO_DESLIGADO);
           const { items } = await itensDoGrupo(conta, grupo2);
           const mudados = await alterar((db) => atualizarSituacaoPagamentos(db, items || [], login()));
           const n = mudados.length;
@@ -20372,7 +20373,7 @@ ${xref}
           const alvo = p2.pago_em || p2.data_pagamento || p2.vencimento;
           const dist = (m) => alvo ? Math.abs(diasEntre(alvo, m.data)) : 0;
           const candidatas = movs().filter((m) => m.conta_id === p2.conta_id && m.tipo === "saida" && m.valor === p2.valor && !m.classificacao && dist(m) <= 5).sort((a, b) => dist(a) - dist(b) || String(b.data).localeCompare(String(a.data)));
-          if (!candidatas.length) throw new Error(`Nenhuma saída de ${reais(p2.valor)} sem destino na conta ${nomeConta(p2.conta_id)} entre ${dataBr(somarDias(alvo, -5))} e ${dataBr(somarDias(alvo, 5))}. Busque o extrato do mês na tela Banco e tente de novo.`);
+          if (!candidatas.length) throw new ErroUsuario(`Nenhuma saída de ${reais(p2.valor)} sem destino na conta ${nomeConta(p2.conta_id)} entre ${dataBr(somarDias(alvo, -5))} e ${dataBr(somarDias(alvo, 5))}. Busque o extrato do mês na tela Banco e tente de novo.`);
           const r = await janela({
             titulo: "Qual saída do extrato é este pagamento?",
             sim: "Confirmar pagamento",
@@ -20388,7 +20389,7 @@ ${xref}
       };
       FORMULARIOS_BANCO = {
         async registrarPagamentosBanco(form) {
-          if (!opera()) throw new Error("Seu usuário não pode confirmar pagamentos.");
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode confirmar pagamentos.");
           const conf = estado.conferencia;
           const marcados = [...form.querySelectorAll('input[name="pag"]:checked')].map((el) => conf && conf.sugestoes[Number(el.value)]).filter(Boolean);
           if (!marcados.length) throw new ErroUsuario("Marque pelo menos um boleto.");
@@ -20438,18 +20439,18 @@ ${xref}
           await mostrar();
         },
         async pagarPeloBanco(form) {
-          if (!opera()) throw new Error("Seu usuário não pode preparar pagamentos.");
-          if (!bancoAtivo2()) throw new Error(`${TITULO_AGUARDANDO}: configure o banco em Dados e backup.`);
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode preparar pagamentos.");
+          if (!bancoAtivo2()) throw new ErroUsuario(BANCO_DESLIGADO);
           const f = Object.fromEntries(new FormData(form));
           const i = buscar2("imoveis", Number(f.imovel));
-          if (!i) throw new Error("Imóvel não encontrado.");
-          if (!f.conta) throw new Error("Escolha a conta que paga.");
+          if (!i) throw new ErroUsuario("Este imóvel não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.");
+          if (!f.conta) throw new ErroUsuario("Escolha a conta do banco que vai pagar.");
           const itens = TIPOS_DESPESA.map((t, n) => ({ tipo_conta: f[`tipo_${n}`] || t, codigo: String(f[`codigo_${n}`] || "").trim(), valor: String(f[`valor_${n}`] || "").trim() ? centavos(f[`valor_${n}`]) : 0, data_pagamento: f[`data_${n}`] || hojeIso() })).filter((x) => x.codigo || x.valor);
-          if (!itens.length) throw new Error("Preencha o código e o valor de pelo menos uma conta.");
+          if (!itens.length) throw new ErroUsuario("Preencha o código e o valor de pelo menos uma conta.");
           for (const x of itens) {
-            if (!x.codigo) throw new Error(`${x.tipo_conta}: informe o código de barras ou o Pix.`);
-            if (!(x.valor > 0)) throw new Error(`${x.tipo_conta}: informe o valor.`);
-            if (x.data_pagamento < hojeIso()) throw new Error(`${x.tipo_conta}: a data de pagamento não pode ser no passado.`);
+            if (!x.codigo) throw new ErroUsuario(`${x.tipo_conta}: informe o código de barras ou o Pix.`);
+            if (!(x.valor > 0)) throw new ErroUsuario(`${x.tipo_conta}: informe o valor.`);
+            if (x.data_pagamento < hojeIso()) throw new ErroUsuario(`${x.tipo_conta}: a data de pagamento não pode ser no passado.`);
           }
           const prontos = itens.map((x) => {
             const r = lerCodigoPagamento(x.codigo);
@@ -20474,7 +20475,7 @@ ${xref}
           await mostrar();
         },
         async configBanco2(form) {
-          if (!podeUsuario("admin")) throw new Error("Só o administrador altera a configuração do banco.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador altera a configuração do banco.");
           const f = Object.fromEntries(new FormData(form));
           const campos = {
             permitir_pagamentos: f.permitir_pagamentos === "1",
@@ -21149,7 +21150,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
   }
   async function indicesMensaisFci(indice, de, ate) {
     const serie = SERIES_FCI[indice];
-    if (!serie) throw new Error(`O índice "${indice}" não está no Banco Central. Escolha outro índice do FCI em "Editar".`);
+    if (!serie) throw new ErroUsuario(`O índice "${indice}" não está no Banco Central. Escolha outro índice do FCI em "Editar".`);
     const br = (m) => `01/${m.slice(5, 7)}/${m.slice(0, 4)}`;
     let lista3 = null;
     for (let n = 1; n <= 3 && !lista3; n += 1) {
@@ -21162,7 +21163,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
         setTimeout(ok, 2e3 * n);
       });
     }
-    if (!lista3) throw new Error("O Banco Central ficou sem resposta (sem internet ou o site deles está ocupado). Tente de novo em alguns minutos.");
+    if (!lista3) throw new ErroUsuario("O Banco Central ficou sem resposta (sem internet ou o site deles está ocupado). Tente de novo em alguns minutos.");
     const out = {};
     for (const x of Array.isArray(lista3) ? lista3 : []) if (Number.isFinite(Number(x.valor))) out[`${x.data.slice(6, 10)}-${x.data.slice(3, 5)}`] = Number(x.valor);
     return out;
@@ -22870,11 +22871,11 @@ ${DICA_DOCUMENTOS}`].join("\n");
   async function janelaEmail(chave, alvo) {
     const modelo = modeloEmail(d(), chave);
     const reg = alvo.contrato ? buscar2("contratos", alvo.contrato) : buscar2("fichas", alvo.ficha);
-    if (!modelo || !reg) throw new Error("Inquilino ou ficha não encontrado.");
+    if (!modelo || !reg) throw new ErroUsuario("Este inquilino ou ficha não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.");
     const objeto = alvo.contrato ? { contrato: reg } : { ficha: reg };
     if (alvo.aditivo) {
       objeto.aditivo = buscar2("aditivos", alvo.aditivo);
-      if (!objeto.aditivo) throw new Error("Termo aditivo não encontrado.");
+      if (!objeto.aditivo) throw new ErroUsuario("Este termo aditivo não existe mais (pode ter sido excluído). Atualize a página.");
     }
     const inicio = dadosDoEmail(d(), objeto);
     const ligado2 = await emailLigado();
@@ -23046,7 +23047,7 @@ ${e.texto}`) ? `Assunto e texto copiados: cole no e-mail.${pendente() ? ` ${pend
       };
       ACOES_EMAILS = {
         async abrirEmail({ chave, contrato, ficha, aditivo }) {
-          if (!opera()) throw new Error("Seu usuário não pode enviar e-mails.");
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode enviar e-mails. Peça ao administrador, se precisar.");
           await janelaEmail(chave, contrato ? { contrato: Number(contrato), ...aditivo ? { aditivo: Number(aditivo) } : {} } : { ficha: Number(ficha) });
         },
         async restaurarModeloEmail({ chave }) {
@@ -23070,14 +23071,14 @@ ${m.texto}
       };
       FORMULARIOS_EMAILS = {
         async modeloEmail(form) {
-          if (!opera()) throw new Error("Seu usuário não pode alterar os modelos.");
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode alterar os modelos de e-mail.");
           const f = new FormData(form);
           const chave = String(f.get("chave") || "");
           const padrao = MODELOS_EMAIL.find((m) => m.chave === chave);
           if (!padrao) throw new Error("Modelo não encontrado.");
           const assunto = String(f.get("assunto") || "").trim();
           const texto3 = String(f.get("texto") || "").trim();
-          if (!assunto || !texto3) throw new Error("Preencha o assunto e o texto.");
+          if (!assunto || !texto3) throw new ErroUsuario("Preencha o assunto e o texto do e-mail antes de salvar.");
           await alterar((db) => {
             const m = (db.modelos_email || []).find((x) => x.chave === chave);
             if (m) atualizar(db, "modelos_email", m.id, { assunto, texto: texto3 }, login(), `Modelo de e-mail "${padrao.nome}"`);
@@ -25467,10 +25468,10 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
           ir(`#/ficha/${salva.id}`);
         },
         async decidirFicha({ id, situacao: situacao2 }) {
-          if (!opera()) throw new Error("Seu usuário não pode decidir fichas.");
-          if (situacao2 !== "Aprovada") throw new Error('Para reprovar, use "Editar" (com o motivo).');
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode aprovar nem reprovar fichas.");
+          if (situacao2 !== "Aprovada") throw new ErroUsuario('Para reprovar, use "Editar" e escreva o motivo.');
           const f = buscar2("fichas", id);
-          if (!f || f.situacao !== "Em análise") throw new Error("Esta ficha já foi decidida.");
+          if (!f || f.situacao !== "Em análise") throw new ErroUsuario("Esta ficha já foi decidida (talvez por outra pessoa). Atualize a página.");
           await alterar((db) => atualizar(db, "fichas", f.id, { situacao: "Aprovada", decisao_data: hojeIso(), decisao_por: login() }, login(), `Ficha de ${f.inquilino_nome} aprovada`));
           aviso("Ficha aprovada. Agora faça o contrato.");
           await mostrar();
@@ -27195,7 +27196,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
           voltar: (r, q) => `#/contrato/${q.contrato}`,
           ajustar(dados, erros, r, form, q) {
             const c = buscar2("contratos", q.contrato);
-            if (!c.data_saida) throw new Error('Informe antes a data de saída, em "Saída do inquilino".');
+            if (!c.data_saida) throw new ErroUsuario('Informe antes a data de saída, em "Saída do inquilino".');
             for (const k of ["garantia_valor", "indice_percentual", "debitos", "fci_credito", "fci_danos"]) if (!dados[k]) dados[k] = 0;
             for (const k of relogiosDoContrato(c)) if (!dados[`leitura_${k}`]) erros[`leitura_${k}`] = "Informe a leitura na saída";
             dados.vistoria_saida = resultadoVistoriaSaida(d(), c).texto;
@@ -27511,6 +27512,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
   var init_icone = __esm({
     "docs/js/telas/icone.js"() {
       init_app();
+      init_calculos();
       init_comum();
       enquadro = { zoom: 1, x: 0, y: 0, fundo: "#ffffff" };
       GUARDADO = "icone-enquadramento";
@@ -27539,8 +27541,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
           }
         },
         async salvarIcone() {
-          if (!podeUsuario("admin")) throw new Error("Só administradores podem trocar o ícone do aplicativo.");
-          if (!E.nuvem) throw new Error("O ícone do aplicativo só muda com os dados na nuvem.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador troca o ícone do aplicativo.");
+          if (!E.nuvem) throw new ErroUsuario("O ícone do aplicativo só muda com os dados na nuvem (entre pelo endereço da internet).");
           await carregarLogo();
           const [grande, pequeno] = await Promise.all([pngDoIcone(512), pngDoIcone(192)]);
           await pedirNuvem("icone/512", "PUT", grande);
@@ -27549,7 +27551,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
           aviso("Ícone do aplicativo salvo. Quem instalar o aplicativo a partir de agora já recebe este ícone.");
         },
         async iconePadrao() {
-          if (!podeUsuario("admin")) throw new Error("Só administradores podem trocar o ícone do aplicativo.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador troca o ícone do aplicativo.");
           await pedirNuvem("icone", "DELETE");
           trocarIconeDaAba();
           aviso("O aplicativo voltou ao ícone padrão (ERP).");
@@ -27644,7 +27646,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     ${caixaContaDosBoletos()}`;
   }
   async function desfazerItens(itens) {
-    if (!podeUsuario("admin")) throw new Error("Só o administrador desfaz alterações.");
+    if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador desfaz alterações. Peça a ele, se precisar.");
     if (E.nuvem && itens.some((x) => Number(String(x).split(":")[0]) >= (E.nuvem.base?.historico?.length || 0))) {
       throw Object.assign(new Error('Esta alteração ainda não foi para a nuvem. Espere a faixa do topo mostrar "tudo enviado" e desfaça de novo.'), { esperado: true });
     }
@@ -27793,7 +27795,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     }
   }
   async function reduzirImagem(arquivo) {
-    if (!podeUsuario("admin")) throw new Error("Só administradores podem alterar a logo.");
+    if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador troca a logo. Peça a ele, se precisar.");
     const url = URL.createObjectURL(arquivo);
     try {
       const img = await new Promise((ok, falha) => {
@@ -29068,14 +29070,14 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
           baixar(f.blob, f.nome);
         },
         async baixarBackupNuvem({ nome }) {
-          if (!podeUsuario("admin")) throw new Error("Só o administrador baixa backups.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador baixa backups.");
           const [dia] = diaDoBackup(nome);
           if (!dia) throw new Error("Backup desconhecido.");
           baixar(await abrirArquivo(await pastaBackups(), nome), nome);
         },
         /** Volta os dados da nuvem para os de um dia (o servidor guarda antes uma cópia "antes-da-substituicao"). */
         async restaurarBackupNuvem({ nome }) {
-          if (!podeUsuario("admin")) throw new Error("Só o administrador restaura backups.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador volta os dados para um backup.");
           const [dia, , motivo] = diaDoBackup(nome);
           if (!dia) throw new Error("Backup desconhecido.");
           if (E.nuvem.pendentesQtd()) throw Object.assign(new Error("Ainda há mudanças deste aparelho esperando para ir à nuvem. Espere enviar (ou conecte à internet) antes de voltar para um backup."), { esperado: true });
@@ -29100,7 +29102,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
             }
             dados = JSON.parse(new TextDecoder().decode(aberto.dados));
           } else dados = JSON.parse(await arquivo.text());
-          if (!dados || dados.formato !== "imoveis-v1" || !Array.isArray(dados.usuarios)) throw new Error("Este backup não está no formato esperado.");
+          if (!dados || dados.formato !== "imoveis-v1" || !Array.isArray(dados.usuarios)) throw new ErroUsuario("Este arquivo de backup está com defeito (não é uma cópia do sistema). Escolha outro dia.");
           E.d = await E.nuvem.importar(dados, { substituir: true, manterUsuarios: true });
           await reabrirSessao();
           await alterar((db) => registrar(db, login(), "Alteração", null, null, `Dados voltaram a ser como estavam ${momento} (backup restaurado por ${login()})`));
@@ -30311,7 +30313,7 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
   }
   async function excelDoNumero(ExcelJS, modelo, numero2) {
     const fs = E.d.faturas.filter((f) => f.numero === Number(numero2) && f.situacao === "Emitida").sort((a, b) => a.id - b.id);
-    if (!fs.length) throw new Error("NF não encontrada.");
+    if (!fs.length) throw new ErroUsuario("Esta NF não existe mais (pode ter sido cancelada ou apagada). Atualize a página.");
     const blob = await faturaExcel(ExcelJS, modelo, fs, E.d.emitentes);
     return { blob, nome: limparNome(`NF ${numeroFatura(numero2)} - ${fs[0].tomador_nome}.xlsx`) };
   }
@@ -30399,7 +30401,7 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
     const sugerida = cb && contaSugerida(d(), cb);
     if (sugerida && !lote2) return sugerida;
     const contas2 = configBanco(d()).contas;
-    if (!contas2.length) throw new Error("Nenhuma conta bancária cadastrada: configure em Dados e backup (Banco C6).");
+    if (!contas2.length) throw new ErroUsuario("Nenhuma conta bancária cadastrada: configure em Dados e backup (Banco C6).");
     if (contas2.length === 1) return contas2[0];
     const marcada = cb ? contaPreMarcada(d(), cb) : contaEmissora(d());
     const resp = await janela({
@@ -30468,7 +30470,7 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
     }
     const data2 = String((resp.data || [])[0] || "");
     const dataPagou = String((resp.pagou || [])[0] || "");
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(data2) || !/^\d{4}-\d{2}-\d{2}$/.test(dataPagou)) throw new Error("Informe as duas datas.");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data2) || !/^\d{4}-\d{2}-\d{2}$/.test(dataPagou)) throw new ErroUsuario("Informe as duas datas.");
     if (dataPagou > data2) throw new ErroUsuario("O dia em que pagou não pode ser depois do dia em que o dinheiro entrou na conta.");
     const pagouEmDia = dataPagou <= limitePagamento(cb.vencimento) && data2 > cb.vencimento;
     if (difere && geraNf(buscar2("contratos", cb.contrato_id))) {
@@ -30513,7 +30515,7 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
   }
   async function baixarPdfs(numeros, nomeZip, emitenteId = null) {
     const fs = E.d.faturas.filter((f) => f.situacao === "Emitida" && numeros.includes(f.numero) && (!emitenteId || f.emitente_id === emitenteId)).sort((a, b) => a.numero - b.numero || a.id - b.id);
-    if (!fs.length) throw new Error("Nenhuma NF para exportar.");
+    if (!fs.length) throw new ErroUsuario("Não há NF emitida com esses números para exportar.");
     aviso(`Gerando ${fs.length} PDF(s)…`, "info");
     const JSZip = await jsZip();
     const zip = new JSZip();
@@ -30667,7 +30669,7 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
     if (!r) return;
     const tipo = String(r.tipo[0]);
     const s = tipo === "solto" ? null : buscar2("seguros", r.seguro[0]);
-    if (s && tipo === "apolice" && s.arquivo_apolice) throw new Error(`A apólice da vigência ${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)} já tem arquivo: apague o atual (×) antes de anexar outro. Nada foi anexado.`);
+    if (s && tipo === "apolice" && s.arquivo_apolice) throw new ErroUsuario(`A apólice da vigência ${dataBr(s.vigencia_inicio)} a ${dataBr(s.vigencia_fim)} já tem arquivo: apague o atual (×) antes de anexar outro. Nada foi anexado.`);
     const dir = await pastaDoEscopo("seguro", contratoId);
     const vig = s ? `${s.vigencia_inicio}-a-${s.vigencia_fim}` : "";
     const nomes = [];
@@ -30820,7 +30822,7 @@ Elas ficam guardadas aqui e sobem sozinhas quando você entrar de novo com inter
         async documentoWord() {
           const [tipo, q] = documentoDaTela();
           const m = await documentoMontado(tipo, q);
-          if (!m) throw new Error("Registro não encontrado.");
+          if (!m) throw new ErroUsuario("Este documento não existe mais (o registro pode ter sido excluído por outra pessoa). Atualize a página.");
           await marcarGeradoNaRotina2(tipo, m);
           const [JSZip, logo] = await Promise.all([jsZip(), logoPng()]);
           const i = buscar2("imoveis", m.c.imovel_id);
@@ -30852,7 +30854,7 @@ Elas ficam guardadas aqui e sobem sozinhas quando você entrar de novo com inter
           baixar(blob, `${m.arquivo || `${m.nome} - ${m.c.inquilino_nome}`}.pdf`.replace(/[\\/:*?"<>|]/g, "-"));
         },
         async escolherPastaSegura() {
-          if (!podeUsuario("admin")) throw new Error("Só o administrador configura o backup seguro.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador configura o backup seguro.");
           if (!E.teste && !suportado()) throw new ErroUsuario("Faça isto no computador (Chrome ou Edge).");
           try {
             E.pastaSeguraNova = E.teste ? await pastaSeguraDeTeste() : await window.showDirectoryPicker({ id: "backup-seguro", mode: "readwrite" });
@@ -30862,7 +30864,7 @@ Elas ficam guardadas aqui e sobem sozinhas quando você entrar de novo com inter
           }
           if (E.pasta && await E.pasta.isSameEntry(E.pastaSeguraNova)) {
             E.pastaSeguraNova = null;
-            throw new Error("Escolha uma pasta diferente da pasta dos dados.");
+            throw new ErroUsuario("Escolha uma pasta diferente da pasta dos dados.");
           }
           await mostrar();
         },
@@ -30991,8 +30993,8 @@ ${MODELO_COMODOS[comodo].join("\n")}
           const data2 = form.querySelector("[name=data]").value;
           const arquivo = form.querySelector("[name=arquivo]").files[0];
           const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === campo2);
-          if (!data2) throw new Error("Informe a data.");
-          if (!arquivo) throw new Error(`Anexe o arquivo de "${doc[1]}" (mesmo sem todas as assinaturas) antes de clicar em "Falta assinatura".`);
+          if (!data2) throw new ErroUsuario("Informe a data.");
+          if (!arquivo) throw new ErroUsuario(`Anexe o arquivo de "${doc[1]}" (mesmo sem todas as assinaturas) antes de clicar em "Falta assinatura".`);
           const partes = partesDoContrato(d(), buscar2("contratos", contrato));
           const r = await janela({
             titulo: `De quem falta a assinatura? (${doc[1]})`,
@@ -31001,7 +31003,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
             sim: "Anexar com assinatura faltante"
           });
           if (!r) return;
-          if (!r.falta || !r.falta.length) throw new Error("Marque de quem falta a assinatura. Nada foi salvo.");
+          if (!r.falta || !r.falta.length) throw new ErroUsuario("Marque de quem falta a assinatura. Nada foi salvo.");
           const nome = await salvarAssinado("assinados", Number(contrato), arquivo, `${doc[1]} falta assinatura ${data2}`);
           await alterar((db) => anexarDocumentoParcial(db, Number(contrato), campo2, { data: data2, arquivo: nome, falta: r.falta }, login(), podeUsuario("admin")));
           aviso(podeUsuario("admin") ? "Anexado. Fica o alerta até chegar o arquivo com todas as assinaturas." : "Anexado. O administrador vai analisar; fica o alerta até chegar o arquivo com todas as assinaturas.");
@@ -31013,7 +31015,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
         },
         /** Administrador confirma ou recusa a perda ou o anexo com assinatura faltante registrados por outro usuário. */
         async analisarDocumento({ contrato, campo: campo2, tipo, aceitar }) {
-          if (!podeUsuario("admin")) throw new Error("Só o administrador analisa.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador analisa este pedido.");
           await alterarApagandoAnexos((db) => analisarDocumento(db, Number(contrato), campo2, tipo, aceitar === "1", login()));
           await mostrar();
         },
@@ -31035,7 +31037,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
         },
         async desfazerMarcados() {
           const itens = [...document.querySelectorAll("input[data-desfazer]:checked")].map((x) => x.value);
-          if (!itens.length) throw new Error("Marque as alterações que quer desfazer.");
+          if (!itens.length) throw new ErroUsuario("Marque as alterações que quer desfazer.");
           if (!await confirmar(`Cada campo das ${itens.length} alteração(ões) marcada(s) volta ao valor que tinha antes.`, { titulo: "Desfazer as alterações marcadas?", sim: "Desfazer", forte: true })) return;
           await desfazerItens(itens);
         },
@@ -31044,18 +31046,18 @@ ${MODELO_COMODOS[comodo].join("\n")}
          * A página não é redesenhada: o que já foi digitado no formulário continua lá (ao salvar, o registro é lido de novo).
          */
         async excluirAnexoDoCampo({ campo: campo2 }, el) {
-          if (!opera()) throw new Error("Seu usuário não pode excluir arquivos.");
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode apagar arquivos.");
           const [, acao, tabela, id] = location.hash.split("?")[0].split("/");
           const r = acao === "editar" ? buscar2(tabela, id) : null;
-          if (!r || !r[campo2]) throw new Error("Arquivo não encontrado neste registro.");
+          if (!r || !r[campo2]) throw new ErroUsuario("Este arquivo já não está neste lançamento (talvez outra pessoa tenha apagado). Atualize a página.");
           await alterarApagandoAnexos((db) => (ANEXOS_COM_X[tabela] || []).includes(campo2) ? removerAnexo(db, tabela, r.id, campo2, login()) : atualizar(db, tabela, r.id, { [campo2]: null }, login(), `Arquivo excluído: ${r[campo2]}`));
           arquivoApagadoNoFormulario(el, r[campo2]);
         },
         /** "×" do comprovante da ficha no Novo contrato feito dela (o arquivo ainda está na pasta da ficha): tira da ficha e apaga. */
         async apagarArquivoDaFicha({ campo: campo2, ficha }, el) {
-          if (!opera()) throw new Error("Seu usuário não pode excluir arquivos.");
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode apagar arquivos.");
           const f = buscar2("fichas", ficha);
-          if (!f || !f[campo2] || !CAMPOS_ARQUIVO_FICHA.includes(campo2)) throw new Error("Arquivo não encontrado na ficha.");
+          if (!f || !f[campo2] || !CAMPOS_ARQUIVO_FICHA.includes(campo2)) throw new ErroUsuario("Este arquivo já não está na ficha (talvez outra pessoa tenha apagado). Atualize a página.");
           const nome = f[campo2];
           await alterarApagandoAnexos((db) => atualizar(db, "fichas", f.id, { [campo2]: null }, login(), `Arquivo excluído: ${nome}`));
           arquivoApagadoNoFormulario(el, nome);
@@ -31064,15 +31066,15 @@ ${MODELO_COMODOS[comodo].join("\n")}
         async abrirAnexoDoCampo({ campo: campo2 }) {
           const [, , tabela, id] = location.hash.split("?")[0].split("/");
           const r = buscar2(tabela, id);
-          if (!r || !r[campo2]) throw new Error("Arquivo não encontrado neste registro.");
+          if (!r || !r[campo2]) throw new ErroUsuario("Este arquivo já não está neste lançamento (talvez outra pessoa tenha apagado). Atualize a página.");
           const [escopo, dono] = tabela === "fichas" ? ["ficha", r.id] : tabela === "seguros" ? ["seguro", r.contrato_id] : tabela === "contratos" ? ["contrato", r[`${campo2}_contrato`] || r.id] : ["contrato", r.contrato_id];
           await ACOES.abrirArquivo({ escopo, id: dono, nome: r[campo2] });
         },
         /** "Excluir" de uma foto já guardada da vistoria (fachada, relógios, quadro de disjuntores). */
         async excluirFotoVistoria({ campo: campo2, vistoria }, el) {
-          if (!opera()) throw new Error("Seu usuário não pode excluir arquivos.");
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode apagar arquivos.");
           const v = buscar2("vistorias", vistoria);
-          if (!v || !(v.fotos || {})[campo2]) throw new Error("Foto não encontrada.");
+          if (!v || !(v.fotos || {})[campo2]) throw new ErroUsuario("Esta foto já foi apagada (talvez por outra pessoa). Atualize a página.");
           const fotos = { ...v.fotos };
           delete fotos[campo2];
           await alterarApagandoAnexos((db) => atualizar(db, "vistorias", v.id, { fotos }, login(), `Foto da vistoria excluída: ${v.fotos[campo2]}`));
@@ -31091,7 +31093,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
         async corrigirDataGarantia({ contrato, qual }) {
           const c = buscar2("contratos", contrato);
           const g = GARANTIAS_DEPOSITADAS[qual];
-          if (!c || !g) throw new Error("Contrato não encontrado.");
+          if (!c || !g) throw new ErroUsuario("Este contrato não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.");
           const quem = pagadorDaGarantia(d(), c, qual);
           const atual = c[g.pago] || quem[g.pago] || "";
           const r = await janela({
@@ -31146,7 +31148,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
           await mostrar();
         },
         async analisarAditivoPerdido({ id, aceitar }) {
-          if (!podeUsuario("admin")) throw new Error("Só o administrador analisa.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador analisa este pedido.");
           await alterar((db) => analisarAditivoPerdido(db, Number(id), aceitar === "1", login()));
           await mostrar();
         },
@@ -31155,8 +31157,8 @@ ${MODELO_COMODOS[comodo].join("\n")}
           const form = el.closest("form");
           const data2 = form.querySelector("[name=data]").value;
           const assunto = form.querySelector("[name=assunto]").value;
-          if (!data2) throw new Error("Informe a data do termo aditivo.");
-          if (!String(assunto || "").trim()) throw new Error("Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).");
+          if (!data2) throw new ErroUsuario("Informe a data do termo aditivo.");
+          if (!String(assunto || "").trim()) throw new ErroUsuario("Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).");
           if (!await confirmar(`O termo aditivo de ${dataBr(data2)} fica registrado como assinado, mas sem o arquivo, e passa a valer como assinado.${podeUsuario("admin") ? "" : " O administrador vai analisar."}`, { titulo: "Registrar o termo aditivo como perdido?", sim: "Registrar como perdido" })) return;
           await alterar((db) => registrarAditivo(db, Number(contrato), { data: data2, assunto, perdido: true }, login(), podeUsuario("admin")));
           aviso("Termo aditivo registrado como perdido.");
@@ -31206,7 +31208,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
           await mostrar();
         },
         async excluirModelo({ id }) {
-          if (!podeUsuario("admin")) throw new Error("Só administradores podem excluir modelos.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só administradores podem excluir modelos.");
           await alterar((db) => {
             const m = buscar(db, "modelos_contrato", Number(id));
             if (m) excluir(db, "modelos_contrato", m.id, login(), `Modelo de contrato "${m.nome}" excluído`);
@@ -31216,7 +31218,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
         voltar: () => history.back(),
         async excluir({ tabela, id }) {
           const cfg4 = TABELAS_EXCLUSAO[tabela] || {};
-          if (cfg4.admin && !podeUsuario("admin")) throw new Error("Só administradores podem excluir.");
+          if (cfg4.admin && !podeUsuario("admin")) throw new ErroUsuario("Só o administrador exclui este tipo de registro.");
           const r = buscar2(tabela, id);
           if (!r) throw new ErroUsuario("Este registro já foi excluído.");
           if (EXCLUSAO_GRANDE[tabela]) {
@@ -31229,7 +31231,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
           await (["imoveis", "fichas"].includes(tabela) ? alterar : alterarApagandoAnexos)((db) => {
             const reg = buscar(db, tabela, id);
             const problema = cfg4.checar ? cfg4.checar(db, reg) : null;
-            if (problema) throw new Error(problema);
+            if (problema) throw new ErroUsuario(problema);
             if (tabela === "imoveis") {
               for (const t of TABELAS_DO_IMOVEL) db[t].filter((p2) => p2.imovel_id === reg.id).forEach((p2) => excluir(db, t, p2.id, login()));
             }
@@ -31251,7 +31253,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
         },
         /** Arquivos que sobraram de lançamentos excluídos antes (comprovantes, fotos da vistoria, assinados, aditivos): lista e apaga. */
         async limparAnexosSoltos() {
-          if (!podeUsuario("admin")) throw new Error("Só o administrador apaga arquivos sem lançamento.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador apaga arquivos sem lançamento.");
           const emUso2 = anexosEmUso();
           const vistas = /* @__PURE__ */ new Set();
           const soltos = [];
@@ -31302,7 +31304,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
           await mostrar();
         },
         async removerLogo() {
-          if (!podeUsuario("admin")) throw new Error("Só administradores podem alterar a logo.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só administradores podem alterar a logo.");
           await alterar((db) => {
             registrar(db, login(), "Exclusão", null, null, "Logo da empresa removida");
             delete db.logo;
@@ -31310,17 +31312,17 @@ ${MODELO_COMODOS[comodo].join("\n")}
           await mostrar();
         },
         async tirarAjuste({ id }) {
-          if (!opera()) throw new Error("Seu usuário não pode alterar.");
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode alterar. Peça ao administrador, se precisar.");
           await alterar((db) => ajustarBoleto(db, Number(id), 0, "", login()));
           await mostrar();
         },
         /** FCI: traz do Banco Central os índices de cada mês desde o primeiro pagamento e guarda no contrato (o saldo corrigido sai deles). */
         async calcularFci({ id }) {
-          if (!opera()) throw new Error("Seu usuário não pode alterar.");
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode alterar. Peça ao administrador, se precisar.");
           const c = buscar2("contratos", id);
-          if (!c.fci_indice) throw new Error('Escolha antes o índice de correção do FCI em "Editar" (O que está incluso no contrato).');
+          if (!c.fci_indice) throw new ErroUsuario('Escolha antes o índice de correção do FCI em "Editar" (O que está incluso no contrato).');
           const deps = depositosFci(d(), c);
-          if (!deps.length) throw new Error("Ainda não há pagamento do FCI para corrigir.");
+          if (!deps.length) throw new ErroUsuario("Ainda não há pagamento do FCI para corrigir.");
           const de = somarMeses(deps[0].data.slice(0, 7), 1);
           const ate = competenciaDe(hojeIso());
           if (de > ate) {
@@ -31328,7 +31330,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
             return;
           }
           const indices = await indicesMensaisFci(c.fci_indice, de, ate);
-          if (!Object.keys(indices).length) throw new Error(`O ${c.fci_indice} de ${compBr(de)} em diante ainda não saiu no Banco Central.`);
+          if (!Object.keys(indices).length) throw new ErroUsuario(`O ${c.fci_indice} de ${compBr(de)} em diante ainda não saiu no Banco Central.`);
           await alterar((db) => atualizar(
             db,
             "contratos",
@@ -31343,7 +31345,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
         },
         /** Grava os depósitos do FCI de antes do sistema (caixa do FCI); a correção antiga fica para refazer no "Calcular atualização". */
         async salvarFciPrevios({ id }, el) {
-          if (!opera()) throw new Error("Seu usuário não pode alterar.");
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode alterar. Peça ao administrador, se precisar.");
           const linhas2 = [...el.closest("details").querySelectorAll("[data-linhas-fci] tr")].map((tr) => {
             const v = tr.querySelector("[name=fci_valor]").value.trim();
             return { data: tr.querySelector("[name=fci_data]").value, valor: v ? centavos(v) : 0 };
@@ -31362,7 +31364,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
           await mostrar();
         },
         async alternarNf({ id }) {
-          if (!opera()) throw new Error("Seu usuário não pode alterar.");
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode alterar. Peça ao administrador, se precisar.");
           await alterar((db) => {
             const c = buscar(db, "contratos", id);
             const emite = !geraNf(c);
@@ -31389,7 +31391,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
         /** Roteiro da saída (B3): data e hora da vistoria de saída, para o convite por e-mail e o termo de devolução das chaves. */
         async marcarVistoriaSaida({ id }) {
           const c = buscar2("contratos", id);
-          if (!c) throw new Error("Inquilino não encontrado.");
+          if (!c) throw new ErroUsuario("Este inquilino não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.");
           const horas = c.finalidade === "Não residencial" ? 48 : 72;
           const r = await janela({
             titulo: `Vistoria de saída - ${c.inquilino_nome}`,
@@ -31411,7 +31413,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
         async valoresReparos({ id }) {
           const v = buscar2("vistorias", id);
           const c = v && buscar2("contratos", v.contrato_id);
-          if (!c) throw new Error("Vistoria de saída não encontrada.");
+          if (!c) throw new ErroUsuario("Este inquilino não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.");
           const res = resultadoVistoriaSaida(d(), c);
           const r = await janela({
             titulo: `Reparos da vistoria de saída - ${c.inquilino_nome}`,
@@ -31443,7 +31445,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
         /** Processo do inquilino que saiu impresso e guardado em papel (etapa final do roteiro da saída). */
         async arquivoFisico({ id, desfazer }) {
           const c = buscar2("contratos", id);
-          if (!c) throw new Error("Inquilino não encontrado.");
+          if (!c) throw new ErroUsuario("Este inquilino não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.");
           if (desfazer === "1") {
             await alterar((db) => marcarArquivoFisico(db, c.id, "", login()));
             await mostrar();
@@ -31462,7 +31464,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
         },
         async garantiaDevolvida({ id }) {
           const e = buscar2("encerramentos", id);
-          if (!e) throw new Error("Cálculo final não encontrado.");
+          if (!e) throw new ErroUsuario("O cálculo final da saída não existe mais (pode ter sido desfeito por outra pessoa). Atualize a página.");
           const r = await janela({
             titulo: e.saldo >= 0 ? "Garantia devolvida" : "Saldo cobrado do inquilino",
             sim: "Marcar",
@@ -31614,7 +31616,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
          */
         async lembrete({ id }) {
           const cb = buscar2("cobrancas", id);
-          if (!cb || cb.data_pagamento) throw new Error("Boleto não encontrado ou já pago.");
+          if (!cb || cb.data_pagamento) throw new ErroUsuario("Este boleto já foi pago ou excluído (talvez por outra pessoa). Atualize a página.");
           const l = textoLembrete(d(), cb, hojeIso());
           const c = buscar2("contratos", cb.contrato_id);
           const tel = l.telefone ? l.telefone.length <= 11 ? `55${l.telefone}` : l.telefone : "";
@@ -31659,7 +31661,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
         /** Tela de Boletos: confirma o pagamento numa janela (os mesmos campos da página do boleto), sem o formulário na linha. */
         async pagarBoleto({ id }) {
           const cb = buscar2("cobrancas", id);
-          if (!cb || cb.data_pagamento) throw new Error("Boleto não encontrado ou já pago.");
+          if (!cb || cb.data_pagamento) throw new ErroUsuario("Este boleto já foi pago ou excluído (talvez por outra pessoa). Atualize a página.");
           const c = buscar2("contratos", cb.contrato_id);
           const i = c ? buscar2("imoveis", c.imovel_id) : null;
           const hoje3 = hojeIso();
@@ -31708,7 +31710,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
         /** Fiador: excluir o cadastro (fiador contratual lançado errado; pode ser incluído de novo em "Editar contrato") ou trocar a garantia. */
         async excluirFiador({ id }) {
           const f = buscar2("fiadores", id);
-          if (!f) throw new Error("Fiador não encontrado.");
+          if (!f) throw new ErroUsuario("Este fiador não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.");
           const r = await janela({
             titulo: `Fiador ${f.nome}`,
             html: `<p>Deseja excluir fiador contratual ou trocar garantia/fiador?</p>
@@ -31760,7 +31762,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
             if (!r) return;
             data2 = String((r.data || [])[0] || "");
           }
-          if (!/^\d{4}-\d{2}-\d{2}$/.test(data2)) throw new Error("Informe a data do pagamento.");
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(data2)) throw new ErroUsuario("Informe a data do pagamento.");
           await alterar((db) => marcarIptuPago(db, Number(id), Number(n), data2, login()));
           aviso("Parcela do IPTU marcada como paga.");
           await mostrar();
@@ -31794,7 +31796,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
           await mostrar();
         },
         async apagarCanceladas({ numero: numero2 }) {
-          if (!podeUsuario("admin")) throw new Error("Só administradores podem apagar NFs.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só administradores podem apagar NFs.");
           await alterar((db) => apagarCanceladas(db, Number(numero2), login()));
           aviso(`NF nº ${numeroFatura(numero2)} apagada da lista.`);
           await mostrar();
@@ -31835,7 +31837,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
           if (!r) return;
           const data2 = String((r.data || [])[0] || "");
           const arq = (r.arquivo || [])[0];
-          if (!/^\d{4}-\d{2}-\d{2}$/.test(data2)) throw new Error("Informe a data do depósito.");
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(data2)) throw new ErroUsuario("Informe a data do depósito.");
           const nome = arq && arq.size ? await salvarArquivo(await pastaDoEscopo("contrato", c.id), new File([arq], nomeComprovante2("complemento-caucao", data2, arq))) : null;
           await alterar((db) => registrarComplementoDepositado(db, c.id, { data: data2, arquivo: nome }, login()));
           aviso(`Complemento de ${reais(x.complemento)} registrado: caução de ${reais(x.necessaria)}.${nome ? "" : " Sem comprovante: fica o aviso até anexar."}`);
@@ -31859,9 +31861,9 @@ ${MODELO_COMODOS[comodo].join("\n")}
          */
         async enviarCartaEmail({ contrato, comp }) {
           const c = buscar2("contratos", contrato);
-          if (!c) throw new Error("Inquilino não encontrado.");
+          if (!c) throw new ErroUsuario("Este inquilino não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.");
           const carta = await pdfDaCarta(c, comp);
-          if (!carta) throw new Error("A carta ainda não sai: falta o índice ou a correção aplicada (tela Reajustes).");
+          if (!carta) throw new ErroUsuario("A carta ainda não sai: falta o índice ou a correção aplicada (tela Reajustes).");
           const assunto = `Reajuste do aluguel a partir de ${compBr(comp)} · ${(buscar2("imoveis", c.imovel_id) || {}).nome || ""}`.trim();
           const para = c.inquilino_email || "";
           const gmail = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(para)}&su=${encodeURIComponent(assunto)}&body=${encodeURIComponent(carta.texto)}`;
@@ -31928,7 +31930,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
             return c ? c.inquilino_nome : `boleto ${cb.id}`;
           };
           const pagos = ids.map((id) => buscar2("cobrancas", id)).filter((cb) => cb && cb.data_pagamento);
-          if (pagos.length) throw new Error(`Boleto(s) já pago(s) não podem ser excluídos: ${pagos.map(nome).join(", ")}. Desmarque ou desfaça o pagamento antes.`);
+          if (pagos.length) throw new ErroUsuario(`Boleto(s) já pago(s) não podem ser excluídos: ${pagos.map(nome).join(", ")}. Desmarque ou desfaça o pagamento antes.`);
           if (!await confirmar(`Eles podem ser gerados de novo depois.`, { titulo: `Excluir ${ids.length} boleto(s) de ${compBr(comp)}?`, sim: "Excluir boletos", forte: true })) return;
           let excluidos = 0;
           await alterar((db) => {
@@ -31937,7 +31939,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
               const cb = buscar(db, "cobrancas", id);
               if (!cb) continue;
               const problema = TABELAS_EXCLUSAO.cobrancas.checar(db, cb);
-              if (problema) throw new Error(`${nome(cb)}: ${problema}`);
+              if (problema) throw new ErroUsuario(`${nome(cb)}: ${problema}`);
               excluir(db, "cobrancas", id, login(), `Boleto de ${compBr(cb.competencia)} - ${nome(cb)} (exclusão em lote)`);
               excluidos += 1;
             }
@@ -31977,7 +31979,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
         },
         // usuários: aprovar pedido de acesso, recusar e bloquear
         async aprovarUsuario({ id }) {
-          if (!podeUsuario("admin")) throw new Error("Só administradores aprovam acessos.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só administradores aprovam acessos.");
           const sel = document.querySelector(`[data-papel-de="${id}"]`);
           const papel = sel ? sel.value : "consulta";
           await alterar((db) => {
@@ -31988,13 +31990,13 @@ ${MODELO_COMODOS[comodo].join("\n")}
           await mostrar();
         },
         async recusarUsuario({ id }) {
-          if (!podeUsuario("admin")) throw new Error("Só administradores recusam acessos.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só administradores recusam acessos.");
           await alterar((db) => excluir(db, "usuarios", Number(id), login(), "Pedido de acesso recusado"));
           await mostrar();
         },
         async bloquearUsuario({ id }) {
-          if (!podeUsuario("admin")) throw new Error("Só administradores bloqueiam usuários.");
-          if (Number(id) === E.usuario.id) throw new Error("Você não pode bloquear o seu próprio acesso.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só administradores bloqueiam usuários.");
+          if (Number(id) === E.usuario.id) throw new ErroUsuario("Você não pode bloquear o seu próprio acesso.");
           await alterar((db) => {
             const u = buscar(db, "usuarios", id);
             atualizar(db, "usuarios", u.id, { ativo: !u.ativo }, login(), u.ativo ? `Usuário ${u.login} bloqueado` : `Usuário ${u.login} desbloqueado`);
@@ -32274,9 +32276,9 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
          * conferir o arquivo antes (marcar "conferi"); depois dá para anexar o certo em "Anexar arquivos" dos documentos.
          */
         async excluirArquivoSeguro({ contrato, seguro, nome, conferir: conferir2 }) {
-          if (!opera()) throw new Error("Seu usuário não pode excluir arquivos.");
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode apagar arquivos.");
           const s = buscar2("seguros", seguro);
-          if (!s) throw new Error("Apólice não encontrada.");
+          if (!s) throw new ErroUsuario("Esta apólice não existe mais (pode ter sido excluída por outra pessoa). Atualize a página.");
           if (conferir2) {
             const resp = await janela({
               titulo: "Apagar a apólice de uma vigência anterior",
@@ -32289,7 +32291,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           <p class="suave">Depois, anexe o certo em "Anexar arquivos" dos documentos do seguro, escolhendo "Apólice" e esta vigência.</p>`
             });
             if (!resp) return;
-            if (!resp.conferi) throw new Error('Marque "Abri o arquivo e confirmo" para apagar. Nada foi apagado.');
+            if (!resp.conferi) throw new ErroUsuario('Marque "Abri o arquivo e confirmo" para apagar. Nada foi apagado.');
           }
           await alterarApagandoAnexos((db) => tirarArquivoSeguro(db, s.id, nome, login()));
           aviso(`Arquivo apagado: ${nome}.`);
@@ -32349,7 +32351,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         /** Dados e backup: chama /saude da ponte e mostra o que falta (certificado, chaves, token, modo simulado). */
         /** Dados e backup: apaga o endereço e a senha da ponte guardados neste navegador (nada muda no arquivo de dados). */
         async esquecerPonteC6() {
-          if (!podeUsuario("admin")) throw new Error("Só o administrador altera a integração com o banco.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador altera a integração com o banco.");
           await esquecerPonteLocal();
           aviso("Ponte esquecida neste computador. Para usar o banco aqui de novo, informe o endereço e a senha e salve.");
           await mostrar();
@@ -32380,7 +32382,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         /** Preenche o formulário "Incluir ou alterar uma conta" com a conta escolhida. */
         editarContaBanco({ conta }) {
           const c = contaBanco(d(), conta);
-          if (!c) throw new Error("Conta não encontrada.");
+          if (!c) throw new ErroUsuario("Esta conta bancária não existe mais. Atualize a página.");
           const det = document.getElementById("nova-conta-banco");
           const form = det && det.querySelector("form");
           if (!form) return;
@@ -32394,14 +32396,14 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           det.scrollIntoView({ block: "start" });
         },
         async excluirContaBanco({ conta }) {
-          if (!podeUsuario("admin")) throw new Error("Só o administrador altera a integração com o banco.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador altera a integração com o banco.");
           await alterar((db) => excluirContaBanco(db, conta, login()));
           aviso("Conta tirada da integração.");
           await mostrar();
         },
         /** Emite um boleto no C6: escolhe a conta (pergunta se o imóvel tem mais de uma empresa), chama a ponte e grava a resposta. */
         async emitirBoletoC6({ id }) {
-          if (!opera()) throw new Error("Seu usuário não pode emitir boletos.");
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode emitir boletos.");
           const cb = buscar2("cobrancas", id);
           const conta = await escolherContaC6(cb);
           if (!conta) return;
@@ -32412,9 +32414,9 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         },
         /** Emite todos os boletos em aberto do mês ainda não emitidos; os que precisam de escolha da conta ficam para emitir um a um. */
         async emitirBoletosMesC6({ comp }) {
-          if (!opera()) throw new Error("Seu usuário não pode emitir boletos.");
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode emitir boletos.");
           const lista3 = boletosParaEmitir(d(), comp);
-          if (!lista3.length) throw new Error("Nenhum boleto em aberto sem emissão neste mês.");
+          if (!lista3.length) throw new ErroUsuario("Todos os boletos em aberto deste mês já foram emitidos no banco: nada a emitir.");
           const falhas = [];
           let emitidos = 0;
           const semConta = lista3.filter((cb) => !contaSugerida(d(), cb));
@@ -32439,7 +32441,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         },
         /** Consulta a situação no banco; se o banco diz que foi pago e aqui ainda não está, propõe registrar o pagamento (nunca registra sozinho). */
         async consultarBoletoC6({ id }) {
-          if (!opera()) throw new Error("Seu usuário não pode alterar boletos.");
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode alterar boletos.");
           const cb = buscar2("cobrancas", id);
           const resposta = await consultarBoleto(d(), cb);
           const banco = await alterar((db) => registrarBoletoBancario(db, cb.id, resposta, login()));
@@ -32458,10 +32460,10 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         },
         /** Negativação do pagador no birô: só administrador, conta com a opção ligada, 2ª confirmação com o nome do inquilino e o prazo. */
         async negativarC6({ id }) {
-          if (!podeUsuario("admin")) throw new Error("Só o administrador negativa um pagador.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador negativa um pagador.");
           const cb = buscar2("cobrancas", id);
           const conta = contaBanco(d(), cb.banco && cb.banco.conta_id);
-          if (!conta || !conta.negativacao.ativa) throw new Error("A negativação está desligada nesta conta (Dados e backup → Banco C6).");
+          if (!conta || !conta.negativacao.ativa) throw new ErroUsuario("A negativação está desligada nesta conta (Dados e backup → Banco C6).");
           const c = buscar2("contratos", cb.contrato_id);
           const resp = await janela({
             titulo: "2ª confirmação: negativar no birô de crédito",
@@ -32473,9 +32475,9 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
             nao: "Cancelar"
           });
           if (!resp) return;
-          if (String((resp.confirmo || [])[0] || "").trim().toUpperCase() !== "NEGATIVAR") throw new Error("Digite NEGATIVAR para confirmar. Nada foi feito.");
+          if (String((resp.confirmo || [])[0] || "").trim().toUpperCase() !== "NEGATIVAR") throw new ErroUsuario("Digite NEGATIVAR para confirmar. Nada foi feito.");
           const dias = Number((resp.dias || [])[0]);
-          if (!Number.isInteger(dias) || dias < 1) throw new Error("Informe os dias de atraso.");
+          if (!Number.isInteger(dias) || dias < 1) throw new ErroUsuario("Informe os dias de atraso (número inteiro, a partir de 1).");
           await conferirAntesDeAgirNoBanco(cb.id, "negativar");
           const resposta = await negativarBoleto(d(), buscar2("cobrancas", cb.id), dias);
           await alterar((db) => registrarNegativacao(db, cb.id, resposta, login(), dias));
@@ -32483,7 +32485,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           await mostrar();
         },
         async cancelarNegativacaoC6({ id }) {
-          if (!podeUsuario("admin")) throw new Error("Só o administrador cancela a negativação.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador cancela a negativação.");
           const cb = buscar2("cobrancas", id);
           const resposta = await cancelarNegativacao(d(), cb);
           await alterar((db) => {
@@ -32495,7 +32497,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         },
         /** Boleto mudou depois de emitido: manda ao banco o valor, o vencimento e a descrição atuais (PATCH). Se recusar, cancelar e emitir outro. */
         async alterarBoletoC6({ id }) {
-          if (!opera()) throw new Error("Seu usuário não pode alterar boletos.");
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode alterar boletos.");
           const cb = buscar2("cobrancas", id);
           let resposta;
           try {
@@ -32508,7 +32510,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           await mostrar();
         },
         async cancelarBoletoC6({ id }) {
-          if (!opera()) throw new Error("Seu usuário não pode alterar boletos.");
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode alterar boletos.");
           await conferirAntesDeAgirNoBanco(id, "cancelar");
           const cb = buscar2("cobrancas", id);
           const resposta = await cancelarBoleto(d(), cb);
@@ -32546,7 +32548,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
          * no lugar com o mesmo nome. PDF assinado fica como está; documento do link da ficha, só depois de conferido.
          */
         async compactarAnexos() {
-          if (!podeUsuario("admin")) throw new Error("Só o administrador compacta os anexos que já estão no sistema.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador compacta os anexos que já estão no sistema.");
           const caixa = document.getElementById("progresso-compactar");
           const mostrarAndamento = (t) => {
             if (caixa) caixa.textContent = t;
@@ -32578,9 +32580,9 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           aviso(texto3, r.falhas ? "aviso" : "ok");
         },
         async excluirArquivo({ escopo, id, nome }) {
-          if (!opera()) throw new Error("Seu usuário não pode excluir arquivos.");
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode apagar arquivos.");
           const dono = rotulosDosArquivos(d()).get(`${escopo}:${id}|${nome}`) || (anexosEmUso().has(`${chavePasta(escopo, id)}|${nome}`) ? "arquivo de um lançamento" : "");
-          if (dono) throw new Error(`Este arquivo é o ${dono}: para apagar, use o "×" ao lado do lançamento (volta o aviso para anexar).`);
+          if (dono) throw new ErroUsuario(`Este arquivo é o ${dono}: para apagar, use o "×" ao lado do lançamento (volta o aviso para anexar).`);
           const dir = await pastaDoEscopo(escopo, Number(id));
           await dir.removeEntry(nome);
           const vinc = vinculoDoEscopo(escopo, id);
@@ -32619,7 +32621,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
   }
   async function confirmarPagamentoBoleto(id, f) {
     const data2 = String(f.get("data") || "");
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(data2)) throw new Error("Informe a data do pagamento.");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data2)) throw new ErroUsuario("Informe a data do pagamento.");
     const valor = String(f.get("valor") || "").trim() ? centavos(f.get("valor")) : null;
     const pagouEmDia = f.get("em_dia") === "1";
     const dataPagou = String(f.get("pagou") || "") || null;
@@ -32644,7 +32646,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       });
       const justificativa = resp && String((resp.justificativa || [])[0] || "").trim();
       if (!resp) return;
-      if (!justificativa) throw new Error("Informe a justificativa da divergência. Nada foi salvo.");
+      if (!justificativa) throw new ErroUsuario("Informe a justificativa da divergência. Nada foi salvo.");
       memoria.pagamentoDivergente = { id: cb.id, data: data2, valor, pagouEmDia, dataPagou, justificativa };
       ir(`#/cobranca/${cb.id}?ir=pagamento`);
       return;
@@ -32684,16 +32686,16 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       REGISTRO_EXCLUIDO = "Este registro foi excluído por outra pessoa; nada foi salvo.";
       FORMULARIOS = {
         async configurarSeguro(form) {
-          if (!podeUsuario("admin")) throw new Error("Só o administrador configura o backup seguro.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador configura o backup seguro.");
           const dir = E.pastaSeguraNova;
-          if (!dir) throw new Error("Escolha a pasta segura primeiro.");
+          if (!dir) throw new ErroUsuario("Escolha a pasta segura primeiro.");
           const f = new FormData(form);
           const senha = String(f.get("senha") || "");
           let chave = await lerChave(dir);
           if (chave) {
-            if (!await conferirSenha2(chave, senha)) throw new Error("Senha do backup incorreta.");
+            if (!await conferirSenha2(chave, senha)) throw new ErroUsuario("Senha do backup incorreta. Confira e digite de novo.");
           } else {
-            if (senha !== String(f.get("senha2") || "")) throw new Error("As duas senhas precisam ser iguais.");
+            if (senha !== String(f.get("senha2") || "")) throw new ErroUsuario("As duas senhas precisam ser iguais.");
             chave = await criarChave(senha);
             await gravarChave(dir, chave);
           }
@@ -32709,7 +32711,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         async restaurarSeguro(form) {
           const f = new FormData(form);
           const arq = f.get("arquivo");
-          if (!arq || !arq.size) throw new Error("Escolha o arquivo de backup.");
+          if (!arq || !arq.size) throw new ErroUsuario("Escolha o arquivo de backup antes de continuar.");
           const { info, dados } = await decifrar(await arq.arrayBuffer(), String(f.get("senha") || ""));
           const data2 = (info.criado_em || "").slice(0, 10);
           const JSZip = await jsZip();
@@ -32732,7 +32734,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
             if (e.name === "AbortError") return;
             throw e;
           }
-          if (await lerBanco(dir)) throw new Error(`A pasta escolhida já tem um ${ARQUIVO_BANCO}. Escolha uma pasta nova e vazia, para não misturar os dados.`);
+          if (await lerBanco(dir)) throw new ErroUsuario(`A pasta escolhida já tem um ${ARQUIVO_BANCO}. Escolha uma pasta nova e vazia, para não misturar os dados.`);
           await importarZip(JSZip, dir, blob, null);
           await lembrarPasta(dir);
           await abrirPasta(dir);
@@ -32748,16 +32750,16 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         async baixaLote(form) {
           const fd = new FormData(form);
           const data2 = String(fd.get("data") || "");
-          if (!/^\d{4}-\d{2}-\d{2}$/.test(data2)) throw new Error("Informe a data em que o dinheiro entrou.");
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(data2)) throw new ErroUsuario("Informe a data em que o dinheiro entrou.");
           const ids = fd.getAll("ids").map(Number);
-          if (!ids.length) throw new Error("Marque os boletos deste vencimento que foram pagos.");
+          if (!ids.length) throw new ErroUsuario("Marque os boletos deste vencimento que foram pagos.");
           const vencs = new Set(ids.map((id) => (buscar2("cobrancas", id) || {}).vencimento));
-          if (vencs.size > 1) throw new Error("Confirme juntos só boletos do mesmo vencimento.");
+          if (vencs.size > 1) throw new ErroUsuario("Confirme juntos só boletos do mesmo vencimento.");
           const atrasado = fd.get("atrasado") === "1";
           const dataPagou = atrasado ? String(fd.get("pagou") || "") || data2 : null;
-          if (atrasado && !/^\d{4}-\d{2}-\d{2}$/.test(dataPagou)) throw new Error("Informe o dia em que pagaram.");
-          if (atrasado && dataPagou > data2) throw new Error("O dia em que pagaram não pode ser depois da data em que o dinheiro entrou.");
-          if (atrasado && dataPagou <= [...vencs][0]) throw new Error(`Pagaram até o vencimento (${dataBr([...vencs][0])}): use a baixa "pagos em dia".`);
+          if (atrasado && !/^\d{4}-\d{2}-\d{2}$/.test(dataPagou)) throw new ErroUsuario("Informe o dia em que pagaram.");
+          if (atrasado && dataPagou > data2) throw new ErroUsuario("O dia em que pagaram não pode ser depois da data em que o dinheiro entrou.");
+          if (atrasado && dataPagou <= [...vencs][0]) throw new ErroUsuario(`Pagaram até o vencimento (${dataBr([...vencs][0])}): use a baixa "pagos em dia".`);
           pagamentoNaoFuturo(data2, dataPagou);
           await confirmarAvisos([dataMuitoAntiga(data2)].filter(Boolean));
           let r;
@@ -32773,7 +32775,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
             const texto3 = String(f[`valor_${n2}`] || "").trim();
             return { tipo: f[`tipo_${n2}`], valor: texto3 ? centavos(texto3) : null, data_pagamento: f[`data_${n2}`], vencimento: f[`venc_${n2}`] || null, observacoes: String(f[`obs_${n2}`] || "").trim() };
           });
-          if (!f.competencia) throw new Error("Informe o mês da conta.");
+          if (!f.competencia) throw new ErroUsuario("Informe o mês da conta.");
           let n = 0;
           await alterar((db) => {
             n = lancarDespesas(db, Number(f.imovel), f.competencia, linhas2, login()).length;
@@ -32813,10 +32815,10 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         },
         async marcarDocumento(form) {
           const f = Object.fromEntries(new FormData(form));
-          if (!f.data) throw new Error("Informe a data.");
+          if (!f.data) throw new ErroUsuario("Informe a data.");
           const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === f.campo);
           const arquivo = form.querySelector("[name=arquivo]").files[0];
-          if (!arquivo) throw new Error(`Anexe o arquivo de "${doc[1]}" ${doc[2]} antes de marcar.`);
+          if (!arquivo) throw new ErroUsuario(`Anexe o arquivo de "${doc[1]}" ${doc[2]} antes de marcar.`);
           const nome = await salvarAssinado("assinados", Number(f.contrato), arquivo, `${doc[1]} ${doc[2]} ${f.data}`);
           await alterar((db) => marcarDocumento(db, Number(f.contrato), f.campo, f.data, login(), nome));
           await mostrar();
@@ -32835,7 +32837,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         /** Rotina de entrada: marca a etapa como feita na data escolhida. */
         async etapaEntrada(form) {
           const f = Object.fromEntries(new FormData(form));
-          if (!f.data) throw new Error("Informe a data.");
+          if (!f.data) throw new ErroUsuario("Informe a data.");
           await alterar((db) => marcarEtapaEntrada(db, Number(f.contrato), f.chave, { data: f.data }, login()));
           await mostrar();
         },
@@ -32845,8 +32847,8 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           const arq = form.querySelector("[name=arquivo]").files[0];
           const g = GARANTIAS_DEPOSITADAS[f.qual];
           const valor = centavos(f.valor);
-          if (!f.data) throw new Error("Informe a data do depósito.");
-          if (!(valor > 0)) throw new Error("Informe o valor depositado.");
+          if (!f.data) throw new ErroUsuario("Informe a data do depósito.");
+          if (!(valor > 0)) throw new ErroUsuario("Informe o valor depositado.");
           const nome = arq ? await salvarArquivo(await pastaDoEscopo("contrato", Number(f.contrato)), new File([arq], nomeComprovante2(g.arquivo, f.data, arq))) : null;
           let s;
           await alterar((db) => {
@@ -32858,9 +32860,9 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         async aditivo(form) {
           const f = Object.fromEntries(new FormData(form));
           const arquivo = form.querySelector("[name=arquivo]").files[0];
-          if (!f.data) throw new Error("Informe a data do termo aditivo.");
-          if (!String(f.assunto || "").trim()) throw new Error("Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).");
-          if (!arquivo) throw new Error("Anexe o arquivo do termo aditivo assinado.");
+          if (!f.data) throw new ErroUsuario("Informe a data do termo aditivo.");
+          if (!String(f.assunto || "").trim()) throw new ErroUsuario("Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).");
+          if (!arquivo) throw new ErroUsuario("Anexe o arquivo do termo aditivo assinado.");
           const tipo = f.pergunta_troca ? f.troca === "1" ? TIPO_ADITIVO_TROCA : "Outro" : null;
           const ciencia = tipo === TIPO_ADITIVO_TROCA ? await cienciaDaTroca(Number(f.contrato)) : {};
           if (!ciencia) return;
@@ -32875,12 +32877,12 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         },
         async vistoria(form) {
           const f = Object.fromEntries(new FormData(form));
-          if (!f.data) throw new Error("Informe a data da vistoria.");
+          if (!f.data) throw new ErroUsuario("Informe a data da vistoria.");
           const c = buscar2("contratos", f.contrato);
           const momento = f.tipo === "Saída" ? "Saída do inquilino" : "Entrada do inquilino";
           const leitura = Object.fromEntries(LEITURAS.map(([k]) => [k, String(f[`leitura_${k}`] || "").trim()]));
           const faltaLeitura = relogiosDoContrato(c).filter((k) => !leitura[k]);
-          if (faltaLeitura.length) throw new Error(`Informe a leitura do relógio de ${faltaLeitura.map((k) => LEITURAS.find(([x]) => x === k)[1].replace("Relógio de ", "")).join(" e ")}.`);
+          if (faltaLeitura.length) throw new ErroUsuario(`Informe a leitura do relógio de ${faltaLeitura.map((k) => LEITURAS.find(([x]) => x === k)[1].replace("Relógio de ", "")).join(" e ")}.`);
           const dados = {
             contrato_id: c.id,
             imovel_id: c.imovel_id || null,
@@ -32894,7 +32896,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
             texto_final: f.tipo === "Entrada" ? String(f.texto_final || "").trim() : ""
           };
           if (f.tipo === "Saída") {
-            if (!PRESENCA_VISTORIA_SAIDA.includes(f.inquilino_presente)) throw new Error("Diga se o inquilino acompanhou a vistoria.");
+            if (!PRESENCA_VISTORIA_SAIDA.includes(f.inquilino_presente)) throw new ErroUsuario("Diga se o inquilino acompanhou a vistoria.");
             dados.inquilino_presente = f.inquilino_presente;
           }
           const semEspacos = (x) => String(x).replace(/\s+/g, " ").trim();
@@ -32903,7 +32905,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           dados.itens = [];
           for (let n = 0; f[`ic_${n}`] !== void 0; n += 1) dados.itens.push({ comodo: f[`ic_${n}`], item: f[`ii_${n}`], situacao: f[`is_${n}`] || "", obs: String(f[`io_${n}`] || "").trim() });
           const semSituacao = dados.itens.filter((x) => !x.situacao);
-          if (semSituacao.length) throw new Error(`Falta a situação de ${semSituacao.length} item(ns): ${semSituacao.slice(0, 8).map((x) => `${x.comodo} – ${x.item}`).join("; ")}${semSituacao.length > 8 ? "…" : ""}. Marque a situação (ou "Não se aplica") antes de salvar.`);
+          if (semSituacao.length) throw new ErroUsuario(`Falta a situação de ${semSituacao.length} item(ns): ${semSituacao.slice(0, 8).map((x) => `${x.comodo} – ${x.item}`).join("; ")}${semSituacao.length > 8 ? "…" : ""}. Marque a situação (ou "Não se aplica") antes de salvar.`);
           const tirados = dados.itens.filter((x) => x.situacao === NAO_SE_APLICA);
           dados.itens = dados.itens.filter((x) => x.situacao !== NAO_SE_APLICA);
           const anterior = Number(f.id) ? buscar2("vistorias", f.id) : null;
@@ -32955,7 +32957,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           const f = Object.fromEntries(new FormData(form));
           const testemunhas = testemunhasDo(f);
           const modelo = f.id ? null : modelosDe(d(), "aditivo").find((m) => String(m.id) === f.modelo);
-          if (!f.id && !modelo) throw new Error("Escolha o modelo do termo aditivo.");
+          if (!f.id && !modelo) throw new ErroUsuario("Escolha o modelo do termo aditivo.");
           const dados = {
             data: f.data,
             dia_novo: f.dia_novo,
@@ -32974,7 +32976,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           const f = Object.fromEntries(new FormData(form));
           const testemunhas = testemunhasDo(f);
           const modelo = f.id ? null : modelosDe(d(), "aditivo_troca").find((m) => String(m.id) === f.modelo);
-          if (!f.id && !modelo) throw new Error("Escolha o modelo do termo aditivo.");
+          if (!f.id && !modelo) throw new ErroUsuario("Escolha o modelo do termo aditivo.");
           const dados = {
             data: f.data,
             testemunhas,
@@ -32992,8 +32994,8 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           const f = Object.fromEntries(new FormData(form));
           const arquivo = form.querySelector("[name=arquivo]").files[0];
           const a = buscar2("aditivos", f.id);
-          if (!f.data) throw new Error("Informe a data da assinatura.");
-          if (!arquivo) throw new Error("Anexe o arquivo do termo aditivo assinado.");
+          if (!f.data) throw new ErroUsuario("Informe a data da assinatura.");
+          if (!arquivo) throw new ErroUsuario("Anexe o arquivo do termo aditivo assinado.");
           const ciencia = a.tipo === TIPO_ADITIVO_TROCA ? await cienciaDaTroca(a.contrato_id) : {};
           if (!ciencia) return;
           const nome = await salvarAssinado("aditivos", a.contrato_id, arquivo, `termo aditivo ${f.data} ${a.assunto}`.slice(0, 80));
@@ -33009,7 +33011,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           const f = new FormData(form);
           const nome = String(f.get("nome") || "").trim();
           const texto3 = String(f.get("texto") || "");
-          if (!nome || !texto3.trim()) throw new Error("Preencha o nome e o texto do modelo.");
+          if (!nome || !texto3.trim()) throw new ErroUsuario("Preencha o nome e o texto do modelo.");
           const id = Number(f.get("id") || 0);
           const tipo = ["aditivo", "aditivo_troca"].includes(f.get("tipo")) ? f.get("tipo") : "contrato";
           await alterar((db) => {
@@ -33025,9 +33027,9 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           const nome = String(f.get("nome")).trim();
           const lg = String(f.get("login")).trim().toLowerCase();
           const senha = String(f.get("senha"));
-          if (!nome || !lg) throw new Error("Preencha nome e login.");
-          if (senhaCurta(senha)) throw new Error(ERRO_SENHA_CURTA);
-          if (senha !== f.get("senha2")) throw new Error("As duas senhas precisam ser iguais.");
+          if (!nome || !lg) throw new ErroUsuario("Preencha o nome e o login.");
+          if (senhaCurta(senha)) throw new ErroUsuario(ERRO_SENHA_CURTA);
+          if (senha !== f.get("senha2")) throw new ErroUsuario("As duas senhas precisam ser iguais.");
           await criarBanco(nome, lg, senha);
           ir("#/");
         },
@@ -33049,10 +33051,10 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           const nome = String(f.get("nome") || "").trim();
           const lg = String(f.get("login") || "").trim().toLowerCase();
           const senha = String(f.get("senha") || "");
-          if (!nome || !lg || /\s/.test(lg)) throw new Error("Preencha o nome e um login sem espaços.");
-          if (senhaCurta(senha)) throw new Error(ERRO_SENHA_CURTA);
-          if (senha !== f.get("senha2")) throw new Error("As duas senhas precisam ser iguais.");
-          if (E.d.usuarios.some((u) => u.login === lg)) throw new Error("Já existe um usuário (ou pedido) com este login.");
+          if (!nome || !lg || /\s/.test(lg)) throw new ErroUsuario("Preencha o nome e um login sem espaços.");
+          if (senhaCurta(senha)) throw new ErroUsuario(ERRO_SENHA_CURTA);
+          if (senha !== f.get("senha2")) throw new ErroUsuario("As duas senhas precisam ser iguais.");
+          if (E.d.usuarios.some((u) => u.login === lg)) throw new ErroUsuario("Já existe um usuário (ou pedido) com este login.");
           const campos = await camposDeSenha(senha);
           await alterar((db) => inserir(db, "usuarios", {
             login: lg,
@@ -33096,7 +33098,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
             }
             for (const [k, v] of Object.entries(mais)) if (!erros[k]) erros[k] = v;
           }
-          if (cfg4.confirmar && !Object.keys(erros).length && !await cfg4.confirmar(dados, registro)) throw new Error("Nada foi salvo.");
+          if (cfg4.confirmar && !Object.keys(erros).length && !await cfg4.confirmar(dados, registro)) throw new ErroUsuario("Nada foi salvo. Corrija o que precisar e salve de novo.");
           if (cfg4.ajustarAsync && !Object.keys(erros).length) await cfg4.ajustarAsync(dados, erros, registro, form, rota.q);
           if (Object.keys(erros).length) return { erros, valores: Object.fromEntries(new FormData(form)) };
           await confirmarAvisos(cfg4.conferir ? cfg4.conferir(dados, registro, rota.q) : []);
@@ -33140,7 +33142,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         /** Pagamento com valor diferente do previsto: a NF sai com o valor digitado (diferente do calculado) e a justificativa fica no histórico. */
         async pagamentoNf(form) {
           const p2 = memoria.pagamentoDivergente;
-          if (!p2 || String(p2.id) !== form.dataset.id) throw new Error("Confirme o pagamento de novo.");
+          if (!p2 || String(p2.id) !== form.dataset.id) throw new ErroUsuario("Confirme o pagamento de novo.");
           const f = new FormData(form);
           const texto3 = String(f.get("valor_nf") || "").trim();
           const valorNf = texto3 ? centavos(texto3) : null;
@@ -33160,9 +33162,9 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         async ajuste(form) {
           const f = new FormData(form);
           const valor = Math.abs(centavos(String(f.get("valor") || "").trim()));
-          if (!valor) throw new Error("Informe o valor do ajuste.");
+          if (!valor) throw new ErroUsuario("Informe o valor do ajuste.");
           const motivo = String(f.get("motivo") || "").trim();
-          if (!motivo) throw new Error("Informe o motivo do ajuste (fica no histórico).");
+          if (!motivo) throw new ErroUsuario("Informe o motivo do ajuste (fica no histórico).");
           await alterar((db) => ajustarBoleto(db, Number(form.dataset.id), f.get("tipo") === "ressarcimento" ? -valor : valor, motivo, login()));
           aviso("Ajuste salvo e registrado no histórico.");
           await mostrar();
@@ -33185,9 +33187,9 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           const f = new FormData(form);
           const indice = String(f.get("indice") || "");
           const mesRef = String(f.get("mes_ref") || "");
-          if (!/^\d{4}-\d{2}$/.test(mesRef)) throw new Error("Informe o mês até onde vai o acumulado.");
+          if (!/^\d{4}-\d{2}$/.test(mesRef)) throw new ErroUsuario("Informe o mês até onde vai o acumulado.");
           const percentual2 = numero(f.get("percentual"));
-          if (String(f.get("percentual") || "").trim() === "") throw new Error("Informe o percentual acumulado em 12 meses.");
+          if (String(f.get("percentual") || "").trim() === "") throw new ErroUsuario("Informe o percentual acumulado em 12 meses.");
           await alterar((db) => {
             const existente = db.indices_acumulados.find((x) => x.indice === indice && x.mes_ref === mesRef);
             if (existente) atualizar(db, "indices_acumulados", existente.id, { percentual: percentual2 }, login(), `${indice} até ${compBr(mesRef)}: ${pct(percentual2)}`);
@@ -33207,7 +33209,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           const temPct = String(f.get("percentual") || "").trim() !== "";
           const pctDigitado = temPct ? numero(f.get("percentual")) : null;
           const valor = String(f.get("valor_novo") || "").trim() ? centavos(f.get("valor_novo")) : 0;
-          if (!temPct && !(valor > 0)) throw new Error("Digite o % da correção ou o novo valor do aluguel.");
+          if (!temPct && !(valor > 0)) throw new ErroUsuario("Digite o % da correção ou o novo valor do aluguel.");
           let manual = null;
           if (["valor_novo", "bonificado"].includes(origem) && valor > 0) manual = valor === aplicarCorrecao(Number(form.dataset.atual), pctIndice ?? NaN) ? null : { valor_novo: valor };
           else if (pctIndice === null || temPct && pctDigitado !== pctIndice) manual = temPct ? { percentual: pctDigitado } : { valor_novo: valor };
@@ -33220,7 +33222,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         async guiaImposto(form) {
           const texto3 = String(new FormData(form).get("valor") || "").trim();
           const valor = texto3 ? centavos(texto3) : null;
-          if (valor !== null && !(valor >= 0)) throw new Error("Valor inválido.");
+          if (valor !== null && !(valor >= 0)) throw new ErroUsuario("Valor inválido. Digite só o valor, como 1.234,56 (ou deixe em branco para apagar).");
           const { emitente, imposto, periodo: periodo2 } = form.dataset;
           await alterar((db) => salvarGuiaImposto(db, Number(emitente), imposto, periodo2, valor, login()));
           aviso(valor === null ? "Valor do contador apagado." : "Valor do contador salvo.");
@@ -33233,7 +33235,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         ir: (form) => ir(enderecoDoFormulario(form.dataset.ir, new FormData(form))),
         async logo(form) {
           const arquivo = new FormData(form).get("arquivo");
-          if (!arquivo || !arquivo.size) throw new Error("Escolha o arquivo da logo.");
+          if (!arquivo || !arquivo.size) throw new ErroUsuario("Escolha o arquivo da logo.");
           const dataUrl = await reduzirImagem(arquivo);
           await alterar((db) => {
             registrar(db, login(), "Alteração", null, null, db.logo ? "Logo da empresa trocada" : "Logo da empresa enviada");
@@ -33264,7 +33266,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         },
         async proximaFatura(form) {
           const n = Number(new FormData(form).get("numero"));
-          if (!Number.isInteger(n) || n < 1) throw new Error("Número inválido.");
+          if (!Number.isInteger(n) || n < 1) throw new ErroUsuario("Digite um número inteiro a partir de 1 para a próxima NF.");
           const ultima = ultimaFatura(E.d);
           if (ultima && n <= ultima.numero && !await confirmar(`Já existe a NF nº ${numeroFatura(ultima.numero)}. Usar ${numeroFatura(n)} vai repetir números de NF.`, { titulo: "Repetir número de NF?", sim: "Usar mesmo assim", forte: true })) return;
           await alterar((db) => {
@@ -33278,7 +33280,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           const f = new FormData(form);
           const arq = f.get("zip");
           if (!arq || !arq.size) throw new ErroUsuario("Escolha o arquivo ZIP.");
-          if (f.get("confirmo") !== "1") throw new Error("Marque a confirmação: a importação substitui os dados desta pasta.");
+          if (f.get("confirmo") !== "1") throw new ErroUsuario("Marque a confirmação: a importação substitui os dados desta pasta.");
           const JSZip = await jsZip();
           const novos = await importarZip(JSZip, E.pasta, arq, E.d);
           E.d = novos;
@@ -33290,7 +33292,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         },
         /** Dados e backup: configuração geral da integração com o banco (ponte, senha, ativar, conta padrão). Só administrador. */
         async configBanco(form) {
-          if (!podeUsuario("admin")) throw new Error("Só o administrador altera a integração com o banco.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador altera a integração com o banco.");
           const f = new FormData(form);
           await salvarPonteLocal({ ponte_url: f.get("ponte_url"), senha_ponte: f.get("senha_ponte") });
           await alterar((db) => salvarConfigBanco(db, { ativo: f.get("ativo") === "1" }, login()));
@@ -33299,7 +33301,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         },
         /** Empresas: qual conta emite os boletos (sempre a padrão ou escolher boleto a boleto). */
         async modoContaBoleto(form) {
-          if (!podeUsuario("admin")) throw new Error("Só o administrador altera a integração com o banco.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador altera a integração com o banco.");
           const f = new FormData(form);
           await alterar((db) => salvarConfigBanco(db, { modo_conta_boleto: f.get("modo"), conta_padrao_id: f.get("conta_padrao_id") || void 0 }, login()));
           aviso(f.get("modo") === "escolher" ? "Ao emitir, o sistema vai perguntar a empresa de cada boleto." : "Os boletos saem sempre pela empresa padrão.");
@@ -33307,7 +33309,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         },
         /** Dados e backup: inclui ou altera uma conta bancária da integração (uma por empresa). */
         async contaBanco(form) {
-          if (!podeUsuario("admin")) throw new Error("Só o administrador altera a integração com o banco.");
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador altera a integração com o banco.");
           const f = Object.fromEntries(new FormData(form));
           const conta = await alterar((db) => salvarContaBanco(db, f, login()));
           aviso(`Conta ${conta.apelido} salva. Lembre de configurar a mesma conta ("${conta.id}") no .env da ponte.`);
@@ -33315,13 +33317,13 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         },
         async modeloExcel(form) {
           const arq = new FormData(form).get("modelo");
-          if (!arq || !arq.size) throw new Error("Escolha o arquivo .xlsx.");
+          if (!arq || !arq.size) throw new ErroUsuario("Escolha a planilha (arquivo .xlsx) antes de continuar.");
           const ExcelJS = await excelJs();
           const wb = new ExcelJS.Workbook();
           try {
             await wb.xlsx.load(await arq.arrayBuffer());
           } catch {
-            throw new Error("Não consegui abrir este arquivo como planilha Excel (.xlsx).");
+            throw new ErroUsuario("Não consegui abrir este arquivo como planilha do Excel. Escolha um arquivo .xlsx (no Excel: Salvar como → Pasta de Trabalho do Excel).");
           }
           const dir = await E.pasta.getDirectoryHandle(PASTA_MODELOS, { create: true });
           await escreverTexto(dir, MODELO_FATURA, arq);
