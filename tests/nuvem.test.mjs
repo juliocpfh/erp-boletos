@@ -283,11 +283,20 @@ async function nuvemComCofre() {
   const r2 = r2Falso();
   const dobj = new CofreDO({ storage: { sql, transactionSync: tx } }, { DADOS: r2 });
   const usuario = async (id, login, papel, senha, extra = {}) => ({ id, login, email: login, nome: `Pessoa ${id}`, papel, ativo: true, senha_sal: `sal${id}`, senha_hash: await resumoSenha(senha, `sal${id}`, 1000), senha_iteracoes: 1000, ...extra });
-  dobj.cofre.importar({ formato: 'imoveis-v1', imoveis: [], usuarios: [
+  const usuarios = [
     await usuario(1, 'dono@exemplo.com.br', 'admin', 'senha do dono 2026'),
     await usuario(2, 'leitor@exemplo.com.br', 'consulta', 'senha do leitor 2026'),
     await usuario(3, 'antigo@exemplo.com.br', 'admin', 'senha antiga 2026', { senha_iteracoes: undefined, senha_hash: await resumoSenha('senha antiga 2026', 'sal3', 150000) }),
-  ] }, 'dono@exemplo.com.br');
+  ];
+  dobj.cofre.importar({ formato: 'imoveis-v1', imoveis: [], usuarios }, 'dono@exemplo.com.br');
+  // cada um já entrou no site com a senha: o verificador do programa do PC está na nuvem (com poucas voltas, para o teste andar)
+  const senhas = ['senha do dono 2026', 'senha do leitor 2026', 'senha antiga 2026'];
+  const verificador = async (u, senha, voltas = 1000) => {
+    const sal = `aparelho:${String(u.id).padStart(32, '0')}`;
+    dobj.cofre.sql.exec('INSERT OR REPLACE INTO verificadores_aparelho (usuario_id, sal, iteracoes, hash, marca, em) VALUES (?, ?, ?, ?, ?, ?)',
+      u.id, sal, voltas, await A.hashDoCracha(await resumoSenha(senha, sal, voltas)), await A.hashDoCracha(u.senha_hash), '2026-11-17T00:00:00.000Z');
+  };
+  for (const [i, u] of usuarios.entries()) await verificador(u, senhas[i]);
   await r2.put('arquivos/Sala 101/contrato.pdf', 'pdf');
   await r2.put('backups/imoveis-dados-2026-11-08.json', '{}');
   W.esquecerPapeis(); W.esquecerCrachas();
@@ -314,7 +323,7 @@ async function nuvemComCofre() {
   };
   dobj.aparelhos.esperas = [];
   dobj.aparelhos.esperar = async (ms) => { dobj.aparelhos.esperas.push(ms); }; // a espera do limite geral não atrasa o teste
-  return { dobj, env, pedir, entrar, desafio, github };
+  return { dobj, env, pedir, entrar, desafio, github, usuarios, verificador };
 }
 
 test('crachá do aparelho: entra com e-mail e senha conferidos no servidor e só lê; nada fora de /api/aparelho/ passa sem o Access', async () => {
@@ -362,8 +371,8 @@ test('crachá do aparelho: entra com e-mail e senha conferidos no servidor e só
 test('crachá do aparelho: a conta da senha é feita no computador (o Workers recusa PBKDF2 acima de 100.000 voltas); a senha não chega à nuvem', async () => {
   const { dobj, pedir, desafio } = await nuvemComCofre();
   // passo 1: sal e voltas do usuário; e-mail desconhecido recebe um sal de mentira, sempre o mesmo (não entrega quem tem cadastro)
-  assert.deepEqual(await (await desafio('Dono@Exemplo.com.br')).json(), { desafio: { sal: 'sal1', iteracoes: 1000 } });
-  assert.deepEqual(await (await desafio('antigo@exemplo.com.br')).json(), { desafio: { sal: 'sal3', iteracoes: 150000 } }, 'usuário antigo: as voltas antigas');
+  // o sal é o do verificador (só a nuvem guarda), não o senha_sal do banco
+  assert.deepEqual(await (await desafio('Dono@Exemplo.com.br')).json(), { desafio: { sal: `aparelho:${'0'.repeat(31)}1`, iteracoes: 1000 } });
   const falso = (await (await desafio('ninguem@exemplo.com.br')).json()).desafio;
   assert.match(falso.sal, /^[0-9a-f]{32}$/, 'parece um sal de verdade (docs/js/auth.js novoSal)');
   assert.ok([150000, 600000].includes(falso.iteracoes), 'voltas de mentira entre os dois valores que os usuários de verdade têm (as voltas não dizem quem tem cadastro)');
@@ -371,13 +380,17 @@ test('crachá do aparelho: a conta da senha é feita no computador (o Workers re
   assert.notEqual((await (await desafio('outro@exemplo.com.br')).json()).desafio.sal, falso.sal);
   assert.equal(dobj.cofre.q('SELECT COUNT(*) AS n FROM tentativas_aparelho')[0].n, 0, 'pedir o sal não conta como tentativa');
   // o cofre não faz PBKDF2 nenhum: nem com a senha certa em texto (programa antigo) entra
+  const daSenha = await resumoSenha('senha do dono 2026', `aparelho:${'0'.repeat(31)}1`, 1000);
   const original = crypto.subtle.deriveBits;
   crypto.subtle.deriveBits = () => { throw new Error('o cofre não pode fazer PBKDF2 (limite de 100.000 voltas do Workers)'); };
   try {
     const antigo = await pedir('POST', 'aparelho/entrar', { corpo: { email: 'dono@exemplo.com.br', senha: 'senha do dono 2026', computador: 'PC' } });
     assert.equal(antigo.status, 400);
     assert.match((await antigo.json()).erro, /programa do computador é antigo/);
-    const certo = await pedir('POST', 'aparelho/entrar', { corpo: { email: 'dono@exemplo.com.br', senha: `pbkdf2:${dobj.cofre.q("SELECT dados FROM registros WHERE tabela = 'usuarios' AND id = 1").map((x) => JSON.parse(x.dados))[0].senha_hash}`, computador: 'PC' } });
+    // quem tem o banco aberto (o senha_hash gravado) não entra: o verificador é outro (2ª rodada do mutirão de 16/11)
+    const doBanco = await pedir('POST', 'aparelho/entrar', { corpo: { email: 'dono@exemplo.com.br', senha: `pbkdf2:${dobj.cofre.q("SELECT dados FROM registros WHERE tabela = 'usuarios' AND id = 1").map((x) => JSON.parse(x.dados))[0].senha_hash}`, computador: 'PC' } });
+    assert.equal(doBanco.status, 401, 'o resumo do banco não abre crachá');
+    const certo = await pedir('POST', 'aparelho/entrar', { corpo: { email: 'dono@exemplo.com.br', senha: `pbkdf2:${daSenha}`, computador: 'PC' } });
     assert.equal(certo.status, 200, 'com o resumo certo entra, sem conta pesada no servidor');
   } finally { crypto.subtle.deriveBits = original; }
   assert.equal((await pedir('POST', 'aparelho/entrar', { corpo: { email: 'dono@exemplo.com.br', senha: '', computador: 'PC' } })).status, 400, 'senha vazia não é pedido de sal');
@@ -385,11 +398,47 @@ test('crachá do aparelho: a conta da senha é feita no computador (o Workers re
   assert.equal((await pedir('POST', 'aparelho/entrar', { corpo: { email: 'ninguem@exemplo.com.br', senha: `pbkdf2:${'0'.repeat(64)}`, computador: 'PC' } })).status, 401, 'sem usuário, o resumo de comparação nunca bate');
 });
 
+test('crachá do aparelho: verificador separado da senha, mandado pelo site; senha trocada ou sem verificador pede para entrar no site', async () => {
+  const { dobj, env, entrar, desafio, usuarios } = await nuvemComCofre();
+  const site = async (email, corpo) => {
+    const agora = Math.floor(Date.now() / 1000);
+    const jwt = await token({ aud: [AUD], iss: `https://${EQUIPE}`, exp: agora + 3600, iat: agora, email });
+    return W.atender(new Request('https://erp.ankjck.com.br/api/dados/verificador-aparelho', {
+      method: 'POST', body: JSON.stringify(corpo), headers: { 'Cf-Access-Jwt-Assertion': jwt, 'X-Sistema': 'imoveis', Origin: 'https://erp.ankjck.com.br' },
+    }), env, buscarCerts);
+  };
+  // sem verificador (ainda não entrou no site com a senha): o mesmo erro da senha errada, e o desafio parece o de quem não existe
+  dobj.cofre.sql.exec('DELETE FROM verificadores_aparelho WHERE usuario_id = 2');
+  const semV = (await (await desafio('leitor@exemplo.com.br')).json()).desafio;
+  assert.match(semV.sal, /^[0-9a-f]{32}$/);
+  const r = await entrar('leitor@exemplo.com.br', 'senha do leitor 2026');
+  assert.equal(r.status, 401);
+  assert.equal((await r.json()).erro, A.ERRO_ENTRAR);
+  // o site manda (como auth.js verificadorDoAparelho, com a senha em mãos no login), só para o próprio usuário
+  const { verificadorDoAparelho, sha256 } = await import('../docs/js/auth.js');
+  const v = await verificadorDoAparelho('senha do leitor 2026', usuarios[1].senha_hash);
+  assert.match(v.sal, /^aparelho:[0-9a-f]{32}$/);
+  assert.equal(v.marca, await sha256(usuarios[1].senha_hash));
+  assert.equal((await site('leitor@exemplo.com.br', v)).status, 200);
+  assert.ok(!JSON.stringify(dobj.cofre.q('SELECT * FROM verificadores_aparelho')).includes(v.resumo), 'a nuvem guarda só o SHA-256 do resumo');
+  assert.ok(!JSON.stringify(dobj.cofre.tudo()).includes(v.sal), 'o verificador não vai para o banco (JSON)');
+  assert.equal((await site('leitor@exemplo.com.br', { ...v, resumo: 'x' })).status, 400);
+  assert.equal((await site('leitor@exemplo.com.br', { ...v, sal: 'sal2' })).status, 400, 'o sal do banco não serve');
+  assert.equal((await site('ninguem@exemplo.com.br', v)).status, 403);
+  assert.deepEqual((await (await desafio('leitor@exemplo.com.br')).json()).desafio, { sal: v.sal, iteracoes: 600000 });
+  const certo = await entrar('leitor@exemplo.com.br', 'senha do leitor 2026');
+  assert.equal(certo.status, 200, 'entra com a senha');
+  // senha trocada depois (o senha_hash do banco mudou): o verificador antigo não vale até entrar no site com a nova
+  const u = dobj.cofre.q("SELECT dados FROM registros WHERE tabela = 'usuarios' AND id = 2").map((x) => JSON.parse(x.dados))[0];
+  dobj.cofre.sql.exec("UPDATE registros SET dados = ? WHERE tabela = 'usuarios' AND id = 2", JSON.stringify({ ...u, senha_hash: await resumoSenha('senha nova 2026 x', 'sal9', 1000) }));
+  assert.equal((await entrar('leitor@exemplo.com.br', 'senha do leitor 2026', { ip: '198.51.100.77' })).status, 401, 'a senha velha não liga mais');
+});
+
 test('crachá do aparelho: senha errada e limite de tentativas (por e-mail e por endereço; o total só atrasa); usuário antigo e pendente', async () => {
   const { dobj, entrar } = await nuvemComCofre();
   const r = await entrar('dono@exemplo.com.br', 'senha errada');
   assert.equal(r.status, 401);
-  assert.equal((await r.json()).erro, 'E-mail ou senha errados.');
+  assert.equal((await r.json()).erro, A.ERRO_ENTRAR);
   assert.equal((await entrar('ninguem@exemplo.com.br', 'qualquer coisa')).status, 401, 'e-mail desconhecido: mesma resposta');
   assert.equal((await entrar('', '')).status, 400);
   assert.equal((await entrar('dono@exemplo.com.br', 'senha do dono 2026', { ip: '198.51.100.1' })).status, 200, 'acertou: entra e zera o e-mail');

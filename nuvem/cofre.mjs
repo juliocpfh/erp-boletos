@@ -1251,6 +1251,7 @@ export class CofreDO {
       if (!email) throw new ErroCofre(401, 'Sem login.');
       if (rota === '/aparelhos' && request.method === 'GET') r = this.aparelhos.lista(c.exigir(email, 'consulta'));
       else if (rota === '/desligar-aparelho' && request.method === 'POST') r = this.aparelhos.desligar(await corpo(), c.exigir(email, 'consulta'), email);
+      else if (rota === '/verificador-aparelho' && request.method === 'POST') r = await this.aparelhos.guardarVerificador(await corpo(), c.exigir(email, 'consulta'));
       else if (rota === '/papel' && request.method === 'GET') {
         // o Worker pede 'admin' para os backups (banco inteiro, com as senhas de todos): nível desconhecido é recusado, nunca vira 'consulta'
         const nivel = url.searchParams.get('nivel');

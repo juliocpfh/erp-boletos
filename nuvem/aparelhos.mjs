@@ -5,8 +5,13 @@
 // A senha é conferida como no site (docs/js/auth.js): a conta pesada (PBKDF2) é feita no computador da pessoa, nunca aqui
 // (o Cloudflare Workers recusa PBKDF2 acima de 100.000 voltas, e as senhas são gravadas com 150.000 ou 600.000). Em dois passos,
 // pela mesma rota: 1) e-mail sem senha → { desafio: { sal, iteracoes } }; 2) e-mail + `pbkdf2:<resumo>` → o cofre compara com o
-// resumo gravado, em tempo constante, com limite de tentativas. A senha em si nunca chega à nuvem. Limite conhecido: quem já
-// tem o resumo gravado de um usuário (administrador, backup aberto) consegue um crachá, que só lê, sem saber a senha.
+// verificador da senha, em tempo constante, com limite de tentativas. A senha em si nunca chega à nuvem.
+// Verificador separado da senha (2ª rodada do mutirão de 16/11): o desafio não é o sal do resumo gravado no banco (`senha_sal`),
+// mas o de um verificador que o site manda ao entrar com a senha (auth.js `verificadorDoAparelho`, rota dados/verificador-aparelho)
+// e que só o cofre guarda (tabela própria, só o SHA-256 do resumo). Antes, quem tinha o banco aberto (o `senha_hash` de um usuário:
+// administrador, backup) conseguia um crachá sem saber a senha. O programa do PC não muda (faz a conta com o sal que vier).
+// Sem verificador (ainda não entrou no site com a senha depois desta versão, ou trocou a senha depois): recusa, pedindo para
+// entrar uma vez no site com a senha. Os computadores já ligados continuam (o crachá não muda).
 // Decisão do dono em 15/11/2026 (documentacao/PROPOSTA_LICENCA_E_PROGRAMA_PC.md, seção 8, item 10).
 
 export const DIAS_SEM_USO = 90; // parado mais que isso: o crachá para e o computador entra de novo
@@ -26,6 +31,9 @@ export const LIMITES = {
 };
 export const ATRASO_GERAL = 2000;
 const FORMATO_RESUMO = /^pbkdf2:([0-9a-f]{64})$/;
+const HEX64 = /^[0-9a-f]{64}$/;
+/** Erro do login do programa do PC: o mesmo para senha errada, e-mail sem cadastro e usuário sem verificador (não diz qual). */
+export const ERRO_ENTRAR = 'E-mail ou senha errados. Se a senha está certa: entre uma vez no sistema pelo site (com o e-mail e a senha) e ligue o computador de novo.';
 export const PREFIXO = 'ap1_';
 const FORMATO_CRACHA = /^ap1_[A-Za-z0-9_-]{43}$/;
 export const crachaValido = (t) => FORMATO_CRACHA.test(String(t || ''));
@@ -63,7 +71,9 @@ export class Aparelhos {
     cofre.sql.exec(`CREATE TABLE IF NOT EXISTS aparelhos (id INTEGER PRIMARY KEY AUTOINCREMENT, hash TEXT NOT NULL UNIQUE, computador TEXT NOT NULL,
         usuario_id INTEGER NOT NULL, ligado_por TEXT NOT NULL, ligado_em TEXT NOT NULL, ultimo_uso TEXT NOT NULL, desligado_em TEXT, desligado_por TEXT);
       CREATE TABLE IF NOT EXISTS tentativas_aparelho (chave TEXT PRIMARY KEY, falhas INTEGER NOT NULL, desde TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS segredo_aparelho (id INTEGER PRIMARY KEY CHECK (id = 1), valor TEXT NOT NULL);`);
+      CREATE TABLE IF NOT EXISTS segredo_aparelho (id INTEGER PRIMARY KEY CHECK (id = 1), valor TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS verificadores_aparelho (usuario_id INTEGER PRIMARY KEY, sal TEXT NOT NULL, iteracoes INTEGER NOT NULL,
+        hash TEXT NOT NULL, marca TEXT NOT NULL, em TEXT NOT NULL);`);
   }
 
   agora() { return this.c.relogio(); }
@@ -139,6 +149,31 @@ export class Aparelhos {
   }
 
   /**
+   * Verificador da senha mandado pelo site (com a senha em mãos: login ou troca da senha), só do próprio usuário (`quem`).
+   * { sal, iteracoes, resumo: PBKDF2 da senha com esse sal, marca: SHA-256 do senha_hash em uso }. Guarda só o SHA-256 do resumo.
+   */
+  async guardarVerificador(pedido, quem) {
+    const u = quem && this.usuarioPorId(Number(quem.id));
+    if (!u) throw new ErroAparelho(403, 'Usuário sem acesso.');
+    const sal = String(pedido?.sal || '');
+    const iteracoes = Number(pedido?.iteracoes);
+    const resumo = String(pedido?.resumo || '').toLowerCase();
+    const marca = String(pedido?.marca || '').toLowerCase();
+    if (!/^aparelho:[0-9a-f]{32}$/.test(sal) || !Number.isSafeInteger(iteracoes) || iteracoes < ITERACOES_ANTIGAS || iteracoes > MAX_ITERACOES
+      || !HEX64.test(resumo) || !HEX64.test(marca)) throw new ErroAparelho(400, 'Verificador inválido.');
+    this.c.sql.exec('INSERT INTO verificadores_aparelho (usuario_id, sal, iteracoes, hash, marca, em) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(usuario_id) DO UPDATE SET sal = excluded.sal, iteracoes = excluded.iteracoes, hash = excluded.hash, marca = excluded.marca, em = excluded.em',
+      u.id, sal, iteracoes, await hashDoCracha(resumo), marca, this.agora().toISOString());
+    return { ok: true };
+  }
+
+  /** O verificador do usuário que ainda vale (feito com a senha em uso: a marca bate com o senha_hash de agora), ou null. */
+  async verificadorDe(u) {
+    const v = u && u.senha_hash && this.c.q('SELECT sal, iteracoes, hash, marca FROM verificadores_aparelho WHERE usuario_id = ?', u.id)[0];
+    if (!v || v.marca !== await hashDoCracha(u.senha_hash)) return null;
+    return { sal: v.sal, iteracoes: Number(v.iteracoes), hash: v.hash };
+  }
+
+  /**
    * Passo 1 (sem `senha`): devolve { desafio: { sal, iteracoes } } para o computador fazer a conta da senha lá.
    * Passo 2 (`senha` = 'pbkdf2:<resumo em hex>'): confere e devolve o crachá novo (o texto só aparece aqui, uma vez).
    * `ip` vem do Worker (CF-Connecting-IP).
@@ -149,19 +184,20 @@ export class Aparelhos {
     const senha = semSenha ? '' : String(pedido.senha);
     if (!email || email.length > 200 || senha.length > 500 || (!semSenha && !senha)) throw new ErroAparelho(400, 'Informe o e-mail e a senha do sistema.');
     const u = this.usuarioPorEmail(email);
-    // e-mail sem cadastro: sal e voltas de mentira, sempre os mesmos para o mesmo e-mail, sorteados entre os dois valores que os
-    // usuários de verdade têm (as voltas não dizem quem tem cadastro)
-    const mentira = u ? '' : await this.salDeMentira(email);
-    const iteracoes = u ? Number(u.senha_iteracoes) || ITERACOES_ANTIGAS : (parseInt(mentira.slice(-1), 16) % 2 ? ITERACOES_ANTIGAS : ITERACOES_PADRAO);
-    if (semSenha) return { desafio: { sal: String(u?.senha_sal || mentira), iteracoes: Math.min(iteracoes, MAX_ITERACOES) } };
+    const v = await this.verificadorDe(u);
+    // e-mail sem cadastro (ou sem verificador): sal e voltas de mentira, sempre os mesmos para o mesmo e-mail, sorteados entre os
+    // dois valores que os usuários de verdade têm (as voltas não dizem quem tem cadastro)
+    const mentira = v ? '' : await this.salDeMentira(email);
+    const iteracoes = v ? v.iteracoes : (parseInt(mentira.slice(-1), 16) % 2 ? ITERACOES_ANTIGAS : ITERACOES_PADRAO);
+    if (semSenha) return { desafio: { sal: v ? v.sal : mentira, iteracoes: Math.min(iteracoes, MAX_ITERACOES) } };
     const computador = nomeDoComputador(pedido?.computador);
     const resumo = FORMATO_RESUMO.exec(senha)?.[1];
     if (!resumo) throw new ErroAparelho(400, 'Este programa do computador é antigo e não consegue mais entrar: baixe a versão nova do programa (Administracao-de-Imoveis.exe) e ligue de novo.');
     const atraso = this.contarTentativa(email, ip);
     if (atraso) await this.esperar(atraso);
-    // sem usuário, compara do mesmo jeito (com um resumo que nunca bate)
-    const certo = mesmoTexto(resumo, String(u?.senha_hash || '').toLowerCase() || '0'.repeat(64));
-    if (!u || !u.senha_hash || iteracoes > MAX_ITERACOES || !certo) throw new ErroAparelho(401, 'E-mail ou senha errados.');
+    // sem usuário ou sem verificador, compara do mesmo jeito (com um resumo que nunca bate)
+    const certo = mesmoTexto(await hashDoCracha(resumo), v ? v.hash : '-'.repeat(64));
+    if (!u || !v || iteracoes > MAX_ITERACOES || !certo) throw new ErroAparelho(401, ERRO_ENTRAR);
     this.esquecerTentativa(email, ip);
     const cracha = PREFIXO + b64url(crypto.getRandomValues(new Uint8Array(32)));
     const agora = this.agora().toISOString();

@@ -1,5 +1,5 @@
 // FORMULARIOS: o que acontece ao enviar cada formulário (data-form="nome"). O de cadastro genérico é FORMULARIOS.cadastro.
-import { abrirPasta, alterar, aviso, confirmar, backupCompletoSeguro, baixar, conectarSeguro, criarBanco, E, entrar, excelJs, ir, janela, jsZip, ligarChaveNaNuvem, login, mostrar, podeUsuario, renovarUsuario, tokenDaSessao } from '../app.js';
+import { abrirPasta, alterar, aviso, confirmar, backupCompletoSeguro, baixar, conectarSeguro, criarBanco, E, entrar, excelJs, ir, janela, jsZip, ligarChaveNaNuvem, login, mandarVerificadorDoAparelho, mostrar, podeUsuario, renovarUsuario, tokenDaSessao } from '../app.js';
 import * as S from '../armazenamento.js';
 import { camposDeSenha, conferirSenha, ERRO_SENHA_CURTA, senhaCurta } from '../auth.js';
 import * as B from '../backup-seguro.js';
@@ -427,6 +427,7 @@ export const FORMULARIOS = {
     const token = tokenDaSessao();
     await alterar((db) => R.atualizar(db, 'usuarios', E.usuario.id, { ...campos, sessoes: token ? [token] : [] }, login(), 'Trocou a própria senha'));
     E.usuario = R.buscar(E.d, 'usuarios', E.usuario.id);
+    mandarVerificadorDoAparelho(E.usuario.login, nova, campos.senha_hash); // ligar o programa do PC com a senha nova
     aviso('Senha alterada. Os outros navegadores e computadores em que você estava entrado vão pedir a senha nova.');
     ir('#/');
   },

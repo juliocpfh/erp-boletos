@@ -1,6 +1,6 @@
 // Aplicação: estado, gravação na pasta escolhida (ou na nuvem, nuvem.js), rotas e ações. As telas estão em telas.js.
 import * as S from './armazenamento.js';
-import { camposDeSenha, conferirSenha, pode, reforcarSenha } from './auth.js';
+import { camposDeSenha, conferirSenha, pode, reforcarSenha, sha256, verificadorDoAparelho } from './auth.js';
 import { carregarPonteLocal, esquecerSenhaDaPonte } from './banco.js';
 import * as B from './backup-seguro.js';
 import { arrumarCaixas } from './caixas.js';
@@ -723,7 +723,26 @@ export async function entrar(loginTexto, senha) {
   // senha gravada com o padrão antigo (menos iterações): regrava com o atual, já que a senha está em mãos
   const reforco = await reforcarSenha(u, senha);
   if (reforco) await alterar((db) => { const x = db.usuarios.find((y) => y.id === u.id); if (x) Object.assign(x, reforco); }, { soSessao: true }).catch(() => {});
+  mandarVerificadorDoAparelho(u.login, senha, (reforco || u).senha_hash);
   await abrirSessao(u);
+}
+
+/**
+ * Na nuvem, com a senha em mãos (login ou troca da senha): manda, por trás, o verificador para ligar o programa do PC
+ * (`verificadorDoAparelho`, auth.js; nuvem/aparelhos.mjs). Uma vez por senha em cada navegador (a conta é pesada no celular).
+ * Falhou (sem internet): fica para o próximo login. Devolve a promessa (testes).
+ */
+export function mandarVerificadorDoAparelho(loginTexto, senha, senhaHash) {
+  if (!E.nuvem || !senhaHash) return Promise.resolve(false);
+  const chave = `verificador-aparelho:${loginTexto}`;
+  return (async () => {
+    const marca = await sha256(senhaHash);
+    try { if (localStorage.getItem(chave) === marca) return false; } catch { /* navegador sem localStorage */ }
+    const v = await verificadorDoAparelho(senha, senhaHash);
+    await N.apiDoSite('api/dados/')('POST', 'verificador-aparelho', v);
+    try { localStorage.setItem(chave, v.marca); } catch { /* idem */ }
+    return true;
+  })().catch(() => false);
 }
 
 /** Atualiza o usuário logado depois de alterar o cadastro dele (ou sai, se foi bloqueado). */

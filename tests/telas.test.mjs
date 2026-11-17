@@ -291,6 +291,25 @@ test('ressarcimento para o boleto de um mês em acordo é recusado na tela (o bo
   assert.deepEqual(erros, {}, 'o boleto de 06/2026 recebe');
 });
 
+test('na nuvem, o login com senha manda por trás o verificador do programa do PC (uma vez por senha em cada navegador)', async () => {
+  const antes = E.nuvem;
+  E.nuvem = {}; // só para mandarVerificadorDoAparelho saber que está na nuvem
+  pedidos.length = 0;
+  internet.responder = () => new Response('{"ok":true}', { headers: { 'Content-Type': 'application/json' } });
+  try {
+    assert.equal(await T.mandarVerificadorDoAparelho('dono@exemplo.com.br', 'senha do dono 2026', 'a'.repeat(64)), true);
+    assert.deepEqual(pedidos, ['api/dados/verificador-aparelho']);
+    assert.equal(await T.mandarVerificadorDoAparelho('dono@exemplo.com.br', 'senha do dono 2026', 'a'.repeat(64)), false, 'mesma senha: não manda de novo');
+    assert.equal(await T.mandarVerificadorDoAparelho('dono@exemplo.com.br', 'senha nova do dono', 'b'.repeat(64)), true, 'senha trocada: manda');
+    E.nuvem = null;
+    assert.equal(await T.mandarVerificadorDoAparelho('dono@exemplo.com.br', 'x', 'c'.repeat(64)), false, 'fora da nuvem: nada');
+    assert.equal(pedidos.length, 2);
+  } finally {
+    E.nuvem = antes;
+    internet.responder = () => { throw new TypeError('sem internet'); };
+  }
+});
+
 test('telas raras carregadas só quando usadas (2ª rodada do mutirão de 16/11): fora da abertura, com as ações e formulários pelo nome', async () => {
   // a abertura (import estático a partir de app.js) não chega às partes adiadas
   const raiz = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'docs', 'js');
