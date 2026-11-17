@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-gyTRExH6Q4WksG3hEmmuisgn/YbyTRKyMAK6C21UVdI='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-nV2LBo/iSAwVHqJJFCDciUl24DqxOMPCwOeTuee6cSo='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="686f6a9d859b8ebd">
+<meta name="fontes" content="b09f92ec490fc6c1">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -162,6 +162,8 @@ textarea { min-height: 80px; }
 .impressao { max-width: none; }
 .fora td { background: #fef2f2; }
 .nw { white-space: nowrap; }
+/* campo do mês (tela Boletos): cabe "novembro de 2026" com o ícone, também no celular */
+.campo-mes { width: 13em; max-width: 100%; }
 .pre { white-space: pre-wrap; }
 .maior { font-size: 18px; font-weight: 700; }
 label.enviar { position: relative; overflow: hidden; margin-top: 8px; }
@@ -547,7 +549,7 @@ button.q-aberto:hover { outline: 2px solid #791F1F; }
   header.topo nav { display: none; order: 4; width: 100%; flex-direction: column; gap: 2px; padding-bottom: 6px; }
   header.topo.menu-aberto nav { display: flex; }
   header.topo nav a { padding: 9px 10px; font-size: 15px; }
-  .faixa { padding: 4px 12px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .faixa { padding: 4px 12px; font-size: 12px; overflow-wrap: anywhere; } /* quebra a linha (cortada, a data sumia) */
   main { padding: 12px 12px 60px; }
   .cartao { padding: 12px; }
   h1 { font-size: 21px; }
@@ -1854,6 +1856,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     aplicarCorrecao: () => aplicarCorrecao,
     arred: () => arred,
     calcularCobranca: () => calcularCobranca,
+    carimboLocal: () => carimboLocal,
     centavos: () => centavos,
     cheioPorBonificado: () => cheioPorBonificado,
     compBr: () => compBr,
@@ -1955,6 +1958,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   function hojeIso() {
     const d2 = /* @__PURE__ */ new Date();
     return `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, "0")}-${String(d2.getDate()).padStart(2, "0")}`;
+  }
+  function carimboLocal(agora = /* @__PURE__ */ new Date()) {
+    const p2 = (n) => String(n).padStart(2, "0");
+    return `${agora.getFullYear()}-${p2(agora.getMonth() + 1)}-${p2(agora.getDate())}-${p2(agora.getHours())}-${p2(agora.getMinutes())}`;
   }
   function diasEntre(a, b) {
     return Math.round((paraData(b) - paraData(a)) / MS_DIA);
@@ -2332,8 +2339,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         nf: /^[01]$/,
         ir: /^[\w-]+$/,
         voltar: /^#\/[\w/?&=.,-]*$/,
-        q: /^[^\r\n<>]{1,100}$/
+        q: /^[^\r\n<>]{1,100}$/,
         // texto da busca global (a tela ainda passa por esc())
+        situacao: /^(Reprovada|Desistiu)$/
+        // "Reprovar (com o motivo)" na ficha: abre o Editar já com a situação
       };
     }
   });
@@ -3446,7 +3455,7 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
     if (c.garantia_tipo === "Fiador + depósito") falta.push("garantia dupla (fiador + depósito): a Lei 8.245/91, art. 37, permite só uma");
     for (const e of locadorasDoContrato(d2, c)) {
       if (!e.representante_nome) falta.push(`${e.nome}: representante que assina (em Empresas)`);
-      if (!e.endereco_sede) falta.push(`${e.nome}: endereço da sede (em Empresas)`);
+      if (!e.endereco_sede && !e.endereco) falta.push(`${e.nome}: endereço da sede (em Empresas)`);
     }
     return falta;
   }
@@ -6019,6 +6028,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   }
   function lembretesAirbnb(d2, meses, hoje3 = hojeIso()) {
     const out = [];
+    const temAirbnb = d2.imoveis.some((i) => i.tipo === "airbnb") || (d2.ganhos_airbnb || []).length > 0;
     for (const comp of [...new Set(meses)].filter((m) => mesFechado(m, hoje3)).sort()) {
       const sem = entradasAirbnbSemDestino(d2, comp);
       if (sem.length) out.push(`${sem.length} entrada(s) do Airbnb no extrato de ${compBr(comp)} ainda sem destino (${reais(sem.reduce((t, m2) => t + m2.valor, 0))}): dê o destino no Financeiro, dividindo entre os imóveis.`);
@@ -6026,7 +6036,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       if (m.numerada) continue;
       if (m.total && !m.nf) out.push(`Os ganhos do Airbnb de ${compBr(comp)} (${reais(m.total)}) ainda não viraram NF: gere a NF do Airbnb.`);
       else if (m.divergente) out.push(`A NF do Airbnb de ${compBr(comp)} está com ${reais(m.nf.valor)}, mas os ganhos somam ${reais(m.total)}: acerte a NF do Airbnb.`);
-      else if (!m.total && !sem.length) out.push(`Nenhuma entrada do Airbnb lançada em ${compBr(comp)}. Se houve, lance antes de numerar.`);
+      else if (!m.total && !sem.length && temAirbnb) out.push(`Nenhuma entrada do Airbnb lançada em ${compBr(comp)}. Se houve, lance antes de numerar.`);
     }
     return out;
   }
@@ -7619,6 +7629,13 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     };
     const feita = (data2, texto3 = "") => ({ situacao: "feita", data: data2 || null, texto: texto3 });
     const andamento = (texto3) => ({ situacao: "andamento", texto: texto3 });
+    let rotinaAnterior = null;
+    const doAnterior = (chave) => {
+      rotinaAnterior = rotinaAnterior || rotinaEntrada(d2, anterior, hoje3);
+      const e = rotinaAnterior.find((x) => x.chave === chave);
+      if (!e || ["feita", "pulada"].includes(e.situacao)) return feita(e ? e.data : null, herdou);
+      return andamento(`pendente no contrato de ${anterior.inquilino_nome}`);
+    };
     const docAssinado = (k, chave) => {
       const doc = documentoEntrada(d2, c, k);
       if (doc) return feita(doc.data, doc.contrato.id !== c.id ? `herdado de ${doc.contrato.inquilino_nome}` : doc.arquivo ? "" : "sem arquivo");
@@ -7640,11 +7657,11 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         if (c.reserva_valor > 0) return c.comprovante_reserva ? feita(c.reserva_data, reais(c.reserva_valor)) : andamento(`${reais(c.reserva_valor)} sem comprovante`);
         return void 0;
       },
-      contrato_gerado: () => anterior ? feita(null, herdou) : jaGerado("doc_contrato_em", "contrato já assinado"),
+      contrato_gerado: () => anterior ? doAnterior("contrato_gerado") : jaGerado("doc_contrato_em", "contrato já assinado"),
       contrato_assinado: () => docAssinado("doc_contrato_em", "contrato_assinado"),
       aditivo: () => {
         const t = aditivoDaTroca(d2, c);
-        if (t) return feita(t.data, t.assunto);
+        if (t) return feita(t.assinado_em || t.data, t.assunto);
         return aditivosAguardando(d2, c.id).some((a) => a.tipo === TIPO_ADITIVO_TROCA) ? andamento("gerado, aguardando assinatura") : void 0;
       },
       garantia: () => {
@@ -7652,7 +7669,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
           const m = marcaAnterior("garantia");
           if (m) return m;
           const semDeposito = (temCaucao(c) || temDeposito(c)) && ![c, ...antes].some((x) => garantiaDepositada(x) || somaDepositos(d2, x, temCaucao(c) ? "caucao" : "deposito") > 0);
-          return semDeposito ? andamento(`herdada de ${anterior.inquilino_nome}: falta o depósito`) : feita(null, `herdada de ${anterior.inquilino_nome}`);
+          if (semDeposito) return andamento(`herdada de ${anterior.inquilino_nome}: falta o depósito`);
+          return temCaucao(c) || temDeposito(c) ? feita(null, `herdada de ${anterior.inquilino_nome}`) : doAnterior("garantia");
         }
         if (temCaucao(c) || temDeposito(c)) {
           const qual = temCaucao(c) ? "caucao" : "deposito";
@@ -7665,11 +7683,11 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       vistoria_gerada: () => {
         const v = vistoriaDeEntrada(d2, c);
         if (v && v.contrato_id === c.id) return feita(v.data);
-        return anterior ? feita(null, herdou) : jaGerado("doc_vistoria_em", "vistoria já assinada");
+        return anterior ? doAnterior("vistoria_gerada") : jaGerado("doc_vistoria_em", "vistoria já assinada");
       },
-      chaves_gerado: () => anterior ? feita(null, herdou) : jaGerado("doc_chaves_em", "termo já assinado"),
+      chaves_gerado: () => anterior ? doAnterior("chaves_gerado") : jaGerado("doc_chaves_em", "termo já assinado"),
       vistoria_assinada: () => docAssinado("doc_vistoria_em", "vistoria_assinada"),
-      contra_vistoria: () => situacaoContraVistoria(d2, c, hoje3),
+      contra_vistoria: () => anterior && !c.contra_vistoria && ![...antes].some((x) => x.contra_vistoria) ? doAnterior("contra_vistoria") : situacaoContraVistoria(d2, c, hoje3),
       chaves_assinado: () => docAssinado("doc_chaves_em", "chaves_assinado"),
       seguro: () => {
         const data2 = c.data_entrada || c.vigencia_inicio || "";
@@ -9950,14 +9968,15 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       c.vistoria_saida_data ? convite && convite.data >= (c.vistoria_saida_marcada_em || "") ? `convite ${comoEnvio(convite)} em ${dataBr(convite.data)}` : "falta mandar o convite ao inquilino" : null
     ];
     const termo = c.termo_chaves_saida;
+    const semTermoAntigo = !!c.data_saida && c.data_saida < "2026-11-13";
     return [
       { chave: "aviso", titulo: "Aviso prévio: data de saída informada", feito: true, detalhe: `saída em ${dataBr(c.data_saida)}` },
       { chave: "vistoria", titulo: "Vistoria de saída (com a leitura dos relógios)", feito: !!vist, detalhe: vistoriaDetalhe.filter(Boolean).join(" · ") },
       {
         chave: "chaves",
         titulo: "Devolução das chaves (termo assinado)",
-        feito: !!termo || saiu && !!e,
-        detalhe: termo ? `chaves devolvidas em ${dataBr(c.data_saida)}; termo de devolução assinado ✓` : saiu ? `chaves devolvidas em ${dataBr(c.data_saida)}${e ? "" : "; falta anexar o termo de devolução assinado"}` : `prevista para ${dataBr(c.data_saida)}`
+        feito: !!termo || saiu && !!e && semTermoAntigo,
+        detalhe: termo ? `chaves devolvidas em ${dataBr(c.data_saida)}; termo de devolução assinado ✓` : saiu ? `chaves devolvidas em ${dataBr(c.data_saida)}${e && semTermoAntigo ? "; acertada sem termo (saída de antes do termo de devolução)" : "; falta anexar o termo de devolução assinado"}` : `prevista para ${dataBr(c.data_saida)}`
       },
       {
         chave: "contas",
@@ -19591,6 +19610,7 @@ Salvar assim mesmo?`)) {
     if (!r && imovelId && dados.gerar_nf !== false && !participacoesDo(d(), imovelId).length) {
       out.push(`O imóvel ${(buscar2("imoveis", imovelId) || {}).nome || ""} ainda não tem empresa que emite a NF. Defina na página do imóvel para conseguir numerar as NFs.`);
     }
+    if (dados.reserva_valor > 0 && dados.reserva_data && dados.data_entrada && dados.reserva_data > somarDias(dados.data_entrada, 31)) out.push(`A reserva tem data de ${dataBr(dados.reserva_data)}, mais de um mês depois da entrada (${dataBr(dados.data_entrada)}): confira o ano. Ela é abatida no 1º aluguel.`);
     if (dados.vigencia_inicio && dados.data_entrada && Math.abs(diasEntre(dados.vigencia_inicio, dados.data_entrada)) > 31) out.push(`O início do contrato (${dataBr(dados.vigencia_inicio)}) e a entrada (${dataBr(dados.data_entrada)}) estão a mais de um mês de distância.`);
     const antigo = r ? CADASTROS.contratos.valores(r) : null;
     for (const [prefixo, quem] of pessoasDoContrato(dados)) out.push(...conferirPessoa(dados, antigo, prefixo, quem));
@@ -22265,7 +22285,7 @@ ${m.texto}
     const semCorrecao = [...reajustes.values()].filter((r) => !r.corrigido).length;
     return `<div class="cabecalho"><h1>Boletos de ${compBr(comp)}</h1>
       <div class="acoes"><a class="botao secundario" href="${url({ comp: somarMeses(comp, -1) })}">← ${compBr(somarMeses(comp, -1))}</a>
-      <form data-form="ir" data-ir="cobrancas" class="acoes"><input type="month" name="comp" value="${esc(comp)}" style="width:160px"><button class="secundario">Ir</button></form>
+      <form data-form="ir" data-ir="cobrancas" class="acoes"><input type="month" name="comp" value="${esc(comp)}" class="campo-mes"><button class="secundario">Ir</button></form>
       <a class="botao secundario" href="${url({ comp: somarMeses(comp, 1) })}">${compBr(somarMeses(comp, 1))} →</a></div></div>
     <p class="suave">Competência é o mês de uso do imóvel. Ao receber, clique em "Confirmar pagamento" na linha e informe a data. Depois, numere as NFs: a numeração segue a ordem das datas de pagamento.</p>
     ${filtros}
@@ -22579,6 +22599,11 @@ ${m.texto}
     } : calc;
     const empresa = locadorasDoContrato(d(), c)[0] || { nome: "" };
     const anterior = somarMeses(comp, -1);
+    const pontualNoAno = (ct, mes) => {
+      const hoje3 = hojeIso();
+      const de = somarMeses(mes, -12);
+      return !d().cobrancas.some((cb) => cb.contrato_id === ct.id && cb.competencia >= de && cb.competencia < mes && !ehComplementoCaucao(cb) && (cb.dias_atraso > 0 || emAcordo(cb) || aCobrar(cb) && vencido(cb.vencimento, hoje3)));
+    };
     const vencNovo = vencimentoDoReajuste(d(), c, comp);
     if (k.percentual === null) {
       const velhos = (k.usados || []).filter((u) => !u.registro && u.ultimo).map((u) => `${u.indice} só até ${compBr(u.ultimo.mes_ref)}`);
@@ -22593,7 +22618,7 @@ ${m.texto}
     ${d().logo ? `${marcaDagua(d().logo)}<p class="ct-capa"><img src="${esc(d().logo)}" alt="Logo"></p>` : ""}
     <p class="carta-data">${esc(i && i.cidade || dadoDaEmpresa(d(), c, "cidade_documentos"))}, ${dataPorExtenso(hojeIso(), { zero: false })}.</p>
     <p>Prezado(a) <b>${esc(c.inquilino_nome)}</b>,<br>Imóvel: <b>${esc(i ? `${i.nome} - ${enderecoCompleto(i)}` : "")}</b></p>
-    <p>Com o aluguel de <b>${mesPorExtenso(comp)}</b> completamos <b>${r ? r.anos : ""} ano${r && r.anos > 1 ? "s" : ""}</b> de parceria. Agradecemos a confiança e a pontualidade, e é uma satisfação ter você conosco.</p>
+    <p>Com o aluguel de <b>${mesPorExtenso(comp)}</b> completamos <b>${r ? r.anos : ""} ano${r && r.anos > 1 ? "s" : ""}</b> de parceria. Agradecemos a confiança${pontualNoAno(c, comp) ? " e a pontualidade" : ""}, e é uma satisfação ter você conosco.</p>
     <p>Conforme a cláusula de reajuste anual do contrato, ${indiceTexto}.</p>
     <table class="carta-tabela"><tr><th></th><th class="n">Atual</th><th class="n">A partir do aluguel de ${compBr(comp)}</th></tr>
       <tr><td>Aluguel</td><td class="n">${reais(k.atual)}</td><td class="n"><b>${reais(k.novo)}</b></td></tr>
@@ -23429,7 +23454,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     return `${topo}<h1>Pasta física · ${esc(c.inquilino_nome)} <span class="suave">· ${esc(i ? `${i.nome} (${endereco(i)})` : "sem imóvel")}</span></h1>
     <p class="suave">${esc(momento)} · contrato de ${dataBr(c.data_entrada)}${fimDoContrato(d(), c) ? ` a ${dataBr(fimDoContrato(d(), c))}` : ""}${c.garantia_tipo ? ` · garantia: ${esc(c.garantia_tipo)}` : ""}${fiadores.length ? ` · fiador: ${esc(fiadores.join(", "))}` : ""}${c.data_saida ? ` · saída em ${dataBr(c.data_saida)}, guardar até ${dataBr(guardarAte(c))}` : ""}</p>
     ${espera}
-    <form id="pasta-fisica" onsubmit="return false">${passo1}${passo2}
+    <form id="pasta-fisica" data-sem-envio>${passo1}${passo2}
       <div class="cartao"><p class="suave">Escolha o que vai para o papel. O importante já vem marcado; o que já está na pasta vem desmarcado.</p>
       <div class="rolagem"><table class="compacta">${tabelaDaPasta(s.itens, s.reg, c) || '<tr><td class="suave">Nenhum documento para a pasta ainda.</td></tr>'}</table></div>${acoes}</div></form>`;
   }
@@ -23743,7 +23768,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       ${decisao}
       ${opera() ? `<p class="acoes">${f.reserva_valor > 0 ? botaoEmail("ficha_envio", { ficha: f.id }, "✉ E-mail: envio da ficha cadastral") : '<span class="suave">O e-mail com a ficha cadastral sai depois do depósito da reserva.</span>'} ${f.situacao === "Aprovada" ? botaoEmail("ficha_aprovada", { ficha: f.id }, "✉ E-mail: ficha aprovada") : ""} ${f.situacao === "Reprovada" ? botaoEmail("ficha_reprovada", { ficha: f.id }, "✉ E-mail: ficha reprovada") : ""}</p>` : ""}
       ${f.situacao === "Em análise" && opera() ? `<div class="acoes">${botao("decidirFicha", "Aprovar", { id: f.id, situacao: "Aprovada" }, "pequeno", `Aprovar a ficha de ${f.inquilino_nome}? Depois aparece o botão para fazer o contrato.`)}
-        ${link(`#/editar/fichas/${f.id}`, "Reprovar (com o motivo)", "botao perigo pequeno")}</div>
+        ${link(`#/editar/fichas/${f.id}?situacao=Reprovada`, "Reprovar (com o motivo)", "botao perigo pequeno")}</div>
         <p class="suave">Para reprovar, escolha "Reprovada" na situação e escreva o motivo. Com reserva paga, registre a devolução (data e comprovante) quando devolver.</p>` : ""}
       ${botaoDesistencia(f)}
       ${devolucao}
@@ -24772,6 +24797,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         ${comParcial ? botao("documentoParcial", "Falta assinatura", { contrato: c.id, campo: k }, "secundario pequeno") : ""}</form>`;
   }
   function caixaRotinaEntrada(c, hoje3 = hojeIso()) {
+    if (c.data_saida && c.data_saida <= hoje3) return "";
     const { etapas, feitas, total, concluida } = resumoRotinaEntrada(d(), c, hoje3);
     if (!total) return "";
     const aberta = rotinaAberta(c, hoje3);
@@ -24951,7 +24977,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const tel = (c.inquilino_telefone || "").replace(/\D/g, "");
     const lig = (x) => `<a href="#/contrato/${x.id}">${esc(x.inquilino_nome)}</a> (${dataBr(x.data_entrada)} a ${dataBr(x.data_saida)})`;
     const historicoIds = /* @__PURE__ */ new Set([c.id, ...cadeia.antes.map((x) => x.id), ...cadeia.depois.map((x) => x.id)]);
-    const outros = outrosContratosDaPessoa(d(), c, hoje3);
+    const daCadeia = new Set([...cadeia.antes, ...cadeia.depois || []].map((x) => x.id));
+    const outros = outrosContratosDaPessoa(d(), c, hoje3).filter((x, k, l) => !daCadeia.has(x.id) && x.imovel_id !== c.imovel_id && l.findIndex((y) => y.imovel_id === x.imovel_id) === k);
     const car = periodoCarencia(c);
     const pj = c.inquilino_tipo === "Pessoa jurídica (empresa)";
     const pessoa2 = (pre) => esc([c[`${pre}_cpf`] && `CPF/CNPJ ${c[`${pre}_cpf`]}`, c[`${pre}_rg`] && `RG ${c[`${pre}_rg`]}`, c[`${pre}_telefone`], c[`${pre}_email`]].filter(Boolean).join(" · "));
@@ -25484,8 +25511,10 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         ];
       },
       padrao: (q) => ({ data_recebida: hojeIso(), ...q.imovel ? { [`imovel_${q.imovel}`]: true } : {} }),
-      valores: (r) => ({
+      // "Reprovar (com o motivo)" abre já com a situação Reprovada (motivo e devolução da reserva à vista)
+      valores: (r, q = {}) => ({
         ...r,
+        ...q.situacao ? { situacao: q.situacao } : {},
         inquilino_tipo: r.inquilino_tipo || "Pessoa física",
         bonificacao: r.bonificacao !== false,
         aluguel_bonificado: r.bonificacao === false || !(r.aluguel_inicial > 0) ? null : inicialBonificado(r),
@@ -26011,6 +26040,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       }
     },
     cobrancas: {
+      semNovo: true,
+      // boleto novo sai em "Gerar boletos" na tela Boletos
       titulo: (r) => `${r.data_pagamento ? "Observações da NF do" : "Alterar"} boleto ${compBr(r.competencia)} - ${buscar2("contratos", r.contrato_id).inquilino_nome}`,
       // boleto pago: só as observações que saem na NF (os valores exigem desfazer o pagamento)
       campos: (r) => r.data_pagamento ? COBRANCA.filter((c) => c.nome === "observacoes_nf") : COBRANCA,
@@ -26038,8 +26069,17 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const cfg4 = CADASTROS[tabela];
     if (!cfg4) return naoEncontrado("Página não encontrada");
     if (!opera() || cfg4.admin && !podeUsuario("admin")) return "<h1>Seu usuário não pode alterar este cadastro</h1>";
+    if (!registro && cfg4.semNovo) return naoEncontrado('Boletos novos saem na tela Boletos ("Gerar boletos" do mês)', "#/cobrancas", "Ir para Boletos");
+    try {
+      return montarFormulario(cfg4, tabela, registro, q, estado2);
+    } catch (e) {
+      if (!(e instanceof TypeError)) throw e;
+      return naoEncontrado("Abra este cadastro pela página do inquilino ou do imóvel");
+    }
+  }
+  function montarFormulario(cfg4, tabela, registro, q, estado2) {
     const campos = cfg4.campos(registro, q);
-    let valores = estado2 ? estado2.valores : paraFormulario(campos, registro && cfg4.valores ? cfg4.valores(registro) : registro);
+    let valores = estado2 ? estado2.valores : paraFormulario(campos, registro && cfg4.valores ? cfg4.valores(registro, q) : registro);
     if (!registro && !estado2) {
       const padroes = Object.fromEntries(campos.filter((c) => c.nome && c.padrao !== void 0).map((c) => [c.nome, c.padrao]));
       valores = paraFormulario(campos, { ...padroes, ...cfg4.padrao ? cfg4.padrao(q) : {} });
@@ -26384,7 +26424,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       if (localStorage.getItem(AVISO_SEGURO_DISPENSADO)) return "";
     } catch {
     }
-    return `<div class="alerta aviso"><b>Backup seguro</b> não está ligado neste computador: sem ele, este computador não guarda a cópia dos dados fora do Cloudflare (reserva para um desastre).
+    return `<div class="alerta aviso"><b>Backup seguro</b> não está ligado neste computador: sem ele, ${E.nuvem ? "este computador não guarda a cópia dos dados fora do Cloudflare" : "não há uma segunda cópia dos dados, fora da pasta que o sistema usa"} (reserva para um desastre).
     ${link("#/backup-seguro", "Ligar o backup seguro", "botao pequeno")} ${botao("dispensarAvisoSeguro", "Não avisar neste computador", {}, "secundario pequeno")}</div>`;
   }
   var dispensarAvisoSeguro = () => {
@@ -27965,6 +28005,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       else outros += n;
     }
     if (outros) itens.push(`${outros} outro(s) registro(s) ligados a ele`);
+    const pagos = tabela === "contratos" ? db.cobrancas.filter((cb) => cb.contrato_id === reg.id && cb.data_pagamento) : [];
+    if (pagos.length) itens.unshift(`ATENÇÃO: ${pagos.length} ${pagos.length === 1 ? "pagamento recebido" : "pagamentos recebidos"} (${reais(pagos.reduce((t, cb) => t + (cb.valor_pago || 0), 0))}), que saem dos Resultados`);
     const arquivos = tabela === "contratos" ? arquivosReferenciados(db).filter((a) => ["contrato", "assinados", "aditivos", "seguro"].includes(a.escopo) && Number(a.id) === reg.id).length : 0;
     return { itens, arquivos };
   }
@@ -29800,12 +29842,12 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       } finally {
         barra.fim();
       }
-      baixar(blob, `imoveis-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 16).replace(/[T:]/g, "-")}.zip`);
+      baixar(blob, `imoveis-${carimboLocal()}.zip`);
       await alterar((db) => registrar(db, login(), "Exportação", "banco", null, "Banco e arquivos exportados em ZIP", null, {}, false));
     },
     async exportarPlanilhaPdf() {
       const [ExcelJS, jsPDF, { pdfDeTudo: pdfDeTudo2, planilhaDeTudo: planilhaDeTudo2 }] = await Promise.all([excelJs(), jsPdf(), carregarParte(() => Promise.resolve().then(() => (init_exportar(), exportar_exports)))]);
-      const quando3 = (/* @__PURE__ */ new Date()).toISOString().slice(0, 16).replace(/[T:]/g, "-");
+      const quando3 = carimboLocal();
       baixar(await planilhaDeTudo2(ExcelJS, E.d), `imoveis-dados-${quando3}.xlsx`);
       baixar(pdfDeTudo2(jsPDF, E.d), `imoveis-dados-${quando3}.pdf`);
       await alterar((db) => registrar(db, login(), "Exportação", "banco", null, "Todos os dados exportados em planilha e PDF", null, {}, false));
@@ -30610,6 +30652,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         if (existente) atualizar(db, "participacoes", existente.id, { percentual }, login());
         else inserir(db, "participacoes", { imovel_id: imovelId, emitente_id: emitenteId, percentual }, login());
       });
+      aviso("Salvo.", "ok");
       await mostrar();
     },
     pagamento: (form) => confirmarPagamentoBoleto(Number(form.dataset.id), new FormData(form)),
@@ -32165,6 +32208,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
   }
   document.addEventListener("submit", async (ev) => {
     const form = ev.target.closest("form[data-form]");
+    if (!form && ev.target.closest("form[data-sem-envio]")) ev.preventDefault();
     if (!form) return;
     ev.preventDefault();
     const botao2 = form.querySelector("button[type=submit],button:not([type])");
