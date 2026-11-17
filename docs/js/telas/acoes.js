@@ -15,16 +15,12 @@ import { MODELOS_PADRAO } from '../modelos-contrato.js';
 import * as R from '../regras.js';
 import { desfazerItens, dispensarAvisoSeguro } from './admin.js';
 import { ACOES_BANCO } from './banco.js';
-import { ACOES_REGRAS, textoDasRegrasEmUso } from './regras-sistema.js';
-import { ACOES_NUVEM } from './nuvem.js';
-import { ACOES_PESSOA } from './pessoa.js';
 import { ACOES_FICHAS } from './fichas.js';
 import { ACOES_EMAILS } from './emails.js';
-import { ACOES_REGUA } from './regua.js';
 import { htmlSaude } from './banco-c6.js';
 import { ANEXOS_COM_X, CADASTROS, nomeComprovante } from './cadastros.js';
 import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria, indicesMensaisFci } from './campos.js';
-import { alterarApagandoAnexos, anexosEmUso, apagarAnexos, apagarPastaDaFicha, nomePastaFicha, arquivoApagadoNoFormulario, buscar, carregarParte, chavePasta, conferirArquivos, conferirHerancas, d, ehMatricula, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, SO_ADMIN_NUMERACAO, vinculoDoEscopo } from './comum.js';
+import { adiados, alterarApagandoAnexos, anexosEmUso, apagarAnexos, apagarPastaDaFicha, nomePastaFicha, arquivoApagadoNoFormulario, buscar, carregarParte, chavePasta, parteAdiada, conferirArquivos, conferirHerancas, d, ehMatricula, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, SO_ADMIN_NUMERACAO, vinculoDoEscopo } from './comum.js';
 import { ACOES_ICONE } from './icone.js';
 import { alertasAbertos } from './comum.js';
 import { ACOES_PASTA } from './arquivo-impresso.js';
@@ -1954,7 +1950,7 @@ export const ACOES = {
   },
 
   async baixarRegras() {
-    const { REGRAS_TEXTO } = await carregarParte(() => import('../regras-texto.js'));
+    const [{ REGRAS_TEXTO }, { textoDasRegrasEmUso }] = await Promise.all([carregarParte(() => import('../regras-texto.js')), parteAdiada('regras')]);
     baixar(new Blob(['﻿', REGRAS_TEXTO, textoDasRegrasEmUso()], { type: 'text/plain;charset=utf-8' }), 'Regras do sistema.txt');
   },
 
@@ -2289,7 +2285,6 @@ export const ACOES = {
 };
 
 // Banco (extrato, comprovantes e pagamentos pelo C6): botões em telas/banco.js
-Object.assign(ACOES, ACOES_BANCO, ACOES_NUVEM, ACOES_FICHAS, ACOES_ICONE, ACOES_REGRAS, ACOES_EMAILS, ACOES_PASTA);
-Object.assign(ACOES, ACOES_REGUA);
-Object.assign(ACOES, ACOES_PESSOA);
-Object.assign(ACOES, ACOES_NOTIFICACOES);
+Object.assign(ACOES, ACOES_BANCO, ACOES_FICHAS, ACOES_ICONE, ACOES_EMAILS, ACOES_PASTA, ACOES_NOTIFICACOES);
+// telas raras (nuvem, regras do sistema, régua, dados de uma pessoa): carregadas no 1º clique (PARTES_ADIADAS, telas/comum.js)
+Object.assign(ACOES, adiados('acoes'));

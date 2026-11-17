@@ -1,4 +1,4 @@
-// Tela "E-mails da régua" (#/regua, pelo botão no alto de Boletos; até 17/11/2026 ficava em Financeiro) e o alerta do Painel: os e-mails de cobrança preparados pela régua
+// Tela "E-mails da régua" (#/regua, pelo botão no alto de Boletos; até 17/11/2026 ficava em Financeiro) (o alerta do Painel e o contador do botão ficam em telas.js: esta parte só carrega quando a tela abre): os e-mails de cobrança preparados pela régua
 // (regua-email.js) esperando a autorização do administrador. Decisão do dono (16/11/2026): nada é enviado sozinho; cada e-mail
 // tem a sua caixa, todas desmarcadas; "Enviar os selecionados (N)" mostra a lista final e pede confirmação. Sem a regra
 // `regua_envio` ligada, só "Abrir no Gmail", "Copiar texto" e "Não enviar". Envio pelo Gmail da nuvem (gmail.js), como telas/emails.js.
@@ -27,15 +27,6 @@ function emailDoItem(db, item) {
 
 const nomeDo = (item) => `${item.imovel ? `${item.imovel.nome} · ` : ''}${item.contrato.inquilino_nome}`;
 const referente = (cb) => (R.ehParcelaAcordo(cb) ? `acordo ${cb.acordo_parcela || ''}`.trim() : C.compBr(cb.competencia));
-
-/** Painel: quantos e-mails da régua esperam a autorização (só para quem opera; o botão leva à lista). */
-export function alertaRegua() {
-  if (!podeUsuario('operador')) return '';
-  const fila = G.filaRegua(d());
-  if (!fila.length) return '';
-  return `<div class="alerta info"><b>Régua de cobrança:</b> ${fila.length} e-mail(s) ${admin() ? 'aguardando a sua autorização' : 'aguardando a autorização do administrador'} (nada é enviado sozinho).
-    ${link('#/regua', admin() ? 'Ver e autorizar' : 'Ver a lista', 'botao pequeno')}</div>`;
-}
 
 /** Linha de um e-mail da fila: caixa (desmarcada), inquilino, boleto, etapa, valor, para quem e a prévia do texto. */
 function linhaDaFila(db, item, envio) {
@@ -82,16 +73,6 @@ export async function telaRegua() {
       ${recentes.map((x) => { const c = buscar('contratos', x.contrato_id); const cb = buscar('cobrancas', x.cobranca_id); return `<tr><td class="nw">${dataBr(x.data)}</td><td>${c ? esc(c.inquilino_nome) : '-'}</td>
         <td>${cb ? `<a href="#/cobranca/${cb.id}">${esc(referente(cb))}</a>` : '-'}</td><td>${esc(G.nomeDaEtapa(x.dias))}</td><td>${esc(G.SITUACOES_REGUA[x.situacao] || x.situacao)}${x.para ? ` <span class="suave">(${esc(x.para)})</span>` : ''}</td></tr>`; }).join('')
       || '<tr><td colspan="5" class="suave">Nada decidido nos últimos 30 dias.</td></tr>'}</table></div>`;
-}
-
-/** Conta os marcados no texto do botão "Enviar os selecionados (N)". */
-export function ligarRegua(raiz) {
-  const caixa = raiz.querySelector('.regua');
-  const btn = raiz.querySelector('[data-acao=enviarReguaSelecionados]');
-  if (!caixa || !btn) return;
-  const contar = () => { btn.textContent = `Enviar os selecionados (${caixa.querySelectorAll('input[data-regua]:checked').length})`; };
-  // "Marcar todos" é tratado no documento (app.js), depois deste: conta no passo seguinte
-  caixa.addEventListener('change', () => setTimeout(contar, 0));
 }
 
 /** Item da fila ainda válido agora (com os dados de agora): boleto pago, em acordo ou já decidido em outra aba dá erro. */

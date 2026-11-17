@@ -28,12 +28,9 @@ import { cadastrosIncompletos, telaFechamento, telaPendencias } from './telas/fe
 import { ligarGarantiasCorrigidas, telaContas, telaFinanceiro, telaGarantias, telaImpostos, telaInadimplencia, telaLiquido, telaResultados } from './telas/financeiro.js';
 import { conferirSoltosUmaVez, ligarPastaImpressao, telaArquivoImpresso, telaPastaFisica, telaPastaImpressao } from './telas/arquivo-impresso.js';
 import { telaImovel } from './telas/imovel.js';
-import { aparelhosLigadosHtml, telaAcessos, telaBackupsNuvem, telaConflitos } from './telas/nuvem.js';
 import { telaReajustes } from './telas/reajustes.js';
-import { telaPessoa, telaPessoasAntigas } from './telas/pessoa.js';
-import { alertasDaTela, carregarParte } from './telas/comum.js';
-import { telaRegras } from './telas/regras-sistema.js';
-import { alertaRegua, ligarRegua, telaRegua } from './telas/regua.js';
+import { alertasDaTela, carregarParte, parteAdiada } from './telas/comum.js';
+import * as G from './regua-email.js';
 import { avisoPrimeiraLogo, ligarEditorIcone } from './telas/icone.js';
 import { alertasAbertos, MOSTRAR_ALERTAS } from './telas/comum.js';
 import * as AJ from './ajuda.js';
@@ -41,6 +38,27 @@ import * as AJ from './ajuda.js';
 // --------------------------------------------------------------------------
 // Telas de abertura
 // --------------------------------------------------------------------------
+const admin = () => podeUsuario('admin');
+
+/** Painel: quantos e-mails da régua esperam a autorização (só para quem opera; o botão leva à lista). */
+function alertaRegua() {
+  if (!podeUsuario('operador')) return '';
+  const fila = G.filaRegua(d());
+  if (!fila.length) return '';
+  return `<div class="alerta info"><b>Régua de cobrança:</b> ${fila.length} e-mail(s) ${admin() ? 'aguardando a sua autorização' : 'aguardando a autorização do administrador'} (nada é enviado sozinho).
+    ${link('#/regua', admin() ? 'Ver e autorizar' : 'Ver a lista', 'botao pequeno')}</div>`;
+}
+
+/** Conta os marcados no texto do botão "Enviar os selecionados (N)". */
+function ligarRegua(raiz) {
+  const caixa = raiz.querySelector('.regua');
+  const btn = raiz.querySelector('[data-acao=enviarReguaSelecionados]');
+  if (!caixa || !btn) return;
+  const contar = () => { btn.textContent = `Enviar os selecionados (${caixa.querySelectorAll('input[data-regua]:checked').length})`; };
+  // "Marcar todos" é tratado no documento (app.js), depois deste: conta no passo seguinte
+  caixa.addEventListener('change', () => setTimeout(contar, 0));
+}
+
 const LINK_RESTAURAR = '<p class="suave" style="margin-top:10px">Administrador: <a href="#/restaurar-backup">restaurar um backup seguro</a></p>';
 
 /** Primeiros passos do Painel (ajuda.js): só em sistema começando, para quem lança, até o "Já sei usar". */
@@ -52,10 +70,11 @@ export const TELAS = {
   _naoEncontrado: naoEncontrado,
   restaurarBackup: () => telaRestaurarBackup(),
   'backup-seguro': () => telaBackupSeguro(),
-  'backups-nuvem': () => telaBackupsNuvem(),
-  acessos: (rota) => telaAcessos(rota.q),
-  pessoa: () => telaPessoa(),
-  'pessoas-antigas': () => telaPessoasAntigas(),
+  // telas raras: carregadas só quando abertas (PARTES_ADIADAS em telas/comum.js; ADIADOS do sw.js)
+  'backups-nuvem': async () => (await parteAdiada('nuvem')).telaBackupsNuvem(),
+  acessos: async (rota) => (await parteAdiada('nuvem')).telaAcessos(rota.q),
+  pessoa: async () => (await parteAdiada('pessoa')).telaPessoa(),
+  'pessoas-antigas': async () => (await parteAdiada('pessoa')).telaPessoasAntigas(),
 
   _ligarDesconto(raiz) {
     AJ.ligarAjuda(raiz);
@@ -373,7 +392,7 @@ export const TELAS = {
   contas: (rota) => telaContas(rota),
   banco: (rota) => telaBanco(rota),
   inadimplencia: () => telaInadimplencia(),
-  regua: () => telaRegua(),
+  regua: async () => (await parteAdiada('regua')).telaRegua(),
   garantias: () => telaGarantias(),
   // painel de Gestão (números do mês para o dono): carregado só quando aberto (ADIADOS do sw.js)
   gestao: async (rota) => (await carregarParte(() => import('./telas/gestao.js'))).telaGestao(rota.q),
@@ -414,7 +433,7 @@ export const TELAS = {
   pendencias: () => telaPendencias(),
   'modelo-contrato': (rota) => telaModelo(rota),
   empresas: () => telaEmpresas(),
-  regras: () => telaRegras(),
+  regras: async () => (await parteAdiada('regras')).telaRegras(),
   inquilinos: (rota) => telaInquilinos(rota.q),
   ficha: (rota) => telaFicha(Number(rota.partes[1])),
   buscar: (rota) => telaBusca(rota.q),
@@ -428,10 +447,10 @@ export const TELAS = {
   'arquivo-impresso': (rota) => telaArquivoImpresso(rota.q),
   'pasta-fisica': (rota) => telaPastaFisica(Number(rota.partes[1])),
   'pasta-impressao': (rota) => telaPastaImpressao(Number(rota.partes[1])),
-  conflitos: () => telaConflitos(),
+  conflitos: async () => (await parteAdiada('nuvem')).telaConflitos(),
   async usuarios() {
     if (!podeUsuario('admin')) return '<h1>Acesso só para administradores</h1>';
-    const aparelhos = await aparelhosLigadosHtml(); // programa do PC (só na nuvem)
+    const aparelhos = E.nuvem ? await (await parteAdiada('nuvem')).aparelhosLigadosHtml() : ''; // programa do PC (só na nuvem)
     const pendentes = d().usuarios.filter((u) => u.pendente);
     const papeis = Object.entries(PAPEIS).map(([k, v]) => `<option value="${k}" ${k === 'operador' ? 'selected' : ''}>${v}</option>`).join('');
     return `<div class="cabecalho"><h1>Usuários</h1>${link('#/novo/usuarios', 'Novo usuário', 'botao')}</div>

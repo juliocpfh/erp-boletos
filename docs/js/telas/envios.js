@@ -15,12 +15,10 @@ import { reduzirImagem } from './admin.js';
 import { confirmarAvisos, dataMuitoAntiga, dataNoFuturo } from './avisos.js';
 import { FORMULARIOS_BANCO } from './banco.js';
 import { FORMULARIOS_EMAILS } from './emails.js';
-import { FORMULARIOS_REGRAS } from './regras-sistema.js';
-import { FORMULARIOS_PESSOA } from './pessoa.js';
 import { FORMULARIOS_NOTIFICACOES } from './notificacoes.js';
 import { CADASTROS, nomeComprovante } from './cadastros.js';
 import { apagarRascunhoVistoria } from './campos.js';
-import { acertarNomesDosComprovantes, alterarApagandoAnexos, buscar, cienciaDaTroca, d, memoria, pastaDoEscopo, registrarCiencia, salvarAssinado, SO_ADMIN_NUMERACAO, trazerHerancaAssinada } from './comum.js';
+import { acertarNomesDosComprovantes, adiados, alterarApagandoAnexos, buscar, cienciaDaTroca, d, memoria, pastaDoEscopo, registrarCiencia, salvarAssinado, SO_ADMIN_NUMERACAO, trazerHerancaAssinada } from './comum.js';
 import { modelosNoBanco, reduzirFoto } from './documentos.js';
 
 const REGISTRO_EXCLUIDO = 'Este registro foi excluído por outra pessoa; nada foi salvo.';
@@ -717,7 +715,7 @@ export const FORMULARIOS = {
 };
 
 // Banco (extrato, comprovantes e pagamentos pelo C6): formulários em telas/banco.js
-Object.assign(FORMULARIOS, FORMULARIOS_BANCO, FORMULARIOS_REGRAS, FORMULARIOS_EMAILS, FORMULARIOS_PESSOA, FORMULARIOS_NOTIFICACOES);
+Object.assign(FORMULARIOS, FORMULARIOS_BANCO, FORMULARIOS_EMAILS, FORMULARIOS_NOTIFICACOES, adiados('formularios'));
 
 
 /** Pagamento no futuro (31/12/2027) passava com um OK e o sistema calculava multa e juros até lá: agora é recusado. */

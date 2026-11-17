@@ -32,13 +32,15 @@ const ESPERA_SEGUNDO_PLANO = 3000; // ms: o que fica em segundo plano começa de
 const LIMITE_CONFERENCIA = 3000; // ms
 const LIMITE_PAGINA = 5000; // ms
 const MAX_TENTATIVAS = 3; // arquivo que nem passando por cima dos caches vem com a data da versão: aceito como veio depois disso
-// Partes do programa que a página só carrega quando usadas (import() em telas/acoes.js e telas/nuvem.js): ficam guardadas
+// Partes do programa que a página só carrega quando usadas (import() em telas/acoes.js, telas/nuvem.js e as telas raras de
+// PARTES_ADIADAS em telas/comum.js: nuvem, regras do sistema, régua, dados de uma pessoa): ficam guardadas
 // desde a primeira abertura com internet, para funcionarem sem internet mesmo sem terem sido usadas antes.
 // As bibliotecas de PDF e ZIP (~700 KB) entram aqui para "Baixar PDF" e o ZIP funcionarem sem internet num aparelho recém-instalado;
 // o pdf.js (1,4 MB) também: sem ele, o PDF escaneado anexado sem internet ia sem compactar (compactar.js) e o visualizador do
 // celular não abria. Bibliotecas só voltam a ser baixadas quando VERSAO_VENDOR muda. A planilha (exceljs), maior, continua
 // guardada só depois do primeiro uso.
 const ADIADOS = ['js/exportar.js', 'js/regras-texto.js', 'js/visualizador.js', 'js/migracao.js', 'js/gestao.js', 'js/telas/gestao.js',
+  'js/telas/nuvem.js', 'js/telas/regras-sistema.js', 'js/telas/regua.js', 'js/telas/pessoa.js', 'js/pessoa.js',
   'vendor/jspdf.umd.min.js', 'vendor/html2canvas.min.js', 'vendor/jszip.min.js', 'vendor/pdf.min.js', 'vendor/pdf.worker.min.js'];
 // O que o navegador pede por fora dos módulos (manifest do aplicativo e ícones): guardado também, para não falhar sem internet
 const EXTRAS = ['manifest.webmanifest', 'icones/erp-192.png', 'icones/erp-512.png', 'icones/aviso-96.png'];
