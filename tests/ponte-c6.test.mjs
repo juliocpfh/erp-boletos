@@ -158,12 +158,18 @@ test('simulado: emite (idempotente, formato da OpenAPI), consulta, lista, altera
   assert.equal(lista.dados.page, 0);
   assert.equal((await chamar('GET', '/contas/ank/boletos?due_date_from=2026-03-01&status=PAID')).dados.content.length, 0);
   // alteração parcial (PATCH)
-  const alt = await chamar('POST', `/contas/ank/boletos/${REF}/alterar`, { amount: 3744.45, due_date: '2026-03-15' });
+  const alt = await chamar('POST', `/contas/ank/boletos/${REF}/alterar`, { amount: 3744.45, due_date: '2099-03-15' });
   assert.equal(alt.status, 200);
   assert.equal(alt.dados.amount, 3744.45);
-  assert.equal(alt.dados.due_date, '2026-03-15');
+  assert.equal(alt.dados.due_date, '2099-03-15');
   const semMudanca = await chamar('POST', `/contas/ank/boletos/${REF}/alterar`, {});
   assert.equal(semMudanca.status, 400);
+  // item 11: a alteração passa pelas regras da emissão (valor máximo, vencimento no passado, aviso a outra pessoa é descartado)
+  assert.equal((await chamar('POST', `/contas/ank/boletos/${REF}/alterar`, { amount: 999999 })).status, 400);
+  assert.equal((await chamar('POST', `/contas/ank/boletos/${REF}/alterar`, { due_date: '2020-01-01' })).status, 400);
+  assert.equal((await chamar('POST', `/contas/ank/boletos/${REF}/alterar`, { amount: 3744.45, fees: { first_discount_value: 5000 } })).status, 400);
+  const soAviso = await chamar('POST', `/contas/ank/boletos/${REF}/alterar`, { payer_notification: [{ channel: 'EMAIL', destination: 'outro@exemplo.com', notification_date: 'ISSUE_DATE' }] });
+  assert.equal(soAviso.status, 400, 'aviso e pagador não mudam pela alteração');
   const pdf = await chamar('GET', `/contas/ank/boletos/${REF}/pdf`);
   assert.equal(pdf.status, 501);
   // negativação: agenda e cancela
@@ -173,9 +179,9 @@ test('simulado: emite (idempotente, formato da OpenAPI), consulta, lista, altera
   assert.equal(neg.status, 201);
   assert.deepEqual(Object.keys(neg.dados).sort(), ['ambiente', 'denial_date', 'external_reference_id', 'id', 'status']);
   assert.equal(neg.dados.status, 'SCHEDULED');
-  assert.equal(neg.dados.denial_date, '2026-04-14'); // 15/03 + 30 dias
+  assert.equal(neg.dados.denial_date, '2099-04-14'); // 15/03 + 30 dias
   const cNeg = await chamar('GET', `/contas/ank/boletos/${REF}`);
-  assert.deepEqual(cNeg.dados.denial_info, { status: 'SCHEDULED', denial_date: '2026-04-14', can_cancel: true });
+  assert.deepEqual(cNeg.dados.denial_info, { status: 'SCHEDULED', denial_date: '2099-04-14', can_cancel: true });
   const cancNeg = await chamar('POST', `/contas/ank/boletos/${REF}/negativar/cancelar`, {});
   assert.equal(cancNeg.status, 200);
   assert.equal(cancNeg.dados.denial_info.status, 'SCHEDULED_CANCELLATION');

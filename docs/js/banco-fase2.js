@@ -53,6 +53,15 @@ export async function boletosPagos(contaId, de, ate, por = 'payment_date') {
   return ponte(contaId, 'GET', `/boletos/pagos${consulta({ de: data(de, 'data inicial'), ate: data(ate, 'data final'), por })}`);
 }
 
+/**
+ * Avisos que o banco mandou à ponte pelo webhook desde ``desde`` → { conta, notificacoes: [{ recebida_em, external_reference_id, status }] }.
+ * O aviso não tem assinatura: serve só para saber QUAIS boletos reconsultar (nada é registrado por ele). Em `?teste`, nenhum aviso.
+ */
+export async function avisosDoBanco(contaId, desde) {
+  if (emTeste()) return { conta: contaId, notificacoes: [] };
+  return chamarPonte(contaId, 'GET', `/notificacoes${consulta({ desde: data(desde, 'data inicial') })}`);
+}
+
 /** Boletos a pagar que chegaram pelo DDA → { conta_id, items: [{ content, amount, beneficiary_name, due_date, overdue, … }] }. */
 export const ddaDaConta = (contaId) => ponte(contaId, 'GET', '/dda');
 

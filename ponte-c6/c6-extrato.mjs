@@ -17,10 +17,25 @@ export const MAX_DIAS_EXTRATO = 366; // proteção: ninguém pede mais de um ano
 
 const contaDe = (c6) => c6?.conta ?? c6?.conta_id ?? null;
 
-/** Erro HTTP do C6 → Error em português com o status e o que o banco respondeu. */
+/**
+ * O que a recusa do banco quer dizer, em português simples (o texto original, em inglês, fica só em ``corpo``/``detalhes``).
+ * Recusa de dados (400/422) leva o detalhe do banco, que diz qual campo corrigir.
+ */
+export function explicarRecusa(status, corpo) {
+  const detalhe = corpo && typeof corpo === 'object' ? [corpo.title, corpo.detail].filter(Boolean).join(': ') : String(corpo ?? '').slice(0, 200);
+  if (status === 401) return 'o banco não aceitou a autenticação (mesmo com um token novo): confira o client_id e o client_secret da conta na ponte.';
+  if (status === 403) return 'o banco negou a permissão: a chave da API desta conta não tem acesso a este serviço. Peça ao C6 para liberar (o "Testar conexão" mostra o que falta).';
+  if (status === 404) return 'o banco não encontrou o que foi pedido.';
+  if (status === 409) return 'o banco diz que isso já existe ou mudou de situação: atualize e confira antes de tentar de novo.';
+  if (status === 400 || status === 422) return `o banco recusou os dados${detalhe ? ` (detalhe do banco: ${detalhe.slice(0, 200)})` : ''}.`;
+  if (status === 429) return 'o banco está recebendo pedidos demais: espere um minuto e tente de novo.';
+  if (status >= 500) return 'o banco está com problema agora: tente daqui a pouco.';
+  return 'resposta inesperada do banco.';
+}
+
+/** Erro HTTP do C6 → Error em português com o status e o que o banco quis dizer (o corpo original fica em ``corpo``). */
 export function erroDoC6(resposta, oQue) {
-  const detalhe = typeof resposta.corpo === 'string' ? resposta.corpo : JSON.stringify(resposta.corpo ?? '');
-  const e = new Error(`O banco respondeu ${resposta.status} ao ${oQue}. ${detalhe}`.trim().slice(0, 500));
+  const e = new Error(`O banco respondeu ${resposta.status} ao ${oQue}: ${explicarRecusa(resposta.status, resposta.corpo)}`.slice(0, 500));
   e.status = resposta.status;
   e.corpo = resposta.corpo;
   return e;

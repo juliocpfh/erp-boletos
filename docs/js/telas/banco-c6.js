@@ -25,13 +25,15 @@ export function botaoEmitirC6(cb, cls = 'secundario pequeno') {
 export function botoesMesC6(comp) {
   if (!opera()) return '';
   const n = R.boletosParaEmitir(d(), comp).length;
+  const vencidos = R.vencidosSemEmissao(d(), comp).length;
   const texto = `Emitir no C6 todos em aberto do mês${n ? ` (${n})` : ''}`;
+  const notaVencidos = vencidos ? ` <span class="suave">${vencidos} boleto(s) já vencido(s) sem emissão ficam de fora: o banco não aceita vencimento no passado (mude o vencimento do boleto para hoje ou depois antes de emitir).</span>` : '';
   const emitidos = d().cobrancas.some((cb) => cb.competencia === comp && R.emitidoNoBanco(cb));
   // a conferência dos boletos pagos é uma só, na tela Banco (lista com marcação): daqui só o atalho até ela
   const conferir = link('#/banco?ir=conferir-boletos', 'Conferir pagamentos no banco (tela Banco)', 'botao secundario');
   if (!B.pontePronta(d())) return `${botaoInativo(texto, B.motivoIndisponivel(d()), 'secundario')} ${conferir}<br><span class="ajuda">Emitir no C6: ${esc(String(B.motivoIndisponivel(d())).replace(/\.$/, ''))}.</span>`;
   return `${n ? botao('emitirBoletosMesC6', texto, { comp }, 'secundario', `Emitir ${n} boleto(s) em aberto no C6?`) : botaoInativo(texto, 'Nenhum boleto em aberto sem emissão neste mês', 'secundario')}
-    ${emitidos ? conferir : botaoInativo('Conferir pagamentos no banco (tela Banco)', 'Nenhum boleto deste mês foi emitido no C6', 'secundario')}`;
+    ${emitidos ? conferir : botaoInativo('Conferir pagamentos no banco (tela Banco)', 'Nenhum boleto deste mês foi emitido no C6', 'secundario')}${notaVencidos}`;
 }
 
 const ROTULO = { emitido: ['emitido no C6', 'info'], pago: ['pago no C6', 'ok'], cancelado: ['cancelado no C6', 'neutra'], erro: ['erro na emissão', 'perigo'] };
@@ -63,14 +65,14 @@ const NEG_TXT = { SCHEDULED: ['negativação agendada', 'aviso'], IN_PROGRESS: [
 function tabelaNotificacoes(b) {
   if (!b.notificacoes || !b.notificacoes.length) return '';
   return `<h3>Avisos ao inquilino pelo banco</h3><table class="boleto-banco"><tr><th>Canal</th><th>Para</th><th>Quando</th><th>Situação</th></tr>
-    ${b.notificacoes.map((n) => { const [t, tipo] = NOTIF_TXT[n.situacao] || [n.situacao || '-', 'neutra']; return `<tr><td>${esc(n.canal === 'SMS' ? 'SMS' : 'E-mail')}</td><td>${esc(n.destino || '-')}</td><td>${esc(MOMENTO_TXT[n.momento] || n.momento || '-')}</td><td>${etiqueta(t, tipo)}${n.enviada_em ? `<br><span class="suave">${dataHoraBr(n.enviada_em)}</span>` : ''}</td></tr>`; }).join('')}</table>`;
+    ${b.notificacoes.map((n) => { const [t, tipo] = NOTIF_TXT[n.situacao] || [n.situacao || '-', 'neutra']; return `<tr><td>${esc(n.canal === 'SMS' ? 'SMS' : 'E-mail')}</td><td>${esc(n.destino || '-')}</td><td>${n.data ? `aviso em ${dataBr(n.data)}` : esc(MOMENTO_TXT[n.momento] || n.momento || '-')}</td><td>${etiqueta(t, tipo)}${n.enviada_em ? `<br><span class="suave">${dataHoraBr(n.enviada_em)}</span>` : ''}</td></tr>`; }).join('')}</table>`;
 }
 
 /** Negativação do pagador no birô de crédito: situação (``denial_info``) e botões (só administrador, conta com a opção ligada). */
 function blocoNegativacao(cb, conta) {
   const b = cb.banco;
   const neg = b.negativacao;
-  const podeNeg = podeUsuario('admin') && conta && conta.negativacao && conta.negativacao.ativa && b.situacao === 'emitido';
+  const podeNeg = podeUsuario('admin') && conta && conta.negativacao && conta.negativacao.ativa && b.situacao === 'emitido' && !R.aguardandoCredito(cb);
   if (!neg && !podeNeg) return '';
   const c = buscar('contratos', cb.contrato_id);
   const [t, tipo] = neg ? (NEG_TXT[neg.situacao] || [neg.situacao || 'negativação', 'neutra']) : ['', ''];
@@ -107,9 +109,10 @@ export function caixaBancoC6(cb) {
   return `<div class="cartao" id="banco-c6"><div class="cabecalho">${titulo}<div>${etiquetaBanco(cb)}${semPix ? ` ${etiqueta('sem Pix', 'aviso')}` : ''}</div></div>
     ${semPix ? `<div class="alerta aviso"><b>O boleto saiu sem o Pix</b>${conta && conta.chave_pix ? `: a ponte não tem a chave Pix desta conta (C6_${esc(String(conta.id).toUpperCase())}_CHAVE_PIX). O inquilino paga só pela linha digitável; para ter o QR Code, configure a chave na ponte e emita de novo.` : ': a conta não tem chave Pix cadastrada (Dados e backup → Banco C6).'}</div>` : ''}
     ${cb.data_pagamento && b.situacao === 'emitido' && !cb.pagamento_c6 && !R.aguardandoCredito(cb) ? `<div class="alerta perigo"><b>Pago aqui, mas ainda em aberto no C6.</b> O inquilino ainda consegue pagar este boleto de novo${b.negativacao && b.negativacao.pode_cancelar ? ' e a negativação agendada continua valendo' : ''}. Clique em "Consultar situação no banco" (se o banco já recebeu este pagamento, acerta sozinho); se o pagamento foi por fora (Pix direto, dinheiro), use "Cancelar no banco"${b.negativacao && b.negativacao.pode_cancelar ? ' e "Cancelar negativação"' : ''}.</div>` : ''}
+    ${b.pagamentos_no_banco > 1 ? `<div class="alerta perigo"><b>O banco recebeu ${b.pagamentos_no_banco} pagamentos deste boleto</b>${b.valor_pago_total ? ` (${reais(b.valor_pago_total)} no total)` : ''}: o inquilino pagou mais de uma vez (ex.: Pix e código de barras). Registre só um aqui e devolva a diferença ao inquilino.</div>` : ''}
     ${R.aguardandoCredito(cb) ? '<div class="alerta info"><b>O inquilino pagou</b> e o banco ainda está confirmando o crédito. Consulte de novo mais tarde para registrar o pagamento aqui.</div>' : ''}
     ${b.situacao === 'pago' && !cb.data_pagamento ? `<div class="alerta aviso"><b>O banco informou o pagamento</b>${b.pago_em ? ` em ${dataBr(b.pago_em)}` : ''}${b.valor_pago ? ` (${reais(b.valor_pago)})` : ''}, mas ele ainda não está registrado aqui. ${opera() ? botao('consultarBoletoC6', 'Registrar o pagamento', { id: cb.id }, 'pequeno') : 'Peça a um operador para registrar.'}</div>` : ''}
-    ${div ? `<div class="alerta aviso"><b>Atenção:</b> o boleto no banco está com ${reais(div.no_banco)}${div.vencimento_banco !== div.vencimento_sistema ? `, vencendo em ${dataBr(div.vencimento_banco)}` : ''}, e o sistema calcula ${reais(div.no_sistema)}${div.vencimento_banco !== div.vencimento_sistema ? ` para ${dataBr(div.vencimento_sistema)}` : ''}.${opera() ? ` ${botao('alterarBoletoC6', 'Atualizar o boleto no banco com os valores do sistema', { id: cb.id }, 'pequeno', 'Alterar no C6 o valor, o vencimento e a descrição deste boleto para os do sistema?')}` : ''} Se o banco não aceitar, cancele no banco e emita de novo.</div>` : ''}
+    ${div ? `<div class="alerta aviso"><b>Atenção:</b> o boleto no banco está com ${reais(div.no_banco)}${div.vencimento_banco !== div.vencimento_sistema ? `, vencendo em ${dataBr(div.vencimento_banco)}` : ''}, e o sistema calcula ${reais(div.no_sistema)}${div.vencimento_banco !== div.vencimento_sistema ? ` para ${dataBr(div.vencimento_sistema)}` : ''}.${div.encargos_mudaram ? ` A bonificação, a multa ou os juros mudaram depois da emissão: o banco dá ${reais(div.desconto_banco)} de bonificação e o sistema calcula ${reais(div.desconto_sistema)}.` : ''}${opera() ? ` ${botao('alterarBoletoC6', 'Atualizar o boleto no banco com os valores do sistema', { id: cb.id }, 'pequeno', 'Alterar no C6 o valor, o vencimento e a descrição deste boleto para os do sistema?')}` : ''} Se o banco não aceitar, cancele no banco e emita de novo.</div>` : ''}
     <div class="grade">${item('Conta', conta ? `${esc(conta.apelido)} (${esc((buscar('emitentes', conta.emitente_id) || {}).nome || '')})` : esc(b.conta_id || '-'))}${item('Ambiente', b.ambiente === 'producao' ? 'Produção' : etiqueta('Sandbox (teste): não vale como cobrança', 'aviso'))}
       ${item('Emitido em', b.emitido_em ? dataHoraBr(b.emitido_em) : '-')}${b.pago_em ? item('Pago em (banco)', `${dataBr(b.pago_em)}${b.credito_em && b.credito_em !== b.pago_em ? `<br><span class="suave">creditado em ${dataBr(b.credito_em)}</span>` : ''}`) : ''}
       ${item('Valor no banco', reais(b.valor))}${item('Vencimento no banco', b.vencimento ? dataBr(b.vencimento) : '-')}
@@ -119,7 +122,7 @@ export function caixaBancoC6(cb) {
     ${tabelaNotificacoes(b)}
     ${blocoNegativacao(cb, conta)}
     ${opera() ? `<div class="acoes">${b.situacao === 'pago' && !cb.data_pagamento ? '' : botao('consultarBoletoC6', 'Consultar situação no banco', { id: cb.id })}
-      ${b.situacao === 'emitido' ? botao('cancelarBoletoC6', 'Cancelar no banco', { id: cb.id }, 'perigo pequeno', 'Cancelar este boleto no C6? O inquilino não conseguirá mais pagar por ele; depois dá para emitir outro.') : ''}
+      ${b.situacao === 'emitido' && !R.aguardandoCredito(cb) ? botao('cancelarBoletoC6', 'Cancelar no banco', { id: cb.id }, 'perigo pequeno', 'Cancelar este boleto no C6? O inquilino não conseguirá mais pagar por ele; depois dá para emitir outro.') : ''}
       ${b.situacao === 'emitido' && b.simulado ? botao('pagarSimuladoC6', 'Simular pagamento (teste)', { id: cb.id }, 'secundario pequeno') : ''}
       ${b.situacao !== 'cancelado' && !b.simulado ? botao('abrirPdfC6', 'Abrir PDF do boleto', { id: cb.id }) : ''}</div>` : ''}</div>`;
 }

@@ -16,6 +16,9 @@ export const CARTEIRAS = { sandbox: '21', producao: '15' };
 /** Escopos que a credencial precisa ter (roteiro oficial); sem eles o banco responde 403. Vêm em ``scope`` (texto separado por espaço). */
 export const ESCOPOS = ['v2.bankslip.read', 'v2.bankslip.write', 'v2.bankslip.pix.write'];
 
+/** Escopos de cada serviço (roteiro de homologação): faltando, o serviço volta 403. O Testar conexão avisa qual falta. */
+export const ESCOPOS_SERVICOS = { boleto: ESCOPOS, extrato: ['statement.read'], pagamentos: ['schedulepayments.read', 'schedulepayments.write'] };
+
 /** Caminhos. ``{id}`` = external_reference_id (nosso, 26 caracteres A-Z0-9, nunca reutilizado). */
 export const CAMINHOS = {
   token: '/v1/auth/', // POST form-urlencoded: grant_type=client_credentials, client_id, client_secret → { access_token, expires_in, token_type: 'Bearer', scope }
@@ -80,7 +83,7 @@ export const RESPOSTA = {
   pix: 'pix', pix_copia_cola: 'qr_code', pix_imagem: 'image_content', pix_imagem_tipo: 'mime_type', pix_referencia: 'reference',
   pagamentos: 'payments', pagamento_valor: 'amount', pagamento_id: 'external_payment_id', pagamento_data: 'payment_date', pagamento_credito: 'credit_date', pagamento_tipo: 'payment_type', // payments[] vem na listagem; amount em texto "123.45"
   lista: 'content', lista_total: 'total_elements', lista_paginas: 'total_pages', lista_pagina: 'page', lista_tamanho: 'size',
-  negativacao: 'denial_info', negativacao_situacao: 'status', negativacao_data: 'denial_date', negativacao_pode_cancelar: 'can_cancel', notificacoes: 'payer_notification',
+  negativacao: 'denial_info', negativacao_situacao: 'status', negativacao_data: 'denial_date', negativacao_data_consulta: 'date', negativacao_erros: 'errors', negativacao_pode_cancelar: 'can_cancel', notificacoes: 'payer_notification', // denial_date na resposta do agendamento; date e errors[] no denial_info da consulta
 };
 
 /** Aviso do webhook: { service, status, information (JSON em texto com id, external_reference_id, amount, status, emission_date, due_date…) }. */
