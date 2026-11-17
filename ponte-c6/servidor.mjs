@@ -521,11 +521,16 @@ export function encargosSeguros(fIn, valor = null, vencimento = null) {
   return Object.keys(fees).length ? fees : null;
 }
 
+/** Vencimento já passado (no horário de Brasília) é recusado: o C6 exige hoje ou depois. */
+export function conferirVencimentoFuturo(vencimento) {
+  if (vencimento < hojeBrasilia()) throw new ErroHttp(400, `O vencimento (${vencimento.split('-').reverse().join('/')}) já passou: o banco só aceita boleto que vence hoje ou depois. Emita com um vencimento novo (o valor é recalculado com multa e juros).`);
+}
+
 /**
  * Corpo final para POST /v2/bank_slips a partir do pedido do site: allowlist estrita (o resto é descartado) + validações.
  * Lança ErroHttp 400 com a explicação. ``conta`` dá a carteira, a chave Pix e o valor máximo.
  */
-export function montarPedidoSeguro(pedido, conta) {
+export function montarPedidoSeguro(pedido, conta, { permitirVencido = false } = {}) {
   if (!pedido || typeof pedido !== 'object') throw new ErroHttp(400, 'Pedido vazio.');
   const K = M.CAMPOS;
   const L = M.LIMITES;
@@ -537,6 +542,8 @@ export function montarPedidoSeguro(pedido, conta) {
   if (valor > L.valor_maximo_reais) throw new ErroHttp(400, 'Valor acima do máximo da API.');
   const vencimento = texto(pedido[K.vencimento], 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(vencimento) || Number.isNaN(Date.parse(vencimento))) throw new ErroHttp(400, `${K.vencimento} precisa ser AAAA-MM-DD.`);
+  // o banco só aceita vencimento de hoje em diante (item 20): o site já separa os vencidos, a ponte confere de novo
+  if (!permitirVencido) conferirVencimentoFuturo(vencimento);
   const descricao = texto(pedido[K.descricao], L.descricao);
   if (!descricao) throw new ErroHttp(400, `Falta o campo "${K.descricao}" no pedido.`);
   const pg = pedido[K.pagador];
@@ -634,11 +641,13 @@ export const SERVICOS = {
     rotas: [
       // BP_01 emitir
       { metodo: 'POST', padrao: /^\/boletos\/?$/, async executar({ cfg, conta, corpo }) {
-        const pedido = montarPedidoSeguro(corpo, conta);
+        // vencimento conferido depois de procurar a cobrança já feita: a nova tentativa de ontem, com o vencimento de ontem, ainda acha a que existe
+        const pedido = montarPedidoSeguro(corpo, conta, { permitirVencido: true });
         if (cfg.simulado) {
           // o mesmo external_reference_id devolve a cobrança já feita
           const existente = simulados.get(chaveSim(conta, pedido[M.CAMPOS.referencia]));
           if (existente) return { status: 200, dados: { ...respostaEmissao(existente), ambiente: conta.ambiente } };
+          conferirVencimentoFuturo(pedido[M.CAMPOS.vencimento]);
           const contar = conferirLimiteDiario(cfg, conta);
           const r = respostaSimulada(conta.id, pedido, conta.ambiente);
           simulados.set(chaveSim(conta, r.external_reference_id), r);
@@ -656,6 +665,7 @@ export const SERVICOS = {
             if (!(e instanceof ErroHttp) || e.status !== 404) throw e; // não deu para conferir: não emite às cegas
           }
         }
+        conferirVencimentoFuturo(pedido[M.CAMPOS.vencimento]);
         const contar = conferirLimiteDiario(cfg, conta);
         const r = await chamarC6(cfg, conta, 'POST', M.CAMINHOS.boletos(versao(conta)), pedido);
         contar();
