@@ -27,7 +27,7 @@ import { cadastrosIncompletos, telaFechamento, telaPendencias } from './telas/fe
 import { ligarGarantiasCorrigidas, telaContas, telaFinanceiro, telaGarantias, telaImpostos, telaInadimplencia, telaLiquido, telaResultados } from './telas/financeiro.js';
 import { conferirSoltosUmaVez, ligarPastaImpressao, telaArquivoImpresso, telaPastaFisica, telaPastaImpressao } from './telas/arquivo-impresso.js';
 import { telaImovel } from './telas/imovel.js';
-import { aparelhosLigadosHtml, telaBackupsNuvem, telaConflitos } from './telas/nuvem.js';
+import { aparelhosLigadosHtml, telaAcessos, telaBackupsNuvem, telaConflitos } from './telas/nuvem.js';
 import { telaReajustes } from './telas/reajustes.js';
 import { alertasDaTela, carregarParte } from './telas/comum.js';
 import { telaRegras } from './telas/regras-sistema.js';
@@ -50,6 +50,7 @@ export const TELAS = {
   restaurarBackup: () => telaRestaurarBackup(),
   'backup-seguro': () => telaBackupSeguro(),
   'backups-nuvem': () => telaBackupsNuvem(),
+  acessos: (rota) => telaAcessos(rota.q),
 
   _ligarDesconto(raiz) {
     AJ.ligarAjuda(raiz);

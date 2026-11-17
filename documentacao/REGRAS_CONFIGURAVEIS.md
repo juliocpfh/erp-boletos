@@ -81,6 +81,7 @@ não e o artigo da lei. O sistema avisa, mas não proíbe as escolhas do adminis
 | D7 | Contrato sem imóvel é apagado | Depois de 7 dias | [C] dias | 7 (hoje). Rotina | |
 | D8 | Etiqueta "alugado em X: veja se ficou conta nossa" | Até 2 meses depois da entrada | [C] meses | 2 (hoje). Rotina | |
 | D9 | Avisos antes de salvar | Pagamento de mais de 90 dias atrás; data até 60 dias no futuro; IPTU/seguro 30% fora do anterior | [C] cada número | Hoje. Rotina | |
+| D10 | Registro de acessos da nuvem (17/11/2026, `dias_registro_acessos`) | Guardado 180 dias: quem baixou o banco, abriu/anexou/apagou arquivos, baixou backups, mandou e-mail, mexeu na ficha pela internet e ligou o programa do PC (tela Acessos, só administrador) | [C] dias (30 a 730) | 180. Marco Civil da Internet, art. 15 (6 meses); LGPD arts. 6º, 37 e 46: guardar o registro das operações, mas só pelo tempo necessário (tem e-mail e endereço de internet da equipe) | Feito (mutirão 3000) |
 
 ## Fora desta lista (de propósito)
 - Impostos (PIS/COFINS, IRPJ, CSLL, mínimo de R$ 10,00 da guia): dependem do regime da empresa; viram configuração quando o

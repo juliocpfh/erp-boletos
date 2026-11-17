@@ -200,6 +200,11 @@ export const DEFINICOES_REGRAS = [
     explica: 'Avisa antes de salvar (costuma ser ano digitado errado).', consequencia: 'Só muda o aviso.', lei: 'Sem lei: rotina.' },
   { chave: 'dias_futuro', grupo: 'rotina', rotulo: 'Aviso: entrada do inquilino a mais de (dias) no futuro', tipo: 'inteiro', padrao: 60, min: 1, max: 3650,
     explica: 'Avisa antes de salvar o contrato.', consequencia: 'Só muda o aviso.', lei: 'Sem lei: rotina.' },
+  // registro de acessos da nuvem (mutirão 3000, 2ª rodada): quem baixou o banco, abriu anexos, mandou e-mail, ligou o programa do PC
+  { chave: 'dias_registro_acessos', grupo: 'rotina', rotulo: 'Registro de acessos da nuvem: guardar por (dias)', tipo: 'inteiro', padrao: 180, min: 30, max: 730,
+    explica: 'O servidor da nuvem anota quem baixou o banco inteiro, abriu ou anexou arquivos, baixou backups, mandou e-mail, mexeu na ficha pela internet e ligou o programa do PC (com a data, o endereço de internet e o tamanho). O administrador vê em Dados e backup → Acessos. Depois deste prazo, a anotação é apagada sozinha. Ex.: 180 dias → o acesso de 17/11/2026 sai em 16/05/2027.',
+    consequencia: 'Prazo maior ajuda a descobrir um vazamento antigo, mas guarda mais dados das pessoas da equipe (e-mail e endereço de internet); prazo menor apaga antes. Vale na próxima faxina da noite.',
+    lei: 'Marco Civil da Internet (Lei 12.965/2014), art. 15 (registros de acesso guardados por 6 meses); LGPD (Lei 13.709/2018), arts. 6º, III e X, 37 e 46 (registro das operações e segurança, guardando só o necessário).' },
   { chave: 'fora_do_padrao', grupo: 'rotina', rotulo: 'Aviso: aluguel, IPTU ou seguro diferente do anterior em mais de (%)', tipo: 'pct', padrao: 30, min: 1, max: 1000,
     explica: 'Ex.: seguro anterior de R$ 100,00 e novo de R$ 140,00 (40%) → avisa antes de salvar.', consequencia: 'Só muda o aviso.', lei: 'Sem lei: rotina.' },
 ];

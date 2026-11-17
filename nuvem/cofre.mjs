@@ -101,6 +101,13 @@ export const COTA_DIA = { ops: 100000, bytes: 80 * 1024 * 1024 };
 /** E-mails pela conta da empresa por usuário num dia. */
 export const MAX_EMAILS_DIA = 150;
 /**
+ * Registro de acessos (quem baixou o banco inteiro, abriu ou mexeu em arquivos, baixou backups, mandou e-mail, usou a ficha
+ * pela internet, ligou o programa do PC): guardado pelos dias da regra `dias_registro_acessos` (config-regras.js; padrão e
+ * limites iguais aos de lá, tests/lgpd-acessos.test.mjs confere) e mostrado ao administrador na tela Acessos.
+ */
+export const DIAS_ACESSOS = { padrao: 180, min: 30, max: 730 };
+export const MAX_ACESSOS_POR_ENVIO = 200;
+/**
  * Chaves de negócio que não repetem (dois aparelhos fazendo a mesma coisa antes de um ver o do outro, ou um deles sem internet):
  * registro novo com a mesma chave de um que já está na nuvem é recusado, e o lote inteiro volta (como código repetido; a tela
  * mostra em Conflitos). `so`: só os registros que contam (o boleto do complemento da caução e as parcelas de acordo não são o
@@ -207,6 +214,8 @@ export class Cofre {
       CREATE TABLE IF NOT EXISTS controle (chave TEXT PRIMARY KEY, valor TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS emails_enviados (n INTEGER PRIMARY KEY AUTOINCREMENT, por TEXT NOT NULL, em TEXT NOT NULL, para TEXT NOT NULL, assunto TEXT, anexos TEXT);
       CREATE TABLE IF NOT EXISTS cotas (chave TEXT PRIMARY KEY, ops INTEGER NOT NULL, bytes INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS acessos (n INTEGER PRIMARY KEY AUTOINCREMENT, em TEXT NOT NULL, email TEXT NOT NULL, rota TEXT NOT NULL, bytes INTEGER, ip TEXT, origem TEXT, resultado INTEGER);
+      CREATE INDEX IF NOT EXISTS acessos_em ON acessos (em);
       CREATE INDEX IF NOT EXISTS log_em ON log (em);
       CREATE INDEX IF NOT EXISTS lotes_em ON lotes (em);
       CREATE INDEX IF NOT EXISTS registros_ordem ON registros (ordem);
@@ -934,6 +943,54 @@ export class Cofre {
     return feitas;
   }
 
+  // -------------------------------------------------------------------------
+  // Registro de acessos (tela Acessos do administrador)
+  // -------------------------------------------------------------------------
+  /** Anota um acesso: { email, rota, bytes, ip, origem ('site' | 'pc'), resultado (código HTTP), em }. */
+  anotarAcesso({ email, rota, bytes = null, ip = '', origem = 'site', resultado = 200, em = null } = {}) {
+    const agora = this.relogio().getTime();
+    const quando = typeof em === 'string' && Math.abs(Date.parse(em) - agora) < 86400000 ? new Date(Date.parse(em)).toISOString() : this.agora();
+    const tamanho = bytes === null || bytes === undefined || !Number.isSafeInteger(Number(bytes)) ? null : Number(bytes);
+    this.sql.exec('INSERT INTO acessos (em, email, rota, bytes, ip, origem, resultado) VALUES (?, ?, ?, ?, ?, ?, ?)', quando,
+      String(email || '').toLowerCase().slice(0, 200) || '(sem login)', String(rota || '').slice(0, 600), tamanho,
+      String(ip || '').slice(0, 60), ['site', 'pc'].includes(origem) ? origem : 'site', Number.isInteger(Number(resultado)) ? Number(resultado) : null);
+  }
+
+  /** Acessos juntados pelo Worker (só ele chama: a rota não está entre as que o site repassa ao cofre). */
+  registrarAcessos({ acessos = [] } = {}) {
+    const lista = Array.isArray(acessos) ? acessos.slice(0, MAX_ACESSOS_POR_ENVIO) : [];
+    this.transacao(() => { for (const a of lista) if (a && typeof a === 'object') this.anotarAcesso(a); });
+    return { ok: true, anotados: lista.length };
+  }
+
+  /** Dias que o registro de acessos fica guardado: a regra do administrador (config_regras), dentro dos limites. */
+  diasAcessos() {
+    const l = this.q("SELECT json_extract(dados, '$.valor') AS v FROM registros WHERE tabela = 'config_regras' AND json_extract(dados, '$.chave') = 'dias_registro_acessos' LIMIT 1")[0];
+    const v = Number(l?.v);
+    return Number.isInteger(v) && v >= DIAS_ACESSOS.min && v <= DIAS_ACESSOS.max ? v : DIAS_ACESSOS.padrao;
+  }
+
+  /**
+   * Acessos para a tela (só administrador), do mais novo ao mais velho: { de, ate ('AAAA-MM-DD', Brasília), email, antes (n, para
+   * ver os mais velhos), limite }. Devolve também o resumo por pessoa no período (quantos, quanto baixou e quantos recusados).
+   */
+  listarAcessos({ de = '', ate = '', email: filtro = '', antes = '', limite = 200 } = {}, email) {
+    this.exigir(email, 'admin');
+    const conds = []; const p = [];
+    const dia = (t) => (/^\d{4}-\d{2}-\d{2}$/.test(String(t)) ? String(t) : '');
+    if (dia(de)) { conds.push('em >= ?'); p.push(new Date(`${dia(de)}T00:00:00-03:00`).toISOString()); }
+    if (dia(ate)) { conds.push('em < ?'); p.push(new Date(Date.parse(`${dia(ate)}T00:00:00-03:00`) + 86400000).toISOString()); }
+    if (filtro) { conds.push('email = ?'); p.push(String(filtro).toLowerCase().slice(0, 200)); }
+    const onde = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+    const n = Math.min(500, Math.max(1, Number(limite) || 200));
+    const antesN = Number(antes);
+    const linhas = this.q(`SELECT n, em, email, rota, bytes, ip, origem, resultado FROM acessos ${onde ? `${onde} AND` : 'WHERE'} n < ? ORDER BY n DESC LIMIT ?`,
+      ...p, Number.isSafeInteger(antesN) && antesN > 0 ? antesN : Number.MAX_SAFE_INTEGER, n + 1);
+    const resumo = this.q(`SELECT email, COUNT(*) AS acessos, COALESCE(SUM(bytes), 0) AS bytes, SUM(CASE WHEN resultado >= 400 THEN 1 ELSE 0 END) AS recusados FROM acessos ${onde} GROUP BY email ORDER BY bytes DESC`, ...p);
+    const emails = this.q('SELECT DISTINCT email FROM acessos ORDER BY email').map((x) => x.email);
+    return { acessos: linhas.slice(0, n), mais: linhas.length > n, resumo, emails, dias: this.diasAcessos() };
+  }
+
   /**
    * Limpa o que já não precisa: fila com mais de DIAS_LOG dias, lotes repetidos antigos, registros excluídos (DIAS_EXCLUIDOS) e
    * conflitos resolvidos (DIAS_CONFLITOS_RESOLVIDOS), cotas e registro de e-mails com mais de um ano, e os rastros das
@@ -952,6 +1009,7 @@ export class Cofre {
     this.sql.exec('DELETE FROM emails_enviados WHERE em < ?', antes(365));
     // fichas reprovadas com os dados pessoais já apagados nos aparelhos: saem também do histórico guardado aqui (LGPD)
     try { this.esquecerFichasApagadas(); } catch (e) { console.error('limpeza das fichas reprovadas', e); }
+    this.sql.exec('DELETE FROM acessos WHERE em < ?', antes(this.diasAcessos())); // registro de acessos: pelo prazo da regra
   }
 }
 
@@ -1076,9 +1134,16 @@ export class CofreDO {
     const corpo = async () => { try { return await request.json(); } catch { throw new ErroCofre(400, 'Pedido inválido.'); } };
     try {
       const c = this.cofre; const rota = url.pathname;
+      const deOnde = { ip: request.headers.get('X-Ip') || '', origem: request.headers.get('X-Origem') === 'pc' ? 'pc' : 'site' };
       let r;
       // programa do PC, sem o login do Access: o Worker só manda estas duas a partir de /api/aparelho/ (atenderAparelho)
-      if (rota === '/aparelho/entrar' && request.method === 'POST') return resposta(200, await this.aparelhos.entrar(await corpo(), request.headers.get('X-Ip') || ''));
+      if (rota === '/aparelho/entrar' && request.method === 'POST') {
+        const pedido = await corpo(); const ip = request.headers.get('X-Ip') || '';
+        // a entrada com senha (não o 1º passo, que só pede o sal) fica no registro de acessos, também a recusada
+        const anotar = (resultado) => { if (pedido?.senha !== undefined && pedido?.senha !== null) this.cofre.anotarAcesso({ email: pedido?.email, rota: `aparelho/entrar (${String(pedido?.computador || '').slice(0, 60)})`, ip, origem: 'pc', resultado, bytes: 0 }); };
+        try { const feito = await this.aparelhos.entrar(pedido, ip); anotar(200); return resposta(200, feito); } catch (e) { anotar(e?.status || 500); throw e; }
+      }
+      if (rota === '/registrar-acessos' && request.method === 'POST') return resposta(200, this.cofre.registrarAcessos(await corpo()));
       if (rota === '/aparelho/conferir' && request.method === 'POST') return resposta(200, await this.aparelhos.conferir((await corpo())?.cracha));
       if (!email) throw new ErroCofre(401, 'Sem login.');
       if (rota === '/aparelhos' && request.method === 'GET') r = this.aparelhos.lista(c.exigir(email, 'consulta'));
@@ -1089,7 +1154,13 @@ export class CofreDO {
         if (!Object.hasOwn(NIVEL, nivel || '')) throw new ErroCofre(400, 'Nível de acesso desconhecido.');
         r = c.exigir(email, nivel);
       }
-      else if (rota === '/tudo' && request.method === 'GET') r = c.tudo(c.exigir(email, 'consulta'));
+      else if (rota === '/tudo' && request.method === 'GET') {
+        // o banco inteiro: fica no registro de acessos, com o tamanho
+        const texto = JSON.stringify(c.tudo(c.exigir(email, 'consulta')));
+        c.anotarAcesso({ email, rota: 'dados/tudo', bytes: texto.length, ...deOnde });
+        return new Response(texto, { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
+      }
+      else if (rota === '/acessos' && request.method === 'GET') r = c.listarAcessos(Object.fromEntries(url.searchParams), email);
       else if (rota === '/mudancas' && request.method === 'GET') r = c.mudancas(url.searchParams.get('desde'), c.exigir(email, 'consulta'));
       else if (rota === '/conflitos' && request.method === 'GET') r = { conflitos: c.conflitosAbertos(c.exigir(email, 'consulta')) };
       else if (rota === '/registrar-email' && request.method === 'POST') r = c.registrarEmail(await corpo(), email);
@@ -1108,6 +1179,7 @@ export class CofreDO {
           if (this.env.DADOS) await backupDoDia(c, this.env.DADOS, new Date(), 'antes-da-substituicao');
         }
         r = c.importar(pedido.dados, email, { substituir: pedido.substituir === true, manterUsuarios: pedido.manterUsuarios === true });
+        c.anotarAcesso({ email, rota: pedido.substituir === true ? (pedido.manterUsuarios === true ? 'dados/importar (voltar para um backup)' : 'dados/importar (substituir)') : 'dados/importar (carga inicial)', ...deOnde });
       } else throw new ErroCofre(404, 'Não encontrado.');
       if (request.method === 'POST') await this.depoisDeGravar();
       return resposta(200, r);
