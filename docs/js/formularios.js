@@ -679,7 +679,7 @@ export function ler(campos, form, antigo = null) {
       if (c.tipo === 'dinheiro') {
         dados[c.nome] = centavos(bruto);
         // negativo só onde faz sentido (ex.: ajuste do mês que desconta do boleto); senão entrava nos totais
-        if (dados[c.nome] < 0 && !c.negativo) { erros[c.nome] = 'O valor não pode ser negativo'; continue; }
+        if (dados[c.nome] < 0 && !c.negativo && !c.positivo) { erros[c.nome] = 'O valor não pode ser negativo'; continue; }
       } else if (c.tipo === 'pct') {
         dados[c.nome] = numero(bruto);
         if (c.min !== undefined && dados[c.nome] < c.min) { erros[c.nome] = c.min === 0 ? 'Não pode ser negativo' : `Não pode ser menor que ${c.min}`; continue; }
