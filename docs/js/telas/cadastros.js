@@ -613,12 +613,12 @@ export const CADASTROS = {
         ${r && r.arquivo_apolice ? F.arquivoGuardado('arquivo_apolice', r.arquivo_apolice) : '<small class="suave">PDF ou foto da apólice. Sem ele, o seguro é salvo e fica o alerta para anexar depois.</small>'}</div>
       <div><label>Outros arquivos (opcional)</label><input type="file" name="outros_arquivos" multiple accept="${ACEITA_DOCUMENTOS}">
         <small class="suave">Ex.: boleto do seguro, proposta, comprovante de pagamento.</small></div></div>`,
-    ajustar(dados, erros, r, form) {
-      const arq = form.querySelector('[name=arquivo_apolice]').files[0];
+    ajustar(dados, erros) {
       if (dados.vigencia_inicio && dados.vigencia_fim && dados.vigencia_fim <= dados.vigencia_inicio) erros.vigencia_fim = 'O fim da vigência precisa ser depois do início';
-      if (!arq && !(r && r.arquivo_apolice) && !Object.keys(erros).length) confirmarAvisos(['Sem o arquivo da apólice. O seguro fica salvo, com o alerta "Falta o arquivo da apólice" na página do inquilino e no Painel até você anexar (em "Editar" da apólice).']);
     },
     async ajustarAsync(dados, erros, r, form, q) {
+      // só corre sem erro nos campos: a pergunta (janela do sistema) vem antes de gravar qualquer arquivo
+      if (!form.querySelector('[name=arquivo_apolice]').files[0] && !(r && r.arquivo_apolice)) await confirmarAvisos(['Sem o arquivo da apólice. O seguro fica salvo, com o alerta "Falta o arquivo da apólice" na página do inquilino e no Painel até você anexar (em "Editar" da apólice).']);
       const pasta = await pastaDoEscopo('seguro', r ? r.contrato_id : Number(q.contrato));
       const vig = `${dados.vigencia_inicio}-a-${dados.vigencia_fim}`;
       const arq = form.querySelector('[name=arquivo_apolice]').files[0];
@@ -968,6 +968,11 @@ export const CADASTROS = {
     campos: () => F.EMITENTE,
     voltar: () => '#/empresas',
     descricao: (dados) => dados.nome,
+    ajustar(dados, erros) {
+      // Estado da sede: duas letras, em maiúsculas (ex.: "pr" → "PR"); vai depois da cidade do imóvel sem Estado
+      if (dados.uf_sede) dados.uf_sede = String(dados.uf_sede).trim().toUpperCase();
+      if (dados.uf_sede && !/^[A-Z]{2}$/.test(dados.uf_sede)) erros.uf_sede = 'Use as duas letras do Estado. Ex.: PR';
+    },
   },
   usuarios: {
     admin: true,

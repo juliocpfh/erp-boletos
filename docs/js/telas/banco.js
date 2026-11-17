@@ -1,7 +1,7 @@
 // Banco: extrato das contas (#/banco), destino das movimentações, comprovantes, caixa do imóvel, "Pagar pelo banco" (#/contas) e pagamentos (#/banco/pagamentos).
 // Regras em conciliacao.js (Z); conversa com a ponte do C6 em banco-fase2.js (P). Nada aqui paga sozinho: o banco só valida e
 // manda para aprovação no aplicativo do C6; a confirmação final vem pelo extrato.
-import { alterar, aviso, E, ir, janela, login, mostrar, podeUsuario } from '../app.js';
+import { alterar, aviso, confirmar, E, ir, janela, login, mostrar, podeUsuario } from '../app.js';
 import * as S from '../armazenamento.js';
 import * as P from '../banco-fase2.js';
 import * as C from '../calculos.js';
@@ -1047,7 +1047,7 @@ export const FORMULARIOS_BANCO = {
     const marcados = [...form.querySelectorAll('input[name="pag"]:checked')].map((el) => conf && conf.sugestoes[Number(el.value)]).filter(Boolean);
     if (!marcados.length) throw new C.ErroUsuario('Marque pelo menos um boleto.');
     const total = marcados.reduce((t, s) => t + s.valor, 0);
-    if (!confirm(`Registrar o pagamento de ${marcados.length} boleto(s), ${reais(total)} no total, com as datas em que o dinheiro entrou?`)) return;
+    if (!(await confirmar(`${marcados.length} boleto(s), ${reais(total)} no total, ficam pagos com as datas em que o dinheiro entrou na conta.`, { titulo: 'Registrar os pagamentos?', sim: 'Registrar os pagamentos' }))) return;
     let n = 0;
     const divergentes = [];
     const repetidos = [];

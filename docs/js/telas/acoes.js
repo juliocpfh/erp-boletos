@@ -721,11 +721,11 @@ export const ACOES = {
     t.scrollTop = t.scrollHeight;
   },
 
-  copiarModeloVistoria() {
+  async copiarModeloVistoria() {
     const sel = document.querySelector('select[name=copiar_de]');
     const t = document.querySelector('textarea[name=modelo]');
     const outro = buscar('imoveis', sel.value);
-    if (t.value.trim() && !confirm('Substituir o texto atual pelo modelo do outro imóvel?')) return;
+    if (t.value.trim() && !(await confirmar(`O texto que está no campo será trocado pelo modelo de vistoria de "${outro ? outro.nome : 'outro imóvel'}".`, { titulo: 'Trocar o texto do modelo?', sim: 'Trocar o texto' }))) return;
     t.value = outro.modelo_vistoria || '';
   },
 
@@ -824,7 +824,7 @@ export const ACOES = {
   async desfazerMarcados() {
     const itens = [...document.querySelectorAll('input[data-desfazer]:checked')].map((x) => x.value);
     if (!itens.length) throw new Error('Marque as alterações que quer desfazer.');
-    if (!confirm(`Desfazer ${itens.length} alteração(ões) marcada(s)? Cada campo volta ao valor anterior.`)) return;
+    if (!(await confirmar(`Cada campo das ${itens.length} alteração(ões) marcada(s) volta ao valor que tinha antes.`, { titulo: 'Desfazer as alterações marcadas?', sim: 'Desfazer', forte: true }))) return;
     await desfazerItens(itens);
   },
 
@@ -956,7 +956,7 @@ export const ACOES = {
     const assunto = form.querySelector('[name=assunto]').value;
     if (!data) throw new Error('Informe a data do termo aditivo.');
     if (!String(assunto || '').trim()) throw new Error('Informe o assunto do termo aditivo (ex.: troca do dia do vencimento).');
-    if (!confirm(`Registrar o termo aditivo de ${C.dataBr(data)} como perdido (assinado, mas sem o arquivo)? Passa a valer como assinado.${podeUsuario('admin') ? '' : ' O administrador vai analisar.'}`)) return;
+    if (!(await confirmar(`O termo aditivo de ${C.dataBr(data)} fica registrado como assinado, mas sem o arquivo, e passa a valer como assinado.${podeUsuario('admin') ? '' : ' O administrador vai analisar.'}`, { titulo: 'Registrar o termo aditivo como perdido?', sim: 'Registrar como perdido' }))) return;
     await alterar((db) => R.registrarAditivo(db, Number(contrato), { data, assunto, perdido: true }, login(), podeUsuario('admin')));
     aviso('Termo aditivo registrado como perdido.');
     await mostrar();
@@ -1526,13 +1526,8 @@ export const ACOES = {
   },
 
   async removerDaLista({ lista, valor }, el) {
-    if (!confirm(`Remover "${valor}" da lista?`)) return;
-    try {
-      await alterar((db) => R.removerDaLista(db, lista, valor, login()));
-    } catch (e) {
-      window.alert(e.message);
-      return;
-    }
+    if (!(await confirmar(`"${valor}" sai da lista de opções. O que já foi gravado com ele continua igual.`, { titulo: 'Remover da lista?', sim: 'Remover', forte: true }))) return;
+    await alterar((db) => R.removerDaLista(db, lista, valor, login())); // recusa (ex.: em uso) aparece na janela de erro
     acertarListaNaTela(el, lista, { removido: valor });
   },
 
@@ -1772,11 +1767,11 @@ export const ACOES = {
       ...(abertos.length ? [`Há pagamento(s) de ${abertos.map(compBr).join(', ')}, mês ainda em andamento: o normal é numerar depois da virada do mês.`] : []),
       ...R.lembretesAirbnb(E.d, meses),
     ];
-    if (avisos.length && !confirm(`${avisos.map((t) => `• ${t}`).join('\n')}\n\nNumerar mesmo assim?`)) return;
+    if (avisos.length && !(await confirmar(`${avisos.map((t) => `• ${t}`).join('\n')}\n\nNumerar mesmo assim?`, { titulo: 'Confira antes de numerar', sim: 'Numerar mesmo assim' }))) return;
     let r = await alterar((db) => R.numerarFaturas(db, login(), { apenas }));
     if (r.foraDeOrdem.length) {
       const lista = r.foraDeOrdem.map((p) => `${dataBr(p.data)}`).join(', ');
-      if (!confirm(`A última NF (nº ${R.numeroFatura(r.ultima.numero)}) é de ${dataBr(r.ultima.emissao)}, e há pagamento(s) com data anterior: ${lista}.\n\nNumerar mesmo assim? Eles receberão os próximos números, com a data do próprio pagamento.`)) return;
+      if (!(await confirmar(`A última NF (nº ${R.numeroFatura(r.ultima.numero)}) é de ${dataBr(r.ultima.emissao)}, e há pagamento(s) com data anterior: ${lista}.\n\nNumerar mesmo assim? Eles receberão os próximos números, com a data do próprio pagamento.`, { titulo: 'Pagamentos com data anterior à última NF', sim: 'Numerar mesmo assim' }))) return;
       r = await alterar((db) => R.numerarFaturas(db, login(), { forcar: true, apenas }));
     }
     if (r.numeradas.length) aviso(`NFs numeradas: ${r.numeradas.map((n) => R.numeroFatura(n.numero)).join(', ')}.`);

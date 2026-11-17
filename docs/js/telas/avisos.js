@@ -4,13 +4,14 @@ import * as C from '../calculos.js';
 import { compBr, dataBr, reais } from '../calculos.js';
 import * as F from '../formularios.js';
 import * as R from '../regras.js';
+import { confirmar } from '../app.js';
 import { CADASTROS, fiadoresMudancas } from './cadastros.js';
 import { buscar, d } from './comum.js';
 
 /** Avisos antes de salvar: valores fora do padrão. Quem confirma, salva; quem cancela, corrige. */
-export function confirmarAvisos(avisos) {
-  if (avisos.length && !confirm(`Confira antes de salvar:\n\n• ${avisos.join('\n• ')}\n\nSalvar assim mesmo?`)) {
-    throw new Error('Nada foi salvo. Corrija o que precisar e salve de novo.');
+export async function confirmarAvisos(avisos) {
+  if (avisos.length && !(await confirmar(`• ${avisos.join('\n• ')}\n\nSalvar assim mesmo?`, { titulo: 'Confira antes de salvar', sim: 'Salvar assim mesmo', nao: 'Voltar e corrigir' }))) {
+    throw new C.ErroUsuario('Nada foi salvo. Corrija o que precisar e salve de novo.');
   }
 }
 
