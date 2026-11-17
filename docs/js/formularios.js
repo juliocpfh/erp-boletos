@@ -103,7 +103,7 @@ export const IMOVEL = [
   campo('energia_ligada', 'Energia ligada', 'opcao', { opcoes: ['Sim', 'Não'] }),
   campo('energia_tipo', 'Tipo de ligação da energia', 'opcao', { opcoes: ['Monofásica', 'Bifásica', 'Trifásica'] }),
   secao('Valor do imóvel'),
-  campo('valor_imovel', 'Valor do imóvel (R$)', 'dinheiro', { ajuda: 'Usado na página Resultados para o retorno sobre o valor' }),
+  campo('valor_imovel', 'Valor do imóvel (R$)', 'dinheiro', { naoNegativo: true, ajuda: 'Usado na página Resultados para o retorno sobre o valor' }),
   campo('valor_data', 'Data do valor', 'data', { ajuda: 'Data da compra ou da avaliação' }),
   secao('Último anúncio'),
   campo('anuncio_descricao', 'Descrição do anúncio', 'area', { largo: true }),
@@ -127,7 +127,7 @@ export const SOLICITACAO = [
 export const REFORMA = [
   campo('data', 'Data', 'data', { obrig: true }),
   campo('descricao', 'O que foi feito', 'texto', { obrig: true, largo: true, ajuda: 'Ex.: troca do telhado, pintura completa' }),
-  campo('valor', 'Valor investido', 'dinheiro', { obrig: true }),
+  campo('valor', 'Valor investido', 'dinheiro', { obrig: true, positivo: true }),
   campo('fornecedor', 'Fornecedor / prestador'),
   campo('documento', 'Nota fiscal / recibo nº'),
   campo('observacoes', 'Observações', 'area'),
@@ -293,7 +293,7 @@ export const CONTRATO = [
   ...CONTAS.map(([nome, rotulo]) => campo(nome, rotulo, 'opcao', { opcoes: SITUACOES_CONTA, padrao: SITUACOES_CONTA[0] })),
   campo('contas_adicionais', 'Contas ou cobranças adicionais', 'area', { linha: true, ajuda: 'Ex.: taxa de lixo, limpeza da área comum, rateio de água' }),
   secao('Valores e boleto'),
-  campo('aluguel_inicial', 'Aluguel', 'dinheiro', { obrig: true, ajuda: 'Valor cheio do contrato (histórico)' }),
+  campo('aluguel_inicial', 'Aluguel', 'dinheiro', { obrig: true, positivo: true, ajuda: 'Valor cheio do contrato (histórico)' }),
   campo('dia_vencimento', 'Dia do vencimento', 'inteiro', { obrig: true }),
   campo('aluguel_bonificado', 'Aluguel bonificado', 'dinheiro', { virtual: true, vinculo: 'desconto', ajuda: 'Digite o valor que o inquilino paga em dia: o % é calculado' }),
   campo('desconto_pontualidade_percentual', 'Bonificação (%)', 'pct', { vinculo: 'desconto', ajuda: 'Ou digite o % e o aluguel bonificado é calculado' }),
@@ -439,7 +439,7 @@ export const SEGURO = [
   campo('data_contratacao', 'Data de contratação', 'data'),
   campo('vigencia_inicio', 'Início da vigência', 'data', { obrig: true }),
   campo('vigencia_fim', 'Fim da vigência', 'data', { obrig: true }),
-  campo('valor_total', 'Valor total', 'dinheiro', { obrig: true }),
+  campo('valor_total', 'Valor total', 'dinheiro', { obrig: true, positivo: true }),
   campo('num_parcelas', 'Número de parcelas', 'inteiro', { obrig: true, padrao: 1 }),
   campo('primeira_competencia', 'Cobrar 1ª parcela no aluguel de', 'mes', { obrig: true }),
   campo('observacoes', 'Observações', 'area'),
@@ -447,7 +447,7 @@ export const SEGURO = [
 
 export const IPTU = [
   campo('ano', 'Ano', 'inteiro', { obrig: true }),
-  campo('valor_total', 'Valor total do IPTU parcelado', 'dinheiro', { obrig: true, ajuda: 'É o valor repassado ao inquilino, mesmo quando o proprietário paga à vista com desconto' }),
+  campo('valor_total', 'Valor total do IPTU parcelado', 'dinheiro', { obrig: true, positivo: true, ajuda: 'É o valor repassado ao inquilino, mesmo quando o proprietário paga à vista com desconto' }),
   campo('num_parcelas', 'Número de parcelas', 'inteiro', { obrig: true, padrao: 10 }),
   campo('valor_parcela', 'Valor fixo cobrado por parcela (opcional)', 'dinheiro', { ajuda: 'Ex.: arredondar para R$ 213,00. Em branco: total ÷ parcelas' }),
   campo('vencimento_primeira', 'Vencimento da 1ª parcela na prefeitura', 'data', { ajuda: 'Data da guia. As demais vencem no mesmo dia dos meses seguintes. Usado no controle e nos alertas do que o proprietário paga' }),
@@ -703,6 +703,13 @@ export function ler(campos, form, antigo = null) {
     } catch (e) {
       erros[c.nome] = e instanceof ErroUsuario ? e.message : 'Valor inválido';
     }
+  }
+  // valores em dinheiro que não podem ser negativos (``naoNegativo``) nem zero (``positivo``): aluguel, seguro, IPTU, reforma
+  for (const c of campos) {
+    const v = dados[c.nome];
+    if (c.tipo !== 'dinheiro' || erros[c.nome] || typeof v !== 'number') continue;
+    if (c.positivo && !(v > 0)) erros[c.nome] = 'Informe um valor maior que zero';
+    else if (c.naoNegativo && v < 0) erros[c.nome] = 'O valor não pode ser negativo';
   }
   return { dados, erros };
 }

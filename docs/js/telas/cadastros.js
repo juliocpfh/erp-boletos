@@ -765,7 +765,7 @@ export const CADASTROS = {
       if (t) return { data: C.hojeIso(), garantia_valor: t.valor_anterior };
       // débitos pelo valor do dia (vencido com multa e juros; acordo só pelas parcelas; sem o complemento da caução)
       const deb = R.debitosDaSaida(d(), c, C.hojeIso());
-      return { data: C.hojeIso(), garantia_valor: R.valorGarantia(d(), c), debitos: deb.total || null,
+      return { data: C.hojeIso(), garantia_valor: R.garantiaRecebida(d(), c), debitos: deb.total || null,
         debitos_descricao: deb.itens.map((x) => x.texto).join('\n') };
     },
     aviso: (r, q) => {
@@ -893,7 +893,7 @@ export const CADASTROS = {
       return {
         fci_credito: R.saldoFci(d(), c).corrigido || null,
         fci_danos: comFci && v.totalReparos ? v.totalReparos : null,
-        leitura_agua: lt.agua || '', leitura_energia: lt.energia || '', leitura_gas: lt.gas || '', garantia_valor: R.valorGarantia(d(), c),
+        leitura_agua: lt.agua || '', leitura_energia: lt.energia || '', leitura_gas: lt.gas || '', garantia_valor: R.garantiaRecebida(d(), c),
         debitos: deb.total + (comFci ? 0 : v.totalReparos),
         debitos_descricao: [...deb.itens.map((x) => x.texto), ...reparos].join('\n'),
       };
@@ -903,7 +903,9 @@ export const CADASTROS = {
       // o "Vistoria de saída" não é digitado: vem da vistoria registrada (fonte única) e é guardado ao salvar
       const v = resultadoVistoriaSaida(d(), c);
       const vistoria = v.vistoria ? `Vistoria de saída de ${dataBr(v.vistoria.data)}: ${v.texto.toLocaleLowerCase('pt-BR')}${v.pendencias.length ? ` (${v.pendencias.slice(0, 5).join('; ')}${v.pendencias.length > 5 ? '…' : ''}): ${v.semValor ? `falta o valor de ${v.semValor} reparo(s) (roteiro da saída, "Valores dos reparos")` : `os reparos (${reais(v.totalReparos)}) já entram nos débitos`}` : ''}.` : 'Vistoria de saída ainda não registrada: o cálculo fica como "não feita" (registre a vistoria antes, se houver).';
-      return `Saída em ${dataBr(c.data_saida)} (mude em "Saída do inquilino"). ${vistoria} A leitura dos relógios é a da vistoria de saída: vem preenchida e, se mudar aqui, muda lá também. Confira o boleto do último mês (proporcional aos dias). A garantia é corrigida pela poupança: o índice vem do Banco Central, pelo aniversário de cada depósito (confira e corrija se precisar).`;
+      const semDeposito = (R.temCaucao(c) || R.temDeposito(c)) && R.valorGarantia(d(), c) > 0 && !R.garantiaRecebida(d(), c)
+        ? ` Atenção: a ${R.temCaucao(c) ? 'caução' : 'garantia'} de ${reais(R.valorGarantia(d(), c))} foi combinada, mas nada foi depositado: não há garantia a devolver (se foi depositada, registre o depósito antes).` : '';
+      return `Saída em ${dataBr(c.data_saida)} (mude em "Saída do inquilino").${semDeposito} ${vistoria} A leitura dos relógios é a da vistoria de saída: vem preenchida e, se mudar aqui, muda lá também. Confira o boleto do último mês (proporcional aos dias). A garantia é corrigida pela poupança: o índice vem do Banco Central, pelo aniversário de cada depósito (confira e corrija se precisar).`;
     },
     // a data de saída é a do contrato (1ª etapa, "Informar data de saída")
     fixos: (r, q) => ({ data_saida: buscar('contratos', q.contrato).data_saida }),

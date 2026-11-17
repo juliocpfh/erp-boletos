@@ -431,6 +431,11 @@ export function iptuPagoPeloBanco(d, iptuId, n) {
  * destino no extrato (ou pagamento pelo C6) só se desfazem pela tela Banco: senão a conta ficaria "em aberto" com o dinheiro já saído.
  */
 export function motivoNaoDesfazer(d, tabela, r, campo, anterior = undefined) {
+  // saída e cálculo final andam juntos: a data de saída só volta pelos botões da saída (que reativam o inquilino e
+  // recalculam o último boleto); com o cálculo final salvo, nem a saída nem os reparos que ele usou se desfazem aqui
+  if (tabela === 'contratos' && r && campo === 'data_saida') return `A data de saída de ${r.inquilino_nome} não se desfaz pelo Histórico: use "Mudar a data" ou "Desfazer a saída" na página do inquilino${encerramentoDo(d, r.id) ? ' (desfaça antes o cálculo final)' : ''}.`;
+  if (tabela === 'contratos' && r && campo === 'ativo' && encerramentoDo(d, r.id)) return `A saída de ${r.inquilino_nome} já tem o cálculo final: desfaça o cálculo final e depois a saída, na página do inquilino.`;
+  if (tabela === 'vistorias' && r && campo === 'reparos' && r.contrato_id && encerramentoDo(d, r.contrato_id)) return 'O cálculo final da saída já usa os valores destes reparos: desfaça antes o cálculo final, na página do inquilino.';
   const campos = CAMPOS_PAGAMENTO_BANCO[tabela];
   if (!campos || !r || !campos.includes(campo)) return null;
   if (tabela === 'iptus') {
@@ -625,6 +630,19 @@ export function valorGarantia(d, c) {
   return (soma(deps.filter((x) => !x.complementar)) || inicial) + extras;
 }
 
+/**
+ * Garantia em dinheiro que de fato entrou (para a devolução e o cálculo final da saída): registrada como depositada (aqui
+ * ou em quem pagou, na herdada), o valor atual; senão, só a soma dos depósitos já lançados. Combinada e nunca depositada → 0.
+ * Ex.: caução de R$ 2.700,00 só com a "data prevista" → R$ 0,00; dois depósitos de R$ 1.000,00 → R$ 2.000,00.
+ */
+export function garantiaRecebida(d, c) {
+  const qual = temCaucao(c) ? 'caucao' : temDeposito(c) ? 'deposito' : null;
+  if (!qual) return 0;
+  const p = pagadorDaGarantia(d, c, qual);
+  if (garantiaDepositada(c) || garantiaDepositada(p) || somaDepositos(d, c, qual) > 0) return valorGarantia(d, c);
+  return p.id !== c.id ? somaDepositos(d, p, qual) : 0;
+}
+
 /** Troca de garantia em vigor (os depósitos de antes dela são da garantia anterior). */
 const trocaAtual = (d, c) => (trocasGarantiaDo(d, c.id)[0] || {}).id || null;
 /**
@@ -745,8 +763,10 @@ export const ehBoletoAvulso = (cb) => ehComplementoCaucao(cb) || ehParcelaAcordo
 export const emAcordo = (cb) => cb.situacao === 'Em acordo';
 /** Boleto em acordo fica como estava no dia do acordo: não recebe pagamento, ajuste nem ressarcimento (valem as parcelas do acordo). */
 const MOTIVO_EM_ACORDO = (cb, oQue) => `O boleto de ${C.compBr(cb.competencia)} está em acordo: ${oQue}. Valem os boletos das parcelas do acordo (ou desfaça o acordo antes).`;
-/** Boleto ainda a cobrar: não pago, sem carência e fora de acordo. */
-export const aCobrar = (cb) => !cb.data_pagamento && cb.situacao !== 'Carência' && !emAcordo(cb);
+/** Boleto descontado da garantia no cálculo final da saída: não se cobra mais (``encerramentos``, ``quitado_saida``). */
+export const quitadoNaSaida = (cb) => !!cb.quitado_saida && !cb.data_pagamento;
+/** Boleto ainda a cobrar: não pago, sem carência, fora de acordo e não descontado no cálculo final da saída. */
+export const aCobrar = (cb) => !cb.data_pagamento && cb.situacao !== 'Carência' && !emAcordo(cb) && !cb.quitado_saida;
 
 /**
  * Caução depois de um reajuste ou novo valor do aluguel (correção posterior à última caução registrada): a necessária
@@ -1510,6 +1530,7 @@ export function gerarCobrancas(d, comp, usuario) {
     if (dados) {
       inserir(d, 'cobrancas', dados, usuario, `Boleto ${C.compBr(comp)} gerado para ${contrato.inquilino_nome}`);
       geradas += 1;
+      aplicarDiferencasPendentes(d, contrato.id, usuario); // diferença de pagamento a menos à espera do próximo boleto
       // a reserva do boleto novo (e a dos que já existiam, se gerou um mês anterior a eles) vai para o mês certo
       realocarReserva(d, contrato, usuario);
     }
@@ -1577,7 +1598,7 @@ export function alertasBoletosSemOcupacao(d) {
  */
 export function recalcularCobrancas(d, filtro, usuario) {
   const mudaram = new Set();
-  const abertos = (cb) => !cb.data_pagamento && !cb.editado_manual && !emAcordo(cb) && !ehBoletoAvulso(cb);
+  const abertos = (cb) => !cb.data_pagamento && !cb.editado_manual && !emAcordo(cb) && !ehBoletoAvulso(cb) && !cb.quitado_saida;
   const lista = d.cobrancas.filter((cb) => abertos(cb) && filtro(cb)).sort((a, b) => a.competencia.localeCompare(b.competencia));
   const contratos = new Map();
   for (const cb of lista) {
@@ -1654,8 +1675,58 @@ export function registrarPagamento(d, cobrancaId, dataContabil, valorPago, usuar
   return r;
 }
 
+/**
+ * Pagamento a menos (ex.: pagou R$ 1.000,00 de R$ 1.800,00): a diferença fica devendo e vai para o próximo boleto do
+ * aluguel em aberto (ajuste do mês, "Diferença do boleto 02/2026"). Sem boleto gerado ainda, entra quando ele for gerado
+ * (``aplicarDiferencasPendentes``). O boleto pago fica "Paga em parte", com ``diferenca_devida`` e ``diferenca_no_boleto``.
+ */
+export function levarDiferencaAoProximo(d, cobrancaId, valor, usuario) {
+  const cb = buscar(d, 'cobrancas', cobrancaId);
+  if (!cb || !cb.data_pagamento || !(valor > 0)) return null;
+  atualizar(d, 'cobrancas', cb.id, { diferenca_devida: valor, diferenca_no_boleto: null, situacao: 'Paga em parte' }, usuario,
+    `Boleto ${C.compBr(cb.competencia)} pago em parte: faltam ${C.reais(valor)}, que vão para o próximo boleto`);
+  aplicarDiferencasPendentes(d, cb.contrato_id, usuario);
+  return buscar(d, 'cobrancas', cb.id);
+}
+
+const textoDiferenca = (cb) => `Diferença do boleto ${C.compBr(cb.competencia)} (pago em parte)`;
+
+/** Põe as diferenças de pagamentos a menos ainda sem boleto no próximo boleto do aluguel em aberto do contrato. */
+export function aplicarDiferencasPendentes(d, contratoId, usuario) {
+  const pendentes = d.cobrancas.filter((x) => x.contrato_id === contratoId && x.diferenca_devida > 0 && !x.diferenca_no_boleto && x.data_pagamento)
+    .sort((a, b) => a.competencia.localeCompare(b.competencia));
+  let mudou = false;
+  for (const cb of pendentes) {
+    const destino = d.cobrancas.filter((x) => x.contrato_id === contratoId && x.competencia > cb.competencia && !ehBoletoAvulso(x) && aCobrar(x) && !emitidoNoBanco(x))
+      .sort((a, b) => a.competencia.localeCompare(b.competencia))[0];
+    if (!destino) continue;
+    const descricao = [destino.outros_descricao, textoDiferenca(cb)].filter(Boolean).join('; ');
+    atualizar(d, 'cobrancas', destino.id, { outros: (destino.outros || 0) + cb.diferenca_devida, outros_descricao: descricao }, usuario,
+      `Boleto ${C.compBr(destino.competencia)}: + ${C.reais(cb.diferenca_devida)} da diferença do boleto ${C.compBr(cb.competencia)} (pago em parte)`);
+    atualizar(d, 'cobrancas', cb.id, { diferenca_no_boleto: destino.id }, usuario, `Diferença de ${C.reais(cb.diferenca_devida)} cobrada no boleto ${C.compBr(destino.competencia)}`);
+    mudou = true;
+  }
+  const c = mudou && buscar(d, 'contratos', contratoId);
+  if (c) realocarReserva(d, c, usuario);
+  return mudou;
+}
+
+/** Pagamento em parte desfeito: a diferença sai do boleto em que foi cobrada (se ele ainda está em aberto). */
+function retirarDiferenca(d, cb, usuario) {
+  if (!(cb.diferenca_devida > 0)) return;
+  const destino = cb.diferenca_no_boleto && buscar(d, 'cobrancas', cb.diferenca_no_boleto);
+  if (destino && destino.data_pagamento) throw new C.ErroUsuario(`A diferença deste pagamento já foi cobrada no boleto de ${C.compBr(destino.competencia)}, que está pago: desfaça antes aquele pagamento.`);
+  if (destino) {
+    const descricao = String(destino.outros_descricao || '').split('; ').filter((x) => x !== textoDiferenca(cb)).join('; ');
+    atualizar(d, 'cobrancas', destino.id, { outros: (destino.outros || 0) - cb.diferenca_devida, outros_descricao: descricao }, usuario,
+      `Boleto ${C.compBr(destino.competencia)}: sai a diferença do boleto ${C.compBr(cb.competencia)} (pagamento desfeito)`);
+  }
+  atualizar(d, 'cobrancas', cb.id, { diferenca_devida: null, diferenca_no_boleto: null }, usuario, 'Diferença do pagamento em parte retirada');
+}
+
 export function estornarPagamento(d, cobrancaId, usuario) {
   const cb = buscar(d, 'cobrancas', cobrancaId);
+  if (cb) retirarDiferenca(d, cb, usuario);
   if (cb && cb.caucao_correcao_id) {
     const depois = d.correcoes_garantia.find((x) => x.contrato_id === cb.contrato_id && x.id > cb.caucao_correcao_id);
     if (depois) throw new Error(`A caução foi corrigida de novo depois deste pagamento (${C.dataBr(depois.data)}): desfaça antes o pagamento da parcela mais recente.`);
@@ -2169,12 +2240,15 @@ export const cobrancasEmAberto = (d, contratoId) => d.cobrancas.filter((cb) => c
  * dois aluguéis em acordo de R$ 4.200,00 → só as parcelas do acordo (R$ 4.200,00), nunca os dois boletos de novo.
  * Devolve { itens: [{ cobranca, valor, texto }], total }.
  */
+/** Nome do boleto na lista de débitos do cálculo final ("Aluguel 10/2026", "Parcela 2/3 do acordo (vence 10/12/2026)"). */
+const nomeDebitoSaida = (cb) => (ehParcelaAcordo(cb) ? `Parcela ${cb.acordo_parcela || 'única'} do acordo (vence ${C.dataBr(cb.vencimento)})` : `Aluguel ${C.compBr(cb.competencia)}`);
+
 export function debitosDaSaida(d, c, data = C.hojeIso()) {
   const itens = cobrancasEmAberto(d, c.id).sort((a, b) => (a.vencimento || '').localeCompare(b.vencimento || '')).map((cb) => {
     const venceu = C.vencido(cb.vencimento, data);
     const l = venceu ? C.liquidar(cb, data) : null;
     const valor = venceu ? l.valor_devido : totais(cb).a_pagar_pontual;
-    const nome = ehParcelaAcordo(cb) ? `Parcela ${cb.acordo_parcela || 'única'} do acordo (vence ${C.dataBr(cb.vencimento)})` : `Aluguel ${C.compBr(cb.competencia)}`;
+    const nome = nomeDebitoSaida(cb);
     const conta = venceu && (l.multa || l.juros) ? ` (com multa de ${C.reais(l.multa)} e juros de ${C.reais(l.juros)} até ${C.dataBr(data)})` : !venceu ? ' (ainda não venceu: valor em dia)' : '';
     return { cobranca: cb, valor, texto: `${nome} em aberto: ${C.reais(valor)}${conta}` };
   }).filter((x) => x.valor > 0);
@@ -2573,7 +2647,27 @@ export function encerrarContrato(d, contratoId, dados, usuario) {
     `Saída de ${c.inquilino_nome} em ${C.dataBr(dados.data_saida)}: saldo ${C.reais(calc.saldo)}`);
   atualizar(d, 'contratos', c.id, { data_saida: dados.data_saida }, usuario, 'Saída do inquilino');
   desativarSeSaiu(d, c, usuario);
+  // os boletos em aberto descontados nos débitos (linha "Aluguel MM/AAAA em aberto" mantida) não se cobram mais
+  for (const cb of boletosDescontadosNaSaida(d, c, dados.debitos_descricao)) {
+    atualizar(d, 'cobrancas', cb.id, { quitado_saida: r.id, situacao: 'Descontado da garantia' }, usuario,
+      `Boleto ${C.compBr(cb.competencia)} descontado da garantia no cálculo final da saída`);
+  }
   return r;
+}
+
+/** Boletos em aberto do contrato que o texto dos débitos do cálculo final desconta (linha "Aluguel 10/2026 em aberto: …" mantida). */
+export function boletosDescontadosNaSaida(d, c, descricao) {
+  const texto = String(descricao || '');
+  if (!texto) return [];
+  return d.cobrancas.filter((cb) => cb.contrato_id === c.id && aCobrar(cb) && texto.includes(`${nomeDebitoSaida(cb)} em aberto`));
+}
+
+/** Cálculo final desfeito: os boletos que ele descontava voltam a ser cobrados. */
+export function liberarBoletosDaSaida(d, encerramentoId, usuario) {
+  for (const cb of d.cobrancas.filter((x) => x.quitado_saida === Number(encerramentoId))) {
+    atualizar(d, 'cobrancas', cb.id, { quitado_saida: null, situacao: cb.data_pagamento ? cb.situacao : 'Em aberto' }, usuario,
+      `Boleto ${C.compBr(cb.competencia)} volta a ser cobrado (cálculo final desfeito)`);
+  }
 }
 
 export const encerramentoDo = (d, contratoId) => d.encerramentos.find((e) => e.contrato_id === contratoId) || null;
@@ -3095,6 +3189,8 @@ export function transferirHeranca(d, novoId, usuario, hoje = C.hojeIso()) {
   // boletos a partir do mês seguinte ao fim do vínculo
   for (const cb of d.cobrancas.filter((x) => x.contrato_id === a.id && x.competencia > fim.slice(0, 7))) {
     if (ehComplementoCaucao(cb) && !out.garantia) continue;
+    // parcela de acordo: é dívida de quem saiu (débitos até a véspera ficam com ele, decisão de 2026-10-27)
+    if (ehParcelaAcordo(cb)) continue;
     if (faturasDe(d, 'cobranca', cb.id).length) { out.comNf += 1; continue; }
     if (!cb.data_pagamento && !ehBoletoAvulso(cb) && boletoDoMes(d, n.id, cb.competencia)) {
       excluir(d, 'cobrancas', cb.id, usuario, `Boleto ${C.compBr(cb.competencia)} de ${a.inquilino_nome} excluído: o de ${n.inquilino_nome} já existe (troca de titular)`);
@@ -3146,8 +3242,10 @@ export function resumoDaHeranca(d, n) {
   const data = n.data_entrada || n.vigencia_inicio;
   const comp = data ? data.slice(0, 7) : null;
   const out = [`Contrato, prazo e reajuste: continuam os de ${a.inquilino_nome} (o prazo não recomeça; reajuste no aniversário do contrato original)`];
-  const boletos = comp ? d.cobrancas.filter((cb) => cb.contrato_id === a.id && cb.competencia >= comp && !faturasDe(d, 'cobranca', cb.id, false).length) : [];
+  const boletos = comp ? d.cobrancas.filter((cb) => cb.contrato_id === a.id && cb.competencia >= comp && !ehParcelaAcordo(cb) && !faturasDe(d, 'cobranca', cb.id, false).length) : [];
   out.push(boletos.length ? `Boletos a partir de ${C.compBr(comp)} sem NF (${boletos.length}): passam para o nome de ${n.inquilino_nome}` : `Boletos: a partir de ${data ? C.dataBr(data) : 'a troca'} saem no nome de ${n.inquilino_nome}`);
+  const parcelas = d.cobrancas.filter((cb) => cb.contrato_id === a.id && ehParcelaAcordo(cb) && !cb.data_pagamento);
+  if (parcelas.length) out.push(`Parcelas do acordo de dívida em aberto (${parcelas.length}): continuam no nome de ${a.inquilino_nome} (débitos até a véspera da troca são de quem sai)`);
   const g = textoGarantiaNaTroca(d, n, a);
   if (g) out.push(garantiaNova(n) ? g.nova : g.continua);
   const reserva = a.reserva_valor > 0 ? saldoReserva(d, a) : 0;
@@ -3222,7 +3320,7 @@ const lancamentosNoAnterior = (d, n, a) => (a && a.garantia_transferida_para ===
 function boletosNoAnterior(d, n, a) {
   if (!n.heranca_transferida || !a || (continuadoPor(d, a) || {}).id !== n.id) return [];
   const ultimoMes = C.somarDias(n.heranca_transferida, -1).slice(0, 7);
-  return d.cobrancas.filter((cb) => cb.contrato_id === a.id && cb.competencia > ultimoMes
+  return d.cobrancas.filter((cb) => cb.contrato_id === a.id && cb.competencia > ultimoMes && !ehParcelaAcordo(cb)
     && !(ehComplementoCaucao(cb) && a.garantia_transferida_para !== n.id)
     && (ehBoletoAvulso(cb) || !boletoDoMes(d, n.id, cb.competencia)));
 }
@@ -6665,8 +6763,8 @@ export function roteiroSaida(d, c, hoje = C.hojeIso()) {
       detalhe: [titularidade ? 'falta o protocolo da volta da titularidade' : 'titularidade de volta ✓', leitura ? 'leitura da saída ✓' : 'falta a leitura dos relógios na saída'].join(' · ') },
     { chave: 'calculo', titulo: 'Cálculo final (garantia corrigida, débitos, FCI)', feito: !!e, detalhe: e ? `${e.saldo >= 0 ? 'a devolver' : 'a cobrar'} ${C.reais(Math.abs(e.saldo))}` : saiu ? 'pendente' : 'depois da saída' },
     { chave: 'garantia', titulo: 'Devolução da garantia (ou cobrança do saldo)', ...garantia },
-    { chave: 'boleto', titulo: `Último boleto (aluguel de ${C.compBr(comp)}, proporcional)`, feito: !!ultimo && !!ultimo.data_pagamento && !abertos.length,
-      detalhe: !ultimo ? 'ainda não gerado (tela Boletos)' : ultimo.data_pagamento ? (abertos.length ? `pago; ${abertos.length} outro(s) boleto(s) em aberto` : `pago em ${C.dataBr(ultimo.data_pagamento)}`) : `em aberto, vence ${C.dataBr(ultimo.vencimento)}`, cobranca_id: ultimo ? ultimo.id : null },
+    { chave: 'boleto', titulo: `Último boleto (aluguel de ${C.compBr(comp)}, proporcional)`, feito: !!ultimo && (!!ultimo.data_pagamento || quitadoNaSaida(ultimo)) && !abertos.length,
+      detalhe: !ultimo ? 'ainda não gerado (tela Boletos)' : quitadoNaSaida(ultimo) ? (abertos.length ? `descontado da garantia; ${abertos.length} outro(s) boleto(s) em aberto` : 'descontado da garantia no cálculo final') : ultimo.data_pagamento ? (abertos.length ? `pago; ${abertos.length} outro(s) boleto(s) em aberto` : `pago em ${C.dataBr(ultimo.data_pagamento)}`) : `em aberto, vence ${C.dataBr(ultimo.vencimento)}`, cobranca_id: ultimo ? ultimo.id : null },
     // arquivo físico (pedido do dono em 2026-11-12): imprimir o processo inteiro e guardar em papel por 10 anos depois do fim;
     // com a rotina Arquivo impresso ligada (2026-11-15), a pasta da saída se monta na tela da pasta, depois da devolução da garantia
     AI.ligado() ? (() => {

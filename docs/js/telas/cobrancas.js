@@ -43,6 +43,8 @@ function formNfDivergente(cb, p) {
       <div class="largo"><label>Justificativa da divergência</label><textarea name="justificativa" rows="2">${esc(p.justificativa)}</textarea><div class="ajuda">Fica só no sistema (histórico do boleto)</div></div>
       <div><label>Valor da NF</label><input name="valor_nf" inputmode="decimal" data-dinheiro value="${F.dinheiroTexto(r.valor_nf)}" data-calculado="${F.dinheiroTexto(r.valor_nf)}" class="valor-calculado">
         <div class="ajuda">Veio o valor calculado: altere para o valor do cálculo manual</div></div>
+      ${dif < 0 ? `<div class="largo"><label class="check"><input type="checkbox" name="diferenca" value="1" checked> Pagou a menos: os ${reais(-dif)} que faltam ficam devendo e vão para o próximo boleto do aluguel</label>
+        <div class="ajuda">Desmarque só se a diferença não vai ser cobrada (ex.: desconto combinado). O boleto fica "Paga em parte".</div></div>` : ''}
       <div class="acoes" style="align-self:end"><button>Confirmar pagamento</button>${botao('cancelarPagamentoDivergente', 'Cancelar', {}, 'secundario')}</div></form>`;
 }
 
