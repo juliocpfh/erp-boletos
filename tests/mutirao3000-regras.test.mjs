@@ -241,3 +241,19 @@ test('[27][28] fechamento confere os boletos pelo vencimento, com as parcelas do
   const e = R.etapasFechamento(d, '2026-11', '2026-11-25').find((x) => x.chave === 'pagamentos');
   assert.equal(e.pendentes, 1);
 });
+
+test('[e2e 30] NF do mês incompleto: quantidade 16/30, unitário do mês inteiro e total proporcional', async () => {
+  const FT = await import('../docs/js/fatura.js');
+  assert.deepEqual(FT.quantidadeDaFatura({ valor: 106667, dias: 16, dias_mes: 30 }), { proporcional: true, quantidade: '16/30', unitario: 200000 });
+  assert.deepEqual(FT.quantidadeDaFatura({ valor: 96000, dias: 16, dias_mes: 30 }), { proporcional: true, quantidade: '16/30', unitario: 180000 });
+  assert.deepEqual(FT.quantidadeDaFatura({ valor: 180000 }), { proporcional: false, quantidade: '1', unitario: 180000 });
+  // a NF numerada guarda os dias do boleto
+  const { d, c } = base({ data_entrada: '2026-11-15', vigencia_inicio: '2026-11-15' });
+  R.gerarCobrancas(d, '2026-11', 'j');
+  const cb = R.boletoDoMes(d, c.id, '2026-11');
+  R.registrarPagamento(d, cb.id, cb.vencimento, null, 'j', { pagouEmDia: true });
+  R.numerarFaturas(d, 'j');
+  const f = d.faturas[0];
+  assert.equal(`${f.dias}/${f.dias_mes}`, '16/30');
+  assert.equal(FT.quantidadeDaFatura(f).quantidade, '16/30');
+});

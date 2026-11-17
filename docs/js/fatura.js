@@ -25,6 +25,23 @@ export function linhasObservacoes(texto, porLinha = 90, maxLinhas = 5) {
 }
 
 /**
+ * Quantidade e valor unitário da linha da locação. Mês inteiro: "1" e o valor da NF. Mês incompleto (entrada ou saída, NF
+ * com ``dias``/``dias_mes``): a fração do mês comercial e o valor do mês inteiro; o total continua o valor da NF.
+ * Ex.: NF de R$ 960,00 com 16/30 → quantidade "16/30", unitário R$ 1.800,00, total R$ 960,00.
+ */
+export function quantidadeDaFatura(f) {
+  if (!(f.dias > 0) || !(f.dias_mes > f.dias)) return { proporcional: false, quantidade: '1', unitario: f.valor };
+  // o proporcional foi arredondado no centavo: entre os valores do mês que dão esta NF, o mais "redondo"
+  // (R$ 1.066,67 com 16/30 → R$ 2.000,00, e não R$ 2.000,01)
+  const base = Math.round((f.valor * f.dias_mes) / f.dias);
+  const dao = [];
+  for (let k = -3; k <= 3; k += 1) if (Math.round(((base + k) * f.dias) / f.dias_mes) === f.valor) dao.push(base + k);
+  const redondo = (u) => (u % 100 === 0 ? 2 : u % 10 === 0 ? 1 : 0);
+  const unitario = dao.length ? dao.sort((a, b) => redondo(b) - redondo(a) || Math.abs(a - base) - Math.abs(b - base))[0] : base;
+  return { proporcional: true, quantidade: `${f.dias}/${f.dias_mes}`, unitario };
+}
+
+/**
  * Linhas da fatura. Cada célula: [colspan, conteúdo, classes]. As classes de borda imitam a planilha:
  * be/bd/bt/bb = borda esquerda/direita/topo/base.
  */
@@ -50,7 +67,7 @@ function linhas(f, emitente) {
     17: [[1, '', 'be bt bb'], [12, '<b>DADOS DA LOCAÇÃO</b>', 'bt bb bd f-12 f-light']],
     18: [[1, '', 'be bd bt'], [1, '<b>ITEM</b>', 'be bd bt centro f-11 f-light'], [3, '<b>DESCRIÇÃO</b>', 'be bd bt centro f-11 f-light'], [1, '<b>MUNICÍPIO</b>', 'be bd bt centro f-11 f-light'], [1, '<b>UN</b>', 'be bd bt centro f-11 f-light'], [3, '<b>QUANTIDADE/MESES</b>', 'be bd bt centro f-11 f-light'], [2, '<b>VALOR UNITÁRIO</b>', 'be bd bt centro f-11 f-light'], [1, '<b>CUSTO TOTAL</b>', 'be bd bt bb centro f-11 f-light']],
     ...Object.fromEntries([19, 20, 21, 23, 24, 25].map((r) => [r, [[1, '', 'be bd'], [1, '', 'be bd'], [3, '', 'be bd'], [1, '', 'be bd'], [1, '', 'be bd'], [3, '', 'be bd'], [2, '', 'be bd'], [1, '', `be bd${r === 25 ? ' bb' : ''}`]]])),
-    22: [[1, '', 'be bd'], [1, '1', 'be bd centro f-12 f-light'], [3, 'LOCAÇÃO DE IMÓVEL', 'be bd centro f-12 f-light'], [1, esc(maiusc(f.municipio)), 'be bd centro f-12 f-light'], [1, 'UN', 'be bd centro f-12 f-light'], [3, '1', 'be bd centro f-12 f-light'], [2, `<span class="moeda">${reais(f.valor)}</span>`, 'be bd f-12 f-light'], [1, `<span class="moeda">${reais(f.valor)}</span>`, 'be bd f-12 f-light']],
+    22: [[1, '', 'be bd'], [1, '1', 'be bd centro f-12 f-light'], [3, 'LOCAÇÃO DE IMÓVEL', 'be bd centro f-12 f-light'], [1, esc(maiusc(f.municipio)), 'be bd centro f-12 f-light'], [1, 'UN', 'be bd centro f-12 f-light'], [3, esc(quantidadeDaFatura(f).quantidade), 'be bd centro f-12 f-light'], [2, `<span class="moeda">${reais(quantidadeDaFatura(f).unitario)}</span>`, 'be bd f-12 f-light'], [1, `<span class="moeda">${reais(f.valor)}</span>`, 'be bd f-12 f-light']],
     26: [[1, '', 'be bt bb'], [5, '', 'bt bb'], [6, '<b>VALOR TOTAL DA FATURA</b>', 'be bd bt bb centro f-12 f-light'], [1, `<b class="moeda">${reais(f.valor)}</b>`, 'be bd bt bb f-12 f-light']],
     ...Object.fromEntries([27, 28, 29, 30, 31].map((r, n) => [r, [[1, '', 'be'], [12, esc(linhasObservacoes(f.observacoes)[n] || ''), 'bd f-11 f-light']]])),
     32: [vazio(13, 'be bd preto')],
@@ -151,8 +168,16 @@ export async function faturaExcel(ExcelJS, modeloBuffer, faturas, emitentes) {
     linhasObservacoes(f.observacoes).forEach((t, n) => set(`B${27 + n}`, t));
     set('G16', `${dataBr(f.periodo_inicio)} A ${dataBr(f.periodo_fim)}`);
     set('F22', maiusc(corta(f.municipio, 25)));
-    set('K22', valor);
-    set('M22', { formula: 'K22', result: valor });
+    const q = quantidadeDaFatura(f);
+    if (q.proporcional) {
+      // mês incompleto: quantidade "16/30" e valor do mês inteiro; o total é o valor da NF
+      set('H22', q.quantidade);
+      set('K22', q.unitario / 100);
+      set('M22', valor);
+    } else {
+      set('K22', valor);
+      set('M22', { formula: 'K22', result: valor });
+    }
     set('M26', { formula: 'M22', result: valor });
     set('A33', `RECEBEMOS DE ${maiusc(f.tomador_nome)} AS LOCAÇÕES CONSTANTES NESSA FATURA INDICADA AO LADO`);
     set('L34', num);

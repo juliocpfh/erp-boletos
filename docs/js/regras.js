@@ -1878,8 +1878,11 @@ export function baseDaFatura(d, tipo, registro) {
     const acordo = ehParcelaAcordo(registro) && registro.acordo_periodo;
     const [ini, fim] = acordo || C.periodoServico(registro.competencia, contrato.data_entrada, contrato.data_saida);
     const ref = acordo ? `acordo${registro.acordo_parcela ? ` ${registro.acordo_parcela}` : ''} (${registro.acordo_referente})` : '';
+    // mês incompleto (entrada ou saída): a NF mostra a quantidade em dias do mês (ex.: 16/30), não "1 mês"
+    const proporcional = !acordo && registro.dias_cobrados > 0 && registro.dias_cobrados < registro.dias_mes;
     return {
       imovel, valor: registro.valor_nf, periodo_inicio: ini, periodo_fim: fim,
+      ...(proporcional ? { dias: registro.dias_cobrados, dias_mes: registro.dias_mes } : {}),
       descricao: `${contrato.inquilino_nome} · ${imovel.nome} · ${ref || C.compBr(registro.competencia)}`,
       observacoes: registro.observacoes_nf || (ref ? `Parcela do ${ref}` : ''),
       tomador: { nome: contrato.inquilino_nome, documento: contrato.inquilino_cpf || '',
@@ -1972,6 +1975,7 @@ export function numerarFaturas(d, usuario, { forcar = false, ate = null, apenas 
       inserir(d, 'faturas', {
         numero, emissao: p.data, origem_tipo: p.tipo, origem_id: p.registro.id, emitente_id: e.id,
         percentual: parte.percentual, valor: valores[i], periodo_inicio: base.periodo_inicio,
+        ...(base.dias ? { dias: base.dias, dias_mes: base.dias_mes } : {}),
         periodo_fim: base.periodo_fim, municipio: base.municipio || e.municipio || (base.imovel && base.imovel.cidade) || '',
         tomador_nome: base.tomador.nome, tomador_documento: base.tomador.documento,
         tomador_telefone: base.tomador.telefone, tomador_endereco: base.tomador.endereco, observacoes: base.observacoes || '', situacao: 'Emitida', lote,
@@ -2007,6 +2011,7 @@ export function registrarNfExterna(d, tipo, id, numero, emissao, usuario) {
     inserir(d, 'faturas', {
       numero: n, emissao, origem_tipo: tipo, origem_id: registro.id, emitente_id: e.id, percentual: parte.percentual, valor: valores[i],
       periodo_inicio: base.periodo_inicio, periodo_fim: base.periodo_fim, municipio: base.municipio || e.municipio || (base.imovel && base.imovel.cidade) || '',
+      ...(base.dias ? { dias: base.dias, dias_mes: base.dias_mes } : {}),
       tomador_nome: base.tomador.nome, tomador_documento: base.tomador.documento, tomador_telefone: base.tomador.telefone,
       tomador_endereco: base.tomador.endereco, observacoes: base.observacoes || '', situacao: 'Emitida', externa: true,
     }, usuario, `NF nº ${numeroFatura(n)} emitida fora do sistema · ${e.nome} · ${base.descricao}`);
