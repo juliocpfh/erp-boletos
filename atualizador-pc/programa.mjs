@@ -11,7 +11,9 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { ARQUIVO_REGISTRO, EXE, PASTA_COPIA, principal } from './atualizador.mjs';
-import { ARQUIVO_CONFIG, pastaConfig } from './ligar.mjs';
+import { ICONE_ICO, NOME_ICONE } from './icone.mjs';
+
+export { NOME_ICONE };import { ARQUIVO_CONFIG, pastaConfig } from './ligar.mjs';
 import { NOME_NOVO, NOME_TRAVA, NOME_VELHO, seAtualizar } from './se-atualizar.mjs';
 
 export const NOME_EXE = 'Administracao-de-Imoveis.exe';
@@ -39,7 +41,7 @@ export const NOME_VBS_JANELA = 'janela.vbs';
 export const CHAVE_DESINSTALAR = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\AdministracaoDeImoveis';
 export const NOME_NO_WINDOWS = 'Administração de Imóveis';
 /** O que o programa grava na pasta `programa` (ao desinstalar, só isto é apagado; a pasta sai se ficar vazia). */
-export const ARQUIVOS_DO_PROGRAMA = [NOME_EXE, NOME_VBS, NOME_VBS_PASTA, NOME_VBS_DESINSTALAR, NOME_VBS_JANELA, NOME_NOVO, NOME_VELHO, NOME_TRAVA];
+export const ARQUIVOS_DO_PROGRAMA = [NOME_EXE, NOME_VBS, NOME_VBS_PASTA, NOME_VBS_DESINSTALAR, NOME_VBS_JANELA, NOME_ICONE, NOME_NOVO, NOME_VELHO, NOME_TRAVA];
 export const TEXTO_CONFIRMAR = `Desinstalar ${NOME_NO_WINDOWS}?|As cópias e a pasta de arquivos continuam no computador.|Para cortar o acesso deste computador ao sistema, use Usuários → Aparelhos ligados → Desligar.`;
 export const TEXTO_PRONTO = 'Pronto: programa desinstalado.|As cópias na pasta do backup seguro e a pasta Arquivos dos imoveis continuam no computador.|Para cortar o acesso deste computador ao sistema, use Usuários → Aparelhos ligados → Desligar.';
 /** As mesmas tarefas (e os mesmos nomes) de instalar-tarefa.cmd: criar de novo troca as antigas, que chamavam o Node. */
@@ -112,11 +114,11 @@ const pastaWindows = (env = process.env) => env.SystemRoot || env.SYSTEMROOT || 
 const wscript = (env = process.env) => path.win32.join(pastaWindows(env), 'System32', 'wscript.exe');
 
 /** Os argumentos do reg.exe para um endereço próprio (protocolo) que chama um .vbs, sem nada do endereço (sem %1). */
-function comandosDeUmProtocolo(chave, descricao, vbs, exe, env) {
+function comandosDeUmProtocolo(chave, descricao, vbs, icone, env) {
   return [
     ['add', chave, '/ve', '/d', descricao, '/f'],
     ['add', chave, '/v', 'URL Protocol', '/d', '', '/f'],
-    ['add', `${chave}\\DefaultIcon`, '/ve', '/d', `"${exe}",0`, '/f'],
+    ['add', `${chave}\\DefaultIcon`, '/ve', '/d', `"${icone}",0`, '/f'],
     // o nome que o Chrome mostra na pergunta "Abrir …?" (sem ele, apareceria o do wscript)
     ['add', `${chave}\\shell\\open`, '/v', 'FriendlyAppName', '/d', 'Administracao de Imoveis', '/f'],
     // sem %1: o endereço chamado não entra no comando
@@ -126,18 +128,18 @@ function comandosDeUmProtocolo(chave, descricao, vbs, exe, env) {
 
 /** Os argumentos do reg.exe para registrar o protocolo imoveis-pasta: (por usuário, sem administrador). `pasta` = a do .exe. */
 export function comandosDoProtocolo(pasta, env = process.env) {
-  return comandosDeUmProtocolo(CHAVE_PROTOCOLO, 'URL:Abrir a pasta Arquivos dos imoveis', path.win32.join(pasta, NOME_VBS_PASTA), path.win32.join(pasta, NOME_EXE), env);
+  return comandosDeUmProtocolo(CHAVE_PROTOCOLO, 'URL:Abrir a pasta Arquivos dos imoveis', path.win32.join(pasta, NOME_VBS_PASTA), path.win32.join(pasta, NOME_ICONE), env);
 }
 
 /** O mesmo para imoveis-desinstalar: (o botão "Desinstalar o programa deste computador"). */
 export function comandosDoProtocoloDesinstalar(pasta, env = process.env) {
-  return comandosDeUmProtocolo(CHAVE_PROTOCOLO_DESINSTALAR, 'URL:Desinstalar o programa Administracao de Imoveis', path.win32.join(pasta, NOME_VBS_DESINSTALAR), path.win32.join(pasta, NOME_EXE), env);
+  return comandosDeUmProtocolo(CHAVE_PROTOCOLO_DESINSTALAR, 'URL:Desinstalar o programa Administracao de Imoveis', path.win32.join(pasta, NOME_VBS_DESINSTALAR), path.win32.join(pasta, NOME_ICONE), env);
 }
 
 /**
  * Os argumentos do reg.exe para o programa aparecer em Configurações do Windows → Aplicativos → Aplicativos instalados (por
  * usuário, sem administrador). `versao` = a do .exe; `kb` = o tamanho dele (EstimatedSize é em KB). "Desinstalar" lá roda o
- * .exe com --desinstalar, que pergunta antes.
+ * .exe com --desinstalar, que pergunta antes. O ícone é o icone.ico ao lado do .exe (casinha; o .exe em si tem o do Node).
  */
 export function comandosDeAplicativos(pasta, { versao = '', kb = 0 } = {}) {
   const exe = path.win32.join(pasta, NOME_EXE);
@@ -147,7 +149,7 @@ export function comandosDeAplicativos(pasta, { versao = '', kb = 0 } = {}) {
     texto('DisplayName', NOME_NO_WINDOWS),
     texto('DisplayVersion', versao || 'sem versão'),
     texto('Publisher', NOME_NO_WINDOWS),
-    texto('DisplayIcon', `${exe},0`),
+    texto('DisplayIcon', `${path.win32.join(pasta, NOME_ICONE)},0`),
     texto('InstallLocation', pasta),
     texto('UninstallString', `"${exe}" --desinstalar`),
     numero('NoModify', 1),
@@ -169,8 +171,9 @@ const reg = (args) => spawnSync('reg.exe', args, { windowsHide: true, encoding: 
 /** O tamanho do .exe instalado em KB (0 se não achou). */
 const kbDoExe = (pasta) => { try { return Math.ceil(fs.statSync(path.join(pasta, NOME_EXE)).size / 1024); } catch { return 0; } };
 
-/** Grava os .vbs ao lado do .exe (sem acento: .vbs em latin1). */
+/** Grava os .vbs (sem acento: .vbs em latin1) e o ícone ao lado do .exe. */
 function gravarVbs(pasta) {
+  fs.writeFileSync(path.join(pasta, NOME_ICONE), ICONE_ICO());
   fs.writeFileSync(path.join(pasta, NOME_VBS), textoVbs(), 'latin1');
   fs.writeFileSync(path.join(pasta, NOME_VBS_PASTA), textoVbsPasta(), 'latin1');
   fs.writeFileSync(path.join(pasta, NOME_VBS_DESINSTALAR), textoVbsDesinstalar(), 'latin1');
