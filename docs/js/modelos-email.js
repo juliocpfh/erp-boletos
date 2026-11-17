@@ -377,6 +377,30 @@ LINHA DIGITÁVEL DO BOLETO
 [fim]
 Se o pagamento já foi feito, por favor desconsidere esta mensagem e, se possível, responda com o comprovante.`,
   },
+  // Notificação ao inquilino (pedido do dono em 2026-11-17): ``notificacao``: o e-mail é de uma notificação (alvo { contrato,
+  // notificacao }); vai anexada a notificação assinada (ou, sem ela, o PDF para assinar). O contrato aceita notificação por e-mail.
+  {
+    chave: 'notificacao_envio', nome: 'Notificação ao inquilino', etapa: 'Notificação ao inquilino', notificacao: true,
+    assunto: '[se reiteracao]{notificacao_numero} [fim]Notificação: {notificacao_assunto} ({imovel})',
+    anexos: '', prontos: ['notificacao:pdf'],
+    texto: `Olá, {nome},
+
+Segue anexa a [se reiteracao]{notificacao_numero} [fim]notificação de {notificacao_data} sobre {notificacao_assunto_minusculo}, referente ao imóvel da {imovel}.
+
+O prazo para resolver é de {prazo_notificacao}, ou seja, até {data_limite}. Quando terminar, responda este e-mail com uma foto ou um documento que mostre que foi resolvido, para darmos a baixa.
+
+Se tiver alguma dúvida ou precisar combinar algo, é só responder esta mensagem.`,
+  },
+  {
+    chave: 'notificacao_lembrete', nome: 'Lembrete do prazo da notificação', etapa: 'Notificação ao inquilino', notificacao: true,
+    assunto: 'Lembrete: prazo da notificação de {notificacao_data} termina em {data_limite} ({imovel})',
+    anexos: '', prontos: ['notificacao:pdf'],
+    texto: `Olá, {nome}, tudo bem?
+
+Lembramos que o prazo da notificação de {notificacao_data}, sobre {notificacao_assunto_minusculo}, termina [se vence_hoje]hoje, {data_limite}[senão]em {data_limite}[fim]. Segue a notificação anexa de novo.
+
+Se já resolveu, por favor responda este e-mail com uma foto ou um documento que mostre, para darmos a baixa. Não cumprido o prazo, vale o que está na notificação, inclusive a multa prevista no contrato.`,
+  },
 ];
 
 /** Modelo de e-mail em uso: o gravado (Dados e backup → Modelos de e-mail) ou o padrão. */

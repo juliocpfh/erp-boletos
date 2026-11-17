@@ -52,6 +52,22 @@ export const AJUDA_TELAS = {
       'Quando o inquilino for sair, use "Saída do inquilino": o sistema faz o cálculo final.'],
     exemplo: 'Aluguel de R$ 2.000,00 com vencimento no dia 10 e bonificação de 10%: pago até 10/12/2026, o boleto de novembro sai por R$ 1.800,00; pago depois, é R$ 2.000,00 mais multa e juros.',
   },
+  notificacoes: {
+    titulo: 'Notificações ao inquilino',
+    serve: 'Lista as notificações que a administração mandou aos inquilinos para resolver algo num prazo (o contrário das solicitações, que são pedidos do inquilino). As em aberto vêm primeiro; o prazo vencido aparece em vermelho.',
+    primeiro: ['Clique em "Nova notificação", escolha o inquilino e o assunto e clique em "Montar o texto".',
+      'Troque no texto o que estiver em "[preencher: …]" pelo caso real e salve.',
+      'Abra a notificação: imprima o PDF, assine no gov.br, anexe a assinada e envie.'],
+    exemplo: 'Ar-condicionado instalado errado: notificação de 17/11/2026 com 10 dias úteis vence em 02/12/2026 (20/11 é feriado). O lembrete aparece no Painel em 27/11; em 03/12, se não resolveu, dá para mandar a 2ª notificação ou gerar a multa no próximo boleto.',
+  },
+  notificacao: {
+    titulo: 'Notificação ao inquilino',
+    serve: 'Acompanha uma notificação do começo ao fim: o PDF para assinar, a assinada, o envio, o prazo em dias úteis, a baixa quando o inquilino resolve e, se não resolver, outra notificação do mesmo assunto ou a multa.',
+    primeiro: ['Clique em "PDF para assinar", baixe e assine no gov.br (assinador.iti.br).',
+      'Anexe a notificação assinada e envie por e-mail (o "Enviar agora" já marca a data do envio) ou entregue à mão e marque como enviada.',
+      'Quando o inquilino resolver, dê a baixa com a data e uma foto.'],
+    exemplo: 'Prazo até 02/12/2026 e nada resolvido: em 03/12 clique em "Gerar multa", digite R$ 2.000,00 (o sistema sugere 1 aluguel) e confira o boleto que recebe. O boleto de 11/2026, que vence em 10/12, passa de R$ 2.000,00 para R$ 4.000,00, e a multa fica fora da NF.',
+  },
   ficha: {
     titulo: 'Ficha em análise',
     serve: 'Guarda o pedido de quem quer alugar: dados da pessoa e dos fiadores, a reserva paga e os documentos (renda, identidade). É aqui que a ficha é aprovada ou reprovada.',

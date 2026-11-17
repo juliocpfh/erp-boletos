@@ -86,6 +86,10 @@ export function itensDaPasta(d, c, soltos = null) {
   for (const a of (d.acordos || []).filter((x) => x.contrato_id === c.id && x.termo_assinado)) {
     poe({ vaga: `acordo:${a.id}`, grupo: 'contrato', rotulo: `Termo do acordo de ${C.dataBr(a.data)} assinado (${a.referente})`, data: a.data, escopo: 'contrato', pasta: c.id, nome: a.termo_assinado });
   }
+  // notificação ao inquilino assinada (2026-11-17): uma vaga por notificação (o comprovante da baixa, foto, não vai para o papel)
+  for (const n of (d.notificacoes || []).filter((x) => x.contrato_id === c.id && x.arquivo_assinado && x.situacao !== 'Cancelada').sort((a, b) => String(a.data).localeCompare(String(b.data)) || a.id - b.id)) {
+    poe({ vaga: `notificacao:${n.id}`, grupo: 'contrato', rotulo: `Notificação de ${C.dataBr(n.data)} assinada (${n.assunto})`, data: n.data, escopo: 'contrato', pasta: c.id, nome: n.arquivo_assinado });
+  }
   // carta de reajuste (pelo índice ou pelo novo valor negociado): a anexada ou, sem arquivo, a que o sistema monta
   for (const x of (d.cartas_reajuste || []).filter((y) => y.contrato_id === c.id).sort((a, b) => String(a.competencia).localeCompare(String(b.competencia)))) {
     const base = { vaga: `carta:${x.competencia}`, grupo: 'contrato', rotulo: `Carta de reajuste de ${C.compBr(x.competencia)}${x.enviada_em ? ` (enviada em ${C.dataBr(x.enviada_em)})` : ''}`, data: x.enviada_em || null };

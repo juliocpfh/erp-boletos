@@ -85,6 +85,7 @@ não e o artigo da lei. O sistema avisa, mas não proíbe as escolhas do adminis
 | D8 | Etiqueta "alugado em X: veja se ficou conta nossa" | Até 2 meses depois da entrada | [C] meses | 2 (hoje). Rotina | |
 | D9 | Avisos antes de salvar | Pagamento de mais de 90 dias atrás; data até 60 dias no futuro; IPTU/seguro 30% fora do anterior | [C] cada número | Hoje. Rotina | |
 | D10 | Registro de acessos da nuvem (17/11/2026, `dias_registro_acessos`) | Guardado 180 dias: quem baixou o banco, abriu/anexou/apagou arquivos, baixou backups, mandou e-mail, mexeu na ficha pela internet e ligou o programa do PC (tela Acessos, só administrador) | [C] dias (30 a 730) | 180. Marco Civil da Internet, art. 15 (6 meses); LGPD arts. 6º, 37 e 46: guardar o registro das operações, mas só pelo tempo necessário (tem e-mail e endereço de internet da equipe) | Feito (mutirão 3000) |
+| D11 | Notificação ao inquilino (17/11/2026, `notificacao_prazo_dias`, `notificacao_aviso_dias`, `notificacao_multa_alugueis`) | Prazo padrão de 10 dias úteis (17/11/2026 → 02/12/2026); lembrete 3 dias úteis antes e no dia; multa sugerida de 1 aluguel (o administrador digita o valor) | [C] dias (1 a 90), dias (0 a 15), aluguéis (0 a 3) | Código Civil, art. 397, parágrafo único (notificação constitui em mora) e arts. 408 a 413 (multa não passa da obrigação; a excessiva pode ser reduzida); Lei 8.245/91, arts. 9º, II, e 23 | Feito |
 
 ## Fora desta lista (de propósito)
 - Impostos (PIS/COFINS, IRPJ, CSLL, mínimo de R$ 10,00 da guia): dependem do regime da empresa; viram configuração quando o
