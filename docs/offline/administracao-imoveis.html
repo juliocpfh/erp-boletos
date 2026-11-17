@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-OQ2yXyOcjwZweRJl4RMUsAhglH0jX61nPAMMZoEDaVE='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-q04G4RGDf2oFJW1jxSyiPbKNZVmqU9n2RMh4PoUzmVg='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="f5a28b2ba8ba6b46">
+<meta name="fontes" content="f2454c830ae41449">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -3575,9 +3575,9 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
   }
   function pendenciasDoContrato(d2, c) {
     const falta = [];
-    const pessoa2 = (pref, rotulo, cond = true) => {
+    const pessoa2 = (pref, rotulo2, cond = true) => {
       if (!cond) return;
-      for (const [k, t] of [["estado_civil", "estado civil"], ["profissao", "profissão"], ["cpf", "CPF"], ["endereco", "endereço"]]) if (!c[`${pref}${k}`]) falta.push(`${rotulo}: ${t}`);
+      for (const [k, t] of [["estado_civil", "estado civil"], ["profissao", "profissão"], ["cpf", "CPF"], ["endereco", "endereço"]]) if (!c[`${pref}${k}`]) falta.push(`${rotulo2}: ${t}`);
     };
     if (c.inquilino_tipo === "Pessoa jurídica (empresa)") {
       if (!c.inquilino_cpf) falta.push("empresa: CNPJ");
@@ -3691,13 +3691,13 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
       return `<p class="ct-par">${runsHtml(b.runs)}</p>`;
     }
   }
-  function imagemX(id, rId, larguraCm, alturaCm, { ancora = false, topo = null, transparencia = 0 } = {}) {
+  function imagemX(id, rId, larguraCm, alturaCm, { ancora = false, topo: topo2 = null, transparencia = 0 } = {}) {
     const cx = Math.round(larguraCm * EMU_CM);
     const cy = Math.round(alturaCm * EMU_CM);
     const pic = `<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="logo${id}.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rId}">${transparencia ? `<a:alphaModFix amt="${Math.round((1 - transparencia) * 1e5)}"/>` : ""}</a:blip><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic>`;
-    if (!ancora && topo === null) return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${id}" name="Logo ${id}"/>${pic}</wp:inline></w:drawing></w:r>`;
-    const capa = topo !== null;
-    return `<w:r><w:drawing><wp:anchor distT="0" distB="${capa ? Math.round(LOGO.espacoCm * EMU_CM) : 0}" distL="0" distR="0" simplePos="0" relativeHeight="${capa ? 1 : 0}" behindDoc="${capa ? 0 : 1}" locked="1" layoutInCell="1" allowOverlap="${capa ? 0 : 1}"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH><wp:positionV relativeFrom="page">${capa ? `<wp:posOffset>${Math.round(topo * EMU_CM)}</wp:posOffset>` : "<wp:align>center</wp:align>"}</wp:positionV><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/>${capa ? "<wp:wrapTopAndBottom/>" : "<wp:wrapNone/>"}<wp:docPr id="${id}" name="${capa ? "Logo" : "Marca"} ${id}"/><wp:cNvGraphicFramePr/>${pic}</wp:anchor></w:drawing></w:r>`;
+    if (!ancora && topo2 === null) return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${id}" name="Logo ${id}"/>${pic}</wp:inline></w:drawing></w:r>`;
+    const capa = topo2 !== null;
+    return `<w:r><w:drawing><wp:anchor distT="0" distB="${capa ? Math.round(LOGO.espacoCm * EMU_CM) : 0}" distL="0" distR="0" simplePos="0" relativeHeight="${capa ? 1 : 0}" behindDoc="${capa ? 0 : 1}" locked="1" layoutInCell="1" allowOverlap="${capa ? 0 : 1}"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH><wp:positionV relativeFrom="page">${capa ? `<wp:posOffset>${Math.round(topo2 * EMU_CM)}</wp:posOffset>` : "<wp:align>center</wp:align>"}</wp:positionV><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/>${capa ? "<wp:wrapTopAndBottom/>" : "<wp:wrapNone/>"}<wp:docPr id="${id}" name="${capa ? "Logo" : "Marca"} ${id}"/><wp:cNvGraphicFramePr/>${pic}</wp:anchor></w:drawing></w:r>`;
   }
   async function contratoDocx(JSZip, blocos, { logo, rodape, titulo: titulo2 }) {
     const prop = logo ? logo.altura / logo.largura : 0;
@@ -5117,16 +5117,16 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       const h = hist[i];
       if (h.desfaz !== void 0 && h.detalhes) for (const k of Object.keys(h.detalhes)) desfeitos.add(`${h.desfaz}:${k}`);
     }
-    const topo = /* @__PURE__ */ new Map();
+    const topo2 = /* @__PURE__ */ new Map();
     for (let i = Math.max(0, desde); i < hist.length; i += 1) {
       const h = hist[i];
       if (h.acao !== "Alteração" || !h.tabela || h.registro_id === null || !h.detalhes || h.desfaz !== void 0) continue;
       for (const [k, m] of Object.entries(h.detalhes)) {
-        if (m && typeof m === "object" && "de" in m && !desfeitos.has(`${i}:${k}`)) topo.set(`${h.tabela}:${h.registro_id}:${k}`, i);
+        if (m && typeof m === "object" && "de" in m && !desfeitos.has(`${i}:${k}`)) topo2.set(`${h.tabela}:${h.registro_id}:${k}`, i);
       }
     }
     const out = /* @__PURE__ */ new Set();
-    for (const [chave, i] of topo) {
+    for (const [chave, i] of topo2) {
       const h = d2.historico[i];
       const k = chave.split(":").slice(2).join(":");
       if (SEM_DESFAZER.has(h.tabela) || CAMPOS_SEM_DESFAZER.has(k) || !Array.isArray(d2[h.tabela])) continue;
@@ -5629,14 +5629,14 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       texto: `Reserva de ${reais(saldo)} marcada para o aluguel de ${compBr(alvo)} não foi usada: ${motivo}. Em "Editar", escolha em "Usar a reserva no aluguel de" o mês do boleto em aberto que deve receber o desconto; se ela já foi abatida em aluguéis antigos, use "Marcar como já abatida" na página do inquilino.`
     } : null;
   }
-  function parcelasDoMes(lista3, comp, rotulo) {
+  function parcelasDoMes(lista3, comp, rotulo2) {
     let total = 0;
     const rotulos = [];
     for (const p2 of lista3) {
       const [n, v] = parcelaNaCompetencia(p2.valor_total, p2.num_parcelas, p2.primeira_competencia, comp);
       if (n) {
         total += p2.valor_parcela > 0 ? p2.valor_parcela : v;
-        rotulos.push(`${rotulo(p2)} parc. ${n}/${p2.num_parcelas}`);
+        rotulos.push(`${rotulo2(p2)} parc. ${n}/${p2.num_parcelas}`);
       }
     }
     return [total, rotulos.join("; ")];
@@ -6696,8 +6696,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return out;
   }
   function outrosContratosDaPessoa(d2, c, hoje3 = hojeIso()) {
-    const doc = String(c.inquilino_cpf || "").replace(/\D/g, "");
-    return d2.contratos.filter((x) => x.id !== c.id && contratoAtivo(x, hoje3) && (doc ? String(x.inquilino_cpf || "").replace(/\D/g, "") === doc : x.inquilino_nome.trim().toLocaleLowerCase("pt-BR") === c.inquilino_nome.trim().toLocaleLowerCase("pt-BR")));
+    const doc2 = String(c.inquilino_cpf || "").replace(/\D/g, "");
+    return d2.contratos.filter((x) => x.id !== c.id && contratoAtivo(x, hoje3) && (doc2 ? String(x.inquilino_cpf || "").replace(/\D/g, "") === doc2 : x.inquilino_nome.trim().toLocaleLowerCase("pt-BR") === c.inquilino_nome.trim().toLocaleLowerCase("pt-BR")));
   }
   function dataApagarSemImovel(c) {
     return !c.imovel_id && c.sem_imovel_desde ? somarDias(c.sem_imovel_desde, regra("dias_sem_imovel")) : null;
@@ -7131,8 +7131,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return buscar(d2, "depositos_garantia", x.id);
   }
   function arquivoDocumento(d2, contratoId, campo2, arquivo, usuario) {
-    const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === campo2);
-    if (!doc) throw new Error("Documento desconhecido.");
+    const doc2 = DOCUMENTOS_ENTRADA.find(([k]) => k === campo2);
+    if (!doc2) throw new Error("Documento desconhecido.");
     const c = buscar(d2, "contratos", contratoId);
     if (!c[campo2]) throw new Error("Este documento ainda não foi marcado como assinado.");
     atualizar(
@@ -7141,7 +7141,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       c.id,
       { [campoArquivoDoc(campo2)]: arquivo || null },
       usuario,
-      `${c.inquilino_nome}: ${doc[1].toLocaleLowerCase("pt-BR")}, arquivo ${arquivo ? `anexado (${arquivo})` : "apagado"}`
+      `${c.inquilino_nome}: ${doc2[1].toLocaleLowerCase("pt-BR")}, arquivo ${arquivo ? `anexado (${arquivo})` : "apagado"}`
     );
   }
   function removerArquivoAditivo(d2, id, usuario) {
@@ -7755,24 +7755,24 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return { nivel: "aviso", tipo: "Documento perdido a confirmar", ancora: "documentos", texto: `${l.join("; ")}. O administrador confirma ou recusa.` };
   }
   function marcarDocumento(d2, contratoId, campo2, data2, usuario, arquivo = null) {
-    const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === campo2);
-    if (!doc) throw new Error("Documento desconhecido.");
-    if (data2 && !arquivo) throw new Error(`Anexe o arquivo d${doc[2].endsWith("a") ? "a" : "o"} ${doc[1].toLocaleLowerCase("pt-BR")} ${doc[2]} antes de marcar.`);
+    const doc2 = DOCUMENTOS_ENTRADA.find(([k]) => k === campo2);
+    if (!doc2) throw new Error("Documento desconhecido.");
+    if (data2 && !arquivo) throw new Error(`Anexe o arquivo d${doc2[2].endsWith("a") ? "a" : "o"} ${doc2[1].toLocaleLowerCase("pt-BR")} ${doc2[2]} antes de marcar.`);
     const c = buscar(d2, "contratos", contratoId);
     const limpa = data2 ? { [campoPerdidoDoc(campo2)]: null, [campoPerdidoPendente(campo2)]: null, [campoParcialDoc(campo2)]: null } : {};
-    atualizar(d2, "contratos", c.id, { [campo2]: data2 || null, [campoArquivoDoc(campo2)]: data2 ? arquivo : null, ...limpa }, usuario, `${c.inquilino_nome}: ${doc[1].toLocaleLowerCase("pt-BR")} ${data2 ? `${doc[2]} em ${dataBr(data2)}` : "voltou a pendente"}`);
+    atualizar(d2, "contratos", c.id, { [campo2]: data2 || null, [campoArquivoDoc(campo2)]: data2 ? arquivo : null, ...limpa }, usuario, `${c.inquilino_nome}: ${doc2[1].toLocaleLowerCase("pt-BR")} ${data2 ? `${doc2[2]} em ${dataBr(data2)}` : "voltou a pendente"}`);
   }
   function anexarDocumentoParcial(d2, contratoId, campo2, dados, usuario, administrador) {
-    const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === campo2);
-    if (!doc) throw new Error("Documento desconhecido.");
+    const doc2 = DOCUMENTOS_ENTRADA.find(([k]) => k === campo2);
+    if (!doc2) throw new Error("Documento desconhecido.");
     const c = buscar(d2, "contratos", contratoId);
-    const nome = doc[1].toLocaleLowerCase("pt-BR");
+    const nome = doc2[1].toLocaleLowerCase("pt-BR");
     if (!dados) {
       atualizar(d2, "contratos", c.id, { [campoParcialDoc(campo2)]: null }, usuario, `${c.inquilino_nome}: ${nome} sem o registro de assinatura faltante`);
       return;
     }
     if (!dados.data) throw new Error("Informe a data.");
-    if (!dados.arquivo) throw new Error(`Anexe o arquivo d${doc[2].endsWith("a") ? "a" : "o"} ${nome}.`);
+    if (!dados.arquivo) throw new Error(`Anexe o arquivo d${doc2[2].endsWith("a") ? "a" : "o"} ${nome}.`);
     const validos = partesDoContrato(d2, c).map(textoParte);
     const falta = [...new Set(dados.falta || [])];
     if (!falta.length) throw new Error("Escolha de quem falta a assinatura.");
@@ -7788,8 +7788,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     );
   }
   function marcarDocumentoPerdido(d2, contratoId, campo2, data2, usuario, administrador = true) {
-    const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === campo2);
-    if (!doc) throw new Error("Documento desconhecido.");
+    const doc2 = DOCUMENTOS_ENTRADA.find(([k]) => k === campo2);
+    if (!doc2) throw new Error("Documento desconhecido.");
     const c = buscar(d2, "contratos", contratoId);
     atualizar(
       d2,
@@ -7797,14 +7797,14 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       c.id,
       { [campoPerdidoDoc(campo2)]: data2 || null, [campoPerdidoPendente(campo2)]: data2 && !administrador ? usuario : null },
       usuario,
-      `${c.inquilino_nome}: ${doc[1].toLocaleLowerCase("pt-BR")} ${data2 ? `perdido (registrado em ${dataBr(data2)}${administrador ? "" : ", aguardando o administrador"})` : "não está mais como perdido"}`
+      `${c.inquilino_nome}: ${doc2[1].toLocaleLowerCase("pt-BR")} ${data2 ? `perdido (registrado em ${dataBr(data2)}${administrador ? "" : ", aguardando o administrador"})` : "não está mais como perdido"}`
     );
   }
   function analisarDocumento(d2, contratoId, campo2, tipo, aceitar, usuario) {
-    const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === campo2);
-    if (!doc) throw new Error("Documento desconhecido.");
+    const doc2 = DOCUMENTOS_ENTRADA.find(([k]) => k === campo2);
+    if (!doc2) throw new Error("Documento desconhecido.");
     const c = buscar(d2, "contratos", contratoId);
-    const nome = doc[1].toLocaleLowerCase("pt-BR");
+    const nome = doc2[1].toLocaleLowerCase("pt-BR");
     if (tipo === "perdido") {
       atualizar(
         d2,
@@ -7812,7 +7812,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         c.id,
         aceitar ? { [campoPerdidoPendente(campo2)]: null } : { [campoPerdidoDoc(campo2)]: null, [campoPerdidoPendente(campo2)]: null },
         usuario,
-        `${c.inquilino_nome}: perda d${doc[2].endsWith("a") ? "a" : "o"} ${nome} ${aceitar ? "confirmada" : "recusada"} pelo administrador`
+        `${c.inquilino_nome}: perda d${doc2[2].endsWith("a") ? "a" : "o"} ${nome} ${aceitar ? "confirmada" : "recusada"} pelo administrador`
       );
     } else {
       const p2 = c[campoParcialDoc(campo2)];
@@ -7885,8 +7885,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       return andamento(`pendente no contrato de ${anterior.inquilino_nome}`);
     };
     const docAssinado = (k, chave) => {
-      const doc = documentoEntrada(d2, c, k);
-      if (doc) return feita(doc.data, doc.contrato.id !== c.id ? `herdado de ${doc.contrato.inquilino_nome}` : doc.arquivo ? "" : "sem arquivo");
+      const doc2 = documentoEntrada(d2, c, k);
+      if (doc2) return feita(doc2.data, doc2.contrato.id !== c.id ? `herdado de ${doc2.contrato.inquilino_nome}` : doc2.arquivo ? "" : "sem arquivo");
       if (documentoPerdido(d2, c, k)) return feita(documentoPerdido(d2, c, k), "registrado como perdido");
       const ph = perdaHerdada(d2, c, k);
       if (ph) return feita(ph.data, `registrado como perdido em ${ph.contrato.inquilino_nome}`);
@@ -7957,12 +7957,12 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       };
     }
     const out = [];
-    for (const [chave, titulo2, doc] of ETAPAS_ENTRADA) {
+    for (const [chave, titulo2, doc2] of ETAPAS_ENTRADA) {
       if (chave === "aditivo" && !anterior) continue;
       if (chave === "garantia" && c.garantia_tipo === "Sem garantia") continue;
       if (chave === "seguro" && c.conta_seguro === SITUACOES[2]) continue;
       const auto = avaliar[chave]();
-      if (auto === null && !doc) continue;
+      if (auto === null && !doc2) continue;
       const conta = CONTAS_ENTRADA.find(([k]) => k === chave);
       const concessionaria = conta ? concessionariaDaConta(d2, c, conta[4], conta[3]) : null;
       const nome = chave === "garantia" ? {
@@ -7973,8 +7973,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         "Seguro fiança": "Apólice do seguro fiança"
       }[c.garantia_tipo] || "Garantia (tipo não informado)" : concessionaria ? `${titulo2} (${concessionaria})` : titulo2;
       const m = marcas[chave];
-      const e = auto && auto.situacao === "feita" ? { ...auto, data: auto.data || (m && !m.pulada ? m.data : null) } : m && m.pulada ? { situacao: "pulada", data: m.data, texto: chave === "contra_vistoria" ? "não houve" : "não se aplica", manual: true } : m && m.data && !doc ? { situacao: "feita", data: m.data, texto: `marcada por ${m.por || "-"}`, manual: true } : auto || { situacao: "pendente", texto: "" };
-      out.push({ chave, titulo: nome, doc: doc || null, concessionaria, ...e });
+      const e = auto && auto.situacao === "feita" ? { ...auto, data: auto.data || (m && !m.pulada ? m.data : null) } : m && m.pulada ? { situacao: "pulada", data: m.data, texto: chave === "contra_vistoria" ? "não houve" : "não se aplica", manual: true } : m && m.data && !doc2 ? { situacao: "feita", data: m.data, texto: `marcada por ${m.por || "-"}`, manual: true } : auto || { situacao: "pendente", texto: "" };
+      out.push({ chave, titulo: nome, doc: doc2 || null, concessionaria, ...e });
     }
     if (ligado()) {
       const m = pastaMontada(d2, c.id);
@@ -8070,10 +8070,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   }
   function comprovantesComNome(d2) {
     const out = [];
-    const usa = (contratoId, nome, tipo, data2, rotulo) => {
-      if (nome && contratoId) out.push({ contratoId, nome, esperado: data2 ? `comprovante-${tipo}-${data2}` : null, rotulo });
+    const usa = (contratoId, nome, tipo, data2, rotulo2) => {
+      if (nome && contratoId) out.push({ contratoId, nome, esperado: data2 ? `comprovante-${tipo}-${data2}` : null, rotulo: rotulo2 });
     };
-    for (const c of d2.contratos) for (const [campo2, tipo, data2, rotulo] of COMPROVANTES_NO_CONTRATO) if (!c[`${campo2}_contrato`]) usa(c.id, c[campo2], tipo, data2(c), rotulo);
+    for (const c of d2.contratos) for (const [campo2, tipo, data2, rotulo2] of COMPROVANTES_NO_CONTRATO) if (!c[`${campo2}_contrato`]) usa(c.id, c[campo2], tipo, data2(c), rotulo2);
     for (const x of d2.depositos_garantia || []) usa(x.contrato_id, x.comprovante, x.qual === "caucao" ? "caucao" : "deposito-garantia", x.data, `comprovante do depósito ${x.qual === "caucao" ? "da caução" : "de garantia"} de ${reais(x.valor)} (${dataBr(x.data)})`);
     for (const x of d2.correcoes_garantia) usa(x.contrato_id, x.comprovante, "complemento-caucao", x.data, `comprovante do complemento da caução (${dataBr(x.data)})`);
     for (const x of d2.aplicacoes) usa(x.contrato_id, x.comprovante, "aplicacao-garantia", x.data, `comprovante da aplicação da garantia (${dataBr(x.data)})`);
@@ -8089,8 +8089,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   }
   function rotulosDosArquivos(d2) {
     const m = /* @__PURE__ */ new Map();
-    const poe = (escopo, id, nome, rotulo) => {
-      if (nome && id) m.set(`${escopo}:${id}|${nome}`, rotulo);
+    const poe = (escopo, id, nome, rotulo2) => {
+      if (nome && id) m.set(`${escopo}:${id}|${nome}`, rotulo2);
     };
     for (const x of comprovantesComNome(d2)) poe("contrato", x.contratoId, x.nome, x.rotulo);
     for (const c of d2.contratos) {
@@ -8116,9 +8116,9 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       for (const x of d2[t] || []) {
         const p2 = pastaDoComprovante(d2, x);
         const c = pastaContador(d2, x);
-        const rotulo = rotuloDoComprovante(d2, x);
-        if (p2) poe(p2.escopo, p2.id, x.comprovante, rotulo);
-        if (c) poe(c.escopo, c.id, x.comprovante_contador, `cópia para o contador (${apelidoDaConta(d2, contaDeOrigem(d2, x))} ${compBr(mesDoDinheiro(d2, x))}) · ${rotulo}`);
+        const rotulo2 = rotuloDoComprovante(d2, x);
+        if (p2) poe(p2.escopo, p2.id, x.comprovante, rotulo2);
+        if (c) poe(c.escopo, c.id, x.comprovante_contador, `cópia para o contador (${apelidoDaConta(d2, contaDeOrigem(d2, x))} ${compBr(mesDoDinheiro(d2, x))}) · ${rotulo2}`);
       }
     }
     return m;
@@ -8676,7 +8676,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     };
     const problemas = [];
     if (!pagador.bairro) problemas.push(`falta o bairro do pagador: complete ${ondeEndereco()}${endereco2.fonte === "inquilino" ? ' (ex.: "Rua das Flores, 45, Centro, Curitiba/PR, CEP 80010-000")' : ""}`);
-    for (const [k, rotulo, verbo, max, onde, semBarra] of [
+    for (const [k, rotulo2, verbo, max, onde, semBarra] of [
       ["nome", "O nome do pagador", "tem", L.nome, "no cadastro do inquilino", false],
       ["rua", "A rua e o número", "têm", L.endereco, ondeEndereco("address"), true],
       ["bairro", "O bairro", "tem", L.bairro, ondeEndereco("neighborhood"), true],
@@ -8684,8 +8684,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       ["email", "O e-mail", "tem", L.email, "no cadastro do inquilino", false]
     ]) {
       const v = pagador[k];
-      if (v.length > max) problemas.push(`${rotulo} ${verbo} ${v.length} letras e o banco aceita até ${max} ("${v}"): abrevie ${onde}`);
-      if (semBarra && v.includes("/")) problemas.push(`${rotulo} ${verbo} uma barra "/", que o banco não aceita ("${v}"): troque por espaço ou "-" ${onde}`);
+      if (v.length > max) problemas.push(`${rotulo2} ${verbo} ${v.length} letras e o banco aceita até ${max} ("${v}"): abrevie ${onde}`);
+      if (semBarra && v.includes("/")) problemas.push(`${rotulo2} ${verbo} uma barra "/", que o banco não aceita ("${v}"): troque por espaço ou "-" ${onde}`);
     }
     if (endereco2.zip_code.length !== 8) problemas.push(`O CEP tem ${endereco2.zip_code.length} números e precisa ter 8 ("${endereco2.zip_code}"): corrija ${ondeEndereco("zip_code")}`);
     if (problemas.length) throw new ErroUsuario(`O boleto de ${c.inquilino_nome} (${compBr(cb.competencia)}) não foi ao banco: ${problemas.join("; ")}. Ex.: "Avenida" → "Av.", "Professor" → "Prof.".`);
@@ -8943,8 +8943,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const porChave = /* @__PURE__ */ new Map();
     const ativos = d2.contratos.filter((c) => c.id === incluirId || c.ativo !== false && contratoAtivo(c, hoje3));
     for (const c of ativos) {
-      const doc = soDigitos(c.inquilino_cpf);
-      const chave = doc ? `d${doc}` : `n${String(c.inquilino_nome || "").trim().toLocaleLowerCase("pt-BR")}`;
+      const doc2 = soDigitos(c.inquilino_cpf);
+      const chave = doc2 ? `d${doc2}` : `n${String(c.inquilino_nome || "").trim().toLocaleLowerCase("pt-BR")}`;
       const imovel = c.imovel_id ? (buscar(d2, "imoveis", c.imovel_id) || {}).nome || "" : "";
       if (!porChave.has(chave)) porChave.set(chave, { chave, nome: c.inquilino_nome, contratos: [] });
       porChave.get(chave).contratos.push({ id: c.id, imovel });
@@ -11652,26 +11652,26 @@ ${xref}
     if (typeof location !== "undefined" && location.protocol === "file:") return null;
     const nome = blob.name || "PDF";
     const lib = await pdfJs();
-    const doc = await lib.getDocument({ data: bytes2.slice(), isEvalSupported: false }).promise;
+    const doc2 = await lib.getDocument({ data: bytes2.slice(), isEvalSupported: false }).promise;
     try {
-      const { info } = await doc.getMetadata().catch(() => ({ info: {} }));
+      const { info } = await doc2.getMetadata().catch(() => ({ info: {} }));
       if (info && (info.IsSignaturesPresent || info.IsAcroFormPresent || info.IsXFAPresent || info.IsCollectionPresent)) return null;
-      if (doc.numPages < 1 || doc.numPages > MAX_PAGINAS) return null;
+      if (doc2.numPages < 1 || doc2.numPages > MAX_PAGINAS) return null;
       const OPS = lib.OPS;
       const imagens = new Set([OPS.paintImageXObject, OPS.paintJpegXObject, OPS.paintInlineImageXObject, OPS.paintImageXObjectRepeat, OPS.paintInlineImageXObjectGroup].filter((x) => x !== void 0));
       avisarAndamento(lote ? `conferindo "${nome}"` : `Conferindo se "${nome}" é um PDF escaneado, para compactar…`);
-      for (let i = 1; i <= doc.numPages; i += 1) {
-        const p2 = await doc.getPage(i);
+      for (let i = 1; i <= doc2.numPages; i += 1) {
+        const p2 = await doc2.getPage(i);
         const t = await p2.getTextContent();
         if (t.items.some((x) => x.str && x.str.trim())) return null;
         if ((await p2.getAnnotations()).length) return null;
       }
       const paginas = [];
       let total = 0;
-      for (let i = 1; i <= doc.numPages; i += 1) {
-        aoAndar(i, doc.numPages);
-        avisarAndamento(lote ? `página ${i} de ${doc.numPages} de "${nome}"` : `Compactando "${nome}" (PDF escaneado): página ${i} de ${doc.numPages}… Aguarde, não feche esta tela.`, false, (i - 1) / doc.numPages);
-        const p2 = await doc.getPage(i);
+      for (let i = 1; i <= doc2.numPages; i += 1) {
+        aoAndar(i, doc2.numPages);
+        avisarAndamento(lote ? `página ${i} de ${doc2.numPages} de "${nome}"` : `Compactando "${nome}" (PDF escaneado): página ${i} de ${doc2.numPages}… Aguarde, não feche esta tela.`, false, (i - 1) / doc2.numPages);
+        const p2 = await doc2.getPage(i);
         const ops = await p2.getOperatorList({ intent: "print" });
         if (!ops.fnArray.some((f) => imagens.has(f))) return null;
         const um = p2.getViewport({ scale: 1 });
@@ -11693,7 +11693,7 @@ ${xref}
       return compensa(blob.size, novo.size) ? novo : null;
     } finally {
       avisarAndamento("", true);
-      doc.destroy();
+      doc2.destroy();
     }
   }
   async function compactarTodos(raiz, { ler: ler2, gravar: gravar2, compactar = compactarAnexo, conferido = () => false, aoAndar = () => {
@@ -12552,13 +12552,13 @@ ${naoIncluidos.join("\r\n")}\r
     const conteudo = await sutil().encrypt({ name: "AES-GCM", iv, additionalData: cabecalhoBytes }, aes, bytes2);
     const prefixo = texto(`${MAGICO}
 `);
-    const topo = new Uint8Array(prefixo.length + cabecalhoBytes.length + 1);
-    topo.set(prefixo, 0);
-    topo.set(cabecalhoBytes, prefixo.length);
-    topo[topo.length - 1] = 10;
-    const saida = new Uint8Array(topo.length + conteudo.byteLength);
-    saida.set(topo, 0);
-    saida.set(new Uint8Array(conteudo), topo.length);
+    const topo2 = new Uint8Array(prefixo.length + cabecalhoBytes.length + 1);
+    topo2.set(prefixo, 0);
+    topo2.set(cabecalhoBytes, prefixo.length);
+    topo2[topo2.length - 1] = 10;
+    const saida = new Uint8Array(topo2.length + conteudo.byteLength);
+    saida.set(topo2, 0);
+    saida.set(new Uint8Array(conteudo), topo2.length);
     return saida;
   }
   function cabecalhoDe(bytes2) {
@@ -13240,7 +13240,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       const v = valores[c.nome] ?? "";
       const id = `f_${c.nome}`;
       const rs2 = c.rotuloSe;
-      const rotulo = rs2 && String(valores[rs2.campo] ?? "") === rs2.valor ? rs2.rotulo : c.rotulo;
+      const rotulo2 = rs2 && String(valores[rs2.campo] ?? "") === rs2.valor ? rs2.rotulo : c.rotulo;
       const rotuloSe = rs2 ? ` data-rotulo-se="${esc([rs2.campo, rs2.valor, rs2.rotulo, c.rotulo].join("|"))}"` : "";
       let entrada;
       if (c.tipo === "simnao") {
@@ -13266,7 +13266,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
         if (c.sugestoes) entrada += `<datalist id="${id}_sugestoes">${c.sugestoes.map((x) => `<option value="${esc(x)}">`).join("")}</datalist>`;
       }
       return `<div class="${c.largo ? "largo" : ""} ${erros[c.nome] ? "com-erro" : ""} ${recolhido}"${grupo2} ${se}>
-      <label for="${id}"${rotuloSe}>${esc(rotulo)}${c.obrig ? " *" : ""}</label>${entrada}
+      <label for="${id}"${rotuloSe}>${esc(rotulo2)}${c.obrig ? " *" : ""}</label>${entrada}
       ${c.ajuda ? `<div class="ajuda">${esc(c.ajuda)}</div>` : ""}
       ${erros[c.nome] ? `<div class="erro-campo">${esc(erros[c.nome])}</div>` : ""}${c.preencher || c.buscarPessoa || c.autoMsg || ["imovel_id", "contrato_anterior_id"].includes(c.nome) ? '<div class="ajuda-auto" data-auto-msg></div>' : ""}</div>`;
     });
@@ -13282,7 +13282,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       init_c6_comum();
       init_calculos();
       esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-      campo = (nome, rotulo, tipo = "texto", extra = {}) => ({ nome, rotulo, tipo, ...extra });
+      campo = (nome, rotulo2, tipo = "texto", extra = {}) => ({ nome, rotulo: rotulo2, tipo, ...extra });
       secao = (titulo2) => ({ secao: titulo2 });
       QUEBRA = { quebra: true };
       DOCUMENTOS = ["cpf", "cnpj", "cpfcnpj", "cep"];
@@ -13368,7 +13368,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       LEITURA = [
         campo("data", "Data da leitura", "data", { obrig: true }),
         campo("momento", "Momento", "opcao", { obrig: true, padrao: "Entrada do inquilino", opcoes: ["Entrada do inquilino", "Saída do inquilino", "Outra"] }),
-        ...LEITURAS.map(([nome, rotulo]) => campo(nome, rotulo)),
+        ...LEITURAS.map(([nome, rotulo2]) => campo(nome, rotulo2)),
         campo("observacoes", "Observações", "area")
       ];
       GENEROS = ["Masculino", "Feminino", "Neutro – o(a)"];
@@ -13412,10 +13412,10 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
         ];
       });
       SEM_COMPROVANTE = "Ainda não tem? Salve assim mesmo: fica um alerta para buscar no banco e anexar depois";
-      comprovante = (nome, rotulo, extra = {}) => campo(nome, rotulo, "arquivo", { ajuda: `PDF ou foto do comprovante. ${SEM_COMPROVANTE}`, ...extra });
+      comprovante = (nome, rotulo2, extra = {}) => campo(nome, rotulo2, "arquivo", { ajuda: `PDF ou foto do comprovante. ${SEM_COMPROVANTE}`, ...extra });
       GARANTIAS = ["Caução", "Depósito garantia", "Fiador", "Fiador + depósito", "Seguro fiança", "Sem garantia"];
       PJ2 = quando("inquilino_tipo", "Pessoa jurídica (empresa)");
-      rotuloPJ = (rotulo) => ({ rotuloSe: { campo: "inquilino_tipo", valor: "Pessoa jurídica (empresa)", rotulo } });
+      rotuloPJ = (rotulo2) => ({ rotuloSe: { campo: "inquilino_tipo", valor: "Pessoa jurídica (empresa)", rotulo: rotulo2 } });
       CONTRATO = [
         secao("Imóvel e situação"),
         // o imóvel é escolhido só no contrato novo (obrigatório); imóvel lançado errado: "Corrigir imóvel" na página do inquilino.
@@ -13485,7 +13485,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
         campo("conta_seguro", "Seguro obrigatório", "opcao", { obrig: true, padrao: "Por conta do inquilino", opcoes: SITUACOES_CONTA, ajuda: "Por conta do inquilino: as parcelas entram no boleto" }),
         campo("fci_percentual", "FCI: fundo de conservação (% do aluguel bonificado)", "pct", { ajuda: "Em branco: não cobra. Ex.: 5 → 5% de R$ 1.800,00 = R$ 90,00 por mês no boleto, guardados para os reparos na saída" }),
         campo("fci_indice", "Correção mensal do FCI", "opcao", { opcoes: INDICES_FCI, ...quando("fci_percentual", "*"), ajuda: "Índice do Banco Central usado para corrigir o saldo do FCI mês a mês" }),
-        ...CONTAS.map(([nome, rotulo]) => campo(nome, rotulo, "opcao", { opcoes: SITUACOES_CONTA, padrao: SITUACOES_CONTA[0] })),
+        ...CONTAS.map(([nome, rotulo2]) => campo(nome, rotulo2, "opcao", { opcoes: SITUACOES_CONTA, padrao: SITUACOES_CONTA[0] })),
         campo("contas_adicionais", "Contas ou cobranças adicionais", "area", { linha: true, ajuda: "Ex.: taxa de lixo, limpeza da área comum, rateio de água" }),
         secao("Valores e boleto"),
         campo("aluguel_inicial", "Aluguel", "dinheiro", { obrig: true, positivo: true, ajuda: "Valor cheio do contrato (histórico)" }),
@@ -13585,7 +13585,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
         campo("iptu_estimado", "IPTU por mês (estimado)", "dinheiro", { ...quando("conta_iptu", "Por conta do inquilino"), ajuda: "Ex.: R$ 153,00 (as parcelas do ano ÷ 10). Só informa: o valor certo vem das guias" }),
         campo("conta_seguro", "Seguro contra incêndio", "opcao", { opcoes: SITUACOES_CONTA, padrao: SITUACOES_CONTA[0] }),
         campo("seguro_estimado", "Seguro por ano (estimado)", "dinheiro", { ...quando("conta_seguro", "Por conta do inquilino"), ajuda: "Ex.: R$ 250,00, parcelado no boleto. Só informa: o valor certo vem da apólice" }),
-        ...CONTAS.map(([nome, rotulo]) => campo(nome, rotulo, "opcao", { opcoes: SITUACOES_CONTA, padrao: SITUACOES_CONTA[0] })),
+        ...CONTAS.map(([nome, rotulo2]) => campo(nome, rotulo2, "opcao", { opcoes: SITUACOES_CONTA, padrao: SITUACOES_CONTA[0] })),
         secao("Reserva"),
         campo("reserva_valor", "Valor da reserva", "dinheiro"),
         campo("reserva_data", "Data da reserva", "data"),
@@ -13704,7 +13704,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
         campo("observacoes", "Observações", "area")
       ];
       ENCERRAMENTO = [
-        ...LEITURAS.map(([nome, rotulo]) => campo(`leitura_${nome}`, `${rotulo} na saída`)),
+        ...LEITURAS.map(([nome, rotulo2]) => campo(`leitura_${nome}`, `${rotulo2} na saída`)),
         campo("garantia_valor", "Valor da garantia a devolver (caução ou depósito)", "dinheiro"),
         campo("indice_percentual", "Correção da garantia: índice da poupança no período (%)", "pct", { autoMsg: true, ajuda: "Vem do Banco Central, pelo aniversário de cada depósito (confira com o extrato da poupança)" }),
         campo("debitos", "Débitos do inquilino a descontar", "dinheiro", { ajuda: "Aluguéis e encargos em aberto, reparos da vistoria etc." }),
@@ -16589,12 +16589,12 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     vencidas.splice(0, vencidas.length, ...feitas);
     if (vencidas.length) aviso(`Documentos apagados de ${vencidas.length} ficha(s) reprovada(s) há ${regra("meses_documentos_ficha")} meses: ${vencidas.map((f) => f.inquilino_nome).join(", ")}.`, "info");
   }
-  function ancoraDoArquivo(escopo, rotulo) {
+  function ancoraDoArquivo(escopo, rotulo2) {
     if (escopo === "seguro") return "seguros";
     if (escopo === "aditivos") return "aditivos";
     if (escopo === "assinados") return "documentos";
-    if (/reserva/i.test(rotulo)) return "reserva";
-    if (/vistoria/i.test(rotulo)) return "vistoria";
+    if (/reserva/i.test(rotulo2)) return "reserva";
+    if (/vistoria/i.test(rotulo2)) return "vistoria";
     return "garantia";
   }
   async function conferirArquivos() {
@@ -16630,17 +16630,17 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     const devolvidos = [];
     const faltando = [];
     for (const a of sumidos) {
-      const rotulo = rotulos.get(`${a.escopo}:${a.id}|${a.nome}`) || "arquivo";
+      const rotulo2 = rotulos.get(`${a.escopo}:${a.id}|${a.nome}`) || "arquivo";
       const h = achados.get(a.nome);
       if (h) {
         try {
           await escreverTexto(await pastaDoEscopo(a.escopo, Number(a.id)), a.nome, await lerConteudo(h));
-          devolvidos.push({ ...a, rotulo });
+          devolvidos.push({ ...a, rotulo: rotulo2 });
           continue;
         } catch {
         }
       }
-      faltando.push({ escopo: a.escopo, contrato_id: Number(a.id), nome: a.nome, rotulo, ancora: ancoraDoArquivo(a.escopo, rotulo) });
+      faltando.push({ escopo: a.escopo, contrato_id: Number(a.id), nome: a.nome, rotulo: rotulo2, ancora: ancoraDoArquivo(a.escopo, rotulo2) });
     }
     if (devolvidos.length) {
       await alterar((db) => devolvidos.forEach((a) => registrar(db, login(), "Alteração", "arquivos", null, `Arquivo encontrado em outra pasta e devolvido ao lugar: ${a.nome} (${a.rotulo})`, null, vinculoDoEscopo(a.escopo, a.id))));
@@ -16913,7 +16913,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
       link = (hash, texto3, cls = "botao secundario pequeno") => `<a class="${cls}" href="${hash}">${texto3}</a>`;
       etiqueta = (texto3, tipo) => `<span class="etiqueta ${tipo}">${esc(texto3)}</span>`;
       situacao = (s) => etiqueta(s, { "Paga em dia": "ok", "Paga com atraso": "aviso", "Em aberto": "neutra", Carência: "info", "Em acordo": "info", "Descontado da garantia": "info", "Paga em parte": "aviso" }[s] || "neutra");
-      item = (rotulo, valor) => `<div><div class="rotulo">${esc(rotulo)}</div><div class="valor">${valor}</div></div>`;
+      item = (rotulo2, valor) => `<div><div class="rotulo">${esc(rotulo2)}</div><div class="valor">${valor}</div></div>`;
       opera = () => podeUsuario("operador");
       SO_ADMIN_NUMERACAO = "Só o administrador desfaz a numeração das NFs (as NFs desfeitas são apagadas da lista).";
       d = () => E.d;
@@ -17079,7 +17079,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     }
     const conta = b.conta_id ? contaBanco(d(), b.conta_id) : null;
     const div = divergenciaBancaria(cb);
-    const linha = (rotulo, valor) => valor ? `<tr><td class="suave">${rotulo}</td><td class="copia-cola"><b>${esc(valor)}</b></td><td class="n">${botao("copiar", "Copiar", { texto: valor })}</td></tr>` : "";
+    const linha = (rotulo2, valor) => valor ? `<tr><td class="suave">${rotulo2}</td><td class="copia-cola"><b>${esc(valor)}</b></td><td class="n">${botao("copiar", "Copiar", { texto: valor })}</td></tr>` : "";
     const qr = imagemQrPix(cb);
     const semPix = b.situacao === "emitido" && !b.pix_copia_cola;
     return `<div class="cartao" id="banco-c6"><div class="cabecalho">${titulo2}<div>${etiquetaBanco(cb)}${semPix ? ` ${etiqueta("sem Pix", "aviso")}` : ""}</div></div>
@@ -18621,8 +18621,8 @@ ${xref}
       if (!m.classificacao || ["boleto", "ignorar", "transferencia"].includes(m.classificacao)) continue;
       const chave = semDigitos(m.descricao);
       if (chave) guardar(porDescricao, `${m.tipo}|${chave}`, m);
-      const doc = m.contrapartida ? String(m.contrapartida.documento || "").replace(/\D/g, "") : "";
-      if (doc) guardar(porDocumento, `${m.tipo}|${doc}`, m);
+      const doc2 = m.contrapartida ? String(m.contrapartida.documento || "").replace(/\D/g, "") : "";
+      if (doc2) guardar(porDocumento, `${m.tipo}|${doc2}`, m);
     }
     let boletos = null;
     let despesasLigadas = null;
@@ -18714,9 +18714,9 @@ ${xref}
     if (porPalavra && (porPalavra.imovel_id || porPalavra.classificacao !== "conta_imovel")) return comContaLancada(d2, mov2, porPalavra, indice);
     if (imv) return comContaLancada(d2, mov2, { classificacao: imv.tipo === "IPTU" ? "iptu" : "conta_imovel", imovel_id: imv.imovel.id, tipo_despesa: imv.tipo && imv.tipo !== "IPTU" ? imv.tipo : "Outra", motivo: "imóvel citado na descrição", confianca: "media" }, indice);
     const chave = semDigitos(mov2.descricao);
-    const doc = mov2.contrapartida && mov2.contrapartida.documento ? String(mov2.contrapartida.documento).replace(/\D/g, "") : "";
+    const doc2 = mov2.contrapartida && mov2.contrapartida.documento ? String(mov2.contrapartida.documento).replace(/\D/g, "") : "";
     const ind = indice || indiceDeSugestoes(d2);
-    const antiga = [...chave ? ind.porDescricao.get(`${mov2.tipo}|${chave}`) || [] : [], ...doc ? ind.porDocumento.get(`${mov2.tipo}|${doc}`) || [] : []].filter((m) => m.id !== mov2.id).sort(maisRecentePrimeiro)[0];
+    const antiga = [...chave ? ind.porDescricao.get(`${mov2.tipo}|${chave}`) || [] : [], ...doc2 ? ind.porDocumento.get(`${mov2.tipo}|${doc2}`) || [] : []].filter((m) => m.id !== mov2.id).sort(maisRecentePrimeiro)[0];
     if (antiga) {
       const de = antiga.despesa_id ? buscar(d2, "despesas", antiga.despesa_id) : null;
       return comContaLancada(d2, mov2, {
@@ -19081,8 +19081,8 @@ ${xref}
       if (situacao2 === "pago") dados.pago_em = dataDe(pago_em) || hoje2();
     } else if (erro && situacao2 === "erro") dados.erro = erro;
     const i = p2.imovel_id ? buscar(d2, "imoveis", p2.imovel_id) : null;
-    const rotulo = `${i ? `${i.nome} · ` : ""}${p2.tipo_conta} ${compBr(p2.competencia)} de ${reais(p2.valor)}`;
-    atualizar(d2, "pagamentos_banco", p2.id, dados, usuario, `Pagamento ${rotulo}: ${SITUACOES_PAGAMENTO[situacao2].toLowerCase()}${dados.erro ? ` (${dados.erro})` : ""}`);
+    const rotulo2 = `${i ? `${i.nome} · ` : ""}${p2.tipo_conta} ${compBr(p2.competencia)} de ${reais(p2.valor)}`;
+    atualizar(d2, "pagamentos_banco", p2.id, dados, usuario, `Pagamento ${rotulo2}: ${SITUACOES_PAGAMENTO[situacao2].toLowerCase()}${dados.erro ? ` (${dados.erro})` : ""}`);
     if (dados.situacao === "pago") efeitosDoPagamento(d2, p2, dados.pago_em, usuario);
     return p2;
   }
@@ -20737,10 +20737,10 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     if (dados.vigencia_inicio && dados.data_entrada && Math.abs(diasEntre(dados.vigencia_inicio, dados.data_entrada)) > 31) out.push(`O início do contrato (${dataBr(dados.vigencia_inicio)}) e a entrada (${dataBr(dados.data_entrada)}) estão a mais de um mês de distância.`);
     const antigo = r ? CADASTROS.contratos.valores(r) : null;
     for (const [prefixo, quem] of pessoasDoContrato(dados)) out.push(...conferirPessoa(dados, antigo, prefixo, quem));
-    const doc = soDigitos(dados.inquilino_cpf || "");
+    const doc2 = soDigitos(dados.inquilino_cpf || "");
     for (const f of [...fiadoresMudancas.novos, ...fiadoresMudancas.alterados]) {
       out.push(...conferirPessoa(f, f.id ? buscar2("fiadores", f.id) : null, "", `do fiador ${f.nome}`));
-      if (doc && soDigitos(f.cpf || "") === doc) out.push(`O CPF do fiador ${f.nome} é o mesmo do inquilino.`);
+      if (doc2 && soDigitos(f.cpf || "") === doc2) out.push(`O CPF do fiador ${f.nome} é o mesmo do inquilino.`);
     }
     return out;
   }
@@ -20796,10 +20796,10 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
   function conferirLeitura(dados, r, q) {
     const iid = r ? r.imovel_id : Number(q.imovel);
     const antes = d().leituras.filter((x) => x.imovel_id === iid && (!r || x.id !== r.id) && x.data && x.data <= dados.data).sort((a, b) => b.data.localeCompare(a.data));
-    return [dataNoFuturo(dados.data, "A data da leitura"), ...LEITURAS.map(([k, rotulo]) => {
+    return [dataNoFuturo(dados.data, "A data da leitura"), ...LEITURAS.map(([k, rotulo2]) => {
       const novo = numeroLeitura(dados[k]);
       const ant = antes.find((x) => numeroLeitura(x[k]) !== null);
-      return novo !== null && ant && novo < numeroLeitura(ant[k]) ? `${rotulo}: ${dados[k]} é menor que a leitura de ${dataBr(ant.data)} (${ant[k]}).` : "";
+      return novo !== null && ant && novo < numeroLeitura(ant[k]) ? `${rotulo2}: ${dados[k]} é menor que a leitura de ${dataBr(ant.data)} (${ant[k]}).` : "";
     })].filter(Boolean);
   }
   function conferirRessarcimento(dados, r, q) {
@@ -20831,8 +20831,8 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       diasFuturo = () => regra("dias_futuro");
       foraDoPadrao = () => regra("fora_do_padrao") / 100;
       diasPassado = () => regra("dias_passado");
-      dataMuitoAntiga = (data2, rotulo = "A data") => data2 && data2 < somarDias(hojeIso(), -diasPassado()) ? `${rotulo} (${dataBr(data2)}) é de mais de ${diasPassado()} dias atrás. Confira o ano.` : "";
-      dataNoFuturo = (data2, rotulo = "A data") => data2 && data2 > hojeIso() ? `${rotulo} (${dataBr(data2)}) está no futuro.` : "";
+      dataMuitoAntiga = (data2, rotulo2 = "A data") => data2 && data2 < somarDias(hojeIso(), -diasPassado()) ? `${rotulo2} (${dataBr(data2)}) é de mais de ${diasPassado()} dias atrás. Confira o ano.` : "";
+      dataNoFuturo = (data2, rotulo2 = "A data") => data2 && data2 > hojeIso() ? `${rotulo2} (${dataBr(data2)}) está no futuro.` : "";
       diferencaGrande = (novo, base) => base > 0 && novo > 0 && Math.abs(novo - base) / base > foraDoPadrao();
       pctDif = (novo, base) => {
         const p2 = Math.round((novo - base) / base * 100);
@@ -21025,8 +21025,8 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       mensagemAuto(el, e && e.semResposta ? "A consulta do CNPJ ficou sem resposta, tente de novo (ou preencha à mão)." : "Não deu para consultar o CNPJ agora (sem internet?). Preencha à mão.");
     }
   }
-  function pessoasComDocumento(doc) {
-    const n = soDigitos(doc);
+  function pessoasComDocumento(doc2) {
+    const n = soDigitos(doc2);
     if (n.length < 11) return [];
     const [, tabela, id] = location.hash.split("?")[0].match(/editar\/(\w+)\/(\d+)/) || [];
     const proprio = (t, r) => tabela === t && Number(id) === r.id;
@@ -21661,7 +21661,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     const quem = pessoa(p2.inquilino_nome, documentoDe(p2));
     const assinaEmpresa = { nome: empresa, linha: [e.cnpj ? `CNPJ ${e.cnpj}` : "", "LOCADORA"].filter(Boolean).join(" · ") };
     const assinaPessoa = (papel) => ({ nome: p2.inquilino_nome, linha: [documentoDe(p2), papel].filter(Boolean).join(" · ") });
-    const nomeArq = (doc, data2) => `${doc} ${i ? i.nome : "sem imovel"} - ${p2.inquilino_nome} - ${data2 || hoje3}`;
+    const nomeArq = (doc2, data2) => `${doc2} ${i ? i.nome : "sem imovel"} - ${p2.inquilino_nome} - ${data2 || hoje3}`;
     const base = { emitente: e, cidade: i && i.cidade || e.municipio || dadoDaEmpresa(d2, alvo.contrato || { imovel_id: i ? i.id : null }, "cidade_documentos"), data: hoje3, tabela: [], depois: [] };
     if (tipo === "ficha") return fichaCadastral(d2, f, base, nomeArq);
     if (tipo === "ficha_fiador") return fichaDoFiador(d2, f, Number(alvo.fiador) || 1, i, base, nomeArq);
@@ -21967,7 +21967,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
         ficha_fiador: "Ficha cadastral do fiador"
       };
       documentoDe = (p2, campo2 = "inquilino_cpf", tipo = p2.inquilino_tipo) => p2[campo2] ? `${tipo === PJ3 ? "CNPJ" : "CPF"} ${p2[campo2]}` : "";
-      pessoa = (nome, doc) => [nome, doc].filter(Boolean).join(", ");
+      pessoa = (nome, doc2) => [nome, doc2].filter(Boolean).join(", ");
       acordoDe = (d2, c, alvo) => {
         const a = buscar(d2, "acordos", Number(alvo.acordo));
         return a && a.contrato_id === c.id ? a : null;
@@ -22885,10 +22885,10 @@ ${DICA_DOCUMENTOS}`].join("\n");
     const f = alvo.ficha || null;
     const c = alvo.contrato || null;
     const out = [];
-    const arquivo = (escopo, id, nome, rotulo) => {
-      if (nome && id) out.push({ tipo: "arquivo", escopo, id, nome, rotulo: `${rotulo} (${nome})` });
+    const arquivo = (escopo, id, nome, rotulo2) => {
+      if (nome && id) out.push({ tipo: "arquivo", escopo, id, nome, rotulo: `${rotulo2} (${nome})` });
     };
-    const doContrato = (campo2, rotulo) => arquivo("contrato", c[`${campo2}_contrato`] || c.id, c[campo2], rotulo);
+    const doContrato = (campo2, rotulo2) => arquivo("contrato", c[`${campo2}_contrato`] || c.id, c[campo2], rotulo2);
     for (const item3 of modelo.prontos || []) {
       const [tipo, qual] = item3.split(":");
       if (tipo === "assinado") {
@@ -22902,9 +22902,9 @@ ${DICA_DOCUMENTOS}`].join("\n");
           if (e) arquivo("contrato", c.id, e.termo_assinado, "termo de quitação assinado por todos");
         } else if (c) {
           const campo2 = `${qual}_em`;
-          const doc = documentoEntrada(d2, c, campo2);
+          const doc2 = documentoEntrada(d2, c, campo2);
           const nome = (DOCUMENTOS_ENTRADA.find(([k]) => k === campo2) || [])[1] || "documento";
-          if (doc && doc.arquivo) arquivo("assinados", doc.contrato.id, doc.arquivo, `${nome.toLowerCase()} assinado por todos`);
+          if (doc2 && doc2.arquivo) arquivo("assinados", doc2.contrato.id, doc2.arquivo, `${nome.toLowerCase()} assinado por todos`);
         }
         continue;
       }
@@ -23255,10 +23255,10 @@ ${e.texto}`) ? `Assunto e texto copiados: cole no e-mail.${pendente() ? ` ${pend
         }
         return inserir(db, "envios_email", dados, login(), `E-mail "${assunto}" enviado para ${para || "(sem destinatário)"}`);
       });
-      campoPergunta = ([nome, rotulo, tipo], valor) => {
-        if (tipo === "area") return `<p><label>${esc(rotulo)}</label><textarea name="p_${nome}" rows="3">${esc(valor)}</textarea></p>`;
+      campoPergunta = ([nome, rotulo2, tipo], valor) => {
+        if (tipo === "area") return `<p><label>${esc(rotulo2)}</label><textarea name="p_${nome}" rows="3">${esc(valor)}</textarea></p>`;
         const t = tipo === "data" ? "date" : tipo === "ano" ? "number" : "text";
-        return `<p><label>${esc(rotulo)}</label><input type="${t}" name="p_${nome}" value="${esc(valor)}"${tipo === "ano" ? ' min="2020" max="2100" style="width:120px"' : ""}></p>`;
+        return `<p><label>${esc(rotulo2)}</label><input type="${t}" name="p_${nome}" value="${esc(valor)}"${tipo === "ano" ? ' min="2020" max="2100" style="width:120px"' : ""}></p>`;
       };
       ACOES_EMAILS = {
         async abrirEmail({ chave, contrato, ficha, aditivo }) {
@@ -23683,7 +23683,7 @@ ${m.texto}
   }
   function caixaBoleto(cb) {
     const b = dadosBoleto(d(), cb);
-    const linha = (rotulo, valor, copia2 = valor) => `<tr><td class="suave">${rotulo}</td><td><b>${esc(valor)}</b></td><td class="n">${botao("copiar", "Copiar", { texto: copia2 })}</td></tr>`;
+    const linha = (rotulo2, valor, copia2 = valor) => `<tr><td class="suave">${rotulo2}</td><td><b>${esc(valor)}</b></td><td class="n">${botao("copiar", "Copiar", { texto: copia2 })}</td></tr>`;
     const num2 = (c) => reais(c, false);
     return `<div class="cartao boleto"><h2>Dados para emitir o boleto no banco</h2>
     <table>${linha("Pagador", `${b.pagador}${b.documento_pagador ? ` · ${b.documento_pagador}` : ""}`, b.pagador)}
@@ -24061,10 +24061,10 @@ ${m.texto}
     }
     return fins;
   }
-  function cortesDoDocumento(el, topo = el.getBoundingClientRect().top) {
+  function cortesDoDocumento(el, topo2 = el.getBoundingClientRect().top) {
     const blocos = [...el.querySelectorAll(".ct-pagina > * > tr > td > *, .ct-tabela tr, .ct-fotos figure, .ct-grupo-assina, .ct-assina, .demonstrativo, tr, p, li, h2, h3")].filter((x) => !x.matches("h1, h2, h3")).map((x) => x.getBoundingClientRect().bottom);
     const linhas2 = [...el.querySelectorAll(".ct-par")].flatMap((p2) => linhasDoParagrafo(p2).slice(1, -2));
-    return [...blocos, ...linhas2].map((y) => y - topo).sort((a, b) => a - b);
+    return [...blocos, ...linhas2].map((y) => y - topo2).sort((a, b) => a - b);
   }
   async function marcaDaguaPdf(img) {
     if (!img || !img.getAttribute("src")) return null;
@@ -24089,16 +24089,16 @@ ${m.texto}
   async function pdfDoDocumento(el, rodape = [], { margemLado = 0, alturaMaxima = 0 } = {}) {
     const { html2canvas, jsPDF } = await bibliotecasPdf();
     const caixa = el.getBoundingClientRect();
-    const topo = caixa.top;
+    const topo2 = caixa.top;
     const links = [...el.querySelectorAll(".ct-link a")].map((a) => {
       const x = a.getBoundingClientRect();
-      return { url: a.href, x: x.left - caixa.left, y: x.top - topo, w: x.width, h: x.height };
+      return { url: a.href, x: x.left - caixa.left, y: x.top - topo2, w: x.width, h: x.height };
     });
-    const cortes = cortesDoDocumento(el, topo);
+    const cortes = cortesDoDocumento(el, topo2);
     const marca2 = await marcaDaguaPdf(el.querySelector(".ct-marca"));
-    const opcoes2 = { scale: ESCALA_PDF, backgroundColor: "#ffffff", onclone: (doc) => {
-      doc.querySelectorAll(".ct-rodape, .ct-marcas").forEach((x) => x.remove());
-      doc.querySelectorAll(".contrato").forEach((x) => {
+    const opcoes2 = { scale: ESCALA_PDF, backgroundColor: "#ffffff", onclone: (doc2) => {
+      doc2.querySelectorAll(".ct-rodape, .ct-marcas").forEach((x) => x.remove());
+      doc2.querySelectorAll(".contrato").forEach((x) => {
         x.style.border = "0";
         x.style.boxShadow = "none";
       });
@@ -24107,7 +24107,7 @@ ${m.texto}
     const pxMm = el.offsetWidth / largura;
     const [margemTopo, margemPe] = [12, 24];
     const capa = el.querySelector(".ct-capa");
-    const inicio = capa ? Math.max(0, capa.getBoundingClientRect().top - topo) : 0;
+    const inicio = capa ? Math.max(0, capa.getBoundingClientRect().top - topo2) : 0;
     const topoDa = (n2) => n2 || !capa ? margemTopo : LOGO.topoCm * 10;
     const alturaFolha = (297 - margemTopo - margemPe) * pxMm;
     const total = el.offsetHeight;
@@ -24730,16 +24730,16 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     if (JSON.stringify(antes) !== JSON.stringify(depois) && noPainel) await mostrar();
   }
   function telaArquivoImpresso(q = {}) {
-    const topo = '<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Arquivo impresso</h1>';
+    const topo2 = '<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Arquivo impresso</h1>';
     conferirSoltosUmaVez().catch(() => {
     });
-    if (!ligado()) return `${topo}${DESLIGADA}`;
+    if (!ligado()) return `${topo2}${DESLIGADA}`;
     const hoje3 = hojeIso();
     const todos = q.todos === "1";
     const linhas2 = contratosDaRotina(d(), hoje3).map((c) => ({ c, s: situacaoPasta(d(), c, hoje3) })).sort((a, b) => Number(b.s.precisa) - Number(a.s.precisa) || nomeImovel(a.c).localeCompare(nomeImovel(b.c), "pt-BR"));
     const visiveis = linhas2.filter((x) => todos || x.s.precisa);
     const tipo = (s) => s.precisa ? "aviso" : s.aguardando ? "neutra" : "ok";
-    return `${topo}
+    return `${topo2}
     <p class="suave">A pasta de papel de cada inquilino: o que imprimir na entrada, quando chega documento novo importante (termo aditivo, carta de reajuste, termo de acordo, notificação) e na saída. Notas fiscais, comprovantes, boletos, documentos de renda, fotos, apólices e e-mails não vão para a pasta. Arquivo posto à mão na pasta do inquilino (ex.: uma notificação) aparece como documento novo depois que o Painel confere as pastas (a cada abertura do sistema).</p>
     <div class="acoes" style="margin-bottom:10px"><span class="suave">Mostrar:</span> ${link("#/arquivo-impresso", "Com pendência", `botao ${todos ? "secundario " : ""}pequeno`)} ${link("#/arquivo-impresso?todos=1", "Todos", `botao ${todos ? "" : "secundario "}pequeno`)}</div>
     <div class="cartao"><table class="responsiva"><tr><th>Inquilino</th><th>Imóvel</th><th>Situação</th><th></th></tr>
@@ -24778,8 +24778,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
   async function telaPastaFisica(id) {
     const c = buscar2("contratos", id);
     if (!c) return naoEncontrado("Inquilino não encontrado", "#/arquivo-impresso", "Ver o Arquivo impresso");
-    const topo = `<p class="suave"><a href="#/contrato/${c.id}">← ${esc(c.inquilino_nome)}</a> · <a href="#/arquivo-impresso">Arquivo impresso</a></p>`;
-    if (!ligado()) return `${topo}<h1>Pasta física</h1>${DESLIGADA}`;
+    const topo2 = `<p class="suave"><a href="#/contrato/${c.id}">← ${esc(c.inquilino_nome)}</a> · <a href="#/arquivo-impresso">Arquivo impresso</a></p>`;
+    if (!ligado()) return `${topo2}<h1>Pasta física</h1>${DESLIGADA}`;
     const hoje3 = hojeIso();
     const s = situacaoPasta(d(), c, hoje3, await soltosDe(c));
     const a = s.anterior;
@@ -24797,7 +24797,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const acoes = opera() ? `<div class="acoes" style="margin-top:10px">${botao("pastaImprimir", "Ver a capa e imprimir tudo", { contrato: c.id }, "botao")}
       ${botao("pastaPapel", "Já está tudo em papel", { contrato: c.id }, "secundario", 'Marcar os documentos marcados como já impressos na pasta (sem imprimir)? Os desmarcados ficam "fora da pasta".')}</div>
       <p class="suave">Marcado = vai para o papel agora. Ao confirmar, o que ficou desmarcado e ainda não estava na pasta passa a "fora da pasta" (não avisa de novo).</p>` : "";
-    return `${topo}<h1>Pasta física · ${esc(c.inquilino_nome)} <span class="suave">· ${esc(i ? `${i.nome} (${endereco(i)})` : "sem imóvel")}</span></h1>
+    return `${topo2}<h1>Pasta física · ${esc(c.inquilino_nome)} <span class="suave">· ${esc(i ? `${i.nome} (${endereco(i)})` : "sem imóvel")}</span></h1>
     <p class="suave">${esc(momento)} · contrato de ${dataBr(c.data_entrada)}${fimDoContrato(d(), c) ? ` a ${dataBr(fimDoContrato(d(), c))}` : ""}${c.garantia_tipo ? ` · garantia: ${esc(c.garantia_tipo)}` : ""}${fiadores.length ? ` · fiador: ${esc(fiadores.join(", "))}` : ""}${c.data_saida ? ` · saída em ${dataBr(c.data_saida)}, guardar até ${dataBr(guardarAte(c))}` : ""}</p>
     ${espera}
     <form id="pasta-fisica" data-sem-envio>${passo1}${passo2}
@@ -25492,7 +25492,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       init_comum();
       COR_SITUACAO = { "Em análise": "aviso", Aprovada: "ok", Reprovada: "neutra", Desistiu: "neutra" };
       nomesDosImoveis = (f) => (f.imoveis_ids || []).map((id) => (buscar2("imoveis", id) || {}).nome).filter(Boolean);
-      item2 = (rotulo, valor) => valor ? item(rotulo, valor) : "";
+      item2 = (rotulo2, valor) => valor ? item(rotulo2, valor) : "";
       sim = (v, texto3) => `${v ? "✓" : '<span class="suave">✗</span>'} ${esc(texto3)}`;
       TEXTO_SITUACAO_LINK = {
         Aguardando: "link enviado, sem resposta ainda",
@@ -26140,8 +26140,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const abrir = (escopo, id, nome, texto3) => `<a href="#" class="botao secundario pequeno" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc(nome)}" title="${esc(nome)}">📎 ${esc(texto3)}</a>`;
     const curto2 = { doc_contrato_em: "Contrato", doc_vistoria_em: "Vistoria de entrada", doc_chaves_em: "Termo das chaves" };
     const botoes = DOCUMENTOS_ENTRADA.map(([k]) => {
-      const doc = documentoEntrada(d(), c, k);
-      if (doc && doc.arquivo) return abrir("assinados", doc.contrato.id, doc.arquivo, curto2[k]);
+      const doc2 = documentoEntrada(d(), c, k);
+      if (doc2 && doc2.arquivo) return abrir("assinados", doc2.contrato.id, doc2.arquivo, curto2[k]);
       const p2 = documentoParcial(d(), c, k);
       return p2 ? abrir("assinados", c.id, p2.arquivo, `${curto2[k]} (falta assinatura)`) : "";
     }).filter(Boolean);
@@ -26172,7 +26172,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const ir2 = (ancora) => `#/contrato/${c.id}?ir=${ancora}`;
     const mini = "botao secundario mini";
     const vistoria = vistoriaDeEntrada(d(), c);
-    const doc = { contrato_assinado: "assinado", vistoria_assinada: "assinada", chaves_assinado: "assinado" };
+    const doc2 = { contrato_assinado: "assinado", vistoria_assinada: "assinada", chaves_assinado: "assinado" };
     const atalhos = {
       reserva: () => c.reserva_valor > 0 ? link(ir2("reserva"), "Anexar o comprovante", mini) : link(`#/editar/contratos/${c.id}`, "Informar a reserva", mini),
       contrato_gerado: () => link(`#/contrato-gerar/${c.id}`, "Gerar contrato", mini),
@@ -26201,7 +26201,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         if (anterior) return link(`#/contrato/${anterior.id}?ir=documentos`, `Marcar em ${esc(anterior.inquilino_nome)}`, mini);
         if (e.situacao === "andamento") return link(ir2("documentos"), "Anexar o arquivo completo", mini);
         const ver = e.chave === "vistoria_assinada" && vistoria ? `${link(`#/imprimir/vistoria?id=${vistoria.id}`, "Ver vistoria", mini)} ` : "";
-        return `${ver}${link(ir2("documentos"), `Marcar ${doc[e.chave]}`, mini)}`;
+        return `${ver}${link(ir2("documentos"), `Marcar ${doc2[e.chave]}`, mini)}`;
       }
       const atalho = e.concessionaria !== null ? conta(e) : (atalhos[e.chave] || (() => ""))();
       return `<div class="acoes" style="justify-content:flex-end">${atalho}
@@ -26231,9 +26231,9 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const hoje3 = hojeIso();
     const vistorias = vistoriasDo(d(), c.id);
     const gerar = geradoresDocumentos(c);
-    const doc = (k) => documentoEntrada(d(), c, k);
-    const herdado = (k) => doc(k) && doc(k).contrato.id !== c.id;
-    const abrir = (k) => doc(k).arquivo ? `<a href="#" data-acao="abrirArquivo" data-escopo="assinados" data-id="${doc(k).contrato.id}" data-nome="${esc(doc(k).arquivo)}">📎 ${esc(doc(k).arquivo)}</a>` : '<span class="suave">sem arquivo</span>';
+    const doc2 = (k) => documentoEntrada(d(), c, k);
+    const herdado = (k) => doc2(k) && doc2(k).contrato.id !== c.id;
+    const abrir = (k) => doc2(k).arquivo ? `<a href="#" data-acao="abrirArquivo" data-escopo="assinados" data-id="${doc2(k).contrato.id}" data-nome="${esc(doc2(k).arquivo)}">📎 ${esc(doc2(k).arquivo)}</a>` : '<span class="suave">sem arquivo</span>';
     const abrirProprio = (k) => c[campoArquivoDoc(k)] ? `<span class="nw">${abrir(k)}${xAnexo("removerArquivoDocumento", { contrato: c.id, campo: k }, `Apagar o arquivo "${c[campoArquivoDoc(k)]}"? O documento continua marcado como assinado; anexe o arquivo certo depois.`)}</span>` : opera() ? `<label class="anexar-falta" title="Anexar o arquivo assinado (PDF ou foto)">⚠ anexar arquivo<input type="file" accept="application/pdf,image/*" data-acao-arquivo="anexarArquivoDocumento" data-contrato="${c.id}" data-campo="${k}"></label>` : abrir(k);
     const original = contratoHerdado(d(), c);
     const perdido = (k) => documentoPerdido(d(), c, k);
@@ -26252,7 +26252,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         <a href="#" data-acao="abrirArquivo" data-escopo="assinados" data-id="${c.id}" data-nome="${esc(p2.arquivo)}">📎 ${esc(p2.arquivo)}</a>
         ${p2.pendente ? `<br>${etiqueta("aguardando análise do administrador", "info")}${analise(k, "parcial")}` : ""}`;
       }
-      if (doc(k)) return `${etiqueta(`${feito} em ${dataBr(doc(k).data)}`, "ok")}${herdado(k) ? `<br><span class="suave">herdado de <a href="#/contrato/${doc(k).contrato.id}?ir=documentos">${esc(doc(k).contrato.inquilino_nome)}</a></span>` : ""}`;
+      if (doc2(k)) return `${etiqueta(`${feito} em ${dataBr(doc2(k).data)}`, "ok")}${herdado(k) ? `<br><span class="suave">herdado de <a href="#/contrato/${doc2(k).contrato.id}?ir=documentos">${esc(doc2(k).contrato.inquilino_nome)}</a></span>` : ""}`;
       if (perdaAnterior(k)) {
         const { data: data2, contrato: a } = perdaAnterior(k);
         return `${etiqueta(`perdido (registrado em ${dataBr(data2)})`, "perigo")}<br><span class="suave">registrado em <a href="#/contrato/${a.id}?ir=documentos">${esc(a.inquilino_nome)}</a>${a[campoPerdidoPendente(k)] ? ", aguardando o administrador" : ""}</span>`;
@@ -26262,10 +26262,10 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     };
     const linhas2 = DOCUMENTOS_ENTRADA.map(([k, nome, feito]) => `<tr${perdido(k) && !aguardaPerda(k) || perdaAnterior(k) ? ' class="doc-perdido"' : parcial(k) ? ' class="doc-parcial"' : ""}><td><b>${esc(nome)}</b></td>
     <td>${situacaoDoc(k, feito)}</td>
-    <td class="nw">${doc(k) || perdido(k) || parcial(k) || original ? "" : gerar[k]}</td>
+    <td class="nw">${doc2(k) || perdido(k) || parcial(k) || original ? "" : gerar[k]}</td>
     <td class="n nw">${herdado(k) ? abrir(k) : c[k] ? `${abrirProprio(k)}
       ${opera() ? botao("desmarcarDocumento", "Desfazer", { contrato: c.id, campo: k }, "link-botao", `Voltar "${nome}" para pendente? O arquivo assinado também é apagado.`) : ""}` : !opera() || perdido(k) || original ? "" : formMarcarDocumento(c, k, feito, !parcial(k))}
-      ${opera() && !doc(k) && !original ? perdido(k) ? botao("desmarcarPerdido", 'Desfazer "perdido"', { contrato: c.id, campo: k }, "link-botao") : parcial(k) ? botao("desfazerParcial", 'Desfazer "falta assinatura"', { contrato: c.id, campo: k }, "link-botao", "Tirar o registro de assinatura faltante? O documento volta a pendente e o arquivo é apagado.") : botao("documentoPerdido", "Documento perdido", { contrato: c.id, campo: k }, "perigo pequeno", `Registrar "${nome}" como perdido? A linha fica em vermelho, sem alerta geral.${adm ? "" : " O administrador vai analisar."}`) : ""}</td></tr>`).join("");
+      ${opera() && !doc2(k) && !original ? perdido(k) ? botao("desmarcarPerdido", 'Desfazer "perdido"', { contrato: c.id, campo: k }, "link-botao") : parcial(k) ? botao("desfazerParcial", 'Desfazer "falta assinatura"', { contrato: c.id, campo: k }, "link-botao", "Tirar o registro de assinatura faltante? O documento volta a pendente e o arquivo é apagado.") : botao("documentoPerdido", "Documento perdido", { contrato: c.id, campo: k }, "perigo pequeno", `Registrar "${nome}" como perdido? A linha fica em vermelho, sem alerta geral.${adm ? "" : " O administrador vai analisar."}`) : ""}</td></tr>`).join("");
     return `<div class="cartao" id="documentos"><div class="cabecalho"><h2>Contrato, Vistoria, Termos e Aditivos</h2>
       ${opera() && !fimDeVinculo(d(), c) ? link(`#/vistoria/novo?contrato=${c.id}&tipo=Saída`, "Fazer vistoria de saída") : ""}</div>
     <div class="rolagem"><table>${linhas2}</table></div>
@@ -27827,7 +27827,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         tabela: "historico",
         titulo: "Histórico de alterações",
         registros: [...d2.historico || []].reverse(),
-        colunas: [["quando", "Quando"], ["usuario", "Usuário"], ["acao", "Ação"], ["tabela", "Cadastro"], ["registro_id", "Nº do registro"], ["descricao", "Descrição"]].map(([nome, rotulo]) => ({ nome, rotulo, dinheiro: false }))
+        colunas: [["quando", "Quando"], ["usuario", "Usuário"], ["acao", "Ação"], ["tabela", "Cadastro"], ["registro_id", "Nº do registro"], ["descricao", "Descrição"]].map(([nome, rotulo2]) => ({ nome, rotulo: rotulo2, dinheiro: false }))
       });
     }
     return lista3;
@@ -28178,6 +28178,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     ${podeUsuario("admin") ? `<div class="cartao"><h2>Compactar os anexos</h2><p>Fotos e PDFs escaneados são compactados sozinhos ao anexar (${link("#/regras", "Regras do sistema")} → "Compactar anexos"${regra("compactar_anexos") ? "" : ", hoje desligada"}). Ex.: foto do RG de 4 MB → cerca de 400 KB; PDF escaneado de 10 páginas com 12 MB → cerca de 1,5 MB.
       Este botão faz o mesmo com os que já estavam no sistema, trocando cada um no lugar, com o mesmo nome. O original não é guardado. PDF com assinatura digital (gov.br, ICP-Brasil, banco) e PDF com texto ficam como estão; documento mandado pelo link da ficha só entra depois de conferido (a conferência fica guardada na ficha).</p>
       ${botao("compactarAnexos", "Compactar os anexos que já estão no sistema", {}, "secundario", "Compactar agora as fotos e os PDFs escaneados já anexados? O arquivo original não é guardado (PDF assinado nunca é mexido). Pode levar alguns minutos: deixe esta tela aberta até o fim.")}<div id="progresso-compactar" aria-live="polite" class="suave"></div></div>` : ""}
+    ${podeUsuario("admin") ? `<div class="cartao"><h2>Dados de uma pessoa (LGPD)</h2><p>Pelo CPF: onde a pessoa aparece e um arquivo com tudo dela (quando ela pedir). Dez anos depois do fim do último contrato, apagar tudo dela de uma vez.</p>
+      <p>${link("#/pessoa", "Dados de uma pessoa", "botao secundario pequeno")} ${link("#/pessoas-antigas", "Pessoas com mais de 10 anos do fim do contrato", "botao secundario pequeno")}</p></div>` : ""}
     ${podeUsuario("admin") ? `<div class="cartao"><h2>Arquivos sem lançamento</h2><p>Ao excluir um lançamento (aditivo, comprovante, depósito, apólice, vistoria, documento assinado), o arquivo anexado é apagado junto.
       Os que sobraram de exclusões antigas podem ser apagados aqui: o sistema mostra a lista antes de apagar. As fichas e documentos anexados à mão em "Arquivos do inquilino" não entram.</p>
       ${botao("limparAnexosSoltos", "Procurar arquivos sem lançamento")}</div>` : ""}
@@ -28326,10 +28328,10 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const imovel = (x) => x.i ? `<a href="#/imovel/${x.i.id}">${esc(x.i.nome)}</a>` : `${etiqueta("Sem imóvel", "aviso")}${podeUsuario("admin") ? ` ${botao("excluir", "×", { tabela: "contratos", id: x.c.id }, "x-excluir")}` : ""}`;
     const situacao2 = (c) => c.data_saida && c.data_saida < hoje3 ? etiqueta(fimDeVinculo(d(), c) ? "Fim do vínculo" : "Saiu", "neutra") : c.ativo === false ? etiqueta("Inativo", "neutra") : "";
     const botaoContrato = (c, celular = false) => {
-      const doc = documentoEntrada(d(), c, "doc_contrato_em");
+      const doc2 = documentoEntrada(d(), c, "doc_contrato_em");
       const cls = celular ? "botao secundario mini so-celular" : "botao secundario pequeno";
       const texto3 = celular ? "Contrato" : "📄 Contrato";
-      return doc && doc.arquivo ? `<a href="#" class="${cls}" data-acao="abrirArquivo" data-escopo="assinados" data-id="${doc.contrato.id}" data-nome="${esc(doc.arquivo)}" title="Abrir o contrato assinado de ${esc(doc.contrato.inquilino_nome)}">${texto3}</a>` : `<span class="${cls} desligado" title="O contrato assinado de ${esc(c.inquilino_nome)} ainda não foi anexado (página do inquilino, Documentos assinados)">${texto3}</span>`;
+      return doc2 && doc2.arquivo ? `<a href="#" class="${cls}" data-acao="abrirArquivo" data-escopo="assinados" data-id="${doc2.contrato.id}" data-nome="${esc(doc2.arquivo)}" title="Abrir o contrato assinado de ${esc(doc2.contrato.inquilino_nome)}">${texto3}</a>` : `<span class="${cls} desligado" title="O contrato assinado de ${esc(c.inquilino_nome)} ainda não foi anexado (página do inquilino, Documentos assinados)">${texto3}</span>`;
     };
     const registrar3 = (c) => `<td class="centro nw so-pc">${botaoContrato(c)}</td>`;
     const comPais = (tel) => tel.length <= 11 ? `55${tel}` : tel;
@@ -29375,8 +29377,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     return r;
   }
   async function telaAcessos(q = {}) {
-    const topo = '<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Acessos</h1>';
-    if (!E.nuvem) return `${topo}<p class="suave">Só existe com os dados na nuvem.</p>`;
+    const topo2 = '<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Acessos</h1>';
+    if (!E.nuvem) return `${topo2}<p class="suave">Só existe com os dados na nuvem.</p>`;
     if (!podeUsuario("admin")) return "<h1>Acesso só para administradores</h1>";
     const filtro = { de: q.de && /^\d{4}-\d{2}-\d{2}$/.test(q.de) ? q.de : "", ate: q.ate || "", email: q.quem || "", antes: q.antes || "" };
     let r;
@@ -29384,7 +29386,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       const busca = new URLSearchParams(Object.entries(filtro).filter(([, v]) => v));
       r = await apiDados()("GET", `acessos${String(busca) ? `?${busca}` : ""}`);
     } catch (e) {
-      return `${topo}<div class="alerta erro">Não deu para ver os acessos agora: ${esc(e.message)}</div>`;
+      return `${topo2}<div class="alerta erro">Não deu para ver os acessos agora: ${esc(e.message)}</div>`;
     }
     const form = `<form class="cartao acoes" data-form="ir" data-ir="acessos"><label style="margin:0">De</label><input type="date" name="de" value="${esc(filtro.de)}" style="width:160px">
     <label style="margin:0">até</label><input type="date" name="ate" value="${esc(filtro.ate)}" style="width:160px">
@@ -29395,7 +29397,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     <td class="n">${tamanho2(a.bytes)}</td><td>${a.origem === "pc" ? "Programa do PC" : "Site"}${a.ip ? `<br><span class="suave">${esc(a.ip)}</span>` : ""}</td></tr>`).join("");
     const ultimo = (r.acessos || []).at(-1);
     const mais = r.mais && ultimo ? `<p>${link(`#/acessos?${new URLSearchParams(Object.entries({ de: filtro.de, ate: filtro.ate, quem: filtro.email, antes: String(ultimo.n) }).filter(([, v]) => v))}`, "Ver os mais antigos")}</p>` : "";
-    return `${topo}
+    return `${topo2}
     <div class="cartao"><p>O servidor da nuvem anota quem <b>baixou o banco inteiro</b>, <b>abriu, anexou ou apagou arquivos</b>, baixou <b>backups</b>, mandou <b>e-mail</b> pela conta da empresa, mexeu na <b>ficha pela internet</b> e ligou o <b>programa do PC</b>, com a data, o endereço de internet e o tamanho. Fica guardado por ${Number(r.dias) || 180} dias (<a href="#/regras">Regras do sistema</a>, "Registro de acessos").</p>
       <p class="suave">Use para conferir se alguém baixou dados demais ou tentou entrar sem poder (linhas "Recusado"). Abrir telas e listas de anexos não entra.</p></div>
     ${form}
@@ -29447,9 +29449,9 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       nomeDoRegistro = (c) => {
         if (c.tabela === "_raiz") return "Configuração geral";
         const r = (E.d[c.tabela] || []).find((x) => String(x.id) === c.reg_id);
-        const rotulo = TABELAS[c.tabela] || c.tabela;
+        const rotulo2 = TABELAS[c.tabela] || c.tabela;
         const nome = r && (r.nome || r.descricao || r.inquilino_nome || r.competencia || r.numero);
-        return `${rotulo} nº ${c.reg_id}${nome ? ` (${valorTexto2(nome)})` : ""}`;
+        return `${rotulo2} nº ${c.reg_id}${nome ? ` (${valorTexto2(nome)})` : ""}`;
       };
       quando2 = (t) => t ? dataHoraBr(t) : "";
       SEM_VALOR = /* @__PURE__ */ new Set(["senha_hash", "senha_sal", "senha_iteracoes", "sessoes"]);
@@ -29579,6 +29581,395 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     }
   });
 
+  // docs/js/pessoa.js
+  function ondeAparece(d2, cpf) {
+    const alvo = soDigitos(cpf);
+    if (!documentoValido(alvo)) return [];
+    const out = [];
+    const procurar = (v, caminho, achou) => {
+      if (Array.isArray(v)) {
+        v.forEach((x, i) => {
+          if (x && typeof x === "object") procurar(x, `${caminho}${i}.`, achou);
+        });
+        return;
+      }
+      for (const [k, x] of Object.entries(v)) {
+        if (typeof x === "string" && CAMPO_DOC.test(k) && soDigitos(x) === alvo) achou(`${caminho}${k}`);
+        else if (x && typeof x === "object") procurar(x, `${caminho}${k}.`, achou);
+      }
+    };
+    for (const t of tabelasDe(d2)) for (const r of d2[t]) if (r && typeof r === "object") procurar(r, "", (campo2) => out.push({ tabela: t, id: r.id, campo: campo2 }));
+    return out;
+  }
+  function nomeDa(d2, achados) {
+    const nomes = [];
+    for (const a of achados) {
+      const r = buscar(d2, a.tabela, a.id);
+      if (!r) continue;
+      if (DONO[a.tabela] === a.campo) return r.inquilino_nome || r.nome || "";
+      const partes = a.campo.split(".");
+      let obj = r;
+      for (const k of partes.slice(0, -1)) obj = obj?.[k];
+      const campo2 = partes.at(-1);
+      const pre = campo2.replace(/(cpf|cnpj|cpfcnpj|documento)$/, "");
+      nomes.push(obj?.[`${pre}nome`] || obj?.[campo2.replace(/^cpf_/, "nome_")] || (partes.length > 1 ? obj?.nome : "") || "");
+    }
+    return nomes.find(Boolean) || "";
+  }
+  function partesDaPessoa(d2, cpf) {
+    const achados = ondeAparece(d2, cpf);
+    const contratos = /* @__PURE__ */ new Set();
+    const fichas = /* @__PURE__ */ new Set();
+    const proprios = [];
+    const outros = [];
+    const bloqueios = [];
+    for (const a of achados) {
+      if (VINCULO_ATIVO[a.tabela]) {
+        bloqueios.push(`aparece como ${VINCULO_ATIVO[a.tabela]}`);
+        continue;
+      }
+      if (DONO[a.tabela] === a.campo) {
+        if (a.tabela === "contratos") contratos.add(a.id);
+        else if (a.tabela === "fichas") fichas.add(a.id);
+        proprios.push(a);
+      } else outros.push(a);
+    }
+    const ligados = [];
+    const dela = new Set(proprios.map((x) => `${x.tabela}:${x.id}`));
+    for (const t of tabelasDe(d2)) {
+      for (const r of d2[t]) {
+        if (!r || dela.has(`${t}:${r.id}`)) continue;
+        if (r.contrato_id && contratos.has(Number(r.contrato_id)) || t === "envios_email" && r.ficha_id && fichas.has(Number(r.ficha_id))) ligados.push({ tabela: t, id: r.id });
+      }
+    }
+    const boletos = new Set(ligados.filter((x) => x.tabela === "cobrancas").map((x) => x.id));
+    for (const f of d2.faturas || []) if (f.origem_tipo === "cobranca" && boletos.has(Number(f.origem_id)) && !ligados.some((x) => x.tabela === "faturas" && x.id === f.id)) ligados.push({ tabela: "faturas", id: f.id });
+    const saem = new Set([...proprios, ...ligados].map((x) => `${x.tabela}:${x.id}`));
+    return { achados, contratos: [...contratos], fichas: [...fichas], proprios, ligados, outros: outros.filter((x) => !saem.has(`${x.tabela}:${x.id}`)), bloqueios, nome: nomeDa(d2, achados) };
+  }
+  function dadosDaPessoa2(d2, cpf) {
+    const p2 = partesDaPessoa(d2, cpf);
+    const registros = {};
+    const chaves = /* @__PURE__ */ new Set();
+    for (const x of [...p2.proprios, ...p2.ligados, ...p2.outros]) {
+      const k = `${x.tabela}:${x.id}`;
+      if (chaves.has(k)) continue;
+      const r = buscar(d2, x.tabela, x.id);
+      if (r) {
+        chaves.add(k);
+        (registros[x.tabela] ||= []).push(r);
+      }
+    }
+    const contratos = new Set(p2.contratos);
+    const historico = (d2.historico || []).filter((h) => chaves.has(`${h.tabela}:${Number(h.registro_id)}`) || h.contrato_id && contratos.has(Number(h.contrato_id)));
+    const fichas = new Set(p2.fichas);
+    const anexos = arquivosReferenciados(d2).filter((a) => a.escopo === "ficha" ? fichas.has(Number(a.id)) : contratos.has(Number(a.id)));
+    return { nome: p2.nome, achados: p2.achados, registros, historico, anexos, partes: p2 };
+  }
+  function vinculos2(d2, p2) {
+    const out = [];
+    const contrato = (id) => buscar(d2, "contratos", id);
+    const fimContrato = (c) => c && c.data_saida ? c.data_saida : null;
+    const nomeC = (c) => c ? `${c.inquilino_nome || "contrato"}${c.data_entrada ? ` (entrada em ${dataBr(c.data_entrada)})` : ""}` : "contrato excluído";
+    const vistos = /* @__PURE__ */ new Set();
+    const usar = (texto3, fim) => {
+      const k = `${texto3}|${fim}`;
+      if (!vistos.has(k)) {
+        vistos.add(k);
+        out.push({ texto: texto3, fim });
+      }
+    };
+    for (const id of p2.contratos) {
+      const c = contrato(id);
+      usar(`contrato de ${nomeC(c)}`, fimContrato(c));
+    }
+    for (const id of p2.fichas) {
+      const f = buscar(d2, "fichas", id);
+      const feitos = (d2.contratos || []).filter((c) => Number(c.ficha_id) === id);
+      if (feitos.length) for (const c of feitos) usar(`contrato de ${nomeC(c)}`, fimContrato(c));
+      else usar(`ficha de ${f.inquilino_nome || "interessado"} (${f.situacao || "sem situação"})`, f.decisao_data || f.data_recebida || null);
+    }
+    for (const x of [...p2.proprios.filter((y) => y.tabela === "fiadores"), ...p2.outros]) {
+      const r = buscar(d2, x.tabela, x.id);
+      if (!r) continue;
+      if (x.tabela === "contratos") {
+        usar(`contrato de ${nomeC(r)} (como ${x.campo.replace(/_?(cpf|cnpj|documento)$/, "").replace(/_/g, " ") || "parte"})`, fimContrato(r));
+        continue;
+      }
+      if (x.tabela === "fichas") {
+        usar(`ficha de ${r.inquilino_nome || "interessado"} (como fiador)`, (d2.contratos || []).find((c) => Number(c.ficha_id) === r.id)?.data_saida || r.decisao_data || r.data_recebida || null);
+        continue;
+      }
+      if (r.contrato_id) {
+        const c = contrato(r.contrato_id);
+        usar(`${x.tabela === "fiadores" ? "fiador do contrato" : `${TABELAS[x.tabela] || x.tabela} do contrato`} de ${nomeC(c)}`, fimContrato(c));
+        continue;
+      }
+      usar(`${TABELAS[x.tabela] || x.tabela} nº ${r.id}`, r.data || r.data_emissao || r.vencimento || r.decisao_data || null);
+    }
+    return out;
+  }
+  function situacaoParaApagar(d2, cpf, hoje3 = hojeIso()) {
+    const p2 = partesDaPessoa(d2, cpf);
+    if (!p2.achados.length) return { pode: false, libera_em: null, motivo: "Este CPF/CNPJ não aparece em nenhum cadastro.", vinculos: [] };
+    if (p2.bloqueios.length) return { pode: false, libera_em: null, motivo: `A pessoa ${[...new Set(p2.bloqueios)].join(" e ")}: tire de lá antes.`, vinculos: [] };
+    const v = vinculos2(d2, p2);
+    const aberto = v.find((x) => !x.fim);
+    if (aberto) return { pode: false, libera_em: null, motivo: `Ainda vale (ou está sem data de fim): ${aberto.texto}.`, vinculos: v };
+    const ultimo = v.map((x) => x.fim).sort().at(-1);
+    const libera = somarMesesData(ultimo, ANOS_GUARDA * 12);
+    return libera <= hoje3 ? { pode: true, libera_em: libera, motivo: "", vinculos: v } : { pode: false, libera_em: libera, motivo: `A lei manda guardar ${ANOS_GUARDA} anos depois do fim do último vínculo (${dataBr(ultimo)}): só pode apagar a partir de ${dataBr(libera)}.`, vinculos: v };
+  }
+  function pessoasParaApagar(d2, hoje3 = hojeIso()) {
+    const docs = /* @__PURE__ */ new Map();
+    for (const [t, campo2] of Object.entries(DONO)) for (const r of d2[t] || []) {
+      const n = soDigitos(r[campo2]);
+      if (documentoValido(n) && !docs.has(n)) docs.set(n, r[campo2]);
+    }
+    const out = [];
+    for (const [n, cpf] of docs) {
+      const s = situacaoParaApagar(d2, n, hoje3);
+      if (s.pode) out.push({ cpf, nome: partesDaPessoa(d2, n).nome, libera_em: s.libera_em, vinculos: s.vinculos });
+    }
+    return out.sort((a, b) => a.libera_em.localeCompare(b.libera_em) || String(a.nome).localeCompare(String(b.nome), "pt-BR"));
+  }
+  function camposDoPapel(r, campo2) {
+    const m = /^(.*_)?(cpf|cnpj|cpfcnpj|documento)(_.*)?$/.exec(campo2);
+    const pre = m && m[1];
+    const suf = m && m[3];
+    return Object.keys(r).filter((k) => k === campo2 || pre && k.startsWith(pre) || suf && k.endsWith(suf));
+  }
+  function apagarPessoa(d2, cpf, usuario, hoje3 = hojeIso()) {
+    const s = situacaoParaApagar(d2, cpf, hoje3);
+    if (!s.pode) throw new ErroUsuario(s.motivo || "Esta pessoa ainda não pode ser apagada.");
+    const p2 = partesDaPessoa(d2, cpf);
+    const antes = { contratos: p2.contratos.map((id) => ({ ...buscar(d2, "contratos", id) })), fichas: p2.fichas.map((id) => ({ ...buscar(d2, "fichas", id) })) };
+    const saem = [...p2.proprios, ...p2.ligados].map((x) => ({ tabela: x.tabela, id: x.id }));
+    const chave = new Set(saem.map((x) => `${x.tabela}:${x.id}`));
+    const limpos = [];
+    const camposLimpos = /* @__PURE__ */ new Map();
+    for (const x of p2.outros) {
+      const r = buscar(d2, x.tabela, x.id);
+      if (!r) continue;
+      const partes = x.campo.split(".");
+      if (partes.length > 1) {
+        let lista3 = r;
+        for (const k of partes.slice(0, -2)) lista3 = lista3?.[k];
+        const i = Number(partes.at(-2));
+        if (Array.isArray(lista3) && Number.isInteger(i)) lista3[i] = SAI;
+        const set = camposLimpos.get(`${x.tabela}:${x.id}`) || /* @__PURE__ */ new Set();
+        set.add(partes[0]);
+        camposLimpos.set(`${x.tabela}:${x.id}`, set);
+      } else {
+        const campos = camposDoPapel(r, x.campo);
+        for (const k of campos) r[k] = null;
+        const set = camposLimpos.get(`${x.tabela}:${x.id}`) || /* @__PURE__ */ new Set();
+        campos.forEach((k) => set.add(k));
+        camposLimpos.set(`${x.tabela}:${x.id}`, set);
+      }
+      if (!limpos.some((y) => y.tabela === x.tabela && y.id === x.id)) limpos.push({ tabela: x.tabela, id: x.id });
+    }
+    const tirarMarcas = (v) => {
+      if (Array.isArray(v)) {
+        for (let i = v.length - 1; i >= 0; i -= 1) if (v[i] === SAI) v.splice(i, 1);
+        else tirarMarcas(v[i]);
+      } else if (v && typeof v === "object") Object.values(v).forEach(tirarMarcas);
+    };
+    for (const x of limpos) tirarMarcas(buscar(d2, x.tabela, x.id));
+    for (const t of new Set(saem.map((x) => x.tabela))) d2[t] = d2[t].filter((r) => !chave.has(`${t}:${r.id}`));
+    const contratos = new Set(p2.contratos);
+    d2.historico = (d2.historico || []).map((h) => {
+      if (chave.has(`${h.tabela}:${Number(h.registro_id)}`) || h.contrato_id && contratos.has(Number(h.contrato_id))) {
+        return { quando: h.quando, usuario: null, acao: "Apagado (LGPD)", tabela: null, registro_id: null, descricao: "(dados de uma pessoa apagados)", detalhes: null, imovel_id: null, contrato_id: null };
+      }
+      const set = camposLimpos.get(`${h.tabela}:${Number(h.registro_id)}`);
+      if (!set || !h.detalhes || typeof h.detalhes !== "object") return h;
+      return { ...h, detalhes: Object.fromEntries(Object.entries(h.detalhes).filter(([k]) => !set.has(k))) };
+    });
+    registrar(
+      d2,
+      usuario,
+      ACAO_APAGAR,
+      null,
+      null,
+      `Dados de uma pessoa apagados (${ANOS_GUARDA} anos depois do fim do último vínculo): ${saem.length} registro(s) excluído(s) e ${limpos.length} limpo(s). Sem nome nem CPF, como manda a LGPD.`,
+      { registros: saem, limpos, contratos: p2.contratos, fichas: p2.fichas }
+    );
+    return { saem, limpos, ...antes };
+  }
+  var ANOS_GUARDA, ACAO_APAGAR, CAMPO_DOC, DONO, VINCULO_ATIVO, SEM_TABELA, SAI, tabelasDe, documentoValido;
+  var init_pessoa = __esm({
+    "docs/js/pessoa.js"() {
+      init_c6_comum();
+      init_calculos();
+      init_regras();
+      ANOS_GUARDA = 10;
+      ACAO_APAGAR = "Apagar pessoa (LGPD)";
+      CAMPO_DOC = /(^|_)(cpf|cnpj|cpfcnpj|documento)(_|$)/;
+      DONO = { contratos: "inquilino_cpf", fichas: "inquilino_cpf", fiadores: "cpf" };
+      VINCULO_ATIVO = { emitentes: "empresa do cadastro (Empresas)", usuarios: "usuário do sistema" };
+      SEM_TABELA = /* @__PURE__ */ new Set(["arquivos", "banco", "listas"]);
+      SAI = Symbol("sai");
+      tabelasDe = (d2) => Object.keys(TABELAS).filter((t) => !SEM_TABELA.has(t) && Array.isArray(d2[t]));
+      documentoValido = (cpf) => [11, 14].includes(soDigitos(cpf).length);
+    }
+  });
+
+  // docs/js/telas/pessoa.js
+  function listaDoQueSai(x) {
+    const p2 = x.partes;
+    const itens = [];
+    const saem = [...p2.proprios, ...p2.ligados];
+    if (saem.length) itens.push(`<b>${saem.length} registro(s)</b> saem inteiros: ${esc(porTabela(saem))}`);
+    if (p2.outros.length) itens.push(`<b>${p2.outros.length} registro(s) de outras pessoas</b> ficam, mas sem os dados dela (${esc([...new Set(p2.outros.map((o) => `${rotulo(o.tabela)} nº ${o.id}: ${campoEmPalavras(o.campo)}`))].join("; "))})`);
+    if (p2.contratos.length || p2.fichas.length) itens.push(`<b>as pastas de arquivos</b> ${p2.contratos.length ? `do(s) ${p2.contratos.length} contrato(s)` : ""}${p2.contratos.length && p2.fichas.length ? " e " : ""}${p2.fichas.length ? `da(s) ${p2.fichas.length} ficha(s)` : ""}, com tudo dentro (${x.anexos.length} arquivo(s) ligados a lançamentos e o que mais estiver lá)`);
+    itens.push(`<b>${x.historico.length} linha(s) do Histórico</b> desses registros${E.nuvem ? ", também no servidor da nuvem (os outros aparelhos baixam os dados de novo sozinhos)" : ""}`);
+    return `<ul>${itens.map((i) => `<li>${i}</li>`).join("")}</ul>`;
+  }
+  function telaPessoa() {
+    if (!podeUsuario("admin")) return SO_ADMIN;
+    const form = `<form class="cartao acoes" data-form="buscarPessoa"><label style="margin:0">CPF ou CNPJ</label><input name="cpf" inputmode="numeric" autocomplete="off" value="${esc(cpfEscolhido ? doc(cpfEscolhido) : "")}" style="width:200px" required><button class="secundario">Procurar</button></form>`;
+    const explica = `<div class="cartao"><p>Pelo CPF (ou CNPJ), o sistema mostra onde a pessoa aparece: contratos, fichas, fiança, boletos, NFs, e-mails, o Histórico e os arquivos. <b>Baixar</b> junta tudo num arquivo ZIP (direito de acesso da LGPD, art. 18).</p>
+    <p class="suave">Apagar tudo só ${ANOS_GUARDA} anos depois do fim do último contrato (ou da ficha sem contrato): antes disso a lei manda guardar. Lista de quem já pode: ${link("#/pessoas-antigas", "Pessoas com mais de 10 anos do fim do contrato", "")}.</p></div>`;
+    if (!cpfEscolhido) return `${topo("Dados de uma pessoa")}${explica}${form}`;
+    const x = dadosDaPessoa2(d(), cpfEscolhido);
+    if (!x.achados.length) return `${topo("Dados de uma pessoa")}${explica}${form}<div class="alerta aviso">O ${esc(doc(cpfEscolhido))} não aparece em nenhum cadastro.</div>`;
+    const s = situacaoParaApagar(d(), cpfEscolhido);
+    const onde = x.achados.map((a) => {
+      const r = buscar(d(), a.tabela, a.id);
+      return `<li>${esc(rotulo(a.tabela))} nº ${a.id}${r && (r.inquilino_nome || r.nome) ? ` (${esc(r.inquilino_nome || r.nome)})` : ""}: ${esc(campoEmPalavras(a.campo))}</li>`;
+    }).join("");
+    const regs = Object.entries(x.registros).map(([t, l]) => `${rotulo(t)}: ${l.length}`).join(" · ");
+    const anexos = x.anexos.length ? `<ul>${x.anexos.slice(0, 30).map((a) => `<li>${esc(a.nome)}</li>`).join("")}${x.anexos.length > 30 ? `<li class="suave">e mais ${x.anexos.length - 30}</li>` : ""}</ul>` : '<p class="suave">Nenhum arquivo ligado a lançamentos.</p>';
+    const vinc = s.vinculos.length ? `<ul>${s.vinculos.map((v) => `<li>${esc(v.texto)}: ${v.fim ? `terminou em ${dataBr(v.fim)}` : "<b>ainda vale (sem data de fim)</b>"}</li>`).join("")}</ul>` : "";
+    const apagar = s.pode ? `<div class="alerta perigo"><p><b>Já passaram ${ANOS_GUARDA} anos do fim do último vínculo</b> (pode desde ${dataBr(s.libera_em)}). Ao apagar, some de vez, sem volta:</p>${listaDoQueSai(x)}
+        <p>Fica só uma linha no Histórico dizendo que os dados de uma pessoa foram apagados, sem o nome nem o CPF.</p>
+        <p>${botao("apagarPessoa", "Apagar tudo desta pessoa", {}, "perigo")}</p></div>` : `<div class="alerta aviso"><p><b>Ainda não pode apagar.</b> ${esc(s.motivo)}</p>${s.libera_em ? `<p>O botão aparece a partir de <b>${dataBr(s.libera_em)}</b>.</p>` : ""}
+        <p class="suave">Por quê: contratos, recibos, NFs e comprovantes servem de prova numa cobrança ou numa fiscalização; o prazo geral da lei é de ${ANOS_GUARDA} anos (Código Civil, art. 205; LGPD, art. 16).</p></div>`;
+    return `${topo("Dados de uma pessoa")}${form}
+    <div class="cartao"><h2>${esc(x.nome || "Pessoa sem nome")} · ${esc(doc(cpfEscolhido))}</h2>
+      <p><b>Onde aparece</b></p><ul>${onde}</ul>
+      <p><b>Registros ligados</b>: ${esc(regs)}<br><b>Linhas do Histórico</b>: ${x.historico.length}</p>
+      <p><b>Arquivos</b> (${x.anexos.length})</p>${anexos}
+      <p>${botao("baixarDadosPessoa", "Baixar os dados desta pessoa (ZIP)", {}, "secundario")}</p></div>
+    <div class="cartao"><h2>Apagar tudo desta pessoa</h2>${vinc}${apagar}</div>`;
+  }
+  function telaPessoasAntigas() {
+    if (!podeUsuario("admin")) return SO_ADMIN;
+    const lista3 = pessoasParaApagar(d());
+    const linhas2 = lista3.map((x) => `<tr><td>${esc(x.nome || "(sem nome)")}</td><td class="nw">${esc(doc(x.cpf))}</td><td>${x.vinculos.map((v) => `${esc(v.texto)} (até ${dataBr(v.fim)})`).join("<br>")}</td>
+    <td class="nw">${dataBr(x.libera_em)}</td><td>${botao("escolherPessoa", "Ver e apagar", { cpf: x.cpf }, "secundario pequeno")}</td></tr>`).join("");
+    return `${topo("Pessoas com mais de 10 anos do fim do contrato")}
+    <div class="cartao"><p>Pessoas cujo último contrato (como inquilino, solidário ou fiador) ou ficha sem contrato terminou há mais de ${ANOS_GUARDA} anos. Ex.: contrato terminou em 31/03/2026 → aparece aqui a partir de 31/03/2036.</p>
+      <p class="suave">Nada é apagado sozinho: em cada uma, "Ver e apagar" mostra tudo o que sai e pede para digitar APAGAR. Quem ainda tem contrato valendo, ou é usuário ou representante de empresa do cadastro, não aparece. Pessoas sem CPF no cadastro também não.</p>
+      ${linhas2 ? `<div class="rolagem"><table><tr><th>Pessoa</th><th>CPF/CNPJ</th><th>Vínculos</th><th>Pode desde</th><th></th></tr>${linhas2}</table></div>` : "<p>Ninguém por enquanto. ✓</p>"}</div>`;
+  }
+  var cpfEscolhido, SO_ADMIN, topo, doc, rotulo, campoEmPalavras, porTabela, FORMULARIOS_PESSOA, ACOES_PESSOA;
+  var init_pessoa2 = __esm({
+    "docs/js/telas/pessoa.js"() {
+      init_app();
+      init_armazenamento();
+      init_calculos();
+      init_formularios();
+      init_pessoa();
+      init_regras();
+      init_comum();
+      cpfEscolhido = "";
+      SO_ADMIN = "<h1>Acesso só para administradores</h1>";
+      topo = (titulo2) => `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>${titulo2}</h1>`;
+      doc = (v) => mascarar("cpfcnpj", v);
+      rotulo = (t) => TABELAS[t] || t;
+      campoEmPalavras = (campo2) => campo2.replace(/\.\d+\./g, " → ").replace(/_/g, " ");
+      porTabela = (lista3) => {
+        const n = /* @__PURE__ */ new Map();
+        for (const x of lista3) n.set(x.tabela, (n.get(x.tabela) || 0) + 1);
+        return [...n].map(([t, q]) => `${rotulo(t)}: ${q}`).join(" · ");
+      };
+      FORMULARIOS_PESSOA = {
+        buscarPessoa(form) {
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador vê os dados de uma pessoa.");
+          const cpf = String(new FormData(form).get("cpf") || "");
+          if (!documentoValido(cpf)) throw new ErroUsuario("Digite o CPF (11 números) ou o CNPJ (14 números).");
+          cpfEscolhido = cpf.replace(/\D/g, "");
+          return mostrar();
+        }
+      };
+      ACOES_PESSOA = {
+        escolherPessoa({ cpf }) {
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador vê os dados de uma pessoa.");
+          cpfEscolhido = String(cpf || "").replace(/\D/g, "");
+          ir("#/pessoa");
+        },
+        /** ZIP com os registros (dados.json), o Histórico (historico.json), a lista dos arquivos (arquivos.txt) e um LEIA-ME. */
+        async baixarDadosPessoa() {
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador baixa os dados de uma pessoa.");
+          const x = dadosDaPessoa2(d(), cpfEscolhido);
+          if (!x.achados.length) throw new ErroUsuario("Este CPF/CNPJ não aparece em nenhum cadastro.");
+          const JSZip = await jsZip();
+          const zip = new JSZip();
+          const semSegredos = (r) => Object.fromEntries(Object.entries(r).filter(([k]) => !/^(senha_|sessoes$|links_ficha$)/.test(k)));
+          const registros = Object.fromEntries(Object.entries(x.registros).map(([t, l]) => [rotulo(t), l.map(semSegredos)]));
+          zip.file("dados.json", JSON.stringify({ pessoa: x.nome, documento: doc(cpfEscolhido), gerado_em: (/* @__PURE__ */ new Date()).toISOString(), gerado_por: login(), onde_aparece: x.achados, registros }, null, 1));
+          zip.file("historico.json", JSON.stringify(x.historico, null, 1));
+          zip.file("arquivos.txt", x.anexos.length ? x.anexos.map((a) => `${a.escopo}	${a.nome}`).join("\r\n") : "Nenhum arquivo ligado a lançamentos.");
+          zip.file("LEIA-ME.txt", `Dados de ${x.nome || "uma pessoa"} (${doc(cpfEscolhido)}), gerados em ${dataHoraBr((/* @__PURE__ */ new Date()).toISOString())} por ${login()}.\r
+\r
+dados.json: os cadastros em que a pessoa aparece e os ligados a eles (contrato, boletos, NFs, garantia, vistorias...).\r
+historico.json: as linhas do Histórico desses cadastros (o que foi mudado, quando e por quem).\r
+arquivos.txt: os arquivos anexados (os arquivos em si ficam no sistema; peça-os se precisar).\r
+\r
+Lei Geral de Proteção de Dados (Lei 13.709/2018), art. 18: direito de acesso aos dados.\r
+`);
+          const nome = limparNome(`dados-${(x.nome || "pessoa").normalize("NFD").replace(/[̀-ͯ]/g, "")}-${hojeIso()}.zip`);
+          baixar(await zip.generateAsync({ type: "blob", compression: "DEFLATE" }), nome);
+        },
+        /** Apagar tudo desta pessoa (só depois de 10 anos do fim do último vínculo): dupla confirmação digitando APAGAR. */
+        async apagarPessoa() {
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador apaga os dados de uma pessoa.");
+          const x = dadosDaPessoa2(d(), cpfEscolhido);
+          const s = situacaoParaApagar(d(), cpfEscolhido);
+          if (!s.pode) throw new ErroUsuario(s.motivo || "Esta pessoa ainda não pode ser apagada.");
+          if (E.nuvem && E.nuvem.pendentesQtd()) throw new ErroUsuario("Ainda há mudanças deste aparelho esperando para ir à nuvem. Espere enviar (ou conecte à internet) e tente de novo.");
+          const resp = await janela({
+            titulo: "2ª confirmação: apagar tudo desta pessoa",
+            forte: true,
+            sim: "Apagar tudo",
+            nao: "Cancelar",
+            html: `<p>Apagar de vez tudo de <b>${esc(x.nome || "esta pessoa")}</b> (${esc(doc(cpfEscolhido))})? Não tem como desfazer.</p>${listaDoQueSai(x)}
+        <p>Digite <b>APAGAR</b> para confirmar: <input name="confirmo" autocomplete="off" required></p>`
+          });
+          if (!resp) return;
+          if (String((resp.confirmo || [])[0] || "").trim().toUpperCase() !== "APAGAR") throw new ErroUsuario("Digite APAGAR para confirmar. Nada foi apagado.");
+          let feito = null;
+          await alterar((db) => {
+            feito = apagarPessoa(db, cpfEscolhido, login());
+          });
+          const falharam = [];
+          for (const c of feito.contratos) {
+            try {
+              const pai = await subpasta(await E.pasta.getDirectoryHandle(PASTA_ARQUIVOS), pastaPaiContrato(c), false);
+              await pai.removeEntry(c.pasta || nomePastaContrato(c), { recursive: true });
+            } catch (e) {
+              if (e?.name !== "NotFoundError") falharam.push(c.pasta || nomePastaContrato(c));
+            }
+          }
+          for (const f of feito.fichas) {
+            try {
+              await apagarPastaDaFicha(f.pasta || nomePastaFicha(f));
+            } catch (e) {
+              if (e?.name !== "NotFoundError") falharam.push(f.pasta || nomePastaFicha(f));
+            }
+          }
+          cpfEscolhido = "";
+          if (E.nuvem) await E.nuvem.sincronizar().catch(() => {
+          });
+          aviso(falharam.length ? `Dados apagados, mas ${falharam.length} pasta(s) não saíram agora (${falharam.join("; ")}): apague à mão em Arquivos.` : `Dados apagados: ${feito.saem.length} registro(s), as pastas de arquivos e o Histórico deles.`, falharam.length ? "aviso" : "ok");
+          ir("#/pessoas-antigas");
+        }
+      };
+    }
+  });
+
   // docs/js/telas/regras-sistema.js
   function valorRegraTexto(def, v) {
     switch (def.tipo) {
@@ -29629,8 +30020,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const des = admin2 ? "" : " disabled";
     switch (def.tipo) {
       case "opcao":
-        return def.opcoes.map(([x, rotulo, explica]) => `<label class="opcao-regra"><input type="radio" name="${nome}" value="${esc(x)}"${x === v ? " checked" : ""}${des}>
-      <span><b>${esc(rotulo)}</b>${explica ? `<br><span class="suave">${esc(explica)}</span>` : ""}</span></label>`).join("");
+        return def.opcoes.map(([x, rotulo2, explica]) => `<label class="opcao-regra"><input type="radio" name="${nome}" value="${esc(x)}"${x === v ? " checked" : ""}${des}>
+      <span><b>${esc(rotulo2)}</b>${explica ? `<br><span class="suave">${esc(explica)}</span>` : ""}</span></label>`).join("");
       case "simnao":
         return `<select name="${nome}"${des}><option value="sim"${v ? " selected" : ""}>Sim</option><option value="nao"${v ? "" : " selected"}>Não</option></select>`;
       case "pct":
@@ -29968,7 +30359,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     caixa.addEventListener("change", () => setTimeout(contar, 0));
   }
   function itemAtual(chave) {
-    if (!admin()) throw new ErroUsuario(SO_ADMIN);
+    if (!admin()) throw new ErroUsuario(SO_ADMIN2);
     const item3 = itemDaFila(d(), String(chave));
     if (!item3) throw new ErroUsuario("Este e-mail saiu da lista (boleto pago, em acordo, já decidido ou a etapa passou). Atualize a tela.");
     return item3;
@@ -30014,7 +30405,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       return false;
     }
   }
-  var admin, SO_ADMIN, LIMITE_ENDERECO2, nomeDo, referente, decidir, ACOES_REGUA;
+  var admin, SO_ADMIN2, LIMITE_ENDERECO2, nomeDo, referente, decidir, ACOES_REGUA;
   var init_regua = __esm({
     "docs/js/telas/regua.js"() {
       init_app();
@@ -30029,7 +30420,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       init_regras();
       init_comum();
       admin = () => podeUsuario("admin");
-      SO_ADMIN = "Só o administrador autoriza os e-mails da régua de cobrança.";
+      SO_ADMIN2 = "Só o administrador autoriza os e-mails da régua de cobrança.";
       LIMITE_ENDERECO2 = 7e3;
       nomeDo = (item3) => `${item3.imovel ? `${item3.imovel.nome} · ` : ""}${item3.contrato.inquilino_nome}`;
       referente = (cb) => ehParcelaAcordo(cb) ? `acordo ${cb.acordo_parcela || ""}`.trim() : compBr(cb.competencia);
@@ -30084,7 +30475,7 @@ ${e.texto}`) ? 'Assunto e texto copiados: cole no e-mail. Depois de mandar, use 
          * Cada um é conferido de novo na hora (boleto pago ou decidido em outra aba não sai).
          */
         async enviarReguaSelecionados() {
-          if (!admin()) throw new ErroUsuario(SO_ADMIN);
+          if (!admin()) throw new ErroUsuario(SO_ADMIN2);
           if (regra("regua_envio") !== true) throw new ErroUsuario('O envio direto da régua está desligado nas Regras do sistema: use "Abrir no Gmail".');
           if (!await emailLigado()) throw new ErroUsuario('O Gmail da empresa não está ligado nesta nuvem (ou você está sem internet): use "Abrir no Gmail".');
           const chaves = [...document.querySelectorAll("input[data-regua]:checked")].map((x) => x.dataset.regua);
@@ -30387,8 +30778,8 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
       pctTexto2 = (n) => `${n.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
       nomeImovel2 = (c) => (buscar2("imoveis", c.imovel_id) || {}).nome || "";
       inquilino = (c) => `<a href="#/contrato/${c.id}"><b>${esc(nomeImovel2(c))}</b></a><br>${esc(c.inquilino_nome || "")}`;
-      cartao = (grande, texto3, extra, href, rotulo = "Ver a lista") => `<div class="cartao"><div class="grande">${grande}</div>${texto3}${extra}
-  <div style="margin-top:6px">${link(href, rotulo)}</div></div>`;
+      cartao = (grande, texto3, extra, href, rotulo2 = "Ver a lista") => `<div class="cartao"><div class="grande">${grande}</div>${texto3}${extra}
+  <div style="margin-top:6px">${link(href, rotulo2)}</div></div>`;
       nada = (n, texto3) => `<tr><td colspan="${n}" class="suave">${texto3}</td></tr>`;
       LISTAS2 = { inadimplencia: listaInadimplencia, recebido: listaRecebido, vagos: listaVagos, vencer: listaVencer, reajustes: listaReajustes };
       _relatorioHtml = (mes, hoje3 = hojeIso()) => relatorioHtml(numerosDaGestao(d(), mes, hoje3));
@@ -30637,11 +31028,11 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
     const primeira = await janela({ titulo: `Excluir ${quem}?`, forte: true, sim: "Continuar", html: `<p>Você vai excluir <b>${esc(quem)}</b>.</p>
     ${lista3.length ? `<p>Sai junto:</p><ul>${lista3.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}<p class="suave">${esc(fica)}</p>` });
     if (!primeira) return false;
-    const rotulo = { contratos: "Excluir contrato", imoveis: "Excluir imóvel", fichas: "Excluir ficha" }[tabela];
+    const rotulo2 = { contratos: "Excluir contrato", imoveis: "Excluir imóvel", fichas: "Excluir ficha" }[tabela];
     const segunda = await janela({
       titulo: "Última confirmação",
       forte: true,
-      sim: rotulo,
+      sim: rotulo2,
       html: `<p>Para excluir <b>${esc(quem)}</b>, digite <b>APAGAR</b> no campo abaixo.</p>
       <p><input name="digitado" autocomplete="off" aria-label="Digite APAGAR para confirmar" style="max-width:220px"></p>`,
       ligar: (dlg) => dlg.querySelector("input[name=digitado]")?.focus()
@@ -31000,6 +31391,7 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
       init_banco2();
       init_regras_sistema();
       init_nuvem2();
+      init_pessoa2();
       init_fichas();
       init_emails();
       init_regua();
@@ -31278,19 +31670,19 @@ ${MODELO_COMODOS[comodo].join("\n")}
           const form = el.closest("form");
           const data2 = form.querySelector("[name=data]").value;
           const arquivo = form.querySelector("[name=arquivo]").files[0];
-          const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === campo2);
+          const doc2 = DOCUMENTOS_ENTRADA.find(([k]) => k === campo2);
           if (!data2) throw new ErroUsuario("Informe a data.");
-          if (!arquivo) throw new ErroUsuario(`Anexe o arquivo de "${doc[1]}" (mesmo sem todas as assinaturas) antes de clicar em "Falta assinatura".`);
+          if (!arquivo) throw new ErroUsuario(`Anexe o arquivo de "${doc2[1]}" (mesmo sem todas as assinaturas) antes de clicar em "Falta assinatura".`);
           const partes = partesDoContrato(d(), buscar2("contratos", contrato));
           const r = await janela({
-            titulo: `De quem falta a assinatura? (${doc[1]})`,
+            titulo: `De quem falta a assinatura? (${doc2[1]})`,
             html: `<p class="suave">Só aparecem as pessoas e empresas cadastradas neste contrato. Marque todas que faltam.</p>
         ${partes.map((p2) => `<label class="check"><input type="checkbox" name="falta" value="${esc(textoParte(p2))}"> <b>${esc(p2.nome)}</b> <span class="suave">(${esc(p2.papel)})</span></label>`).join("")}`,
             sim: "Anexar com assinatura faltante"
           });
           if (!r) return;
           if (!r.falta || !r.falta.length) throw new ErroUsuario("Marque de quem falta a assinatura. Nada foi salvo.");
-          const nome = await salvarAssinado("assinados", Number(contrato), arquivo, `${doc[1]} falta assinatura ${data2}`);
+          const nome = await salvarAssinado("assinados", Number(contrato), arquivo, `${doc2[1]} falta assinatura ${data2}`);
           await alterar((db) => anexarDocumentoParcial(db, Number(contrato), campo2, { data: data2, arquivo: nome, falta: r.falta }, login(), podeUsuario("admin")));
           aviso(podeUsuario("admin") ? "Anexado. Fica o alerta até chegar o arquivo com todas as assinaturas." : "Anexado. O administrador vai analisar; fica o alerta até chegar o arquivo com todas as assinaturas.");
           await mostrar();
@@ -31414,8 +31806,8 @@ ${MODELO_COMODOS[comodo].join("\n")}
         /** "⚠ anexar arquivo" no documento já assinado sem arquivo. */
         async anexarArquivoDocumento({ contrato, campo: campo2 }, el) {
           const c = buscar2("contratos", contrato);
-          const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === campo2);
-          const nome = await salvarAssinado("assinados", c.id, el.files[0], `${doc[1]} ${doc[2]} ${c[campo2]}`);
+          const doc2 = DOCUMENTOS_ENTRADA.find(([k]) => k === campo2);
+          const nome = await salvarAssinado("assinados", c.id, el.files[0], `${doc2[1]} ${doc2[2]} ${c[campo2]}`);
           await alterar((db) => arquivoDocumento(db, c.id, campo2, nome, login()));
           aviso("Arquivo anexado.");
           await mostrar();
@@ -32877,6 +33269,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       };
       Object.assign(ACOES, ACOES_BANCO, ACOES_NUVEM, ACOES_FICHAS, ACOES_ICONE, ACOES_REGRAS, ACOES_EMAILS, ACOES_PASTA);
       Object.assign(ACOES, ACOES_REGUA);
+      Object.assign(ACOES, ACOES_PESSOA);
     }
   });
 
@@ -32964,6 +33357,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       init_banco2();
       init_emails();
       init_regras_sistema();
+      init_pessoa2();
       init_cadastros();
       init_campos();
       init_comum();
@@ -33101,10 +33495,10 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         async marcarDocumento(form) {
           const f = Object.fromEntries(new FormData(form));
           if (!f.data) throw new ErroUsuario("Informe a data.");
-          const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === f.campo);
+          const doc2 = DOCUMENTOS_ENTRADA.find(([k]) => k === f.campo);
           const arquivo = form.querySelector("[name=arquivo]").files[0];
-          if (!arquivo) throw new ErroUsuario(`Anexe o arquivo de "${doc[1]}" ${doc[2]} antes de marcar.`);
-          const nome = await salvarAssinado("assinados", Number(f.contrato), arquivo, `${doc[1]} ${doc[2]} ${f.data}`);
+          if (!arquivo) throw new ErroUsuario(`Anexe o arquivo de "${doc2[1]}" ${doc2[2]} antes de marcar.`);
+          const nome = await salvarAssinado("assinados", Number(f.contrato), arquivo, `${doc2[1]} ${doc2[2]} ${f.data}`);
           await alterar((db) => marcarDocumento(db, Number(f.contrato), f.campo, f.data, login(), nome));
           await mostrar();
         },
@@ -33623,7 +34017,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           await mostrar();
         }
       };
-      Object.assign(FORMULARIOS, FORMULARIOS_BANCO, FORMULARIOS_REGRAS, FORMULARIOS_EMAILS);
+      Object.assign(FORMULARIOS, FORMULARIOS_BANCO, FORMULARIOS_REGRAS, FORMULARIOS_EMAILS, FORMULARIOS_PESSOA);
     }
   });
 
@@ -33657,6 +34051,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       init_imovel();
       init_nuvem2();
       init_reajustes();
+      init_pessoa2();
       init_comum();
       init_regras_sistema();
       init_regua();
@@ -33677,6 +34072,8 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         "backup-seguro": () => telaBackupSeguro(),
         "backups-nuvem": () => telaBackupsNuvem(),
         acessos: (rota) => telaAcessos(rota.q),
+        pessoa: () => telaPessoa(),
+        "pessoas-antigas": () => telaPessoasAntigas(),
         _ligarDesconto(raiz) {
           ligarAjuda(raiz);
           ligarCamposAutomaticos(raiz);
@@ -34895,8 +35292,8 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           campo2.setAttribute("aria-describedby", msg.id);
         }
       }
-      const rotulo = (cx.querySelector("label")?.textContent || "").replace(/\s*\*\s*$/, "").replace(/\s+/g, " ").trim();
-      if (rotulo && !nomes.includes(rotulo)) nomes.push(rotulo);
+      const rotulo2 = (cx.querySelector("label")?.textContent || "").replace(/\s*\*\s*$/, "").replace(/\s+/g, " ").trim();
+      if (rotulo2 && !nomes.includes(rotulo2)) nomes.push(rotulo2);
     });
     const primeiro = caixas[0]?.querySelector("input:not([type=hidden]), select, textarea");
     if (primeiro) {
@@ -35215,8 +35612,8 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       document.addEventListener("click", async (ev) => {
         const menu = ev.target.closest("[data-menu]");
         if (menu) {
-          const topo = menu.closest("header.topo");
-          const aberto = topo.classList.toggle("menu-aberto");
+          const topo2 = menu.closest("header.topo");
+          const aberto = topo2.classList.toggle("menu-aberto");
           menu.setAttribute("aria-expanded", String(aberto));
           return;
         }
@@ -35226,9 +35623,9 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         if (el.dataset.ocupado) return;
         if (el.dataset.confirmar) {
           const apaga = el.classList.contains("perigo") || el.classList.contains("x-excluir");
-          const rotulo = (el.textContent || "").trim();
+          const rotulo2 = (el.textContent || "").trim();
           el.dataset.ocupado = "1";
-          const ok = await confirmar(el.dataset.confirmar, { sim: rotulo && rotulo !== "×" && rotulo.length <= 40 ? rotulo : apaga ? "Excluir" : "Confirmar", forte: apaga });
+          const ok = await confirmar(el.dataset.confirmar, { sim: rotulo2 && rotulo2 !== "×" && rotulo2.length <= 40 ? rotulo2 : apaga ? "Excluir" : "Confirmar", forte: apaga });
           delete el.dataset.ocupado;
           if (!ok) return;
         }
