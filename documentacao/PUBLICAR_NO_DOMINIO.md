@@ -45,7 +45,7 @@ O registro DNS é o que diz à internet "quando alguém digitar `erp.ankjck.com.
 1. Entre em `https://github.com` e abra o repositório **juliocpfh/erp-boletos**.
 2. Clique na aba **Settings** (Configurações), no alto da página do repositório.
 3. No menu da esquerda, em "Code and automation", clique em **Pages**.
-4. Confira a seção **Build and deployment**: deve estar "Deploy from a branch", com a branch principal e a pasta **/docs**. Não mude.
+4. Confira a seção **Build and deployment**: deve estar "Deploy from a branch", com a branch principal e a pasta **/docs** (ou, depois da Etapa 5, **GitHub Actions**). Não mude aqui: a troca é a Etapa 5.
 5. Na seção **Custom domain** (Domínio personalizado), digite `erp.ankjck.com.br` e clique em **Save**.
 6. O GitHub começa uma **verificação de DNS** (aparece "DNS check in progress"). Espere. Normalmente são alguns minutos; pode chegar a 24 horas se o DNS ainda estiver se espalhando. Atualize a página de vez em quando (F5).
 7. Quando aparecer **"DNS check successful"** (com um ✓ verde ao lado do domínio), o GitHub pede o certificado à Let's Encrypt. Isso também leva de minutos a algumas horas. Enquanto isso, a caixa **Enforce HTTPS** fica cinza (desabilitada) com um aviso de "certificate ... pending" ou parecido.
@@ -123,6 +123,39 @@ Por padrão o Cloudflare **não** guarda cópia de páginas HTML, só de arquivo
 - `https://erp.ankjck.com.br` abre com cadeado, sem erro de redirecionamento.
 - No cadeado do navegador → "A conexão é segura" → "Certificado": o emissor agora é do Cloudflare (ex.: "Google Trust Services" ou "Let's Encrypt" via Cloudflare) em vez de o do GitHub. Isso é normal.
 - Em SSL/TLS → Overview aparece **Full** ou **Full (strict)**.
+
+---
+
+## Etapa 5 — Publicar pelo GitHub Actions (mais rápido; nada muda para quem usa)
+
+Decisão do dono de 17/11/2026, só para o sistema abrir e atualizar mais rápido. Hoje o GitHub Pages publica a pasta `docs/` como está ("Deploy from a branch"). Com o GitHub Actions, o fluxo `.github/workflows/publicar-site.yml` monta, a cada mudança na `main`, uma cópia de `docs/` (`node tools/publicar-site.mjs`) e publica essa cópia:
+
+- **Lista de resumos** (`resumos.json`): o resumo (SHA-256) de cada arquivo publicado. Numa versão nova, o aplicativo (`sw.js`) só baixa o que mudou; o resto passa da cópia do aparelho. Medido num servidor que imita o GitHub Pages: versão nova com 1 arquivo mudado → 4 pedidos e 56 KB (antes: 78 pedidos e 1,9 MB). Sem a lista (publicação pela branch, como hoje), o aplicativo baixa tudo, como sempre.
+- **JS e CSS compactados** (esbuild `--minify`, um arquivo por vez, os `import` e `import()` iguais, nomes de funções mantidos): ~29% menos para baixar na 1ª visita (854 KB → 610 KB já comprimidos). O código no repositório não muda; `vendor/`, `offline/` (versão PC, CSP por hash e `window.VERSAO_OFFLINE`) e `sw.js` vão como estão.
+- **`modulepreload`** no `index.html` publicado: o navegador pede os ~64 módulos de uma vez, em vez de 18 níveis um depois do outro (1ª visita com sinal fraco). A política de segurança (CSP) do `index.html` continua a mesma.
+- **Mesma data em todos os arquivos** (a da montagem), como na publicação pela branch: o `sw.js` continua reconhecendo a versão pela data do `index.html`.
+- **Versão PC**: continua gerada como hoje (`versao-pc.yml`, que envia `docs/offline/` à `main`). Mudança que a Versão PC regenera só é publicada quando ela termina, já com o arquivo novo; mudança só no `sw.js`, `index.html`, ícones etc. é publicada na hora. Não há laço: o envio da Versão PC não dispara publicação por push e este fluxo não envia nada ao repositório.
+
+**Enquanto a fonte for "Deploy from a branch", o fluxo só monta e confere (testes e montagem) e avisa "O GitHub Pages ainda publica pela branch"; nada é publicado por ele.**
+
+### Ligar (uma vez, depois do merge, com a aprovação do dono)
+
+1. GitHub → repositório → **Settings → Pages → Build and deployment → Source**: escolha **GitHub Actions**. O domínio `erp.ankjck.com.br` e o cadeado continuam (ficam nas configurações, não no arquivo `docs/CNAME`, que pode continuar lá).
+   Pelo terminal, o mesmo: `gh api -X PUT repos/juliocpfh/erp-boletos/pages -f build_type=workflow`
+2. **Actions → Publicar o site → Run workflow** (branch `main`). Pelo terminal: `gh workflow run publicar-site.yml --ref main`
+3. Espere o fluxo ficar verde (uns 2 minutos; o passo "publicar" mostra o endereço).
+
+### Como saber se deu certo
+
+- `gh api repos/juliocpfh/erp-boletos/pages --jq .build_type` responde `workflow`.
+- No navegador, em `https://erp.ankjck.com.br/resumos.json`: aparece a lista com `"formato": 1` e os arquivos.
+- O sistema abre normalmente. Na 1ª abertura depois da troca, cada aparelho baixa tudo uma vez (os arquivos compactados são diferentes); nas versões seguintes, só o que mudou.
+- Em Dados e backup, a versão em uso é a data da publicação nova.
+
+### Voltar atrás
+
+- **Tudo** (publicar pela branch de novo, como antes): Settings → Pages → Source **Deploy from a branch**, branch `main`, pasta `/docs` → Save. Pelo terminal: `gh api -X PUT repos/juliocpfh/erp-boletos/pages -f build_type=legacy -f "source[branch]=main" -f "source[path]=/docs"`. O fluxo volta a só montar e conferir. Os aparelhos baixam tudo uma vez na próxima versão (sem a lista, como hoje).
+- **Só a compactação** (se alguma tela der erro só no site publicado): Settings → Secrets and variables → Actions → aba **Variables** → **New repository variable** `PUBLICAR_SEM_COMPACTAR` = `1` → e rode o fluxo de novo (passo 2). Os arquivos vão como estão no repositório, com a lista de resumos e o `modulepreload`. Para conferir em casa: `node tools/publicar-site.mjs` monta em `_site/` (fora do Git); `--sem-compactar` monta sem compactar.
 
 ---
 

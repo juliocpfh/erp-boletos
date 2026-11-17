@@ -31,7 +31,18 @@ function mundo({ hostname = 'erp.exemplo.com.br', publicada = A, armazem = new M
   // lento: o site não responde (sinal fraco) até `site.soltar()`; os prazos do service worker vencem antes
   // caiu: caminhos que não respondem mais (a internet caiu no meio da abertura, depois da conferência)
   // arquivos: caminho → conteúdo de verdade (ex.: o index.html e os módulos de docs/), para a instalação ler os import
-  const site = { publicada, internet: true, erro: 0, noCaminho: new Map(), naOrigem: new Map(), fora: new Set(), caiu: new Set(), semInternetNoFundo: false, lento: false, soltar: () => {}, arquivos: new Map() };
+  // fixo: o conteúdo de cada arquivo não muda de uma publicação a outra (só o que estiver em `arquivos`), como no site de verdade
+  // lista: o site publica resumos.json (tools/publicar-site.mjs) com o resumo de cada arquivo conhecido
+  const site = { publicada, internet: true, erro: 0, noCaminho: new Map(), naOrigem: new Map(), fora: new Set(), caiu: new Set(), semInternetNoFundo: false, lento: false, soltar: () => {}, arquivos: new Map(), fixo: false, lista: false };
+  const conteudo = (caminho, data) => (site.arquivos.has(caminho) ? site.arquivos.get(caminho) : site.fixo ? `conteudo de ${caminho}` : `conteudo de ${caminho} @ ${data}`);
+  /** resumos.json da publicação: todo arquivo que o aparelho guardou ou que o site tem em `arquivos`, com o conteúdo de agora. */
+  const listaDeResumos = (data) => {
+    const caminhos = new Set([...site.arquivos.keys()]);
+    for (const m of armazem.values()) for (const u of m.keys()) caminhos.add(new URL(u).pathname);
+    const arquivos = {};
+    for (const c of caminhos) if (c !== '/' && c !== '/resumos.json' && !c.startsWith('/__') && !site.fora.has(c)) arquivos[c.slice(1)] = createHash('sha256').update(conteudo(c, data)).digest('hex');
+    return JSON.stringify({ formato: 1, arquivos });
+  };
   const chave = (k) => (k instanceof Request ? k.url : new URL(k, `${origem}/`).href);
   const cacheFalso = (nome) => {
     if (!armazem.has(nome)) armazem.set(nome, new Map());
@@ -65,13 +76,14 @@ function mundo({ hostname = 'erp.exemplo.com.br', publicada = A, armazem = new M
     const data = site.noCaminho.get(url.pathname + url.search) || site.naOrigem.get(url.pathname) || site.publicada;
     const r = site.erro ? new Response('Bad gateway', { status: site.erro })
       : site.fora.has(url.pathname) ? new Response('Not found', { status: 404 })
-        : new Response(site.arquivos.has(url.pathname) ? site.arquivos.get(url.pathname) : `conteudo de ${url.pathname} @ ${data}`, { status: 200, headers: { 'last-modified': data } });
+        : url.pathname === '/resumos.json' && !site.lista && !site.arquivos.has(url.pathname) ? new Response('Not found', { status: 404 }) // publicação pela branch: sem a lista
+          : new Response(url.pathname === '/resumos.json' && !site.arquivos.has(url.pathname) ? listaDeResumos(data) : conteudo(url.pathname, data), { status: 200, headers: { 'last-modified': data } });
     Object.defineProperty(r, 'type', { value: 'basic' });
     Object.defineProperty(r, 'url', { value: url.href });
     return r;
   };
   // o segundo plano espera ESPERA_SEGUNDO_PLANO; aqui, o próximo instante (depois dos pedidos da abertura)
-  const ctx = { self, caches, fetch, Request, Response, URL, console, setTimeout: (fn) => setTimeout(fn, 0), clearTimeout };
+  const ctx = { self, caches, fetch, Request, Response, Headers, URL, crypto: globalThis.crypto, console, setTimeout: (fn) => setTimeout(fn, 0), clearTimeout };
   vm.runInNewContext(codigo, ctx, { filename: 'sw.js' });
   /** Simula um pedido da página: devolve o texto da resposta. */
   const pedir = async (caminho, modo = 'no-cors') => {
@@ -455,6 +467,84 @@ test('página velha de um cache no caminho, mais velha que a versão guardada: a
   const emUso = m.armazem.get('imoveis-telas-v3');
   assert.equal(await emUso.get('https://erp.exemplo.com.br/__versao-publicada').clone().text(), B);
   assert.match(await (await emUso.get('https://erp.exemplo.com.br/')).clone().text(), /@ Sun, 08/);
+});
+
+// Lista de resumos (resumos.json, tools/publicar-site.mjs): na versão nova, só os arquivos de conteúdo diferente vão ao site
+const NAO_PAGINA = (p) => !p.startsWith('GET / ');
+const marcaDe = async (m, nome = 'imoveis-telas-v3') => m.armazem.get(nome)?.get('https://erp.exemplo.com.br/__versao-publicada')?.clone().text();
+
+test('lista de resumos publicada: versão nova com 1 arquivo mudado baixa só ele; o resto passa da cópia; sem internet abre a nova', async () => {
+  const m = mundo();
+  m.site.fixo = true; m.site.lista = true;
+  await m.abrir(); // versão A guardada (com ADIADOS, EXTRAS e bibliotecas em segundo plano)
+  const guardadosA = m.guardados().length;
+  assert.ok(guardadosA > 15, 'a cópia tem a página, os módulos, ADIADOS e EXTRAS');
+  m.site.publicada = B; m.site.arquivos.set('/js/regras.js', 'regras da versão B');
+  m.pedidos.length = 0;
+  const textos = await m.abrir();
+  assert.deepEqual(m.pedidos.filter(NAO_PAGINA), [`GET /resumos.json?v=${encodeURIComponent(B).replace(/%20/g, '+')} (reload)`, 'GET /js/regras.js (no-cache)'],
+    'foram ao site só a lista e o arquivo que mudou');
+  assert.equal(textos[1], 'regras da versão B');
+  assert.equal(textos[0], 'conteudo de /js/app.js', 'o que não mudou veio da cópia');
+  assert.equal(await marcaDe(m), B, 'a versão nova já está em uso');
+  assert.ok(!m.armazem.has('imoveis-telas-nova'), 'sem sobra da cópia à parte');
+  assert.equal(m.guardados().length, guardadosA, 'nada saiu da cópia');
+  // a cópia em uso é a da versão B: a abertura seguinte não vai ao site, e sem internet abre a nova
+  m.pedidos.length = 0;
+  await m.abrir();
+  assert.deepEqual(m.pedidos, ['GET / (no-cache)']);
+  m.site.internet = false;
+  const semInternet = await m.abrir();
+  assert.equal(semInternet[1], 'regras da versão B');
+  assert.equal(await m.pedir('js/exportar.js'), 'conteudo de /js/exportar.js', 'as partes adiadas continuam guardadas');
+});
+
+test('lista de resumos e nada mudou (só a data): a versão nova entra em uso sem baixar nenhum arquivo', async () => {
+  const m = mundo();
+  m.site.fixo = true; m.site.lista = true;
+  await m.abrir();
+  m.site.publicada = B; m.pedidos.length = 0;
+  await m.abrir();
+  assert.deepEqual(m.pedidos.filter(NAO_PAGINA).map((p) => p.split('?')[0]), ['GET /resumos.json']);
+  assert.equal(await marcaDe(m), B);
+  // a próxima publicação também usa a cópia (os arquivos que passaram levam a data da versão em que entraram)
+  m.site.publicada = C; m.site.arquivos.set('/css/estilo.css', 'estilo da C'); m.pedidos.length = 0;
+  const textos = await m.abrir();
+  assert.deepEqual(m.pedidos.filter(NAO_PAGINA).map((p) => p.split('?')[0]), ['GET /resumos.json', 'GET /css/estilo.css (no-cache)']);
+  assert.equal(textos[2], 'estilo da C');
+});
+
+test('sem a lista (publicação pela branch, 404), com a lista de outra versão ou ilegível: baixa tudo de novo, como antes', async () => {
+  for (const caso of ['sem lista', 'lista velha', 'ilegível']) {
+    const m = mundo();
+    m.site.fixo = true; m.site.lista = caso !== 'sem lista';
+    await m.abrir();
+    m.site.publicada = B; m.pedidos.length = 0;
+    if (caso === 'lista velha') m.site.noCaminho.set(`/resumos.json?v=${encodeURIComponent(B).replace(/%20/g, '+')}`, A);
+    if (caso === 'ilegível') m.site.arquivos.set('/resumos.json', '{ isto não é a lista');
+    await m.abrir();
+    assert.ok(m.pedidos.includes('GET /js/app.js (no-cache)'), `${caso}: a página buscou o app.js no site`);
+    assert.ok(m.pedidos.some((p) => p.startsWith('GET /js/exportar.js?v=')), `${caso}: o resto voltou em segundo plano`);
+    assert.equal(await marcaDe(m), B, `${caso}: a versão nova entrou em uso`);
+  }
+});
+
+test('lista de resumos e a internet cai no meio: abre a versão anterior inteira; depois completa só com o que mudou', async () => {
+  const m = mundo();
+  m.site.fixo = true; m.site.lista = true;
+  await m.abrir();
+  m.site.publicada = B; m.site.arquivos.set('/js/regras.js', 'regras da versão B');
+  m.site.caiu.add('/js/regras.js'); // a lista chega; o arquivo que mudou não
+  await m.abrir();
+  assert.equal(await marcaDe(m), A, 'a versão A continua em uso, inteira');
+  m.site.internet = false;
+  const semInternet = await m.abrir();
+  assert.equal(semInternet[1], 'conteudo de /js/regras.js', 'sem internet: a regras.js da A, sem mistura');
+  m.site.internet = true; m.site.caiu.clear(); m.pedidos.length = 0;
+  const textos = await m.abrir();
+  assert.equal(textos[1], 'regras da versão B');
+  assert.ok(!m.pedidos.some((p) => p.includes('/js/app.js')), 'o que não mudou não foi ao site');
+  assert.equal(await marcaDe(m), B);
 });
 
 /** carregarScript de docs/js/app.js (que não roda no Node) com uma página falsa: cada <script> pedido carrega ou falha. */

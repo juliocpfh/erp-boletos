@@ -1,0 +1,94 @@
+# Publica o site (erp.ankjck.com.br, GitHub Pages) pelo GitHub Actions, para ficar mais rápido; nada muda para quem usa.
+# tools/publicar-site.mjs monta a cópia de docs/ que vai ao ar: JS/CSS compactados, modulepreload no index.html e
+# resumos.json (o resumo de cada arquivo: o sw.js baixa numa versão nova só o que mudou). O código no repositório não muda.
+#
+# Enquanto o GitHub Pages estiver em "Deploy from a branch" (main /docs), este fluxo só MONTA e confere (não publica nada):
+# a publicação continua a de sempre. Para passar a publicar por aqui: Settings → Pages → Source "GitHub Actions"
+# (ou `gh api -X PUT repos/<dono>/<repositório>/pages -f build_type=workflow`) e rodar este fluxo uma vez (Actions →
+# Publicar o site → Run workflow). Voltar atrás: o mesmo com build_type=legacy (Source "Deploy from a branch", main, /docs).
+# Compactação com problema: variável do repositório PUBLICAR_SEM_COMPACTAR = 1 (Settings → Secrets and variables →
+# Actions → Variables) e rodar de novo: vai sem compactar, mas com a lista de resumos.
+#
+# Sem laço com a Versão PC (versao-pc.yml): push que muda o que ela gera fica para quando ela terminar (workflow_run), e
+# então já sai com o docs/offline/ novo que ela enviou à main. O envio dela (feito com o GITHUB_TOKEN) não dispara push,
+# e este fluxo não envia nada ao repositório.
+name: Publicar o site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'tools/publicar-site.mjs'
+      - '.github/workflows/publicar-site.yml'
+  workflow_run:
+    workflows: ['Versão PC']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: publicar-site
+  cancel-in-progress: false
+
+jobs:
+  montar:
+    runs-on: ubuntu-latest
+    outputs:
+      publicar: ${{ steps.decidir.outputs.publicar }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main # depois da Versão PC: a main com o docs/offline/ que ela acabou de enviar
+          fetch-depth: 0
+      - name: Decidir se publica agora
+        id: decidir
+        shell: bash
+        env:
+          EVENTO: ${{ github.event_name }}
+          ANTES: ${{ github.event.before }}
+          DEPOIS: ${{ github.sha }}
+          CONCLUSAO: ${{ github.event.workflow_run.conclusion }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          publicar=true
+          if [ "$EVENTO" = "push" ] && [ -n "$ANTES" ] && ! echo "$ANTES" | grep -q '^0*$' \
+            && git diff --name-only "$ANTES" "$DEPOIS" | grep -Eq '^(docs/(js|css|vendor|modelos)/|tools/(gerar-offline|fontes-offline)\.mjs$)'; then
+            echo "A Versão PC vai rodar com esta mudança: a publicação sai quando ela terminar."
+            publicar=false
+          fi
+          if [ "$EVENTO" = "workflow_run" ] && [ "$CONCLUSAO" = "cancelled" ]; then publicar=false; fi
+          fonte="$(gh api "repos/${GITHUB_REPOSITORY}/pages" --jq .build_type 2>/dev/null || echo '?')"
+          if [ "$publicar" = "true" ] && [ "$fonte" != "workflow" ]; then
+            echo "::notice::O GitHub Pages ainda publica pela branch (build_type=${fonte}): só montei e conferi; nada foi publicado por aqui."
+            publicar=false
+          fi
+          echo "publicar=$publicar" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Testar o aplicativo e a montagem
+        run: node --test tests/sw.test.mjs tests/publicar-site.test.mjs
+      - name: Montar o site
+        run: node tools/publicar-site.mjs _site ${{ vars.PUBLICAR_SEM_COMPACTAR == '1' && '--sem-compactar' || '' }}
+      - name: Enviar o site montado
+        if: steps.decidir.outputs.publicar == 'true'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+  publicar:
+    needs: montar
+    if: needs.montar.outputs.publicar == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.publicacao.outputs.page_url }}
+    steps:
+      - id: publicacao
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
