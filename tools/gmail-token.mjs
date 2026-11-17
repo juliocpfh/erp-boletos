@@ -1,3 +1,5 @@
+// JEITO ANTIGO (desde 17/11/2026 o Gmail se liga pelo botão "Conectar o Gmail", em Dados e backup; ver documentacao/LIGAR_GMAIL.md).
+// Fica só para quem já usa o segredo GMAIL_REFRESH_TOKEN, que continua valendo enquanto ninguém conectar pelo botão.
 // Gera o GMAIL_REFRESH_TOKEN (autorização para o sistema enviar e-mails pela conta Gmail da empresa). Roda uma vez, no computador.
 // Uso: node tools/gmail-token.mjs
 //      (pede o Client ID e o Client Secret da credencial OAuth "App para computador"; ou GMAIL_CLIENT_ID e GMAIL_CLIENT_SECRET no ambiente)

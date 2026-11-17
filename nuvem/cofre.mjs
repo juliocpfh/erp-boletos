@@ -3,8 +3,9 @@
 // sem se verem = conflito: fica o valor já gravado e o outro vira proposta até o administrador escolher (DECISOES.md, 2026-11-17).
 // Também: faixas de códigos por aparelho (sem internet não repete), contador da NF (só com internet), backup diário no R2.
 // A lógica fica em `Cofre` (recebe `sql` e `transacao`) para os testes rodarem no Node com node:sqlite.
-// Crachás do programa do PC (aparelhos ligados): aparelhos.mjs, numa tabela própria.
+// Crachás do programa do PC (aparelhos ligados): aparelhos.mjs, numa tabela própria. Gmail ligado pelo botão: gmail-conta.mjs.
 import { Aparelhos, ErroAparelho } from './aparelhos.mjs';
+import { ContaGmail } from './gmail-conta.mjs';
 import { faxinaDosLinks } from './ficha-publica.mjs';
 import { faxinaDaLixeira } from './lixeira.mjs';
 import { chaveDoBackupValida, cifrarBackup, resumoDaChave } from './cifrar-backup.mjs';
@@ -1170,6 +1171,7 @@ export class CofreDO {
     this.cofre = new Cofre(ctx.storage.sql, (fn) => ctx.storage.transactionSync(fn));
     this.cofre.dono = String(env?.DONO_EMAIL || '').trim().toLowerCase();
     this.aparelhos = new Aparelhos(this.cofre);
+    this.gmail = new ContaGmail(this.cofre, ErroCofre);
     this.alarmeMarcado = false;
   }
 
@@ -1232,6 +1234,8 @@ export class CofreDO {
       }
       if (rota === '/registrar-acessos' && request.method === 'POST') return resposta(200, this.cofre.registrarAcessos(await corpo()));
       if (rota === '/aparelho/conferir' && request.method === 'POST') return resposta(200, await this.aparelhos.conferir((await corpo())?.cracha));
+      // a conta do Gmail (refresh token cifrado): só o Worker chega aqui (gmail.mjs, contaGuardada), também nos avisos da ficha
+      if (rota === '/gmail/conta' && request.method === 'GET') return resposta(200, { conta: this.gmail.conta() });
       if (!email) throw new ErroCofre(401, 'Sem login.');
       if (rota === '/aparelhos' && request.method === 'GET') r = this.aparelhos.lista(c.exigir(email, 'consulta'));
       else if (rota === '/desligar-aparelho' && request.method === 'POST') r = this.aparelhos.desligar(await corpo(), c.exigir(email, 'consulta'), email);
@@ -1251,6 +1255,10 @@ export class CofreDO {
       else if (rota === '/mudancas' && request.method === 'GET') r = c.mudancas(url.searchParams.get('desde'), c.exigir(email, 'consulta'), undefined, Number(url.searchParams.get('formato')) || 1);
       else if (rota === '/conflitos' && request.method === 'GET') r = { conflitos: c.conflitosAbertos(c.exigir(email, 'consulta')) };
       else if (rota === '/registrar-email' && request.method === 'POST') r = c.registrarEmail(await corpo(), email);
+      else if (rota === '/gmail/estado-novo' && request.method === 'POST') r = this.gmail.novoEstado(await corpo(), email);
+      else if (rota === '/gmail/estado-usar' && request.method === 'POST') r = this.gmail.usarEstado(await corpo(), email);
+      else if (rota === '/gmail/guardar' && request.method === 'POST') r = this.gmail.guardar(await corpo(), email);
+      else if (rota === '/gmail/apagar' && request.method === 'POST') r = this.gmail.apagar(email);
       else if (rota === '/chave-backup' && request.method === 'POST') r = await c.ligarChaveDoBackup(await corpo(), email);
       else if (rota === '/lote' && request.method === 'POST') r = c.aplicar(await corpo(), email);
       else if (rota === '/resolver' && request.method === 'POST') r = c.resolver(await corpo(), email);

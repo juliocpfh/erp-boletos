@@ -1,16 +1,16 @@
 // E-mails por etapa: botão "E-mail" nas etapas da ficha, da entrada e da saída (e no informe anual do IR), a janela com o
 // texto preenchido (Copiar texto · Abrir no Gmail · Enviar agora) e a tela de edição dos modelos (Dados e backup).
 // Modelos e preenchimento: modelos-email.js e email-dados.js. Envio direto: gmail.js (Worker, só na nuvem com o Gmail ligado).
-import { alterar, aviso, baixar, confirmar, ir, login, mostrar } from '../app.js';
+import { alterar, aviso, baixar, confirmar, E, ir, login, mostrar, podeUsuario } from '../app.js';
 import * as S from '../armazenamento.js';
 import * as C from '../calculos.js';
 import { dataBr } from '../calculos.js';
 import { anexosProntos, dadosDoEmail, informesPendentes } from '../email-dados.js';
 import { esc } from '../formularios.js';
-import { emailLigado, enviarEmail } from '../gmail.js';
+import { desconectarGmail, emailLigado, enderecoParaConectar, enviarEmail, situacaoGmail } from '../gmail.js';
 import { MODELOS_EMAIL, modeloEmail, montarEmail } from '../modelos-email.js';
 import * as R from '../regras.js';
-import { ACEITA_DOCUMENTOS, botao, buscar, d, link, naoEncontrado, opera, pastaDoEscopo } from './comum.js';
+import { ACEITA_DOCUMENTOS, botao, buscar, d, etiqueta, link, naoEncontrado, opera, pastaDoEscopo } from './comum.js';
 import { pdfDoRecibo } from './documentos.js';
 
 /** Endereço do Gmail para escrever: com o texto, enquanto couber no endereço (o navegador corta endereços muito longos). */
@@ -177,7 +177,75 @@ async function janelaEmail(chave, alvo) {
   dlg.showModal();
 }
 
+/** Aviso da volta do Google (#/dados?gmail=…, nuvem/worker.mjs AVISOS_VOLTA_GMAIL). */
+const VOLTA_GMAIL = {
+  ligado: ['ok', 'Gmail conectado. Faça um teste: abra o e-mail de uma etapa, ponha o seu próprio e-mail e clique em <b>Enviar agora</b>; ele aparece em "Enviados" no Gmail.'],
+  cancelado: ['aviso', 'Você cancelou na tela do Google: nada foi ligado.'],
+  recusado: ['erro', 'O pedido venceu ou foi aberto em outro navegador. Clique em <b>Conectar o Gmail</b> de novo e termine em até 10 minutos, no mesmo navegador.'],
+  'sem-permissao': ['erro', 'Faltou marcar, na tela do Google, a caixa de <b>enviar e-mail em seu nome</b>. Clique em <b>Conectar o Gmail</b> de novo e marque essa caixa.'],
+  credencial: ['erro', 'O Google não reconheceu o aplicativo: confira os segredos GMAIL_CLIENT_ID e GMAIL_CLIENT_SECRET no Cloudflare (copiados da credencial "Aplicativo da Web").'],
+  retorno: ['erro', 'O endereço de retorno cadastrado no Google Cloud está diferente. Copie o endereço abaixo e cole na credencial, em "URIs de redirecionamento autorizados".'],
+  'sem-rede': ['erro', 'Não deu para falar com o Google agora. Tente de novo daqui a pouco.'],
+  erro: ['erro', 'Não deu para ligar o Gmail. Tente de novo; se repetir, veja o passo a passo (documentacao/LIGAR_GMAIL.md).'],
+};
+
+/**
+ * Caixa "E-mail pelo Gmail" (Dados e backup, só administrador): situação, Conectar o Gmail / Desconectar e o endereço de
+ * retorno para colar no Google Cloud. `volta`: o código que o Worker manda na volta do Google (?gmail=…).
+ */
+export async function caixaGmailHtml(volta = '') {
+  if (!podeUsuario('admin')) return '';
+  const topo = '<div class="cartao"><h2>E-mail pelo Gmail</h2>';
+  if (!E.nuvem) {
+    return `${topo}<p class="suave">O envio direto (botão <b>Enviar agora</b>) só existe no sistema na nuvem (erp.ankjck.com.br), onde o administrador liga o Gmail da empresa com o botão <b>Conectar o Gmail</b>. Aqui, os e-mails saem por <b>Copiar texto</b> ou <b>Abrir no Gmail</b>.</p></div>`;
+  }
+  const s = await situacaoGmail();
+  const [tipo, texto] = VOLTA_GMAIL[volta] || [];
+  const avisoVolta = texto ? `<div class="alerta ${tipo}">${texto}</div>` : '';
+  if (!s) return `${topo}${avisoVolta}<p class="suave">Não deu para ver a situação agora (sem internet?). Recarregue a página para tentar de novo.</p></div>`;
+  let situacao;
+  if (s.origem === 'conta' && s.ligado) {
+    situacao = `<p>${etiqueta('Ligado', 'ok')} Os e-mails saem pela conta <b>${esc(s.conta || '')}</b>${s.remetente && s.remetente !== s.conta ? `, com o remetente <b>${esc(s.remetente)}</b>` : ''}${s.ligado_em ? ` <span class="suave">(conectado em ${dataBr(String(s.ligado_em).slice(0, 10))})</span>` : ''}.</p>`;
+  } else if (s.origem === 'segredo' && s.ligado) {
+    situacao = `<p>${etiqueta('Ligado', 'ok')} Pelo jeito antigo (código colado no Cloudflare), com o remetente <b>${esc(s.remetente || '')}</b>.</p>
+      <p class="suave">Para passar ao botão: clique em <b>Conectar o Gmail</b>. Depois disso o código antigo deixa de ser usado e pode ser apagado no Cloudflare (segredo GMAIL_REFRESH_TOKEN).</p>`;
+  } else if (s.origem === 'simulado') {
+    situacao = `<p>${etiqueta('Simulado', 'info')} Teste no computador: os e-mails só aparecem na janela do programa, nada vai ao Google.</p>`;
+  } else {
+    situacao = `<p>${etiqueta('Desligado', 'neutra')} Os e-mails saem por <b>Copiar texto</b> ou <b>Abrir no Gmail</b>.</p>`;
+  }
+  const ilegivel = s.ilegivel ? '<div class="alerta aviso">A autorização guardada não abre mais (o Client Secret foi trocado no Google Cloud?). Clique em <b>Conectar o Gmail</b> de novo.</div>' : '';
+  const falta = s.cliente ? '' : '<div class="alerta info">Falta um passo antes de conectar: no Cloudflare, os segredos <b>GMAIL_CLIENT_ID</b> e <b>GMAIL_CLIENT_SECRET</b> da credencial "Aplicativo da Web" do Google Cloud (passo a passo em documentacao/LIGAR_GMAIL.md).</div>';
+  const botoes = s.origem === 'simulado' ? '' : `<p>${s.cliente ? botao('conectarGmail', s.origem === 'conta' && s.ligado ? 'Trocar a conta do Gmail' : 'Conectar o Gmail', {}, 'pequeno') : ''}
+    ${s.origem === 'conta' ? botao('desconectarGmail', 'Desconectar', {}, 'perigo pequeno', 'Desconectar o Gmail? O botão "Enviar agora" some até alguém conectar de novo; a permissão também é retirada na conta do Google.') : ''}</p>`;
+  const retorno = s.retorno ? `<p><label>Endereço de retorno (cole no Google Cloud, na credencial, em "URIs de redirecionamento autorizados")</label>
+    <span class="nw"><input readonly value="${esc(s.retorno)}" data-retorno-gmail style="max-width:480px"> ${botao('copiarRetornoGmail', 'Copiar', {}, 'secundario pequeno')}</span></p>` : '';
+  return `${topo}${avisoVolta}${ilegivel}
+    <p class="suave">Com o Gmail conectado, os e-mails das etapas (boleto, NF, recibos, avisos) saem pelo botão <b>Enviar agora</b>, pela conta da empresa. Conectar é como entrar com o Google em qualquer site: <b>Conectar o Gmail → escolher a conta → Permitir</b>. O sistema só <b>envia</b>: não lê a caixa de entrada.</p>
+    ${situacao}${falta}${botoes}${retorno}</div>`;
+}
+
 export const ACOES_EMAILS = {
+  async conectarGmail() {
+    const url = await enderecoParaConectar();
+    aviso('Abrindo a tela do Google…', 'info');
+    window.location.assign(url);
+  },
+
+  async desconectarGmail() {
+    const r = await desconectarGmail();
+    aviso(r.segredo_antigo ? 'Gmail desconectado. Atenção: ainda existe o código antigo no Cloudflare (GMAIL_REFRESH_TOKEN), que continua enviando até ser apagado lá.'
+      : r.havia && !r.revogado ? 'Gmail desconectado aqui. O Google não confirmou a retirada da permissão: confira em Conta do Google → Segurança → Apps com acesso.' : 'Gmail desconectado.', r.segredo_antigo || (r.havia && !r.revogado) ? 'aviso' : 'ok');
+    if (/[?&]gmail=/.test(window.location.hash)) ir('#/dados'); else await mostrar();
+  },
+
+  async copiarRetornoGmail() {
+    const campo = document.querySelector('[data-retorno-gmail]');
+    if (!campo) return;
+    if (await copiar(campo.value)) aviso('Endereço copiado. Cole no Google Cloud, na credencial.');
+    else { campo.select(); aviso('O navegador não deixou copiar: o endereço ficou selecionado, use Ctrl+C.', 'info'); }
+  },
+
   async abrirEmail({ chave, contrato, ficha, aditivo }) {
     if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode enviar e-mails. Peça ao administrador, se precisar.');
     await janelaEmail(chave, contrato ? { contrato: Number(contrato), ...(aditivo ? { aditivo: Number(aditivo) } : {}) } : { ficha: Number(ficha) });

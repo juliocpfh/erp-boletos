@@ -5,7 +5,7 @@
 // - para a equipe: e-mail na caixa da empresa (AVISOS_EQUIPE, ou o próprio remetente do Gmail) e aviso no celular
 //   (push.mjs), quando a pessoa manda os dados, o primeiro documento, a ficha assinada ou desiste.
 // Sem o Gmail ligado, os e-mails não saem; sem as chaves VAPID, o aviso no celular não sai: o Painel continua avisando.
-import { emailValido, enviarEmail, estadoEmail } from './gmail.mjs';
+import { contaGuardada, emailValido, enviarEmail, estadoEmail } from './gmail.mjs';
 import { avisarAparelhos } from './push.mjs';
 
 const primeiro = (n) => String(n || '').trim().split(/\s+/)[0] || '';
@@ -62,19 +62,20 @@ export function textosDoAviso(registro, evento, detalhe = '') {
 export async function avisar(env, registro, evento, detalhe = '', { buscar = fetch } = {}) {
   const t = textosDoAviso(registro, evento, detalhe);
   const simular = env.SIMULAR_GMAIL === '1' && /\/\/(localhost|127\.0\.0\.1)[:/]/.test(String(env.ORIGEM || ''));
-  const gmail = estadoEmail(env, { simular });
+  const conta = simular ? null : await contaGuardada(env); // a ligada pelo botão (cofre) ou, sem ela, o segredo antigo
+  const gmail = estadoEmail(env, { simular, conta });
   const feitos = [];
   const url = `${String(env.ORIGEM || 'https://erp.ankjck.com.br').replace(/\/$/, '')}/#/ficha/${registro.ficha_id}`;
   if (t.pessoa && gmail.ligado) {
     const para = emailDaPessoa(registro);
     if (para) {
-      try { await enviarEmail(env, { para, assunto: t.pessoa.assunto, texto: t.pessoa.texto }, { buscar, simular }); feitos.push('pessoa'); } catch (e) { console.warn('aviso por e-mail à pessoa', e.message); }
+      try { await enviarEmail(env, { para, assunto: t.pessoa.assunto, texto: t.pessoa.texto }, { buscar, simular, conta }); feitos.push('pessoa'); } catch (e) { console.warn('aviso por e-mail à pessoa', e.message); }
     }
   }
   if (t.equipe) {
     const equipe = String(env.AVISOS_EQUIPE || gmail.remetente || '').split(',').map((x) => x.trim()).filter(emailValido);
     if (gmail.ligado && equipe.length) {
-      try { await enviarEmail(env, { para: equipe.join(','), assunto: `Ficha pela internet: ${t.equipe.titulo}`, texto: `${t.equipe.texto}\n\nAbrir a ficha: ${url}` }, { buscar, simular }); feitos.push('equipe'); } catch (e) { console.warn('aviso por e-mail à equipe', e.message); }
+      try { await enviarEmail(env, { para: equipe.join(','), assunto: `Ficha pela internet: ${t.equipe.titulo}`, texto: `${t.equipe.texto}\n\nAbrir a ficha: ${url}` }, { buscar, simular, conta }); feitos.push('equipe'); } catch (e) { console.warn('aviso por e-mail à equipe', e.message); }
     }
     try { if (await avisarAparelhos(env, { ...AVISO_CELULAR, url: `./#/ficha/${registro.ficha_id}`, tag: `ficha-${registro.ficha_id}` }, { buscar })) feitos.push('celular'); } catch (e) { console.warn('aviso no celular', e.message); }
   }

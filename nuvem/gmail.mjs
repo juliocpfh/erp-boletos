@@ -1,7 +1,11 @@
 // Envio de e-mail pela conta Gmail da empresa (Gmail API, escopo gmail.send), chamado pelo Worker (rotas /api/email/…).
-// Monta a mensagem (MIME) aqui mesmo, sem bibliotecas: só fetch, btoa e TextEncoder (roda no Worker e no Node 22).
-// Segredos do Worker: GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_REMETENTE, GMAIL_NOME, GMAIL_CCO (opcional).
-// Não grava nada: o registro do envio é feito pelo site. Passo a passo para ligar: documentacao/LIGAR_GMAIL.md.
+// Monta a mensagem (MIME) aqui mesmo, sem bibliotecas: só fetch, btoa, TextEncoder e WebCrypto (roda no Worker e no Node 22).
+// Ligar: botão "Conectar o Gmail" (Dados e backup), fluxo OAuth 2.0 de aplicativo da Web com PKCE. O Worker troca o código pelo
+// refresh token e o guarda CIFRADO no cofre (AES-GCM, chave tirada do GMAIL_CLIENT_SECRET por HKDF; tabela própria em
+// gmail-conta.mjs): nunca no JSON do banco nem no navegador. Segredos do Worker: GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET,
+// GMAIL_REMETENTE e GMAIL_NOME (opcionais: sem remetente, sai pela própria conta ligada), GMAIL_CCO (opcional).
+// GMAIL_REFRESH_TOKEN (jeito antigo, tools/gmail-token.mjs) continua valendo enquanto ninguém conectar pelo botão.
+// Não grava o envio: o registro é do cofre (registrar-email) e do site. Passo a passo: documentacao/LIGAR_GMAIL.md.
 
 export const MAX_DESTINATARIOS = 5;
 export const MAX_ASSUNTO = 200;
@@ -15,19 +19,175 @@ const URL_TOKEN = 'https://oauth2.googleapis.com/token';
 const URL_ENVIO = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send';
 const URL_ENVIO_GRANDE = 'https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=media';
 
-/** Erro com a mensagem para o usuário (o Worker devolve { erro } com esse status). */
+const URL_AUTORIZAR = 'https://accounts.google.com/o/oauth2/v2/auth';
+const URL_REVOGAR = 'https://oauth2.googleapis.com/revoke';
+/** Só enviar (não lê a caixa). "openid email" só para saber qual conta foi ligada (o e-mail vem na resposta do Google). */
+export const ESCOPO_ENVIO = 'https://www.googleapis.com/auth/gmail.send';
+export const ESCOPOS = ['openid', 'email', ESCOPO_ENVIO];
+/** Caminho do endereço de retorno (o "URI de redirecionamento autorizado" da credencial no Google Cloud). */
+export const CAMINHO_RETORNO = '/api/email/google/retorno';
+/** O pedido de ligação (state) vale por 10 minutos e uma vez só (gmail-conta.mjs). */
+export const VALIDADE_ESTADO = 10 * 60 * 1000;
+
+/** Erro com a mensagem para o usuário (o Worker devolve { erro } com esse status). `codigo`: o aviso na volta do Google. */
 export class ErroEmail extends Error {
-  constructor(status, mensagem) { super(mensagem); this.status = status; }
+  constructor(status, mensagem, codigo = 'erro') { super(mensagem); this.status = status; this.codigo = codigo; }
 }
 
 const texto = (v) => (v === undefined || v === null ? '' : String(v));
 const segredo = (env, k) => texto(env?.[k]).trim();
 
-/** O envio está ligado (os segredos estão no Worker)? */
-export function estadoEmail(env, { simular = false } = {}) {
-  const ligado = ['GMAIL_CLIENT_ID', 'GMAIL_CLIENT_SECRET', 'GMAIL_REFRESH_TOKEN', 'GMAIL_REMETENTE'].every((k) => segredo(env, k));
-  if (simular) return { ligado: true, remetente: segredo(env, 'GMAIL_REMETENTE') || 'administracao@exemplo.com.br', simulado: true };
-  return { ligado, remetente: ligado ? segredo(env, 'GMAIL_REMETENTE') : null };
+/** A credencial do Google (Aplicativo da Web) está nos segredos do Worker? */
+export const clienteConfigurado = (env) => !!(segredo(env, 'GMAIL_CLIENT_ID') && segredo(env, 'GMAIL_CLIENT_SECRET'));
+
+/** Endereço de retorno que o administrador cola no Google Cloud (ex.: https://erp.ankjck.com.br/api/email/google/retorno). */
+export const enderecoDeRetorno = (env, url = null) => `${texto(env?.ORIGEM || url?.origin || 'https://erp.ankjck.com.br').trim().replace(/\/+$/, '')}${CAMINHO_RETORNO}`;
+
+/**
+ * O envio está ligado? `conta`: a conta ligada pelo botão, já decifrada ({ refresh, email }, de contaGuardada); ela vale
+ * antes do segredo antigo GMAIL_REFRESH_TOKEN. Remetente: GMAIL_REMETENTE ou, sem ele, a própria conta ligada.
+ * `origem`: 'conta' (botão), 'segredo' (jeito antigo) ou null. `cliente`: GMAIL_CLIENT_ID e GMAIL_CLIENT_SECRET no Worker.
+ */
+export function estadoEmail(env, { simular = false, conta = null } = {}) {
+  if (simular) return { ligado: true, remetente: segredo(env, 'GMAIL_REMETENTE') || 'administracao@exemplo.com.br', simulado: true, origem: 'simulado', conta: null, cliente: true };
+  const cliente = clienteConfigurado(env);
+  const pelaConta = !!conta?.refresh;
+  const antigo = !pelaConta && !!segredo(env, 'GMAIL_REFRESH_TOKEN');
+  const remetente = segredo(env, 'GMAIL_REMETENTE') || (pelaConta ? texto(conta.email).trim() : '');
+  const ligado = cliente && (pelaConta || antigo) && !!remetente;
+  return { ligado, remetente: ligado ? remetente : null, origem: pelaConta ? 'conta' : antigo ? 'segredo' : null, conta: pelaConta ? (texto(conta.email) || null) : null, cliente };
+}
+
+// ---------------------------------------------------------------------------
+// Refresh token guardado no cofre, cifrado (AES-GCM 256; chave por HKDF-SHA256 do GMAIL_CLIENT_SECRET com sal sorteado)
+// Trocar o Client Secret no Google = o guardado não abre mais: a tela pede "Conectar o Gmail" de novo.
+// ---------------------------------------------------------------------------
+const enc = new TextEncoder();
+const INFO_CHAVE = enc.encode('erp-imoveis/gmail-refresh/v1');
+const b64u = (bytes) => base64DeBytes(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+function deB64u(t) {
+  const s = atob(String(t).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(t).length + 3) % 4));
+  return Uint8Array.from(s, (c) => c.charCodeAt(0));
+}
+const RE_CIFRADO = /^g1\.([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{16})\.([A-Za-z0-9_-]{24,5000})$/;
+export const cifradoValido = (t) => typeof t === 'string' && RE_CIFRADO.test(t);
+
+async function chaveDoToken(env, sal) {
+  const base = segredo(env, 'GMAIL_CLIENT_SECRET');
+  if (!base) throw new ErroEmail(503, 'Falta o GMAIL_CLIENT_SECRET nos segredos do Cloudflare (documentacao/LIGAR_GMAIL.md).');
+  const k = await crypto.subtle.importKey('raw', enc.encode(base), 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'HKDF', hash: 'SHA-256', salt: sal, info: INFO_CHAVE }, k, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+
+/** Refresh token → "g1.<sal>.<iv>.<cifrado>" (só isso vai ao cofre). */
+export async function cifrarToken(env, token) {
+  const sal = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const cifrado = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: INFO_CHAVE }, await chaveDoToken(env, sal), enc.encode(texto(token))));
+  return `g1.${b64u(sal)}.${b64u(iv)}.${b64u(cifrado)}`;
+}
+
+/** O contrário de cifrarToken; null se não abre (outro Client Secret, texto mexido). */
+export async function decifrarToken(env, cifrado) {
+  const m = RE_CIFRADO.exec(texto(cifrado));
+  if (!m || !clienteConfigurado(env)) return null;
+  try {
+    const aberto = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: deB64u(m[2]), additionalData: INFO_CHAVE }, await chaveDoToken(env, deB64u(m[1])), deB64u(m[3]));
+    return new TextDecoder().decode(aberto) || null;
+  } catch { return null; }
+}
+
+const cofreDe = (env) => env.COFRE.get(env.COFRE.idFromName('principal'));
+
+/**
+ * A conta ligada pelo botão, lida do cofre e decifrada: { refresh, email, ligado_em, ligado_por } ou null (nenhuma, sem cofre
+ * ou cofre fora). `ilegivel: true` (refresh null): está guardada, mas não abre (o Client Secret mudou): conectar de novo.
+ */
+export async function contaGuardada(env) {
+  if (!env?.COFRE) return null;
+  let dados;
+  try {
+    const r = await cofreDe(env).fetch(new Request('https://cofre/gmail/conta'));
+    if (!r.ok) return null;
+    dados = await r.json();
+  } catch { return null; }
+  const c = dados?.conta;
+  if (!c || !c.cifrado) return null;
+  const refresh = await decifrarToken(env, c.cifrado);
+  return { refresh, email: c.email || null, ligado_em: c.ligado_em || null, ligado_por: c.ligado_por || null, ilegivel: !refresh };
+}
+
+// ---------------------------------------------------------------------------
+// "Entrar com o Google": endereço de autorização (state + PKCE), troca do código, revogação
+// ---------------------------------------------------------------------------
+/** Texto sorteado em base64url (32 bytes = 43 caracteres). */
+export const sorteado = () => b64u(crypto.getRandomValues(new Uint8Array(32)));
+export const hashHex = async (t) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(texto(t))))].map((b) => b.toString(16).padStart(2, '0')).join('');
+/** PKCE (RFC 7636): o verificador fica no cofre com o state; ao Google vai só o desafio (SHA-256). */
+export async function pkce() {
+  const verificador = sorteado();
+  return { verificador, desafio: b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(verificador)))) };
+}
+
+/** Endereço da tela de permissão do Google ("escolher a conta → Permitir"). */
+export function urlDeAutorizacao(env, { state, desafio, retorno }) {
+  const p = new URLSearchParams({
+    client_id: segredo(env, 'GMAIL_CLIENT_ID'), redirect_uri: retorno, response_type: 'code', scope: ESCOPOS.join(' '),
+    access_type: 'offline', prompt: 'consent', state, code_challenge: desafio, code_challenge_method: 'S256',
+  });
+  return `${URL_AUTORIZAR}?${p.toString()}`;
+}
+
+/** O e-mail da conta, do id_token que veio direto do Google (TLS, sem intermediário: OpenID Connect 3.1.3.7 dispensa a assinatura). */
+function emailDoIdToken(env, idToken) {
+  try {
+    const dados = JSON.parse(new TextDecoder().decode(deB64u(texto(idToken).split('.')[1] || '')));
+    const auds = Array.isArray(dados.aud) ? dados.aud : [dados.aud];
+    if (!auds.includes(segredo(env, 'GMAIL_CLIENT_ID')) || !['accounts.google.com', 'https://accounts.google.com'].includes(dados.iss)) return null;
+    if (dados.email_verified === false || !emailValido(dados.email)) return null;
+    return String(dados.email).toLowerCase();
+  } catch { return null; }
+}
+
+/** Revoga a autorização no Google (Desconectar). Devolve se o Google confirmou; falha de rede não impede apagar aqui. */
+export async function revogarToken(token, buscar = fetch) {
+  if (!texto(token)) return false;
+  try {
+    const r = await buscar(URL_REVOGAR, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token: texto(token) }).toString() });
+    return r.ok;
+  } catch { return false; }
+}
+
+/**
+ * Troca o código da volta do Google pelo refresh token. Devolve { refresh, email }. Recusa se a pessoa desmarcou a permissão
+ * de enviar (o Google deixa escolher por caixa) ou se não veio o refresh token. Lança ErroEmail com `codigo` para o aviso.
+ */
+export async function trocarCodigo(env, { code, verificador, retorno }, buscar = fetch) {
+  let r;
+  try {
+    r = await buscar(URL_TOKEN, {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code: texto(code), client_id: segredo(env, 'GMAIL_CLIENT_ID'), client_secret: segredo(env, 'GMAIL_CLIENT_SECRET'),
+        redirect_uri: retorno, grant_type: 'authorization_code', code_verifier: texto(verificador),
+      }).toString(),
+    });
+  } catch { throw new ErroEmail(502, 'Não foi possível falar com o Google agora.', 'sem-rede'); }
+  const dados = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    if (dados.error === 'invalid_client' || dados.error === 'unauthorized_client') throw new ErroEmail(503, 'Client ID ou Client Secret errados.', 'credencial');
+    if (dados.error === 'redirect_uri_mismatch') throw new ErroEmail(400, 'Endereço de retorno diferente do cadastrado no Google Cloud.', 'retorno');
+    throw new ErroEmail(400, 'O Google recusou o código (vencido ou já usado).', 'erro');
+  }
+  const escopos = texto(dados.scope).split(/\s+/);
+  if (!escopos.includes(ESCOPO_ENVIO)) {
+    await revogarToken(dados.refresh_token || dados.access_token, buscar);
+    throw new ErroEmail(400, 'A permissão de enviar e-mails não foi marcada.', 'sem-permissao');
+  }
+  if (!dados.refresh_token) throw new ErroEmail(502, 'O Google não mandou a autorização permanente.', 'erro');
+  const email = emailDoIdToken(env, dados.id_token);
+  if (!email) { await revogarToken(dados.refresh_token, buscar); throw new ErroEmail(502, 'O Google não disse qual conta foi ligada.', 'erro'); }
+  return { refresh: dados.refresh_token, email };
 }
 
 // ---------------------------------------------------------------------------
@@ -166,8 +326,9 @@ export const esquecerToken = () => { tokenGuardado = { chave: '', valor: '', ate
 
 const semRede = () => new ErroEmail(502, 'Não foi possível falar com o Gmail agora. Tente de novo daqui a pouco.');
 
-export async function tokenDeAcesso(env, buscar = fetch, agora = Date.now()) {
-  const chave = `${segredo(env, 'GMAIL_CLIENT_ID')}|${segredo(env, 'GMAIL_REFRESH_TOKEN')}`;
+/** Access token (renovado sozinho a partir do refresh token: o da conta ligada pelo botão ou, sem ela, o segredo antigo). */
+export async function tokenDeAcesso(env, buscar = fetch, agora = Date.now(), refresh = segredo(env, 'GMAIL_REFRESH_TOKEN')) {
+  const chave = `${segredo(env, 'GMAIL_CLIENT_ID')}|${refresh}`;
   if (tokenGuardado.chave === chave && tokenGuardado.ate > agora) return tokenGuardado.valor;
   let r;
   try {
@@ -176,13 +337,13 @@ export async function tokenDeAcesso(env, buscar = fetch, agora = Date.now()) {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         client_id: segredo(env, 'GMAIL_CLIENT_ID'), client_secret: segredo(env, 'GMAIL_CLIENT_SECRET'),
-        refresh_token: segredo(env, 'GMAIL_REFRESH_TOKEN'), grant_type: 'refresh_token',
+        refresh_token: refresh, grant_type: 'refresh_token',
       }).toString(),
     });
   } catch { throw semRede(); }
   const dados = await r.json().catch(() => ({}));
   if (!r.ok || !dados.access_token) {
-    if (dados.error === 'invalid_grant') throw new ErroEmail(503, 'A autorização do Gmail venceu ou foi retirada. É preciso gerar um token novo (documentacao/LIGAR_GMAIL.md).');
+    if (dados.error === 'invalid_grant') throw new ErroEmail(503, 'A autorização do Gmail venceu ou foi retirada. O administrador precisa clicar em "Conectar o Gmail" de novo (Dados e backup → E-mail pelo Gmail).');
     if (dados.error === 'invalid_client' || dados.error === 'unauthorized_client') throw new ErroEmail(503, 'O código do aplicativo do Google (GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET) está errado.');
     throw new ErroEmail(502, 'O Google não liberou o envio agora. Tente de novo daqui a pouco.');
   }
@@ -195,7 +356,7 @@ function erroDoGmail(status, dados) {
   const motivo = dados?.error?.errors?.[0]?.reason || dados?.error?.status || '';
   const detalhe = texto(dados?.error?.message).slice(0, 200);
   if (status === 429 || /rateLimit|dailyLimit|userRateLimit|RESOURCE_EXHAUSTED/i.test(motivo)) return new ErroEmail(429, 'Limite de envios do Gmail atingido. Tente de novo mais tarde.');
-  if (status === 403 && /insufficient|PERMISSION_DENIED/i.test(motivo + detalhe)) return new ErroEmail(503, 'A autorização do Gmail não permite enviar e-mails. Gere o token de novo (documentacao/LIGAR_GMAIL.md).');
+  if (status === 403 && /insufficient|PERMISSION_DENIED/i.test(motivo + detalhe)) return new ErroEmail(503, 'A autorização do Gmail não permite enviar e-mails. Clique em "Conectar o Gmail" de novo e marque a permissão de enviar e-mails.');
   if (status === 403 && /accessNotConfigured|SERVICE_DISABLED|has not been used|disabled/i.test(motivo + detalhe)) return new ErroEmail(503, 'A Gmail API não está ativada no projeto do Google Cloud.');
   if (status >= 500) return new ErroEmail(502, 'O Gmail está com problema agora. Tente de novo daqui a pouco.');
   return new ErroEmail(502, `O Gmail recusou o e-mail${detalhe ? ` (${detalhe})` : ''}.`);
@@ -204,10 +365,12 @@ function erroDoGmail(status, dados) {
 /**
  * Envia. `pedido` como chega do site ({ para, cco, assunto, texto, anexos: [{ nome, tipo, base64 }] }).
  * Devolve { ok: true, id }. `simular`: só no computador (nuvem/local.mjs com SIMULAR_GMAIL=1), não fala com o Google.
+ * `conta`: a conta ligada (contaGuardada); sem passar, é lida do cofre aqui.
  */
-export async function enviarEmail(env, pedido, { buscar = fetch, simular = false, registrar = console.log } = {}) {
+export async function enviarEmail(env, pedido, { buscar = fetch, simular = false, registrar = console.log, conta } = {}) {
   const v = validarEnvio(pedido);
-  const estado = estadoEmail(env, { simular });
+  const ligada = conta !== undefined ? conta : simular ? null : await contaGuardada(env);
+  const estado = estadoEmail(env, { simular, conta: ligada });
   if (!estado.ligado) throw new ErroEmail(503, 'O envio pelo Gmail ainda não foi ligado.');
   const fixa = listaDeEmails(segredo(env, 'GMAIL_CCO'), { campo: 'cópia oculta (GMAIL_CCO)', maximo: MAX_DESTINATARIOS });
   const cco = [...new Set([...v.cco, ...fixa].map((e) => e.toLowerCase()))].filter((e) => !v.para.some((p) => p.toLowerCase() === e));
@@ -217,7 +380,7 @@ export async function enviarEmail(env, pedido, { buscar = fetch, simular = false
     return { ok: true, id: `simulado-${Date.now().toString(36)}` };
   }
   const tentar = async () => {
-    const token = await tokenDeAcesso(env, buscar);
+    const token = await tokenDeAcesso(env, buscar, Date.now(), ligada?.refresh || segredo(env, 'GMAIL_REFRESH_TOKEN'));
     const grande = mime.length > LIMITE_RAW;
     try {
       return await buscar(grande ? URL_ENVIO_GRANDE : URL_ENVIO, {

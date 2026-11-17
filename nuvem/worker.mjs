@@ -4,6 +4,9 @@
 // · arquivos/<caminho> (GET/PUT/DELETE) · lista/<pasta>/ · lista-tudo/<pasta>/ (tudo de uma vez, em partes) · mover · apagar
 // · icone-192.png / icone-512.png (GET: ícone do aplicativo, o da logo ou o padrão) · icone/192 e icone/512 (PUT) · icone (DELETE)
 // · email/estado (GET) e email/enviar (POST): e-mail pela conta Gmail da empresa (gmail.mjs; documentacao/LIGAR_GMAIL.md).
+//   email/google/conectar (POST, administrador: devolve o endereço da permissão do Google), email/google/retorno (GET: a volta
+//   do Google, no mesmo navegador já logado no Access; troca o código e guarda a autorização cifrada no cofre) e
+//   email/google/desconectar (POST, administrador: apaga e revoga). gmail-conta.mjs guarda.
 // · aparelho/… (sem o login do Access: política Bypass só neste caminho): o programa do PC entra com e-mail e senha
 //   (aparelho/entrar) e depois só LÊ com o crachá do aparelho (Authorization: Bearer ap1_…): saude, dados/tudo, dados/mudancas,
 //   lista/, lista-tudo/, arquivos/, modelos/, backups/ e programa (a versão PC). aparelhos.mjs; atualizador-pc/README.md.
@@ -19,7 +22,10 @@
 import { crachaValido, hashDoCracha } from './aparelhos.mjs';
 import { avisar } from './avisos-ficha.mjs';
 import { SO_SE_NOVO, atenderEquipe, atenderFicha, lerAteLimite } from './ficha-publica.mjs';
-import { ErroEmail, MAX_BYTES_ANEXOS, MAX_PEDIDO, enviarEmail, estadoEmail, validarEnvio } from './gmail.mjs';
+import {
+  ErroEmail, MAX_BYTES_ANEXOS, MAX_PEDIDO, cifrarToken, clienteConfigurado, contaGuardada, decifrarToken, enderecoDeRetorno, enviarEmail,
+  esquecerToken, estadoEmail, hashHex, pkce, revogarToken, sorteado, trocarCodigo, urlDeAutorizacao, validarEnvio,
+} from './gmail.mjs';
 import { atenderVendas, ehEnderecoDeVendas } from './painel-vendas.mjs';
 import { guardarVersaoAnterior, paraLixeira } from './lixeira.mjs';
 export { CofreDO } from './cofre.mjs'; // o Cloudflare exige a classe do Durable Object no arquivo principal
@@ -187,6 +193,7 @@ export function rotaDoRegistro(rota, metodo) {
   if (/^lista(-tudo)?\/backups(\/|$)/.test(rota)) return [rota, false];
   if (rota === 'mover' || rota === 'apagar') return [rota, true];
   if (rota === 'email/enviar') return [rota, true];
+  if (rota.startsWith('email/google/')) return [rota, true]; // ligar e desligar o Gmail (só o caminho: o código do Google não entra)
   if (rota.startsWith('ficha-online/')) return [`${metodo === 'GET' ? '' : `${metodo} `}${rota}`, metodo !== 'GET'];
   return null;
 }
@@ -520,7 +527,8 @@ const simularGmail = (env, url) => env.SIMULAR_GMAIL === '1' && ['localhost', '1
 async function rotaEnviarEmail(request, env, email, url, buscar) {
   conferirGravacao(request, env);
   const simular = simularGmail(env, url);
-  if (!estadoEmail(env, { simular }).ligado) throw new ErroHttp(503, 'O envio pelo Gmail ainda não foi ligado.');
+  const conta = simular ? null : await contaGuardada(env); // a ligada pelo botão (cifrada no cofre); sem ela, o segredo antigo
+  if (!estadoEmail(env, { simular, conta }).ligado) throw new ErroHttp(503, 'O envio pelo Gmail ainda não foi ligado.');
   const corpo = await lerAteLimite(request, MAX_PEDIDO);
   if (!corpo) throw new ErroHttp(413, `Anexos passam de ${MAX_BYTES_ANEXOS / 1048576} MB.`);
   let pedido;
@@ -531,9 +539,78 @@ async function rotaEnviarEmail(request, env, email, url, buscar) {
     const reg = await cofreDe(env).fetch(new Request('https://cofre/registrar-email', { method: 'POST', body: JSON.stringify({ para: [...v.para, ...v.cco], assunto: v.assunto, anexos: v.anexos.map((a) => a.nome) }), headers: { 'Content-Type': 'application/json', 'X-Email-Conferido': email } }));
     if (!reg.ok) { const e = await reg.json().catch(() => ({})); throw new ErroHttp(reg.status, e.erro || 'Não foi possível registrar o envio.'); }
   }
-  const r = await enviarEmail(env, pedido, { buscar, simular });
+  const r = await enviarEmail(env, pedido, { buscar, simular, conta });
   console.log(`e-mail enviado por ${email} (${r.id})`); // só quem e o código: o conteúdo não fica no registro
   return json(200, r);
+}
+
+/** Situação do envio (todos os papéis): ligado, remetente, de onde vem (botão ou segredo antigo), a conta e o endereço de retorno. */
+async function rotaEstadoEmail(env, url) {
+  const simular = simularGmail(env, url);
+  const conta = simular ? null : await contaGuardada(env);
+  const e = estadoEmail(env, { simular, conta });
+  return json(200, {
+    ligado: e.ligado, remetente: e.remetente, origem: e.origem, conta: e.conta, cliente: e.cliente, retorno: enderecoDeRetorno(env, url),
+    ...(conta?.refresh ? { ligado_em: conta.ligado_em } : {}), ...(conta?.ilegivel ? { ilegivel: true } : {}),
+  });
+}
+
+// "Conectar o Gmail" (fluxo OAuth 2.0 de aplicativo da Web, com state de uso único e PKCE; gmail.mjs e gmail-conta.mjs).
+// A volta do Google (email/google/retorno) passa pelo Access como qualquer página do site: o navegador do administrador já
+// está logado, então o redirecionamento chega com o login dele (se o login venceu, o Access pede o código e depois volta).
+async function pedirAoCofre(env, rota, email, corpo = {}) {
+  if (!env.COFRE) throw new ErroHttp(503, 'Worker sem o cofre ligado (binding COFRE).');
+  const r = await cofreDe(env).fetch(new Request(`https://cofre/${rota}`, { method: 'POST', body: JSON.stringify(corpo), headers: { 'Content-Type': 'application/json', 'X-Email-Conferido': email } }));
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new ErroHttp(r.status, d.erro || 'Erro no cofre da nuvem.');
+  return d;
+}
+
+/** Começa: guarda o pedido (hash do state + verificador PKCE) no cofre e devolve o endereço da permissão do Google. */
+async function conectarGmail(env, email, url) {
+  if (!clienteConfigurado(env)) throw new ErroHttp(503, 'Faltam o GMAIL_CLIENT_ID e o GMAIL_CLIENT_SECRET nos segredos do Cloudflare (documentacao/LIGAR_GMAIL.md).');
+  const state = sorteado();
+  const { verificador, desafio } = await pkce();
+  await pedirAoCofre(env, 'gmail/estado-novo', email, { hash: await hashHex(state), verificador });
+  return json(200, { url: urlDeAutorizacao(env, { state, desafio, retorno: enderecoDeRetorno(env, url) }) });
+}
+
+/** Avisos da volta (o site mostra o texto de cada um em Dados e backup; FORMATOS_PARAMETRO.gmail em calculos.js). */
+export const AVISOS_VOLTA_GMAIL = ['ligado', 'cancelado', 'recusado', 'sem-permissao', 'credencial', 'retorno', 'sem-rede', 'erro'];
+const voltarParaTela = (env, url, codigo) => new Response(null, {
+  status: 303,
+  headers: { Location: `${String(env.ORIGEM || url.origin).trim().replace(/\/+$/, '')}/#/dados?gmail=${AVISOS_VOLTA_GMAIL.includes(codigo) ? codigo : 'erro'}`, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' },
+});
+
+/** A volta do Google: gasta o state (uma vez, do mesmo administrador, em 10 min), troca o código e guarda a autorização cifrada. */
+async function retornoDoGoogle(env, email, url, buscar) {
+  const p = url.searchParams;
+  const state = p.get('state') || '';
+  if (!/^[A-Za-z0-9_-]{43}$/.test(state)) return voltarParaTela(env, url, 'recusado');
+  let verificador;
+  try { ({ verificador } = await pedirAoCofre(env, 'gmail/estado-usar', email, { hash: await hashHex(state) })); } catch { return voltarParaTela(env, url, 'recusado'); }
+  if (p.get('error')) return voltarParaTela(env, url, p.get('error') === 'access_denied' ? 'cancelado' : 'erro');
+  const code = p.get('code') || '';
+  if (!code || code.length > 2048) return voltarParaTela(env, url, 'erro');
+  try {
+    const conta = await trocarCodigo(env, { code, verificador, retorno: enderecoDeRetorno(env, url) }, buscar);
+    await pedirAoCofre(env, 'gmail/guardar', email, { cifrado: await cifrarToken(env, conta.refresh), conta: conta.email });
+    esquecerToken();
+    console.log(`Gmail ligado por ${email}`); // só quem: a conta e a autorização não vão para o registro
+    return voltarParaTela(env, url, 'ligado');
+  } catch (e) {
+    if (!(e instanceof ErroEmail)) console.error('ligar o Gmail', e?.message || e);
+    return voltarParaTela(env, url, e instanceof ErroEmail ? e.codigo : 'erro');
+  }
+}
+
+/** Desconectar: apaga a autorização do cofre e a revoga no Google (se o Google não responder, aqui ela já sumiu). */
+async function desconectarGmail(env, email, buscar) {
+  const { conta } = await pedirAoCofre(env, 'gmail/apagar', email);
+  const refresh = conta ? await decifrarToken(env, conta.cifrado) : null;
+  const revogado = refresh ? await revogarToken(refresh, buscar) : false;
+  esquecerToken();
+  return json(200, { ok: true, havia: !!conta, revogado, segredo_antigo: !!String(env.GMAIL_REFRESH_TOKEN || '').trim() });
 }
 
 // ---------------------------------------------------------------------------
@@ -584,8 +661,11 @@ async function atenderComLogin(request, env, rota, email, url, buscar, ctx) {
   const novoIcone = rota.match(/^icone\/(192|512)$/);
   if (novoIcone && m === 'PUT') { await exigirPapel(env, email, 'admin'); return await gravarIcone(request, env, novoIcone[1], email); }
   if (rota === 'icone' && m === 'DELETE') { await exigirPapel(env, email, 'admin'); return await apagarIcone(request, env); }
-  if (rota === 'email/estado' && m === 'GET') { await exigirPapel(env, email, 'consulta'); const { ligado, remetente } = estadoEmail(env, { simular: simularGmail(env, url) }); return json(200, { ligado, remetente }); }
+  if (rota === 'email/estado' && m === 'GET') { await exigirPapel(env, email, 'consulta'); return await rotaEstadoEmail(env, url); }
   if (rota === 'email/enviar' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await rotaEnviarEmail(request, env, email, url, buscar); }
+  if (rota === 'email/google/conectar' && m === 'POST') { conferirGravacao(request, env); await exigirPapel(env, email, 'admin'); return await conectarGmail(env, email, url); }
+  if (rota === 'email/google/retorno' && m === 'GET') return await retornoDoGoogle(env, email, url, buscar);
+  if (rota === 'email/google/desconectar' && m === 'POST') { conferirGravacao(request, env); await exigirPapel(env, email, 'admin'); return await desconectarGmail(env, email, buscar); }
   if (rota.startsWith('dados/')) return await repassarAoCofre(request, env, rota.slice(6), email, url);
   if (rota.startsWith('ficha-online/')) {
     if (m !== 'GET') conferirGravacao(request, env);
