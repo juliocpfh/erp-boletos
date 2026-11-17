@@ -80,11 +80,32 @@ export async function telaBackupSeguro() {
         ${copia && copia.falhas ? item('Ficaram para a próxima', `${copia.falhas} arquivo(s) não baixaram`) : ''}</div>
       <p class="suave">Atualiza sozinha: logo depois de anexar, apagar ou mover arquivos neste computador, e de hora em hora pelo atualizador do PC (o que foi anexado no celular ou por outra pessoa).</p>
       <div class="acoes">${botao('atualizarCopiaAberta', 'Atualizar a pasta agora', {}, 'secundario')}</div>
-      <div id="progresso-copia" aria-live="polite"></div>` : '<p class="suave">Só com os dados na nuvem (com a pasta dos dados no computador, os arquivos já estão nela).</p>'}</div>
+      <div id="progresso-copia" aria-live="polite"></div>
+      ${caixaAbrirPasta(copia)}` : '<p class="suave">Só com os dados na nuvem (com a pasta dos dados no computador, os arquivos já estão nela).</p>'}</div>
     <div class="cartao"><h2>Restaurar</h2>${FORM_RESTAURAR}</div>
     <div class="cartao"><h2>Arquivos na pasta segura</h2><div class="rolagem"><table><tr><th>Arquivo</th><th>Tipo</th><th>Gravado em</th><th class="n">Tamanho</th></tr>
       ${lista.slice(0, 40).map((x) => `<tr><td>${esc(x.pasta)}/${esc(x.nome)}</td><td>${esc(x.tipo)}</td><td>${dataHoraBr(x.alterado)}</td><td class="n">${tamanho(x.tamanho)}</td></tr>`).join('')
       || '<tr><td colspan="4" class="suave">Nenhum backup ainda.</td></tr>'}</table></div></div>`;
+}
+
+/** Computador (não celular nem tablet): o mesmo critério do visualizador de anexos. */
+const noComputador = () => !window.matchMedia?.('(max-width: 760px), (hover: none) and (pointer: coarse)').matches;
+
+/**
+ * "Abrir a pasta no Explorer" (pedido do dono de 17/11): o navegador não abre pastas do computador, então o link chama o
+ * endereço imoveis-pasta:, que o programa do PC registra no Windows (atualizador-pc/programa.mjs, PROTOCOLO) e que sempre
+ * abre a pasta da cópia aberta configurada nele (o que vem no endereço é ignorado). Só no computador com Windows; o caminho
+ * inteiro vem do registro da cópia, gravado pelo programa do PC (`caminho_no_pc`): sem ele, só o nome da pasta.
+ */
+function caixaAbrirPasta(copia) {
+  if (!noComputador()) return '';
+  const caminho = copia?.caminho || '';
+  const windows = /Windows/.test(navigator.userAgent);
+  return `<div class="abrir-pasta">
+    <div class="acoes">${windows ? '<a class="botao" href="imoveis-pasta:abrir">Abrir a pasta no Explorer</a>' : ''}
+      ${caminho ? botao('copiar', 'Copiar o caminho', { texto: caminho }, 'secundario') : ''}</div>
+    ${windows ? '<p class="suave">Na primeira vez o Chrome pergunta se pode abrir o programa: marque "Sempre permitir" e clique em Abrir. Precisa do programa do PC atualizado.</p>' : ''}
+    <p class="suave">Onde fica: ${caminho ? `<b>${esc(caminho)}</b>` : `pasta do backup seguro (<b>${esc(E.seguro.dir.name)}</b>) → <b>${CA.PASTA_COPIA}</b> (o caminho completo aparece aqui depois que o programa do PC atualizar a pasta)`}</p></div>`;
 }
 
 const AVISO_SEGURO_DISPENSADO = 'imoveis-aviso-backup-seguro';

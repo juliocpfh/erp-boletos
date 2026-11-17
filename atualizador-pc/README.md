@@ -38,7 +38,8 @@ O que ele faz ao instalar: copia a si mesmo para `%LOCALAPPDATA%\Administracao d
 |---|---|
 | Ligar de novo (depois de Desligar ou de 90 dias parado) | `Administracao-de-Imoveis.exe --ligar` (ou dois cliques de novo) |
 | Atualizar agora | `Administracao-de-Imoveis.exe --atualizar` (só os arquivos: `--arquivos`) |
-| Parar as atualizações automáticas | `Administracao-de-Imoveis.exe --desinstalar` |
+| Parar as atualizações automáticas (e tirar o botão "Abrir a pasta no Explorer") | `Administracao-de-Imoveis.exe --desinstalar` |
+| Abrir no Explorer a pasta `Arquivos dos imoveis` (o que o botão do sistema chama) | `Administracao-de-Imoveis.exe --abrir-pasta` |
 | Ver a versão / a ajuda | `--versao` / `--ajuda` |
 | Ver o que a instalação faria, sem mexer em nada | `--instalar --simular` |
 
@@ -73,6 +74,15 @@ Além dos dados cifrados, o atualizador mantém na pasta do backup seguro a subp
 - Todo dia às 20h e ao entrar no Windows: dados, versão PC e arquivos.
 - **De hora em hora**: só os arquivos (`node atualizador.mjs --arquivos`, pela tarefa "Imoveis - copia dos arquivos (de hora em hora)", que roda escondida por `rodar-escondido.vbs`, sem janela preta; escondida, ela nunca abre a página de ligar: só registra o erro).
 - O sistema aberto neste computador também atualiza a cópia logo depois de anexar, apagar ou mover arquivos, e no botão **Atualizar a pasta agora** (Dados e backup → Backup seguro).
+
+### Botão "Abrir a pasta no Explorer" (desde 17/11/2026, só com o `.exe`)
+
+Em Dados e backup → Backup seguro → "Cópia aberta dos arquivos" (só no computador com Windows; não aparece no celular) há o link **Abrir a pasta no Explorer** (`imoveis-pasta:abrir`) e o botão **Copiar o caminho**. O navegador não deixa um site abrir pastas do computador, então o link chama este programa por um endereço próprio, `imoveis-pasta:`:
+
+- **Onde fica registrado:** `HKCU\Software\Classes\imoveis-pasta` (só para o usuário do Windows, sem pedir administrador), apontando para `wscript.exe "<pasta programa>\abrir-pasta.vbs"`, que roda `Administracao-de-Imoveis.exe --abrir-pasta` sem janela. O `.exe` registra ao instalar (dois cliques ou `--instalar`) e de novo em cada rodada (`--atualizar`, `--arquivos`, `--ligar`): quem já tinha o programa ganha o botão ao trocar o `.exe`. `--desinstalar` tira o registro. `--instalar --simular` mostra os comandos do `reg` sem mexer em nada. Pelo Node (jeito antigo) não há botão.
+- **Segurança:** o comando registrado não leva o endereço (sem `%1`), o `.vbs` não repassa argumento nenhum e `--abrir-pasta` ignora todo o resto: qualquer site que chame `imoveis-pasta:` só consegue abrir a pasta `Arquivos dos imoveis` deste computador (a do backup seguro guardada em `config.json`; sem a cópia ainda, a própria pasta do backup seguro). Nunca outro caminho, nunca outro comando. Sem o computador ligado, aparece uma janelinha dizendo para abrir o programa.
+- **Primeira vez:** o Chrome pergunta se pode abrir o programa: marque "Sempre permitir" e clique em Abrir.
+- **Caminho na tela:** o navegador só sabe o nome da pasta; o caminho inteiro vem do registro `copia-aberta.json` (campo `caminho_no_pc`, gravado pelo programa; o site mantém o que o programa gravou).
 
 ## Como saber se está funcionando
 

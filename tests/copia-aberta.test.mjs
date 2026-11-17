@@ -106,8 +106,24 @@ test('atualizador do PC: baixa com a chave de serviço, em partes, e o arquivo a
   assert.deepEqual(n.pedidos, ['Casa 1/Inquilinos/Maria Exemplo/RG.jpg']);
   assert.equal(existe(raiz, 'Casa 1', 'IPTU'), false);
 
-  // o site e o atualizador leem o mesmo registro
-  assert.equal((await CA.situacaoCopia(new PastaDisco(raiz))).total, 2);
+  // o site e o atualizador leem o mesmo registro; o atualizador grava o caminho inteiro da cópia (botão "Copiar o caminho")
+  const sit = await CA.situacaoCopia(new PastaDisco(raiz));
+  assert.equal(sit.total, 2);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(raiz, A.ARQUIVO_COPIA), 'utf8')).caminho_no_pc, path.resolve(raiz, CA.PASTA_COPIA));
+  assert.equal(sit.caminho, process.platform === 'win32' ? path.resolve(raiz, CA.PASTA_COPIA) : '', 'só caminho do Windows aparece na tela');
+});
+
+test('caminho da cópia no PC: o site mostra só caminho do Windows e mantém o que o atualizador gravou', async () => {
+  for (const c of ['C:\\Users\\Maria Exemplo\\Imoveis\\Arquivos dos imoveis', '\\\\servidor\\pasta\\Arquivos dos imoveis']) assert.equal(CA.caminhoNoPc({ caminho_no_pc: c }), c);
+  for (const c of ['/tmp/x', 'imoveis-pasta:abrir', 'C:\\a<script>', 'C:\\a"b', 'C:\\a\nb', 'x'.repeat(500), '', null]) assert.equal(CA.caminhoNoPc({ caminho_no_pc: c }), '', String(c));
+  const raiz = pasta(); const dir = new PastaDisco(raiz);
+  const caminho = 'C:\\Users\\Maria Exemplo\\Imoveis\\Arquivos dos imoveis';
+  fs.writeFileSync(path.join(raiz, CA.ARQUIVO_COPIA), JSON.stringify({ por: 'atualizador', caminho_no_pc: caminho, arquivos: {} }));
+  const n = nuvemFalsa({ 'Casa 1/a.pdf': { texto: 'a', alterado: '1' } });
+  await CA.atualizarCopia(dir, { listar: n.listar, ler: n.ler });
+  const sit = await CA.situacaoCopia(dir);
+  assert.equal(sit.por, 'site');
+  assert.equal(sit.caminho, caminho, 'a atualização feita pelo site não apaga o caminho');
 });
 
 test('atualizador do PC: chave de serviço recusada avisa', async () => {

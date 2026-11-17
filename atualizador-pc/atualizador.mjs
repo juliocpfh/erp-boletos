@@ -271,7 +271,8 @@ async function copiar(cfg, buscar, erros, trava) {
   const { baixar, apagar, atual } = planoCopia(nuvem, arquivos);
   // o prazo de "Apagados na nuvem" é o que o site gravou no registro (regra dias_lixeira_anexos); sem ele, 30 dias
   const dias = Number.isInteger(reg.dias_apagados) && reg.dias_apagados > 0 ? reg.dias_apagados : DIAS_APAGADOS;
-  const salvar = (falhas) => fs.writeFileSync(arqReg, JSON.stringify({ atualizado_em: new Date().toISOString(), por: 'atualizador', falhas, dias_apagados: dias, arquivos }));
+  // caminho_no_pc: o caminho inteiro da cópia neste computador, para o botão "Copiar o caminho" do site (o navegador só sabe o nome da pasta)
+  const salvar = (falhas) => fs.writeFileSync(arqReg, JSON.stringify({ atualizado_em: new Date().toISOString(), por: 'atualizador', falhas, dias_apagados: dias, caminho_no_pc: path.resolve(raiz), arquivos }));
   const apagados = path.join(cfg.pasta, PASTA_APAGADOS, diaDeHoje());
   for (const c of apagar) {
     const p = caminhoLocal(c);

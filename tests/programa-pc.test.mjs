@@ -2,7 +2,9 @@
 // argumentos, ajuda, as tarefas do Windows (mesmos nomes de instalar-tarefa.cmd, para trocar as antigas) e o .vbs que roda
 // sem janela. Nada é criado de verdade: o schtasks é de mentira.
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import * as P from '../atualizador-pc/programa.mjs';
@@ -67,4 +69,91 @@ test('simular não mexe em nada e mostra os comandos; o .vbs não leva o caminho
   const vbs = P.textoVbs();
   assert.ok(/^[\x00-\x7f]*$/.test(vbs), 'só letras sem acento');
   assert.ok(vbs.includes(`\\${P.NOME_EXE}"""`) && vbs.includes(', 0, False'), 'roda o .exe da mesma pasta, escondido');
+});
+
+// Botão "Abrir a pasta no Explorer" (endereço imoveis-pasta:, pedido do dono de 17/11). Nada é registrado de verdade: o
+// reg.exe e o Explorer são de mentira.
+const PASTA_PROG = 'C:\\Users\\Maria Exemplo\\AppData\\Local\\Administracao de Imoveis\\programa';
+const cfgTemp = (pasta) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'programa-pc-'));
+  if (pasta !== undefined) fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ site: 'https://erp.exemplo.com.br', pasta }));
+  return dir;
+};
+
+test('protocolo imoveis-pasta: registrado só para este usuário, chamando o .vbs sem nada do endereço', () => {
+  const cmds = P.comandosDoProtocolo(PASTA_PROG, { SystemRoot: 'C:\\Windows' });
+  assert.equal(P.CHAVE_PROTOCOLO, 'HKCU\\Software\\Classes\\imoveis-pasta');
+  for (const a of cmds) {
+    assert.equal(a[0], 'add'); assert.ok(a[1].startsWith('HKCU\\Software\\Classes\\imoveis-pasta'), 'HKCU: sem administrador'); assert.equal(a.at(-1), '/f');
+    assert.ok(!a.join(' ').includes('%'), 'sem %1: o endereço não entra no comando');
+  }
+  assert.deepEqual(cmds[1], ['add', P.CHAVE_PROTOCOLO, '/v', 'URL Protocol', '/d', '', '/f']);
+  const comando = cmds.find((a) => a[1].endsWith('\\shell\\open\\command'));
+  assert.equal(comando[comando.indexOf('/d') + 1], `"C:\\Windows\\System32\\wscript.exe" "${PASTA_PROG}\\abrir-pasta.vbs"`, 'caminho com espaço entre aspas');
+  // as aspas chegam inteiras ao programa chamado (o reg.exe lê a linha de comando com a mesma regra do Node)
+  const eco = spawnSync(process.execPath, ['-e', 'process.stdout.write(JSON.stringify(process.argv.slice(1)))', ...comando], { encoding: 'utf8' });
+  assert.deepEqual(JSON.parse(eco.stdout), comando);
+  const vbs = P.textoVbsPasta();
+  assert.ok(/^[\x00-\x7f]*$/.test(vbs), 'só letras sem acento');
+  assert.ok(vbs.includes(`\\${P.NOME_EXE}"" --abrir-pasta", 0, True)`), 'roda o .exe da mesma pasta, escondido, só com --abrir-pasta');
+  assert.ok(!/WScript\.Arguments/.test(vbs), 'não repassa argumento nenhum');
+});
+
+test('--abrir-pasta abre só a pasta configurada e ignora o que vem no endereço', async () => {
+  const backup = fs.mkdtempSync(path.join(os.tmpdir(), 'backup-seguro-'));
+  const abertas = [];
+  const abrir = (p) => abertas.push(p);
+  const rodar = (args, env) => P.executar(args, { env, dizer: () => {}, pausar: async () => {}, abrir, atualizar: async () => { throw new Error('não atualiza'); } });
+  // ainda sem a cópia: abre a pasta do backup seguro
+  assert.equal(await rodar(['--abrir-pasta'], { IMOVEIS_CONFIG: cfgTemp(backup) }), 0);
+  assert.deepEqual(abertas, [backup]);
+  fs.mkdirSync(path.join(backup, 'Arquivos dos imoveis'));
+  abertas.length = 0;
+  const env = { IMOVEIS_CONFIG: cfgTemp(backup) };
+  for (const lixo of [[], ['imoveis-pasta:abrir'], ['imoveis-pasta:C:\\Windows\\System32'], ['"C:\\Windows" & calc.exe'], ['--desinstalar'], ['..\\..\\Windows']]) {
+    assert.equal(await rodar(['--abrir-pasta', ...lixo], env), 0, lixo.join(' '));
+    assert.equal(await rodar([...lixo, '--abrir-pasta'], env), 0, lixo.join(' '));
+  }
+  assert.equal(abertas.length, 12);
+  assert.ok(abertas.every((p) => p === path.join(backup, 'Arquivos dos imoveis')), 'sempre a mesma pasta');
+  // computador não ligado, pasta relativa ou que sumiu: não abre nada (o .vbs avisa)
+  abertas.length = 0;
+  for (const e of [cfgTemp(), cfgTemp('relativa\\pasta'), cfgTemp(path.join(backup, 'nao-existe')), cfgTemp('')]) assert.equal(await rodar(['--abrir-pasta'], { IMOVEIS_CONFIG: e }), 1);
+  assert.deepEqual(abertas, []);
+});
+
+test('registro do protocolo: na instalação, em cada rodada do .exe (programa já instalado) e só pelo .exe', async () => {
+  const env = { IMOVEIS_CONFIG: cfgTemp(), SystemRoot: 'C:\\Windows' };
+  const chamadas = []; const rodar = (a) => { chamadas.push(a); return { status: 0 }; };
+  assert.equal(P.garantirProtocolo({ env, rodar, exe: null }), 'sem programa instalado', 'pelo Node não registra');
+  assert.equal(P.garantirProtocolo({ env, rodar, exe: { versao: 'x' } }), 'sem programa instalado', 'sem o .exe instalado não aponta para o arquivo baixado');
+  assert.equal(chamadas.length, 0);
+  fs.mkdirSync(P.pastaInstalada(env), { recursive: true });
+  fs.writeFileSync(path.join(P.pastaInstalada(env), P.NOME_EXE), 'programa');
+  assert.equal(P.garantirProtocolo({ env, rodar, exe: { versao: 'x' } }), 'registrado');
+  assert.equal(chamadas.length, P.comandosDoProtocolo('C:\\x', env).length);
+  assert.equal(fs.readFileSync(path.join(P.pastaInstalada(env), P.NOME_VBS_PASTA), 'latin1'), P.textoVbsPasta(), 'grava o .vbs ao lado do .exe');
+  assert.match(P.garantirProtocolo({ env, rodar: () => ({ status: 1 }), exe: { versao: 'x' } }), /^falhou/);
+  // as rodadas normais pedem o registro; ajuda e versão não
+  const pedidos = [];
+  const exec = (args) => P.executar(args, { env, dizer: () => {}, pausar: async () => {}, atualizar: async () => true, garantir: () => { pedidos.push(args[0]); return 'registrado'; } });
+  for (const a of ['--atualizar', '--arquivos', '--ligar', '--ajuda', '--versao']) await exec([a]);
+  assert.deepEqual(pedidos, ['--atualizar', '--arquivos', '--ligar']);
+  // --simular mostra os comandos do reg
+  const linhas = [];
+  await P.executar(['--instalar', '--simular'], { env, dizer: (t) => linhas.push(t), pausar: async () => {} });
+  assert.match(linhas.join('\n'), /reg add HKCU\\Software\\Classes\\imoveis-pasta\\shell\\open\\command \/ve \/d/);
+  assert.match(linhas.join('\n'), /"URL Protocol" \/d "" \/f/);
+});
+
+test('desinstalar tira o protocolo (e não reclama se não havia)', async () => {
+  const feitos = [];
+  assert.equal(P.apagarProtocolo({ rodar: (a) => { feitos.push(a.join(' ')); return { status: 1 }; } }), 'não havia');
+  assert.deepEqual(feitos, ['query HKCU\\Software\\Classes\\imoveis-pasta']);
+  feitos.length = 0;
+  assert.equal(P.apagarProtocolo({ rodar: (a) => { feitos.push(a.join(' ')); return { status: 0 }; } }), 'apagado');
+  assert.deepEqual(feitos, ['query HKCU\\Software\\Classes\\imoveis-pasta', 'delete HKCU\\Software\\Classes\\imoveis-pasta /f']);
+  assert.equal(P.apagarProtocolo({ rodar: (a) => ({ status: a[0] === 'query' ? 0 : 1 }) }), 'falhou');
+  const sim = []; await P.executar(['--desinstalar', '--simular'], { env: { IMOVEIS_CONFIG: 'C:\\cfg' }, dizer: (t) => sim.push(t), pausar: async () => {} });
+  assert.match(sim.join('\n'), /reg delete HKCU\\Software\\Classes\\imoveis-pasta \/f/);
 });
