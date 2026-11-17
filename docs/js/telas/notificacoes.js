@@ -124,7 +124,8 @@ export function telaNovaNotificacao(q = {}) {
       <input type="hidden" name="prazo" value="${dados.prazo_dias}">${edicao ? `<input type="hidden" name="id" value="${edicao.id}">` : ''}${ant ? `<input type="hidden" name="anterior" value="${ant.id}">` : ''}
       <p><label for="nt_assunto">Assunto</label><input id="nt_assunto" name="assunto" value="${esc(pronto.assunto)}" maxlength="120"></p>
       <p><label for="nt_clausula">Cláusula(s) do contrato citada(s)</label><input id="nt_clausula" name="clausula" value="${esc(pronto.clausula || '')}" maxlength="200"></p>
-      <p class="suave">Confira o número da cláusula no contrato assinado: o sistema conta pelo modelo de hoje, e um contrato antigo pode ter outra numeração.</p>
+      <div class="alerta aviso"><p><strong>Confira a cláusula no contrato assinado deste inquilino.</strong> O número vem do modelo de contrato de hoje; um contrato antigo pode ter outra numeração. Se for diferente, corrija aqui e no texto.</p>
+        <p><label><input type="checkbox" name="clausula_conferida" value="1" required> Conferi o número da(s) cláusula(s) no contrato assinado deste inquilino</label></p></div>
       <p><label for="nt_texto">Texto <span class="suave">(troque o que estiver entre colchetes, "[preencher: …]", pelo caso real)</span></label><textarea id="nt_texto" name="texto" rows="18" spellcheck="true">${esc(pronto.texto)}</textarea></p>
       <div class="acoes"><button>${edicao ? 'Salvar o rascunho' : 'Salvar a notificação (rascunho)'}</button> <a class="botao secundario" href="${volta}">Cancelar</a></div>
       <p class="suave">Depois de salvar: imprima o PDF, assine (gov.br), anexe a assinada e envie. O prazo corre a partir da data da notificação.</p></form>` : '<p class="suave">Escolha o inquilino e clique em "Montar o texto".</p>'}`;
@@ -200,6 +201,7 @@ export const FORMULARIOS_NOTIFICACOES = {
   async salvarNotificacao(form) {
     if (!opera()) throw new C.ErroUsuario(SO_CONSULTA);
     const f = new FormData(form);
+    if (!f.get('clausula_conferida')) throw new C.ErroUsuario('Marque "Conferi o número da(s) cláusula(s) no contrato assinado deste inquilino" antes de salvar.');
     const dados = { contrato_id: Number(f.get('contrato')), modelo: String(f.get('tema') || ''), data: String(f.get('data') || ''), prazo_dias: Number(f.get('prazo')),
       assunto: f.get('assunto'), clausula: f.get('clausula'), texto: f.get('texto'), anterior_id: Number(f.get('anterior')) || null };
     const id = Number(f.get('id')) || null;

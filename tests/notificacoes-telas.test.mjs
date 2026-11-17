@@ -39,8 +39,13 @@ test('nova notificação: texto pronto com a data limite, salvar o rascunho, pá
   assert.match(nova, /Data limite: <b>02\/12\/2026<\/b>.*feriado\(s\) 20\/11\/2026/);
   assert.match(nova, /<textarea[^>]*name="texto"[^>]*>Pela presente, a LOCADORA NOTIFICA/);
   assert.match(nova, /Pão &amp; Cia/, 'nome escapado');
+  assert.match(nova, /name="clausula_conferida"[^>]*required/, 'conferência da cláusula obrigatória (decisão do dono, 17/11/2026)');
   const t = R.buscar(E.d, 'contratos', c.id) && (await import('../docs/js/notificacoes.js')).textoDoModelo(E.d, c, { data: '2026-11-17', prazo_dias: 10 }, 'obra');
-  await enviar('salvarNotificacao', [['contrato', String(c.id)], ['tema', 'obra'], ['data', '2026-11-17'], ['prazo', '10'], ['assunto', t.assunto], ['clausula', t.clausula],
+  const antes = (E.d.notificacoes || []).length;
+  await enviar('salvarNotificacao', [['contrato', String(c.id)], ['tema', 'obra'], ['data', '2026-11-17'], ['prazo', '10'], ['assunto', t.assunto],
+    ['clausula', t.clausula], ['texto', t.texto.replace(/[preencher: [^]]*]/g, 'furo na fachada')]]);
+  assert.equal((E.d.notificacoes || []).length, antes, 'sem marcar a conferência da cláusula não salva');
+  await enviar('salvarNotificacao', [['contrato', String(c.id)], ['tema', 'obra'], ['data', '2026-11-17'], ['prazo', '10'], ['assunto', t.assunto], ['clausula', t.clausula], ['clausula_conferida', '1'],
     ['texto', t.texto.replace(/\[preencher: [^\]]*\]/g, 'furo na fachada')]]);
   const n = E.d.notificacoes.at(-1);
   assert.ok(n, 'gravou');

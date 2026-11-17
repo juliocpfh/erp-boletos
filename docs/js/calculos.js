@@ -374,7 +374,9 @@ export function aluguelVigente(inicial, correcoes, dataRef) {
 // --------------------------------------------------------------------------
 // Composição da cobrança
 // --------------------------------------------------------------------------
-export function totaisCobranca({ aluguel, desconto, iptu = 0, seguro = 0, taxa_boleto = 0, outros = 0, ressarcimento = 0, fci = 0 }, reservaDisponivel = 0) {
+export function totaisCobranca({ aluguel, desconto, iptu = 0, seguro = 0, taxa_boleto = 0, outros = 0, ressarcimento = 0, fci = 0, multas_notificacao = [] }, reservaDisponivel = 0) {
+  // multa da notificação ao inquilino (vai em `outros`): sem multa nem juros de atraso sobre ela (decisão do dono, 2026-11-17)
+  const multaNotif = (multas_notificacao || []).reduce((s, e) => s + (Number(e && e.valor) || 0), 0);
   const encargos = iptu + seguro + taxa_boleto + outros + (fci || 0);
   // ressarcimento ao inquilino (ex.: taxa extraordinária do condomínio que ele pagou e é do proprietário)
   const totalSemDesconto = aluguel + encargos - (ressarcimento || 0);
@@ -388,11 +390,12 @@ export function totaisCobranca({ aluguel, desconto, iptu = 0, seguro = 0, taxa_b
     // nunca negativo (ex.: ressarcimento maior que o boleto): igual ao "sem desconto", para quem atrasa não pagar mais que quem paga em dia
     a_pagar_pontual: Math.max(totalPontual - reserva, 0),
     a_pagar_sem_desconto: Math.max(totalSemDesconto - reserva, 0),
-    // multa e juros por atraso não incidem sobre o FCI (fundo de conservação do imóvel); regra `base_multa`: boleto inteiro
+    // multa e juros por atraso não incidem sobre o FCI (fundo de conservação do imóvel) nem sobre a multa da notificação
+    // (boleto de R$ 2.000,00 + multa da notificação de R$ 1.500,00 → base R$ 2.000,00); regra `base_multa`: boleto inteiro
     // (padrão) ou só o aluguel cheio (ex.: aluguel R$ 2.000,00 + IPTU R$ 200,00 → base R$ 2.200,00 ou R$ 2.000,00)
     base_multa: regra('base_multa') === 'aluguel'
-      ? Math.max(Math.min(aluguel - (ressarcimento || 0), totalSemDesconto - (fci || 0)) - reserva, 0)
-      : Math.max(totalSemDesconto - reserva - (fci || 0), 0),
+      ? Math.max(Math.min(aluguel - (ressarcimento || 0), totalSemDesconto - (fci || 0) - multaNotif) - reserva, 0)
+      : Math.max(totalSemDesconto - reserva - (fci || 0) - multaNotif, 0),
   };
 }
 
