@@ -91,7 +91,7 @@ async function consultarCnpj(el, cfg) {
     const unico = admins.length === 1 ? admins[0] : socios.length === 1 ? socios[0] : null;
     const tel = F.soDigitos(r.ddd_telefone_1 || '');
     const feitos = preencherVazios(el.form, { [cfg.razao]: r.razao_social, [cfg.nome]: cfg.razao ? (r.nome_fantasia || r.razao_social) : r.razao_social, [cfg.fantasia]: r.nome_fantasia,
-      [cfg.endereco]: endereco, [cfg.sede]: endereco, [cfg.telefone]: tel.length >= 10 ? F.mascarar('tel', tel) : '', [cfg.email]: String(r.email || '').toLowerCase(),
+      [cfg.endereco]: endereco, [cfg.sede]: endereco, [cfg.uf]: r.uf, [cfg.telefone]: tel.length >= 10 ? F.mascarar('tel', tel) : '', [cfg.email]: String(r.email || '').toLowerCase(),
       [cfg.representante]: unico && unico.nome_socio ? titulo(unico.nome_socio) : '' });
     mensagemAuto(el, `${esc(r.razao_social || '')}${r.descricao_situacao_cadastral ? ` · situação na Receita: <b>${esc(r.descricao_situacao_cadastral)}</b>` : ''}${feitos.length ? `<br>Preenchido: ${esc(feitos.join(', '))}.` : ''}${endereco && (feitos.length) ? '<br><b>Confira os acentos do endereço</b>: a Receita manda sem acento (ex.: "Sao Paulo" → "São Paulo"), e ele vai assim para a NF e o contrato.' : ''}`);
   } catch (e) {

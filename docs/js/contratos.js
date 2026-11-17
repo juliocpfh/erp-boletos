@@ -185,19 +185,21 @@ export function textoIndice(nome) {
  * assinaturas e a conta; todas ficam com Curitiba, Copel e Sanepar. Empresa nova começa em branco (o formulário grava os campos).
  */
 const LOCADORA_ANTIGA = /\bANK\b/i;
-const DADOS_ANTIGOS_EMPRESA = { cidade_documentos: 'Curitiba', energia_concessionaria: 'Companhia Paranaense de Energia (COPEL)', agua_concessionaria: 'Companhia de Saneamento do Paraná (SANEPAR)' };
+const DADOS_ANTIGOS_EMPRESA = { cidade_documentos: 'Curitiba', uf_sede: 'PR', energia_concessionaria: 'Companhia Paranaense de Energia (COPEL)', agua_concessionaria: 'Companhia de Saneamento do Paraná (SANEPAR)' };
 const DADOS_ANTIGOS_LOCADORA = { email_contato: 'administracao@ankjck.com.br', assinatura_email: 'Administradora', assinatura_mensagens: 'ANK Administradora',
   conta_deposito: `ANK ADMINISTRADORA DE BENS LTDA · Banco 336 (C6) · Ag. 0001 · C/C 36152656-3
 Pix (CNPJ): 58.492.818/0001-59` };
 /** Campos novos para uma empresa gravada antes deles ({} quando ela já os tem). */
 export function camposAntigosDaEmpresa(e) {
-  if (!e || e.assina_documentos !== undefined) return {};
+  if (!e) return {};
+  // "Estado da sede" veio depois (2026-11-17; antes, "PR" fixo nos endereços): a empresa já gravada fica com PR
+  if (e.assina_documentos !== undefined) return e.uf_sede === undefined ? { uf_sede: 'PR' } : {};
   const assina = LOCADORA_ANTIGA.test(`${e.nome || ''} ${e.razao_social || ''}`);
   const out = { assina_documentos: assina };
   for (const [k, v] of Object.entries({ ...DADOS_ANTIGOS_EMPRESA, ...(assina ? DADOS_ANTIGOS_LOCADORA : {}) })) if (e[k] === undefined) out[k] = v;
   return out;
 }
-const comCamposNovos = (e) => (e.assina_documentos === undefined ? { ...e, ...camposAntigosDaEmpresa(e) } : e);
+const comCamposNovos = (e) => (e.assina_documentos === undefined || e.uf_sede === undefined ? { ...e, ...camposAntigosDaEmpresa(e) } : e);
 
 /**
  * Empresa locadora dos documentos do inquilino (contrato, vistoria, recibos, carta, e-mails): a marcada em Empresas
@@ -221,6 +223,16 @@ export function dadoDaEmpresa(d, c, campo) {
     if (v) return v;
   }
   return '';
+}
+
+/**
+ * "Cidade/UF" do imóvel nos documentos e e-mails. Imóvel sem Estado: o do CEP dele e, sem CEP, o da sede da empresa
+ * (até 2026-11-17 era "PR" fixo para qualquer imóvel). Sem Estado nenhum, só a cidade. Ex.: "Curitiba/PR"; sem cidade, ''.
+ */
+export function cidadeUfDoImovel(d, imovel, c = null) {
+  if (!imovel || !imovel.cidade) return '';
+  const uf = imovel.uf || C.ufDoCep(imovel.cep) || String(dadoDaEmpresa(d, c || { imovel_id: imovel.id }, 'uf_sede') || '').toUpperCase();
+  return uf ? `${imovel.cidade}/${uf}` : imovel.cidade;
 }
 
 /** Companhia com artigo, como entra no contrato: "Companhia X (CX)" → "a Companhia X (CX)"; "o Departamento…" fica como está. */
@@ -281,7 +293,7 @@ export function dadosDoContrato(d, c, extra = {}) {
   const inquilinoPaga = ENCARGOS.filter(([k]) => (c[k] || (k === 'conta_iptu' ? (c.cobrar_iptu ? 'Por conta do inquilino' : '') : '')) === 'Por conta do inquilino').map(([, t]) => t);
   const inclusos = ENCARGOS.filter(([k]) => c[k] === 'Incluso no aluguel').map(([, t]) => t);
   const endereco = [imovel.endereco, imovel.complemento].filter(Boolean).join(', ');
-  const situado = [endereco, imovel.bairro, imovel.cidade ? `${imovel.cidade}/${imovel.uf || 'PR'}` : ''].filter(Boolean).join(', ');
+  const situado = [endereco, imovel.bairro, cidadeUfDoImovel(d, imovel, c)].filter(Boolean).join(', ');
   // caução pelas condições do contrato: sem valor gravado, aluguéis × aluguel com bonificação (não depende do depósito)
   const caucaoValor = c.caucao_valor > 0 ? c.caucao_valor : (c.caucao_meses > 0 ? c.caucao_meses * bonificado : 0);
   const caucaoMeses = c.caucao_meses || (caucaoValor && bonificado ? Math.round(caucaoValor / bonificado) : 0);
