@@ -144,6 +144,9 @@ export function cartaReajuste(c, comp) {
     escolhido: { indice: x.indice }, doIndice: x.percentual_indice ?? null } : calc;
   const empresa = K.locadorasDoContrato(d(), c)[0] || { nome: '' };
   const anterior = C.somarMeses(comp, -1);
+  // "e a pontualidade" só para quem pagou tudo em dia nos 12 meses antes (sem atraso, acordo nem boleto vencido em aberto)
+  const pontualNoAno = (ct, mes) => { const hoje = C.hojeIso(); const de = C.somarMeses(mes, -12); return !d().cobrancas.some((cb) => cb.contrato_id === ct.id && cb.competencia >= de && cb.competencia < mes && !R.ehComplementoCaucao(cb)
+    && (cb.dias_atraso > 0 || R.emAcordo(cb) || (R.aCobrar(cb) && C.vencido(cb.vencimento, hoje)))); };
   // vencimento do boleto corrigido: o do boleto já gerado ou o do contrato naquele mês (vale o termo de troca do dia), o mesmo da tela Reajustes
   const vencNovo = R.vencimentoDoReajuste(d(), c, comp);
   if (k.percentual === null) {
@@ -166,7 +169,7 @@ export function cartaReajuste(c, comp) {
     ${d().logo ? `${K.marcaDagua(d().logo)}<p class="ct-capa"><img src="${esc(d().logo)}" alt="Logo"></p>` : ''}
     <p class="carta-data">${esc((i && i.cidade) || K.dadoDaEmpresa(d(), c, 'cidade_documentos'))}, ${K.dataPorExtenso(C.hojeIso(), { zero: false })}.</p>
     <p>Prezado(a) <b>${esc(c.inquilino_nome)}</b>,<br>Imóvel: <b>${esc(i ? `${i.nome} - ${R.enderecoCompleto(i)}` : '')}</b></p>
-    <p>Com o aluguel de <b>${K.mesPorExtenso(comp)}</b> completamos <b>${r ? r.anos : ''} ano${r && r.anos > 1 ? 's' : ''}</b> de parceria. Agradecemos a confiança e a pontualidade, e é uma satisfação ter você conosco.</p>
+    <p>Com o aluguel de <b>${K.mesPorExtenso(comp)}</b> completamos <b>${r ? r.anos : ''} ano${r && r.anos > 1 ? 's' : ''}</b> de parceria. Agradecemos a confiança${pontualNoAno(c, comp) ? ' e a pontualidade' : ''}, e é uma satisfação ter você conosco.</p>
     <p>Conforme a cláusula de reajuste anual do contrato, ${indiceTexto}.</p>
     <table class="carta-tabela"><tr><th></th><th class="n">Atual</th><th class="n">A partir do aluguel de ${compBr(comp)}</th></tr>
       <tr><td>Aluguel</td><td class="n">${reais(k.atual)}</td><td class="n"><b>${reais(k.novo)}</b></td></tr>

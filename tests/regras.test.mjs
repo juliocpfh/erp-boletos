@@ -2695,6 +2695,9 @@ test('NFs: numera só os pagamentos marcados (mês fechado) e lembra do Airbnb a
   assert.deepEqual([R.mesFechado('2026-10', '2026-11-09'), R.mesFechado('2026-11', '2026-11-09')], [true, false]);
   const pend = R.pendentesDeFatura(d);
   assert.deepEqual(pend.map(R.chavePendente), ['cobranca:1', 'cobranca:2']);
+  // sem nenhum imóvel Airbnb nem ganho lançado: não lembra (item 14 do teste de ponta a ponta, 16/11/2026)
+  assert.deepEqual(R.lembretesAirbnb(d, ['2026-10'], '2026-11-09'), []);
+  R.inserir(d, 'imoveis', { tipo: 'airbnb', nome: 'Grupo Airbnb' }, 'julio');
   // sem ganho do Airbnb em outubro: lembra de lançar; com a entrada no extrato sem destino: avisa a entrada
   assert.match(R.lembretesAirbnb(d, ['2026-10', '2026-11'], '2026-11-09').join(' | '), /Nenhuma entrada do Airbnb lançada em 10\/2026/);
   d.movimentacoes_banco = [{ id: 1, tipo: 'entrada', data: '2026-10-20', valor: 90000, titulo: 'PIX RECEBIDO AIRBNB PAYMENTS', classificacao: null }];

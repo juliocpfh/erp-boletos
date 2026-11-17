@@ -513,7 +513,8 @@ export const CADASTROS = {
         ...p.contato, ...p.proposta, ...p.pessoa, ...F.FICHA_RENDA, ...F.FICHA_FIADORES, ...p.fim];
     },
     padrao: (q) => ({ data_recebida: C.hojeIso(), ...(q.imovel ? { [`imovel_${q.imovel}`]: true } : {}) }),
-    valores: (r) => ({ ...r, inquilino_tipo: r.inquilino_tipo || 'Pessoa física', bonificacao: r.bonificacao !== false,
+    // "Reprovar (com o motivo)" abre já com a situação Reprovada (motivo e devolução da reserva à vista)
+    valores: (r, q = {}) => ({ ...r, ...(q.situacao ? { situacao: q.situacao } : {}), inquilino_tipo: r.inquilino_tipo || 'Pessoa física', bonificacao: r.bonificacao !== false,
       aluguel_bonificado: r.bonificacao === false || !(r.aluguel_inicial > 0) ? null : inicialBonificado(r),
       ...Object.fromEntries((r.imoveis_ids || []).map((id) => [`imovel_${id}`, true])) }),
     compacto: true,
@@ -990,6 +991,7 @@ export const CADASTROS = {
     },
   },
   cobrancas: {
+    semNovo: true, // boleto novo sai em "Gerar boletos" na tela Boletos
     titulo: (r) => `${r.data_pagamento ? 'Observações da NF do' : 'Alterar'} boleto ${compBr(r.competencia)} - ${buscar('contratos', r.contrato_id).inquilino_nome}`,
     // boleto pago: só as observações que saem na NF (os valores exigem desfazer o pagamento)
     campos: (r) => (r.data_pagamento ? F.COBRANCA.filter((c) => c.nome === 'observacoes_nf') : F.COBRANCA),
@@ -1018,8 +1020,19 @@ export function telaFormulario(tabela, registro, q, estado) {
   const cfg = CADASTROS[tabela];
   if (!cfg) return naoEncontrado('Página não encontrada');
   if (!opera() || (cfg.admin && !podeUsuario('admin'))) return '<h1>Seu usuário não pode alterar este cadastro</h1>';
+  if (!registro && cfg.semNovo) return naoEncontrado('Boletos novos saem na tela Boletos ("Gerar boletos" do mês)', '#/cobrancas', 'Ir para Boletos');
+  // cadastro que depende de outro (ex.: depósito da garantia de um contrato) aberto sem ele: endereço incompleto
+  try {
+    return montarFormulario(cfg, tabela, registro, q, estado);
+  } catch (e) {
+    if (!(e instanceof TypeError)) throw e;
+    return naoEncontrado('Abra este cadastro pela página do inquilino ou do imóvel');
+  }
+}
+
+function montarFormulario(cfg, tabela, registro, q, estado) {
   const campos = cfg.campos(registro, q);
-  let valores = estado ? estado.valores : F.paraFormulario(campos, registro && cfg.valores ? cfg.valores(registro) : registro);
+  let valores = estado ? estado.valores : F.paraFormulario(campos, registro && cfg.valores ? cfg.valores(registro, q) : registro);
   if (!registro && !estado) {
     const padroes = Object.fromEntries(campos.filter((c) => c.nome && c.padrao !== undefined).map((c) => [c.nome, c.padrao]));
     valores = F.paraFormulario(campos, { ...padroes, ...(cfg.padrao ? cfg.padrao(q) : {}) });

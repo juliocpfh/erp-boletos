@@ -1843,6 +1843,8 @@ export const entradasAirbnbSemDestino = (d, comp) => (d.movimentacoes_banco || [
  */
 export function lembretesAirbnb(d, meses, hoje = C.hojeIso()) {
   const out = [];
+  // "nenhuma entrada lançada" só para quem tem Airbnb (imóvel do tipo ou algum ganho já lançado)
+  const temAirbnb = d.imoveis.some((i) => i.tipo === 'airbnb') || (d.ganhos_airbnb || []).length > 0;
   for (const comp of [...new Set(meses)].filter((m) => mesFechado(m, hoje)).sort()) {
     const sem = entradasAirbnbSemDestino(d, comp);
     if (sem.length) out.push(`${sem.length} entrada(s) do Airbnb no extrato de ${C.compBr(comp)} ainda sem destino (${C.reais(sem.reduce((t, m) => t + m.valor, 0))}): dê o destino no Financeiro, dividindo entre os imóveis.`);
@@ -1850,7 +1852,7 @@ export function lembretesAirbnb(d, meses, hoje = C.hojeIso()) {
     if (m.numerada) continue;
     if (m.total && !m.nf) out.push(`Os ganhos do Airbnb de ${C.compBr(comp)} (${C.reais(m.total)}) ainda não viraram NF: gere a NF do Airbnb.`);
     else if (m.divergente) out.push(`A NF do Airbnb de ${C.compBr(comp)} está com ${C.reais(m.nf.valor)}, mas os ganhos somam ${C.reais(m.total)}: acerte a NF do Airbnb.`);
-    else if (!m.total && !sem.length) out.push(`Nenhuma entrada do Airbnb lançada em ${C.compBr(comp)}. Se houve, lance antes de numerar.`);
+    else if (!m.total && !sem.length && temAirbnb) out.push(`Nenhuma entrada do Airbnb lançada em ${C.compBr(comp)}. Se houve, lance antes de numerar.`);
   }
   return out;
 }
@@ -4031,6 +4033,15 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
   };
   const feita = (data, texto = '') => ({ situacao: 'feita', data: data || null, texto });
   const andamento = (texto) => ({ situacao: 'andamento', texto });
+  // etapa que é do contrato (gerar contrato, vistoria, termo das chaves, contra-vistoria, fiador): vale a situação dela no
+  // contrato anterior; pendente lá, fica "pendente no contrato de Fulano" (antes aparecia feita, herdada, sem estar)
+  let rotinaAnterior = null;
+  const doAnterior = (chave) => {
+    rotinaAnterior = rotinaAnterior || rotinaEntrada(d, anterior, hoje);
+    const e = rotinaAnterior.find((x) => x.chave === chave);
+    if (!e || ['feita', 'pulada'].includes(e.situacao)) return feita(e ? e.data : null, herdou);
+    return andamento(`pendente no contrato de ${anterior.inquilino_nome}`);
+  };
   const docAssinado = (k, chave) => {
     const doc = documentoEntrada(d, c, k);
     if (doc) return feita(doc.data, doc.contrato.id !== c.id ? `herdado de ${doc.contrato.inquilino_nome}` : (doc.arquivo ? '' : 'sem arquivo'));
@@ -4054,12 +4065,12 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
       if (c.reserva_valor > 0) return c.comprovante_reserva ? feita(c.reserva_data, C.reais(c.reserva_valor)) : andamento(`${C.reais(c.reserva_valor)} sem comprovante`);
       return undefined;
     },
-    contrato_gerado: () => (anterior ? feita(null, herdou) : jaGerado('doc_contrato_em', 'contrato já assinado')),
+    contrato_gerado: () => (anterior ? doAnterior('contrato_gerado') : jaGerado('doc_contrato_em', 'contrato já assinado')),
     contrato_assinado: () => docAssinado('doc_contrato_em', 'contrato_assinado'),
     aditivo: () => {
       // só o termo da troca de titular (outro termo assinado não conta)
       const t = aditivoDaTroca(d, c);
-      if (t) return feita(t.data, t.assunto);
+      if (t) return feita(t.assinado_em || t.data, t.assunto); // a data em que foi assinado (não a da troca)
       return aditivosAguardando(d, c.id).some((a) => a.tipo === TIPO_ADITIVO_TROCA) ? andamento('gerado, aguardando assinatura') : undefined;
     },
     garantia: () => {
@@ -4067,7 +4078,8 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
         const m = marcaAnterior('garantia');
         if (m) return m;
         const semDeposito = (temCaucao(c) || temDeposito(c)) && ![c, ...antes].some((x) => garantiaDepositada(x) || somaDepositos(d, x, temCaucao(c) ? 'caucao' : 'deposito') > 0);
-        return semDeposito ? andamento(`herdada de ${anterior.inquilino_nome}: falta o depósito`) : feita(null, `herdada de ${anterior.inquilino_nome}`);
+        if (semDeposito) return andamento(`herdada de ${anterior.inquilino_nome}: falta o depósito`);
+        return temCaucao(c) || temDeposito(c) ? feita(null, `herdada de ${anterior.inquilino_nome}`) : doAnterior('garantia');
       }
       if (temCaucao(c) || temDeposito(c)) {
         const qual = temCaucao(c) ? 'caucao' : 'deposito';
@@ -4081,11 +4093,11 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
       // a vistoria de entrada que vale (própria ou, na troca de titular, a do contrato anterior: aparece como herdada)
       const v = vistoriaDeEntrada(d, c);
       if (v && v.contrato_id === c.id) return feita(v.data);
-      return anterior ? feita(null, herdou) : jaGerado('doc_vistoria_em', 'vistoria já assinada');
+      return anterior ? doAnterior('vistoria_gerada') : jaGerado('doc_vistoria_em', 'vistoria já assinada');
     },
-    chaves_gerado: () => (anterior ? feita(null, herdou) : jaGerado('doc_chaves_em', 'termo já assinado')),
+    chaves_gerado: () => (anterior ? doAnterior('chaves_gerado') : jaGerado('doc_chaves_em', 'termo já assinado')),
     vistoria_assinada: () => docAssinado('doc_vistoria_em', 'vistoria_assinada'),
-    contra_vistoria: () => situacaoContraVistoria(d, c, hoje),
+    contra_vistoria: () => (anterior && !c.contra_vistoria && ![...antes].some((x) => x.contra_vistoria) ? doAnterior('contra_vistoria') : situacaoContraVistoria(d, c, hoje)),
     chaves_assinado: () => docAssinado('doc_chaves_em', 'chaves_assinado'),
     seguro: () => {
       const data = c.data_entrada || c.vigencia_inicio || '';
@@ -6948,11 +6960,13 @@ export function roteiroSaida(d, c, hoje = C.hojeIso()) {
       c.vistoria_saida_data ? (convite && convite.data >= (c.vistoria_saida_marcada_em || '') ? `convite ${comoEnvio(convite)} em ${C.dataBr(convite.data)}` : 'falta mandar o convite ao inquilino') : null];
   // B4: a etapa das chaves fecha com o termo de devolução assinado (saídas já acertadas antes do termo: pelo cálculo final)
   const termo = c.termo_chaves_saida;
+  // o termo de devolução das chaves existe desde 13/11/2026: só as saídas de antes fecham a etapa pelo cálculo final
+  const semTermoAntigo = !!c.data_saida && c.data_saida < '2026-11-13';
   return [
     { chave: 'aviso', titulo: 'Aviso prévio: data de saída informada', feito: true, detalhe: `saída em ${C.dataBr(c.data_saida)}` },
     { chave: 'vistoria', titulo: 'Vistoria de saída (com a leitura dos relógios)', feito: !!vist, detalhe: vistoriaDetalhe.filter(Boolean).join(' · ') },
-    { chave: 'chaves', titulo: 'Devolução das chaves (termo assinado)', feito: !!termo || (saiu && !!e),
-      detalhe: termo ? `chaves devolvidas em ${C.dataBr(c.data_saida)}; termo de devolução assinado ✓` : saiu ? `chaves devolvidas em ${C.dataBr(c.data_saida)}${e ? '' : '; falta anexar o termo de devolução assinado'}` : `prevista para ${C.dataBr(c.data_saida)}` },
+    { chave: 'chaves', titulo: 'Devolução das chaves (termo assinado)', feito: !!termo || (saiu && !!e && semTermoAntigo),
+      detalhe: termo ? `chaves devolvidas em ${C.dataBr(c.data_saida)}; termo de devolução assinado ✓` : saiu ? `chaves devolvidas em ${C.dataBr(c.data_saida)}${e && semTermoAntigo ? '; acertada sem termo (saída de antes do termo de devolução)' : '; falta anexar o termo de devolução assinado'}` : `prevista para ${C.dataBr(c.data_saida)}` },
     { chave: 'contas', titulo: 'Contas: titularidade de volta ao proprietário e leitura final', feito: contasOk,
       detalhe: [titularidade ? 'falta o protocolo da volta da titularidade' : 'titularidade de volta ✓', leitura ? 'leitura da saída ✓' : 'falta a leitura dos relógios na saída'].join(' · ') },
     { chave: 'calculo', titulo: 'Cálculo final (garantia corrigida, débitos, FCI)', feito: !!e, detalhe: e ? `${e.saldo >= 0 ? 'a devolver' : 'a cobrar'} ${C.reais(Math.abs(e.saldo))}` : saiu ? 'pendente' : 'depois da saída' },

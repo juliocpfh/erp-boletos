@@ -40,6 +40,8 @@ export function conferirContrato(dados, r, q) {
   if (!r && imovelId && dados.gerar_nf !== false && !R.participacoesDo(d(), imovelId).length) {
     out.push(`O imóvel ${(buscar('imoveis', imovelId) || {}).nome || ''} ainda não tem empresa que emite a NF. Defina na página do imóvel para conseguir numerar as NFs.`);
   }
+  // a reserva é paga antes de entrar: data muito depois da entrada costuma ser o ano errado (ex.: 10/11/2026 com entrada em 15/11/2025)
+  if (dados.reserva_valor > 0 && dados.reserva_data && dados.data_entrada && dados.reserva_data > C.somarDias(dados.data_entrada, 31)) out.push(`A reserva tem data de ${dataBr(dados.reserva_data)}, mais de um mês depois da entrada (${dataBr(dados.data_entrada)}): confira o ano. Ela é abatida no 1º aluguel.`);
   if (dados.vigencia_inicio && dados.data_entrada && Math.abs(C.diasEntre(dados.vigencia_inicio, dados.data_entrada)) > 31) out.push(`O início do contrato (${dataBr(dados.vigencia_inicio)}) e a entrada (${dataBr(dados.data_entrada)}) estão a mais de um mês de distância.`);
   const antigo = r ? CADASTROS.contratos.valores(r) : null;
   for (const [prefixo, quem] of pessoasDoContrato(dados)) out.push(...conferirPessoa(dados, antigo, prefixo, quem));

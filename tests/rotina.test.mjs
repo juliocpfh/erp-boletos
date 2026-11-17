@@ -105,7 +105,12 @@ test('rotina do novo titular: documentos, garantia e vistoria herdados; termo ad
   assert.equal(e('reserva'), undefined, 'reserva é do contrato anterior');
   assert.equal(e('contrato_assinado').texto, 'herdado de Maria Exemplo');
   assert.equal(e('aditivo').situacao, 'pendente');
-  assert.equal(e('vistoria_gerada').situacao, 'feita');
+  // a vistoria não foi feita no contrato anterior: fica pendente lá (antes aparecia feita, herdada)
+  assert.equal(e('vistoria_gerada').situacao, 'andamento');
+  assert.equal(e('vistoria_gerada').texto, 'pendente no contrato de Maria Exemplo');
+  assert.equal(e('contrato_gerado').situacao, 'feita', 'o contrato do anterior já está assinado');
+  R.marcarDocumento(d, c.id, 'doc_vistoria_em', '2026-06-05', 'julio', 'vistoria.pdf');
+  assert.equal(R.rotinaEntrada(d, novo, '2026-11-01').find((x) => x.chave === 'vistoria_gerada').situacao, 'feita');
 });
 
 test('reajuste com índice arredondado ou aluguel digitado: guarda o índice do contrato e o % calculado', () => {

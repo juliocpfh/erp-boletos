@@ -152,6 +152,8 @@ textarea { min-height: 80px; }
 .impressao { max-width: none; }
 .fora td { background: #fef2f2; }
 .nw { white-space: nowrap; }
+/* campo do mês (tela Boletos): cabe "novembro de 2026" com o ícone, também no celular */
+.campo-mes { width: 13em; max-width: 100%; }
 .pre { white-space: pre-wrap; }
 .maior { font-size: 18px; font-weight: 700; }
 label.enviar { position: relative; overflow: hidden; margin-top: 8px; }
@@ -537,7 +539,7 @@ button.q-aberto:hover { outline: 2px solid #791F1F; }
   header.topo nav { display: none; order: 4; width: 100%; flex-direction: column; gap: 2px; padding-bottom: 6px; }
   header.topo.menu-aberto nav { display: flex; }
   header.topo nav a { padding: 9px 10px; font-size: 15px; }
-  .faixa { padding: 4px 12px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .faixa { padding: 4px 12px; font-size: 12px; overflow-wrap: anywhere; } /* quebra a linha (cortada, a data sumia) */
   main { padding: 12px 12px 60px; }
   .cartao { padding: 12px; }
   h1 { font-size: 21px; }

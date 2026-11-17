@@ -575,6 +575,8 @@ function formMarcarDocumento(c, k, feito, comParcial = true) {
  * continua com o histórico). Aberta enquanto falta algo para quem entrou há até 6 meses; depois, recolhida.
  */
 function caixaRotinaEntrada(c, hoje = C.hojeIso()) {
+  // depois da saída (ou do fim do vínculo), a rotina de entrada sai da página: vale o roteiro da saída
+  if (c.data_saida && c.data_saida <= hoje) return '';
   const { etapas, feitas, total, concluida } = R.resumoRotinaEntrada(d(), c, hoje);
   if (!total) return '';
   const aberta = rotinaAberta(c, hoje);
@@ -785,7 +787,9 @@ export function telaContrato(c) {
   const tel = (c.inquilino_telefone || '').replace(/\D/g, '');
   const lig = (x) => `<a href="#/contrato/${x.id}">${esc(x.inquilino_nome)}</a> (${dataBr(x.data_entrada)} a ${dataBr(x.data_saida)})`;
   const historicoIds = new Set([c.id, ...cadeia.antes.map((x) => x.id), ...cadeia.depois.map((x) => x.id)]);
-  const outros = R.outrosContratosDaPessoa(d(), c, hoje);
+  // outros imóveis da pessoa: sem os contratos da mesma cadeia de troca de titular e sem repetir o imóvel
+  const daCadeia = new Set([...cadeia.antes, ...(cadeia.depois || [])].map((x) => x.id));
+  const outros = R.outrosContratosDaPessoa(d(), c, hoje).filter((x, k, l) => !daCadeia.has(x.id) && x.imovel_id !== c.imovel_id && l.findIndex((y) => y.imovel_id === x.imovel_id) === k);
   const car = R.periodoCarencia(c);
   const pj = c.inquilino_tipo === 'Pessoa jurídica (empresa)';
   const pessoa = (pre) => esc([c[`${pre}_cpf`] && `CPF/CNPJ ${c[`${pre}_cpf`]}`, c[`${pre}_rg`] && `RG ${c[`${pre}_rg`]}`, c[`${pre}_telefone`], c[`${pre}_email`]].filter(Boolean).join(' · '));

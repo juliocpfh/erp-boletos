@@ -90,7 +90,7 @@ const AVISO_SEGURO_DISPENSADO = 'imoveis-aviso-backup-seguro';
 export function avisoBackupSeguro() {
   if (!podeUsuario('admin') || E.seguro || !S.suportado() || window.VERSAO_OFFLINE) return '';
   try { if (localStorage.getItem(AVISO_SEGURO_DISPENSADO)) return ''; } catch { /* sem armazenamento */ }
-  return `<div class="alerta aviso"><b>Backup seguro</b> não está ligado neste computador: sem ele, este computador não guarda a cópia dos dados fora do Cloudflare (reserva para um desastre).
+  return `<div class="alerta aviso"><b>Backup seguro</b> não está ligado neste computador: sem ele, ${E.nuvem ? 'este computador não guarda a cópia dos dados fora do Cloudflare' : 'não há uma segunda cópia dos dados, fora da pasta que o sistema usa'} (reserva para um desastre).
     ${link('#/backup-seguro', 'Ligar o backup seguro', 'botao pequeno')} ${botao('dispensarAvisoSeguro', 'Não avisar neste computador', {}, 'secundario pequeno')}</div>`;
 }
 export const dispensarAvisoSeguro = () => { try { localStorage.setItem(AVISO_SEGURO_DISPENSADO, '1'); } catch { /* sem armazenamento */ } };
