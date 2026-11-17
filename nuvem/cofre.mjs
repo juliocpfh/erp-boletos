@@ -687,6 +687,14 @@ export class Cofre {
     return { ok: true };
   }
 
+  /** Valor inteiro de uma regra do sistema escolhida pelo administrador (tabela config_regras), ou undefined (vale o padrão). */
+  regraNumero(chave) {
+    for (const r of this.q("SELECT dados FROM registros WHERE tabela = 'config_regras'")) {
+      try { const x = JSON.parse(r.dados); if (x.chave === chave && Number.isInteger(x.valor)) return x.valor; } catch { /* linha estragada */ }
+    }
+    return undefined;
+  }
+
   /** Desliga os crachás do programa do PC de um usuário (a tabela é de aparelhos.mjs; sem ela, nada a fazer). */
   desligarAparelhosDe(usuarioId, email) {
     try {
@@ -1111,9 +1119,9 @@ export class CofreDO {
     if (so !== 'faxina' && this.env.DADOS) await backupDoDia(c, this.env.DADOS, agora);
     if (so !== 'backup') {
       c.limpar(); c.controle('ultima_faxina', agora.toISOString());
-      // R2: lixeira dos anexos apagados (30 dias) e links da ficha passados da guarda (LGPD), sem esperar alguém abrir a lista
+      // R2: lixeira dos anexos apagados (regra dias_lixeira_anexos, padrão 30 dias) e links da ficha passados da guarda (LGPD)
       if (this.env.DADOS) {
-        await faxinaDaLixeira(this.env.DADOS, agora).catch((e) => console.error('lixeira', e));
+        await faxinaDaLixeira(this.env.DADOS, agora, c.regraNumero('dias_lixeira_anexos')).catch((e) => console.error('lixeira', e));
         await faxinaDosLinks(this.env).catch((e) => console.error('links da ficha', e));
       }
     }

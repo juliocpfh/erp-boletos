@@ -4466,6 +4466,44 @@ export function rotulosDosArquivos(d) {
   return m;
 }
 
+/** O valor de um campo com o nome de arquivo trocado (texto, lista ou objeto de fotos); undefined se o nome não está nele. */
+function trocarNomeNoValor(v, antigo, novo) {
+  if (v === antigo) return novo;
+  if (Array.isArray(v)) return v.includes(antigo) ? v.map((x) => (x === antigo ? novo : x)) : undefined;
+  if (v && typeof v === 'object') {
+    if (!Object.values(v).includes(antigo)) return undefined;
+    return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, x === antigo ? novo : x]));
+  }
+  return undefined;
+}
+
+/**
+ * Anexo de uma pasta (escopo e código, como em arquivosReferenciados) que passou a se chamar `novo`: troca o nome só nos
+ * lançamentos que apontam para ele naquela pasta (o mesmo nome em outra pasta é outro arquivo). Cada campo candidato é
+ * conferido trocando e vendo se a referência daquela pasta aparece com o nome novo. `deste(tabela, id)`: só os lançamentos
+ * deste aparelho (o do outro continua com o arquivo dele). Devolve quantos campos mudaram.
+ */
+export function renomearArquivoNoBanco(d, escopo, id, antigo, novo, usuario, deste = () => true) {
+  const alvo = `${escopo}:${id}|${novo}`;
+  const tem = () => arquivosReferenciados(d).some((x) => `${x.escopo}:${x.id}|${x.nome}` === alvo);
+  if (!antigo || !novo || antigo === novo || tem()) return 0;
+  const trocas = [];
+  for (const [t, lista] of Object.entries(d)) {
+    if (t === 'historico' || !Array.isArray(lista) || !TABELAS[t]) continue;
+    for (const r of lista) {
+      if (!r || typeof r !== 'object' || !deste(t, r.id)) continue;
+      for (const [k, v] of Object.entries(r)) {
+        const trocado = trocarNomeNoValor(v, antigo, novo);
+        if (trocado === undefined) continue;
+        r[k] = trocado; const daPasta = tem(); r[k] = v;
+        if (daPasta) trocas.push([t, r.id, k, trocado]);
+      }
+    }
+  }
+  for (const [t, rid, k, valor] of trocas) atualizar(d, t, rid, { [k]: valor }, usuario, `Arquivo guardado como "${novo}" (já havia outro "${antigo}" na nuvem, de outro aparelho)`);
+  return trocas.length;
+}
+
 /** Arquivo renomeado na pasta do inquilino: troca o nome em todos os lançamentos que apontam para ele. */
 export function renomearReferencias(d, contratoId, antigo, novo, usuario) {
   const texto = `Arquivo renomeado para acompanhar o lançamento: ${antigo} → ${novo}`;

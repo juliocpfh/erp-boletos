@@ -14,7 +14,7 @@ import { AnexosNuvem } from './pasta-nuvem.js';
 import { Cofrinho, guardarCifrado } from './cofrinho.js';
 import * as R from './regras.js';
 import { TELAS, FORMULARIOS, ACOES } from './telas.js';
-import { apagarAnexosConfirmados, SELETOR_FORMULARIO } from './telas/comum.js';
+import { apagarAnexosConfirmados, corrigirAnexoRenomeado, SELETOR_FORMULARIO } from './telas/comum.js';
 
 export const E = {
   pasta: null, // atalho para a pasta dos dados
@@ -304,7 +304,7 @@ export function atualizarProgramaSeguro() {
  * Cópia cifrada do banco de hoje na pasta segura (se este computador tem o backup seguro ligado). Cada cópia cifra e grava o
  * banco inteiro: gravações seguidas (e mudanças de outros aparelhos) enquanto uma espera a vez viram uma só, com o banco do momento.
  */
-const espelharUmaVez = B.espelhoSemAcumular(naFilaSegura, () => (E.seguro && E.seguro.chave && E.d ? B.espelhar(E.seguro.dir, E.seguro.chave, E.d) : undefined));
+const espelharUmaVez = B.espelhoSemAcumular(naFilaSegura, () => (E.seguro && E.seguro.chave && E.d ? B.espelhar(E.seguro.dir, E.seguro.chave, E.d, { diasHoras: R.regra('dias_copias_backup') }) : undefined));
 function espelharSeguro() {
   if (E.seguro?.falhou) { tentarSeguroDeNovo(); return; }
   if (E.seguro && E.seguro.chave && E.d) espelharUmaVez();
@@ -322,6 +322,7 @@ export function atualizarCopiaAberta(aoAndar = () => {}) {
       listar: () => E.anexos.listaCrua([S.PASTA_ARQUIVOS]),
       ler: (caminho) => E.anexos.ler([S.PASTA_ARQUIVOS, ...caminho.split('/')]),
       aoAndar,
+      diasApagados: R.regra('dias_lixeira_anexos'), // o que saiu da nuvem fica em "Apagados na nuvem" (item 28)
     });
   });
   filaCopia = tarefa.catch(() => {});
@@ -615,6 +616,7 @@ export async function abrirNuvem() {
   E.nuvem = new N.Sincronia({ api: N.apiDoSite(), guardar, aoMudar: (externo) => aoMudarNuvem(externo), trava: N.travaDoNavegador, normalizar: R.normalizar, tabelas: TABELAS_DO_SISTEMA });
   E.anexos = new AnexosNuvem({ guardar });
   E.anexos.aoMudar = agendarCopiaAberta; // cópia aberta dos arquivos no computador do administrador
+  E.anexos.aoRenomear = corrigirAnexoRenomeado; // anexo sem internet que subiu com outro nome: o lançamento acompanha (item 22)
   // sem internet, neste computador: o anexo abre da cópia aberta (só precisa da pasta do backup seguro com permissão)
   E.anexos.daCopiaLocal = (partes) => (partes[0] === S.PASTA_ARQUIVOS && E.seguro?.dir ? CA.lerDaCopia(E.seguro.dir, partes.slice(1).join('/')) : null);
   E.pasta = E.anexos.raiz(); // anexos pela mesma interface da pasta do computador

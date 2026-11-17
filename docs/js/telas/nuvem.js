@@ -189,6 +189,7 @@ function relatorio(r) {
     `${r.registros} registros do banco ${r.diferencas.length ? `<b>com diferença em: ${esc(r.diferencas.join(', '))}</b>` : 'conferidos: iguais à pasta ✓'}`,
     `${r.total} anexos (${mb(r.totalBytes)}) ${r.faltando.length ? `<b>${r.faltando.length} faltando na nuvem</b>: ${esc(r.faltando.slice(0, 10).join('; '))}` : 'conferidos: todos na nuvem com o mesmo tamanho ✓'}${r.pulados ? ` (${r.pulados} já estavam lá)` : ''}`,
     ...(r.recusados.length ? [`<b>${r.recusados.length} recusados</b>: ${esc(r.recusados.map((x) => `${x.caminho} (${x.motivo})`).join('; '))}`] : []),
+    ...(r.trocados?.length ? [`<b>${r.trocados.length} trocados pelo da pasta</b> (a nuvem tinha outro arquivo com o mesmo nome; a versão de lá ficou guardada na lixeira da nuvem por ${esc(String(R.regra('dias_lixeira_anexos')))} dias): ${esc(r.trocados.slice(0, 20).join('; '))}${r.trocados.length > 20 ? '…' : ''}`] : []),
   ];
   return `<div class="alerta ${r.ok && !r.recusados.length ? 'ok' : 'perigo'}"><b>${r.ok && !r.recusados.length ? 'Pronto: os dados estão na nuvem.' : 'Terminou, mas confira:'}</b><ul>${itens.map((i) => `<li>${i}</li>`).join('')}</ul></div>`;
 }

@@ -30,7 +30,7 @@ const FORM_RESTAURAR = `<form data-form="restaurarSeguro" class="formulario">
 export function telaRestaurarBackup() {
   return `<main><div id="mensagens"></div><div class="cartao login" style="max-width:640px">
     <h1>Restaurar backup seguro</h1>
-    <p>Use só em caso de desastre (dados perdidos). Site fora do ar ou sem internet: abra pelo aplicativo instalado, que guarda os dados neste aparelho e envia sozinho quando voltar. Para restaurar, escolha um arquivo da pasta do backup seguro (<b>${B.PASTA_DIARIO}</b> tem a cópia do banco de cada dia; <b>${B.PASTA_SEMANAL}</b> tem os completos, com anexos) e digite a senha do backup.</p>
+    <p>Use só em caso de desastre (dados perdidos). Site fora do ar ou sem internet: abra pelo aplicativo instalado, que guarda os dados neste aparelho e envia sozinho quando voltar. Para restaurar, escolha um arquivo da pasta do backup seguro (<b>${B.PASTA_DIARIO}</b> tem a cópia do banco de cada dia; <b>${B.PASTA_HORAS}</b>, a de cada hora dos últimos dias, para voltar a antes de um erro; <b>${B.PASTA_SEMANAL}</b> tem os completos, com anexos) e digite a senha do backup.</p>
     ${FORM_RESTAURAR}
     <p><a href="#/">Voltar</a></p></div></main>`;
 }
