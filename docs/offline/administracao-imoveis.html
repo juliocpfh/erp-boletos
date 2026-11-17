@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-REBrVBUvD/6ggVOYr1nA/WL8W2g1nyqw0fssoR4Qltg='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-B5xigHtox2BeXrwm/a8iWEAmDswuLgNDvYbVVIAwpAE='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="79abf449087ad09e">
+<meta name="fontes" content="4c52a2fefae6ed10">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -2294,7 +2294,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     });
     return valor;
   }
-  function totaisCobranca({ aluguel, desconto, iptu = 0, seguro = 0, taxa_boleto = 0, outros = 0, ressarcimento = 0, fci = 0 }, reservaDisponivel = 0) {
+  function totaisCobranca({ aluguel, desconto, iptu = 0, seguro = 0, taxa_boleto = 0, outros = 0, ressarcimento = 0, fci = 0, multas_notificacao = [] }, reservaDisponivel = 0) {
+    const multaNotif = (multas_notificacao || []).reduce((s, e) => s + (Number(e && e.valor) || 0), 0);
     const encargos = iptu + seguro + taxa_boleto + outros + (fci || 0);
     const totalSemDesconto = aluguel + encargos - (ressarcimento || 0);
     const totalPontual = totalSemDesconto - desconto;
@@ -2307,9 +2308,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       // nunca negativo (ex.: ressarcimento maior que o boleto): igual ao "sem desconto", para quem atrasa não pagar mais que quem paga em dia
       a_pagar_pontual: Math.max(totalPontual - reserva, 0),
       a_pagar_sem_desconto: Math.max(totalSemDesconto - reserva, 0),
-      // multa e juros por atraso não incidem sobre o FCI (fundo de conservação do imóvel); regra `base_multa`: boleto inteiro
+      // multa e juros por atraso não incidem sobre o FCI (fundo de conservação do imóvel) nem sobre a multa da notificação
+      // (boleto de R$ 2.000,00 + multa da notificação de R$ 1.500,00 → base R$ 2.000,00); regra `base_multa`: boleto inteiro
       // (padrão) ou só o aluguel cheio (ex.: aluguel R$ 2.000,00 + IPTU R$ 200,00 → base R$ 2.200,00 ou R$ 2.000,00)
-      base_multa: regra("base_multa") === "aluguel" ? Math.max(Math.min(aluguel - (ressarcimento || 0), totalSemDesconto - (fci || 0)) - reserva, 0) : Math.max(totalSemDesconto - reserva - (fci || 0), 0)
+      base_multa: regra("base_multa") === "aluguel" ? Math.max(Math.min(aluguel - (ressarcimento || 0), totalSemDesconto - (fci || 0) - multaNotif) - reserva, 0) : Math.max(totalSemDesconto - reserva - (fci || 0) - multaNotif, 0)
     };
   }
   function diasComerciais(comp, entrada, saida) {
@@ -24585,7 +24587,7 @@ ${m.texto}
       ${cb.reserva_utilizada ? linha("(-) Reserva paga na visita, abatida neste mês", `- ${reais(cb.reserva_utilizada)}`) : ""}
       ${cb.ressarcimento ? linha(`(-) Ressarcimento de taxa do condomínio (${esc(cb.ressarcimento_descricao || "")})`, `- ${reais(cb.ressarcimento)}`) : ""}
       <tr class="total"><td>Valor a pagar até ${dataBr(cb.vencimento)}${prazoNaoUtil(cb)}</td><td class="n maior">${reais(t.a_pagar_pontual)}</td></tr>
-      <tr><td colspan="2" class="suave">Após o vencimento: ${reais(t.a_pagar_sem_desconto)} + multa de ${pct(cb.multa_percentual)} + juros de ${pct(cb.juros_mensal_percentual)} ao mês, pro rata dia${cb.fci ? ` (sobre ${reais(t.base_multa)}: o FCI não tem multa nem juros)` : ""}.</td></tr></table>
+      <tr><td colspan="2" class="suave">Após o vencimento: ${reais(t.a_pagar_sem_desconto)} + multa de ${pct(cb.multa_percentual)} + juros de ${pct(cb.juros_mensal_percentual)} ao mês, pro rata dia${cb.fci || (cb.multas_notificacao || []).length ? ` (sobre ${reais(t.base_multa)}: ${[cb.fci && "o FCI", (cb.multas_notificacao || []).length && "a multa da notificação"].filter(Boolean).join(" e ")} não ${cb.fci && (cb.multas_notificacao || []).length ? "têm" : "tem"} multa nem juros)` : ""}.</td></tr></table>
     ${cb.data_pagamento ? `<p><b>Pago em ${dataBr(cb.data_pagamento)}</b>${cb.pagou_em_dia ? " (pagou até o vencimento; compensado depois)" : ""}${cb.dias_atraso ? ` com ${cb.dias_atraso} dia(s) de atraso${cb.data_pagou ? ` (pagou em ${dataBr(cb.data_pagou)})` : ""}: multa ${pct(cb.multa_percentual)} = ${reais(cb.multa)}; juros ${pct(cb.juros_mensal_percentual)} a.m. = ${reais(cb.juros)}` : ""} · recebido ${reais(cb.valor_pago)}</p>` : ""}
     ${cb.observacoes ? `<p class="pre">${esc(cb.observacoes)}</p>` : ""}</div>`;
   }
@@ -26709,7 +26711,8 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       <input type="hidden" name="prazo" value="${dados.prazo_dias}">${edicao ? `<input type="hidden" name="id" value="${edicao.id}">` : ""}${ant ? `<input type="hidden" name="anterior" value="${ant.id}">` : ""}
       <p><label for="nt_assunto">Assunto</label><input id="nt_assunto" name="assunto" value="${esc(pronto.assunto)}" maxlength="120"></p>
       <p><label for="nt_clausula">Cláusula(s) do contrato citada(s)</label><input id="nt_clausula" name="clausula" value="${esc(pronto.clausula || "")}" maxlength="200"></p>
-      <p class="suave">Confira o número da cláusula no contrato assinado: o sistema conta pelo modelo de hoje, e um contrato antigo pode ter outra numeração.</p>
+      <div class="alerta aviso"><p><strong>Confira a cláusula no contrato assinado deste inquilino.</strong> O número vem do modelo de contrato de hoje; um contrato antigo pode ter outra numeração. Se for diferente, corrija aqui e no texto.</p>
+        <p><label><input type="checkbox" name="clausula_conferida" value="1" required> Conferi o número da(s) cláusula(s) no contrato assinado deste inquilino</label></p></div>
       <p><label for="nt_texto">Texto <span class="suave">(troque o que estiver entre colchetes, "[preencher: …]", pelo caso real)</span></label><textarea id="nt_texto" name="texto" rows="18" spellcheck="true">${esc(pronto.texto)}</textarea></p>
       <div class="acoes"><button>${edicao ? "Salvar o rascunho" : "Salvar a notificação (rascunho)"}</button> <a class="botao secundario" href="${volta}">Cancelar</a></div>
       <p class="suave">Depois de salvar: imprima o PDF, assine (gov.br), anexe a assinada e envie. O prazo corre a partir da data da notificação.</p></form>` : '<p class="suave">Escolha o inquilino e clique em "Montar o texto".</p>'}`;
@@ -26790,6 +26793,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         async salvarNotificacao(form) {
           if (!opera()) throw new ErroUsuario(SO_CONSULTA);
           const f = new FormData(form);
+          if (!f.get("clausula_conferida")) throw new ErroUsuario('Marque "Conferi o número da(s) cláusula(s) no contrato assinado deste inquilino" antes de salvar.');
           const dados = {
             contrato_id: Number(f.get("contrato")),
             modelo: String(f.get("tema") || ""),
