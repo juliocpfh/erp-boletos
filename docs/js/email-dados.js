@@ -93,6 +93,28 @@ function linkDaFicha(f, pessoa, hoje) {
   return l && !l.encerrado && naAba && String(l.vence_em).slice(0, 10) >= hoje ? { url: naAba.url, validade: C.dataBr(String(l.vence_em).slice(0, 10)) } : { url: '', validade: '' };
 }
 
+/**
+ * Campos do boleto para os e-mails da régua de cobrança (modelos com ``boleto``): põe em ``campos`` e devolve as condições.
+ * O valor de hoje (multa e juros) é o do dia em que o e-mail é montado. Ex.: boleto de 11/2026 de R$ 1.350,00 (R$ 1.242,00 em dia)
+ * vencido em 10/12/2026, em 16/12 → valor_hoje "R$ 1.380,29" (R$ 1.350,00 + multa R$ 27,00 + juros R$ 3,29), dias_atraso "6".
+ */
+function camposDoBoleto(cb, campos, hoje) {
+  const t = R.totais(cb);
+  const limite = C.limitePagamento(cb.vencimento);
+  const r = C.liquidar(cb, hoje);
+  const b = cb.banco && cb.banco.situacao !== 'cancelado' ? cb.banco : {};
+  Object.assign(campos, {
+    boleto_referente: R.ehParcelaAcordo(cb) ? `da parcela ${cb.acordo_parcela || ''} do acordo`.replace(/ {2,}/g, ' ') : `do aluguel de ${C.compBr(cb.competencia)}`,
+    vencimento_boleto: C.dataBr(cb.vencimento), limite_pagamento: C.dataBr(limite),
+    valor_em_dia: C.reais(t.a_pagar_pontual), valor_cheio: C.reais(t.a_pagar_sem_desconto),
+    multa_pct: C.pct(cb.multa_percentual || 0), juros_pct: C.pct(cb.juros_mensal_percentual || 0),
+    valor_hoje: C.reais(r.valor_devido), multa_hoje: C.reais(r.multa || 0), juros_hoje: C.reais(r.juros || 0),
+    dias_atraso: String(r.dias_atraso), data_hoje: C.dataBr(hoje),
+    pix: b.pix_copia_cola || '', linha_digitavel: b.linha_digitavel || '',
+  });
+  return { nao_util: limite !== cb.vencimento, bonificacao_boleto: t.a_pagar_pontual < t.a_pagar_sem_desconto, pix: !!b.pix_copia_cola, linha_digitavel: !!b.linha_digitavel };
+}
+
 /** Valor inicial de cada pergunta do modelo (o que se digita na hora): datas em 'AAAA-MM-DD'. */
 function respostasPadrao(d, c, hoje) {
   const reparos = c ? K.resultadoVistoriaSaida(d, c).reparos : [];
@@ -175,6 +197,7 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
     link: !!linkDaFicha(f, 'interessado', hoje).url, link_fiador: !!linkDaFicha(f, 'fiador1', hoje).url,
     varios_fiadores: !!f && R.fiadoresDaFicha(f).length > 1,
   };
+  if (alvo.cobranca) Object.assign(condicoes, camposDoBoleto(alvo.cobranca, campos, hoje));
   const a = alvo.aditivo || null;
   if (a) Object.assign(campos, { aditivo_data: C.dataBr(a.data), aditivo_assunto: a.assunto || 'alteração do contrato' });
   // termo do novo valor negociado: os valores combinados (cheio, bonificado) e a data em que passam a valer
@@ -220,6 +243,15 @@ export function anexosProntos(d, modelo, alvo) {
         const nome = (R.DOCUMENTOS_ENTRADA.find(([k]) => k === campo) || [])[1] || 'documento';
         if (doc && doc.arquivo) arquivo('assinados', doc.contrato.id, doc.arquivo, `${nome.toLowerCase()} assinado por todos`);
       }
+      continue;
+    }
+    if (tipo === 'boleto') {
+      // régua de cobrança: o PDF do boleto vem do C6 pela ponte na hora de enviar; o QR Code do Pix já está guardado no boleto
+      const cb = alvo.cobranca || null;
+      const b = cb && cb.banco;
+      if (!b || !R.emitidoNoBanco(cb)) continue;
+      if (qual === 'pdf' && b.id_externo && !b.simulado) out.push({ tipo: 'boleto', qual, id: cb.id, nome: `boleto-${cb.competencia}.pdf`, rotulo: 'boleto do C6 (PDF)' });
+      if (qual === 'pix' && b.pix_qr_base64) out.push({ tipo: 'boleto', qual, id: cb.id, nome: `pix-${cb.competencia}.png`, rotulo: 'QR Code do Pix (imagem)' });
       continue;
     }
     if (tipo === 'recibo' && qual === 'ficha_fiador') {

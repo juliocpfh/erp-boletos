@@ -24,6 +24,7 @@ export function valorRegraTexto(def, v) {
     case 'indice': return v || 'em branco (escolher em cada contrato)';
     case 'feriados': return v.length ? v.map(feriadoTela).join(', ') : 'nenhum';
     case 'regua': return v.map((p) => `${p.dias} dia(s): ${p.passo}`).join('; ');
+    case 'dias': return v.length ? v.join(', ') : 'nenhum';
     default: return String(v ?? '');
   }
 }
@@ -65,6 +66,7 @@ function campoRegra(def, v, admin) {
     }
     case 'feriados': return `<textarea name="${nome}" rows="3" placeholder="20/01&#10;15/06/2028"${des}>${esc(v.map(feriadoTela).join('\n'))}</textarea>`;
     case 'regua': return `<textarea name="${nome}" rows="4"${des}>${esc(v.map((p) => `${p.dias}: ${p.passo}`).join('\n'))}</textarea>`;
+    case 'dias': return `<input name="${nome}" value="${esc(v.join(', '))}" placeholder="-3, 0, 3, 10" style="width:220px"${des}>`;
     default: return '';
   }
 }
@@ -132,6 +134,10 @@ export function lerFormularioRegras(dados) {
         const m = linha.match(/^(\d+)\s*(?:dias?)?\s*[:\-–]\s*(.+)$/i);
         if (!m) throw new C.ErroUsuario(`Régua de cobrança: escreva "dias: o que fazer" em cada linha (ex.: "10: Ligar para o inquilino"). Linha: "${linha}"`);
         return { dias: Number(m[1]), passo: m[2].trim() };
+      }); break;
+      case 'dias': out[def.chave] = String(t || '').replace(/−/g, '-').split(/[;,\s]+/).filter(Boolean).map((x) => {
+        if (!/^[-+]?\d+$/.test(x)) throw new C.ErroUsuario(`${def.rotulo}: use números separados por vírgula (ex.: "-3, 0, 3, 10"). Não entendi: "${x}"`);
+        return Number(x);
       }); break;
       default: out[def.chave] = t;
     }

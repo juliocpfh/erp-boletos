@@ -28,7 +28,7 @@ export function telaInadimplencia() {
   const hoje = C.hojeIso();
   const r = R.inadimplencia(d(), hoje);
   const imovelDe = (c) => (buscar('imoveis', c.imovel_id) || {}).nome || '';
-  return `<h1>Financeiro</h1>${abasFinanceiro('inadimplencia')}<div class="cabecalho"><h2>Inadimplência</h2>${link('#/cobrancas', 'Ver boletos')}</div>
+  return `<h1>Financeiro</h1>${abasFinanceiro('inadimplencia')}<div class="cabecalho"><h2>Inadimplência</h2><div>${link('#/regua', 'E-mails da régua (autorizar)')} ${link('#/cobrancas', 'Ver boletos')}</div></div>
     <div class="numeros">
       <div class="cartao"><div class="grande">${r.devedores.length}</div>inquilino(s) em atraso</div>
       <div class="cartao"><div class="grande">${r.devedores.reduce((s, x) => s + x.boletos.length, 0)}</div>boleto(s) vencido(s)</div>

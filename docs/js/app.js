@@ -783,7 +783,7 @@ function atualizarFaixa() {
 const MENU = [
   ['#/', 'Painel', '^$|^fechamento|^pendencias'], ['#/inquilinos', 'Inquilinos', '^inquilino|^contrato|^vistoria|^solicitacoes'],
   ['#/reajustes', 'Reajustes', 'reajustes'], ['#/cobrancas', 'Boletos', 'cobranca'], ['#/faturas', 'NF', 'fatura'], ['#/banco', 'Banco', '^banco'],
-  ['#/imoveis', 'Imóveis', '^imove|^novo|^editar|^iptu$|^modelo-vistoria'], ['#/financeiro', 'Financeiro', '^financeiro|^gestao|^resultados|^liquido|^contas|^impostos|^inadimplencia|^garantias'],
+  ['#/imoveis', 'Imóveis', '^imove|^novo|^editar|^iptu$|^modelo-vistoria'], ['#/financeiro', 'Financeiro', '^financeiro|^gestao|^resultados|^liquido|^contas|^impostos|^inadimplencia|^garantias|^regua'],
   ['#/dados', 'Dados e backup', '^dados|^historico|^modelos?-contrato|^modelos?-email|^regras|^backup|^empresas'],
 ];
 /** Formulário (#/novo/<tabela>, #/editar/<tabela>/id) → item do menu que acende (antes todos acendiam "Imóveis"). */
