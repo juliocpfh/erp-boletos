@@ -287,7 +287,7 @@ export const TELAS = {
       ${alertaFichas()}
       ${alertaInformeIr()}
       ${alertaRegua()}
-      ${E.nuvem && E.nuvem.conflitos.length ? `<div class="alerta perigo"><b>${E.nuvem.conflitos.length} conflito(s) na nuvem:</b> o mesmo campo foi mudado em dois aparelhos sem internet. Até o administrador escolher, vale o valor de antes.
+      ${E.nuvem && E.nuvem.conflitos.length ? `<div class="alerta perigo"><b>${E.nuvem.conflitos.length} conflito(s) na nuvem:</b> o mesmo campo foi mudado em dois aparelhos sem internet. Até o administrador escolher, fica o valor que chegou primeiro.
         ${link('#/conflitos', podeUsuario('admin') ? 'Escolher agora' : 'Ver (o administrador escolhe)', 'botao pequeno')}</div>` : ''}
       ${avisoBackupSeguro()}
       ${calendarioDoPainel(C.competenciaValida(rota.q.mes, C.competenciaDe(hoje)), hoje)}

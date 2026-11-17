@@ -94,19 +94,19 @@ test('mudanças de um aparelho chegam aos outros pela fila; lote repetido não a
   assert.equal(c.mudancas(m.seq).mudancas.length, 0);
 });
 
-test('mesmo campo mudado em dois aparelhos: volta ao valor anterior e nada vale até alguém escolher', () => {
+test('mesmo campo mudado em dois aparelhos: fica o já gravado e o outro vira proposta até o administrador escolher', () => {
   const c = carregado();
   // os dois viram R$ 3.644,45; o celular muda para 3.700,00 e a data; o PC muda para 3.650,00
   c.aplicar(lote([{ op: 'alterar', tabela: 'contratos', id: 20, campos: { valor: { antes: 364445, depois: 370000 }, vencimento_dia: { antes: 10, depois: 15 } } }], 'celular'), DONO);
   const r = c.aplicar(lote([{ op: 'alterar', tabela: 'contratos', id: 20, campos: { valor: { antes: 364445, depois: 365000 } } }], 'pc'), SOCIO);
   assert.equal(r.conflitos.length, 1);
-  assert.equal(contrato(c, 20).valor, 364445, 'fica com o valor anterior');
+  assert.equal(contrato(c, 20).valor, 370000, 'fica o valor já gravado na nuvem (decisão de 2026-11-17)');
   assert.equal(contrato(c, 20).vencimento_dia, 15, 'o campo sem disputa vale normalmente');
   const [cf] = c.conflitosAbertos();
   assert.deepEqual([cf.campo, cf.atual, cf.por_atual, cf.proposto, cf.por_proposto], ['valor', 370000, DONO, 365000, SOCIO]);
   // enquanto não escolhem, nova mudança no mesmo campo vira mais uma proposta e não vale
   c.aplicar(lote([{ op: 'alterar', tabela: 'contratos', id: 20, campos: { valor: { antes: 364445, depois: 380000 } } }], 'pc'), SOCIO);
-  assert.equal(contrato(c, 20).valor, 364445);
+  assert.equal(contrato(c, 20).valor, 370000);
   assert.equal(c.conflitosAbertos().length, 2);
   assert.throws(() => c.resolver({ conflito: cf.id, escolha: 'atual' }, CONSULTA), (e) => e.status === 403);
   assert.throws(() => c.resolver({ conflito: cf.id, escolha: 'atual' }, OPERADOR), (e) => e.status === 403, 'só o administrador escolhe');

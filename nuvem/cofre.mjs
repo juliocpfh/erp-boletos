@@ -1,6 +1,6 @@
 // Cofre dos dados na nuvem (Durable Object com SQLite): recebe as filas de mudanças de cada aparelho, uma por vez, em ordem.
 // Cada registro (contrato, boleto…) é uma linha; cada campo sabe quem o mudou por último. Mesmo campo mudado em dois aparelhos
-// sem se verem = conflito: o campo fica com o valor anterior até alguém escolher (DECISOES.md, 2026-11-06).
+// sem se verem = conflito: fica o valor já gravado e o outro vira proposta até o administrador escolher (DECISOES.md, 2026-11-17).
 // Também: faixas de códigos por aparelho (sem internet não repete), contador da NF (só com internet), backup diário no R2.
 // A lógica fica em `Cofre` (recebe `sql` e `transacao`) para os testes rodarem no Node com node:sqlite.
 // Crachás do programa do PC (aparelhos ligados): aparelhos.mjs, numa tabela própria.
@@ -638,10 +638,10 @@ export class Cofre {
         }
         const junto = juntarSubchaves(antes, depois, dados[c]);
         if (junto !== undefined) { dados[c] = junto; meta[c] = { por: email, em: this.agora() }; mudou = true; continue; }
-        // mudado aqui e lá: o campo volta ao valor que este aparelho viu e espera a escolha
+        // mudado aqui e lá: fica o valor já gravado na nuvem e o deste aparelho vira proposta para o administrador escolher
+        // (decisão do dono de 2026-11-17, item 14 do mutirão 3000; antes o campo voltava ao valor que este aparelho tinha visto)
         novosConflitos.push(this.abrirConflito('campo', tabela, id, c, dados[c], meta[c]?.por || null, depois, email));
-        dados[c] = antes; meta[c] = { por: email, em: this.agora(), disputa: true };
-        mudou = true; conflito = true;
+        conflito = true;
       }
       if (mudou && quem.papel !== 'admin') conferirRegrasDoAdmin(tabela, JSON.parse(atual.dados), dados);
       if (mudou) {
@@ -679,8 +679,8 @@ export class Cofre {
     const junto = !aberto && !igual(atual, antes) ? juntarSubchaves(antes, depois, atual) : undefined;
     if (junto !== undefined) { this.gravarRaiz(campo, junto, email); return { ok: true }; }
     if (aberto || !igual(atual, antes)) {
+      // fica o valor já gravado; o deste aparelho é a proposta (item 14)
       novosConflitos.push(this.abrirConflito('campo', '_raiz', 0, campo, atual, linha ? JSON.parse(linha.meta || '{}').por || null : null, depois, email));
-      if (!aberto && linha) this.gravarRaiz(campo, antes, email);
       return { ok: false, conflito: true };
     }
     this.gravarRaiz(campo, depois, email);
@@ -735,13 +735,20 @@ export class Cofre {
       const id = Number(c.reg_id);
       if (c.tipo === 'campo') {
         if (!['atual', 'proposto'].includes(escolha)) throw new ErroCofre(400, 'Escolha "atual" ou "proposto".');
-        const valor = JSON.parse((escolha === 'atual' ? c.atual : c.proposto) ?? 'null');
-        if (c.tabela === '_raiz') this.gravarRaiz(c.campo, valor, email);
-        else {
+        // valor escolhido que era "campo que não existia" (guardado como vazio no banco do cofre): o campo some, em vez de
+        // ficar gravado como null (item 35; regras que testam "=== undefined" mudariam de comportamento)
+        const escolhido = escolha === 'atual' ? c.atual : c.proposto;
+        const ausente = escolhido === null || escolhido === undefined;
+        const valor = ausente ? undefined : JSON.parse(escolhido);
+        if (c.tabela === '_raiz') {
+          if (!ausente) this.gravarRaiz(c.campo, valor, email);
+          else { this.sql.exec('DELETE FROM raiz WHERE campo = ?', c.campo); this.registrarLog('raiz', null, null, { campo: c.campo }, email); }
+        } else {
           const r = this.q('SELECT dados, meta FROM registros WHERE tabela = ? AND id = ?', c.tabela, id)[0];
           if (r) {
             const dados = JSON.parse(r.dados); const meta = JSON.parse(r.meta || '{}');
-            dados[c.campo] = valor; meta[c.campo] = { por: email, em: this.agora() };
+            if (ausente) delete dados[c.campo]; else dados[c.campo] = valor;
+            meta[c.campo] = { por: email, em: this.agora() };
             this.sql.exec('UPDATE registros SET dados = ?, meta = ? WHERE tabela = ? AND id = ?', texto(dados), JSON.stringify(meta), c.tabela, id);
             this.registrarLog('registro', c.tabela, id, dados, email);
           }
