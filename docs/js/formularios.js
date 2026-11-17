@@ -682,7 +682,7 @@ export function ler(campos, form, antigo = null) {
         if (dados[c.nome] < 0 && !c.negativo) { erros[c.nome] = 'O valor não pode ser negativo'; continue; }
       } else if (c.tipo === 'pct') {
         dados[c.nome] = numero(bruto);
-        if (c.min !== undefined && dados[c.nome] < c.min) { erros[c.nome] = `O valor não pode ser menor que ${c.min}`; continue; }
+        if (c.min !== undefined && dados[c.nome] < c.min) { erros[c.nome] = c.min === 0 ? 'Não pode ser negativo' : `Não pode ser menor que ${c.min}`; continue; }
       }
       else if (c.tipo === 'inteiro') {
         const n = numero(bruto);

@@ -1002,9 +1002,20 @@ document.addEventListener('submit', async (ev) => {
   try {
     const resposta = await FORMULARIOS[form.dataset.form](form, rotaAtual());
     if (resposta && resposta.erros) {
+      // arquivo escolhido (ex.: comprovante da reserva): o redesenho do formulário o perdia sem avisar; volta ao campo novo
+      const arquivos = typeof form.querySelectorAll === 'function'
+        ? [...form.querySelectorAll('input[type=file]')].filter((i) => i.files && i.files.length && !i.dataset.acaoArquivo).map((i) => [i.name, i.files]) : [];
       await mostrar(resposta);
       const novo = typeof document.querySelector === 'function' ? document.querySelector(`main form[data-form="${form.dataset.form}"]`) : null;
       if (novo && novo.dataset) novo.dataset.alterado = '1';
+      for (const [nome, files] of arquivos) {
+        const el = novo && novo.querySelector(`input[type=file][name="${nome}"]`);
+        if (!el) continue;
+        try {
+          el.files = files;
+          el.insertAdjacentHTML('afterend', `<div class="ajuda">📎 Continua escolhido: ${esc(files[0].name)}</div>`);
+        } catch { el.insertAdjacentHTML('afterend', '<div class="erro-campo">Escolha o arquivo de novo.</div>'); }
+      }
       aviso(marcarCamposComErro(), 'erro');
     }
   } catch (e) {

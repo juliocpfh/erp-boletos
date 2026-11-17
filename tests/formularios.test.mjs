@@ -90,7 +90,7 @@ test('mutirão 3000 (telas): telefone com DDD, e-mail completo, sem negativo e v
   assert.match(r.erros.valor, /negativo/);
   assert.equal(r.erros.ajuste, undefined);
   assert.equal(r.dados.ajuste, -15000);
-  assert.match(r.erros.area, /menor que 0/);
+  assert.match(r.erros.area, /negativo/);
   assert.match(r.erros.outro, /Use 2\.300,00/);
   const ok = ler({ tel: '41999998888', email: 'contato@exemplo.com.br', valor: '2.300,00' });
   assert.deepEqual(ok.erros, {});

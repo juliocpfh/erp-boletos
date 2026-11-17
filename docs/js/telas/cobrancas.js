@@ -148,7 +148,7 @@ export function telaCobrancas(comp, ordemPedida = 'vencimento', filtroPedido = '
     ${pend.length && opera() ? `<div class="alerta info">${pend.length} pagamento(s) de ${compBr(comp)} aguardando número de NF. ${link('#/faturas', 'Numerar na tela NF', 'botao pequeno')}</div>` : ''}
     ${opera() ? caixaBaixaLote(lista, hoje) : ''}
     ${lista.length ? `<p class="acoes">${botoesMesC6(comp)}</p>` : ''}
-    ${tabelaBoletos(lista, hoje, ordem, url, { comp: false, reajustes, totalLinha: lista.length ? `<tr class="total"><td></td><td colspan="2">Total${controle ? ` <span class="suave">(sem ${controle} boleto(s) de controle)</span>` : ''}</td><td class="n">${reais(soma((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais(soma((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : '' })}`;
+    ${tabelaBoletos(lista, hoje, ordem, url, { comp: false, mes: comp, reajustes, totalLinha: lista.length ? `<tr class="total"><td></td><td colspan="2">Total${controle ? ` <span class="suave">(sem ${controle} boleto(s) de controle)</span>` : ''}</td><td class="n">${reais(soma((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais(soma((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : '' })}`;
 }
 
 /**
@@ -157,12 +157,12 @@ export function telaCobrancas(comp, ordemPedida = 'vencimento', filtroPedido = '
  */
 function tabelaBoletos(lista, hoje, ordem, url, opcoes = {}) {
   const { reajustes = new Map(), totalLinha = '' } = opcoes;
-  const comp = lista.length ? lista[0].cb.competencia : C.competenciaDe(hoje);
+  const comp = opcoes.mes || (lista.length ? lista[0].cb.competencia : C.competenciaDe(hoje)); // lista vazia: o mês da tela
   // botões de impressão em cima e embaixo da lista
   const impressao = `${botao('imprimirDemonstrativos', 'Imprimir demonstrativos selecionados', { comp }, 'botao')}
       ${opcoes.comp ? '' : `<a class="botao secundario" href="#/imprimir/demonstrativos?comp=${esc(comp)}">Imprimir todos os demonstrativos do mês</a>`}
       ${opera() ? botao('excluirBoletosSelecionados', 'Excluir boletos selecionados', { comp }, 'perigo') : ''}`;
-  return `${lista.length ? `<div class="acoes barra-nf">${impressao} <a class="botao secundario" href="#/faturas">Tela NF</a></div>
+  return `${lista.length ? `<div class="acoes barra-nf lote-topo">${impressao} <a class="botao secundario" href="#/faturas">Tela NF</a></div>
       <div class="acoes barra-nf">${link('#/inadimplencia', 'Inadimplência')} <label class="suave" for="ordem-boletos">Ordenar por:</label> <select id="ordem-boletos" data-ordem-boletos="${esc(url({ ordem: '' }).replace(/&ordem=&?/, '&').replace(/[?&]$/, ''))}" style="width:auto">${[['vencimento', 'Data de vencimento'], ['imovel', 'Nome do imóvel'], ['inquilino', 'Nome do inquilino'], ['valor', 'Valor (maior para menor)']]
     .map(([k, t]) => `<option value="${k}" ${ordem === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : ''}
     <div class="cartao rolagem"><table class="cobrancas responsiva">

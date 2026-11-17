@@ -27,7 +27,7 @@ export function botoesMesC6(comp) {
   const emitidos = d().cobrancas.some((cb) => cb.competencia === comp && R.emitidoNoBanco(cb));
   // a conferência dos boletos pagos é uma só, na tela Banco (lista com marcação): daqui só o atalho até ela
   const conferir = link('#/banco?ir=conferir-boletos', 'Conferir pagamentos no banco (tela Banco)', 'botao secundario');
-  if (!B.pontePronta(d())) return `${botaoInativo(texto, B.motivoIndisponivel(d()), 'secundario')} ${conferir}`;
+  if (!B.pontePronta(d())) return `${botaoInativo(texto, B.motivoIndisponivel(d()), 'secundario')} ${conferir}<br><span class="ajuda">Emitir no C6: ${esc(String(B.motivoIndisponivel(d())).replace(/\.$/, ''))}.</span>`;
   return `${n ? botao('emitirBoletosMesC6', texto, { comp }, 'secundario', `Emitir ${n} boleto(s) em aberto no C6?`) : botaoInativo(texto, 'Nenhum boleto em aberto sem emissão neste mês', 'secundario')}
     ${emitidos ? conferir : botaoInativo('Conferir pagamentos no banco (tela Banco)', 'Nenhum boleto deste mês foi emitido no C6', 'secundario')}`;
 }
@@ -47,7 +47,8 @@ export function resumoBancoLinha(cb) {
   const partes = [etiquetaBanco(cb)];
   if (R.emitidoNoBanco(cb) && cb.banco.linha_digitavel) partes.push(botao('copiar', 'Copiar linha digitável', { texto: cb.banco.linha_digitavel }));
   if (R.emitidoNoBanco(cb) && cb.banco.pix_copia_cola) partes.push(botao('copiar', 'Copiar Pix', { texto: cb.banco.pix_copia_cola }));
-  partes.push(botaoEmitirC6(cb));
+  // banco ainda não ligado: o botão apagado em cada linha não explicava nada no celular; o motivo vai uma vez, em cima da lista
+  if (B.pontePronta(d())) partes.push(botaoEmitirC6(cb));
   return partes.filter(Boolean).join(' ');
 }
 

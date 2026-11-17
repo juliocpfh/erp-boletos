@@ -104,6 +104,8 @@ function linhaPendente(p, mes, ultima) {
 
 /** Lembrete do Airbnb antes de numerar: o mês que acabou de fechar e os meses fechados que estão na fila. */
 function caixaAirbnb(pend) {
+  // quem não usa Airbnb (nenhum imóvel Airbnb e nenhum ganho lançado) não vê o lembrete
+  if (!d().imoveis.some((i) => i.tipo === 'airbnb') && !(d().ganhos_airbnb || []).length) return '';
   const hoje = C.hojeIso();
   const meses = [C.somarMeses(C.competenciaDe(hoje), -1), ...pend.map((p) => p.data.slice(0, 7))];
   const lembretes = R.lembretesAirbnb(d(), meses, hoje);

@@ -1,5 +1,5 @@
 // FORMULARIOS: o que acontece ao enviar cada formulário (data-form="nome"). O de cadastro genérico é FORMULARIOS.cadastro.
-import { abrirPasta, alterar, aviso, backupCompletoSeguro, baixar, conectarSeguro, criarBanco, E, entrar, excelJs, ir, janela, jsZip, login, mostrar, podeUsuario, renovarUsuario } from '../app.js';
+import { abrirPasta, alterar, aviso, confirmar, backupCompletoSeguro, baixar, conectarSeguro, criarBanco, E, entrar, excelJs, ir, janela, jsZip, login, mostrar, podeUsuario, renovarUsuario } from '../app.js';
 import * as S from '../armazenamento.js';
 import { camposDeSenha, conferirSenha, ERRO_SENHA_CURTA, senhaCurta } from '../auth.js';
 import * as B from '../backup-seguro.js';
@@ -527,7 +527,7 @@ export const FORMULARIOS = {
   async desfazerNumeracao(form) {
     if (!podeUsuario('admin')) throw new C.ErroUsuario(SO_ADMIN_NUMERACAO);
     const n = Number(new FormData(form).get('numero'));
-    if (!confirm(`Desfazer a numeração a partir da NF nº ${R.numeroFatura(n)}? Todas as NFs com este número ou maior saem da lista (ficam no Histórico), os pagamentos voltam para a fila e o próximo número volta a ser ${R.numeroFatura(n)}.`)) return;
+    if (!(await confirmar(`Todas as NFs com este número ou maior saem da lista (ficam no Histórico), os pagamentos voltam para a fila e o próximo número volta a ser ${R.numeroFatura(n)}.`, { titulo: `Desfazer a numeração a partir da NF nº ${R.numeroFatura(n)}?`, sim: 'Desfazer a numeração', forte: true }))) return;
     const qtd = await alterar((db) => R.desfazerNumeracao(db, n, login()));
     aviso(`${qtd} número(s) desfeito(s). Corrija o que precisar e clique em "Numerar estas NFs".`);
     await mostrar();

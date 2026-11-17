@@ -195,6 +195,17 @@ function avisoDaFicha(f) {
   return `Contrato a partir da ficha aprovada de ${f.inquilino_nome}: ${veio.join(', ').replace(/, ([^,]*)$/, ' e $1')} já vieram preenchidos. Confira e complete o que falta (${dados.fiador1_nome || dados.fiador2_nome ? '' : 'fiador, '}o que está incluso, datas).${f.documentos_no_contrato ? '' : ' Ao salvar, os documentos da ficha vão para a pasta do inquilino.'}`;
 }
 
+/**
+ * Contrato novo aberto pelo imóvel: imóvel sem relógio de gás ou sem administradora de condomínio no cadastro começa com
+ * Gás / Condomínio em "Não tem" (antes vinha "Por conta do inquilino" e nasciam a etapa de transferência e o alerta do
+ * boleto do condomínio para imóvel sem condomínio). O operador pode trocar no formulário.
+ */
+export function contasDoImovel(i) {
+  if (!i) return {};
+  const nao = F.SITUACOES_CONTA[2];
+  return { ...(String(i.gas_relogio || '').trim() ? {} : { conta_gas: nao }), ...(String(i.administradora_nome || '').trim() ? {} : { conta_condominio: nao }) };
+}
+
 export const CADASTROS = {
   imoveis: {
     titulo: (r) => (r ? 'Editar imóvel' : 'Novo imóvel'),
@@ -306,7 +317,7 @@ export const CADASTROS = {
     // a mesma pessoa em outro imóvel (q.pessoa): só os dados da pessoa vêm preenchidos
     // contrato a partir da ficha aprovada (q.ficha): os dados da pessoa e, no primeiro contrato dela, a reserva
     // (aberto pelo imóvel, sem q.ficha: vale a ficha aprovada que espera o contrato dele)
-    padrao: (q) => ({ ...R.padroesNovoContrato(), ...(q.pessoa ? R.dadosDaPessoa(buscar('contratos', q.pessoa)) : {}), ...(fichaDoNovoContrato(q) ? R.dadosDaFicha(d(), fichaDoNovoContrato(q)) : {}), ...(q.imovel ? { imovel_id: Number(q.imovel) } : {}) }),
+    padrao: (q) => ({ ...R.padroesNovoContrato(), ...(q.imovel ? contasDoImovel(buscar('imoveis', q.imovel)) : {}), ...(q.pessoa ? R.dadosDaPessoa(buscar('contratos', q.pessoa)) : {}), ...(fichaDoNovoContrato(q) ? R.dadosDaFicha(d(), fichaDoNovoContrato(q)) : {}), ...(q.imovel ? { imovel_id: Number(q.imovel) } : {}) }),
     compacto: true,
     valores: (r) => ({ ...r, ativo: r.ativo !== false, gerar_nf: r.gerar_nf !== false, bonificacao: r.bonificacao !== false,
       conta_iptu: r.conta_iptu || (r.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1]), conta_seguro: r.conta_seguro || (r.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0]),
