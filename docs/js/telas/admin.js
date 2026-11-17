@@ -81,6 +81,7 @@ export async function telaBackupSeguro() {
       <p class="suave">Atualiza sozinha: logo depois de anexar, apagar ou mover arquivos neste computador, e de hora em hora pelo atualizador do PC (o que foi anexado no celular ou por outra pessoa).</p>
       <div class="acoes">${botao('atualizarCopiaAberta', 'Atualizar a pasta agora', { status: 'Atualizando a pasta…' }, 'secundario')}</div>
       ${caixaAbrirPasta(copia)}` : '<p class="suave">Só com os dados na nuvem (com a pasta dos dados no computador, os arquivos já estão nela).</p>'}</div>
+    ${E.nuvem ? caixaDesinstalarPrograma() : ''}
     <div class="cartao"><h2>Restaurar</h2>${FORM_RESTAURAR}</div>
     <div class="cartao"><h2>Arquivos na pasta segura</h2><div class="rolagem"><table><tr><th>Arquivo</th><th>Tipo</th><th>Gravado em</th><th class="n">Tamanho</th></tr>
       ${lista.slice(0, 40).map((x) => `<tr><td>${esc(x.pasta)}/${esc(x.nome)}</td><td>${esc(x.tipo)}</td><td>${dataHoraBr(x.alterado)}</td><td class="n">${tamanho(x.tamanho)}</td></tr>`).join('')
@@ -89,6 +90,22 @@ export async function telaBackupSeguro() {
 
 /** Computador (não celular nem tablet): o mesmo critério do visualizador de anexos. */
 const noComputador = () => !window.matchMedia?.('(max-width: 760px), (hover: none) and (pointer: coarse)').matches;
+const noWindows = () => /Windows/.test(navigator.userAgent);
+
+/**
+ * "Desinstalar o programa deste computador" (pedido do dono de 17/11): o link chama o endereço imoveis-desinstalar:, que o
+ * programa do PC registra no Windows (atualizador-pc/programa.mjs, PROTOCOLO_DESINSTALAR) e que só abre a pergunta do Windows
+ * "Desinstalar?" (Sim/Não; o que vem no endereço é ignorado): nenhum site desinstala sem a pessoa clicar em Sim. O mesmo de
+ * Configurações do Windows → Aplicativos → Aplicativos instalados. Só no computador com Windows.
+ */
+function caixaDesinstalarPrograma() {
+  if (!noComputador() || !noWindows()) return '';
+  return `<div class="cartao" id="programa-do-pc"><h2>Programa deste computador</h2>
+    <p class="suave">O programa do PC (Administração de Imóveis) mantém a pasta segura em dia sozinho. Para tirá-lo deste computador:</p>
+    <div class="acoes"><a class="botao perigo pequeno" href="imoveis-desinstalar:confirmar">Desinstalar o programa deste computador</a></div>
+    <p class="suave">Pede confirmação no Windows. Depois, se quiser cortar o acesso deste computador, use ${link('#/usuarios', 'Usuários → Aparelhos ligados → Desligar', '')}.
+      A pasta segura e a pasta <b>${CA.PASTA_COPIA}</b> continuam no computador. Também dá para desinstalar em Configurações do Windows → Aplicativos → Aplicativos instalados.</p></div>`;
+}
 
 /**
  * "Abrir a pasta no Explorer" (pedido do dono de 17/11): o navegador não abre pastas do computador, então o link chama o
@@ -99,7 +116,7 @@ const noComputador = () => !window.matchMedia?.('(max-width: 760px), (hover: non
 function caixaAbrirPasta(copia) {
   if (!noComputador()) return '';
   const caminho = copia?.caminho || '';
-  const windows = /Windows/.test(navigator.userAgent);
+  const windows = noWindows();
   return `<div class="abrir-pasta">
     <div class="acoes">${windows ? '<a class="botao" href="imoveis-pasta:abrir">Abrir a pasta no Explorer</a>' : ''}
       ${caminho ? botao('copiar', 'Copiar o caminho', { texto: caminho }, 'secundario') : ''}</div>

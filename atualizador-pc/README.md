@@ -38,10 +38,10 @@ O que ele faz ao instalar: copia a si mesmo para `%LOCALAPPDATA%\Administracao d
 |---|---|
 | Ligar de novo (depois de Desligar ou de 90 dias parado) | `Administracao-de-Imoveis.exe --ligar` (ou dois cliques de novo) |
 | Atualizar agora | `Administracao-de-Imoveis.exe --atualizar` (só os arquivos: `--arquivos`) |
-| Parar as atualizações automáticas (e tirar o botão "Abrir a pasta no Explorer") | `Administracao-de-Imoveis.exe --desinstalar` |
+| Desinstalar (pergunta antes; o mesmo de Configurações do Windows → Aplicativos instalados) | `Administracao-de-Imoveis.exe --desinstalar` |
 | Abrir no Explorer a pasta `Arquivos dos imoveis` (o que o botão do sistema chama) | `Administracao-de-Imoveis.exe --abrir-pasta` |
 | Ver a versão / a ajuda | `--versao` / `--ajuda` |
-| Ver o que a instalação faria, sem mexer em nada | `--instalar --simular` |
+| Ver o que a instalação (ou a desinstalação) faria, sem mexer em nada | `--instalar --simular` (`--desinstalar --simular`) |
 
 Programa novo publicado: baixe e dê dois cliques de novo (ele se copia por cima). Ele ainda **não se atualiza sozinho**.
 
@@ -83,6 +83,17 @@ Em Dados e backup → Backup seguro → "Cópia aberta dos arquivos" (só no com
 - **Segurança:** o comando registrado não leva o endereço (sem `%1`), o `.vbs` não repassa argumento nenhum e `--abrir-pasta` ignora todo o resto: qualquer site que chame `imoveis-pasta:` só consegue abrir a pasta `Arquivos dos imoveis` deste computador (a do backup seguro guardada em `config.json`; sem a cópia ainda, a própria pasta do backup seguro). Nunca outro caminho, nunca outro comando. Sem o computador ligado, aparece uma janelinha dizendo para abrir o programa.
 - **Primeira vez:** o Chrome pergunta se pode abrir o programa: marque "Sempre permitir" e clique em Abrir.
 - **Caminho na tela:** o navegador só sabe o nome da pasta; o caminho inteiro vem do registro `copia-aberta.json` (campo `caminho_no_pc`, gravado pelo programa; o site mantém o que o programa gravou).
+
+## Desinstalar (desde 17/11/2026, só com o `.exe`)
+
+Dois jeitos, os dois chegam ao mesmo `Administracao-de-Imoveis.exe --desinstalar`:
+
+1. **Configurações do Windows → Aplicativos → Aplicativos instalados → Administração de Imóveis → Desinstalar**, como qualquer programa. O `.exe` se registra ali ao instalar e de novo em cada rodada (como o botão da pasta), só para o usuário do Windows, sem administrador: `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\AdministracaoDeImoveis`, com `DisplayName` "Administração de Imóveis", `DisplayVersion` (a do `.exe`), `Publisher`, `DisplayIcon` (o `.exe`), `InstallLocation` (a pasta `programa`), `EstimatedSize` (em KB), `NoModify`/`NoRepair` = 1 e `UninstallString` = `"<pasta programa>\Administracao-de-Imoveis.exe" --desinstalar` (o caminho tem espaço: vai entre aspas).
+2. **No sistema:** Dados e backup → Backup seguro → **Programa deste computador** → **Desinstalar o programa deste computador** (só no computador com Windows; não aparece no celular). O link `imoveis-desinstalar:confirmar` chama, pelo mesmo esquema do botão da pasta, `HKCU\Software\Classes\imoveis-desinstalar` → `wscript.exe "<pasta programa>\desinstalar.vbs"` → o `.exe` com `--desinstalar` e nada mais (sem `%1`, o `.vbs` não repassa argumento nenhum e `--desinstalar` com argumento a mais é recusado).
+
+**O que o `--desinstalar` faz:** primeiro pergunta numa janela do Windows (Sim/Não, com o Não marcado): *"Desinstalar Administração de Imóveis? As cópias e a pasta de arquivos continuam no computador. Para cortar o acesso deste computador ao sistema, use Usuários → Aparelhos ligados → Desligar."* Por isso nenhum site consegue desinstalar: só a pessoa, clicando em Sim. Com Sim: tira os dois endereços (`imoveis-pasta:` e `imoveis-desinstalar:`), as três tarefas (pede administrador se o Windows exigir), a entrada em Aplicativos instalados e, por último, os arquivos do programa da pasta `programa` (o `.exe` e os `.vbs`; a pasta sai se ficar vazia). O `.exe` em uso não se apaga sozinho: um PowerShell escondido espera o programa fechar e apaga. No fim, a janela "Pronto: programa desinstalado".
+
+**Nunca apaga:** a pasta do backup seguro, a pasta `Arquivos dos imoveis` (os arquivos dos inquilinos), o crachá (`cracha.dat`) nem `config.json`. Se a pasta do backup estiver dentro da pasta `programa` (ou o contrário), a pasta do programa fica como está. O computador continua ligado ao sistema até **Usuários → Aparelhos ligados → Desligar** (reinstalar não pede a senha de novo). Se alguma tarefa não sair, a entrada em Aplicativos instalados fica, para tentar de novo por lá. `--desinstalar --simular` mostra tudo sem mexer em nada. Pelo Node (jeito antigo), `desinstalar-tarefa.cmd` continua só tirando as tarefas.
 
 ## Como saber se está funcionando
 
