@@ -76,7 +76,7 @@ test('limite geral de senhas erradas somando vários endereços', () => {
 
 test('limite de boletos novos por dia e por conta (BOLETOS_POR_DIA)', async () => {
   P.zerarTentativas(); P.zerarLimiteDiario();
-  const base = { amount: 100, due_date: '2026-12-10', description: 'ALUGUEL',
+  const base = { amount: 100, due_date: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10), description: 'ALUGUEL',
     payer: { name: 'Maria Exemplo', tax_id: '52998224725', address: { address: 'Rua das Flores, 45', neighborhood: 'Centro', city: 'Curitiba', state: 'PR', zip_code: '80010000' } },
     payment_method: { bank_slip: { your_number: '7' } } };
   const status = [];

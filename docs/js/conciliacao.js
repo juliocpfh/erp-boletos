@@ -379,13 +379,54 @@ export function datasPossiveisDoPagamento(credito, pix = false) {
   return out;
 }
 
+/**
+ * Identificador normalizado para comparar: só letras e números, em maiúsculas; só números, sem os zeros à esquerda (o nosso número
+ * "0000123456" e "123456" são o mesmo). Vale só com 6 ou mais caracteres e algum número (palavras como "RECEBIDO" nunca casam).
+ */
+const idNormal = (t) => { const x = String(t ?? '').toUpperCase().replace(/[^A-Z0-9]/g, ''); return /^\d+$/.test(x) ? x.replace(/^0+/, '') : x; };
+const idUtil = (x) => x.length >= 6 && /\d/.test(x);
+/**
+ * Identificadores de um boleto emitido no banco, guardados na emissão e nas consultas: a nossa referência, a referência do Pix, o
+ * nosso número e os ids dos pagamentos que o banco informou (``external_payment_id``; ``end_to_end_id`` do Pix quando vier).
+ */
+export function identificadoresDoBoleto(cb) {
+  const b = (cb && cb.banco) || {};
+  return [...new Set([b.id_externo, b.pix_referencia, b.nosso_numero, ...(b.ids_pagamento || [])].map(idNormal).filter(idUtil))];
+}
+/** Identificadores de uma linha do extrato: o id do Pix (end to end), a referência local do C6 e os códigos citados na descrição. */
+export function identificadoresDaMov(m) {
+  const citados = `${(m && m.descricao) || ''} ${(m && m.titulo) || ''}`.match(/[A-Za-z0-9][A-Za-z0-9-]{5,}/g) || [];
+  return [...new Set([m && m.end_to_end_id, m && m.local_reference, ...citados].map(idNormal).filter(idUtil))];
+}
+/** Boletos emitidos no banco por identificador (os em aberto e os já pagos), na ordem de ``d.cobrancas``; o primeiro vale. */
+function boletosPorIdentificador(cobrancas) {
+  const mapa = new Map();
+  for (const cb of cobrancas) if (cb.banco) for (const id of identificadoresDoBoleto(cb)) if (!mapa.has(id)) mapa.set(id, cb);
+  return mapa;
+}
+
 /** Último dia em que o crédito ainda conta como pagamento em dia: o limite (vencimento ou próximo dia útil); boleto creditado depois, até mais ``dias`` dias úteis. */
 const ultimoCreditoEmDia = (cb, pix, dias) => (pix ? C.limitePagamento(cb.vencimento) : C.somarDiasUteis(C.limitePagamento(cb.vencimento), dias));
 
-function casarBoletos(d, valor, data, dias, { idExterno = null, nossoNumero = null, movId = null, dataCredito = null, indice = null, pix = false, pagouConhecido = false } = {}) {
+function casarBoletos(d, valor, data, dias, { idExterno = null, nossoNumero = null, movId = null, dataCredito = null, indice = null, pix = false, pagouConhecido = false, ids = null } = {}) {
   // com o índice da tela (um por desenho), os boletos em aberto e os pagos por valor já estão separados, na mesma ordem
   const ib = indice && indice.boletos ? indice.boletos() : null;
   const abertos = ib ? ib.abertos : d.cobrancas.filter(emAberto);
+  // 0) pelo identificador (referência do Pix, nosso número, id do pagamento) que a linha do extrato traz: antes do valor e da data
+  if (ids && ids.length) {
+    const porId = ib ? ib.porIdentificador : boletosPorIdentificador(d.cobrancas);
+    const cb = ids.map((i) => porId.get(i)).find(Boolean);
+    if (cb) {
+      if (emAberto(cb)) {
+        const pontual = ib ? ib.pontual.get(cb) : totais(cb).a_pagar_pontual;
+        const noPrazo = valor === pontual && data <= (pix ? C.limitePagamento(cb.vencimento) : ultimoCreditoEmDia(cb, false, dias));
+        return [{ cobranca: cb, certeza: 'exata', previsto: noPrazo ? pontual : previstoNoPagamento(cb, data).valor_devido, pagouEmDia: noPrazo && data > cb.vencimento, peloId: true }];
+      }
+      if (cb.data_pagamento && ligavel(cb, movId) && cb.valor_pago === valor) return [{ cobranca: cb, certeza: 'exata', previsto: cb.valor_pago, pagouEmDia: !!cb.pagou_em_dia, jaPago: true, peloId: true }];
+      // boleto em acordo, em carência ou já ligado a outra linha: nunca cai na busca por valor (iria para o boleto de outro inquilino)
+      return [];
+    }
+  }
   if (idExterno || nossoNumero) {
     const cb = abertos.find((x) => x.banco && ((idExterno && x.banco.id_externo === idExterno) || (nossoNumero && x.banco.nosso_numero && String(x.banco.nosso_numero) === String(nossoNumero))));
     if (cb) {
@@ -484,7 +525,14 @@ export function prontoParaRegistrar(d, s) {
 }
 
 /** A entrada do extrato (ainda sem destino) de um recebimento: mesma conta, valor e data de crédito; null se não foi importada. */
-export function entradaDoRecebimento(d, { conta_id = null, valor, data, nome = '' }) {
+export function entradaDoRecebimento(d, { conta_id = null, valor, data, nome = '', ids = [] }) {
+  // a entrada com o mesmo identificador do pagamento (id do Pix ou do pagamento no banco): é ela, mesmo com outro Pix igual no dia
+  const procurados = new Set((ids || []).map(idNormal).filter(idUtil));
+  if (procurados.size) {
+    const peloId = (d.movimentacoes_banco || []).find((x) => (!conta_id || x.conta_id === conta_id) && x.tipo === 'entrada' && !x.classificacao && x.valor === valor
+      && identificadoresDaMov(x).some((i) => procurados.has(i)));
+    if (peloId) return peloId;
+  }
   const lista = (d.movimentacoes_banco || []).filter((x) => (!conta_id || x.conta_id === conta_id) && x.tipo === 'entrada' && x.valor === valor && x.data === data && !x.classificacao);
   if (lista.length <= 1) return lista[0] || null;
   // mais de uma entrada igual no dia (Pix de dois inquilinos): só a que cita o pagador; sem como saber, nenhuma (o usuário liga na tela Banco)
@@ -502,7 +550,7 @@ const nomeDoPagador = (d, cb) => { const c = cb && buscar(d, 'contratos', cb.con
 export function ligarEntradaDoBoleto(d, cobrancaId, contaId, usuario) {
   const cb = buscar(d, 'cobrancas', cobrancaId);
   if (!cb || !cb.data_pagamento || cb.movimentacao_id) return null;
-  const mov = entradaDoRecebimento(d, { conta_id: contaId, valor: cb.valor_pago, data: cb.data_pagamento, nome: nomeDoPagador(d, cb) });
+  const mov = entradaDoRecebimento(d, { conta_id: contaId, valor: cb.valor_pago, data: cb.data_pagamento, nome: nomeDoPagador(d, cb), ids: identificadoresDoBoleto(cb) });
   if (mov) ligarMovimentacaoAoBoleto(d, mov.id, cb.id, usuario);
   return mov;
 }
@@ -517,7 +565,7 @@ export function ligarEntradaDoBoleto(d, cobrancaId, contaId, usuario) {
 export function registrarPagamentoDoBanco(d, contaId, p, usuario, { pagouEmDia, valorNf = null, justificativa = '' } = {}) {
   const cb = buscar(d, 'cobrancas', p.cobranca_id);
   if (!cb) throw new Error('Boleto não encontrado.');
-  const mov = entradaDoRecebimento(d, { conta_id: contaId, valor: p.valor, data: p.data_credito, nome: nomeDoPagador(d, cb) });
+  const mov = entradaDoRecebimento(d, { conta_id: contaId, valor: p.valor, data: p.data_credito, nome: nomeDoPagador(d, cb), ids: [p.external_payment_id, p.end_to_end_id, ...identificadoresDoBoleto(cb)] });
   if (cb.data_pagamento) {
     if (mov && ligavel(cb, mov.id) && cb.valor_pago === mov.valor) { ligarMovimentacaoAoBoleto(d, mov.id, cb.id, usuario); return { divergente: false, ligada: true, cobranca: cb }; }
     throw new Error(`Este boleto já está pago (${C.dataBr(cb.data_pagamento)}). Nada foi alterado.`);
@@ -532,8 +580,8 @@ export function conciliarMovimentacoes(d, movs, { dias = null, indice = null } =
   const out = [];
   for (const m of movs || []) {
     if (m.tipo !== 'entrada' || m.classificacao || ehDevolucao(m)) continue;
-    for (const a of casarBoletos(d, m.valor, m.data, tol, { movId: m.id, indice, pix: ehPix(m) })) {
-      out.push({ movimentacao_id: m.id, cobranca_id: a.cobranca.id, certeza: a.certeza, previsto: a.previsto, pagouEmDia: a.pagouEmDia, jaPago: !!a.jaPago });
+    for (const a of casarBoletos(d, m.valor, m.data, tol, { movId: m.id, indice, pix: ehPix(m), ids: identificadoresDaMov(m) })) {
+      out.push({ movimentacao_id: m.id, cobranca_id: a.cobranca.id, certeza: a.certeza, previsto: a.previsto, pagouEmDia: a.pagouEmDia, jaPago: !!a.jaPago, peloId: !!a.peloId });
     }
   }
   return out;
@@ -685,7 +733,7 @@ function indiceDeBoletos(d) {
     if (emAberto(cb)) { abertos.push(cb); pontual.set(cb, totais(cb).a_pagar_pontual); }
     if (cb.data_pagamento) { const l = pagosPorValor.get(cb.valor_pago); if (l) l.push(cb); else pagosPorValor.set(cb.valor_pago, [cb]); }
   }
-  return { abertos, pontual, pagosPorValor };
+  return { abertos, pontual, pagosPorValor, porIdentificador: boletosPorIdentificador(d.cobrancas) };
 }
 
 /** Contas pagas por nós que já têm uma linha do extrato ligada (ids). */
@@ -724,6 +772,9 @@ export function sugerirDestino(d, mov, indice = null) {
   const texto = textoDaMov(mov);
   // 0) devolução de Pix ou estorno: nunca é aluguel nem transferência entre as nossas contas
   if (ehDevolucao(mov)) return { classificacao: 'devolucao', motivo: mov.tipo === 'entrada' ? 'devolução de Pix recebida (ou estorno): dinheiro que voltou' : 'devolução de Pix enviada: dinheiro devolvido (confira o boleto de quem recebeu)', confianca: 'alta' };
+  // 0b) entrada com o identificador de um boleto nosso (referência do Pix, nosso número, id do pagamento): é ele, antes de tudo
+  const casa = mov.tipo === 'entrada' && !mov.classificacao ? conciliarMovimentacoes(d, [mov], { indice }) : [];
+  if (casa.length === 1 && casa[0].peloId) return sugestaoDeBoleto(d, casa[0]);
   // 1) saída que é um pagamento feito pelo sistema
   if (mov.tipo === 'saida') {
     const pag = (d.pagamentos_banco || []).find((p) => ['agendado', 'pago'].includes(p.situacao) && !p.movimentacao_id && p.conta_id === mov.conta_id && p.valor === mov.valor
@@ -747,16 +798,7 @@ export function sugerirDestino(d, mov, indice = null) {
   if (mov.tipo === 'entrada' && /AIRBNB/.test(texto)) return { classificacao: 'airbnb', motivo: 'descrição do Airbnb', confianca: 'alta' };
   // 3) entrada que parece boleto
   if (mov.tipo === 'entrada' && !mov.classificacao) {
-    const casa = conciliarMovimentacoes(d, [mov], { indice });
-    if (casa.length === 1) {
-      const cb = buscar(d, 'cobrancas', casa[0].cobranca_id);
-      const c = buscar(d, 'contratos', cb.contrato_id);
-      if (casa[0].jaPago) {
-        return { classificacao: 'boleto', cobranca_id: cb.id, imovel_id: c ? c.imovel_id : null, ligar: true, confianca: 'alta',
-          motivo: `o boleto de ${c ? c.inquilino_nome : ''} (${C.compBr(cb.competencia)}) já está pago desde ${C.dataBr(cb.data_pagamento)} com este valor: só ligar esta entrada a ele` };
-      }
-      return { classificacao: 'boleto', cobranca_id: cb.id, imovel_id: c ? c.imovel_id : null, pagouEmDia: casa[0].pagouEmDia, motivo: `valor igual ao boleto de ${c ? c.inquilino_nome : ''} (${C.compBr(cb.competencia)})`, confianca: 'alta' };
-    }
+    if (casa.length === 1) return sugestaoDeBoleto(d, casa[0]);
     if (casa.length > 1) return { classificacao: 'boleto', cobranca_id: null, candidatos: casa.map((x) => x.cobranca_id), motivo: `${casa.length} boletos com este valor`, confianca: 'baixa' };
   }
   if (parIncerto) return parIncerto;
@@ -794,6 +836,19 @@ export function sugerirDestino(d, mov, indice = null) {
       motivo: `igual à movimentação de ${C.dataBr(antiga.data)}`, confianca: 'media' }, indice);
   }
   return porPalavra;
+}
+
+/** Sugestão "boleto" de uma entrada casada com um boleto só (pelo identificador, ou pelo valor e pela data). */
+function sugestaoDeBoleto(d, x) {
+  const cb = buscar(d, 'cobrancas', x.cobranca_id);
+  const c = buscar(d, 'contratos', cb.contrato_id);
+  const quem = `${c ? c.inquilino_nome : ''} (${C.compBr(cb.competencia)})`;
+  if (x.jaPago) {
+    return { classificacao: 'boleto', cobranca_id: cb.id, imovel_id: c ? c.imovel_id : null, ligar: true, confianca: 'alta',
+      motivo: `o boleto de ${quem} já está pago desde ${C.dataBr(cb.data_pagamento)} com este valor${x.peloId ? ' (o código do banco é o mesmo)' : ''}: só ligar esta entrada a ele` };
+  }
+  return { classificacao: 'boleto', cobranca_id: cb.id, imovel_id: c ? c.imovel_id : null, pagouEmDia: x.pagouEmDia, confianca: 'alta',
+    motivo: x.peloId ? `o código do banco (Pix ou nosso número) é o do boleto de ${quem}` : `valor igual ao boleto de ${quem}` };
 }
 
 /**

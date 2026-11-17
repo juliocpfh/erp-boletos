@@ -5224,6 +5224,9 @@ export function normalizarRespostaC6(resposta) {
     pix_copia_cola: pix[Q.pix_copia_cola] || r.pix_copia_cola || null,
     pix_qr_base64: pix[Q.pix_imagem] || r.pix_qr_base64 || null,
     pix_qr_mime: pix[Q.pix_imagem_tipo] || r.pix_qr_mime || (pix[Q.pix_imagem] ? 'image/png' : null),
+    // identificadores para casar o extrato sem depender de valor e data: a referência do Pix (vem na emissão) e os ids dos pagamentos
+    pix_referencia: pix[Q.pix_referencia] || r.pix_referencia || null,
+    ids_pagamento: Array.isArray(pgs) ? [...new Set(pgs.flatMap((x) => [x && x[Q.pagamento_id], x && x[Q.pagamento_e2e]]).filter(Boolean).map(String))] : (Array.isArray(r.ids_pagamento) ? r.ids_pagamento : null),
     situacao: r.situacao && SITUACOES_BANCO.includes(r.situacao) ? r.situacao : situacaoBancaria(r[Q.situacao]),
     situacao_banco: r[Q.situacao] || r.situacao_banco || null,
     valor: r[Q.valor] !== undefined && r[Q.valor] !== null ? reaisParaCentavos(r[Q.valor]) : (r.valor ?? null),
@@ -5260,6 +5263,8 @@ export function registrarBoletoBancario(d, cbId, resposta, usuario, extra = {}) 
     id_externo: n.id_externo || antes.id_externo || null, id_banco: n.id_banco || antes.id_banco || null, nosso_numero: n.nosso_numero || antes.nosso_numero || null,
     linha_digitavel: n.linha_digitavel || antes.linha_digitavel || null, codigo_barras: n.codigo_barras || antes.codigo_barras || null,
     pix_copia_cola: n.pix_copia_cola || antes.pix_copia_cola || null, pix_qr_base64: n.pix_qr_base64 || antes.pix_qr_base64 || null, pix_qr_mime: n.pix_qr_mime || antes.pix_qr_mime || null,
+    pix_referencia: n.pix_referencia || (reemissao ? null : antes.pix_referencia) || null,
+    ids_pagamento: [...new Set([...(reemissao ? [] : antes.ids_pagamento || []), ...(n.ids_pagamento || [])])],
     situacao: n.situacao, situacao_banco: n.situacao_banco, valor: n.valor ?? antes.valor ?? valorNoBanco(d, cb), vencimento: n.vencimento || antes.vencimento || cb.vencimento,
     emitido_em: antes.emitido_em && !reemissao ? antes.emitido_em : new Date().toISOString(), consultado_em: antes.emitido_em && !reemissao ? new Date().toISOString() : null,
     ...(emissoesAnteriores ? { emissoes_anteriores: emissoesAnteriores } : {}),

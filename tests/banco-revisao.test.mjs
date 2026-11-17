@@ -419,7 +419,8 @@ test('item 6: campo do pagador acima do limite do C6 (ou com "/") barra a emiss�
   // a ponte também recusa em vez de cortar (o lugar de confiança)
   const S = await import('../ponte-c6/servidor.mjs');
   R.atualizar(d, 'contratos', c.id, { inquilino_email: '' }, 'julio');
-  const ok = R.pedidoBoletoC6(d, cb2, conta);
+  // vencimento no futuro (a ponte recusa vencimento já passado)
+  const ok = { ...R.pedidoBoletoC6(d, cb2, conta), due_date: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10) };
   const contaPonte = { id: 'ank', ambiente: 'sandbox', valor_maximo: 50000, chave_pix: '' };
   assert.equal(S.montarPedidoSeguro(ok, contaPonte).payer.name, 'Maria Aparecida dos S. Oliveira Ferreira');
   assert.throws(() => S.montarPedidoSeguro({ ...ok, payer: { ...ok.payer, name: 'Maria Aparecida dos Santos Oliveira Ferreira' } }, contaPonte), (e) => e.status === 400 && /nome do pagador tem 44 caracteres; o banco aceita até 40/.test(e.message));

@@ -24,7 +24,11 @@ const chamar = async (metodo, caminho, corpo = null, cabecalhos = {}) => {
 };
 
 const REF = 'B00000007ABCDEFGHIJ0000000';
-const PEDIDO = { external_reference_id: REF, amount: 3644.45, due_date: '2026-03-10', description: 'ALUGUEL RS3.644,45',
+// datas relativas a hoje (a ponte recusa vencimento no passado): vence daqui a 60 dias
+const diaMais = (n) => new Date(Date.now() - 3 * 3600000 + n * 86400000).toISOString().slice(0, 10);
+const VENC = diaMais(60);
+const MES = VENC.slice(0, 7);
+const PEDIDO = { external_reference_id: REF, amount: 3644.45, due_date: VENC, description: 'ALUGUEL RS3.644,45',
   payer: { name: 'Maria Exemplo', tax_id: '52998224725', email: 'maria@exemplo.com.br', phone: '41999990000', address: { address: 'Rua das Flores, 45', neighborhood: 'Centro', city: 'Curitiba', state: 'PR', zip_code: '80010000' } },
   payment_method: { bank_slip: { your_number: '7' }, pix: { key: 'chave-do-navegador', type: 'EVP' } }, campo_desconhecido: 'some',
   payer_notification: [{ channel: 'EMAIL', destination: 'maria@exemplo.com.br', notification_date: 'DUE_DATE' }, { channel: 'SMS', destination: '41999990000', notification_date: 'ISSUE_DATE' }] };
@@ -152,11 +156,18 @@ test('simulado: emite (idempotente, formato da OpenAPI), consulta, lista, altera
   assert.deepEqual(c.dados.payer_notification[0], { channel: 'EMAIL', destination: 'maria@exemplo.com.br', notification_date: 'DUE_DATE', status: 'SCHEDULED', sent_at: null });
   assert.equal(c.dados.payment_method.pix.qr_code.includes('br.gov.bcb.pix'), true);
   // listagem: content[] + paginação
-  const lista = await chamar('GET', '/contas/ank/boletos?due_date_from=2026-03-01&due_date_to=2026-03-31&status=CREATED');
+  const lista = await chamar('GET', `/contas/ank/boletos?due_date_from=${MES}-01&due_date_to=${VENC}&status=CREATED`);
   assert.equal(lista.dados.content.length, 1);
   assert.equal(lista.dados.total_pages, 1);
   assert.equal(lista.dados.page, 0);
-  assert.equal((await chamar('GET', '/contas/ank/boletos?due_date_from=2026-03-01&status=PAID')).dados.content.length, 0);
+  assert.equal((await chamar('GET', `/contas/ank/boletos?due_date_from=${MES}-01&status=PAID`)).dados.content.length, 0);
+  // item 20: a ponte recusa vencimento no passado (ontem), mas a nova tentativa de um boleto já feito ainda acha o que existe
+  const vencido = await chamar('POST', '/contas/ank/boletos', { ...PEDIDO, external_reference_id: 'B00000009ABCDEFGHIJ0000000', due_date: diaMais(-1) });
+  assert.equal(vencido.status, 400);
+  assert.match(vencido.dados.erro, /já passou: o banco só aceita boleto que vence hoje ou depois/);
+  assert.equal((await chamar('POST', '/contas/ank/boletos', { ...PEDIDO, external_reference_id: 'B00000009ABCDEFGHIJ0000000', due_date: diaMais(0) })).status, 201, 'hoje pode');
+  assert.equal((await chamar('POST', '/contas/ank/boletos', { ...PEDIDO, due_date: diaMais(-1), repetir: true })).status, 200, 'já existia: devolve o que existe');
+  assert.throws(() => P.montarPedidoSeguro({ ...PEDIDO, due_date: '2020-01-01' }, cfg.contas.ank), (e) => e.status === 400);
   // alteração parcial (PATCH)
   const alt = await chamar('POST', `/contas/ank/boletos/${REF}/alterar`, { amount: 3744.45, due_date: '2099-03-15' });
   assert.equal(alt.status, 200);
@@ -186,13 +197,13 @@ test('simulado: emite (idempotente, formato da OpenAPI), consulta, lista, altera
   assert.equal(cancNeg.status, 200);
   assert.equal(cancNeg.dados.denial_info.status, 'SCHEDULED_CANCELLATION');
   // pagamento fictício: payments[] como na listagem
-  const pago = await chamar('POST', `/contas/ank/simulado/pagar/${REF}`, { payment_date: '2026-03-09', credit_date: '2026-03-10' });
+  const pago = await chamar('POST', `/contas/ank/simulado/pagar/${REF}`, { payment_date: diaMais(59), credit_date: VENC });
   assert.equal(pago.status, 200);
   assert.equal(pago.dados.status, 'PAID');
   assert.equal(pago.dados.payments.length, 1);
   assert.equal(pago.dados.payments[0].amount, '3744.45');
-  assert.equal(pago.dados.payments[0].payment_date, '2026-03-09');
-  assert.equal(pago.dados.payments[0].credit_date, '2026-03-10');
+  assert.equal(pago.dados.payments[0].payment_date, diaMais(59));
+  assert.equal(pago.dados.payments[0].credit_date, VENC);
   assert.equal(pago.dados.payments[0].payment_type, 'PIX');
   const naoCancela = await chamar('POST', `/contas/ank/boletos/${REF}/cancelar`, {});
   assert.equal(naoCancela.status, 409);
