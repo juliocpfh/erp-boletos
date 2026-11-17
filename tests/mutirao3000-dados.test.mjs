@@ -314,3 +314,45 @@ test('itens 26, 27 e 51: importar ZIP guarda o anexo trocado; ZIP sai mesmo com 
   await S.exportarZip(Zip, pastaFalsa, { formato: 'imoveis-v1' });
   assert.ok(nomes.includes('NAO-INCLUIDOS.txt'));
 });
+
+test('itens 21 e 23: dois aparelhos anexando o mesmo nome não se apagam; anexo que sumiu da fila vira aviso', async () => {
+  const S = await import('../docs/js/armazenamento.js');
+  const { AnexosNuvem } = await import('../docs/js/pasta-nuvem.js');
+  const { atender } = await import('../nuvem/worker.mjs');
+  const R2 = r2Falso(); const env = { MODO_TESTE: '1', ORIGEM: 'http://localhost:8787', DADOS: R2 }; const est = { internet: true };
+  const buscar = async (url, op = {}) => { if (!est.internet) throw new TypeError('Failed to fetch'); return atender(new Request(url, { ...op, headers: { Origin: 'http://localhost:8787', ...op.headers } }), env); };
+  const novo = () => { const g = new Map(); const c = new AnexosNuvem({ base: 'http://localhost:8787/api/', buscar, guardar: { ler: async (k) => g.get(k), gravar: async (k, v) => { g.set(k, v); }, apagar: async (k) => { g.delete(k); } } }); c.g = g; return c; };
+  const pasta = async (cli) => S.subpasta(await cli.raiz().getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true }), ['Apto 1']);
+  const a = novo(); const b = novo();
+  const da = await pasta(a); const db = await pasta(b);
+  await S.listar(db); // a lista da pasta fica guardada no aparelho B
+  const na = await S.salvarArquivo(da, new File(['DO DONO'], 'comprovante.pdf'), { compactar: false });
+  const nb = await S.salvarArquivo(db, new File(['DA SOCIA'], 'comprovante.pdf'), { compactar: false });
+  assert.equal(na, 'comprovante.pdf'); assert.equal(nb, 'comprovante (2).pdf');
+  assert.equal(await (await a.ler(['arquivos', 'Apto 1', 'comprovante.pdf'])).text(), 'DO DONO');
+  // 23: sem internet, o arquivo guardado sumiu do aparelho antes de subir
+  est.internet = false;
+  await S.salvarArquivo(da, new File(['RECIBO'], 'recibo.pdf'), { compactar: false });
+  for (const k of [...a.g.keys()]) if (k.startsWith('anexo:')) a.g.delete(k);
+  est.internet = true; a.avisos = [];
+  await a.enviarFila();
+  assert.equal(a.naoEnviados.length, 1);
+  assert.match(a.avisos[0], /sumiu deste aparelho/);
+});
+
+test('item 40: fila, contador e faixas gravados juntos: falha no meio não deixa o aparelho sem poder incluir', async () => {
+  const cofre = novoCofreDO(); const g = new Map();
+  let a = aparelho(cofre, DONO, g); await a.sinc.iniciar(); await a.sinc.importar(baseSimples()); await a.sinc.sincronizar();
+  let falhar = false;
+  const comVarios = (ap) => { ap.guardar.gravarVarios = async (obj) => { if (falhar) { falhar = false; throw new Error('aba fechada'); } for (const [k, v] of Object.entries(obj)) g.set(k, structuredClone(v)); }; };
+  comVarios(a);
+  a.internet = false;
+  await a.sinc.alterar((x) => R.inserir(x, 'despesas', { descricao: 'primeira', valor: 1 }, 'dono'));
+  falhar = true;
+  await assert.rejects(a.sinc.alterar((x) => R.inserir(x, 'despesas', { descricao: 'segunda', valor: 1 }, 'dono')), /aba fechada/);
+  a = aparelho(cofre, DONO, g); comVarios(a); a.internet = false; await a.sinc.iniciar().catch(() => {});
+  await a.sinc.alterar((x) => R.inserir(x, 'despesas', { descricao: 'terceira', valor: 1 }, 'dono'));
+  const ids = a.sinc.atual().despesas.map((x) => x.id);
+  assert.equal(new Set(ids).size, ids.length);
+  assert.deepEqual(a.sinc.atual().despesas.map((x) => x.descricao), ['primeira', 'terceira']);
+});

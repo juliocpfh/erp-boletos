@@ -193,9 +193,14 @@ export async function salvarArquivo(dir, arquivo, { compactar = true } = {}) {
   const ponto = nome.lastIndexOf('.');
   const [base, ext] = ponto > 0 ? [nome.slice(0, ponto), nome.slice(ponto)] : [nome, ''];
   let final = nome;
-  for (let n = 2; await arquivoExiste(dir, final); n += 1) final = `${base} (${n})${ext}`;
-  await escreverTexto(dir, final, arquivo);
-  return final;
+  for (let n = 2; ; n += 1) {
+    if (!(await arquivoExiste(dir, final))) {
+      if (!dir.gravarSeNovo) { await escreverTexto(dir, final, arquivo); return final; }
+      // nuvem: grava "só se novo" (a lista da pasta fica guardada 60 s; outro aparelho pode ter gravado o mesmo nome): item 21
+      try { await dir.gravarSeNovo(final, arquivo); return final; } catch (e) { if (e?.status !== 412) throw e; }
+    }
+    final = `${base} (${n})${ext}`;
+  }
 }
 
 export async function abrirArquivo(dir, nome) {

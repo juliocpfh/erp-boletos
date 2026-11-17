@@ -589,6 +589,9 @@ export class Sincronia {
 
   /** Grava a fila, o contador de lotes e as faixas (sempre dentro da trava). */
   async gravarFila() {
+    // numa gravação só quando o aparelho deixa (IndexedDB): se a de faixas falhasse depois da fila, a próxima inclusão
+    // repetiria um código da fila e o aparelho não conseguiria mais incluir naquela tabela (item 40)
+    if (this.guardar.gravarVarios) { await this.guardar.gravarVarios({ n: this.n, pendentes: this.pendentes, faixas: this.faixas }); return; }
     await this.guardar.gravar('n', this.n);
     await this.guardar.gravar('pendentes', this.pendentes);
     await this.guardar.gravar('faixas', this.faixas);
@@ -934,6 +937,8 @@ export function guardarNoNavegador(nome = 'imoveis-nuvem', { indexedDB: idb = gl
   return {
     ler: (k) => op('readonly', (s) => s.get(k)),
     gravar: (k, v) => op('readwrite', (s) => s.put(v, k)),
+    /** Várias chaves numa transação só: grava todas ou nenhuma. */
+    gravarVarios: (obj) => op('readwrite', (s) => { let r; for (const [k, v] of Object.entries(obj)) r = s.put(v, k); return r; }),
     apagar: (k) => op('readwrite', (s) => s.delete(k)),
   };
 }
