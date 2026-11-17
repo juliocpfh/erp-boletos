@@ -83,12 +83,17 @@ export function configDaConta(id, env, pastaContas) {
     certificado: caminhoCert, chave: caminhoChave, senha_chave: env[`${P}SENHA_CHAVE`] || '',
     url_base: env[`${P}URL_BASE`] || URLS_C6[ambiente],
     webhook_token: env[`${P}WEBHOOK_TOKEN`] || lerArquivoSeExiste(arq('webhook_token.txt')), // 32 hex: sem ele o webhook da conta fica desligado
-    valor_maximo: Number(env[`${P}VALOR_MAXIMO`] || lerArquivoSeExiste(arq('valor_maximo.txt')) || 50000), // reais, por boleto
+    valor_maximo: Number(env[`${P}VALOR_MAXIMO`] || lerArquivoSeExiste(arq('valor_maximo.txt')) || 50000), // reais, por boleto (e por pagamento da fase 2)
+    lote_maximo: Number(env[`${P}LOTE_MAXIMO`] || lerArquivoSeExiste(arq('lote_maximo.txt')) || 250000), // reais, soma de um lote de pagamentos (fase 2)
     empresa: env[`${P}EMPRESA`] || lerArquivoSeExiste(arq('empresa.txt')) || id.toUpperCase(),
     versao_boleto: (env[`${P}VERSAO_BOLETO`] || lerArquivoSeExiste(arq('versao_boleto.txt')) || 'v2').toLowerCase() === 'v1' ? 'v1' : 'v2', // v1: campos diferentes, só para contas antigas
     chave_pix: env[`${P}CHAVE_PIX`] || lerArquivoSeExiste(arq('chave_pix.txt')), // só informativo: a chave usada vem do pedido do site
   };
 }
+
+const ORIGENS_PADRAO = 'https://erp.ankjck.com.br,http://localhost:8000,http://127.0.0.1:8000';
+/** Senhas de exemplo publicadas (.env.exemplo, documentação): a ponte não sobe com elas. */
+export const SENHAS_DE_EXEMPLO = ['troque-esta-frase-longa-de-senha'];
 
 export function carregarConfig(env = process.env) {
   const ids = String(env.CONTAS || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
@@ -101,8 +106,13 @@ export function carregarConfig(env = process.env) {
     porta: Number(env.PONTE_PORTA || 8765),
     host, exposta, expor: ['1', 'true', 'sim'].includes(String(env.EXPOR || '').toLowerCase()),
     // lista FIXA de origens que podem chamar a ponte (CORS); "*" nunca é aceito
-    origens: String(env.ORIGENS || env.PONTE_ORIGEM || 'http://localhost:8000,http://127.0.0.1:8000,https://juliocpfh.github.io').split(',').map((x) => x.trim()).filter((x) => x && x !== '*'),
+    // padrão: só o endereço do sistema e o teste local (o *.github.io é de todos os projetos da conta, não entra sozinho)
+    origens: String(env.ORIGENS || env.PONTE_ORIGEM || ORIGENS_PADRAO).split(',').map((x) => x.trim()).filter((x) => x && x !== '*'),
+    // nomes aceitos no cabeçalho Host além de 127.0.0.1/localhost (contra "DNS rebinding"): o endereço do Cloudflare Tunnel, se houver
+    hosts: String(env.HOSTS || env.PONTE_HOSTS || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean),
     senha: env.PONTE_SENHA || '',
+    boletos_por_dia: Number(env.BOLETOS_POR_DIA || 200), // boletos novos por conta em um dia (contra uso indevido da senha)
+    pagamentos_max_itens: Number(env.PAGAMENTOS_MAX_ITENS || 100), // itens num lote de pagamentos (fase 2)
     simulado: ['1', 'true', 'sim'].includes(String(env.SIMULADO || '').toLowerCase()),
     pagamentos: ['1', 'true', 'sim'].includes(String(env.PAGAMENTOS || '').toLowerCase()), // libera as rotas de pagamento (fase 2)
     retencao_registros_dias: Number(env.RETENCAO_REGISTROS_DIAS || 30),
@@ -123,6 +133,7 @@ export function validarConfig(cfg) {
   }
   if (cfg.exposta && !cfg.expor) throw new Error(`PONTE_HOST=${cfg.host} expõe a ponte fora deste computador. Se for isso mesmo, defina EXPOR=1 e proteja o acesso (Cloudflare Access ou Tailscale); senão use 127.0.0.1.`);
   if (String(cfg.senha).length < 20) throw new Error('PONTE_SENHA precisa ter pelo menos 20 caracteres (uma frase): defina no .env. A mesma senha vai no site, em Dados e backup → Banco (C6).');
+  if (SENHAS_DE_EXEMPLO.includes(String(cfg.senha).trim().toLowerCase())) throw new Error('PONTE_SENHA ainda é a senha do exemplo (publicada no GitHub): invente outra frase longa no .env. A mesma senha vai no site, em Dados e backup → Banco (C6).');
   for (const c of Object.values(cfg.contas)) {
     if (c.webhook_token && !/^[0-9a-f]{32}$/i.test(c.webhook_token)) throw new Error(`C6_${c.id.toUpperCase()}_WEBHOOK_TOKEN precisa ter 32 caracteres hexadecimais (gere com: node -e "console.log(require('crypto').randomBytes(16).toString('hex'))").`);
     if (!(c.valor_maximo > 0)) throw new Error(`C6_${c.id.toUpperCase()}_VALOR_MAXIMO precisa ser um valor em reais maior que zero.`);
@@ -556,6 +567,21 @@ const simuladoOuErro = (conta, id) => {
   return r;
 };
 
+// Boletos novos por conta e por dia (BOLETOS_POR_DIA no .env): se a senha da ponte vazar, ninguém emite milhares de boletos
+const emitidosNoDia = new Map(); // "conta|AAAA-MM-DD" → quantidade
+const diaDeHoje = () => new Date().toISOString().slice(0, 10);
+function conferirLimiteDiario(cfg, conta) {
+  const chave = `${conta.id}|${diaDeHoje()}`;
+  for (const k of emitidosNoDia.keys()) if (!k.endsWith(diaDeHoje())) emitidosNoDia.delete(k);
+  const n = emitidosNoDia.get(chave) || 0;
+  const teto = cfg.boletos_por_dia > 0 ? cfg.boletos_por_dia : 200;
+  if (n >= teto) throw new ErroHttp(429, `Limite de ${teto} boletos novos por dia na conta ${conta.id.toUpperCase()} atingido. Se for isso mesmo, aumente BOLETOS_POR_DIA no .env da ponte e reinicie.`);
+  if (n + 1 === Math.ceil(teto * 0.8)) console.error(`${new Date().toISOString()} conta ${conta.id}: ${n + 1} boletos emitidos hoje (80% do limite de ${teto} por dia)`);
+  return () => emitidosNoDia.set(chave, (emitidosNoDia.get(chave) || 0) + 1);
+}
+/** Zera a contagem diária de boletos (testes). */
+export const zerarLimiteDiario = () => emitidosNoDia.clear();
+
 export const SERVICOS = {
   boletos: {
     descricao: 'Boleto com Pix (bolepix)',
@@ -567,12 +593,16 @@ export const SERVICOS = {
           // o mesmo external_reference_id devolve a cobrança já feita
           const existente = simulados.get(chaveSim(conta, pedido[M.CAMPOS.referencia]));
           if (existente) return { status: 200, dados: { ...respostaEmissao(existente), ambiente: conta.ambiente } };
+          const contar = conferirLimiteDiario(cfg, conta);
           const r = respostaSimulada(conta.id, pedido, conta.ambiente);
           simulados.set(chaveSim(conta, r.external_reference_id), r);
+          contar();
           return { status: 201, dados: { ...respostaEmissao(r), ambiente: conta.ambiente } };
         }
         exigirConfigurada(conta);
+        const contar = conferirLimiteDiario(cfg, conta);
         const r = await chamarC6(cfg, conta, 'POST', M.CAMINHOS.boletos(versao(conta)), pedido);
+        contar();
         return { status: 201, dados: { ...r.dados, ambiente: conta.ambiente } };
       } },
       // BP_06 listar (um intervalo de datas obrigatório, até 60 dias; status, external_reference_id, page, size)
@@ -790,23 +820,55 @@ const CABECALHO_SENHA = 'x-senha-ponte';
 
 function cors(cfg, req, res) {
   const origem = req.headers.origin;
-  if (origem && (cfg.origens.includes('*') || cfg.origens.includes(origem))) {
+  const aceita = origem && (cfg.origens.includes('*') || cfg.origens.includes(origem));
+  if (aceita) {
     res.setHeader('Access-Control-Allow-Origin', origem);
     res.setHeader('Vary', 'Origin');
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', `Content-Type, Accept, ${CABECALHO_SENHA}`);
   res.setHeader('Access-Control-Max-Age', '600');
-  // o Chrome exige isto para um site público (GitHub Pages) chamar um endereço local
-  if (req.method === 'OPTIONS') res.setHeader('Access-Control-Allow-Private-Network', 'true');
+  // o Chrome exige isto para um site público chamar um endereço local: só para as origens da lista
+  if (req.method === 'OPTIONS' && aceita) res.setHeader('Access-Control-Allow-Private-Network', 'true');
 }
+
+const NOMES_LOCAIS = ['127.0.0.1', 'localhost', '[::1]'];
+/**
+ * O cabeçalho Host é deste computador (127.0.0.1/localhost na porta em que a ponte escuta) ou um dos HOSTS do .env (o endereço
+ * do Cloudflare Tunnel)? Contra "DNS rebinding": um site que faz o próprio nome apontar para 127.0.0.1 chega com o Host dele.
+ * Ponte exposta (EXPOR=1) sem HOSTS: aceita também o endereço em que escuta.
+ */
+export function hostAceito(cfg, req) {
+  const host = String(req.headers.host || '').trim().toLowerCase();
+  if (!host) return false;
+  if (cfg.hosts.includes(host)) return true;
+  const porta = String((req.socket && req.socket.localPort) || cfg.porta);
+  const nomes = cfg.exposta ? [...NOMES_LOCAIS, String(cfg.host).toLowerCase()] : NOMES_LOCAIS;
+  return nomes.some((n) => host === `${n}:${porta}`);
+}
+/** Veio pelo Cloudflare Tunnel (Host de HOSTS, conexão local do cloudflared)? Só aí o CF-Connecting-IP é do Cloudflare. */
+const viaTunel = (cfg, req) => cfg.hosts.includes(String(req.headers.host || '').trim().toLowerCase())
+  && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(String(req.socket && req.socket.remoteAddress));
 
 // Tentativas de senha: atraso progressivo (1 s, 2 s, 4 s… até 8 s) e, após 10 erros seguidos do mesmo IP, 15 minutos sem atender
 const TENTATIVAS_MAX = 10;
 const BLOQUEIO_MS = 15 * 60000;
 const tentativas = new Map(); // ip → { erros, bloqueadoAte }
-/** IP de quem chama: o que o Cloudflare informa (CF-Connecting-IP), senão o do socket. */
-const ipDe = (req) => String(req.headers['cf-connecting-ip'] || (req.socket && req.socket.remoteAddress) || 'desconhecido').slice(0, 64);
+/** IP de quem chama: o que o Cloudflare informa (CF-Connecting-IP) só quando o pedido veio pelo Tunnel; senão o do socket. */
+const ipDe = (cfg, req) => String((viaTunel(cfg, req) && req.headers['cf-connecting-ip']) || (req.socket && req.socket.remoteAddress) || 'desconhecido').slice(0, 64);
+// Limite geral (somando todos os IPs): 50 senhas erradas em 15 minutos fecham a ponte por 15 minutos para senha errada
+const ERROS_GERAIS_MAX = 50;
+let errosGerais = { desde: 0, n: 0, bloqueadoAte: 0 };
+export function bloqueioGeral(agora = Date.now()) {
+  return errosGerais.bloqueadoAte > agora ? Math.ceil((errosGerais.bloqueadoAte - agora) / 60000) : 0;
+}
+function contarErroGeral(agora = Date.now()) {
+  if (agora - errosGerais.desde > BLOQUEIO_MS) errosGerais = { desde: agora, n: 0, bloqueadoAte: errosGerais.bloqueadoAte };
+  errosGerais.n += 1;
+  if (errosGerais.n >= ERROS_GERAIS_MAX) { errosGerais = { desde: agora, n: 0, bloqueadoAte: agora + BLOQUEIO_MS }; console.error(`${new Date(agora).toISOString()} ${ERROS_GERAIS_MAX} senhas erradas em 15 minutos (vários endereços): senha errada bloqueada por 15 minutos`); }
+}
+/** Zera os contadores de senha errada (testes). */
+export function zerarTentativas() { tentativas.clear(); errosGerais = { desde: 0, n: 0, bloqueadoAte: 0 }; }
 /** Segundos de espera antes de responder a mais uma senha errada deste IP (0 no primeiro erro). */
 export const atrasoDe = (ip) => { const t = tentativas.get(ip); return t && t.erros ? Math.min(8, 2 ** (t.erros - 1)) : 0; };
 const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
@@ -818,6 +880,7 @@ export function bloqueado(ip, agora = Date.now()) {
 }
 export function registrarTentativa(ip, acertou, agora = Date.now()) {
   if (acertou) { tentativas.delete(ip); return; }
+  contarErroGeral(agora);
   const t = tentativas.get(ip) || { erros: 0, bloqueadoAte: 0 };
   t.erros += 1;
   if (t.erros >= TENTATIVAS_MAX) { t.bloqueadoAte = agora + BLOQUEIO_MS; t.erros = 0; console.error(`${new Date(agora).toISOString()} ${ip}: ${TENTATIVAS_MAX} senhas erradas, bloqueado por 15 minutos`); }
@@ -845,12 +908,11 @@ function lerCorpo(req, maximo = 256 * 1024) {
   });
 }
 
+/** Compara dois textos sem revelar pelo tempo nem o conteúdo nem o tamanho (compara os SHA-256, sempre do mesmo tamanho). */
+export const textosIguais = (a, b) => crypto.timingSafeEqual(crypto.createHash('sha256').update(String(a)).digest(), crypto.createHash('sha256').update(String(b)).digest());
 const senhaConfere = (cfg, req) => {
   if (!cfg.senha) return false;
-  const dada = String(req.headers[CABECALHO_SENHA] || '');
-  const a = Buffer.from(dada);
-  const b = Buffer.from(cfg.senha);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
+  return textosIguais(String(req.headers[CABECALHO_SENHA] || ''), cfg.senha);
 };
 
 // --------------------------------------------------------------------------
@@ -888,6 +950,8 @@ function montarFase2(cfg) {
     c6DaConta: (id) => { const conta = cfg.contas[id]; if (!conta) return null; return cfg.simulado ? c6SimuladoDaConta(id) : c6RealDaConta(cfg, conta); },
     registrar: (t) => console.log(`${new Date().toISOString()} ${t}`),
     empresas: Object.fromEntries(Object.values(cfg.contas).map((c) => [c.id, c.empresa])),
+    limitesPagamento: Object.fromEntries(Object.values(cfg.contas).map((c) => [c.id, { valor_maximo: c.valor_maximo, lote_maximo: c.lote_maximo, max_itens: cfg.pagamentos_max_itens }])),
+    nomeEnvio: cfg.software.nome,
   });
 }
 
@@ -899,7 +963,7 @@ async function atenderFase2(cfg, req, res, caminho, url) {
   if (/\/pagamentos\//.test(rota.padrao) && !cfg.pagamentos) throw new ErroHttp(403, 'As rotas de pagamento estão desligadas nesta ponte (PAGAMENTOS=1 no .env liga).');
   const params = rota.caminho.exec(caminho).groups || {};
   const corpo = req.method === 'POST' || req.method === 'DELETE' ? await lerCorpo(req) : null;
-  const r = await rota.handler(req, { conta: params.conta, params, query: Object.fromEntries(url.searchParams), corpo });
+  const r = await rota.handler(req, { conta: params.conta, params, query: Object.fromEntries(url.searchParams), corpo, ip: ipDe(cfg, req), origem: String(req.headers.origin || '').slice(0, 100) });
   if (r.pdf) {
     res.writeHead(r.status, { 'Content-Type': 'application/pdf', 'Content-Length': r.pdf.length, ...(r.cabecalhos || {}) });
     res.end(r.pdf);
@@ -911,6 +975,8 @@ async function atenderFase2(cfg, req, res, caminho, url) {
 
 /** Trata um pedido HTTP. Exportado para os testes. */
 export async function tratar(cfg, req, res) {
+  // Host de outro site (DNS rebinding): recusa antes de qualquer outra coisa, sem CORS
+  if (!hostAceito(cfg, req)) return responderJson(res, 421, { erro: 'Endereço não reconhecido pela ponte. Use http://127.0.0.1:PORTA (ou acrescente o endereço em HOSTS no .env).' });
   cors(cfg, req, res);
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
   const url = new URL(req.url, 'http://ponte');
@@ -921,7 +987,7 @@ export async function tratar(cfg, req, res) {
     let m = /^\/webhook\/c6\/([a-z0-9_-]+)\/([0-9a-f]{32})$/i.exec(caminho);
     if (m || caminho.startsWith('/webhook/')) {
       const conta = m && cfg.contas[m[1]];
-      const ok = conta && conta.webhook_token && Buffer.from(m[2].toLowerCase()).length === Buffer.from(conta.webhook_token.toLowerCase()).length && crypto.timingSafeEqual(Buffer.from(m[2].toLowerCase()), Buffer.from(conta.webhook_token.toLowerCase()));
+      const ok = conta && conta.webhook_token && textosIguais(m[2].toLowerCase(), conta.webhook_token.toLowerCase());
       if (!ok) throw new ErroHttp(404, 'Rota não existe.');
       if (req.method !== 'POST') throw new ErroHttp(405, 'Use POST.');
       const corpo = await lerCorpo(req, 64 * 1024);
@@ -930,11 +996,13 @@ export async function tratar(cfg, req, res) {
       res.writeHead(204);
       return res.end();
     }
-    const ip = ipDe(req);
+    const ip = ipDe(cfg, req);
     const minutos = bloqueado(ip);
     if (minutos) throw new ErroHttp(429, `Muitas senhas erradas: tente de novo em ${minutos} minuto(s).`);
     const comSenha = senhaConfere(cfg, req);
     const semSenhaNoPedido = !req.headers[CABECALHO_SENHA];
+    const geral = !comSenha && !semSenhaNoPedido && bloqueioGeral();
+    if (geral) throw new ErroHttp(429, `Muitas senhas erradas: tente de novo em ${geral} minuto(s).`);
     if (!comSenha && !semSenhaNoPedido) { const atraso = atrasoDe(ip); registrarTentativa(ip, false); if (atraso && !cfg.sem_atraso) await esperar(atraso * 1000); }
     if (comSenha) registrarTentativa(ip, true);
     if ((caminho === '/saude' || caminho === '/') && req.method === 'GET') {
