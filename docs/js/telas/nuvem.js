@@ -2,7 +2,7 @@
 import { alterar, aviso, baixar, E, ir, janela, login, mostrar, podeUsuario, reabrirSessao } from '../app.js';
 import * as S from '../armazenamento.js';
 import * as B from '../backup-seguro.js';
-import { dataBr, dataHoraBr, hojeIso } from '../calculos.js';
+import { dataBr, dataHoraBr, ErroUsuario, hojeIso } from '../calculos.js';
 import { esc } from '../formularios.js';
 import * as N from '../nuvem.js';
 import * as R from '../regras.js';
@@ -217,14 +217,14 @@ export const ACOES_NUVEM = {
     baixar(f.blob, f.nome);
   },
   async baixarBackupNuvem({ nome }) {
-    if (!podeUsuario('admin')) throw new Error('Só o administrador baixa backups.');
+    if (!podeUsuario('admin')) throw new ErroUsuario('Só o administrador baixa backups.');
     const [dia] = diaDoBackup(nome);
     if (!dia) throw new Error('Backup desconhecido.');
     baixar(await S.abrirArquivo(await pastaBackups(), nome), nome);
   },
   /** Volta os dados da nuvem para os de um dia (o servidor guarda antes uma cópia "antes-da-substituicao"). */
   async restaurarBackupNuvem({ nome }) {
-    if (!podeUsuario('admin')) throw new Error('Só o administrador restaura backups.');
+    if (!podeUsuario('admin')) throw new ErroUsuario('Só o administrador volta os dados para um backup.');
     const [dia, , motivo] = diaDoBackup(nome);
     if (!dia) throw new Error('Backup desconhecido.');
     if (E.nuvem.pendentesQtd()) throw Object.assign(new Error('Ainda há mudanças deste aparelho esperando para ir à nuvem. Espere enviar (ou conecte à internet) antes de voltar para um backup.'), { esperado: true });
@@ -241,7 +241,7 @@ export const ACOES_NUVEM = {
       try { aberto = await B.decifrar(await arquivo.arrayBuffer(), String((resp.senha || [])[0] || '')); } catch (e) { throw Object.assign(new Error(`${e.message} Nada foi trocado.`), { esperado: true }); }
       dados = JSON.parse(new TextDecoder().decode(aberto.dados));
     } else dados = JSON.parse(await arquivo.text());
-    if (!dados || dados.formato !== 'imoveis-v1' || !Array.isArray(dados.usuarios)) throw new Error('Este backup não está no formato esperado.');
+    if (!dados || dados.formato !== 'imoveis-v1' || !Array.isArray(dados.usuarios)) throw new ErroUsuario('Este arquivo de backup está com defeito (não é uma cópia do sistema). Escolha outro dia.');
     // os usuários ficam como estão hoje (quem foi desativado não volta ativo, senha trocada não volta à antiga): item 10
     E.d = await E.nuvem.importar(dados, { substituir: true, manterUsuarios: true });
     await reabrirSessao();

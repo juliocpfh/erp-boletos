@@ -481,7 +481,7 @@ const SERIES_FCI = { ...SERIES_BC, Poupança: 196, SELIC: 4390 };
  */
 export async function indicesMensaisFci(indice, de, ate) {
   const serie = SERIES_FCI[indice];
-  if (!serie) throw new Error(`O índice "${indice}" não está no Banco Central. Escolha outro índice do FCI em "Editar".`);
+  if (!serie) throw new C.ErroUsuario(`O índice "${indice}" não está no Banco Central. Escolha outro índice do FCI em "Editar".`);
   const br = (m) => `01/${m.slice(5, 7)}/${m.slice(0, 4)}`;
   // o Banco Central às vezes recusa consultas seguidas: tenta até 3 vezes, com uma pausa entre elas
   let lista = null;
@@ -492,7 +492,7 @@ export async function indicesMensaisFci(indice, de, ate) {
     } catch { /* sem internet ou Banco Central ocupado */ }
     if (!lista && n < 3) await new Promise((ok) => { setTimeout(ok, 2000 * n); });
   }
-  if (!lista) throw new Error('O Banco Central ficou sem resposta (sem internet ou o site deles está ocupado). Tente de novo em alguns minutos.');
+  if (!lista) throw new C.ErroUsuario('O Banco Central ficou sem resposta (sem internet ou o site deles está ocupado). Tente de novo em alguns minutos.');
   const out = {};
   for (const x of Array.isArray(lista) ? lista : []) if (Number.isFinite(Number(x.valor))) out[`${x.data.slice(6, 10)}-${x.data.slice(3, 5)}`] = Number(x.valor);
   return out;

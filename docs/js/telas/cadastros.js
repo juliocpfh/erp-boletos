@@ -929,7 +929,7 @@ export const CADASTROS = {
     voltar: (r, q) => `#/contrato/${q.contrato}`,
     ajustar(dados, erros, r, form, q) {
       const c = buscar('contratos', q.contrato);
-      if (!c.data_saida) throw new Error('Informe antes a data de saída, em "Saída do inquilino".');
+      if (!c.data_saida) throw new C.ErroUsuario('Informe antes a data de saída, em "Saída do inquilino".');
       for (const k of ['garantia_valor', 'indice_percentual', 'debitos', 'fci_credito', 'fci_danos']) if (!dados[k]) dados[k] = 0;
       for (const k of R.relogiosDoContrato(c)) if (!dados[`leitura_${k}`]) erros[`leitura_${k}`] = 'Informe a leitura na saída';
       dados.vistoria_saida = resultadoVistoriaSaida(d(), c).texto;
