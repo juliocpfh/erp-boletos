@@ -53,6 +53,8 @@ async function emFila(itens, n, fn) {
  * `aoAndar({ fase, feitos, total, bytes, totalBytes, nome })` mostra o andamento. Devolve o relatório da conferência.
  */
 export async function levarParaNuvem(pasta, { anexos, sinc, aoAndar = () => {}, substituir = false }) {
+  // como em "Voltar para este dia": as mudanças deste aparelho ainda na fila se perderiam caladas (mutirão 3000, item 25)
+  if (substituir && sinc.pendentesQtd?.()) throw Object.assign(new Error(`Ainda há ${sinc.pendentesQtd()} mudança(s) deste aparelho esperando para ir à nuvem. Espere enviar (ou conecte à internet) antes de substituir os dados.`), { esperado: true });
   const dados = await lerBanco(pasta);
   if (!dados) throw Object.assign(new Error(`A pasta escolhida não tem o arquivo ${ARQUIVO_BANCO}. Escolha a pasta dos dados de sempre.`), { esperado: true });
   const arquivos = [];

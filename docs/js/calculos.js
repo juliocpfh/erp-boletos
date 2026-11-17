@@ -509,7 +509,11 @@ export function competenciaValida(texto, padrao) {
 
 /** 'AAAA-MM-DD' válido, senão o padrão. */
 export function dataValida(texto, padrao = '') {
-  return DATA_RE.test(String(texto || '')) ? String(texto) : padrao;
+  const t = String(texto || '');
+  if (!DATA_RE.test(t)) return padrao;
+  // o dia existe no mês (31/02 não passa): item 47 do mutirão 3000
+  const [a, m, d] = t.split('-').map(Number);
+  return new Date(Date.UTC(a, m - 1, d)).getUTCDate() === d ? t : padrao;
 }
 
 /** Formato aceito de cada parâmetro conhecido do endereço; os demais passam como estão (as telas escapam o texto). */

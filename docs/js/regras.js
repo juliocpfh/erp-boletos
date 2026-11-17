@@ -131,7 +131,7 @@ export function normalizar(d) {
   // versão 1 guardava um único fiador dentro do contrato
   for (const c of d.contratos) {
     if (c.fiador_nome && !d.fiadores.some((f) => f.contrato_id === c.id)) {
-      d.seq.fiadores = (d.seq.fiadores || 0) + 1;
+      d.seq.fiadores = proximoCodigo(d, 'fiadores'); // nunca repete um código já gravado (item 38)
       d.fiadores.push({ id: d.seq.fiadores, contrato_id: c.id, nome: c.fiador_nome, cpf: c.fiador_cpf || '',
         rg: c.fiador_rg || '', telefone: c.fiador_telefone || '', email: c.fiador_email || '', endereco: c.fiador_endereco || '' });
     }
@@ -367,8 +367,22 @@ const semPeso = (tabela, k, v) => (tabela === 'cobrancas' && k === 'banco' && v 
  * Inclui um registro, com a linha no histórico. ``historico: false`` só para carga em lote que registra UMA linha por conta
  * própria (importação do extrato: 1.100 lançamentos davam 1.100 linhas de histórico, cada uma com a cópia do lançamento).
  */
+/**
+ * Próximo código de uma tabela: o seguinte ao `seq` (na nuvem, a faixa deste aparelho); se esse já está usado (dados montados
+ * fora, backup antigo) ou não há `seq`, o seguinte ao maior código da tabela. Laço simples: `Math.max(...lista)` estourava a
+ * pilha com tabela muito grande (item 45).
+ */
+function proximoCodigo(d, tabela) {
+  const lista = d[tabela] || [];
+  const seguinte = Number(d.seq[tabela]) > 0 ? Number(d.seq[tabela]) + 1 : 0;
+  if (seguinte && !lista.some((r) => r.id === seguinte)) return seguinte;
+  let maior = Number(d.seq[tabela]) || 0;
+  for (const r of lista) if (r.id > maior) maior = r.id;
+  return maior + 1;
+}
+
 export function inserir(d, tabela, dados, usuario, descricao, { historico = true } = {}) {
-  d.seq[tabela] = (d.seq[tabela] || Math.max(0, ...d[tabela].map((r) => r.id))) + 1;
+  d.seq[tabela] = proximoCodigo(d, tabela);
   const r = { id: d.seq[tabela], ...dados };
   d[tabela].push(r);
   if (historico) registrar(d, usuario, 'Inclusão', tabela, r.id, descricao, visivel(dados), vinculos(d, tabela, r));
@@ -2405,6 +2419,10 @@ const FICAM_SEM_O_CONTRATO = new Set(['contratos', 'faturas', 'movimentacoes_ban
 export function excluirContrato(d, contratoId, usuario, descricao) {
   const c = buscar(d, 'contratos', contratoId);
   if (!c) return;
+  // apólice que veio do contrato anterior (troca de titular) volta para ele, com o arquivo: não sai junto (item 17)
+  for (const s of (d.seguros || []).filter((x) => x.contrato_id === c.id && x.herdado_de && buscar(d, 'contratos', x.herdado_de))) {
+    atualizar(d, 'seguros', s.id, { contrato_id: s.herdado_de, herdado_de: null }, usuario, `Seguro volta para o contrato anterior (${c.inquilino_nome} excluído)`);
+  }
   for (const t of Object.keys(TABELAS)) {
     if (FICAM_SEM_O_CONTRATO.has(t) || !Array.isArray(d[t])) continue;
     d[t].filter((x) => x && x.contrato_id === c.id).forEach((x) => excluir(d, t, x.id, usuario));
@@ -5651,7 +5669,31 @@ export function rotinaDeAbertura(d, usuario, { hoje = C.hojeIso(), soConferir = 
   for (const x of adiamentosVencidos(d, hoje)) { n += 1; if (!soConferir) excluir(d, 'adiamentos_alerta', x.id, usuario, `Adiamento do alerta "${x.tipo}" encerrado (até ${C.dataBr(x.ate)})`); }
   // alerta desligado de inquilino ou imóvel que foi excluído: sai
   for (const x of desligamentosOrfaos(d)) { n += 1; if (!soConferir) excluir(d, 'alertas_desligados', x.id, usuario, `Alerta "${x.tipo}" desligado: o inquilino ou imóvel não existe mais`); }
+  // movimentação do banco apontando para despesa, boleto, IPTU, guia ou reforma que não existe mais: perde o destino (item 20)
+  for (const { m, campos } of vinculosBancoOrfaos(d)) {
+    n += 1;
+    if (!soConferir) atualizar(d, 'movimentacoes_banco', m.id, campos, usuario, `Movimentação de ${C.dataBr(m.data)} (${C.reais(m.valor)}): o destino foi excluído, volta a ficar sem destino`);
+  }
   return n;
+}
+
+/** Destino de cada classificação do extrato: campo da movimentação e a tabela para onde ele aponta. */
+const DESTINOS_MOVIMENTACAO = { conta_imovel: ['despesa_id', 'despesas'], boleto: ['cobranca_id', 'cobrancas'], iptu: ['iptu_id', 'iptus'], imposto: ['guia_imposto_id', 'guias_impostos'], reforma: ['reforma_id', 'reformas'] };
+/** Movimentações com destino que sumiu: [{ m, campos }] (os campos a limpar; a classificação sai se era dela o destino). */
+export function vinculosBancoOrfaos(d) {
+  const ids = Object.fromEntries(Object.values(DESTINOS_MOVIMENTACAO).map(([, t]) => [t, new Set((d[t] || []).map((x) => x.id))]));
+  const out = [];
+  for (const m of d.movimentacoes_banco || []) {
+    const campos = {};
+    for (const [classe, [campo, t]] of Object.entries(DESTINOS_MOVIMENTACAO)) {
+      if (!m[campo] || ids[t].has(m[campo])) continue;
+      campos[campo] = null;
+      if (campo === 'iptu_id') campos.iptu_parcela = null;
+      if (m.classificacao === classe) campos.classificacao = null;
+    }
+    if (Object.keys(campos).length) out.push({ m, campos });
+  }
+  return out;
 }
 
 /**

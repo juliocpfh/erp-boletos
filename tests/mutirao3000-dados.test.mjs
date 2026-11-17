@@ -179,3 +179,107 @@ test('item 3: o que espera a confirmação (apagar anexos) só sai depois que a 
   b.internet = true; await b.sinc.sincronizar();
   assert.deepEqual(await b.sinc.prontosAposConfirmar(), { confirmados: [], recusados: [{ soltos: [{ pasta: 'p', nome: 'boleto.pdf' }] }] });
 });
+
+test('itens 9 e 10: voltar para um backup segura a fila dos outros aparelhos e mantém os usuários de hoje', async () => {
+  const d = R.bancoVazio(); usuarios(d, 'operador'); R.inserir(d, 'imoveis', { nome: 'Apto 1', cep: '80010-000' }, 't');
+  const { cofre, a, b } = await doisAparelhos(R.normalizar(d));
+  const backup = await tudo(cofre);
+  await a.sinc.alterar((x) => R.atualizar(x, 'usuarios', 2, { ativo: false }, 'dono')); await a.sinc.sincronizar();
+  b.internet = false;
+  await b.sinc.alterar((x) => { R.atualizar(x, 'imoveis', 1, { nome: 'Apto 1 - errado' }, 'socia'); R.inserir(x, 'despesas', { descricao: 'x', valor: 1 }, 'socia'); });
+  await a.sinc.importar(backup, { substituir: true, manterUsuarios: true });
+  assert.equal(a.sinc.atual().usuarios.find((u) => u.id === 2).ativo, false, 'a sócia desativada continua desativada');
+  b.internet = true; await b.sinc.sincronizar().catch(() => {});
+  await a.sinc.sincronizar();
+  assert.equal(a.sinc.atual().imoveis[0].nome, 'Apto 1', 'a mudança feita antes da volta não entrou');
+  assert.equal(a.sinc.atual().despesas.length, 0);
+});
+
+test('item 9: depois da volta, o aparelho que já viu a carga nova grava normalmente', async () => {
+  const { cofre, a, b } = await doisAparelhos(baseSimples());
+  await a.sinc.importar(await tudo(cofre), { substituir: true });
+  await b.sinc.sincronizar();
+  await b.sinc.alterar((x) => R.atualizar(x, 'imoveis', 1, { nome: 'Novo nome' }, 'socia')); await b.sinc.sincronizar();
+  assert.deepEqual(b.sinc.recusas, []);
+  assert.equal((await tudo(cofre)).imoveis[0].nome, 'Novo nome');
+});
+
+test('itens 12 e 13: subchaves diferentes do mesmo campo (parcelas do IPTU, extrato de cada conta) se juntam sem conflito', () => {
+  const c = novoCofre();
+  c.importar({ formato: 'imoveis-v1', usuarios: [{ id: 1, login: DONO, papel: 'admin', ativo: true }, { id: 2, login: SOCIA, papel: 'operador', ativo: true }], iptus: [{ id: 1, ano: 2026, pagas: {} }], extrato_importado_ate: {} }, DONO);
+  c.aplicar({ id: 'aaaaaaaa-1', ops: [{ op: 'alterar', tabela: 'iptus', id: 1, campos: { pagas: { antes: {}, depois: { 1: '2026-02-10' } } } }] }, DONO);
+  const r = c.aplicar({ id: 'bbbbbbbb-1', ops: [{ op: 'alterar', tabela: 'iptus', id: 1, campos: { pagas: { antes: {}, depois: { 2: '2026-03-10' } } } }] }, SOCIA);
+  assert.equal(r.conflitos.length, 0);
+  assert.deepEqual(c.tudo().iptus[0].pagas, { 1: '2026-02-10', 2: '2026-03-10' });
+  c.aplicar({ id: 'aaaaaaaa-2', ops: [{ op: 'raiz', campo: 'extrato_importado_ate', antes: {}, depois: { ank: '2026-11-10' } }] }, DONO);
+  c.aplicar({ id: 'bbbbbbbb-2', ops: [{ op: 'raiz', campo: 'extrato_importado_ate', antes: {}, depois: { jck: '2026-11-12' } }] }, SOCIA);
+  assert.deepEqual(c.tudo().extrato_importado_ate, { ank: '2026-11-10', jck: '2026-11-12' });
+  // a mesma parcela com datas diferentes continua sendo conflito
+  const r2 = c.aplicar({ id: 'bbbbbbbb-3', ops: [{ op: 'alterar', tabela: 'iptus', id: 1, campos: { pagas: { antes: {}, depois: { 1: '2026-02-11' } } } }] }, SOCIA);
+  assert.equal(r2.conflitos.length, 1);
+  assert.deepEqual(K.juntarSubchaves({ a: 1 }, {}, { a: 1, b: 2 }), { b: 2 }, 'subchave apagada aqui sai');
+});
+
+test('itens 31, 32, 34, 43 e 49: faxina, código repetido na importação, nulo da tela e lote muito antigo', () => {
+  let agora = new Date('2026-11-16T12:00:00Z');
+  const c = novoCofre(() => agora);
+  const ini = { formato: 'imoveis-v1', usuarios: [{ id: 1, login: DONO, papel: 'admin', ativo: true }, { id: 9, login: 'z', papel: 'consulta', ativo: true, senha_hash: 'HASH', sessoes: ['t'] }], imoveis: [{ id: 1, nome: 'Apto' }], cobrancas: [{ id: 900, contrato_id: 1, competencia: '2026-01' }] };
+  c.importar(ini, DONO);
+  // 43: a tela tinha `banco: null` (normalizar) e a nuvem nem tinha o campo: exclui sem conflito
+  const r = c.aplicar({ id: 'aaaaaaaa-43', ops: [{ op: 'excluir', tabela: 'cobrancas', id: 900, base: { id: 900, contrato_id: 1, competencia: '2026-01', banco: null } }] }, DONO);
+  assert.deepEqual(r.conflitos, []);
+  assert.equal(c.tudo().cobrancas.length, 0);
+  // 31: usuário apagado fica guardado sem senha e sai depois de 180 dias
+  c.aplicar({ id: 'aaaaaaaa-31', ops: [{ op: 'excluir', tabela: 'usuarios', id: 9 }] }, DONO);
+  const guardado = JSON.parse(c.q("SELECT dados FROM excluidos WHERE tabela = 'usuarios'")[0].dados);
+  assert.equal(guardado.senha_hash, undefined); assert.equal(guardado.sessoes, undefined); assert.equal(guardado.login, 'z');
+  // 32: conflito resolvido sai depois de 90 dias
+  c.aplicar({ id: 'bbbbbbbb-32', ops: [{ op: 'alterar', tabela: 'imoveis', id: 1, campos: { nome: { antes: 'outro', depois: 'B' } } }] }, DONO);
+  c.resolver({ conflito: c.conflitosAbertos()[0].id, escolha: 'atual' }, DONO);
+  agora = new Date('2027-06-01T12:00:00Z'); c.limpar();
+  assert.equal(c.q('SELECT COUNT(*) AS n FROM excluidos')[0].n, 0);
+  assert.equal(c.q('SELECT COUNT(*) AS n FROM conflitos')[0].n, 0);
+  // 49: lote parado mais de 60 dias no aparelho é recusado
+  assert.throws(() => c.aplicar({ id: 'aparelhoX-000001', em: '2027-03-01T12:00:00Z', ops: [{ op: 'historico', entrada: { descricao: 'Pagamento registrado' } }] }, DONO), (e) => e.status === 409 && /60 dias/.test(e.message));
+  // 34: código repetido na importação: 400 dizendo onde, nada trocado
+  assert.throws(() => c.importar({ formato: 'imoveis-v1', usuarios: [{ id: 1, login: DONO, papel: 'admin', ativo: true }], despesas: [{ id: 5 }, { id: 5 }] }, DONO, { substituir: true }), (e) => e.status === 400 && /código 5 em despesas/.test(e.message));
+  assert.equal(c.tudo().imoveis.length, 1);
+});
+
+test('item 17: excluir o contrato do novo titular devolve ao anterior o seguro herdado', () => {
+  const { d, loja, c } = baseContrato();
+  const n = R.inserir(d, 'contratos', { imovel_id: loja.id, inquilino_nome: 'Novo', contrato_anterior_id: c.id, data_entrada: '2026-09-01', vigencia_inicio: '2026-09-01', aluguel_inicial: 135000 }, 'j');
+  const s = R.inserir(d, 'seguros', { imovel_id: loja.id, contrato_id: c.id, vigencia_inicio: '2026-01-01', vigencia_fim: '2027-01-01', arquivo_apolice: 'apolice.pdf' }, 'j');
+  R.atualizar(d, 'seguros', s.id, { contrato_id: n.id, herdado_de: c.id }, 'j', 'herdar');
+  R.excluirContrato(d, n.id, 'j');
+  const x = R.buscar(d, 'seguros', s.id);
+  assert.equal(x.contrato_id, c.id); assert.equal(x.herdado_de, null);
+  assert.ok(R.arquivosReferenciados(d).some((a) => a.nome === 'apolice.pdf'), 'o arquivo da apólice continua em uso');
+});
+
+test('item 20: rotina de abertura tira o destino que foi excluído das movimentações do banco, com histórico', () => {
+  const d = R.bancoVazio();
+  R.inserir(d, 'movimentacoes_banco', { conta_id: 'ank', id_externo: 'X', data: '2026-10-01', valor: 100, tipo: 'saida', classificacao: 'iptu', iptu_id: 77, iptu_parcela: 1, cobranca_id: 88 }, 'j');
+  const dn = R.normalizar(d);
+  assert.equal(R.rotinaDeAbertura(dn, 'j', { soConferir: true }), 1);
+  const h = dn.historico.length;
+  R.rotinaDeAbertura(dn, 'j');
+  const m = dn.movimentacoes_banco[0];
+  assert.deepEqual([m.iptu_id, m.iptu_parcela, m.cobranca_id, m.classificacao], [null, null, null, null]);
+  assert.equal(dn.historico.length, h + 1);
+  assert.equal(R.rotinaDeAbertura(dn, 'j', { soConferir: true }), 0);
+});
+
+test('itens 38, 45 e 47: códigos novos nunca repetem, tabela enorme não quebra, data impossível não passa', async () => {
+  const d = R.bancoVazio(); d.seq = {};
+  d.fiadores.push({ id: 1, contrato_id: 5, nome: 'Já migrado' }); d.contratos.push({ id: 6, inquilino_nome: 'Y', fiador_nome: 'Antigo' });
+  R.normalizar(d);
+  assert.deepEqual(d.fiadores.map((f) => f.id).sort(), [1, 2]);
+  const e = R.bancoVazio(); e.despesas.push({ id: 1 }, { id: 5 }); e.seq.despesas = 4;
+  assert.equal(R.inserir(e, 'despesas', { valor: 1 }, 'j').id, 6);
+  const g = R.bancoVazio(); for (let i = 1; i <= 200000; i += 1) g.despesas.push({ id: i });
+  assert.equal(R.inserir(g, 'despesas', { valor: 1 }, 'j').id, 200001);
+  const C = await import('../docs/js/calculos.js');
+  assert.equal(C.dataValida('2026-02-31'), '');
+  assert.equal(C.dataValida('2028-02-29'), '2028-02-29');
+});
