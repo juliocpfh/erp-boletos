@@ -82,7 +82,7 @@ export function guardarCifrado(cru, obterChave) {
       if (ABERTAS.includes(k)) return cru.gravar(k, v);
       if (k === 'base' && v?.usuarios) await cru.gravar('acesso', usuariosParaAcesso(v.usuarios, Object.keys((await cru.ler('embrulhos')) || {})));
       // quantos lotes/anexos esperam envio fica aberto: outro usuário não pode entrar trocando a chave e perder isso
-      if (k === 'pendentes') await cru.gravar('aguardando-dados', (v || []).length);
+      if (k === 'pendentes' || k === 'fila') await cru.gravar('aguardando-dados', (v || []).length);
       if (k === 'fila-anexos') await cru.gravar('aguardando-anexos', (v || []).length);
       const chave = obterChave();
       if (!chave) return undefined;
@@ -94,6 +94,7 @@ export function guardarCifrado(cru, obterChave) {
         const chave = obterChave();
         if (!chave) return undefined;
         if (obj.pendentes !== undefined) await cru.gravar('aguardando-dados', (obj.pendentes || []).length);
+        if (obj.fila !== undefined) await cru.gravar('aguardando-dados', (obj.fila || []).length); // fila nova (item 41)
         const cifrados = {};
         for (const [k, v] of Object.entries(obj)) cifrados[k] = ABERTAS.includes(k) ? v : await cifrar(chave, v);
         return cru.gravarVarios(cifrados);

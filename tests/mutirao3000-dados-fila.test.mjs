@@ -42,6 +42,31 @@ test('item 30: gravação em partes leva o histórico junto com cada parte', () 
   assert.deepEqual(N.dividirLote({ id: 'ap-aba-000003', ops: imp }).map((p) => p.ops.length), p2.map((p) => p.ops.length), 'o corte é sempre o mesmo (reenvio seguro)');
 });
 
+test('item 41: sem internet, cada clique grava só o lote novo (não a fila inteira); a fila do formato antigo é aproveitada', async () => {
+  const offline = () => { throw new N.ErroNuvem('Sem internet.', 0); };
+  const { s, guardado } = aparelho(offline);
+  // fila deixada pela versão anterior (formato antigo, tudo numa chave só)
+  guardado.set('pendentes', [{ id: 'apvelho-aba-000001', em: '2026-11-16T10:00:00Z', ops: [{ op: 'inserir', tabela: 'imoveis', id: 900, dados: { id: 900, nome: 'Da versão anterior' } }] }]);
+  const gravar = s.guardar.gravar; let bytes = 0;
+  s.guardar.gravar = async (k, v) => { bytes += JSON.stringify(v ?? null).length; return gravar(k, v); };
+  await s.iniciar();
+  assert.equal(s.pendentes.length, 1, 'a fila antiga continua valendo');
+  // uma importação grande sem internet…
+  await s.alterar((d) => { for (let i = 0; i < 500; i += 1) R.inserir(d, 'imoveis', { nome: `Importado ${i}` }, 'ana'); });
+  assert.ok(!guardado.has('pendentes'), 'a fila antiga passou para o formato novo');
+  // …e depois três cliques pequenos: cada um grava pouco (antes, a fila inteira a cada clique)
+  const medidas = [];
+  for (const nome of ['A', 'B', 'C']) { bytes = 0; await s.alterar((d) => R.atualizar(d, 'imoveis', 900, { nome }, 'ana')); medidas.push(bytes); }
+  assert.ok(medidas.every((b) => b < 5000), `bytes por clique: ${medidas}`);
+  assert.deepEqual(guardado.get('fila').map((m) => m.mudancas), [1, 1000, 2, 2, 2]);
+  // outra aba (ou a página reaberta) lê a mesma fila
+  const outra = new N.Sincronia({ api: offline, guardar: s.guardar, normalizar: R.normalizar, tabelas: ['imoveis'], agrupar: 1e9 });
+  await outra.iniciar();
+  assert.deepEqual(outra.pendentes.map((l) => l.ops.length), s.pendentes.map((l) => l.ops.length));
+  assert.equal(outra.atual().imoveis.find((i) => i.id === 900).nome, 'C');
+  for (const x of [s, outra]) if (x.envioMarcado) clearTimeout(x.envioMarcado);
+});
+
 test('item 44: a mudança recusada porque o registro veio de uma gravação também recusada aparece ligada a ela', async () => {
   let criado = null;
   const { s } = aparelho((parte) => {

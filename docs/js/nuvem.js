@@ -280,6 +280,8 @@ export class Sincronia {
     this.base = null; this.pendentes = []; this.faixas = {}; this.recusas = []; this.conflitos = [];
     this.aparelho = null; this.n = 0; this.online = true; this.enviando = null; this.vista = null; this.externo = false;
     this.envioMarcado = null; this.semFaixas = false; this.ultimoLote = null;
+    // fila no aparelho (item 41): as mudanças de cada lote ficam em 'lote:<código>', gravadas uma vez; 'fila' só tem a lista
+    this.opsDe = new Map(); this.noAparelho = new Set(); this.legado = false;
     this.geracao = 0; // anda toda vez que a vista deixa de valer (base, fila ou faixas mudaram)
     this.normalizarMexeuNoHistorico = false;
     this.puxando = Promise.resolve(); // um puxar de cada vez (dois aplicariam as mesmas mudanças duas vezes)
@@ -296,7 +298,7 @@ export class Sincronia {
     // em vez de baixar o banco inteiro de novo
     const baixada = this.base;
     if (guardada && !(baixada && seqDe(baixada) > seqDe(guardada))) this.base = guardada;
-    this.pendentes = (await this.guardar.ler('pendentes')) || [];
+    this.pendentes = (await this.lerPendentes()).lotes;
     this.faixas = juntarFaixas({}, (await this.guardar.ler('faixas')) || {});
     this.recusas = (await this.guardar.ler('recusas')) || [];
     this.conflitos = this.base?._nuvem?.conflitos || [];
@@ -595,11 +597,11 @@ export class Sincronia {
    * foi confirmado por outra aba, que gravou antes uma base com ele: se essa base é mais nova que a desta aba, vale ela.
    */
   async releFila() {
-    const p = await this.guardar.ler('pendentes');
+    const { lotes: p, existe } = await this.lerPendentes();
     const f = await this.guardar.ler('faixas');
     this.n = Math.max(this.n, Number(await this.guardar.ler('n')) || 0);
     let mudou = false;
-    if (Array.isArray(p) && idsDaFila(p) !== idsDaFila(this.pendentes)) {
+    if (existe && idsDaFila(p) !== idsDaFila(this.pendentes)) {
       const sumiu = this.pendentes.some((l) => !p.some((x) => x.id === l.id));
       this.pendentes = p; mudou = true;
       if (sumiu) await this.releBase();
@@ -621,14 +623,66 @@ export class Sincronia {
     if (b && seqDe(b) > seqDe(this.base)) { this.base = b; this.conflitos = b._nuvem?.conflitos || []; }
   }
 
+  /**
+   * A fila guardada no aparelho (item 41 do mutirão 3000): 'fila' é só a lista (código, data, quantas mudanças) e as mudanças de
+   * cada lote ficam em 'lote:<código>', gravadas uma vez; antes a fila inteira (com uma importação grande, ~100 KB) era cifrada e
+   * regravada a cada clique. A fila do formato antigo ('pendentes': aparelho que acabou de atualizar, ou uma aba ainda na versão
+   * anterior) entra junto e sai na próxima gravação. `existe`: há fila guardada (num formato ou no outro).
+   */
+  async lerPendentes() {
+    const fila = await this.guardar.ler('fila');
+    const antiga = await this.guardar.ler('pendentes');
+    const lotes = []; const vistos = new Set();
+    for (const { mudancas, ...m } of Array.isArray(fila) ? fila : []) {
+      let ops = this.opsDe.get(m.id);
+      if (!ops) {
+        ops = await this.guardar.ler(`lote:${m.id}`);
+        if (!Array.isArray(ops)) continue; // (não acontece: o lote é gravado junto com a lista)
+        this.opsDe.set(m.id, ops);
+      }
+      this.noAparelho.add(m.id);
+      lotes.push({ ...m, ops }); vistos.add(m.id);
+    }
+    if (Array.isArray(antiga)) {
+      for (const l of antiga) if (l && !vistos.has(l.id)) { lotes.push(l); this.opsDe.set(l.id, l.ops); }
+      this.legado = true;
+    }
+    return { lotes, existe: Array.isArray(fila) || Array.isArray(antiga) };
+  }
+
+  /** O que gravar no aparelho para a fila: a lista curta e as mudanças dos lotes que ainda não estão lá. */
+  objetoDaFila() {
+    const obj = {};
+    for (const l of this.pendentes) if (!this.noAparelho.has(l.id)) { obj[`lote:${l.id}`] = l.ops; this.opsDe.set(l.id, l.ops); }
+    obj.fila = this.pendentes.map(({ ops, ...m }) => ({ ...m, mudancas: ops.length }));
+    return obj;
+  }
+
+  /** Depois de gravar a fila: marca os lotes guardados e apaga do aparelho os que saíram dela (e a fila do formato antigo). */
+  async arrumarFilaGravada(gravados) {
+    for (const k of Object.keys(gravados)) if (k.startsWith('lote:')) this.noAparelho.add(k.slice(5));
+    const naFila = new Set(this.pendentes.map((l) => l.id));
+    for (const id of [...this.noAparelho]) {
+      if (naFila.has(id)) continue;
+      this.noAparelho.delete(id); this.opsDe.delete(id);
+      await this.guardar.apagar?.(`lote:${id}`);
+    }
+    if (this.legado) { this.legado = false; await this.guardar.apagar?.('pendentes'); }
+  }
+
+  /** Grava só a fila (lista e lotes novos), dentro da trava. `mais`: outras chaves na mesma gravação (contador, faixas). */
+  async gravarListaFila(mais = {}) {
+    const obj = { ...this.objetoDaFila(), ...mais };
+    if (this.guardar.gravarVarios) await this.guardar.gravarVarios(obj);
+    else for (const [k, v] of Object.entries(obj)) await this.guardar.gravar(k, v); // lotes antes da lista
+    await this.arrumarFilaGravada(obj);
+  }
+
   /** Grava a fila, o contador de lotes e as faixas (sempre dentro da trava). */
   async gravarFila() {
     // numa gravação só quando o aparelho deixa (IndexedDB): se a de faixas falhasse depois da fila, a próxima inclusão
     // repetiria um código da fila e o aparelho não conseguiria mais incluir naquela tabela (item 40)
-    if (this.guardar.gravarVarios) { await this.guardar.gravarVarios({ n: this.n, pendentes: this.pendentes, faixas: this.faixas }); return; }
-    await this.guardar.gravar('n', this.n);
-    await this.guardar.gravar('pendentes', this.pendentes);
-    await this.guardar.gravar('faixas', this.faixas);
+    await this.gravarListaFila({ n: this.n, faixas: this.faixas });
   }
 
   async enfileirar(ops) {
@@ -717,7 +771,7 @@ export class Sincronia {
       const antes = this.pendentes.length;
       this.pendentes = this.pendentes.filter((x) => !ids.has(x.id));
       if (this.pendentes.length === antes) return;
-      await this.guardar.gravar('pendentes', this.pendentes);
+      await this.gravarListaFila();
       this.invalidar();
     });
   }
@@ -751,7 +805,7 @@ export class Sincronia {
       for (const id of inteiros) enviados.delete(id);
       const antes = this.pendentes.length;
       this.pendentes = this.pendentes.filter((x) => !inteiros.has(x.id));
-      if (this.pendentes.length !== antes) { await this.guardar.gravar('pendentes', this.pendentes); this.invalidar(); }
+      if (this.pendentes.length !== antes) { await this.gravarListaFila(); this.invalidar(); }
     });
   }
 
@@ -891,7 +945,7 @@ export class Sincronia {
   /** Primeira carga (nuvem vazia): o banco inteiro vai de uma vez. */
   async importar(d, { substituir = false, manterUsuarios = false } = {}) {
     await this.api('POST', 'importar', { dados: d, substituir, ...(manterUsuarios ? { manterUsuarios: true } : {}) });
-    await this.trava(async () => { this.pendentes = []; await this.guardar.gravar('pendentes', []); });
+    await this.trava(async () => { await this.lerPendentes(); this.pendentes = []; await this.gravarListaFila(); });
     await this.baixarTudo();
     await this.garantirFaixas();
     return this.atual();
