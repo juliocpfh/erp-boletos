@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-rjuPxXSmu93Ei9j4W3JOd0SjBDzp3EpMXZuSBGrdTi0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-yWcvofWoBnJG6GrfR3SIg1A8YXVsG1vY34K47ct+QtQ='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="3b54a47484c7e406">
+<meta name="fontes" content="ee7ae03fee7de40d">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1888,6 +1888,19 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           consequencia: "Só muda o aviso.",
           lei: "Sem lei: rotina."
         },
+        // registro de acessos da nuvem (mutirão 3000, 2ª rodada): quem baixou o banco, abriu anexos, mandou e-mail, ligou o programa do PC
+        {
+          chave: "dias_registro_acessos",
+          grupo: "rotina",
+          rotulo: "Registro de acessos da nuvem: guardar por (dias)",
+          tipo: "inteiro",
+          padrao: 180,
+          min: 30,
+          max: 730,
+          explica: "O servidor da nuvem anota quem baixou o banco inteiro, abriu ou anexou arquivos, baixou backups, mandou e-mail, mexeu na ficha pela internet e ligou o programa do PC (com a data, o endereço de internet e o tamanho). O administrador vê em Dados e backup → Acessos. Depois deste prazo, a anotação é apagada sozinha. Ex.: 180 dias → o acesso de 17/11/2026 sai em 16/05/2027.",
+          consequencia: "Prazo maior ajuda a descobrir um vazamento antigo, mas guarda mais dados das pessoas da equipe (e-mail e endereço de internet); prazo menor apaga antes. Vale na próxima faxina da noite.",
+          lei: "Marco Civil da Internet (Lei 12.965/2014), art. 15 (registros de acesso guardados por 6 meses); LGPD (Lei 13.709/2018), arts. 6º, III e X, 37 e 46 (registro das operações e segurança, guardando só o necessário)."
+        },
         {
           chave: "fora_do_padrao",
           grupo: "rotina",
@@ -2433,8 +2446,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         // texto da busca global (a tela ainda passa por esc())
         situacao: /^(Reprovada|Desistiu)$/,
         // "Reprovar (com o motivo)" na ficha: abre o Editar já com a situação
-        pagina: /^\d{1,5}$/
+        pagina: /^\d{1,5}$/,
         // página de uma lista longa (Histórico)
+        quem: /^[^\s<>"']{3,200}$/,
+        antes: /^\d{1,12}$/
+        // tela Acessos: e-mail da pessoa e "ver os mais antigos"
       };
     }
   });
@@ -11585,8 +11601,8 @@ ${xref}
           continue;
         }
         if (partes[0] === PASTA_FICHAS && ehDoLink(nome) && !conferido(partes[1], nome)) continue;
-        const tamanho2 = h.tamanho ?? (await h.getFile()).size;
-        if (candidato(nome, tamanho2)) lista3.push({ dir, nome, h });
+        const tamanho3 = h.tamanho ?? (await h.getFile()).size;
+        if (candidato(nome, tamanho3)) lista3.push({ dir, nome, h });
       }
     };
     await juntar2(raiz, []);
@@ -11663,7 +11679,7 @@ ${xref}
       lote = null;
       PASTA_FICHAS = "Fichas em analise";
       CANDIDATO = /\.(jpe?g|png|webp|heic|pdf)$/i;
-      candidato = (nome, tamanho2) => CANDIDATO.test(nome) && tamanho2 >= (/\.pdf$/i.test(nome) ? MINIMO_PDF : MINIMO_FOTO);
+      candidato = (nome, tamanho3) => CANDIDATO.test(nome) && tamanho3 >= (/\.pdf$/i.test(nome) ? MINIMO_PDF : MINIMO_FOTO);
       ehDoLink = (nome) => /^link-/.test(nome);
     }
   });
@@ -11812,8 +11828,8 @@ ${xref}
     const itens = [];
     for await (const [nome, h] of dir.entries()) {
       if (h.kind === "file") {
-        const tamanho2 = h.tamanho ?? (await h.getFile()).size;
-        itens.push({ nome, tamanho: tamanho2, foto: /\.(jpe?g|png|gif|webp)$/i.test(nome) });
+        const tamanho3 = h.tamanho ?? (await h.getFile()).size;
+        itens.push({ nome, tamanho: tamanho3, foto: /\.(jpe?g|png|gif|webp)$/i.test(nome) });
       }
     }
     return itens.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
@@ -15184,12 +15200,12 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
           this.tudo = null;
         }
         /** Acrescenta à lista guardada o arquivo que acabou de subir (para aparecer mesmo se a internet cair logo depois). */
-        anotarNaLista(partes, tamanho2) {
+        anotarNaLista(partes, tamanho3) {
           const chave = partes.slice(0, -1).join("/");
           this.tudo = null;
           const l = this.listas.get(chave);
           if (!l) return;
-          l.arquivos.set(partes.at(-1), tamanho2);
+          l.arquivos.set(partes.at(-1), tamanho3);
           l.em = 0;
           this.guardar?.gravar(`lista:${chave}`, { pastas: [...l.pastas], arquivos: [...l.arquivos].map(([nome, t]) => ({ nome, tamanho: t })) }).catch(() => {
           });
@@ -15334,12 +15350,12 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
         }
       };
       ArquivoNuvem = class {
-        constructor(cliente, partes, tamanho2) {
+        constructor(cliente, partes, tamanho3) {
           this.cliente = cliente;
           this.partes = partes;
           this.kind = "file";
           this.name = partes.at(-1);
-          this.tamanho = tamanho2;
+          this.tamanho = tamanho3;
         }
         async getFile() {
           const blob = await this.cliente.ler(this.partes);
@@ -27750,7 +27766,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       ${E.nuvem ? "" : `<p class="suave">Tudo é gravado na hora no arquivo <b>${ARQUIVO_BANCO}</b> desta pasta. Uma cópia por dia fica em <b>${PASTA_BACKUPS}</b> (30 dias). Os anexos ficam em <b>${PASTA_ARQUIVOS}</b>, separados por imóvel e inquilino.</p>`}
       ${E.nuvem ? `<p class="suave">Na nuvem, tudo é gravado no Cloudflare (com backup diário de 30 dias). Sem internet, as mudanças ficam neste aparelho e sobem quando a conexão voltar.</p>
       ${lembreteZipNuvem()}
-      ${podeUsuario("admin") ? `<p>${link("#/backups-nuvem", "Backups da nuvem (baixar ou voltar para um dia)", "botao secundario pequeno")}</p>
+      ${podeUsuario("admin") ? `<p>${link("#/backups-nuvem", "Backups da nuvem (baixar ou voltar para um dia)", "botao secundario pequeno")} ${link("#/acessos", "Acessos (quem baixou, abriu ou mandou o quê)", "botao secundario pequeno")}</p>
       <details id="avancado-nuvem"><summary class="suave">Avançado: substituir os dados da nuvem pelos de uma pasta</summary>
         <div class="alerta perigo" style="margin-top:8px"><b>Só para voltar a uma pasta do computador</b> (ex.: a pasta do OneDrive de antes da nuvem, ou uma pasta aberta de um backup). Tudo o que está na nuvem é trocado pelo que está na pasta: o que foi lançado depois, por qualquer aparelho, <b>se perde</b> (fica uma cópia de antes nos backups da nuvem). Para desfazer um dia ruim, prefira "Backups da nuvem".</div>
         <p>${botao("levarParaNuvem", "Substituir os dados da nuvem pelos de uma pasta", { substituir: "1" }, "perigo pequeno")}</p><div id="progresso-nuvem"></div></details>` : ""}` : `<p>${botao("escolherPasta", "Trocar de pasta")}</p>`}</div>
@@ -28947,6 +28963,55 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       <p><b>Voltar para este dia</b> troca os dados da nuvem pelos daquele backup (antes, o servidor guarda uma cópia de como estava agora). Tudo o que foi lançado depois das 3h daquele dia se perde, em todos os aparelhos. Use só em caso de erro geral.</p>
       <div class="rolagem"><table><tr><th>Dia</th><th>O que é</th><th class="n">Tamanho</th><th></th></tr>${linhas2 || '<tr><td colspan="4" class="suave">Nenhum backup ainda (o primeiro é feito às 3h da manhã).</td></tr>'}</table></div></div>`;
   }
+  function descreverAcesso(rota) {
+    const m = /^(PUT|DELETE|POST) (.*)$/.exec(String(rota || ""));
+    const metodo = m ? m[1] : "GET";
+    const r = m ? m[2] : String(rota || "");
+    if (r === "dados/tudo") return "Baixou o banco de dados inteiro";
+    if (r.startsWith("dados/importar")) return r.includes("voltar") ? "Voltou os dados da nuvem para um backup" : r.includes("substituir") ? "Substituiu os dados da nuvem" : "Carga inicial dos dados na nuvem";
+    if (r.startsWith("aparelho/entrar")) {
+      const pc = (/\((.+)\)$/.exec(r) || [])[1];
+      return `Programa do PC: entrar${pc ? ` (computador ${pc})` : ""}`;
+    }
+    if (r.startsWith("arquivos/")) return `${{ PUT: "Anexou", DELETE: "Apagou" }[metodo] || "Abriu"} ${r.slice(9)}`;
+    if (r.startsWith("backups/")) return `Baixou o backup ${r.slice(8)}`;
+    if (/^lista(-tudo)?\/backups/.test(r)) return "Viu a lista dos backups";
+    if (r === "mover") return "Moveu ou renomeou uma pasta de arquivos";
+    if (r === "apagar") return "Apagou uma pasta de arquivos (vai para a lixeira por 30 dias)";
+    if (r === "email/enviar") return "Mandou um e-mail pela conta da empresa";
+    if (r.startsWith("ficha-online/")) return `Ficha pela internet: ${metodo === "GET" ? "consultou" : "mexeu em"} ${r.slice(13)}`;
+    return r;
+  }
+  async function telaAcessos(q = {}) {
+    const topo = '<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Acessos</h1>';
+    if (!E.nuvem) return `${topo}<p class="suave">Só existe com os dados na nuvem.</p>`;
+    if (!podeUsuario("admin")) return "<h1>Acesso só para administradores</h1>";
+    const filtro = { de: q.de && /^\d{4}-\d{2}-\d{2}$/.test(q.de) ? q.de : "", ate: q.ate || "", email: q.quem || "", antes: q.antes || "" };
+    let r;
+    try {
+      const busca = new URLSearchParams(Object.entries(filtro).filter(([, v]) => v));
+      r = await apiDados()("GET", `acessos${String(busca) ? `?${busca}` : ""}`);
+    } catch (e) {
+      return `${topo}<div class="alerta erro">Não deu para ver os acessos agora: ${esc(e.message)}</div>`;
+    }
+    const form = `<form class="cartao acoes" data-form="ir" data-ir="acessos"><label style="margin:0">De</label><input type="date" name="de" value="${esc(filtro.de)}" style="width:160px">
+    <label style="margin:0">até</label><input type="date" name="ate" value="${esc(filtro.ate)}" style="width:160px">
+    <label style="margin:0">Pessoa</label><select name="quem" style="width:auto"><option value="">Todas</option>${(r.emails || []).map((e) => `<option${e === filtro.email ? " selected" : ""}>${esc(e)}</option>`).join("")}</select>
+    <button class="secundario">Ver</button>${filtro.de || filtro.ate || filtro.email ? ` ${link("#/acessos", "Limpar")}` : ""}</form>`;
+    const resumo = (r.resumo || []).map((x) => `<tr><td>${esc(x.email)}</td><td class="n">${x.acessos}</td><td class="n">${tamanho2(x.bytes)}${x.bytes > MUITO ? ` ${etiqueta("muito", "aviso")}` : ""}</td><td class="n">${x.recusados ? etiqueta(String(x.recusados), "perigo") : "0"}</td></tr>`).join("");
+    const linhas2 = (r.acessos || []).map((a) => `<tr><td class="nw">${esc(dataHoraBr(a.em))}</td><td>${esc(a.email)}</td><td>${esc(descreverAcesso(a.rota))} ${resultadoDoAcesso(a.resultado)}</td>
+    <td class="n">${tamanho2(a.bytes)}</td><td>${a.origem === "pc" ? "Programa do PC" : "Site"}${a.ip ? `<br><span class="suave">${esc(a.ip)}</span>` : ""}</td></tr>`).join("");
+    const ultimo = (r.acessos || []).at(-1);
+    const mais = r.mais && ultimo ? `<p>${link(`#/acessos?${new URLSearchParams(Object.entries({ de: filtro.de, ate: filtro.ate, quem: filtro.email, antes: String(ultimo.n) }).filter(([, v]) => v))}`, "Ver os mais antigos")}</p>` : "";
+    return `${topo}
+    <div class="cartao"><p>O servidor da nuvem anota quem <b>baixou o banco inteiro</b>, <b>abriu, anexou ou apagou arquivos</b>, baixou <b>backups</b>, mandou <b>e-mail</b> pela conta da empresa, mexeu na <b>ficha pela internet</b> e ligou o <b>programa do PC</b>, com a data, o endereço de internet e o tamanho. Fica guardado por ${Number(r.dias) || 180} dias (<a href="#/regras">Regras do sistema</a>, "Registro de acessos").</p>
+      <p class="suave">Use para conferir se alguém baixou dados demais ou tentou entrar sem poder (linhas "Recusado"). Abrir telas e listas de anexos não entra.</p></div>
+    ${form}
+    <div class="cartao"><h2>Por pessoa${filtro.de || filtro.ate ? " no período" : ""}</h2>
+      ${resumo ? `<table><tr><th>Pessoa</th><th class="n">Acessos</th><th class="n">Baixou ou enviou</th><th class="n">Recusados</th></tr>${resumo}</table>` : '<p class="suave">Nenhum acesso anotado.</p>'}</div>
+    <div class="cartao"><h2>Acessos${filtro.antes ? " (mais antigos)" : ""}</h2>
+      ${linhas2 ? `<div class="rolagem"><table><tr><th>Quando</th><th>Quem</th><th>O quê</th><th class="n">Tamanho</th><th>De onde</th></tr>${linhas2}</table></div>${mais}` : '<p class="suave">Nenhum acesso anotado.</p>'}</div>`;
+  }
   function relatorio(r) {
     const itens = [
       `${r.registros} registros do banco ${r.diferencas.length ? `<b>com diferença em: ${esc(r.diferencas.join(", "))}</b>` : "conferidos: iguais à pasta ✓"}`,
@@ -28970,7 +29035,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     <p class="suave">Computadores com o programa do PC (cópia diária dos dados, versão PC e cópia aberta dos arquivos). Cada um só <b>lê</b>, com o acesso de quem o ligou; se essa pessoa for bloqueada, o computador para também. Computador roubado ou de alguém que saiu: <b>Desligar</b>.</p>
     <table><tr><th>Computador</th><th>Ligado por</th><th>Quando</th><th>Última vez</th><th></th></tr>${linhas2 || '<tr><td colspan="5" class="suave">Nenhum computador ligado.</td></tr>'}</table></div>`;
   }
-  var valorTexto, nomeDoRegistro, quando2, SEM_VALOR, MOSTRAR_MUDANCAS, curto, mb, diaDoBackup, cifrado, pastaBackups, momentoDoBackup, apiDados, ACOES_NUVEM;
+  var valorTexto, nomeDoRegistro, quando2, SEM_VALOR, MOSTRAR_MUDANCAS, curto, mb, diaDoBackup, cifrado, pastaBackups, momentoDoBackup, tamanho2, resultadoDoAcesso, MUITO, apiDados, ACOES_NUVEM;
   var init_nuvem2 = __esm({
     "docs/js/telas/nuvem.js"() {
       init_app();
@@ -29005,6 +29070,9 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       cifrado = (nome) => nome.endsWith(EXTENSAO);
       pastaBackups = () => E.pasta.getDirectoryHandle(PASTA_BACKUPS);
       momentoDoBackup = (dia, motivo) => motivo ? `logo antes da substituição feita em ${dataBr(dia)}` : `às 3h de ${dataBr(dia)}`;
+      tamanho2 = (b) => b === null || b === void 0 ? "" : b >= 1048576 ? mb(b) : b >= 1024 ? `${Math.round(b / 1024)} KB` : `${b} B`;
+      resultadoDoAcesso = (x) => x >= 400 ? etiqueta(x === 401 ? "Recusado (senha ou login)" : x === 403 ? "Recusado (sem permissão)" : x === 429 ? "Recusado (muitos pedidos)" : `Recusado (${x})`, "perigo") : x === 304 ? '<span class="suave">já estava no aparelho</span>' : "";
+      MUITO = 200 * 1048576;
       apiDados = () => apiDoSite("api/dados/");
       ACOES_NUVEM = {
         async desligarAparelho({ id }) {
@@ -33385,6 +33453,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         restaurarBackup: () => telaRestaurarBackup(),
         "backup-seguro": () => telaBackupSeguro(),
         "backups-nuvem": () => telaBackupsNuvem(),
+        acessos: (rota) => telaAcessos(rota.q),
         _ligarDesconto(raiz) {
           ligarAjuda(raiz);
           ligarCamposAutomaticos(raiz);
