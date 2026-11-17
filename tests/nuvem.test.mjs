@@ -517,3 +517,26 @@ test('crachá do aparelho: papel do usuário, desligar em Usuários, usuário de
   assert.equal((await pedir('GET', 'aparelho/saude', { cracha: dono })).status, 401);
   assert.equal(dobj.cofre.q('SELECT desligado_por FROM aparelhos WHERE id = 2')[0].desligado_por, 'parado 90 dias');
 });
+
+test('crachá do aparelho: a versão do programa do PC fica guardada por computador e aparece em Aparelhos ligados', async () => {
+  const { env, pedir, entrar } = await nuvemComCofre();
+  const cracha = (await (await entrar('dono@exemplo.com.br', 'senha do dono 2026')).json()).cracha;
+  const site = async () => {
+    const agora = Math.floor(Date.now() / 1000);
+    const jwt = await token({ aud: [AUD], iss: `https://${EQUIPE}`, exp: agora + 3600, iat: agora, email: 'dono@exemplo.com.br' });
+    const r = await W.atender(new Request('https://erp.ankjck.com.br/api/dados/aparelhos', { headers: { 'Cf-Access-Jwt-Assertion': jwt } }), env, buscarCerts);
+    return (await r.json()).aparelhos[0].versao_programa;
+  };
+  assert.equal(await site(), '', 'ligado e ainda sem usar: sem versão');
+  assert.equal((await pedir('GET', 'aparelho/saude', { cracha })).status, 200);
+  assert.equal(await site(), '', 'programa antigo (não manda a versão): continua sem');
+  W.esquecerCrachas();
+  assert.equal((await pedir('GET', 'aparelho/saude', { cracha, cab: { 'X-Programa-Versao': '2026-11-17 abc1234' } })).status, 200);
+  assert.equal(await site(), '2026-11-17 abc1234');
+  W.esquecerCrachas();
+  assert.equal((await pedir('GET', 'aparelho/saude', { cracha, cab: { 'X-Programa-Versao': '<b>2026-11-18</b>' } })).status, 200, 'versão estranha não barra o computador');
+  assert.equal(await site(), '2026-11-17 abc1234', 'e é ignorada');
+  W.esquecerCrachas();
+  await pedir('GET', 'aparelho/saude', { cracha, cab: { 'X-Programa-Versao': '2026-11-20 def5678' } });
+  assert.equal(await site(), '2026-11-20 def5678', 'trocou sozinho: a versão nova aparece');
+});

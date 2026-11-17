@@ -418,7 +418,9 @@ async function conferirCracha(request, env) {
   if (guardado && guardado.ate > Date.now()) return guardado.email;
   if ((crachasRecusados.get(hash) || 0) > Date.now()) throw new ErroHttp(401, 'Este computador não está mais ligado ao sistema. Ligue de novo com o e-mail e a senha.');
   limitarIp(request, 'cracha');
-  const r = await cofreDe(env).fetch(new Request('https://cofre/aparelho/conferir', { method: 'POST', body: JSON.stringify({ cracha: m[1] }), headers: { 'Content-Type': 'application/json' } }));
+  // a versão do programa do PC (atualizador-pc/se-atualizar.mjs): só o formato "AAAA-MM-DD commit"; outra coisa é ignorada
+  const versao = /^\d{4}-\d{2}-\d{2} [0-9a-z-]{1,40}$/.exec(request.headers.get('X-Programa-Versao') || '')?.[0] || '';
+  const r = await cofreDe(env).fetch(new Request('https://cofre/aparelho/conferir', { method: 'POST', body: JSON.stringify({ cracha: m[1], versao }), headers: { 'Content-Type': 'application/json' } }));
   const d = await r.json().catch(() => ({}));
   if (!r.ok) {
     if (crachasRecusados.size > 1000) crachasRecusados.clear();

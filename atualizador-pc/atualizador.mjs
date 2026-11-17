@@ -113,7 +113,8 @@ export function carregarConfig(env = lerEnv(path.join(PASTA, '.env')), ligacao =
  */
 export function acesso(cfg) {
   if (cfg.cracha) {
-    return { api: `${cfg.site}/api/aparelho/`, programa: `${cfg.site}/api/aparelho/programa`, cabecalhos: { Authorization: `Bearer ${cfg.cracha}` },
+    // a versão do programa vai junto: o sistema mostra em Usuários → Aparelhos ligados (o programa se atualiza sozinho)
+    return { api: `${cfg.site}/api/aparelho/`, programa: `${cfg.site}/api/aparelho/programa`, cabecalhos: { Authorization: `Bearer ${cfg.cracha}`, ...(EXE?.versao ? { 'X-Programa-Versao': EXE.versao } : {}) },
       recusou: (status) => `A nuvem não aceitou o crachá deste computador (resposta ${status}). Se ele foi desligado em Usuários, ligue de novo (${COMO_LIGAR}); se for logo depois de instalar, confira a regra "Bypass" do Access (README.md).` };
   }
   return { api: `${cfg.site}/api/`, programa: `${cfg.site}/${CAMINHO_PROGRAMA}`, cabecalhos: { 'CF-Access-Client-Id': cfg.clientId, 'CF-Access-Client-Secret': cfg.clientSecret },

@@ -1,7 +1,8 @@
 # Programa do PC (Instalar-Administracao-de-Imoveis.exe): o atualizador-pc/ num arquivo só para Windows, com o Node dentro
 # (não precisa instalar o Node). Gerado SOZINHO pelo GitHub a cada mudança do atualizador que entra na main, por
 # tools/gerar-exe.mjs. O arquivo não fica no repositório: sai como artefato desta execução e na "release" fixa "programa-pc"
-# (https://github.com/<dono>/<repositório>/releases/tag/programa-pc), sempre com a versão mais nova.
+# (https://github.com/<dono>/<repositório>/releases/tag/programa-pc), sempre com a versão mais nova, junto de programa-pc.json
+# (versão, tamanho e SHA-256): o programa instalado confere esse aviso e se atualiza sozinho (atualizador-pc/se-atualizar.mjs).
 # Sem assinatura de código por enquanto (decisão do dono, documentacao/PROPOSTA_LICENCA_E_PROGRAMA_PC.md, item 11).
 name: Programa do PC
 
@@ -30,7 +31,7 @@ jobs:
         with:
           node-version: 24
       - name: Testar o programa
-        run: node --test tests/programa-pc.test.mjs tests/atualizador-pc.test.mjs
+        run: node --test tests/programa-pc.test.mjs tests/programa-pc-se-atualizar.test.mjs tests/atualizador-pc.test.mjs
       - name: Gerar o .exe
         run: node tools/gerar-exe.mjs
       - name: Conferir que abre (ajuda e computador não ligado)
@@ -45,7 +46,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: Instalar-Administracao-de-Imoveis
-          path: atualizador-pc/dist/Instalar-Administracao-de-Imoveis.exe
+          path: |
+            atualizador-pc/dist/Instalar-Administracao-de-Imoveis.exe
+            atualizador-pc/dist/programa-pc.json
           if-no-files-found: error
       - name: Publicar na release "programa-pc"
         shell: bash
@@ -53,11 +56,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           exe="atualizador-pc/dist/Instalar-Administracao-de-Imoveis.exe"
+          aviso="atualizador-pc/dist/programa-pc.json"
           versao="$("$exe" --versao)"
-          notas="Programa do computador (Windows), versão ${versao}. Sem assinatura: no aviso azul do Windows, Mais informações → Executar assim mesmo. Passo a passo em atualizador-pc/README.md."
+          grep -q "\"versao\":\"$versao\"" "$aviso"
+          notas="Programa do computador (Windows), versão ${versao}. Instalado, ele se atualiza sozinho (às 20h e ao entrar no Windows). Sem assinatura: no aviso azul do Windows, Mais informações → Executar assim mesmo. Passo a passo em atualizador-pc/README.md."
           if gh release view programa-pc > /dev/null 2>&1; then
+            # o programa antes do aviso: se o envio parar no meio, os computadores só veem o aviso novo com o programa já no lugar
             gh release upload programa-pc "$exe" --clobber
+            gh release upload programa-pc "$aviso" --clobber
             gh release edit programa-pc --notes "$notas"
           else
-            gh release create programa-pc "$exe" --title "Programa do PC" --notes "$notas" --target "$GITHUB_SHA"
+            gh release create programa-pc "$exe" "$aviso" --title "Programa do PC" --notes "$notas" --target "$GITHUB_SHA"
           fi

@@ -74,6 +74,8 @@ export class Aparelhos {
       CREATE TABLE IF NOT EXISTS segredo_aparelho (id INTEGER PRIMARY KEY CHECK (id = 1), valor TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS verificadores_aparelho (usuario_id INTEGER PRIMARY KEY, sal TEXT NOT NULL, iteracoes INTEGER NOT NULL,
         hash TEXT NOT NULL, marca TEXT NOT NULL, em TEXT NOT NULL);`);
+    // versão do programa do PC (17/11/2026: o programa se atualiza sozinho e conta a versão a cada vez que usa o crachá)
+    if (!cofre.q('PRAGMA table_info(aparelhos)').some((c) => c.name === 'versao_programa')) cofre.sql.exec('ALTER TABLE aparelhos ADD COLUMN versao_programa TEXT');
   }
 
   agora() { return this.c.relogio(); }
@@ -207,8 +209,11 @@ export class Aparelhos {
     return { cracha, id, computador, login: u.login || u.email, nome: u.nome || '', papel: u.papel };
   }
 
-  /** Crachá → { email, papel, aparelho }. Desligado, parado há 90 dias ou de usuário desativado: recusa. Marca o último uso. */
-  async conferir(cracha) {
+  /**
+   * Crachá → { email, papel, aparelho }. Desligado, parado há 90 dias ou de usuário desativado: recusa. Marca o último uso e a
+   * versão do programa (`versao`, já conferida pelo Worker; vazia = programa antigo, que não conta).
+   */
+  async conferir(cracha, versao = '') {
     const naoVale = new ErroAparelho(401, 'Este computador não está mais ligado ao sistema. Ligue de novo com o e-mail e a senha (abra o programa do computador com --ligar, ou ligar-computador.cmd).');
     if (!crachaValido(cracha)) throw naoVale;
     const a = this.c.q('SELECT * FROM aparelhos WHERE hash = ? AND desligado_em IS NULL', await hashDoCracha(cracha))[0];
@@ -221,6 +226,8 @@ export class Aparelhos {
     const u = this.usuarioPorId(Number(a.usuario_id));
     if (!u) throw new ErroAparelho(403, 'O usuário que ligou este computador foi desativado no sistema. Ligue de novo com outro usuário.');
     if (agora.getTime() - Date.parse(a.ultimo_uso) > MINUTO) this.c.sql.exec('UPDATE aparelhos SET ultimo_uso = ? WHERE id = ?', agora.toISOString(), a.id);
+    const v = /^\d{4}-\d{2}-\d{2} [0-9a-z-]{1,40}$/.test(String(versao || '')) ? String(versao) : '';
+    if (v && v !== a.versao_programa) this.c.sql.exec('UPDATE aparelhos SET versao_programa = ? WHERE id = ?', v, a.id);
     return { email: String(u.login || u.email).toLowerCase(), papel: u.papel, aparelho: Number(a.id) };
   }
 
@@ -229,12 +236,12 @@ export class Aparelhos {
     const nomes = new Map(this.usuarios().map((u) => [u.id, u]));
     const limite = this.agora().getTime() - DIAS_SEM_USO * 24 * 60 * MINUTO;
     return {
-      aparelhos: this.c.q('SELECT id, computador, usuario_id, ligado_por, ligado_em, ultimo_uso FROM aparelhos WHERE desligado_em IS NULL ORDER BY ligado_em')
+      aparelhos: this.c.q('SELECT id, computador, usuario_id, ligado_por, ligado_em, ultimo_uso, versao_programa FROM aparelhos WHERE desligado_em IS NULL ORDER BY ligado_em')
         .filter((a) => quem?.papel === 'admin' || Number(a.usuario_id) === quem?.id)
         .map((a) => {
           const u = nomes.get(Number(a.usuario_id));
           return { id: Number(a.id), computador: a.computador, usuario_id: Number(a.usuario_id), ligado_por: a.ligado_por, nome: u?.nome || a.ligado_por,
-            ligado_em: a.ligado_em, ultimo_uso: a.ultimo_uso, parado: Date.parse(a.ultimo_uso) < limite, usuario_ativo: !!(u && u.ativo !== false && !u.pendente) };
+            ligado_em: a.ligado_em, ultimo_uso: a.ultimo_uso, versao_programa: a.versao_programa || '', parado: Date.parse(a.ultimo_uso) < limite, usuario_ativo: !!(u && u.ativo !== false && !u.pendente) };
         }),
     };
   }

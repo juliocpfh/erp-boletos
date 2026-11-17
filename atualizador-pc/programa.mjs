@@ -2,6 +2,7 @@
 // dentro (Node "single executable application"). Faz, por argumento, tudo o que os .cmd e o .vbs desta pasta faziam:
 // instalar (copia o programa para %LOCALAPPDATA%\Administracao de Imoveis\programa, liga o computador com e-mail e senha, cria
 // as tarefas do Windows e roda a primeira atualização), ligar, atualizar, só os arquivos, desinstalar. Dois cliques = instalar.
+// Em --atualizar (20h e ao entrar no Windows) o próprio programa se atualiza sozinho pela release do GitHub (se-atualizar.mjs).
 // Sem assinatura de código por enquanto (decisão do dono, proposta de licença, item 11): o Windows mostra o aviso azul uma vez.
 // A atualização em si é a de atualizador.mjs (`principal`); o crachá, o de ligar.mjs. Ajuda: Administracao-de-Imoveis.exe --ajuda
 import { spawn, spawnSync } from 'node:child_process';
@@ -9,8 +10,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
-import { EXE, PASTA_COPIA, principal } from './atualizador.mjs';
+import { ARQUIVO_REGISTRO, EXE, PASTA_COPIA, principal } from './atualizador.mjs';
 import { ARQUIVO_CONFIG, pastaConfig } from './ligar.mjs';
+import { NOME_NOVO, NOME_TRAVA, NOME_VELHO, seAtualizar } from './se-atualizar.mjs';
 
 export const NOME_EXE = 'Administracao-de-Imoveis.exe';
 export const NOME_VBS = 'rodar-escondido.vbs';
@@ -37,13 +39,13 @@ export const NOME_VBS_JANELA = 'janela.vbs';
 export const CHAVE_DESINSTALAR = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\AdministracaoDeImoveis';
 export const NOME_NO_WINDOWS = 'Administração de Imóveis';
 /** O que o programa grava na pasta `programa` (ao desinstalar, só isto é apagado; a pasta sai se ficar vazia). */
-export const ARQUIVOS_DO_PROGRAMA = [NOME_EXE, NOME_VBS, NOME_VBS_PASTA, NOME_VBS_DESINSTALAR, NOME_VBS_JANELA];
+export const ARQUIVOS_DO_PROGRAMA = [NOME_EXE, NOME_VBS, NOME_VBS_PASTA, NOME_VBS_DESINSTALAR, NOME_VBS_JANELA, NOME_NOVO, NOME_VELHO, NOME_TRAVA];
 export const TEXTO_CONFIRMAR = `Desinstalar ${NOME_NO_WINDOWS}?|As cópias e a pasta de arquivos continuam no computador.|Para cortar o acesso deste computador ao sistema, use Usuários → Aparelhos ligados → Desligar.`;
 export const TEXTO_PRONTO = 'Pronto: programa desinstalado.|As cópias na pasta do backup seguro e a pasta Arquivos dos imoveis continuam no computador.|Para cortar o acesso deste computador ao sistema, use Usuários → Aparelhos ligados → Desligar.';
 /** As mesmas tarefas (e os mesmos nomes) de instalar-tarefa.cmd: criar de novo troca as antigas, que chamavam o Node. */
 export const TAREFAS = [
-  { nome: 'Imoveis - atualizador da versao PC', quando: ['/SC', 'DAILY', '/ST', '20:00'], args: '--atualizar', texto: 'todo dia às 20h: dados, versão PC e arquivos' },
-  { nome: 'Imoveis - atualizador da versao PC (ao entrar)', quando: ['/SC', 'ONLOGON', '/DELAY', '0002:00'], args: '--atualizar', texto: 'ao entrar no Windows: dados, versão PC e arquivos' },
+  { nome: 'Imoveis - atualizador da versao PC', quando: ['/SC', 'DAILY', '/ST', '20:00'], args: '--atualizar', texto: 'todo dia às 20h: dados, versão PC, arquivos e o próprio programa' },
+  { nome: 'Imoveis - atualizador da versao PC (ao entrar)', quando: ['/SC', 'ONLOGON', '/DELAY', '0002:00'], args: '--atualizar', texto: 'ao entrar no Windows: dados, versão PC, arquivos e o próprio programa' },
   { nome: 'Imoveis - copia dos arquivos (de hora em hora)', quando: ['/SC', 'HOURLY'], args: '--arquivos', escondida: true, texto: 'de hora em hora, sem janela: só os arquivos' },
 ];
 
@@ -208,6 +210,20 @@ function pastaDoBackup(env = process.env) {
 }
 
 /**
+ * O programa se atualiza sozinho (se-atualizar.mjs) e anota o resultado no fim de ultima-atualizacao.txt (pasta do backup
+ * seguro). Devolve { situacao, texto }. Pelo Node ou fora da pasta instalada, não mexe em nada ('pulado').
+ */
+export async function atualizarPrograma({ env = process.env, exe = EXE, trocar = seAtualizar } = {}) {
+  const pasta = pastaInstalada(env);
+  // para o teste de ponta a ponta no Windows: a "release" pode ser um servidor deste computador (nunca outro endereço)
+  const local = /^http:\/\/127\.0\.0\.1:\d{2,5}\/$/.test(env.IMOVEIS_URL_RELEASE || '') ? { url: env.IMOVEIS_URL_RELEASE } : {};
+  const r = await trocar({ pasta, exe: path.join(pasta, NOME_EXE), atual: exe?.versao || '', ...local });
+  const base = pastaDoBackup(env);
+  if (base && r.situacao !== 'pulado') { try { fs.appendFileSync(path.join(base, ARQUIVO_REGISTRO), `  programa do PC: ${r.texto}\n`); } catch { /* sem pasta */ } }
+  return r;
+}
+
+/**
  * A pasta `programa` que o desinstalar pode limpar, ou null: tem de ser exatamente <pasta do crachá>\programa e não pode
  * conter nem estar dentro da pasta do backup seguro (o backup e os arquivos dos inquilinos nunca são apagados).
  */
@@ -330,7 +346,7 @@ Mantém a pasta do backup seguro em dia com a nuvem: dados cifrados, versão PC 
 Uso:
   ${NOME_EXE}                 (dois cliques) instala: liga o computador, cria as tarefas do Windows e atualiza
   ${NOME_EXE} --ligar         liga de novo com e-mail e senha (depois de Desligar ou de 90 dias parado) e atualiza
-  ${NOME_EXE} --atualizar     atualiza agora: dados, versão PC e arquivos
+  ${NOME_EXE} --atualizar     atualiza agora: dados, versão PC, arquivos e o próprio programa (se saiu versão nova)
   ${NOME_EXE} --arquivos      atualiza agora só a pasta "Arquivos dos imoveis"
   ${NOME_EXE} --instalar      só copia o programa e cria as tarefas (20h, ao entrar e de hora em hora)
   ${NOME_EXE} --desinstalar   pergunta antes e desinstala: tarefas, botões do sistema, Aplicativos instalados e a pasta "programa"
@@ -340,7 +356,9 @@ Uso:
   ${NOME_EXE} --ajuda         mostra este texto
   --simular                   junto de --instalar ou --desinstalar: só mostra o que faria, sem mexer em nada
 
-O resultado de cada atualização fica em ultima-atualizacao.txt, na pasta do backup seguro.`;
+O programa se atualiza sozinho (às 20h e ao entrar no Windows): baixa a versão nova do GitHub, confere o arquivo e troca;
+a nova vale a partir da rodada seguinte. O resultado de cada atualização fica em ultima-atualizacao.txt, na pasta do
+backup seguro.`;
 
 const COMANDOS = ['--ligar', '--atualizar', '--arquivos', '--instalar', '--desinstalar', '--versao', '--ajuda'];
 
@@ -450,7 +468,8 @@ async function desinstalar({ env, dizer, simular, elevado, rodarReg, rodarTarefa
  */
 export async function executar(args = [], { env = process.env, dizer = console.log, atualizar = principal, pausar = esperarEnter,
   garantir = garantirRegistro, rodarReg = reg, rodarTarefas = schtasks, abrir = abrirExplorer, perguntar = confirmarNoWindows,
-  avisar = (texto, e) => janelaDoWindows(texto, { env: e }), apagarPasta = apagarPastaDoPrograma, elevar = rodarComoAdministrador } = {}) {
+  avisar = (texto, e) => janelaDoWindows(texto, { env: e }), apagarPasta = apagarPastaDoPrograma, elevar = rodarComoAdministrador,
+  programa = () => atualizarPrograma({ env }) } = {}) {
   // o botão do sistema (imoveis-pasta:): abre só a pasta configurada; qualquer outro argumento (até o endereço) é ignorado
   if (args.includes('--abrir-pasta')) return abrirPasta({ env, abrir });
   const versao = EXE?.versao || '';
@@ -468,7 +487,13 @@ export async function executar(args = [], { env = process.env, dizer = console.l
   try {
     if (pedido === '--ajuda' || pedido === '-h' || pedido === '/?') { dizer(AJUDA(versao)); return 0; }
     if (pedido === '--versao') { dizer(versao || 'rodando pelo Node (sem versão)'); return 0; }
-    if (pedido === '--atualizar') { emDia(); return (await atualizar([])) ? 0 : 1; }
+    if (pedido === '--atualizar') {
+      emDia();
+      const ok = await atualizar([]);
+      // depois dos dados (que nunca esperam o download do programa); falhar aqui não muda o resultado dos dados
+      try { const p = await programa(); if (p.situacao !== 'pulado') dizer(`Programa do PC: ${p.texto}.`); } catch (e) { dizer(`Programa do PC: não deu para conferir a versão nova (${e.message}).`); }
+      return ok ? 0 : 1;
+    }
     if (pedido === '--arquivos') { emDia(); return (await atualizar(['--arquivos'])) ? 0 : 1; }
     if (pedido === '--ligar') {
       emDia();
@@ -484,7 +509,7 @@ export async function executar(args = [], { env = process.env, dizer = console.l
     }
     // dois cliques: instala tudo
     dizer(`Administração de Imóveis — programa do computador${versao ? ` (versão ${versao})` : ''}\n`);
-    dizer('Este programa mantém a pasta do backup seguro em dia com a nuvem, sozinho (todo dia às 20h, ao entrar no Windows e,\npara os arquivos, de hora em hora). Passos: 1) criar as tarefas do Windows; 2) ligar este computador; 3) primeira atualização.\n');
+    dizer('Este programa mantém a pasta do backup seguro em dia com a nuvem, sozinho (todo dia às 20h, ao entrar no Windows e,\npara os arquivos, de hora em hora), e se atualiza sozinho quando sai uma versão nova. Passos: 1) criar as tarefas do Windows; 2) ligar este computador; 3) primeira atualização.\n');
     dizer('Passo 1 de 3');
     const tarefas = instalar({ env, simular, elevado, dizer, rodarReg });
     if (simular) return 0;

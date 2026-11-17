@@ -197,6 +197,16 @@ function relatorio(r) {
 const apiDados = () => N.apiDoSite('api/dados/');
 
 /**
+ * A versão do programa do PC de um computador ("AAAA-MM-DD commit", atualizador-pc/se-atualizar.mjs): o dia em que foi
+ * publicada. Sem versão = programa antigo, de antes de se atualizar sozinho (precisa baixar o novo uma vez).
+ */
+export const versaoDoProgramaHtml = (v) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2}) (\S+)$/.exec(String(v || ''));
+  if (!m) return '<span class="suave">antiga: baixe o programa novo uma vez (depois ele se atualiza sozinho)</span>';
+  return `de ${m[3]}/${m[2]}/${m[1]} <span class="suave">(${esc(m[4])})</span>`;
+};
+
+/**
  * "Aparelhos ligados" (em Usuários): computadores com o programa do PC (atualizador-pc/), cada um com o crachá que só lê.
  * Só na nuvem (o crachá é dela). Desligar para o crachá na hora (nos anexos, em até 1 minuto).
  */
@@ -208,10 +218,12 @@ export async function aparelhosLigadosHtml() {
   }
   const linhas = lista.map((a) => `<tr><td>${esc(a.computador)}</td><td>${esc(a.nome)}${a.usuario_ativo ? '' : ' <span class="suave">(usuário bloqueado: o crachá não vale)</span>'}</td>
     <td>${dataHoraBr(a.ligado_em)}</td><td>${dataHoraBr(a.ultimo_uso)}${a.parado ? ' <span class="suave">(parado há mais de 90 dias: precisa ligar de novo)</span>' : ''}</td>
+    <td>${versaoDoProgramaHtml(a.versao_programa)}</td>
     <td class="n">${botao('desligarAparelho', 'Desligar', { id: a.id }, 'perigo pequeno', `Desligar o computador ${a.computador}? Ele para de baixar os dados na hora; para voltar, é preciso entrar de novo nele com e-mail e senha.`)}</td></tr>`).join('');
   return `<div class="cartao"><h2>Aparelhos ligados</h2>
-    <p class="suave">Computadores com o programa do PC (cópia diária dos dados, versão PC e cópia aberta dos arquivos). Cada um só <b>lê</b>, com o acesso de quem o ligou; se essa pessoa for bloqueada, o computador para também. Computador roubado ou de alguém que saiu: <b>Desligar</b>.</p>
-    <table><tr><th>Computador</th><th>Ligado por</th><th>Quando</th><th>Última vez</th><th></th></tr>${linhas || '<tr><td colspan="5" class="suave">Nenhum computador ligado.</td></tr>'}</table></div>`;
+    <p class="suave">Computadores com o programa do PC (cópia diária dos dados, versão PC e cópia aberta dos arquivos). Cada um só <b>lê</b>, com o acesso de quem o ligou; se essa pessoa for bloqueada, o computador para também. Computador roubado ou de alguém que saiu: <b>Desligar</b>.
+      O programa se atualiza sozinho (todo dia às 20h e ao entrar no Windows); a coluna <b>Programa</b> mostra a versão que cada computador está usando.</p>
+    <table><tr><th>Computador</th><th>Ligado por</th><th>Quando</th><th>Última vez</th><th>Programa</th><th></th></tr>${linhas || '<tr><td colspan="6" class="suave">Nenhum computador ligado.</td></tr>'}</table></div>`;
 }
 
 export const ACOES_NUVEM = {
