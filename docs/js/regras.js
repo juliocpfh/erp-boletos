@@ -1331,7 +1331,8 @@ function iptuDoInquilino(c, p, comp, v, base) {
   const cb = base.boletos.get(`${c.id}|${comp}`);
   if (cb) {
     const valor = iptuNoBoleto(cb, c, p, base.iptus);
-    return valor > 0 ? { contrato: c, comp, dias: cb.dias_cobrados, diasMes: cb.dias_mes, valor } : null;
+    // o IPTU é sempre pelos dias reais (mesmo com o aluguel pelo mês comercial de 30 dias)
+    return valor > 0 ? { contrato: c, comp, dias: C.diasOcupados(comp, c.data_entrada, c.data_saida), diasMes: C.diasNoMes(comp), valor } : null;
   }
   if (c.ativo === false || !c.cobrar_iptu) return null;
   // o mês já tem boleto do aluguel em outro contrato do imóvel com IPTU (ex.: troca de titular com boletos no anterior):
@@ -1524,8 +1525,8 @@ export function montarCobranca(d, contrato, comp) {
     taxaBoleto: cobra('taxa') ? contrato.taxa_boleto || 0 : 0,
   });
   // o FCI do mês incompleto é sempre pelos dias reais (regra `proporcional`), também com o mês comercial de 30 dias
-  // Ex.: entrada 15/02/2027, R$ 1.800,00 bonificado, FCI 5%: 14/28 → R$ 45,00 (e não 14/30 → R$ 42,00)
-  const aluguelReal = r.dias_mes === diasMes ? r.aluguel : C.aluguelProporcional(r.aluguel_mensal, r.dias_cobrados, diasMes);
+  // Ex.: entrada 15/02/2027, R$ 1.800,00 bonificado, FCI 5%: 14/28 → R$ 45,00 (e não 16/30 → R$ 48,00)
+  const aluguelReal = r.dias_mes === diasMes ? r.aluguel : C.aluguelProporcional(r.aluguel_mensal, dias, diasMes);
   const descontoReal = r.dias_mes === diasMes ? r.desconto : C.descontoPorPercentual(aluguelReal, bonificacaoNaCompetencia(d, contrato, comp));
   return {
     contrato_id: contrato.id, competencia: comp,
