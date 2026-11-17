@@ -137,7 +137,7 @@ export function caixaContaDosBoletos() {
       <div class="largo"><label class="check-mini"><input type="radio" name="modo" value="escolher" ${cfg.modo_conta_boleto === 'escolher' ? 'checked' : ''}> Escolher a empresa boleto a boleto</label>
         <div class="ajuda">Ao emitir, o sistema pergunta sempre a conta, mesmo quando o imóvel tem uma só empresa (ela já vem marcada; senão, a padrão). Em "Emitir todos do mês", pergunta uma vez para o lote.</div></div>
       <div class="acoes" style="align-self:end"><button class="secundario">Salvar</button></div></form>
-      <p class="suave">Decisão de 2026-11-05: por orientação do contador, os boletos saem pela ANK e a JCK recebe o repasse depois; a opção de escolher um a um fica disponível.</p>`
+      <p class="suave">Com a empresa padrão, todos os boletos saem pela conta dela, mesmo quando o imóvel é dividido com outra empresa.</p>`
     : '<p class="suave">Nenhuma conta bancária cadastrada ainda: cadastre as contas em <a href="#/dados?ir=banco">Dados e backup → Banco (C6)</a>.</p>'}</div>`;
 }
 
@@ -152,7 +152,7 @@ export function caixaConfigBanco() {
   const resumoNotif = (x) => { const canais = Object.entries(R.CANAIS_NOTIFICACAO).filter(([k]) => x.notificar[k]).map(([, [, r]]) => r); const quando = Object.entries(R.MOMENTOS_NOTIFICACAO).filter(([k]) => x.notificar[k]).map(([, [, r]]) => r); return canais.length && quando.length ? `${canais.join(' e ')}: ${quando.join(', ')}` : 'não avisa'; };
   return `<div class="cartao" id="banco"><div class="cabecalho"><h2>Banco (C6) — boleto com Pix</h2><div>${situacao}</div></div>
     <p>Emite os boletos (com QR Code Pix) direto na conta do C6, pelo botão <b>Emitir no C6</b> da tela Boletos. Como o banco exige certificado digital, o site fala com uma <b>ponte</b>: um programinha que roda no computador de quem emite (pasta <code>ponte-c6</code> do programa, veja o README dela). As chaves do banco ficam só na ponte, nunca aqui.</p>
-    <p class="suave">Até as chaves chegarem, a ponte pode rodar em <b>modo simulado</b>: os botões funcionam e devolvem boletos fictícios, para treinar. Qual empresa emite os boletos (padrão ${emissora ? esc(emissora.apelido) : 'ANK'}, ou escolher um a um) se define em <a href="#/empresas?ir=conta-boletos">Empresas</a>.</p>
+    <p class="suave">Até as chaves chegarem, a ponte pode rodar em <b>modo simulado</b>: os botões funcionam e devolvem boletos fictícios, para treinar. Qual empresa emite os boletos (${emissora ? `padrão ${esc(emissora.apelido)}` : 'a padrão'}, ou escolher um a um) se define em <a href="#/empresas?ir=conta-boletos">Empresas</a>.</p>
     <form data-form="configBanco" class="formulario">
       <div><label>Endereço da ponte (neste computador)</label><input name="ponte_url" value="${esc(B.ponteLocal().configurada ? B.ponteLocal().ponte_url : '')}" placeholder="http://localhost:8765"><div class="ajuda">Mostrado quando a ponte é ligada (node servidor.mjs)</div></div>
       <div><label>Senha da ponte (neste computador)</label><input type="password" name="senha_ponte" value="${esc(B.ponteLocal().senha_ponte)}" autocomplete="off"><div class="ajuda">A mesma de PONTE_SENHA no .env da ponte</div></div>
@@ -165,14 +165,14 @@ export function caixaConfigBanco() {
       ${cfg.contas.map((x) => `<tr><td><code>${esc(x.id)}</code></td><td><b>${esc(x.apelido)}</b>${(emissora || {}).id === x.id ? ` ${etiqueta('padrão dos boletos', 'info')}` : ''}</td><td>${nomeEmp(x.emitente_id)}</td><td>${x.ambiente === 'producao' ? 'Produção' : etiqueta('Sandbox (teste)', 'aviso')}<br><span class="suave">carteira ${esc(R.carteiraDaConta(x))}</span></td>
         <td>${x.chave_pix ? esc(x.chave_pix) : '<span class="suave">sem Pix</span>'}</td><td>${esc(resumoNotif(x))}</td><td>${x.negativacao.ativa ? `${x.negativacao.dias_atraso} dias de atraso` : '<span class="suave">desligada</span>'}</td>
         <td class="n nw">${botao('testarContaC6', 'Testar conexão', { conta: x.id })} ${botao('editarContaBanco', 'Editar', { conta: x.id })} ${botao('excluirContaBanco', 'Tirar', { conta: x.id }, 'perigo pequeno', `Tirar a conta "${x.apelido}" da integração?`)}</td></tr>`).join('')
-    || '<tr><td colspan="8" class="suave">Nenhuma conta cadastrada. Cadastre abaixo uma conta por empresa (ex.: ANK e JCK), com o mesmo identificador usado no .env da ponte (CONTAS=ank,jck).</td></tr>'}</table></div>
+    || '<tr><td colspan="8" class="suave">Nenhuma conta cadastrada. Cadastre abaixo uma conta por empresa, com o mesmo identificador configurado na ponte (linha CONTAS do arquivo .env dela; ex.: CONTAS=loja1,loja2).</td></tr>'}</table></div>
     <details id="nova-conta-banco" class="caixa-historico"><summary><b>Incluir ou alterar uma conta</b> <span class="suave">· clique para expandir</span></summary>
     <form data-form="contaBanco" class="formulario" style="margin-top:10px">
-      <div><label>Identificador na ponte</label><input name="id" placeholder="ank" required pattern="[A-Za-z0-9_\\-]+"><div class="ajuda">Só letras e números; igual ao da ponte</div></div>
-      <div><label>Apelido</label><input name="apelido" placeholder="ANK"></div>
+      <div><label>Identificador na ponte</label><input name="id" placeholder="loja1" required pattern="[A-Za-z0-9_\\-]+"><div class="ajuda">Só letras e números; igual ao da ponte</div></div>
+      <div><label>Apelido</label><input name="apelido" placeholder="Loja 1"></div>
       <div><label>Empresa dona da conta</label><select name="emitente_id" required><option value=""></option>${emitentes.map((e) => `<option value="${e.id}">${esc(e.nome)}</option>`).join('')}</select></div>
-      <div><label>Ambiente</label><select name="ambiente"><option value="sandbox">Sandbox (teste do banco)</option><option value="producao">Produção (cobranças de verdade)</option></select></div>
-      <div><label>Carteira (billing_scheme)</label><input name="carteira" placeholder="automática" inputmode="numeric"><div class="ajuda">Em branco: 21 no sandbox, 15 em produção</div></div>
+      <div><label>Ambiente</label><select name="ambiente"><option value="sandbox">Teste do banco (sandbox): não cobra de verdade</option><option value="producao">Cobrança de verdade (produção)</option></select></div>
+      <div><label>Carteira de cobrança</label><input name="carteira" placeholder="automática" inputmode="numeric"><div class="ajuda">Número que o banco informa. Em branco: 21 no teste, 15 na cobrança de verdade</div></div>
       <div><label>Chave Pix aleatória da conta (para o QR Code)</label><input name="chave_pix" placeholder="chave aleatória cadastrada no C6"><div class="ajuda">Só chave aleatória (EVP). Em branco: boleto sem Pix</div></div>
       <div><label>Baixar sozinho após o vencimento (dias)</label><input name="dias_baixa" type="number" min="0" value="${padrao.dias_baixa}"><div class="ajuda">0 = o boleto fica aberto até cancelar</div></div>
       <div><label>Desconto de pontualidade vale até (dias antes do vencimento)</label><input name="desconto_dias_antes" type="number" min="0" value="${padrao.desconto_dias_antes}"><div class="ajuda">0 = até o dia do vencimento</div></div>
