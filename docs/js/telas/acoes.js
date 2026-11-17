@@ -7,6 +7,7 @@ import * as BANCO from '../banco.js';
 import * as C from '../calculos.js';
 import { compBr, dataBr, reais } from '../calculos.js';
 import * as CP from '../compactar.js';
+import * as CPF from '../conferir-pdf.js';
 import * as Z from '../conciliacao.js';
 import * as K from '../contratos.js';
 import { encaixarFaturas, faturaExcel, faturaHtml } from '../fatura.js';
@@ -2257,11 +2258,19 @@ export const ACOES = {
     let raiz;
     try { raiz = await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS); } catch { aviso('Não há anexos para compactar.', 'info'); mostrarAndamento(''); return; }
     // documentos do link da ficha: só os já conferidos (a conferência guardada na ficha olhou o arquivo como chegou)
-    const conferidos = new Set((d().fichas || []).flatMap((f) => Object.keys(f.conferencias_link || {}).map((n) => `${S.limparNome(f.pasta || nomePastaFicha(f))}|${n}`)));
+    const conferidos = new Map((d().fichas || []).flatMap((f) => Object.keys(f.conferencias_link || {}).map((n) => [`${S.limparNome(f.pasta || nomePastaFicha(f))}|${n}`, f.id])));
     const r = await CP.compactarTodos(raiz, {
       conferido: (pastaFicha, nome) => conferidos.has(`${pastaFicha}|${nome}`),
       ler: (h) => S.lerConteudo(h),
-      gravar: (dir, nome, arq) => S.escreverTexto(dir, nome, arq),
+      gravar: async (dir, nome, arq, partes = []) => {
+        // documento do link: o resumo do compactado entra na conferência antes da troca (senão a ficha acusa "o arquivo mudou")
+        const fichaId = partes[0] === CP.PASTA_FICHAS ? conferidos.get(`${partes[1]}|${nome}`) : null;
+        if (fichaId) {
+          const sha256 = await CPF.resumoDoArquivo(new Uint8Array(await arq.arrayBuffer()));
+          await alterar((db) => R.registrarCompactacaoDoLink(db, fichaId, { [nome]: sha256 }, login()));
+        }
+        return S.escreverTexto(dir, nome, arq);
+      },
       aoAndar: ({ feitos, total, compactados, economia }) => mostrarAndamento(`${total ? Math.floor((100 * feitos) / total) : 100}%: ${feitos} de ${total} arquivo(s) olhados · ${compactados} compactado(s) · ${MB(economia)} a menos`),
     });
     const texto = r.compactados

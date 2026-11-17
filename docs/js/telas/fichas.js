@@ -348,8 +348,12 @@ function blocoDoLink(f, l) {
  * como chegou, guarda o resultado na ficha (`conferencias_link`, por nome do arquivo) e só então compacta o arquivo no lugar,
  * com o mesmo nome (compactar.js; decisão do dono em 2026-11-16: compactar depois do envio da pessoa). Das outras vezes,
  * mostra o resultado guardado (o arquivo compactado não tem mais o que a conferência olha).
+ * Segurança 44 (mutirão 3000): a conferência guardada leva o resumo SHA-256 do arquivo conferido, quem conferiu e quando
+ * (`CP.registroDaConferencia`), e a compactação guarda o resumo do arquivo novo (`R.registrarCompactacaoDoLink`). A cada
+ * abertura o arquivo é lido e o resumo de agora decide (`CP.situacaoDaConferencia`): o mesmo arquivo é conferido de novo
+ * (não depende do que está gravado), o compactado mostra a conferência guardada, e outro arquivo avisa que mudou.
  */
-const conferidos = new Map(); // "ficha|arquivo" → resultado da conferência (nesta abertura)
+const conferidos = new Map(); // "ficha|arquivo" → { estado, r (o que mostrar), reg (o guardado) } nesta abertura
 // uma de cada vez: a ficha é desenhada duas vezes seguidas (lista guardada e a da nuvem) e a conferência não pode correr dobrada
 let filaConferencia = Promise.resolve();
 function conferirArquivosDoLink(area, f) {
@@ -366,38 +370,79 @@ async function conferirEGuardar(area, f) {
   for (const li of itens) {
     const nome = li.dataset.conferir;
     const chave = `${f.id}|${nome}`;
-    if (!conferidos.has(chave) && guardadas[nome]) conferidos.set(chave, guardadas[nome]);
     if (!conferidos.has(chave)) {
       try {
-        const blob = await S.abrirArquivo(pasta, nome);
-        const r = await CP.conferirArquivo(new Uint8Array(await blob.arrayBuffer()));
-        conferidos.set(chave, r);
-        novas[nome] = { ...r, conferido_em: new Date().toISOString() };
+        const bytes = new Uint8Array(await (await S.abrirArquivo(pasta, nome)).arrayBuffer());
+        const sha256 = await CP.resumoDoArquivo(bytes);
+        const g = guardadas[nome];
+        const estado = CP.situacaoDaConferencia(g, sha256);
+        // o arquivo conferido (ou um que mudou) é olhado de novo; o compactado e o antigo (sem resumo) mostram o guardado
+        const r = ['antiga', 'compactado'].includes(estado) ? g : await CP.conferirArquivo(bytes);
+        let reg = g || null;
+        if (estado === 'nova' && opera()) {
+          reg = CP.registroDaConferencia(r, { sha256, por: login(), nome: E.usuario && E.usuario.nome });
+          novas[nome] = reg;
+        }
+        conferidos.set(chave, { estado, r, reg });
       } catch { conferidos.set(chave, null); }
     }
-    const alvo = li.querySelector('[data-sinais]');
-    const r = conferidos.get(chave);
-    if (alvo) { alvo.className = ''; alvo.innerHTML = r ? sinaisHtml(r, li.dataset.nomePessoa) : '<span class="suave">não foi possível conferir o arquivo</span>'; }
+    desenharConferencia(li, f, conferidos.get(chave));
   }
-  if (!Object.keys(novas).length || !opera()) return;
-  await alterar((db) => {
-    const atual = R.buscar(db, 'fichas', f.id);
-    if (!atual) return;
-    R.atualizar(db, 'fichas', f.id, { conferencias_link: { ...(atual.conferencias_link || {}), ...novas } }, login(),
-      `Conferência guardada de ${Object.keys(novas).length} documento(s) mandado(s) pelo link`);
-  });
-  if (R.regra('compactar_anexos')) await compactarDoLink(pasta, Object.keys(novas));
+  if (!Object.keys(novas).length) return;
+  await alterar((db) => R.guardarConferenciasDoLink(db, f.id, novas, login()));
+  if (R.regra('compactar_anexos')) await compactarDoLink(pasta, f.id, Object.keys(novas));
 }
 
-/** Compacta no lugar (mesmo nome) os documentos do link já conferidos. Ex.: foto do RG de 4 MB → ~400 KB. */
-async function compactarDoLink(pasta, nomes) {
-  let antes = 0; let depois = 0; let n = 0;
+/** Escreve na linha do documento o resultado da conferência e o registro (quem conferiu, quando, se o arquivo mudou). */
+function desenharConferencia(li, f, c) {
+  const alvo = li.querySelector('[data-sinais]');
+  if (!alvo) return;
+  alvo.className = '';
+  // arquivo que mudou: também o que a conferência guardada viu no de antes (trocar um PDF montado por outro não apaga o alerta)
+  const antes = c && c.estado === 'mudou' && c.reg ? `<br><span class="suave"><b>No arquivo conferido antes:</b></span><br>${sinaisHtml(c.reg, li.dataset.nomePessoa)}` : '';
+  alvo.innerHTML = c ? `${registroHtml(f, li.dataset.conferir, c)}${sinaisHtml(c.r, li.dataset.nomePessoa)}${antes}` : '<span class="suave">não foi possível conferir o arquivo</span>';
+}
+
+/** "17/11/2026 14:05" de um instante ISO. */
+const quandoBr = (iso) => C.dataHoraBr(iso).slice(0, 17).replace(', ', ' ');
+
+/** Linha do registro: "conferido por Fulano em 17/11/2026 14:05", a compactação depois, ou o aviso de arquivo que mudou. */
+function registroHtml(f, nome, { estado, reg }) {
+  if (!reg) return estado === 'nova' ? '<span class="suave">conferido agora (seu usuário só consulta: a conferência não fica guardada)</span><br>' : '';
+  const quem = reg.conferido_por_nome || reg.conferido_por;
+  const porTexto = `conferido${quem ? ` por ${quem}` : ''}${reg.conferido_em ? ` em ${quandoBr(reg.conferido_em)}` : ''}`;
+  const por = esc(porTexto);
+  if (estado === 'mudou') {
+    return `${etiqueta('⚠ o arquivo mudou depois da conferência', 'perigo')} <span class="suave">${por}${reg.compactado_em ? ` (compactado em ${quandoBr(reg.compactado_em)})` : ''}; o arquivo de hoje não é o que foi conferido, e a conferência guardada não vale para ele. Abaixo, o que se vê no arquivo de agora e no de antes.</span>
+      ${opera() ? botao('conferirDeNovoFicha', 'Conferir de novo', { id: f.id, nome }, 'secundario mini', `Guardar a conferência do arquivo de agora no lugar da antiga (de ${quandoBr(reg.conferido_em)})?`) : ''}<br>`;
+  }
+  if (estado === 'antiga') return `<span class="suave">${por} (conferência de antes do registro do arquivo: não dá para saber se o arquivo mudou depois)</span><br>`;
+  const compactado = estado === 'compactado' ? ` · compactado depois${reg.compactado_em ? ` em ${quandoBr(reg.compactado_em)}` : ''} (o resultado abaixo é o do arquivo como chegou)` : '';
+  return `${etiqueta(`✓ ${porTexto}`, 'ok')} <span class="suave">${compactado}</span><br>`;
+}
+
+/**
+ * Compacta no lugar (mesmo nome) os documentos do link já conferidos. Ex.: foto do RG de 4 MB → ~400 KB.
+ * Antes de trocar cada arquivo, guarda na conferência o resumo do compactado (sem isso a ficha acusaria "o arquivo mudou").
+ */
+async function compactarDoLink(pasta, fichaId, nomes) {
+  const prontos = [];
   for (const nome of nomes) {
     try {
       const c = await CPT.compactarAnexo(await S.lerConteudo(await pasta.getFileHandle(nome)), { manterNome: true });
-      if (!c.mudou) continue;
+      if (c.mudou) prontos.push({ nome, c, sha256: await CP.resumoDoArquivo(new Uint8Array(await c.arquivo.arrayBuffer())) });
+    } catch (e) { console.warn(`Compactar "${nome}" da ficha: ${e.message}`); }
+  }
+  if (!prontos.length) return;
+  const em = new Date().toISOString();
+  await alterar((db) => R.registrarCompactacaoDoLink(db, fichaId, Object.fromEntries(prontos.map((p) => [p.nome, p.sha256])), login(), em));
+  let antes = 0; let depois = 0; let n = 0;
+  for (const { nome, c, sha256 } of prontos) {
+    try {
       await S.escreverTexto(pasta, nome, c.arquivo);
       antes += c.antes; depois += c.depois; n += 1;
+      const vista = conferidos.get(`${fichaId}|${nome}`);
+      if (vista && vista.reg) conferidos.set(`${fichaId}|${nome}`, { ...vista, estado: 'compactado', reg: CP.comCompactacao(vista.reg, sha256, em) });
     } catch (e) { console.warn(`Compactar "${nome}" da ficha: ${e.message}`); }
   }
   if (n) aviso(`${n} documento(s) do link compactado(s) depois da conferência: de ${tamanhoMb(antes)} para ${tamanhoMb(depois)}.`, 'info');
@@ -405,7 +450,9 @@ async function compactarDoLink(pasta, nomes) {
 const tamanhoMb = (b) => `${(b / 1048576).toFixed(1).replace('.', ',')} MB`;
 
 /** Sinais da conferência de um arquivo: alertas (editor), atenção, informação e as assinaturas (com o nome da ficha). */
-function sinaisHtml(r, nomePessoa) {
+function sinaisHtml(conferencia, nomePessoa) {
+  // a guardada vem do banco: sem as listas (gravação antiga ou mexida), mostra como vazia em vez de quebrar a tela
+  const r = { ...conferencia, sinais: Array.isArray(conferencia && conferencia.sinais) ? conferencia.sinais : [], assinaturas: Array.isArray(conferencia && conferencia.assinaturas) ? conferencia.assinaturas : [] };
   const cor = { alerta: 'perigo', atencao: 'aviso', info: 'neutra' };
   const titulo = { alerta: '⚠ possível montagem', atencao: 'atenção', info: 'impresso de página' };
   const out = r.sinais.map((s) => `<span class="etiqueta ${cor[s.nivel]}" title="${esc(s.texto)}">${titulo[s.nivel]}</span> <span class="suave">${esc(s.texto)}</span>`);
@@ -478,6 +525,13 @@ async function janelaDoLink(f, pessoa, link, { lembrete = false, faltando = [] }
 
 /** Botão "Aprovar" da página da ficha (operador ou administrador). */
 export const ACOES_FICHAS = {
+  /** Documento do link que mudou depois da conferência: tira a guardada e confere (e guarda) o arquivo de agora. */
+  async conferirDeNovoFicha({ id, nome }) {
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode conferir de novo.');
+    await alterar((db) => R.refazerConferenciaDoLink(db, Number(id), nome, login()));
+    conferidos.delete(`${Number(id)}|${nome}`);
+    await mostrar();
+  },
   /** Cria o link da pessoa na nuvem (com a ficha em PDF para baixar), guarda na ficha e mostra para copiar ou mandar. */
   async gerarLinkFicha({ id, pessoa }) {
     if (!opera()) throw new C.ErroUsuario('Seu usuário não pode gerar o link da ficha.');

@@ -244,7 +244,7 @@ export const ehDoLink = (nome) => /^link-/.test(nome);
  * Mesmo nome = o lançamento continua apontando para ele e o arquivo impresso não acusa "arquivo trocado".
  * Documento mandado pelo link da ficha só entra depois de conferido (a conferência fica guardada na ficha; antes disso o
  * arquivo precisa ficar como chegou): `conferido(pastaDaFicha, nome)` diz se já foi.
- * `ler(handle)` → File, `gravar(dir, nome, File)`; `aoAndar({ feitos, total, compactados, economia })`.
+ * `ler(handle)` → File, `gravar(dir, nome, File, partes)` (`partes`: as pastas desde `raiz`, ex.: ['Fichas em analise', 'Ana']); `aoAndar({ feitos, total, compactados, economia })`.
  * Devolve { vistos, compactados, antes, depois, falhas }.
  */
 export async function compactarTodos(raiz, { ler, gravar, compactar = compactarAnexo, conferido = () => false, aoAndar = () => {} }) {
@@ -254,7 +254,7 @@ export async function compactarTodos(raiz, { ler, gravar, compactar = compactarA
       if (h.kind === 'directory') { await juntar(h, [...partes, nome]); continue; }
       if (partes[0] === PASTA_FICHAS && ehDoLink(nome) && !conferido(partes[1], nome)) continue;
       const tamanho = h.tamanho ?? (await h.getFile()).size;
-      if (candidato(nome, tamanho)) lista.push({ dir, nome, h });
+      if (candidato(nome, tamanho)) lista.push({ dir, nome, h, partes });
     }
   };
   await juntar(raiz, []);
@@ -263,14 +263,14 @@ export async function compactarTodos(raiz, { ler, gravar, compactar = compactarA
   lote = { feitos: 0, total: lista.length, compactados: 0, economia: 0 };
   try {
     for (let i = 0; i < lista.length; i += 1) {
-      const { dir, nome, h } = lista[i];
+      const { dir, nome, h, partes } = lista[i];
       lote.feitos = i;
       avisarAndamento(`"${nome}"`);
       try {
         const f = await ler(h);
         const c = await compactar(f, { manterNome: true });
         if (c.mudou) {
-          await gravar(dir, nome, c.arquivo);
+          await gravar(dir, nome, c.arquivo, partes);
           r.compactados += 1; r.antes += c.antes; r.depois += c.depois;
         }
       } catch (e) {

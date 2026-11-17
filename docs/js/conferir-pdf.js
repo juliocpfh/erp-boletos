@@ -219,3 +219,38 @@ export function mesmoNome(a, b) {
   // pelo menos duas palavras em comum (uma só vale apenas quando os dois nomes têm uma palavra) e todas as do mais curto
   return comuns >= (x.length === 1 && y.length === 1 ? 1 : 2) && (x.every((p) => y.includes(p)) || y.every((p) => x.includes(p)));
 }
+
+// Registro da conferência (mutirão 3000, segurança 44): a conferência guardada na ficha (`fichas.conferencias_link`) leva o
+// resumo SHA-256 do arquivo conferido, quem conferiu e quando; a compactação (que vem depois e troca o arquivo) guarda o
+// resumo do arquivo novo. Ao abrir a ficha, o resumo do arquivo de agora diz se a conferência ainda vale para ele.
+
+/** Resumo SHA-256 dos bytes (64 letras de 0-9 e a-f): muda se mudar qualquer byte do arquivo. */
+export async function resumoDoArquivo(entrada) {
+  const bytes = entrada instanceof Uint8Array ? entrada : new Uint8Array(entrada);
+  const h = new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', bytes));
+  return Array.from(h, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** O que fica guardado de uma conferência: o resultado e o resumo do arquivo, quem conferiu (login e nome) e quando. */
+export function registroDaConferencia(resultado, { sha256, por, nome = '', em = new Date().toISOString() }) {
+  return { ...resultado, sha256, conferido_por: por || '', conferido_por_nome: nome || '', conferido_em: em };
+}
+
+/**
+ * A conferência guardada diante do arquivo de agora (resumo `sha256`):
+ * 'nova' (não há conferência), 'antiga' (guardada antes do resumo: não dá para saber se o arquivo mudou),
+ * 'mesmo' (é o arquivo conferido), 'compactado' (é o que a compactação gravou depois da conferência) ou
+ * 'mudou' (não é nem o conferido nem o compactado: a conferência guardada não vale para ele).
+ */
+export function situacaoDaConferencia(guardada, sha256) {
+  if (!guardada || typeof guardada !== 'object') return 'nova';
+  if (!guardada.sha256) return 'antiga';
+  if (sha256 && sha256 === guardada.sha256) return 'mesmo';
+  if (sha256 && sha256 === guardada.sha256_compactado) return 'compactado';
+  return 'mudou';
+}
+
+/** A conferência com a compactação anotada: resumo do arquivo compactado e quando. A do original continua guardada. */
+export function comCompactacao(guardada, sha256, em = new Date().toISOString()) {
+  return { ...guardada, sha256_compactado: sha256, compactado_em: em };
+}
