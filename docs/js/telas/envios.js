@@ -739,5 +739,7 @@ export async function confirmarPagamentoBoleto(id, f) {
   else aviso(r.pontual ? `Pagamento em dia confirmado${pagouEmDia ? ' (sem multa e juros)' : ''}. Data da NF: ${dataBr(data)}. Valor da nota: ${reais(r.valor_nf)}.`
     : `Pagamento com ${r.dias_atraso} dia(s) de atraso: multa ${reais(r.multa)} e juros ${reais(r.juros)}. Valor da nota: ${reais(r.valor_nf)} (com multa e juros). Data da NF: ${dataBr(data)}.`, r.pontual ? 'ok' : 'aviso');
   avisarImovelSemEmpresa(pago);
+  // pago à mão com o boleto ainda aberto no C6: o inquilino pode pagar de novo (ou ser negativado já tendo pago)
+  if (pago && pago.banco && pago.banco.situacao === 'emitido' && !pago.pagamento_c6) aviso('Atenção: este boleto continua em aberto no C6. Se o pagamento foi por fora do boleto (Pix direto, dinheiro), cancele no banco na página do boleto ("Cancelar no banco"); se foi pelo boleto, use "Consultar situação no banco".', 'aviso');
   await mostrar();
 }

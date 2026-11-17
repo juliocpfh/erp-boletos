@@ -19,7 +19,7 @@ function base() {
 
 function comContas(d, ank, jck) {
   R.salvarContaBanco(d, { id: 'ANK', apelido: 'ANK', emitente_id: ank.id, ambiente: 'sandbox', chave_pix: 'chave-aleatoria-ank', dias_baixa: 30, instrucoes: 'Após o vencimento, pagar só pelo Pix' }, 'teste');
-  R.salvarContaBanco(d, { id: 'jck', apelido: 'JCK', emitente_id: jck.id, ambiente: 'producao', chave_pix: '', dias_baixa: 0, notificar_email: '1', notificar_sms: '', notificar_emissao: '1', notificar_antes: '', notificar_vencimento: '', notificar_depois: '' }, 'teste');
+  R.salvarContaBanco(d, { id: 'jck', apelido: 'JCK', emitente_id: jck.id, ambiente: 'producao', chave_pix: '', dias_baixa: 1, notificar_email: '1', notificar_sms: '', notificar_emissao: '1', notificar_antes: '', notificar_vencimento: '', notificar_depois: '' }, 'teste');
   R.salvarConfigBanco(d, { ativo: true }, 'teste');
 }
 
@@ -137,11 +137,20 @@ test('pedidoBoletoC6: valor cheio, desconto até o vencimento, multa e juros em 
   assert.equal(p.payer_notification.length, 8);
   assert.deepEqual(p.payer_notification[0], { channel: 'EMAIL', destination: 'maria@exemplo.com.br', notification_date: 'ISSUE_DATE' });
   assert.deepEqual(p.payer_notification[4], { channel: 'SMS', destination: '41999990000', notification_date: 'ISSUE_DATE' });
-  // conta JCK: sem Pix, carteira 15, só e-mail na emissão, não baixa sozinho
+  // conta JCK em produção: com desconto, só depois de conferir o tipo num boleto de teste (trava de 16/11/2026, VALUE_PER_DAY)
+  assert.throws(() => R.pedidoBoletoC6(d, cb, R.contaBanco(d, 'jck'), ref), /não foi conferido num boleto de teste/);
+  R.salvarContaBanco(d, { id: 'jck', emitente_id: jck.id, desconto_conferido_campo: '1', desconto_conferido: '1' }, 'teste');
+  assert.equal(R.contaBanco(d, 'jck').desconto_conferido.tipo, 'VALUE_PER_DAY');
+  // conta JCK: sem Pix, carteira 15, só e-mail na emissão, prazo mínimo de 1 dia depois do vencimento (0 é recusado)
   const p2 = R.pedidoBoletoC6(d, cb, R.contaBanco(d, 'jck'), ref);
   assert.equal(p2.payment_method.pix, undefined);
   assert.equal(p2.payment_method.bank_slip.billing_scheme, '15');
-  assert.equal(p2.days_after_due_date, 0);
+  assert.equal(p2.days_after_due_date, 1);
+  assert.throws(() => R.salvarContaBanco(d, { id: 'jck', emitente_id: jck.id, dias_baixa: '0' }, 'teste'), /pelo menos 1/);
+  // trocar o tipo do desconto desmarca a conferência
+  R.salvarContaBanco(d, { id: 'jck', emitente_id: jck.id, tipo_desconto: 'MONTHLY_PERCENTAGE' }, 'teste');
+  assert.equal(R.contaBanco(d, 'jck').desconto_conferido, null);
+  assert.throws(() => R.pedidoBoletoC6(d, cb, R.contaBanco(d, 'jck'), ref), /não foi conferido/);
   assert.deepEqual(p2.payer_notification, [{ channel: 'EMAIL', destination: 'maria@exemplo.com.br', notification_date: 'ISSUE_DATE' }]);
   // desconto configurável: até 3 dias antes, outro tipo
   R.salvarContaBanco(d, { id: 'ank', emitente_id: ank.id, desconto_dias_antes: '3', tipo_desconto: 'MONTHLY_PERCENTAGE' }, 'teste');

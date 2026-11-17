@@ -286,7 +286,9 @@ test('site: extrato, comprovante e listas de boletos esperam 5 minutos pela pont
   for (const c of ['/extrato?de=2026-01-01&ate=2026-12-31', 'extrato', '/boletos/pagos?de=2026-11-01&ate=2026-11-30&por=payment_date', '/boletos?due_date_from=2026-11-01&due_date_to=2026-11-30', '/boletos', '/comprovante/01ABC?data=2026-11-03&formato=json']) {
     assert.equal(B.tempoLimiteDaRota('GET', c), longo, c);
   }
-  for (const [m, c] of [['GET', '/boletos/B0001'], ['GET', '/boletos/B0001/pdf'], ['POST', '/boletos'], ['POST', '/boletos/B0001/cancelar'], ['GET', '/saldo'], ['GET', '/saude'], ['GET', '/dda'], ['POST', '/pagamentos/decodificar'], ['GET', '/pagamentos/G1/itens'], ['GET', '/notificacoes?desde=2026-11-01']]) {
+  // emissão e alteração: 90 s (a ponte espera o token, a conferência de repetição e o banco, 25 s cada)
+  for (const c of ['/boletos', '/boletos/B0001/alterar']) assert.equal(B.tempoLimiteDaRota('POST', c), 90000, `POST ${c}`);
+  for (const [m, c] of [['GET', '/boletos/B0001'], ['GET', '/boletos/B0001/pdf'], ['POST', '/boletos/B0001/cancelar'], ['GET', '/saldo'], ['GET', '/saude'], ['GET', '/dda'], ['POST', '/pagamentos/decodificar'], ['GET', '/pagamentos/G1/itens'], ['GET', '/notificacoes?desde=2026-11-01']]) {
     assert.equal(B.tempoLimiteDaRota(m, c), 30000, `${m} ${c}`);
   }
 });

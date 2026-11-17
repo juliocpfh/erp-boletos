@@ -257,12 +257,20 @@ const avisoSemPix = (conta, banco) => (conta && conta.chave_pix && !banco.pix_co
 
 /** Chama a ponte e grava a resposta no boleto; em falha do banco, grava o erro no boleto e repassa a mensagem. */
 async function emitirNoC6(cb, conta) {
+  // confere o pedido antes de marcar a emissão (erro do cadastro não deixa nada pendente)
+  R.pedidoBoletoC6(d(), cb, conta);
+  // grava a emissão pendente ANTES de chamar a ponte: outra aba/pessoa não emite o mesmo boleto, e a nova tentativa usa a mesma referência
+  const { referencia, repetir } = await alterar((db) => R.iniciarEmissaoBancaria(db, cb.id, conta, login()));
   let r;
   try {
-    r = await BANCO.emitirBoleto(d(), cb, conta);
+    r = await BANCO.emitirBoleto(d(), buscar('cobrancas', cb.id), conta, { referencia, repetir });
   } catch (e) {
-    // recusa do banco ou da ponte (não falta de conexão): fica registrada no boleto
-    if (e instanceof BANCO.ErroPonte && e.status) await alterar((db) => R.registrarErroBancario(db, cb.id, e.message, login(), { conta_id: conta.id, ambiente: conta.ambiente }));
+    if (e instanceof BANCO.ErroPonte) {
+      // sem resposta certa: o boleto PODE ter sido emitido; a pendência fica e o botão vira "Conferir no banco"
+      const incerto = BANCO.emissaoIncerta(e);
+      await alterar((db) => R.registrarErroBancario(db, cb.id, e.message, login(), { conta_id: conta.id, ambiente: conta.ambiente, incerto }));
+      if (incerto) throw new C.ErroUsuario(`Sem resposta certa do banco: o boleto pode ter sido emitido. Não emita no site do banco. Clique em "Conferir no banco" na página do boleto: o sistema usa a mesma referência e não cria outro boleto. (${e.message})`);
+    } else await alterar((db) => R.desistirDaEmissao(db, cb.id, login()));
     throw e;
   }
   return alterar((db) => R.registrarBoletoBancario(db, cb.id, r.resposta, login(), { conta_id: conta.id, ambiente: r.resposta.ambiente || conta.ambiente }));
@@ -2013,6 +2021,7 @@ export const ACOES = {
     for (const [k, v] of Object.entries(c.notificar || {})) if (form.elements[`notificar_${k}`]) form.elements[`notificar_${k}`].checked = !!v;
     if (form.elements.negativacao_ativa) form.elements.negativacao_ativa.checked = !!(c.negativacao && c.negativacao.ativa);
     if (form.elements.negativacao_dias && c.negativacao) form.elements.negativacao_dias.value = c.negativacao.dias_atraso;
+    if (form.elements.desconto_conferido) form.elements.desconto_conferido.checked = !!(c.desconto_conferido && c.desconto_conferido.tipo === c.tipo_desconto);
     form.elements.id.focus();
     det.scrollIntoView({ block: 'start' });
   },

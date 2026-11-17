@@ -20,8 +20,20 @@ const TEMPO_LIMITE_MS = 30000;
 export const TEMPO_LIMITE_LONGO_MS = 5 * 60000;
 const ROTAS_DEMORADAS = /^\/(extrato|boletos\/pagos|boletos|comprovante\/[^/?]+)\/?(\?|$)/;
 
-/** Tempo de espera padrão de uma rota da conta: 5 minutos nas consultas de extrato, comprovante e listas de boletos; 30 s no resto. */
-export const tempoLimiteDaRota = (metodo, caminho) => (String(metodo).toUpperCase() === 'GET' && ROTAS_DEMORADAS.test(`/${String(caminho).replace(/^\/+/, '')}`) ? TEMPO_LIMITE_LONGO_MS : TEMPO_LIMITE_MS);
+/**
+ * Emissão e alteração: a ponte pode levar até 25 s pelo token, 25 s para conferir se o boleto já existe (nova tentativa) e 25 s pelo
+ * pedido. Desistir em 30 s deixava o banco emitir sem o site gravar nada.
+ */
+export const TEMPO_LIMITE_EMISSAO_MS = 90000;
+
+/** Tempo de espera padrão de uma rota da conta: 5 minutos nas consultas de extrato, comprovante e listas de boletos; 90 s na emissão; 30 s no resto. */
+export const tempoLimiteDaRota = (metodo, caminho) => {
+  const m = String(metodo).toUpperCase();
+  const c = `/${String(caminho).replace(/^\/+/, '')}`;
+  if (m === 'GET' && ROTAS_DEMORADAS.test(c)) return TEMPO_LIMITE_LONGO_MS;
+  if (m === 'POST' && /^\/boletos(\/[^/?]+\/alterar)?\/?(\?|$)/.test(c)) return TEMPO_LIMITE_EMISSAO_MS;
+  return TEMPO_LIMITE_MS;
+};
 
 /**
  * Endereço e senha da ponte DESTE navegador (IndexedDB, como o atalho da pasta): o JSON compartilhado na pasta/OneDrive não leva
@@ -110,7 +122,8 @@ export async function chamarPonteCrua(metodo, caminho, corpo = null, opcoes = {}
   try { dados = texto ? JSON.parse(texto) : null; } catch { dados = { erro: texto.slice(0, 300) }; }
   if (!resposta.ok) {
     const msg = (dados && (dados.erro || dados.mensagem || dados.message)) || `A ponte respondeu com erro ${resposta.status}.`;
-    if (resposta.status === 401 || resposta.status === 403) throw new ErroPonte('A ponte recusou a senha. Confira a senha da ponte em Dados e backup (Banco C6) e no .env da ponte.', { status: resposta.status, detalhes: dados });
+    // só o 401 é a senha da ponte; o 403 da ponte traz o motivo dele (ex.: rotas de pagamento desligadas)
+    if (resposta.status === 401) throw new ErroPonte('A ponte recusou a senha. Confira a senha da ponte em Dados e backup (Banco C6) e no .env da ponte.', { status: resposta.status, detalhes: dados });
     throw new ErroPonte(msg, { status: resposta.status, detalhes: dados });
   }
   return dados;
@@ -135,13 +148,17 @@ export const saudeConta = (d, contaId, opcoes = {}) => { void d; return chamarPo
  * Emite o boleto com Pix no banco pela conta escolhida. Devolve ``{ pedido, resposta, conta }``: a resposta crua do banco (a tela
  * grava com ``R.registrarBoletoBancario``). Não grava nada aqui.
  */
-export async function emitirBoleto(d, cb, conta, opcoes = {}) {
+export async function emitirBoleto(d, cb, conta, { referencia = null, repetir = false, ...opcoes } = {}) {
   if (!pontePronta(d)) throw new Error(motivoIndisponivel(d));
   if (R.emitidoNoBanco(cb)) throw new Error('Este boleto já foi emitido no banco. Cancele no banco antes de emitir de novo.');
-  const pedido = R.pedidoBoletoC6(d, cb, conta);
-  const resposta = await chamarPonte(conta.id, 'POST', '/boletos', pedido, opcoes);
+  const pedido = referencia ? R.pedidoBoletoC6(d, cb, conta, referencia) : R.pedidoBoletoC6(d, cb, conta);
+  // ``repetir``: nova tentativa com a mesma referência; a ponte confere no banco antes e devolve o boleto que já existir
+  const resposta = await chamarPonte(conta.id, 'POST', '/boletos', repetir ? { ...pedido, repetir: true } : pedido, opcoes);
   return { pedido, resposta, conta };
 }
+
+/** Falha da emissão sem resposta certa (o boleto PODE ter sido emitido): a ponte não respondeu, o tempo acabou ou a ponte avisou. */
+export const emissaoIncerta = (e) => e instanceof ErroPonte && (!e.status || e.status === 504 || !!(e.detalhes && e.detalhes.detalhes && e.detalhes.detalhes.incerto));
 
 const idNoBanco = (cb) => {
   const id = cb.banco && (cb.banco.id_externo || cb.banco.id_banco);
