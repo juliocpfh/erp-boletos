@@ -573,7 +573,8 @@ function ligarPoupancaDaGarantia(raiz) {
   // troca de garantia do mesmo inquilino: os depósitos da garantia que saiu ficaram guardados na troca
   const troca = c && tabela === 'devolucoes_garantia' && buscar('trocas_garantia', new URLSearchParams(consulta).get('troca'));
   if (!c || !(troca ? troca.devolucao_movimentos : R.temCaucao(c) || R.temDeposito(c))) return;
-  const movimentos = troca ? troca.devolucao_movimentos : R.movimentosGarantia(d(), c);
+  // garantia combinada e nunca depositada: nada rende (o valor a devolver vem zerado)
+  const movimentos = troca ? troca.devolucao_movimentos : R.garantiaRecebida(d(), c) > 0 ? R.movimentosGarantia(d(), c) : [];
   const dataEl = form.querySelector('[name=data]');
   let pedido = 0;
   let trazido = null; // % que veio do Banco Central: troca quando a data muda, salvo se o usuário digitou outro

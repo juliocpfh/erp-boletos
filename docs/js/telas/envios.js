@@ -492,12 +492,17 @@ export const FORMULARIOS = {
     const justificativa = String(f.get('justificativa') || '').trim();
     const r = await alterar((db) => {
       const res = R.registrarPagamento(db, p.id, p.data, p.valor, login(), { pagouEmDia: p.pagouEmDia, dataPagou: p.dataPagou, valorNf, justificativa });
+      // pagou a menos: a diferença fica devendo e vai para o próximo boleto (marcado na tela)
+      if (f.get('diferenca') === '1' && p.valor < res.valor_devido) res.diferenca = R.levarDiferencaAoProximo(db, p.id, res.valor_devido - p.valor, login());
       // veio da tela Banco (entrada do extrato com valor diferente do previsto): a movimentação fica ligada ao boleto
       if (p.movimentacao_id) Z.ligarMovimentacaoAoBoleto(db, p.movimentacao_id, p.id, login());
       return res;
     });
     memoria.pagamentoDivergente = null;
-    aviso(`Pagamento confirmado com valor diferente do previsto. Recebido ${reais(p.valor)}; NF de ${reais(valorNf)} (calculada ${reais(r.valor_nf)}). Data da NF: ${dataBr(p.data)}.`, 'aviso');
+    const dif = r.diferenca && r.diferenca.diferenca_devida;
+    const proximo = dif && r.diferenca.diferenca_no_boleto && buscar('cobrancas', r.diferenca.diferenca_no_boleto);
+    aviso(`Pagamento confirmado com valor diferente do previsto. Recebido ${reais(p.valor)}; NF de ${reais(valorNf)} (calculada ${reais(r.valor_nf)}). Data da NF: ${dataBr(p.data)}.${dif
+      ? ` Faltam ${reais(dif)}: ${proximo ? `entraram no boleto de ${compBr(proximo.competencia)}` : 'entram no próximo boleto, quando ele for gerado'}.` : ''}`, 'aviso');
     await mostrar();
   },
 

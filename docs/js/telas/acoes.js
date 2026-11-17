@@ -176,7 +176,8 @@ const TABELAS_EXCLUSAO = {
   iptus: { recalcular: (db, r) => (cb) => (R.buscar(db, 'contratos', cb.contrato_id) || {}).imovel_id === r.imovel_id },
   seguros: { recalcular: (db, r) => (cb) => cb.contrato_id === r.contrato_id },
   avulsas: { checar: (db, r) => (R.faturasDe(db, 'avulsa', r.id).length ? 'Esta NF avulsa já tem número.' : null) },
-  encerramentos: { admin: true },
+  // desfazer o cálculo final: os boletos que ele descontava da garantia voltam a ser cobrados
+  encerramentos: { admin: true, depois: (db, reg) => R.liberarBoletosDaSaida(db, reg.id, login()) },
   vistorias: { admin: true, voltar: (r) => `#/contrato/${r.contrato_id}?ir=documentos` },
   aditivos: { depois: (db, r) => R.marcarAditivos(db, r.contrato_id, login()), voltar: (r) => `#/contrato/${r.contrato_id}?ir=aditivos` },
   fiadores: { voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },
