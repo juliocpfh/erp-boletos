@@ -31,6 +31,8 @@ export function canon(v) {
  */
 const igual = (a, b) => a === b || JSON.stringify(a) === JSON.stringify(b) || canon(a) === canon(b);
 const ehTabela = (v) => Array.isArray(v) && v.every((r) => r && typeof r === 'object' && Number.isSafeInteger(r.id));
+/** Quantas recusas guardadas são olhadas para achar a causa de uma recusa "não existe" (item 44). */
+const RECUSAS_PARA_CAUSA = 20;
 /** Intervalo (ms) em que várias gravações seguidas (duplo clique, arrumações do Painel) vão numa sincronia só. */
 export const AGRUPAR_ENVIO = 300;
 /**
@@ -155,19 +157,48 @@ const ehContador = (o) => o.op === 'raiz' && CONTADORES.includes(o.campo);
  * do lote (o histórico continua na ordem), e as partes vão uma depois da outra. O corte depende só do lote, então reenviar dá
  * as mesmas partes com os mesmos códigos (`<lote>-p1`, `-p2`…) e a nuvem reconhece as que já recebeu. O número da NF
  * (contador) vai sempre na 1ª parte: se ele for recusado (outro aparelho usou o número), nada do resto foi aplicado.
+ * Histórico (item 30 do mutirão 3000): cada linha vai na mesma parte do registro de que ela fala (se a parte for recusada,
+ * a linha não entra sem o registro, nem o registro sem a linha); a linha que não é de um registro (ex.: "Importados 1100
+ * lançamentos") vai na última, e cada parte sem nenhuma linha leva uma curta ("… (parte 1 de 3: 1000 mudanças)", sem
+ * detalhes, que o Desfazer não usa): se a última for recusada, o que entrou continua explicado no Histórico.
  */
 export function dividirLote(l, { maximo = PARTE_MAXIMA, bytes = PARTE_BYTES } = {}) {
   const pesos = l.ops.map((o) => JSON.stringify(o).length);
   if (l.ops.length <= maximo && pesos.reduce((s, p) => s + p, 0) <= bytes) return [l];
-  const ordem = [...l.ops.keys()].sort((a, b) => Number(ehContador(l.ops[b])) - Number(ehContador(l.ops[a])) || a - b);
+  // grupos: cada mudança de registro com as linhas do histórico dele; as linhas soltas, num grupo no fim
+  const grupos = []; const doRegistro = new Map(); const soltas = [];
+  for (const [i, o] of l.ops.entries()) {
+    if (o.op === 'historico') continue;
+    const g = { ops: [i], contador: ehContador(o), ordem: i };
+    grupos.push(g);
+    if (o.op !== 'raiz') doRegistro.set(`${o.tabela}:${o.id}`, g);
+  }
+  for (const [i, o] of l.ops.entries()) {
+    if (o.op !== 'historico') continue;
+    const g = doRegistro.get(`${o.entrada?.tabela}:${o.entrada?.registro_id}`);
+    if (g) g.ops.push(i); else soltas.push(i);
+  }
+  grupos.sort((a, b) => Number(b.contador) - Number(a.contador) || a.ordem - b.ordem);
+  for (const i of soltas) grupos.push({ ops: [i] }); // cada linha solta cabe em qualquer parte (no fim, na ordem)
   const partes = []; let atual = []; let peso = 0;
-  for (const i of ordem) {
-    if (atual.length && (atual.length >= maximo || peso + pesos[i] > bytes)) { partes.push(atual); atual = []; peso = 0; }
-    atual.push(l.ops[i]); peso += pesos[i];
+  for (const g of grupos) {
+    const pg = g.ops.reduce((s, i) => s + pesos[i], 0);
+    if (atual.length && (atual.length + g.ops.length > maximo || peso + pg > bytes)) { partes.push(atual); atual = []; peso = 0; }
+    atual.push(...g.ops); peso += pg;
   }
   if (atual.length) partes.push(atual);
-  return partes.map((ops, i) => ({ id: `${l.id}-p${i + 1}`, ops, em: l.em, ...(l.base !== undefined ? { base: l.base } : {}) }));
+  const n = partes.length;
+  const ultima = l.ops.filter((o) => o.op === 'historico').at(-1)?.entrada;
+  return partes.map((idx, k) => {
+    const ops = idx.map((i) => l.ops[i]);
+    // parte sem nenhuma linha do histórico (ex.: importação gravada sem linha por registro): uma linha curta
+    if (ultima && n > 1 && !ops.some((o) => o.op === 'historico')) {
+      ops.push({ op: 'historico', entrada: { quando: ultima.quando, usuario: ultima.usuario, acao: 'Gravação em partes', descricao: `${ultima.descricao || ultima.acao || 'Gravação'} (parte ${k + 1} de ${n}: ${ops.length} mudança(s))` } });
+    }
+    return { id: `${l.id}-p${k + 1}`, ops, em: l.em, ...(l.base !== undefined ? { base: l.base } : {}) };
+  });
 }
+
 
 /** Faixas de códigos de duas cópias (memória e aparelho): por tabela vale a mais nova (fim maior) e, na mesma, a mais adiantada. */
 export function juntarFaixas(a = {}, b = {}) {
@@ -219,7 +250,8 @@ export const erroDeRede = (e) => new ErroNuvem(e?.name === 'TimeoutError' ? 'A n
 /** Registros e campos que os lotes deste aparelho mexem (para separar o que volta da nuvem do que é de outro). */
 function chavesDosLotes(lotes) {
   const chaves = new Set(); let historico = 0;
-  for (const l of lotes) for (const o of l.ops) {
+  // como vão à nuvem (lote grande em partes ganha uma linha do histórico por parte)
+  for (const l of lotes.flatMap((x) => dividirLote(x))) for (const o of l.ops) {
     if (o.op === 'historico') historico += 1;
     else if (o.op === 'raiz') chaves.add(`raiz:${o.campo}`);
     else chaves.add(`${o.tabela}:${o.id}`);
@@ -387,7 +419,9 @@ export class Sincronia {
    */
   async enviarAjustes() {
     if (!this.base) return 0;
-    const ops = diferencas(this.montar(), this.atual()).filter((o) => !ehContador(o));
+    // fila vazia: o "como está na nuvem" é a própria base (diferencas só lê), sem copiar o banco inteiro (desempenho, item 13)
+    const naNuvem = this.pendentes.length ? this.montar() : { ...this.base, seq: this.seqDaVista() };
+    const ops = diferencas(naNuvem, this.atual()).filter((o) => !ehContador(o));
     if (!ops.length) return 0;
     await this.enfileirar(ops);
     this.enviarDepois();
@@ -696,11 +730,19 @@ export class Sincronia {
     await this.trava(async () => {
       const lista = (await this.guardar.ler('recusas')) || this.recusas;
       const ja = new Set(lista.map((r) => r.id || r.lote));
+      // registros criados por partes recusadas (agora ou nas últimas recusas guardadas): a mudança seguinte num deles é recusada
+      // com "não existe" por causa daquela, e a tela mostra as duas juntas (item 44 do mutirão 3000)
+      const criadosPor = new Map();
+      const anotar = (id, ops) => { for (const o of ops || []) if (o.op === 'inserir') criadosPor.set(`${o.tabela}:${o.id}`, id); };
+      for (const r of lista.slice(-RECUSAS_PARA_CAUSA)) anotar(r.id || r.lote, await this.guardar.ler(`recusa:${r.id || r.lote}`));
       for (const { lote, parte, erro } of recusadas) {
+        const naoExiste = String(erro).match(/^Registro (\S+) (\d+) não existe/);
+        const causa = naoExiste ? criadosPor.get(`${naoExiste[1]}:${naoExiste[2]}`) : undefined;
+        anotar(parte.id, parte.ops);
         if (ja.has(parte.id)) continue;
         ja.add(parte.id);
         await this.guardar.gravar(`recusa:${parte.id}`, parte.ops);
-        lista.push({ id: parte.id, lote: lote.id, em: lote.em, erro, mudancas: parte.ops.length });
+        lista.push({ id: parte.id, lote: lote.id, em: lote.em, erro, mudancas: parte.ops.length, ...(causa && causa !== parte.id ? { causa } : {}) });
       }
       this.recusas = lista;
       await this.guardar.gravar('recusas', lista);

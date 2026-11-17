@@ -82,7 +82,7 @@ export async function telaConflitos() {
     </div>
     ${recusas.length ? `<div class="caixa"><h2>Mudanças recusadas pela nuvem</h2>
       <p class="suave">Estas gravações feitas neste aparelho não foram aceitas e não valem (a tela já voltou ao que vale). Veja o que eram e o motivo; refaça o que ainda precisar. "Baixar" guarda o detalhe num arquivo.</p>
-      ${recusas.map((r) => `<div class="cartao"><p><b>${esc(quando(r.em))}</b> · ${Number(r.mudancas) || 0} mudança(s)<br>Motivo: <b>${esc(r.erro)}</b></p>
+      ${recusas.map((r) => `<div class="cartao"><p><b>${esc(quando(r.em))}</b> · ${Number(r.mudancas) || 0} mudança(s)<br>Motivo: <b>${esc(r.erro)}</b>${r.causa ? `<br>Isto aconteceu porque a gravação de ${esc(quando((recusas.find((x) => x.id === r.causa) || {}).em) || 'antes')} também foi recusada: ela criava o registro que esta mudava. Refaça aquela primeiro.` : ''}</p>
         ${resumoDaRecusa(r.ops)}
         <div class="acoes">${r.ops ? botao('baixarRecusa', 'Baixar', { id: r.id }, 'secundario pequeno') : ''} ${botao('esquecerRecusa', 'Esquecer', { id: r.id }, 'secundario pequeno')}</div></div>`).join('')}
       ${recusas.length > 1 ? botao('esquecerRecusas', 'Esquecer todas', {}, 'secundario', 'Esquecer todas as mudanças recusadas? Elas não estão na nuvem e somem deste aparelho.') : ''}</div>` : ''}
