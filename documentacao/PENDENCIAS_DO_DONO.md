@@ -1,6 +1,6 @@
 # O que ainda falta no sistema (e como fazer)
 
-Situação em 17/11/2026. Tudo o que foi feito até hoje está no ar (até a PR #296, mutirão 3000).
+Situação em 17/11/2026. Tudo o que foi feito até hoje está no ar (até a PR #303: mutirão 3000, Gmail por "Entrar com o Google", notificações ao inquilino, régua em Boletos e abrir a pasta no Explorer).
 
 Marque com `[x]` o que for concluindo.
 
