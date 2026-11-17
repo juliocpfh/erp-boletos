@@ -305,7 +305,8 @@ export class AnexosNuvem {
 
   /**
    * Sobe os anexos guardados sem internet. Se outro aparelho gravou um arquivo com o mesmo nome no meio tempo,
-   * este sobe com "(deste aparelho)" no nome e vira aviso (o lançamento continua apontando para o nome antigo: conferir).
+   * este sobe com "(deste aparelho)" no nome e vira aviso; `aoRenomear(pasta, antigo, novo)` acerta o nome no lançamento deste
+   * aparelho (item 22 do mutirão 3000: antes ele continuava apontando para o arquivo do outro aparelho).
    * Mas se o que está na nuvem com esse nome é o MESMO arquivo (este envio já tinha chegado e a resposta se perdeu, ou outra aba
    * deste navegador o enviou), está enviado: nada de cópia nem de aviso.
    * A fila é relida do aparelho (dentro da trava) antes de começar e a cada mudança: outra aba pode ter posto ou enviado anexos.
@@ -335,7 +336,9 @@ export class AnexosNuvem {
                 const nome = f.partes.at(-1); const ponto = nome.lastIndexOf('.');
                 const outro = ponto > 0 ? `${nome.slice(0, ponto)} (deste aparelho)${nome.slice(ponto)}` : `${nome} (deste aparelho)`;
                 await this.pedir('PUT', codificar([...f.partes.slice(0, -1), outro]), { corpo: blob });
-                this.avisos.push(`O anexo "${nome}" já existia na nuvem (outro aparelho): o deste aparelho foi guardado como "${outro}". Confira.`);
+                const acertou = this.aoRenomear ? await Promise.resolve().then(() => this.aoRenomear(f.partes.slice(0, -1), nome, outro, f.em)).catch(() => false) : false;
+                this.avisos.push(acertou ? `O anexo "${nome}" já existia na nuvem (outro aparelho): o deste aparelho foi guardado como "${outro}" e o lançamento passou a apontar para ele.`
+                  : `O anexo "${nome}" já existia na nuvem (outro aparelho): o deste aparelho foi guardado como "${outro}". Confira o lançamento.`);
               }
             } else {
               // recusado de vez (sem permissão, nome barrado…): o arquivo não se perde, fica para baixar em Conflitos

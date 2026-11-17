@@ -66,6 +66,9 @@ export async function levarParaNuvem(pasta, { anexos, sinc, aoAndar = () => {}, 
   const total = arquivos.length; const totalBytes = arquivos.reduce((s, a) => s + a.tamanho, 0);
   let feitos = 0; let bytes = 0; let pulados = 0;
   const recusados = [];
+  // arquivo com o mesmo nome e outro tamanho na nuvem (ex.: contrato assinado trocado lá): o da pasta grava por cima, porque é
+  // para ele que o banco da pasta aponta, mas a versão da nuvem fica 30 dias na lixeira (worker) e entra no relatório (item 24)
+  const trocados = [];
   let jaTem;
   try { jaTem = await naNuvem(anexos); } catch (e) {
     if (caiu(e)) throw Object.assign(new Error('A internet caiu ao ver o que já está na nuvem. Clique de novo: o que já subiu é pulado.'), { esperado: true });
@@ -75,8 +78,12 @@ export async function levarParaNuvem(pasta, { anexos, sinc, aoAndar = () => {}, 
     const caminho = a.partes.join('/');
     aoAndar({ fase: 'anexos', feitos, total, bytes, totalBytes, nome: caminho });
     try {
-      if (jaTem(a.partes.slice(0, -1)).get(a.partes.at(-1)) === a.tamanho) pulados += 1; // já subiu (passagem repetida)
-      else await anexos.pedir('PUT', codificar(a.partes), { corpo: await lerConteudo(a.handle) });
+      const naNuvemTamanho = jaTem(a.partes.slice(0, -1)).get(a.partes.at(-1));
+      if (naNuvemTamanho === a.tamanho) pulados += 1; // já subiu (passagem repetida)
+      else {
+        await anexos.pedir('PUT', codificar(a.partes), { corpo: await lerConteudo(a.handle) });
+        if (naNuvemTamanho !== undefined) trocados.push(caminho);
+      }
     } catch (e) {
       if (caiu(e)) throw Object.assign(new Error(`A internet caiu no arquivo ${caminho}. Clique de novo: o que já subiu é pulado.`), { esperado: true });
       recusados.push({ caminho, motivo: e.message });
@@ -85,10 +92,11 @@ export async function levarParaNuvem(pasta, { anexos, sinc, aoAndar = () => {}, 
     aoAndar({ fase: 'anexos', feitos, total, bytes, totalBytes, nome: caminho });
   });
   recusados.sort((x, y) => x.caminho.localeCompare(y.caminho));
+  trocados.sort();
   aoAndar({ fase: 'dados', feitos, total, bytes, totalBytes, nome: ARQUIVO_BANCO });
   await sinc.importar(dados, { substituir });
   aoAndar({ fase: 'conferencia', feitos, total, bytes, totalBytes, nome: '' });
-  return { ...(await conferir(dados, arquivos, { anexos, sinc })), total, totalBytes, pulados, recusados };
+  return { ...(await conferir(dados, arquivos, { anexos, sinc })), total, totalBytes, pulados, recusados, trocados };
 }
 
 /** Confere a nuvem contra a pasta: cada tabela e campo do banco, e cada arquivo (nome e tamanho). */

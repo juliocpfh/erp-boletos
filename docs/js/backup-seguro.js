@@ -10,6 +10,12 @@ import { hojeIso } from './calculos.js';
 
 export const ARQUIVO_CHAVE = 'chave-do-backup.json';
 export const PASTA_DIARIO = 'copias-diarias';
+/**
+ * Cópia de cada hora em que houve gravação (a 1ª da hora, que não é trocada depois), guardada `dias_copias_backup` dias
+ * (padrão 2): uma exclusão errada às 15h troca a cópia do dia pela ruim, mas a das 14h continua com os dados de antes (item 29).
+ */
+export const PASTA_HORAS = 'copias-por-hora';
+export const DIAS_HORAS = 2;
 export const PASTA_SEMANAL = 'completos-semanais';
 export const PASTA_PROGRAMA = 'programa';
 export const EXTENSAO = '.bkp';
@@ -211,12 +217,30 @@ export const gravarChave = (dir, chave) => gravar(dir, ARQUIVO_CHAVE, JSON.strin
 
 const hoje = () => hojeIso(); // data local (toISOString daria o dia seguinte depois das 21h)
 
-/** Cópia do banco do dia (sobrescreve a do mesmo dia a cada gravação). */
-export async function espelhar(dir, chave, dados) {
+const diaLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+/** Nome da cópia da hora (hora local): imoveis-dados-AAAA-MM-DD-15h.bkp. */
+export const nomeDaHora = (agora = new Date()) => `imoveis-dados-${diaLocal(agora)}-${String(agora.getHours()).padStart(2, '0')}h${EXTENSAO}`;
+/** Cópias de hora com mais de `dias` dias (pela data no nome). */
+export function horasParaApagar(nomes, dias = DIAS_HORAS, agora = new Date()) {
+  const limite = diaLocal(new Date(agora.getTime() - (Number.isInteger(dias) && dias > 0 ? dias : DIAS_HORAS) * 86400000));
+  return nomes.filter((n) => { const d = (n.match(/^imoveis-dados-(\d{4}-\d{2}-\d{2})-\d{2}h/) || [])[1]; return d && d < limite; });
+}
+
+/**
+ * Cópia do banco do dia (sobrescreve a do mesmo dia a cada gravação) e, se ainda não há, a da hora (item 29). `diasHoras`:
+ * por quantos dias as cópias de hora ficam (regra `dias_copias_backup`).
+ */
+export async function espelhar(dir, chave, dados, { diasHoras = DIAS_HORAS, agora = new Date() } = {}) {
   const sub = await dir.getDirectoryHandle(PASTA_DIARIO, { create: true });
   const nome = `imoveis-dados-${hoje()}${EXTENSAO}`;
-  await gravar(sub, nome, await cifrar(chave, texto(JSON.stringify(dados)), { tipo: 'diario', arquivo: 'imoveis-dados.json', revisao: dados.revisao }));
+  const cifrado = await cifrar(chave, texto(JSON.stringify(dados)), { tipo: 'diario', arquivo: 'imoveis-dados.json', revisao: dados.revisao });
+  await gravar(sub, nome, cifrado);
   for (const velho of diariosParaApagar(await nomesEm(sub))) await sub.removeEntry(velho);
+  const horas = await dir.getDirectoryHandle(PASTA_HORAS, { create: true });
+  const daHora = nomeDaHora(agora);
+  const existentes = await nomesEm(horas);
+  if (!existentes.includes(daHora)) await gravar(horas, daHora, cifrado);
+  for (const velho of horasParaApagar(existentes, diasHoras, agora)) await horas.removeEntry(velho);
   return nome;
 }
 
@@ -259,6 +283,7 @@ export const TEXTO_LEIAME = `PASTA DO BACKUP SEGURO - Administracao de Imoveis
 
 O que tem aqui (tudo cifrado: so abre com a SENHA DO BACKUP, que nao esta em lugar nenhum deste computador):
 - ${PASTA_DIARIO}/   uma copia do banco de dados por dia (ficam ${MANTER_DIARIOS})
+- ${PASTA_HORAS}/   uma copia do banco de cada hora em que houve gravacao (ficam os ultimos dias; para voltar a uma hora antes de um erro)
 - ${PASTA_SEMANAL}/   backup completo por semana, com os anexos
 - ${PASTA_PROGRAMA}/   uma copia do programa (${ARQUIVO_PROGRAMA}), atualizada sozinha: reserva para um desastre
 

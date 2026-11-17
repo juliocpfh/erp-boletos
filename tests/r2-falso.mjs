@@ -1,6 +1,6 @@
 // R2 de mentira em memória (mesmo formato do Cloudflare), usado por nuvem.test.mjs e cofre.test.mjs.
 /** R2 em memória com o mesmo formato do Cloudflare (get/head/put/delete/list, etag, onlyIf.etagMatches e onlyIf como Headers: If-Match, If-None-Match). */
-export function r2Falso() {
+export function r2Falso({ prefixoEtag = '' } = {}) {
   const m = new Map();
   let n = 0;
   const objeto = (key, o) => ({ key, size: o.dados.byteLength, etag: o.etag, httpEtag: `"${o.etag}"`, httpMetadata: o.httpMetadata, customMetadata: o.customMetadata, uploaded: o.uploaded });
@@ -22,7 +22,7 @@ export function r2Falso() {
         if (se && !(atual && (se.trim() === '*' || se.includes(`"${atual.etag}"`)))) return null;
       } else if (op.onlyIf?.etagMatches && atual?.etag !== op.onlyIf.etagMatches) return null;
       n += 1;
-      const o = { dados, etag: `e${n}`, uploaded: new Date(Date.UTC(2026, 10, 1, 0, 0, n)), httpMetadata: op.httpMetadata, customMetadata: op.customMetadata };
+      const o = { dados, etag: `${prefixoEtag}e${n}`, uploaded: new Date(Date.UTC(2026, 10, 1, 0, 0, n)), httpMetadata: op.httpMetadata, customMetadata: op.customMetadata };
       m.set(key, o);
       return objeto(key, o);
     },

@@ -26,6 +26,13 @@ export const ARQUIVO_PROGRAMA = 'administracao-imoveis.html';
 export const CAMINHO_PROGRAMA = 'offline/administracao-imoveis.html';
 export const PASTA_COPIA = 'Arquivos dos imoveis'; // iguais a docs/js/copia-aberta.js
 export const ARQUIVO_COPIA = 'copia-aberta.json';
+export const PASTA_APAGADOS = 'Apagados na nuvem'; // iguais a docs/js/copia-aberta.js (item 28)
+export const DIAS_APAGADOS = 30;
+export const diaDeHoje = (agora = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(agora);
+export const diasVencidos = (nomes, dias = DIAS_APAGADOS, agora = new Date()) => {
+  const limite = diaDeHoje(new Date(agora.getTime() - dias * 86400000));
+  return nomes.filter((n) => /^\d{4}-\d{2}-\d{2}$/.test(n) && n < limite);
+};
 export const ARQUIVO_TRAVA = 'copia-aberta.trava'; // uma rodada da cópia aberta por vez (a de hora em hora e a das 20h podem se cruzar)
 export const VALIDADE_TRAVA = 15 * 60000; // trava parada há mais que isso é de uma rodada que morreu: a próxima passa por cima
 export const TEMPO_CONSULTA = 30000; // tempo-limite de cada consulta à nuvem (sem ele, uma conexão presa travaria a tarefa para sempre)
@@ -262,10 +269,14 @@ async function copiar(cfg, buscar, erros, trava) {
     cursor = corpo.cursor;
   }
   const { baixar, apagar, atual } = planoCopia(nuvem, arquivos);
-  const salvar = (falhas) => fs.writeFileSync(arqReg, JSON.stringify({ atualizado_em: new Date().toISOString(), por: 'atualizador', falhas, arquivos }));
+  // o prazo de "Apagados na nuvem" é o que o site gravou no registro (regra dias_lixeira_anexos); sem ele, 30 dias
+  const dias = Number.isInteger(reg.dias_apagados) && reg.dias_apagados > 0 ? reg.dias_apagados : DIAS_APAGADOS;
+  const salvar = (falhas) => fs.writeFileSync(arqReg, JSON.stringify({ atualizado_em: new Date().toISOString(), por: 'atualizador', falhas, dias_apagados: dias, arquivos }));
+  const apagados = path.join(cfg.pasta, PASTA_APAGADOS, diaDeHoje());
   for (const c of apagar) {
     const p = caminhoLocal(c);
-    try { fs.unlinkSync(path.join(raiz, ...p)); } catch { /* já não estava */ }
+    // não apaga: guarda em "Apagados na nuvem/<hoje>/" (item 28; uma lista vazia da nuvem não esvazia o PC)
+    try { fs.mkdirSync(path.join(apagados, ...p.slice(0, -1)), { recursive: true }); fs.renameSync(path.join(raiz, ...p), path.join(apagados, ...p)); } catch { /* já não estava */ }
     for (let i = p.length - 1; i >= 1; i -= 1) { try { fs.rmdirSync(path.join(raiz, ...p.slice(0, i))); } catch { break; } } // só pasta vazia
     delete arquivos[c];
   }
@@ -293,6 +304,10 @@ async function copiar(cfg, buscar, erros, trava) {
   const fila = async () => { while (proximo < baixar.length) { const c = baixar[proximo]; proximo += 1; await baixarUm(c); } };
   await Promise.all(Array.from({ length: Math.min(BAIXAR_JUNTOS, baixar.length) }, fila));
   salvar(falhas);
+  try {
+    const base = path.join(cfg.pasta, PASTA_APAGADOS);
+    for (const n of diasVencidos(fs.readdirSync(base), dias)) fs.rmSync(path.join(base, n), { recursive: true, force: true });
+  } catch { /* ainda não há "Apagados na nuvem" */ }
   return { baixados: baixar.length - falhas, apagados: apagar.length, falhas, total: Object.keys(arquivos).length };
 }
 

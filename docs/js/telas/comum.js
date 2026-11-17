@@ -469,6 +469,30 @@ export async function alterarApagandoAnexos(fn) {
 }
 
 /** Nuvem: apaga os anexos guardados por `alterarApagandoAnexos` quando o lote foi confirmado e eles continuam sem uso. */
+/**
+ * Anexo feito sem internet que subiu com outro nome (já havia um com o mesmo nome na nuvem, de outro aparelho): o lançamento
+ * deste aparelho que apontava para o nome antigo naquela pasta passa a apontar para o novo (item 22). Devolve true se acertou.
+ */
+export async function corrigirAnexoRenomeado(pasta, antigo, novo, em = null) {
+  if (!E.d || !E.usuario || !opera()) return false;
+  const alvo = pasta.join('/');
+  // só os lançamentos feitos por este usuário depois que o arquivo foi guardado no aparelho (o do outro aparelho fica no dele)
+  const desde = em ? new Date(new Date(em).getTime() - 60000).toISOString() : '';
+  const meus = new Set();
+  for (let i = E.d.historico.length - 1; i >= 0; i -= 1) {
+    const h = E.d.historico[i];
+    if (desde && String(h.quando) < desde) break;
+    if (h.usuario === login() && h.tabela) meus.add(`${h.tabela}:${h.registro_id}`);
+  }
+  for (const ref of R.arquivosReferenciados(E.d).filter((x) => x.nome === antigo)) {
+    const p = await pastaDoEscopo(ref.escopo, ref.id, false).catch(() => null);
+    if (!p || !Array.isArray(p.partes) || p.partes.join('/') !== alvo) continue;
+    const n = await alterar((db) => R.renomearArquivoNoBanco(db, ref.escopo, ref.id, antigo, novo, login(), (t, id) => meus.has(`${t}:${id}`)));
+    if (n) return true;
+  }
+  return false;
+}
+
 export async function apagarAnexosConfirmados() {
   if (!E.nuvem) return 0;
   const { confirmados } = await E.nuvem.prontosAposConfirmar();

@@ -21,7 +21,7 @@ import { avisar } from './avisos-ficha.mjs';
 import { SO_SE_NOVO, atenderEquipe, atenderFicha, lerAteLimite } from './ficha-publica.mjs';
 import { ErroEmail, MAX_BYTES_ANEXOS, MAX_PEDIDO, enviarEmail, estadoEmail, validarEnvio } from './gmail.mjs';
 import { atenderVendas, ehEnderecoDeVendas } from './painel-vendas.mjs';
-import { paraLixeira } from './lixeira.mjs';
+import { guardarVersaoAnterior, paraLixeira } from './lixeira.mjs';
 export { CofreDO } from './cofre.mjs'; // o Cloudflare exige a classe do Durable Object no arquivo principal
 export { CofreLicencasDO } from './cofre-licencas.mjs'; // licenças (painel de vendas, HOST_VENDAS): separado dos dados
 const RAIZES = ['arquivos', 'modelos', 'backups']; // pastas que existem na pasta de hoje
@@ -253,6 +253,8 @@ async function gravarArquivo(request, env, chave, email) {
   if (nomeProibido(nomeDe(chave))) throw new ErroHttp(415, ERRO_TIPO);
   const corpo = await lerCorpo(request, MAX_ARQUIVO);
   const seNovo = request.headers.get('If-None-Match') === '*';
+  // por cima de um arquivo que já existe: a versão de antes vai para a lixeira (item 24; o R2 não guarda versões)
+  if (!seNovo) await guardarVersaoAnterior(env.DADOS, chave, { por: email });
   // "só se novo" numa chamada só ao R2: dois aparelhos com o mesmo nome ao mesmo tempo, um grava e o outro recebe o 412
   const gravado = await env.DADOS.put(chave, corpo, { ...(seNovo ? SO_SE_NOVO() : {}), customMetadata: { por: email } });
   if (!gravado) throw new ErroHttp(412, 'Já existe um arquivo com esse nome.');

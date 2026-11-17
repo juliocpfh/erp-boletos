@@ -7,6 +7,20 @@
 
 export const PASTA_COPIA = 'Arquivos dos imoveis';
 export const ARQUIVO_COPIA = 'copia-aberta.json';
+/**
+ * O que saiu da nuvem não é apagado da cópia: vai para "Apagados na nuvem/AAAA-MM-DD/<caminho>" e fica `dias` (regra
+ * `dias_lixeira_anexos`, padrão 30) antes de sair de vez (item 28 do mutirão 3000: anexo apagado por engano, ou uma lista vazia
+ * da nuvem, sumia também do PC). O prazo vai no copia-aberta.json para o atualizador do PC usar o mesmo.
+ */
+export const PASTA_APAGADOS = 'Apagados na nuvem';
+export const DIAS_APAGADOS = 30;
+/** Dia de hoje em Brasília (AAAA-MM-DD), para o nome da pasta de cada dia em "Apagados na nuvem". */
+export const diaDeHoje = (agora = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(agora);
+/** Pastas de dias de "Apagados na nuvem" que já passaram do prazo (nomes AAAA-MM-DD mais velhos que `dias`). */
+export const diasVencidos = (nomes, dias = DIAS_APAGADOS, agora = new Date()) => {
+  const limite = diaDeHoje(new Date(agora.getTime() - dias * 86400000));
+  return nomes.filter((n) => /^\d{4}-\d{2}-\d{2}$/.test(n) && n < limite);
+};
 const EM_PARALELO = 5; // arquivos baixados ao mesmo tempo
 
 const PROIBIDOS = /[<>:"|?*]/g; // caracteres que o Windows não aceita em nomes
@@ -52,6 +66,15 @@ async function gravarRegistro(dir, reg) {
   await w.close();
 }
 
+/** Tira de "Apagados na nuvem" os dias que passaram do prazo. */
+async function faxinaApagados(dir, dias, agora) {
+  let pasta;
+  try { pasta = await dir.getDirectoryHandle(PASTA_APAGADOS); } catch { return; }
+  const nomes = [];
+  for await (const [nome, h] of pasta.entries()) if (h.kind === 'directory') nomes.push(nome);
+  for (const n of diasVencidos(nomes, dias, agora)) { try { await pasta.removeEntry(n, { recursive: true }); } catch { /* fica para a próxima */ } }
+}
+
 /** Como está a cópia (para a tela do Backup seguro): { total, atualizado_em, por } ou null se nunca foi feita. */
 export async function situacaoCopia(dir) {
   const r = await lerRegistro(dir);
@@ -78,18 +101,25 @@ export async function lerDaCopia(dir, caminho) {
  * Atualiza a cópia na pasta `dir` (a do backup seguro). `listar()` devolve a lista da nuvem; `ler(caminho)` o Blob do arquivo
  * (caminho dentro de arquivos/). `aoAndar({ feitos, total })`. Devolve { baixados, apagados, falhas, total }.
  */
-export async function atualizarCopia(dir, { listar, ler, aoAndar = () => {}, por = 'site' }) {
+export async function atualizarCopia(dir, { listar, ler, aoAndar = () => {}, por = 'site', diasApagados = DIAS_APAGADOS, agora = new Date() }) {
   const reg = (await lerRegistro(dir)) || { arquivos: {} };
   const arquivos = { ...(reg.arquivos || {}) };
   const { baixar, apagar, atual } = planoCopia(await listar(), arquivos);
   const raiz = await dir.getDirectoryHandle(PASTA_COPIA, { create: true });
-  const salvar = (falhas) => gravarRegistro(dir, { atualizado_em: new Date().toISOString(), por, falhas, arquivos });
+  const salvar = (falhas) => gravarRegistro(dir, { atualizado_em: new Date().toISOString(), por, falhas, dias_apagados: diasApagados, arquivos });
   let falhas = 0; let feitos = 0;
   const total = baixar.length + apagar.length;
+  const hoje = diaDeHoje(agora);
   for (const c of apagar) {
     const p = caminhoLocal(c);
     try {
       const pai = await pastaDe(raiz, p.slice(0, -1), false);
+      // guarda em "Apagados na nuvem/<hoje>/" antes de tirar da cópia (item 28)
+      const arq = await (await pai.getFileHandle(p.at(-1))).getFile();
+      const destino = await pastaDe(dir, [PASTA_APAGADOS, hoje, ...p.slice(0, -1)], true);
+      const w = await (await destino.getFileHandle(p.at(-1), { create: true })).createWritable();
+      await w.write(arq);
+      await w.close();
       await pai.removeEntry(p.at(-1));
     } catch { /* já não estava lá */ }
     // pastas que ficaram vazias saem também (removeEntry sem recursive recusa pasta com algo dentro)
@@ -119,5 +149,6 @@ export async function atualizarCopia(dir, { listar, ler, aoAndar = () => {}, por
   await Promise.all(Array.from({ length: Math.min(EM_PARALELO, baixar.length) }, emFila));
   await salvando;
   await salvar(falhas);
+  await faxinaApagados(dir, diasApagados, agora);
   return { baixados: baixar.length - falhas, apagados: apagar.length, falhas, total: Object.keys(arquivos).length };
 }

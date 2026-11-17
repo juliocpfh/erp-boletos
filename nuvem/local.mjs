@@ -3,14 +3,15 @@
 //      PORTA=8787 EMAIL_TESTE=dono@exemplo.com.br NUVEM_DB=nuvem/.local/cofre.sqlite
 //      SIMULAR_GMAIL=1 → o envio de e-mail aparece ligado e só escreve aqui no console (nada vai ao Google);
 //      com GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_REMETENTE (e GMAIL_NOME, GMAIL_CCO) envia de verdade.
-// Os dados ficam em nuvem/.local/ (fora do git). Anexos e backups ficam só na memória (somem ao fechar).
+// Os dados ficam em nuvem/.local/ (fora do git): o cofre em cofre.sqlite e os anexos e backups em arquivos/ (r2-disco.mjs).
+// ZERAR=1 apaga os dois antes de abrir (começa do zero, sem banco apontando para anexo que não existe).
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
-import { r2Falso } from '../tests/r2-falso.mjs';
 import { CofreDO } from './cofre.mjs';
+import { r2EmDisco } from './r2-disco.mjs';
 import { atenderFicha } from './ficha-publica.mjs';
 import { atender, avisador } from './worker.mjs';
 
@@ -18,12 +19,14 @@ const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const DOCS = path.join(AQUI, '..', 'docs');
 const PORTA = Number(process.env.PORTA || 8787);
 const arquivoDb = process.env.NUVEM_DB || path.join(AQUI, '.local', 'cofre.sqlite');
+const pastaR2 = process.env.NUVEM_ARQUIVOS || path.join(path.dirname(arquivoDb), 'arquivos');
+if (process.env.ZERAR === '1') { fs.rmSync(arquivoDb, { force: true }); fs.rmSync(pastaR2, { recursive: true, force: true }); }
 fs.mkdirSync(path.dirname(arquivoDb), { recursive: true });
 
 const db = new DatabaseSync(arquivoDb);
 const sql = { exec(q, ...p) { if (!p.length && q.trim().split(';').filter((x) => x.trim()).length > 1) { db.exec(q); return { toArray: () => [] }; } const l = db.prepare(q).all(...p).map((x) => ({ ...x })); return { toArray: () => l }; } };
 const tx = (fn) => { db.exec('BEGIN'); try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { db.exec('ROLLBACK'); throw e; } };
-const R2 = r2Falso();
+const R2 = r2EmDisco(pastaR2);
 const cofre = new CofreDO({ storage: { sql, transactionSync: tx } }, { DADOS: R2 });
 const env = {
   MODO_TESTE: '1', EMAIL_TESTE: process.env.EMAIL_TESTE || 'teste@exemplo.com.br', ORIGEM: `http://localhost:${PORTA}`,
