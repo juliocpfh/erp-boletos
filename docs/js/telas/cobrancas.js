@@ -5,6 +5,7 @@ import { compBr, dataBr, pct, reais } from '../calculos.js';
 import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
+import { filaRegua } from '../regua-email.js';
 import { botoesMesC6, caixaBancoC6, resumoBancoLinha } from './banco-c6.js';
 import { botao, buscar, d, endereco, etiqueta, item, link, memoria, multaJurosTexto, opera, situacao } from './comum.js';
 import { AVISO_CONTROLE, seloControle, situacaoBoleto } from './contrato.js';
@@ -87,6 +88,13 @@ const FILTROS_BOLETO = {
   pagos: { titulo: 'Boletos pagos', todosMeses: false, f: (x) => !!x.cb.data_pagamento },
 };
 
+/** Botão "E-mails da régua" no alto de Boletos (pedido do dono em 17/11/2026; antes ficava em Financeiro), com quantos esperam a autorização. */
+function botaoRegua() {
+  if (!opera()) return '';
+  const n = filaRegua(d()).length;
+  return link('#/regua', `E-mails da régua${n ? ` (${n})` : ''}`, 'botao secundario');
+}
+
 export function telaCobrancas(comp, ordemPedida = 'vencimento', filtroPedido = 'todos', buscaPedida = '') {
   const ordem = ORDENS_BOLETO[ordemPedida] ? ordemPedida : 'vencimento'; // a ordem vem do endereço: só as conhecidas
   const filtro = FILTROS_BOLETO[filtroPedido] ? filtroPedido : 'todos';
@@ -117,7 +125,7 @@ export function telaCobrancas(comp, ordemPedida = 'vencimento', filtroPedido = '
     // lista de trabalho (em aberto, vencidos, sem NF, pagos): sem as caixas do mês (gerar boletos, caução, recálculo)
     const soma = (f) => lista.filter((x) => R.geraNf(x.c)).reduce((s, x) => s + f(x), 0);
     return `<div class="cabecalho"><h1>${F_.titulo}${F_.todosMeses ? ' <span class="suave">· todos os meses</span>' : ` de ${compBr(comp)}`}</h1>
-        <div class="acoes">${link(url({ filtro: 'todos' }), `← Boletos de ${compBr(comp)}`, 'botao secundario')}</div></div>
+        <div class="acoes">${link(url({ filtro: 'todos' }), `← Boletos de ${compBr(comp)}`, 'botao secundario')} ${botaoRegua()}</div></div>
       ${filtros}
       ${filtro === 'vencidos' ? `<p class="suave">Aqui entram todos os boletos vencidos e não pagos, também os de inquilinos que já saíram (com o cálculo final feito). A tela ${link('#/inadimplencia', 'Inadimplência', '')} mostra só os inquilinos em cobrança, por isso os números podem ser diferentes.</p>` : ''}
       ${filtro === 'semnf' && lista.length && opera() ? `<div class="alerta info">${lista.length} pagamento(s) aguardando número de NF. ${link('#/faturas', 'Numerar na tela NF', 'botao pequeno')}</div>` : ''}
@@ -137,7 +145,7 @@ export function telaCobrancas(comp, ordemPedida = 'vencimento', filtroPedido = '
   return `<div class="cabecalho"><h1>Boletos de ${compBr(comp)}</h1>
       <div class="acoes"><a class="botao secundario" href="${url({ comp: C.somarMeses(comp, -1) })}">← ${compBr(C.somarMeses(comp, -1))}</a>
       <form data-form="ir" data-ir="cobrancas" class="acoes"><input type="month" name="comp" value="${esc(comp)}" class="campo-mes"><button class="secundario">Ir</button></form>
-      <a class="botao secundario" href="${url({ comp: C.somarMeses(comp, 1) })}">${compBr(C.somarMeses(comp, 1))} →</a></div></div>
+      <a class="botao secundario" href="${url({ comp: C.somarMeses(comp, 1) })}">${compBr(C.somarMeses(comp, 1))} →</a> ${botaoRegua()}</div></div>
     <p class="suave">Competência é o mês de uso do imóvel. Ao receber, clique em "Confirmar pagamento" na linha e informe a data. Depois, numere as NFs: a numeração segue a ordem das datas de pagamento.</p>
     ${filtros}
     ${reajustes.size ? `<div class="alerta aviso"><b>Reajuste</b> ${reajustes.size} inquilino(s) têm o aluguel de ${compBr(comp)} corrigido: envie a carta de reajuste junto com o boleto deste mês (botão "Gerar carta" na linha).${semCorrecao ? ` <b>${semCorrecao} ainda sem a correção aplicada</b>: informe o índice e aplique a correção (os boletos em aberto são recalculados).` : ''} ${link('#/reajustes', 'Ver reajustes')}</div>` : ''}

@@ -241,10 +241,10 @@ Revisão em 8 frentes (regras, banco C6, segurança, dados, telas, teste de pont
 **Decisões suas (16–17/11), já aplicadas:** Pix pago depois do vencimento com o valor de desconto perde o desconto e a diferença (mais multa e juros) vai ao boleto seguinte; boleto pago pelo código de barras e creditado em até 3 dias úteis não é atraso; pagamento a menos fica "Paga em parte" e a diferença vai ao boleto seguinte; índice negativo mantém o aluguel; renovação negociada pergunta o mês a partir do qual vale; todo mês conta 30 dias (entrada em 15/02 = 16/30); NF do mês incompleto com quantidade "16/30"; ficha reprovada ou desistência tem os dados pessoais apagados no prazo dos documentos; exclusão grande com dupla confirmação digitando APAGAR; formulário alterado pergunta "Sair sem salvar?"; link da ficha aparece uma vez só (reenviar gera outro).
 
 **Conferir no uso (5 min cada):**
-- [ ] Uma NF de aluguel proporcional: quantidade "16/30", unitário do mês inteiro, total proporcional.
-- [ ] Sair e entrar de novo: pede o código do login da internet de novo (normal agora).
+- [ ] Uma NF de aluguel proporcional: quantidade "16/30", unitário do mês inteiro, total proporcional. (Só dá para conferir no próximo inquilino com entrada no meio do mês.)
+- [x] Sair e entrar de novo: pede o código do login da internet de novo (normal agora). (Conferido 17/11.)
 - [ ] Trocar a senha de um usuário: os computadores ligados pelo programa do PC desse usuário precisam ser ligados de novo.
-- [ ] Painel: alertas mostram 5 de cada tipo e "Ver todos".
+- [x] Painel: alertas mostram 5 de cada tipo e "Ver todos". (Conferido 17/11.)
 
 **Falta você (Cloudflare, opcional):** pôr `DONO_EMAIL` nas variáveis do Worker (com a nuvem vazia, só esse e-mail faz a primeira carga); criar o aplicativo do Access para `vendas.ankjck.com.br`.
 
@@ -253,12 +253,14 @@ Revisão em 8 frentes (regras, banco C6, segurança, dados, telas, teste de pont
 - Publicar o site pelo GitHub Actions (permite o aplicativo baixar só os arquivos que mudaram).
 - Impedimentos de venda que são projetos grandes (vários clientes no mesmo sistema, login próprio, proprietário de terceiros com repasse, DIMOB, importar planilha, outros bancos, portal do inquilino, assinatura eletrônica): ver `MUTIRAO_3000.md`, frente "mercado".
 
-**2ª rodada do mutirão 3000 (17/11), na `main` pelas PRs #285–#298:** tela **Gestão** (Financeiro, com PDF); **régua de cobrança** (Financeiro → E-mails da régua: prepara 3 dias antes, no dia, 3 e 10 dias depois; só envia os que o administrador marcar e autorizar, com a regra `regua_envio` ligada); **banco automático** (avisos do C6, ligação pelo código do Pix, extrato CSV com conferência do saldo, Saúde do banco); **primeiros passos** e botão "?" nas telas; 192 mensagens de erro em português simples; **LGPD**: backups da nuvem cifrados, tela **Acessos**, "Dados de uma pessoa" (ZIP pelo CPF) e "Apagar tudo desta pessoa" só 10 anos depois do fim do contrato; lixeira de anexos (30 dias) e cópia de cada hora do backup seguro (2 dias). Decisões de 17/11 aplicadas: conflito fica com o valor já gravado na nuvem; troca de titular esperando o termo não apaga mais a saída; caução R$ 0,00 de propósito fica; Desfazer volta a alteração inteira, com prévia dos boletos que mudam. Parte 3 de dados (PR #298): a nuvem passa só os campos mudados, a fila sem internet grava cada lote uma vez, a gravação copia só as tabelas que usa (no banco grande, de ~215 ms para ~5 ms) e recusas ligadas aparecem juntas em Conflitos.
+**2ª rodada do mutirão 3000 (17/11), na `main` pelas PRs #285–#298:** tela **Gestão** (Financeiro, com PDF); **régua de cobrança** (Boletos → botão "E-mails da régua", no alto da tela; até 17/11 ficava em Financeiro: prepara 3 dias antes, no dia, 3 e 10 dias depois; só envia os que o administrador marcar e autorizar, com a regra `regua_envio` ligada); **banco automático** (avisos do C6, ligação pelo código do Pix, extrato CSV com conferência do saldo, Saúde do banco); **primeiros passos** e botão "?" nas telas; 192 mensagens de erro em português simples; **LGPD**: backups da nuvem cifrados, tela **Acessos**, "Dados de uma pessoa" (ZIP pelo CPF) e "Apagar tudo desta pessoa" só 10 anos depois do fim do contrato; lixeira de anexos (30 dias) e cópia de cada hora do backup seguro (2 dias). Decisões de 17/11 aplicadas: conflito fica com o valor já gravado na nuvem; troca de titular esperando o termo não apaga mais a saída; caução R$ 0,00 de propósito fica; Desfazer volta a alteração inteira, com prévia dos boletos que mudam. Parte 3 de dados (PR #298): a nuvem passa só os campos mudados, a fila sem internet grava cada lote uma vez, a gravação copia só as tabelas que usa (no banco grande, de ~215 ms para ~5 ms) e recusas ligadas aparecem juntas em Conflitos.
 
 **Conferir no uso (2ª rodada):**
-- [ ] Abrir o sistema uma vez no computador do administrador com o backup seguro ligado (o backup da nuvem passa a sair cifrado; "Voltar para este dia" pede a senha do backup).
-- [ ] Financeiro → Gestão: números do mês e o PDF.
-- [ ] Financeiro → E-mails da régua: a lista do dia, tudo desmarcado.
+- [x] Abrir o sistema uma vez no computador do administrador com o backup seguro ligado (o backup da nuvem passa a sair cifrado; "Voltar para este dia" pede a senha do backup). (17/11: reconheceu ao entrar.)
+- [x] Financeiro → Gestão: números do mês e o PDF. (17/11: tudo ok.)
+- [x] E-mails da régua: a lista do dia, tudo desmarcado. (Conferido 17/11; a pedido do dono, o botão "E-mails da régua" passou de Financeiro para o alto da tela **Boletos**; o "← Boletos" da régua volta para lá.)
+- [ ] Notificações ao inquilino (PR #300, depois do aceite): conferir no celular a caixa Notificações ao inquilino, abrir uma notificação e o Gerar multa depois do prazo (no computador já foi testado).
+- [ ] Gmail (PR #299): aceitar e ligar com o Claude (item 1).
 
 **Relatório do trabalho para o contratante:** https://claude.ai/artifact/FNTqKJrMNp8sZGYywrmyHt
 

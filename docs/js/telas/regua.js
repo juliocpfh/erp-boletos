@@ -1,4 +1,4 @@
-// Tela "E-mails da régua" (#/regua, em Financeiro) e o alerta do Painel: os e-mails de cobrança preparados pela régua
+// Tela "E-mails da régua" (#/regua, pelo botão no alto de Boletos; até 17/11/2026 ficava em Financeiro) e o alerta do Painel: os e-mails de cobrança preparados pela régua
 // (regua-email.js) esperando a autorização do administrador. Decisão do dono (16/11/2026): nada é enviado sozinho; cada e-mail
 // tem a sua caixa, todas desmarcadas; "Enviar os selecionados (N)" mostra a lista final e pede confirmação. Sem a regra
 // `regua_envio` ligada, só "Abrir no Gmail", "Copiar texto" e "Não enviar". Envio pelo Gmail da nuvem (gmail.js), como telas/emails.js.
@@ -69,7 +69,7 @@ export async function telaRegua() {
     : !gmail ? 'O envio direto está ligado, mas o Gmail da empresa não está ligado nesta nuvem (ou você está sem internet): por enquanto, abra no Gmail ou copie o texto.'
       : 'Marque os e-mails que quer mandar e clique em "Enviar os selecionados": o sistema mostra a lista final e pede a sua confirmação.';
   const recentes = G.decididosRecentes(db, hoje);
-  return `<h1>Financeiro</h1><div class="abas"><a href="#/inadimplencia">← Inadimplência</a></div>
+  return `<h1>Boletos</h1><div class="abas"><a href="#/cobrancas">← Boletos</a></div>
     <div class="cabecalho"><h2>E-mails da régua de cobrança: aguardando sua autorização</h2>${link('#/modelos-email', 'Textos dos e-mails')}</div>
     <p class="suave">O sistema prepara os e-mails ${dias.length ? `de cada boleto em aberto: ${esc(dias.map(G.nomeDaEtapa).join('; '))}` : '(nenhum dia escolhido nas Regras do sistema: nada é preparado)'}. <b>Nada é enviado sozinho.</b>
       Boleto pago, em acordo ou de contrato encerrado sai da lista. A cobrança de atraso só aparece passados 3 dias úteis do último dia para pagar (o banco leva até 3 dias úteis para creditar o boleto). E-mail enviado ou marcado "Não enviar" não volta.${admin() ? '' : ' Só o administrador autoriza.'}</p>
