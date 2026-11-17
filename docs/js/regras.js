@@ -6,6 +6,7 @@ import { soDigitos } from './c6-comum.js';
 import * as C from './calculos.js';
 import { camposAntigosDaEmpresa, dadoDaEmpresa, locadorasDoContrato, modelosDe, resultadoVistoriaSaida, TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR, vistoriaDeEntrada } from './contratos.js';
 import * as CR from './config-regras.js';
+import * as F from './formularios.js';
 import * as M from './mapa-c6.js';
 import { CLAUSULAS_FCI, GARANTIA_NOVA_TROCA, atualizarTextoModelo } from './modelos-contrato.js';
 
@@ -400,7 +401,51 @@ function proximoCodigo(d, tabela) {
   return maior + 1;
 }
 
+/**
+ * Campos de dinheiro (centavos inteiros) de cada tabela. ``TABELAS`` não diz o tipo dos campos; o que já diz é o formulário de
+ * cada cadastro (``formularios.js``, tipo "dinheiro"; os virtuais não são gravados). Só esses são conferidos ao gravar.
+ * Formulário novo de cadastro com dinheiro: entra aqui. Montado na 1ª gravação.
+ */
+const FORMULARIOS_DA_TABELA = () => ({
+  imoveis: [F.IMOVEL], solicitacoes: [F.SOLICITACAO], reformas: [F.REFORMA], ressarcimentos: [F.RESSARCIMENTO], contratos: [F.CONTRATO],
+  fichas: [F.FICHA_RENDA, F.FICHA_FIM], correcoes: [F.CORRECAO], seguros: [F.SEGURO], iptus: [F.IPTU], aplicacoes: [F.APLICACAO],
+  depositos_garantia: [F.DEPOSITO_GARANTIA], correcoes_garantia: [F.CORRECAO_GARANTIA], devolucoes_garantia: [F.DEVOLUCAO_GARANTIA],
+  renovacoes: [F.RENOVACAO], encerramentos: [F.ENCERRAMENTO], avulsas: [F.AVULSA], cobrancas: [F.COBRANCA],
+});
+let camposDinheiro = null;
+/** ``{ tabela: Map(campo → rótulo) }`` dos campos em centavos (ver ``FORMULARIOS_DA_TABELA``). */
+export function camposDeDinheiro() {
+  if (!camposDinheiro) {
+    camposDinheiro = {};
+    for (const [t, forms] of Object.entries(FORMULARIOS_DA_TABELA())) {
+      const m = new Map();
+      for (const c of forms.flat()) if (c && c.nome && c.tipo === 'dinheiro' && !c.virtual && !m.has(c.nome)) m.set(c.nome, String(c.rotulo || c.nome).replace(/\s*\*$/, ''));
+      camposDinheiro[t] = m;
+    }
+  }
+  return camposDinheiro;
+}
+
+/**
+ * Confere, antes de gravar, que os campos de dinheiro estão em centavos inteiros (vazio vale: null, undefined ou '').
+ * Ex.: "10,5" (texto) ou 10.5 num campo de centavos → erro na tela, nada é gravado. ``atual``: o registro de antes
+ * (só confere o que muda, para não travar um registro antigo por um campo que ninguém mexeu).
+ */
+export function conferirCentavos(tabela, dados, atual = null) {
+  const campos = camposDeDinheiro()[tabela];
+  if (!campos || !dados) return;
+  for (const [k, rotulo] of campos) {
+    if (!Object.prototype.hasOwnProperty.call(dados, k)) continue;
+    const v = dados[k];
+    if (v === null || v === undefined || v === '' || Number.isSafeInteger(v)) continue;
+    if (atual && (atual[k] === v || String(atual[k] ?? '') === String(v))) continue; // não mudou
+    const mostrar = String(v).slice(0, 30);
+    throw new C.ErroUsuario(`Valor inválido em "${rotulo}" (${TABELAS[tabela]}): "${mostrar}". Use reais com centavos, ex.: 1.250,50. Nada foi gravado.`);
+  }
+}
+
 export function inserir(d, tabela, dados, usuario, descricao, { historico = true } = {}) {
+  conferirCentavos(tabela, dados);
   d.seq[tabela] = proximoCodigo(d, tabela);
   const r = { id: d.seq[tabela], ...dados };
   d[tabela].push(r);
@@ -411,6 +456,7 @@ export function inserir(d, tabela, dados, usuario, descricao, { historico = true
 export function atualizar(d, tabela, id, dados, usuario, descricao) {
   const r = buscar(d, tabela, id);
   if (!r) throw new Error(`${TABELAS[tabela]} não encontrado`);
+  conferirCentavos(tabela, dados, r);
   const mudancas = {};
   const texto = (x) => (x === undefined || x === null ? '' : typeof x === 'object' ? JSON.stringify(x) : String(x));
   for (const [k, novo] of Object.entries(dados)) {

@@ -10,7 +10,7 @@ import * as CP from '../compactar.js';
 import * as CPF from '../conferir-pdf.js';
 import * as Z from '../conciliacao.js';
 import * as K from '../contratos.js';
-import { encaixarFaturas, faturaExcel, faturaHtml } from '../fatura.js';
+import { avisosDeCorte, cortesDaFatura, encaixarFaturas, faturaExcel, faturaHtml } from '../fatura.js';
 import { chipDaLista, dinheiroTexto, esc } from '../formularios.js';
 import { MODELOS_PADRAO } from '../modelos-contrato.js';
 import * as R from '../regras.js';
@@ -373,6 +373,27 @@ async function proporPagamentoDoBanco(cb, pagamento = null) {
   aviso(r.pontual ? `Pagamento em dia registrado${pagouEmDia ? ' (sem multa e juros)' : ''}. Data da NF: ${dataBr(data)}.${extrato}` : `Pagamento registrado com ${r.dias_atraso} dia(s) de atraso: multa ${reais(r.multa)} e juros ${reais(r.juros)}. Data da NF: ${dataBr(data)}.${extrato}`, r.pontual ? 'ok' : 'aviso');
 }
 
+/**
+ * NF tem tamanho fixo: texto que não cabe sai cortado (fatura.js, LIMITES_NF). Antes de baixar em PDF ou Excel, avisa
+ * o que foi cortado (até 3 avisos e "mais N").
+ */
+function avisarCortes(fs) {
+  const cortes = avisosDeCorte(fs);
+  if (!cortes.length) return;
+  const mais = cortes.length > 3 ? ` E mais ${cortes.length - 3} aviso(s): veja em "Ver / imprimir NF".` : '';
+  aviso(`Texto cortado na NF (tamanho fixo): ${cortes.slice(0, 3).join(' ')}${mais}`, 'aviso');
+}
+
+/** Antes de numerar: o texto que vai sair cortado nas NFs dos pagamentos marcados (ainda dá para encurtar no cadastro). */
+function cortesAntesDeNumerar(pendentes) {
+  return pendentes.flatMap((p) => {
+    let b;
+    try { b = R.baseDaFatura(E.d, p.tipo, p.registro); } catch { return []; } // o problema aparece na numeração
+    const dados = { tomador_nome: b.tomador.nome, tomador_endereco: b.tomador.endereco, observacoes: b.observacoes, municipio: b.municipio || (b.imovel && b.imovel.cidade) || '' };
+    return cortesDaFatura(dados).map((c) => `${b.descricao}: ${c.texto} Para sair inteiro, encurte no cadastro antes de numerar.`);
+  });
+}
+
 const numerosSelecionados = () => {
   const ns = [...document.querySelectorAll('input[data-nf]:checked')].map((x) => Number(x.dataset.nf));
   if (!ns.length) throw new C.ErroUsuario('Marque pelo menos uma NF na lista.');
@@ -408,6 +429,7 @@ async function baixarPdfs(numeros, nomeZip, emitenteId = null) {
   const fs = E.d.faturas.filter((f) => f.situacao === 'Emitida' && numeros.includes(f.numero) && (!emitenteId || f.emitente_id === emitenteId))
     .sort((a, b) => a.numero - b.numero || a.id - b.id);
   if (!fs.length) throw new C.ErroUsuario('Não há NF emitida com esses números para exportar.');
+  avisarCortes(fs);
   aviso(`Gerando ${fs.length} PDF(s)…`, 'info');
   const JSZip = await jsZip();
   const zip = new JSZip();
@@ -1718,6 +1740,7 @@ export const ACOES = {
 
   async pdf({ id }) {
     const f = buscar('faturas', id);
+    avisarCortes([f]);
     aviso('Gerando o PDF…', 'info');
     const { blob, nome } = await pdfDaFatura(f);
     baixar(blob, nome);
@@ -1736,6 +1759,7 @@ export const ACOES = {
 
   async excelSelecionadas() {
     const ns = numerosSelecionados();
+    avisarCortes(E.d.faturas.filter((f) => f.situacao === 'Emitida' && ns.includes(f.numero)));
     const [ExcelJS, JSZip] = await Promise.all([excelJs(), jsZip()]);
     const modelo = await modeloFatura();
     const zip = new JSZip();
@@ -1785,6 +1809,7 @@ export const ACOES = {
     const avisos = [
       ...(abertos.length ? [`Há pagamento(s) de ${abertos.map(compBr).join(', ')}, mês ainda em andamento: o normal é numerar depois da virada do mês.`] : []),
       ...R.lembretesAirbnb(E.d, meses),
+      ...cortesAntesDeNumerar(marcados),
     ];
     if (avisos.length && !(await confirmar(`${avisos.map((t) => `• ${t}`).join('\n')}\n\nNumerar mesmo assim?`, { titulo: 'Confira antes de numerar', sim: 'Numerar mesmo assim' }))) return;
     let r = await alterar((db) => R.numerarFaturas(db, login(), { apenas }));
@@ -1799,6 +1824,7 @@ export const ACOES = {
   },
 
   async excel({ numero }) {
+    avisarCortes(E.d.faturas.filter((f) => f.situacao === 'Emitida' && f.numero === Number(numero)));
     const ExcelJS = await excelJs();
     const { blob, nome } = await excelDoNumero(ExcelJS, await modeloFatura(), numero);
     baixar(blob, nome);
@@ -1928,6 +1954,7 @@ export const ACOES = {
     const [ExcelJS, JSZip] = await Promise.all([excelJs(), jsZip()]);
     const modelo = await modeloFatura();
     const numeros = [...new Set(E.d.faturas.filter((f) => f.situacao === 'Emitida' && f.emissao.slice(0, 7) === mes).map((f) => f.numero))].sort((a, b) => a - b);
+    avisarCortes(E.d.faturas.filter((f) => f.situacao === 'Emitida' && numeros.includes(f.numero)));
     const zip = new JSZip();
     for (const n of numeros) {
       const { blob, nome } = await excelDoNumero(ExcelJS, modelo, n);
