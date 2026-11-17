@@ -12,7 +12,7 @@ Marque com `[x]` o que for concluindo.
 3. [ ] Depois do merge da PR do programa que se atualiza sozinho (item 11; uns 10 min): baixar o `.exe` novo **pela última vez**, rodar uma vez e conferir em Configurações → Aplicativos que aparece "Administração de Imóveis" (item 9) e, no sistema, em Usuários → Aparelhos ligados, a coluna **Programa** com a data da versão (depois da próxima rodada das 20h). Daqui em diante ele se troca sozinho.
 4. [ ] Ligar o Gmail com o Claude (item 1).
 5. [ ] Ficha pela internet com um conhecido (item 3).
-6. [ ] Contador: informe do IR (D5), DIMOB e numeração da NF por empresa (item 6).
+6. [x] Contador: informe do IR (D5), DIMOB e numeração da NF: **encerrado em 17/11** (resposta do contador; nada muda no sistema; ver item 6).
 7. [ ] Quando o C6 liberar: chaves + boleto de teste (decidir o corte do texto e conferir o desconto) (item 5).
 8. [ ] Depois do C6 no ar: rever a sugestão do tipo de despesa pela descrição (ex.: SANEPAR → Água).
 9. [ ] Quando acontecer: NF 16/30 (próximo inquilino com entrada no meio do mês) e troca de senha → religar o PC (item 13).
@@ -30,7 +30,7 @@ Marque com `[x]` o que for concluindo.
 | 3 | Teste da ficha pela internet com uma pessoa de verdade (depois do Gmail) | você + um conhecido | 20 min |
 | 4 | Conferências no celular: falta só o "Enviar agora" (depois do Gmail); ícone e caução da troca conferidos em 15/11 | você | 5 min |
 | 5 | Banco C6 (boleto e extrato automáticos): cobrado por e-mail em 17/11, aguardando as chaves | o C6 liberar as chaves | depende do C6 |
-| 6 | Decisões que estão com você: abertas só D5 (IR), DIMOB, numeração da NF por empresa, CBS 2027 e corte do texto do boleto; as outras decididas em 17/11 | você / contador | — |
+| 6 | Decisões que estão com você: abertas só CBS 2027 e corte do texto do boleto; D5 (IR), DIMOB e numeração da NF encerradas em 17/11 com o contador; as outras decididas em 17/11 | você / contador | — |
 | ~~7~~ | ~~Aceitar a PR #231~~ aceita em 14/11 | — | — |
 | 8 | Lembretes com data | você | — |
 | 9 | Programa no PC: concluído; "Abrir a pasta no Explorer" funciona (17/11); falta só o `.exe` novo depois do merge do desinstalar | você | 5 min |
@@ -163,10 +163,10 @@ Coisas que funcionaram no computador mas não foram vistas num celular de verdad
 
 | Assunto | O que decidir | Quando |
 |---|---|---|
-| **D5, informe do IR** (pendente com o contador em 14/11) | Perguntar ao contador se o informe anual separa IPTU, seguro, multa e juros, mês a mês. Hoje mostra só o aluguel. **15/11:** mensagem enviada ao contador (junto com a DIMOB e a data do informe); aguardando a resposta. | já |
-| **DIMOB** (pendente com o contador em 14/11) | Confirmar com o contador a entrega da DIMOB (empresa com patrimônio próprio pode ser obrigada). | já |
+| ~~**D5, informe do IR**~~ | **Encerrado em 17/11 (resposta do contador):** um demonstrativo **por empresa**, **só o aluguel** (IPTU, seguro, multa, juros e correção não entram), com **cada mês e o total do ano** (o dono decidiu os dois, já que o contador não disse). Os valores batem com as NFs emitidas e com a DIMOB. O ano é o da **data da NF**, e a NF sai na data em que o dinheiro entrou: aluguel de 12/2025 pago em 05/01/2026 entra no informe de 2026, na linha "Aluguel de 12/2025, NF de 05/01/2026". **O sistema já fazia exatamente assim** (Documentos → Declaração anual); nada muda. | feito |
+| ~~**DIMOB**~~ | **Encerrado em 17/11:** é obrigatória e **quem entrega é o contador** (sempre foi). O sistema não precisa gerar nada; os valores dela batem com as NFs. | feito |
 | ~~**Feriados sem banco**~~ | **Decidido em 14/11:** Carnaval e Corpus Christi contam como dia sem banco (o sistema já fazia assim). | feito |
-| **Numeração da NF por empresa** (aberto em 17/11) | Perguntar ao contador se cada empresa (ANK e JCK) precisa da sua própria numeração contínua de NF. | já |
+| ~~**Numeração da NF por empresa**~~ | **Decidido pelo dono em 17/11:** continua **uma numeração só para as duas empresas** (ANK e JCK são espelho uma da outra: o mesmo pagamento sai com o mesmo número nas duas; fora de sincronia está errado). É como o sistema já faz; nada muda. | feito |
 | **Corte do texto do boleto no C6** | Descrição de 100 letras e instruções em 4 linhas de 80: **decidido em 17/11 que se decide com o boleto de teste** (item 5). | quando o C6 liberar |
 | ~~**Prazos da conferência do banco**~~ | **Decidido em 17/11:** não há mais prazo de 45 dias nem de 7 dias para ligar sozinho. Só liga sozinho com o identificador igual (código de barras/nosso número, Pix do próprio boleto, código do Pix devolvido); Pix feito à mão e parcela de IPTU citada no extrato são sempre "vincular manualmente"; pagamento adiantado a empresa devolve. Contas lançadas à mão: candidatas do mês anterior e do mês da saída (saída em 17/11 → de 01/10 a 30/11). PR #309. | feito |
 | ~~**Devolução de Pix ao inquilino**~~ | **Decidido em 17/11:** a devolução fica ligada ao boleto e o recebido volta ao devido; a NF não muda (boleto de R$ 2.000,00 pago duas vezes, devolução de R$ 2.000,00 → R$ 2.000,00 recebidos, NF de R$ 2.000,00). PR #309. | feito |
