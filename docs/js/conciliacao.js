@@ -264,7 +264,7 @@ const marca = (bloco, tag) => { const m = new RegExp(`<${tag}>([^<\\r\\n]*)`, 'i
  */
 export function lerOfx(texto) {
   const s = String(texto || '');
-  if (!/<OFX>/i.test(s)) throw new Error('Este arquivo não é um OFX (não achei a marca <OFX>). Exporte o extrato no app do C6 em "OFX".');
+  if (!/<OFX>/i.test(s)) throw new Error('Este arquivo não é um OFX (não achei a marca <OFX>). Exporte o extrato em "OFX" no site ou no aplicativo do banco.');
   const lancamentos = [];
   const vistos = new Set();
   for (const m of s.matchAll(/<STMTTRN>([\s\S]*?)(?=<STMTTRN>|<\/STMTTRN>|<\/BANKTRANLIST>)/gi)) {
@@ -1432,6 +1432,7 @@ function validarPagamento(d, dados) {
   const conf = cfg(d);
   if (!conf.permitir_pagamentos) throw new Error('Os pagamentos pelo banco estão desligados em Dados e backup → Banco.');
   exigirConta(d, dados.conta_id);
+  if (!contasConfiguradas(d).some((c) => c.id === dados.conta_id)) throw new C.ErroUsuario('Esta conta é de outro banco (só extrato por arquivo): o pagamento pelo banco sai só por uma conta do C6.');
   if (!(Number(dados.valor) > 0)) throw new Error('Informe o valor a pagar.');
   if (conf.limite_pagamento > 0 && dados.valor > conf.limite_pagamento) throw new C.ErroUsuario(`O valor (${C.reais(dados.valor)}) passa do limite por pagamento (${C.reais(conf.limite_pagamento)}) definido em Dados e backup → Banco.`);
   if (dados.imovel_id && !buscar(d, 'imoveis', dados.imovel_id)) throw new Error('Imóvel não encontrado.');

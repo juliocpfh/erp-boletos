@@ -242,10 +242,10 @@ export const FORMULARIOS = {
     const f = Object.fromEntries(new FormData(form));
     if (!f.data) throw new C.ErroUsuario('Informe a data da vistoria.');
     const c = buscar('contratos', f.contrato);
-    // leitura dos relógios: obrigatória e registrada aqui (entrada ou saída do inquilino)
+    // leitura dos relógios: obrigatória (regra leitura_relogios_obrigatoria, padrão) e registrada aqui (entrada ou saída do inquilino)
     const momento = f.tipo === 'Saída' ? 'Saída do inquilino' : 'Entrada do inquilino';
     const leitura = Object.fromEntries(F.LEITURAS.map(([k]) => [k, String(f[`leitura_${k}`] || '').trim()]));
-    const faltaLeitura = R.relogiosDoContrato(c).filter((k) => !leitura[k]);
+    const faltaLeitura = R.relogiosObrigatorios(c).filter((k) => !leitura[k]);
     if (faltaLeitura.length) throw new C.ErroUsuario(`Informe a leitura do relógio de ${faltaLeitura.map((k) => F.LEITURAS.find(([x]) => x === k)[1].replace('Relógio de ', '')).join(' e ')}.`);
     const dados = { contrato_id: c.id, imovel_id: c.imovel_id || null, tipo: f.tipo, data: f.data, link_fotos: (f.link_fotos || '').trim(),
       chaves: f.chaves || '', descritivo: f.descritivo || '', condicoes: f.condicoes || '',
@@ -694,7 +694,16 @@ export const FORMULARIOS = {
     if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador altera a integração com o banco.');
     const f = Object.fromEntries(new FormData(form));
     const conta = await alterar((db) => R.salvarContaBanco(db, f, login()));
-    aviso(`Conta ${conta.apelido} salva. Lembre de configurar a mesma conta ("${conta.id}") no .env da ponte.`);
+    aviso(`Conta ${conta.apelido} salva. Lembre de pedir ao técnico para cadastrar a mesma conta (código "${conta.id}") na ponte.`);
+    await mostrar();
+  },
+
+  /** Dados e backup: inclui ou altera uma conta de outro banco (só o extrato por arquivo OFX ou CSV, sem a ponte). */
+  async contaArquivo(form) {
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador altera as contas do banco.');
+    const f = Object.fromEntries(new FormData(form));
+    const conta = await alterar((db) => R.salvarContaArquivo(db, f, login()));
+    aviso(`Conta ${conta.apelido} salva. Na tela Banco, abra a aba dela e importe o arquivo do extrato (OFX ou CSV).`);
     await mostrar();
   },
 

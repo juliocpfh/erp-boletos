@@ -90,6 +90,8 @@ Exemplo: a Maria Exemplo pagou pelo Pix em **10/12/2026** às 22h, e o C6 credit
 
 Pode buscar quantas vezes quiser no mês (uma vez por semana, por exemplo). O importante é que, no fechamento, as duas contas estejam buscadas até o último dia do mês.
 
+**Conta de outro banco (sem ligação com o sistema).** O administrador cadastra em **Dados e backup → Banco (C6) → Contas de outros bancos** (apelido, banco e empresa; ex.: "Itaú"). Na tela **Banco** ela ganha uma aba (ex.: **Itaú · conta no Itaú (extrato por arquivo)**) com o botão **Importar o extrato do Itaú (arquivo OFX ou CSV)**: baixe o extrato no site ou no aplicativo do banco e escolha o arquivo. Valem as mesmas conferências do C6: o mesmo lançamento não entra duas vezes, arquivo de outra conta é recusado e o saldo do arquivo é conferido com as movimentações. Essa conta não emite boleto, não paga e não gera comprovante pelo banco (anexe o PDF do banco). Como o arquivo não traz o código do boleto, **nenhuma entrada se liga sozinha a um boleto**: a linha mostra "vincular manualmente" e você escolhe o boleto em **Dar destino**.
+
 ### 2.6 Dar destino a cada movimentação
 
 Cada linha do extrato precisa de um **destino**. O sistema sugere o destino quando reconhece a linha (etiqueta "parece: Loja 1 · Água"); basta clicar em **Usar sugestão**. Se a conta (ex.: água de R$ 123,45) já foi lançada à mão em Contas pagas por nós, a sugestão liga a linha a ela, sem lançar outra; se a entrada é de um boleto já registrado à mão (mesma data e valor), a sugestão é "já pago: só ligar". Quando não reconhece, você escolhe:

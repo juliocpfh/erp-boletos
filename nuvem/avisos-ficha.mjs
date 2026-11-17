@@ -65,7 +65,8 @@ export async function avisar(env, registro, evento, detalhe = '', { buscar = fet
   const conta = simular ? null : await contaGuardada(env); // a ligada pelo botão (cofre) ou, sem ela, o segredo antigo
   const gmail = estadoEmail(env, { simular, conta });
   const feitos = [];
-  const url = `${String(env.ORIGEM || 'https://erp.ankjck.com.br').replace(/\/$/, '')}/#/ficha/${registro.ficha_id}`;
+  // endereço do sistema (ORIGEM, wrangler.toml): sem ele, o e-mail vai sem o link (antes caía no endereço da ANK, fixo)
+  const url = env.ORIGEM ? `${String(env.ORIGEM).replace(/\/$/, '')}/#/ficha/${registro.ficha_id}` : '';
   if (t.pessoa && gmail.ligado) {
     const para = emailDaPessoa(registro);
     if (para) {
@@ -75,7 +76,7 @@ export async function avisar(env, registro, evento, detalhe = '', { buscar = fet
   if (t.equipe) {
     const equipe = String(env.AVISOS_EQUIPE || gmail.remetente || '').split(',').map((x) => x.trim()).filter(emailValido);
     if (gmail.ligado && equipe.length) {
-      try { await enviarEmail(env, { para: equipe.join(','), assunto: `Ficha pela internet: ${t.equipe.titulo}`, texto: `${t.equipe.texto}\n\nAbrir a ficha: ${url}` }, { buscar, simular, conta }); feitos.push('equipe'); } catch (e) { console.warn('aviso por e-mail à equipe', e.message); }
+      try { await enviarEmail(env, { para: equipe.join(','), assunto: `Ficha pela internet: ${t.equipe.titulo}`, texto: `${t.equipe.texto}${url ? `\n\nAbrir a ficha: ${url}` : ''}` }, { buscar, simular, conta }); feitos.push('equipe'); } catch (e) { console.warn('aviso por e-mail à equipe', e.message); }
     }
     try { if (await avisarAparelhos(env, { ...AVISO_CELULAR, url: `./#/ficha/${registro.ficha_id}`, tag: `ficha-${registro.ficha_id}` }, { buscar })) feitos.push('celular'); } catch (e) { console.warn('aviso no celular', e.message); }
   }

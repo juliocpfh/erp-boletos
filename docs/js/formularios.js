@@ -145,6 +145,12 @@ export const RESSARCIMENTO = [
 /** Contas do imóvel e quem paga cada uma, conforme o contrato. */
 export const CONTAS = [['conta_agua', 'Água'], ['conta_energia', 'Energia'], ['conta_gas', 'Gás'], ['conta_internet', 'Internet / TV'], ['conta_condominio', 'Condomínio']];
 export const SITUACOES_CONTA = ['Por conta do inquilino', 'Incluso no aluguel', 'Não tem'];
+/**
+ * Quem paga cada conta no contrato (ou na ficha) novo: "Por conta do inquilino", salvo a Internet / TV, que vem "Não tem"
+ * (decisão do dono em 2026-11-17; quem tiver internet no contrato troca no formulário). Gás e condomínio sem o dado no
+ * imóvel também começam em "Não tem" (contasDoImovel, telas/cadastros.js). Contrato já gravado não muda.
+ */
+export const contaPadrao = (nome) => (nome === 'conta_internet' ? SITUACOES_CONTA[2] : SITUACOES_CONTA[0]);
 
 /** Índices para corrigir o FCI (séries mensais do Banco Central). */
 export const INDICES_FCI = ['Poupança', 'IPCA', 'IGP-M', 'INPC', 'IGP-DI', 'SELIC'];
@@ -290,7 +296,7 @@ export const CONTRATO = [
   campo('conta_seguro', 'Seguro obrigatório', 'opcao', { obrig: true, padrao: 'Por conta do inquilino', opcoes: SITUACOES_CONTA, ajuda: 'Por conta do inquilino: as parcelas entram no boleto' }),
   campo('fci_percentual', 'FCI: fundo de conservação (% do aluguel bonificado)', 'pct', { ajuda: 'Em branco: não cobra. Ex.: 5 → 5% de R$ 1.800,00 = R$ 90,00 por mês no boleto, guardados para os reparos na saída' }),
   campo('fci_indice', 'Correção mensal do FCI', 'opcao', { opcoes: INDICES_FCI, ...quando('fci_percentual', '*'), ajuda: 'Índice do Banco Central usado para corrigir o saldo do FCI mês a mês' }),
-  ...CONTAS.map(([nome, rotulo]) => campo(nome, rotulo, 'opcao', { opcoes: SITUACOES_CONTA, padrao: SITUACOES_CONTA[0] })),
+  ...CONTAS.map(([nome, rotulo]) => campo(nome, rotulo, 'opcao', { opcoes: SITUACOES_CONTA, padrao: contaPadrao(nome) })),
   campo('contas_adicionais', 'Contas ou cobranças adicionais', 'area', { linha: true, ajuda: 'Ex.: taxa de lixo, limpeza da área comum, rateio de água' }),
   secao('Valores e boleto'),
   campo('aluguel_inicial', 'Aluguel', 'dinheiro', { obrig: true, positivo: true, ajuda: 'Valor cheio do contrato (histórico)' }),
@@ -410,7 +416,7 @@ export const FICHA_FIM = [
   campo('iptu_estimado', 'IPTU por mês (estimado)', 'dinheiro', { ...quando('conta_iptu', 'Por conta do inquilino'), ajuda: 'Ex.: R$ 153,00 (as parcelas do ano ÷ 10). Só informa: o valor certo vem das guias' }),
   campo('conta_seguro', 'Seguro contra incêndio', 'opcao', { opcoes: SITUACOES_CONTA, padrao: SITUACOES_CONTA[0] }),
   campo('seguro_estimado', 'Seguro por ano (estimado)', 'dinheiro', { ...quando('conta_seguro', 'Por conta do inquilino'), ajuda: 'Ex.: R$ 250,00, parcelado no boleto. Só informa: o valor certo vem da apólice' }),
-  ...CONTAS.map(([nome, rotulo]) => campo(nome, rotulo, 'opcao', { opcoes: SITUACOES_CONTA, padrao: SITUACOES_CONTA[0] })),
+  ...CONTAS.map(([nome, rotulo]) => campo(nome, rotulo, 'opcao', { opcoes: SITUACOES_CONTA, padrao: contaPadrao(nome) })),
   secao('Reserva'),
   campo('reserva_valor', 'Valor da reserva', 'dinheiro'),
   campo('reserva_data', 'Data da reserva', 'data'),

@@ -107,13 +107,13 @@ export function caixaBancoC6(cb) {
   const qr = B.imagemQrPix(cb);
   const semPix = b.situacao === 'emitido' && !b.pix_copia_cola;
   return `<div class="cartao" id="banco-c6"><div class="cabecalho">${titulo}<div>${etiquetaBanco(cb)}${semPix ? ` ${etiqueta('sem Pix', 'aviso')}` : ''}</div></div>
-    ${semPix ? `<div class="alerta aviso"><b>O boleto saiu sem o Pix</b>${conta && conta.chave_pix ? `: a ponte não tem a chave Pix desta conta (C6_${esc(String(conta.id).toUpperCase())}_CHAVE_PIX). O inquilino paga só pela linha digitável; para ter o QR Code, configure a chave na ponte e emita de novo.` : ': a conta não tem chave Pix cadastrada (Dados e backup → Banco C6).'}</div>` : ''}
+    ${semPix ? `<div class="alerta aviso"><b>O boleto saiu sem o Pix</b>${conta && conta.chave_pix ? ': a ponte não tem a chave Pix desta conta. O inquilino paga só pela linha digitável; para ter o QR Code, peça ao técnico para pôr a chave Pix da conta na ponte e emita de novo.' : ': a conta não tem chave Pix cadastrada (Dados e backup → Banco C6).'}</div>` : ''}
     ${cb.data_pagamento && b.situacao === 'emitido' && !cb.pagamento_c6 && !R.aguardandoCredito(cb) ? `<div class="alerta perigo"><b>Pago aqui, mas ainda em aberto no C6.</b> O inquilino ainda consegue pagar este boleto de novo${b.negativacao && b.negativacao.pode_cancelar ? ' e a negativação agendada continua valendo' : ''}. Clique em "Consultar situação no banco" (se o banco já recebeu este pagamento, acerta sozinho); se o pagamento foi por fora (Pix direto, dinheiro), use "Cancelar no banco"${b.negativacao && b.negativacao.pode_cancelar ? ' e "Cancelar negativação"' : ''}.</div>` : ''}
     ${b.pagamentos_no_banco > 1 ? `<div class="alerta perigo"><b>O banco recebeu ${b.pagamentos_no_banco} pagamentos deste boleto</b>${b.valor_pago_total ? ` (${reais(b.valor_pago_total)} no total)` : ''}: o inquilino pagou mais de uma vez (ex.: Pix e código de barras). Registre só um aqui e devolva a diferença ao inquilino.</div>` : ''}
     ${R.aguardandoCredito(cb) ? '<div class="alerta info"><b>O inquilino pagou</b> e o banco ainda está confirmando o crédito. Consulte de novo mais tarde para registrar o pagamento aqui.</div>' : ''}
     ${b.situacao === 'pago' && !cb.data_pagamento ? `<div class="alerta aviso"><b>O banco informou o pagamento</b>${b.pago_em ? ` em ${dataBr(b.pago_em)}` : ''}${b.valor_pago ? ` (${reais(b.valor_pago)})` : ''}, mas ele ainda não está registrado aqui. ${opera() ? botao('consultarBoletoC6', 'Registrar o pagamento', { id: cb.id }, 'pequeno') : 'Peça a um operador para registrar.'}</div>` : ''}
     ${div ? `<div class="alerta aviso"><b>Atenção:</b> o boleto no banco está com ${reais(div.no_banco)}${div.vencimento_banco !== div.vencimento_sistema ? `, vencendo em ${dataBr(div.vencimento_banco)}` : ''}, e o sistema calcula ${reais(div.no_sistema)}${div.vencimento_banco !== div.vencimento_sistema ? ` para ${dataBr(div.vencimento_sistema)}` : ''}.${div.encargos_mudaram ? ` A bonificação, a multa ou os juros mudaram depois da emissão: o banco dá ${reais(div.desconto_banco)} de bonificação e o sistema calcula ${reais(div.desconto_sistema)}.` : ''}${opera() ? ` ${botao('alterarBoletoC6', 'Atualizar o boleto no banco com os valores do sistema', { id: cb.id }, 'pequeno', 'Alterar no C6 o valor, o vencimento e a descrição deste boleto para os do sistema?')}` : ''} Se o banco não aceitar, cancele no banco e emita de novo.</div>` : ''}
-    <div class="grade">${item('Conta', conta ? `${esc(conta.apelido)} (${esc((buscar('emitentes', conta.emitente_id) || {}).nome || '')})` : esc(b.conta_id || '-'))}${item('Ambiente', b.ambiente === 'producao' ? 'Produção' : etiqueta('Sandbox (teste): não vale como cobrança', 'aviso'))}
+    <div class="grade">${item('Conta', conta ? `${esc(conta.apelido)} (${esc((buscar('emitentes', conta.emitente_id) || {}).nome || '')})` : esc(b.conta_id || '-'))}${item('Tipo de emissão', b.ambiente === 'producao' ? 'Cobrança de verdade' : etiqueta('Teste do banco: não vale como cobrança', 'aviso'))}
       ${item('Emitido em', b.emitido_em ? dataHoraBr(b.emitido_em) : '-')}${b.pago_em ? item('Pago em (banco)', `${dataBr(b.pago_em)}${b.credito_em && b.credito_em !== b.pago_em ? `<br><span class="suave">creditado em ${dataBr(b.credito_em)}</span>` : ''}`) : ''}
       ${item('Valor no banco', reais(b.valor))}${item('Vencimento no banco', b.vencimento ? dataBr(b.vencimento) : '-')}
       ${item('Situação no banco', `${esc(b.situacao_banco || b.situacao)}${b.consultado_em ? `<br><span class="suave">consultado em ${dataHoraBr(b.consultado_em)}</span>` : ''}`)}</div>
@@ -131,6 +131,8 @@ export function caixaBancoC6(cb) {
 // Configuração (Dados e backup e Empresas, só administrador)
 // --------------------------------------------------------------------------
 const marcado = (v) => (v ? 'checked' : '');
+/** Nome em português de cada forma de desconto do banco (o valor gravado continua o nome do banco, mapa-c6.js). */
+const NOME_TIPO_DESCONTO = { VALUE_PER_DAY: 'Em reais (o valor do desconto)', MONTHLY_PERCENTAGE: 'Em percentual do boleto' };
 
 /** Empresas: qual conta emite os boletos (sempre a padrão, ou escolher boleto a boleto). */
 export function caixaContaDosBoletos() {
@@ -154,7 +156,7 @@ export function caixaConfigBanco() {
   const cfg = B.configuracaoBanco(d());
   const emitentes = ordenar(d().emitentes.filter((e) => e.ativo !== false), 'nome');
   const nomeEmp = (id) => esc((buscar('emitentes', id) || {}).nome || '(empresa excluída)');
-  const situacao = cfg.contas.length ? (cfg.ativo ? (B.ponteLocal().configurada ? etiqueta('Ativa', 'ok') : etiqueta('Ativa · falta a ponte neste computador', 'aviso')) : etiqueta('Desligada', 'neutra')) : etiqueta('Aguardando as chaves da API do C6', 'aviso');
+  const situacao = cfg.contas.length ? (cfg.ativo ? (B.ponteLocal().configurada ? etiqueta('Ativa', 'ok') : etiqueta('Ativa · falta a ponte neste computador', 'aviso')) : etiqueta('Desligada', 'neutra')) : etiqueta('Aguardando as chaves de acesso do C6', 'aviso');
   const padrao = R.CONTA_BANCO_PADRAO;
   const emissora = R.contaEmissora(d());
   const resumoNotif = (x) => { const canais = Object.entries(R.CANAIS_NOTIFICACAO).filter(([k]) => x.notificar[k]).map(([, [, r]]) => r); const quando = Object.entries(R.MOMENTOS_NOTIFICACAO).filter(([k]) => x.notificar[k]).map(([, [, r]]) => r); return canais.length && quando.length ? `${canais.join(' e ')}: ${quando.join(', ')}` : 'não avisa'; };
@@ -169,24 +171,24 @@ export function caixaConfigBanco() {
       <div class="acoes" style="align-self:end"><button class="secundario">Salvar</button> ${botao('testarPonteC6', 'Testar conexão', {}, 'secundario')}${B.ponteLocal().configurada ? ` ${botao('esquecerPonteC6', 'Esquecer a ponte neste computador', {}, 'perigo', 'Apagar o endereço e a senha da ponte guardados neste computador? Os botões do banco param de funcionar aqui até informar os dois de novo.')}` : ''}</div></form>
     <div id="saude-ponte"></div>
     <h3>Contas bancárias (uma por empresa)</h3>
-    <div class="rolagem"><table><tr><th>Identificador na ponte</th><th>Apelido</th><th>Empresa dona da conta</th><th>Ambiente</th><th>Chave Pix</th><th>Avisos ao inquilino</th><th>Negativação</th><th></th></tr>
-      ${cfg.contas.map((x) => `<tr><td><code>${esc(x.id)}</code></td><td><b>${esc(x.apelido)}</b>${(emissora || {}).id === x.id ? ` ${etiqueta('padrão dos boletos', 'info')}` : ''}</td><td>${nomeEmp(x.emitente_id)}</td><td>${x.ambiente === 'producao' ? 'Produção' : etiqueta('Sandbox (teste)', 'aviso')}<br><span class="suave">carteira ${esc(R.carteiraDaConta(x))}</span>${x.desconto_conferido && x.desconto_conferido.tipo === x.tipo_desconto ? `<br><span class="suave">desconto conferido em ${dataBr(x.desconto_conferido.em)}</span>` : x.ambiente === 'producao' ? `<br>${etiqueta('desconto não conferido: boleto com bonificação não sai', 'perigo')}` : `<br><span class="suave">desconto: conferir no boleto de teste</span>`}</td>
+    <div class="rolagem"><table><tr><th>Código da conta</th><th>Apelido</th><th>Empresa dona da conta</th><th>Teste ou de verdade</th><th>Chave Pix</th><th>Avisos ao inquilino</th><th>Negativação</th><th></th></tr>
+      ${cfg.contas.map((x) => `<tr><td><code>${esc(x.id)}</code></td><td><b>${esc(x.apelido)}</b>${(emissora || {}).id === x.id ? ` ${etiqueta('padrão dos boletos', 'info')}` : ''}</td><td>${nomeEmp(x.emitente_id)}</td><td>${x.ambiente === 'producao' ? 'Cobrança de verdade' : etiqueta('Teste do banco', 'aviso')}<br><span class="suave">carteira ${esc(R.carteiraDaConta(x))}</span>${x.desconto_conferido && x.desconto_conferido.tipo === x.tipo_desconto ? `<br><span class="suave">desconto conferido em ${dataBr(x.desconto_conferido.em)}</span>` : x.ambiente === 'producao' ? `<br>${etiqueta('desconto não conferido: boleto com bonificação não sai', 'perigo')}` : '<br><span class="suave">desconto: conferir no boleto de teste</span>'}</td>
         <td>${x.chave_pix ? esc(x.chave_pix) : '<span class="suave">sem Pix</span>'}</td><td>${esc(resumoNotif(x))}</td><td>${x.negativacao.ativa ? `${x.negativacao.dias_atraso} dias de atraso` : '<span class="suave">desligada</span>'}</td>
         <td class="n nw">${botao('testarContaC6', 'Testar conexão', { conta: x.id })} ${botao('editarContaBanco', 'Editar', { conta: x.id })} ${botao('excluirContaBanco', 'Tirar', { conta: x.id }, 'perigo pequeno', `Tirar a conta "${x.apelido}" da integração?`)}</td></tr>`).join('')
-    || '<tr><td colspan="8" class="suave">Nenhuma conta cadastrada. Cadastre abaixo uma conta por empresa, com o mesmo identificador que o técnico usou na ponte (ex.: loja1).</td></tr>'}</table></div>
+    || '<tr><td colspan="8" class="suave">Nenhuma conta cadastrada. Cadastre abaixo uma conta por empresa, com o mesmo código que o técnico usou na ponte (ex.: loja1).</td></tr>'}</table></div>
     <details id="nova-conta-banco" class="caixa-historico"><summary><b>Incluir ou alterar uma conta</b> <span class="suave">· clique para expandir</span></summary>
     <form data-form="contaBanco" class="formulario" style="margin-top:10px">
-      <div><label>Identificador na ponte</label><input name="id" placeholder="loja1" required pattern="[A-Za-z0-9_\\-]+"><div class="ajuda">Só letras e números; igual ao da ponte</div></div>
+      <div><label>Código da conta</label><input name="id" placeholder="loja1" required pattern="[A-Za-z0-9_\\-]+"><div class="ajuda">Só letras e números; o mesmo que o técnico usou ao instalar a ponte</div></div>
       <div><label>Apelido</label><input name="apelido" placeholder="Loja 1"></div>
       <div><label>Empresa dona da conta</label><select name="emitente_id" required><option value=""></option>${emitentes.map((e) => `<option value="${e.id}">${esc(e.nome)}</option>`).join('')}</select></div>
-      <div><label>Ambiente</label><select name="ambiente"><option value="sandbox">Teste do banco (sandbox): não cobra de verdade</option><option value="producao">Cobrança de verdade (produção)</option></select></div>
+      <div><label>Teste ou de verdade</label><select name="ambiente"><option value="sandbox">Teste do banco: não cobra de verdade</option><option value="producao">Cobrança de verdade</option></select></div>
       <div><label>Carteira de cobrança</label><input name="carteira" placeholder="automática" inputmode="numeric"><div class="ajuda">Número que o banco informa. Em branco: 21 no teste, 15 na cobrança de verdade</div></div>
       <div><label>Chave Pix aleatória da conta (para o QR Code)</label><input name="chave_pix" placeholder="chave aleatória cadastrada no C6"><div class="ajuda">Só chave aleatória (EVP). Em branco: boleto sem Pix</div></div>
       <div><label>Prazo para pagar depois do vencimento (dias)</label><input name="dias_baixa" type="number" min="1" value="${padrao.dias_baixa}"><div class="ajuda">Passados esses dias depois do vencimento, o banco encerra o boleto e o inquilino não consegue mais pagar por ele (pelo menos 1)</div></div>
       <div><label>Desconto de pontualidade vale até (dias antes do vencimento)</label><input name="desconto_dias_antes" type="number" min="0" value="${padrao.desconto_dias_antes}"><div class="ajuda">0 = até o dia do vencimento</div></div>
-      <div><label>Tipo do desconto na API</label><select name="tipo_desconto">${Object.values(M.TIPOS_ENCARGO.desconto).map((t) => `<option ${t === padrao.tipo_desconto ? 'selected' : ''}>${t}</option>`).join('')}</select><div class="ajuda">Confirmar no sandbox no 1º boleto de teste</div></div>
-      <div class="largo"><input type="hidden" name="desconto_conferido_campo" value="1"><label class="check-mini"><input type="checkbox" name="desconto_conferido" value="1"> Conferi o desconto no boleto de teste (sandbox)</label>
-        <div class="ajuda"><b>Por que isto existe:</b> a documentação do banco descreve o tipo de desconto "VALUE_PER_DAY" como "valor por dia de antecipação". Se o banco entender assim, um desconto de R$ 135,00 viraria R$ 135,00 <b>por dia</b> pago antes do vencimento (pago 10 dias antes, R$ 1.350,00 de desconto num boleto de R$ 1.353,50). Por isso, numa conta em <b>produção</b>, o sistema só manda boleto com desconto depois desta conferência. Como conferir: deixe a conta em sandbox, emita um boleto de teste, abra o PDF e veja se o desconto aparece com o valor total certo (ex.: R$ 135,00) até o vencimento. Se estiver certo, marque aqui; se não, troque o tipo e teste de novo. Trocar o tipo desmarca a conferência.</div></div>
+      <div><label>Como o desconto vai ao banco</label><select name="tipo_desconto">${Object.values(M.TIPOS_ENCARGO.desconto).map((t) => `<option value="${esc(t)}" ${t === padrao.tipo_desconto ? 'selected' : ''}>${esc(NOME_TIPO_DESCONTO[t] || t)}</option>`).join('')}</select><div class="ajuda">Confira no 1º boleto de teste</div></div>
+      <div class="largo"><input type="hidden" name="desconto_conferido_campo" value="1"><label class="check-mini"><input type="checkbox" name="desconto_conferido" value="1"> Conferi o desconto no boleto de teste</label>
+        <div class="ajuda"><b>Por que isto existe:</b> a documentação do banco descreve o desconto "em reais" como "valor por dia de antecipação". Se o banco entender assim, um desconto de R$ 135,00 viraria R$ 135,00 <b>por dia</b> pago antes do vencimento (pago 10 dias antes, R$ 1.350,00 de desconto num boleto de R$ 1.353,50). Por isso, numa conta de <b>cobrança de verdade</b>, o sistema só manda boleto com desconto depois desta conferência. Como conferir: deixe a conta em "Teste do banco", emita um boleto de teste, abra o PDF e veja se o desconto aparece com o valor total certo (ex.: R$ 135,00) até o vencimento. Se estiver certo, marque aqui; se não, troque a forma do desconto e teste de novo. Trocar a forma desmarca a conferência.</div></div>
       <div class="largo"><label>Instruções fixas no boleto (opcional, uma por linha, até 4 de 80 letras)</label><textarea name="instrucoes" rows="2" placeholder="Ex.: Após o vencimento, pagar somente pelo Pix"></textarea></div>
       <div class="largo"><label>Avisos automáticos ao inquilino pelo banco</label><div class="acoes">
         ${Object.entries(R.CANAIS_NOTIFICACAO).map(([k, [, r]]) => `<label class="check-mini"><input type="checkbox" name="notificar_${k}" value="1" ${marcado(padrao.notificar[k])}> ${r}</label>`).join('')} <span class="suave">·</span>
@@ -195,7 +197,27 @@ export function caixaConfigBanco() {
       <div class="largo"><label>Negativação no birô de crédito</label><div class="acoes"><label class="check-mini"><input type="checkbox" name="negativacao_ativa" value="1"> Mostrar o botão "Negativar" na página do boleto (só administrador)</label>
         após <input name="negativacao_dias" type="number" min="1" value="${padrao.negativacao.dias_atraso}" style="width:80px"> dias de atraso</div></div>
       <div class="acoes" style="align-self:end"><button class="secundario">Salvar conta</button></div></form></details>
+    ${caixaContasArquivo(emitentes, nomeEmp)}
     <p class="suave" style="margin-top:10px">Para ligar o banco quando as chaves chegarem, peça ao técnico (o passo a passo está na documentação do sistema: "Ligar o boleto com Pix do C6").</p></div>`;
+}
+
+/**
+ * Contas de outros bancos (sem a ponte): só recebem o extrato por arquivo OFX ou CSV na tela Banco, com a conferência do saldo e
+ * dos lançamentos repetidos. Não emitem boleto nem pagam. Ex.: a conta do Itaú da empresa, para conciliar o extrato dela.
+ */
+function caixaContasArquivo(emitentes, nomeEmp) {
+  const lista = R.contasSoArquivo(d());
+  const qtd = (id) => (d().movimentacoes_banco || []).filter((m) => m.conta_id === id).length;
+  return `<h3 id="contas-arquivo">Contas de outros bancos (só o extrato por arquivo)</h3>
+    <p class="suave">Para conferir o extrato de uma conta de outro banco (sem ligação com o sistema): cadastre aqui e importe o arquivo OFX ou CSV baixado no site ou no aplicativo do banco, na tela Banco. O sistema confere o saldo do arquivo e não deixa entrar o mesmo lançamento duas vezes. As entradas não se ligam sozinhas aos boletos: cada uma é vinculada à mão.</p>
+    ${lista.length ? `<div class="rolagem"><table><tr><th>Apelido</th><th>Banco</th><th>Empresa dona da conta</th><th>Extrato importado</th><th></th></tr>
+      ${lista.map((x) => `<tr><td><b>${esc(x.apelido)}</b></td><td>${esc(x.banco || '-')}</td><td>${nomeEmp(x.emitente_id)}</td><td>${qtd(x.id)} lançamento(s) · ${link(`#/banco?conta=${encodeURIComponent(x.id)}`, 'abrir na tela Banco')}</td>
+        <td class="n nw">${qtd(x.id) ? '' : botao('excluirContaArquivo', 'Tirar', { conta: x.id }, 'perigo pequeno', `Tirar a conta "${x.apelido}"?`)}</td></tr>`).join('')}</table></div>` : ''}
+    <form data-form="contaArquivo" class="formulario" style="margin-top:8px">
+      <div><label>Apelido</label><input name="apelido" placeholder="Itaú" required maxlength="40"><div class="ajuda">Aparece na aba da tela Banco. O mesmo apelido de uma conta já cadastrada altera a conta</div></div>
+      <div><label>Banco</label><input name="banco" placeholder="Itaú" maxlength="60"></div>
+      <div><label>Empresa dona da conta</label><select name="emitente_id" required><option value=""></option>${emitentes.map((e) => `<option value="${e.id}">${esc(e.nome)}</option>`).join('')}</select></div>
+      <div class="acoes" style="align-self:end"><button class="secundario">Salvar conta de outro banco</button></div></form>`;
 }
 
 /** Desenha o resultado de /saude na caixa (texto em português, sem jargão). */
@@ -203,11 +225,12 @@ export function htmlSaude(s, contaId = null) {
   if (!s || !s.ponte) return '<div class="alerta perigo">A ponte respondeu algo inesperado.</div>';
   const contas = s.contas || {};
   const certificado = (c) => (c.certificado_valido_ate ? ` · certificado válido até ${dataBr(c.certificado_valido_ate)}${c.certificado_dias !== null && c.certificado_dias <= 30 ? ` ${etiqueta(c.certificado_dias < 0 ? 'vencido' : `vence em ${c.certificado_dias} dia(s)`, 'perigo')}` : ''}` : '');
-  const escopos = (c) => (c.escopos && c.escopos.length ? ` · escopos: ${esc(c.escopos.join(' '))}` : '');
-  const linhaConta = (c) => `<li><b>${esc(c.id)}</b> (${c.ambiente === 'producao' ? 'produção' : 'sandbox'}): ${c.simulado ? etiqueta('modo simulado', 'aviso') : c.configurado ? `${etiqueta('chaves ok', 'ok')} · token ${c.token === 'ok' ? etiqueta('ok', 'ok') : c.token === 'falhou' ? `${etiqueta('falhou', 'perigo')} ${esc(c.erro_token || '')}` : etiqueta('não testado', 'neutra')}${escopos(c)}` : `${etiqueta('faltam as chaves', 'aviso')} ${esc((c.faltam || []).join(', '))}`}${certificado(c)}${(c.avisos || []).map((a) => ` <span class="suave">${esc(a)}</span>`).join('')}</li>`;
+  // as permissões que o banco deu (nomes do banco, para o técnico): ficam no "title", fora do texto
+  const escopos = (c) => (c.escopos && c.escopos.length ? ` · <span title="${esc(c.escopos.join(' '))}">${c.escopos.length} permissão(ões) do banco</span>` : '');
+  const linhaConta = (c) => `<li><b>${esc(c.id)}</b> (${c.ambiente === 'producao' ? 'cobrança de verdade' : 'teste do banco'}): ${c.simulado ? etiqueta('modo simulado', 'aviso') : c.configurado ? `${etiqueta('chaves ok', 'ok')} · entrada no banco ${c.token === 'ok' ? etiqueta('ok', 'ok') : c.token === 'falhou' ? `${etiqueta('falhou', 'perigo')} ${esc(c.erro_token || '')}` : etiqueta('não testada', 'neutra')}${escopos(c)}` : `${etiqueta('faltam as chaves', 'aviso')} ${esc((c.faltam || []).join(', '))}`}${certificado(c)}${(c.avisos || []).map((a) => ` <span class="suave">${esc(a)}</span>`).join('')}</li>`;
   const cfg = B.configuracaoBanco(d());
   const semNaPonte = contaId ? [] : cfg.contas.filter((x) => !contas[x.id]).map((x) => x.id);
-  return `<div class="alerta ${s.simulado ? 'aviso' : s.configurado ? 'ok' : 'info'}"><b>Ponte respondeu</b>${s.versao ? ` (versão ${esc(s.versao)})` : ''}${s.simulado ? ': <b>modo simulado</b>, os boletos emitidos são fictícios' : s.configurado ? ': pronta para falar com o banco' : ': ainda falta configurar'}${s.senha_exigida === false ? ' · <b>sem senha na ponte</b> (defina PONTE_SENHA no .env)' : ''}.
-    <ul style="margin:6px 0 0">${Object.values(contas).map(linhaConta).join('') || '<li>Nenhuma conta na ponte: defina CONTAS=ank,jck no .env dela.</li>'}</ul>
+  return `<div class="alerta ${s.simulado ? 'aviso' : s.configurado ? 'ok' : 'info'}"><b>Ponte respondeu</b>${s.versao ? ` (versão ${esc(s.versao)})` : ''}${s.simulado ? ': <b>modo simulado</b>, os boletos emitidos são fictícios' : s.configurado ? ': pronta para falar com o banco' : ': ainda falta configurar'}${s.senha_exigida === false ? ' · <b>sem senha na ponte</b> (peça ao técnico para pôr uma senha nela)' : ''}.
+    <ul style="margin:6px 0 0">${Object.values(contas).map(linhaConta).join('') || '<li>Nenhuma conta na ponte: peça ao técnico para cadastrar nela as contas, com os mesmos códigos daqui.</li>'}</ul>
     ${semNaPonte.length ? `<p style="margin:6px 0 0">Contas cadastradas aqui mas não na ponte: <b>${semNaPonte.map(esc).join(', ')}</b>.</p>` : ''}</div>`;
 }
