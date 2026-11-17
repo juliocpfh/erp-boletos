@@ -22,6 +22,8 @@ export function centavos(texto) {
   if (texto === null || texto === undefined || texto === '') return 0;
   if (typeof texto === 'number') return arred(texto * 100);
   let t = String(texto).replace(/R\$|\s/g, '');
+  // formato americano ("2,300.00": vírgula antes do ponto) virava R$ 2,30 sem aviso (decisão do dono, 2026-11-16: recusar)
+  if (/,.*\./.test(t)) throw new ErroUsuario(`Valor "${texto}" no formato errado. Use 2.300,00 (ponto no milhar, vírgula nos centavos).`);
   if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
   else if (/^-?\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, ''); // "1.350" = mil trezentos e cinquenta reais
   const n = Number(t);
