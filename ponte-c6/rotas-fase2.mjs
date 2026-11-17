@@ -80,10 +80,36 @@ export function montarPdfComprovante(l, { conta, empresa = String(conta ?? '').t
   });
 }
 
+/**
+ * Limites de um lote de pagamentos antes de ir ao banco (configurados no .env da ponte): quantidade de itens, valor de cada um
+ * (C6_<ID>_VALOR_MAXIMO) e soma do lote (C6_<ID>_LOTE_MAXIMO). Lança Error (vira 400) com a explicação.
+ */
+export function conferirLimitesDoLote(itens, limites = {}) {
+  if (!Array.isArray(itens) || !itens.length) return;
+  const maxItens = limites.max_itens > 0 ? limites.max_itens : 100;
+  if (itens.length > maxItens) throw new Error(`Lote com ${itens.length} pagamentos; o máximo nesta ponte é ${maxItens} (PAGAMENTOS_MAX_ITENS no .env).`);
+  let soma = 0;
+  itens.forEach((it, i) => {
+    const v = it && (typeof it.amount === 'string' ? Number(it.amount.replace(',', '.')) : it.amount);
+    if (typeof v !== 'number' || !Number.isFinite(v)) return; // validarItem explica depois
+    const c = Math.round(v * 100);
+    if (limites.valor_maximo > 0 && c > Math.round(limites.valor_maximo * 100)) throw new Error(`Item ${i + 1}: valor acima do máximo desta conta na ponte (R$ ${reaisBr(Math.round(limites.valor_maximo * 100))}; C6_<ID>_VALOR_MAXIMO no .env).`);
+    soma += c;
+  });
+  if (limites.lote_maximo > 0 && soma > Math.round(limites.lote_maximo * 100)) throw new Error(`A soma do lote (R$ ${reaisBr(soma)}) passa do máximo desta conta na ponte (R$ ${reaisBr(Math.round(limites.lote_maximo * 100))}; C6_<ID>_LOTE_MAXIMO no .env).`);
+}
+
+/** Nome que aparece no app do C6 para quem enviou o lote: sempre começa pelo nome fixo da ponte (o resto é o que o site informou). */
+export function nomeDeQuemEnvia(nomeFixo, informado) {
+  const resto = String(informado ?? '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40);
+  if (!resto) throw new Error('Informe o nome de quem está enviando o lote (uploader_name).');
+  return `${String(nomeFixo || 'ponte').slice(0, 30)} - ${resto}`;
+}
+
 /** Por quanto tempo o extrato buscado para um comprovante serve aos próximos comprovantes da mesma conta e janela. */
 export const VALIDADE_EXTRATO_COMPROVANTE_MS = 90000;
 
-export function rotasFase2({ c6DaConta, registrar = () => {}, empresas = {}, agora = () => new Date(), validadeExtratoMs = VALIDADE_EXTRATO_COMPROVANTE_MS, relogio = () => Date.now() }) {
+export function rotasFase2({ c6DaConta, registrar = () => {}, empresas = {}, agora = () => new Date(), validadeExtratoMs = VALIDADE_EXTRATO_COMPROVANTE_MS, relogio = () => Date.now(), limitesPagamento = {}, nomeEnvio = 'ponte' }) {
   if (typeof c6DaConta !== 'function') throw new Error('rotasFase2 precisa de c6DaConta(conta).');
   const hojeTxt = () => hoje();
 
@@ -109,14 +135,14 @@ export function rotasFase2({ c6DaConta, registrar = () => {}, empresas = {}, ago
     const caminho = regexDoPadrao(padrao);
     return {
       metodo, padrao, caminho,
-      async handler(req, { conta, query = {}, corpo = null, params = {} } = {}) {
+      async handler(req, { conta, query = {}, corpo = null, params = {}, ip = '', origem = '' } = {}) {
         const daUrl = caminho.exec(String(req?.url ?? '').split('?')[0])?.groups ?? {};
         const p = Object.fromEntries(Object.entries({ ...daUrl, ...params }).map(([k, v]) => [k, decodificarParam(String(v))]));
         const contaId = String(conta ?? p.conta ?? '').toLowerCase();
         try {
           const c6 = contaId ? await c6DaConta(contaId) : null;
           if (!c6) return erro(404, `A conta "${contaId}" não está configurada na ponte.`, 'conta');
-          return await fn({ c6, conta: contaId, query: query ?? {}, corpo, params: p });
+          return await fn({ c6, conta: contaId, query: query ?? {}, corpo, params: p, ip, origem });
         } catch (e) {
           if (e?.status >= 400) {
             registrar(`[${contaId}] ${metodo} ${padrao}: o banco respondeu ${e.status}: ${e.message}`);
@@ -155,10 +181,11 @@ export function rotasFase2({ c6DaConta, registrar = () => {}, empresas = {}, ago
 
     rota('GET', '/contas/:conta/dda', async ({ c6, conta }) => ({ status: 200, corpo: { conta_id: conta, ...(await dda(c6)) } })),
 
-    rota('POST', '/contas/:conta/pagamentos/decodificar', async ({ c6, conta, corpo }) => {
+    rota('POST', '/contas/:conta/pagamentos/decodificar', async ({ c6, conta, corpo, ip, origem }) => {
       const itens = Array.isArray(corpo) ? corpo : corpo?.items ?? corpo?.itens;
+      conferirLimitesDoLote(itens, limitesPagamento[conta]);
       const r = await decodificar(c6, itens);
-      registrar(`[${conta}] pagamentos enviados para leitura: grupo ${r.group_id} (${itens.length} itens)`);
+      registrar(`[${conta}] pagamentos enviados para leitura: grupo ${r.group_id} (${itens.length} itens) · ${ip} ${origem}`);
       return { status: 201, corpo: { conta_id: conta, ...r } };
     }),
 
@@ -171,9 +198,10 @@ export function rotasFase2({ c6DaConta, registrar = () => {}, empresas = {}, ago
 
     rota('DELETE', '/contas/:conta/pagamentos/:grupo/itens/:item', async ({ c6, conta, params }) => ({ status: 200, corpo: { conta_id: conta, ...(await removerItem(c6, params.grupo, params.item)) } })),
 
-    rota('POST', '/contas/:conta/pagamentos/:grupo/enviar', async ({ c6, conta, params, corpo }) => {
-      const r = await enviarParaAprovacao(c6, params.grupo, corpo?.uploader_name ?? corpo?.nome);
-      registrar(`[${conta}] grupo ${params.grupo} enviado para aprovação por ${corpo?.uploader_name ?? corpo?.nome}`);
+    rota('POST', '/contas/:conta/pagamentos/:grupo/enviar', async ({ c6, conta, params, corpo, ip, origem }) => {
+      const nome = nomeDeQuemEnvia(nomeEnvio, corpo?.uploader_name ?? corpo?.nome);
+      const r = await enviarParaAprovacao(c6, params.grupo, nome);
+      registrar(`[${conta}] grupo ${params.grupo} enviado para aprovação: "${nome}" · ${ip} ${origem}`);
       return { status: 200, corpo: { conta_id: conta, ...r } };
     }),
 

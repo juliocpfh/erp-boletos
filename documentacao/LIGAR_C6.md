@@ -66,7 +66,7 @@ Passos, no computador da ponte:
    - `ponte-c6/credenciais/ank/` (produção)
    - `ponte-c6/credenciais/jck-sandbox/` e `ponte-c6/credenciais/jck/` (se for usar a JCK)
 2. Descompacte o ZIP do C6 e coloque dentro da pasta da conta o **certificado** (`.crt` ou `.pem`) e a **chave privada** (`.key` ou `.pem`), com os nomes que o `ponte-c6/README` indica.
-3. Copie o arquivo `ponte-c6/.env.exemplo` para `ponte-c6/.env` (mesma pasta) e abra no Bloco de Notas. Preencha, para cada conta: `client_id`, `client_secret`, o caminho dos arquivos do certificado e o ambiente (`sandbox` ou `producao`). Preencha também a **senha da ponte** (invente uma senha longa, 20+ caracteres; ela é o que o sistema vai informar para a ponte aceitar os pedidos) e as **origens permitidas** (CORS): `https://erp.ankjck.com.br` (e, enquanto o endereço antigo estiver em uso, `https://juliocpfh.github.io`).
+3. Copie o arquivo `ponte-c6/.env.exemplo` para `ponte-c6/.env` (mesma pasta) e abra no Bloco de Notas. Preencha, para cada conta: `client_id`, `client_secret`, o caminho dos arquivos do certificado e o ambiente (`sandbox` ou `producao`). Preencha também a **senha da ponte** (invente uma senha longa, 20+ caracteres; ela é o que o sistema vai informar para a ponte aceitar os pedidos) e as **origens permitidas** (CORS): `https://erp.ankjck.com.br` (o `https://juliocpfh.github.io` serve a todos os projetos da conta: só acrescente se ainda usar o endereço antigo). A ponte **não sobe** com a senha do exemplo nem com o campo vazio. Ela também limita os boletos novos por dia (`BOLETOS_POR_DIA`, padrão 200 por conta) e, nos pagamentos da fase 2, a quantidade e a soma do lote (`PAGAMENTOS_MAX_ITENS`, `C6_<ID>_LOTE_MAXIMO`).
 4. Guarde uma **cópia de segurança** das chaves e do `.env` em lugar fechado (pen drive no cofre, ou gerenciador de senhas da empresa com anexos). Se o computador da ponte quebrar, é isso que evita ter de pedir tudo de novo ao banco.
 5. Confira que `credenciais/` e `.env` aparecem no `ponte-c6/.gitignore`. Se usar Git nesse computador, `git status` **não** pode listar esses arquivos.
 
@@ -88,7 +88,7 @@ O computador da ponte deve ficar **ligado** sempre que alguém for emitir boleto
 4. A tela do terminal deve mostrar algo como "Ponte C6 ouvindo em http://localhost:PORTA (modo SIMULADO)". Deixe essa janela aberta.
 5. No navegador do mesmo computador, abra `http://localhost:PORTA/saude`. Deve aparecer uma resposta curta dizendo que a ponte está de pé, o modo (simulado/sandbox/produção) e as contas configuradas (sem mostrar as chaves).
 6. Para a ponte **iniciar sozinha** com o computador (recomendado), siga o `ponte-c6/README` (no Windows, uma tarefa agendada "ao iniciar" ou um serviço; no Linux, `systemd`).
-7. Para o sistema acessar a ponte de outros computadores, exponha-a com **Cloudflare Tunnel** em `https://banco.ankjck.com.br` (passos em `PUBLICAR_NO_DOMINIO.md`, seção "Para o futuro"). Se todo mundo usa a ponte no mesmo computador, `http://localhost:PORTA` serve.
+7. Para o sistema acessar a ponte de outros computadores, exponha-a com **Cloudflare Tunnel** em `https://banco.ankjck.com.br` (passos em `PUBLICAR_NO_DOMINIO.md`, seção "Para o futuro"). Ponha esse endereço em `HOSTS=banco.ankjck.com.br` no `.env`: a ponte recusa (erro 421) pedidos com outro nome que não 127.0.0.1/localhost, para um site qualquer não se passar por ela. Se todo mundo usa a ponte no mesmo computador, `http://localhost:PORTA` serve.
 
 ### Como saber se deu certo
 

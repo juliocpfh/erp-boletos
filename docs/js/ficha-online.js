@@ -120,6 +120,21 @@ Se preferir não seguir, é só avisar por lá${!fiador && f.reserva_valor > 0 ?
 Pelo link você preenche os dados, manda os documentos e, depois, a ficha assinada (pelo gov.br ou à mão). Qualquer dúvida, é só responder.`;
 }
 
+/**
+ * O endereço do link (com a chave da pessoa depois do "#") só fica na memória desta aba, até recarregar: no banco fica só a
+ * validade (decisão de 2026-11-16). Mandar de novo depois disso gera outro link (o anterior deixa de valer).
+ */
+const urlsDestaAba = new Map(); // "ficha|pessoa" → { url, vence_em }
+export function lembrarUrlDoLink(fichaId, pessoa, link) {
+  if (link && link.url) urlsDestaAba.set(`${fichaId}|${pessoa}`, { url: String(link.url), vence_em: String(link.vence_em || '') });
+}
+/** { url, vence_em } do link gerado nesta aba, ainda no prazo (ou null). */
+export function urlDoLink(fichaId, pessoa, agora = new Date().toISOString()) {
+  const l = urlsDestaAba.get(`${fichaId}|${pessoa}`);
+  return l && l.vence_em > agora ? l : null;
+}
+export const esquecerUrlsDosLinks = () => urlsDestaAba.clear();
+
 /** Documentos do link (a lista da pessoa como ela está agora na ficha; com as partes, conforme a renda e o estado civil). */
 export function documentosDoLink(f, l) {
   if (l.pessoa !== 'interessado') return R.documentosDoFiador(R.fiadorDaFicha(f, l.pessoa.slice(6)));
