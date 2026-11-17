@@ -86,37 +86,42 @@ export function telaInquilinos(q) {
     return doc && doc.arquivo
       ? `<a href="#" class="${cls}" data-acao="abrirArquivo" data-escopo="assinados" data-id="${doc.contrato.id}" data-nome="${esc(doc.arquivo)}" title="Abrir o contrato assinado de ${esc(doc.contrato.inquilino_nome)}">${texto}</a>`
       : `<span class="${cls} desligado" title="O contrato assinado de ${esc(c.inquilino_nome)} ainda não foi anexado (página do inquilino, Documentos assinados)">${texto}</span>`; };
-  const registrar = (c) => `<td class="centro nw so-pc">${botaoContrato(c)}</td>`;
+  // Matrícula e Contrato lado a lado, do mesmo tamanho: no computador numa coluna própria (alinhados em todas as
+  // linhas); no celular numa linha embaixo do imóvel (pedido do dono, 2026-11-17: antes ficavam colados ao nome)
+  const documentos = (x) => `<td class="centro nw so-pc"><div class="botoes-doc">${matricula(x)}${botaoContrato(x.c)}</div></td>`;
   // no celular (cartão): telefone ao lado do nome (toque liga)
   const comPais = (tel) => (tel.length <= 11 ? `55${tel}` : tel);
   const nomeCelular = (x) => { const tel = String(x.c.inquilino_telefone || '').replace(/\D/g, '');
     const fone = tel ? `<span class="so-celular"> · <a class="tel-inq" href="tel:+${comPais(tel)}" title="Ligar para ${esc(x.c.inquilino_nome)}">${esc(x.c.inquilino_telefone)}</a></span>` : '';
     return nome(x, fone); };
-  // ao lado do imóvel, o botão que abre o arquivo da matrícula
-  const matricula = (x) => (x.i ? ` <a href="#" class="botao secundario mini" data-acao="abrirMatricula" data-imovel="${x.i.id}" title="Abrir o arquivo da matrícula de ${esc(x.i.nome)}">Matrícula</a>` : '');
+  // o botão que abre o arquivo da matrícula do imóvel
+  const matricula = (x, celular = false) => (x.i ? `<a href="#" class="botao secundario ${celular ? 'mini' : 'pequeno'}" data-acao="abrirMatricula" data-imovel="${x.i.id}" title="Abrir o arquivo da matrícula de ${esc(x.i.nome)}">${celular ? 'Matrícula' : '📑 Matrícula'}</a>` : '');
+  const documentosCelular = (x) => (x.i ? `<div class="botoes-doc so-celular">${matricula(x, true)}${botaoContrato(x.c, true)}</div>` : '');
   // nenhum ativo: sem contrato nenhum, o próximo passo (imóvel primeiro, depois a ficha ou o contrato)
   const semAtivos = () => (d().contratos.length ? `<span class="suave">${busca ? 'Nenhum inquilino ativo encontrado nesta busca.' : 'Nenhum inquilino ativo hoje.'}</span>`
     : !d().imoveis.length ? AJ.proximoPasso('Nenhum inquilino ainda.', 'O contrato liga o inquilino a um imóvel: cadastre o imóvel primeiro.', [opera() && ['#/novo/imoveis', 'Cadastrar o primeiro imóvel']])
       : AJ.proximoPasso('Nenhum inquilino ainda.', 'Já tem o contrato assinado? Cadastre o contrato. Alguém ainda vai mandar os documentos para análise? Comece pela ficha.',
-        [opera() && ['#/novo/contratos', 'Cadastrar o contrato'], opera() && ['#/novo/fichas', 'Novo interessado (ficha)']]));
+        [opera() && ['#/novo/contratos', 'Cadastrar o contrato'], opera() && ['#/novo/fichas', 'Nova ficha em análise']]));
   const resumo = R.resumoSolicitacoes(d());
-  // 1ª etapa de um inquilino novo: a ficha do interessado (proposta, reserva e e-mail da ficha); dela sai o contrato
-  return `<div class="cabecalho"><h1>Inquilinos</h1>${opera() ? `<div class="acoes">${link('#/novo/fichas', 'Novo interessado (ficha)', 'botao')} ${link('#/novo/contratos', 'Novo contrato', 'botao secundario')}</div>` : ''}</div>
+  // 1ª etapa de um inquilino novo: a ficha do interessado (botão "Nova ficha em análise", na caixa das fichas); dela sai
+  // o contrato. O "Novo contrato" fica na caixa dos contratos ativos (pedido do dono, 2026-11-17: um lugar só para cada um)
+  return `<div class="cabecalho"><h1>Inquilinos</h1></div>
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="ir" data-ir="inquilinos" style="flex-wrap:nowrap;min-width:0;max-width:100%"><input name="busca" value="${esc(q.busca || '')}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px;max-width:100%;min-width:0"><button class="secundario">Buscar</button>${busca ? link('#/inquilinos', 'Limpar') : ''}</form>
       <a class="botao secundario resumo-solicitacoes" href="#/solicitacoes" title="Ver todas as solicitações dos inquilinos">Solicitações: ${SITUACOES_SOLICITACAO.map((s) => `<span>${s.simbolo} ${resumo[s.nome]} ${s.texto}</span>`).join(' ')}</a>
       ${(() => { const l = (d().notificacoes || []).filter((n) => ['Rascunho', 'Aguardando resposta', 'Multa gerada'].includes(n.situacao)); const v = l.filter((n) => R.estadoNotificacao(d(), n).podeMulta).length;
     return `<a class="botao secundario" href="#/notificacoes" title="Notificações ao inquilino (prazo para resolver algo)">Notificações: ${l.length} em aberto${v ? ` · ${v} com prazo vencido` : ''}</a>`; })()}</div>
     ${caixaFichas()}
-    <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th><th class="centro so-pc">Contrato</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
-      ${atuais.map((x) => `<tr class="${x.c.verificar ? 'amarelo' : ''}"><td>${imovel(x)}${matricula(x)}${x.i ? ` ${botaoContrato(x.c, true)}` : ''}</td><td>${nomeCelular(x)}</td>${registrar(x.c)}
+    <div class="cartao rolagem" id="contratos-ativos"><div class="cabecalho"><h2>Contratos ativos (${atuais.length})</h2>${opera() ? link('#/novo/contratos', 'Novo contrato', 'botao secundario pequeno') : ''}</div>
+      <table><tr><th>Imóvel</th><th>Inquilino</th><th class="centro so-pc">Documentos</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
+      ${atuais.map((x) => `<tr class="${x.c.verificar ? 'amarelo' : ''}"><td>${imovel(x)}${documentosCelular(x)}</td><td>${nomeCelular(x)}</td>${documentos(x)}
         <td class="nw">${x.c.prazo_tipo === 'Indeterminado' ? `${(x.c.data_entrada || x.c.vigencia_inicio) ? `${dataBr((x.c.data_entrada || x.c.vigencia_inicio))} · ` : ''}${etiqueta('indeterminado', 'aviso')}` : `${dataBr((x.c.data_entrada || x.c.vigencia_inicio))} a ${dataBr(x.c.vigencia_fim)}`}</td><td class="n nw">${reais(R.aluguelAtual(d(), x.c))}</td>
         <td class="nw">${esc(x.c.garantia_tipo || '-')}${R.valorGarantia(d(), x.c) ? ` ${reais(R.valorGarantia(d(), x.c))}` : ''}</td></tr>`).join('') || `<tr><td colspan="6">${semAtivos()}</td></tr>`}</table>
       <p class="suave">O inquilino deixa de ser ativo (e de gerar boleto) pela saída: na página dele, "Saída do inquilino".</p></div>
-    <div class="cartao rolagem"><h2>Inativos e histórico de quem saiu (${anteriores.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th><th>Entrada</th><th>Saída</th><th class="n">Garantia corrigida</th><th class="n">Débitos</th><th class="n">Saldo</th></tr>
-      ${anteriores.map((x) => `<tr><td>${imovel(x)}</td><td>${nome(x)} ${situacao(x.c)}</td><td class="nw">${dataBr(x.c.data_entrada)}</td><td class="nw">${dataBr(x.c.data_saida)}</td>
+    <div class="cartao rolagem"><h2>Inativos e histórico de quem saiu (${anteriores.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th><th>Situação</th><th>Entrada</th><th>Saída</th><th class="n">Garantia corrigida</th><th class="n">Débitos</th><th class="n">Saldo</th></tr>
+      ${anteriores.map((x) => `<tr><td>${imovel(x)}</td><td>${nome(x)}</td><td class="nw">${situacao(x.c) || '-'}</td><td class="nw">${dataBr(x.c.data_entrada)}</td><td class="nw">${dataBr(x.c.data_saida)}</td>
         ${x.e ? `<td class="n">${reais(x.e.garantia_corrigida)}</td><td class="n">${reais(x.e.debitos)}</td><td class="n"><b>${reais(x.e.saldo)}</b></td>` : `<td colspan="3" class="suave">${R.fimDeVinculo(d(), x.c) ? `contrato continua com ${esc(R.continuadoPor(d(), x.c).inquilino_nome)}` : opera() && x.c.data_saida ? link(`#/novo/encerramentos?contrato=${x.c.id}`, 'Fazer cálculo final') : x.c.data_saida ? 'sem cálculo final' : '-'}</td>`}
 </tr>`).join('')
-      || '<tr><td colspan="7" class="suave">Nenhum inquilino inativo.</td></tr>'}</table></div>`;
+      || '<tr><td colspan="8" class="suave">Nenhum inquilino inativo.</td></tr>'}</table></div>`;
 }
 
 export function telaIptu(ano) {

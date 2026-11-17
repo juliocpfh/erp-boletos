@@ -662,9 +662,15 @@ body.com-visualizador { overflow: hidden; }
 /* Inquilinos: no celular, telefone ao lado do nome (numa linha só; nome comprido diminui a letra) e o botão Contrato
    ao lado da Matrícula; a coluna Contrato some */
 .so-celular { display: none; }
+/* Matrícula e Contrato: lado a lado, mesmo tamanho; no celular numa linha embaixo do nome do imóvel */
+.botoes-doc { display: flex; gap: 6px; justify-content: center; align-items: center; flex-wrap: nowrap; }
+.botoes-doc .botao { margin: 0; }
+.botoes-doc.so-celular { display: none; }
 @media (max-width: 760px) {
   .so-pc { display: none !important; }
   span.so-celular { display: inline; }
+  div.botoes-doc.so-celular { display: flex; justify-content: flex-start; margin-top: 4px; }
+  .botoes-doc .botao { display: inline-flex; align-items: center; justify-content: center; }
   .tel-inq { white-space: nowrap; }
   a.so-celular { display: inline-block; }
   .linha-inq { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: clamp(11px, calc((100vw - 76px) / (var(--letras) * 0.5)), 15px); }
