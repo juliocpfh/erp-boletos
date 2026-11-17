@@ -81,7 +81,7 @@ export const RESPOSTA = {
   id: 'id', referencia: 'external_reference_id', situacao: 'status', valor: 'amount', vencimento: 'due_date', emissao: 'emission_date', descricao: 'description', dias_baixa: 'days_after_due_date',
   forma: 'payment_method', boleto: 'bank_slip', linha_digitavel: 'digitable_line', codigo_barras: 'bar_code', nosso_numero: 'our_number', seu_numero: 'number', carteira: 'billing_scheme', originador: 'originator_id', tipo_boleto: 'billing_type',
   pix: 'pix', pix_copia_cola: 'qr_code', pix_imagem: 'image_content', pix_imagem_tipo: 'mime_type', pix_referencia: 'reference',
-  pagamentos: 'payments', pagamento_valor: 'amount', pagamento_id: 'external_payment_id', pagamento_data: 'payment_date', pagamento_credito: 'credit_date', pagamento_tipo: 'payment_type', // payments[] vem na listagem; amount em texto "123.45"
+  pagamentos: 'payments', pagamento_valor: 'amount', pagamento_id: 'external_payment_id', pagamento_data: 'payment_date', pagamento_credito: 'credit_date', pagamento_tipo: 'payment_type', pagamento_e2e: 'end_to_end_id', // payments[] vem na listagem; amount em texto "123.45"; end_to_end_id não está na OpenAPI 1.2.0 (lido só se vier)
   lista: 'content', lista_total: 'total_elements', lista_paginas: 'total_pages', lista_pagina: 'page', lista_tamanho: 'size',
   negativacao: 'denial_info', negativacao_situacao: 'status', negativacao_data: 'denial_date', negativacao_data_consulta: 'date', negativacao_erros: 'errors', negativacao_pode_cancelar: 'can_cancel', notificacoes: 'payer_notification', // denial_date na resposta do agendamento; date e errors[] no denial_info da consulta
 };
