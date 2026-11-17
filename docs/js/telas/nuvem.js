@@ -237,7 +237,8 @@ export const ACOES_NUVEM = {
     if (cifrado(nome)) {
       const resp = await janela({ titulo: 'Senha do backup seguro', html: '<p>Este backup está cifrado. Digite a senha do backup seguro (a mesma da pasta segura do administrador).</p><p><input type="password" name="senha" autocomplete="off" required></p>', sim: 'Abrir', nao: 'Cancelar' });
       if (!resp) return;
-      const aberto = await B.decifrar(await arquivo.arrayBuffer(), String((resp.senha || [])[0] || ''));
+      let aberto;
+      try { aberto = await B.decifrar(await arquivo.arrayBuffer(), String((resp.senha || [])[0] || '')); } catch (e) { throw Object.assign(new Error(`${e.message} Nada foi trocado.`), { esperado: true }); }
       dados = JSON.parse(new TextDecoder().decode(aberto.dados));
     } else dados = JSON.parse(await arquivo.text());
     if (!dados || dados.formato !== 'imoveis-v1' || !Array.isArray(dados.usuarios)) throw new Error('Este backup não está no formato esperado.');
