@@ -1,5 +1,5 @@
 {
-  "_comentario": "Extrato fictício no formato EXATO de GET /v1/statement/ (saldo-extrato.yaml, StatementResponse). Uma lista por conta. Dados inventados: CPF de teste 529.982.247-25, CNPJ 11.222.333/0001-81. A TED de 10/11 sai da ANK e entra na JCK (transferência entre as nossas contas).",
+  "_comentario": "Extrato fictício no formato EXATO de GET /v1/statement/ (saldo-extrato.yaml, StatementResponse). Uma lista por conta. Dados inventados: CPF de teste 529.982.247-25, CNPJ 11.222.333/0001-81. A TED de 10/11 sai da ANK e entra na JCK (transferência entre as nossas contas). João pagou de novo em 11/11 (Pix de R$ 1.500,00) e a ANK devolveu no mesmo dia (DEBIT_PIX_DEVOLUTION_SENT com o end_to_end_id do Pix devolvido).",
   "ank": {
     "entries": [
       {
@@ -69,6 +69,30 @@
         "reference": "019aeec3-4f60-7172-c384-5e6f708192a3",
         "operation_type": "OUTGOING",
         "transaction_type": "TRANSFER"
+      },
+      {
+        "local_reference": "01JGHANX8S0T2V4W6X8Y0Z2A4D",
+        "created_at": "2026-11-11T09:05:00",
+        "entry_date": "2026-11-11",
+        "amount": "1500.00",
+        "title": "Pix Recebido",
+        "description": "PIX RECEBIDO JOAO EXEMPLO CPF 529.982.247-25",
+        "reference": "019aeec3-5a71-7183-c495-6f708192a3c1",
+        "operation_type": "INCOMING",
+        "transaction_type": "CREDIT_PIX_PAYMENT_RECEIVED",
+        "end_to_end_id": "E33600000202611110905ANKEXEMPLO04"
+      },
+      {
+        "local_reference": "01JGHANZ9T1V3W5X7Y9Z1A3B5E",
+        "created_at": "2026-11-11T17:40:00",
+        "entry_date": "2026-11-11",
+        "amount": "1500.00",
+        "title": "Devolução de Pix",
+        "description": "DEVOLUCAO PIX JOAO EXEMPLO (pagou duas vezes)",
+        "reference": "019aeec3-6b82-7294-d5a6-708192a3b4d2",
+        "operation_type": "OUTGOING",
+        "transaction_type": "DEBIT_PIX_DEVOLUTION_SENT",
+        "end_to_end_id": "E33600000202611110905ANKEXEMPLO04"
       },
       {
         "local_reference": "01JGHAP08S0T2V4W6X8Y0Z2A4B",

@@ -3,11 +3,12 @@
 // Os dados chegam no formato EXATO do C6 (saldo-extrato.yaml, bolepix.yaml, agendamento-de-pagamentos.yaml).
 import * as K from './c6-comum.js';
 import * as C from './calculos.js';
+import * as M from './mapa-c6.js';
 import { regra } from './config-regras.js';
 import {
   buscar, inserir, atualizar, excluir, registrar, registrarPagamento, previstoNoPagamento, totais, marcarIptuPago, parcelasIptu,
   lancarDespesas, lancarGanhoAirbnb, contasPermitidas, participacoesDo, TIPOS_DESPESA, contaBancaria, apelidoDaConta, pastaDoComprovante, pastaContador,
-  CONFIG_BANCO_FASE2, mesDoDinheiro, contaDeOrigem, extratoImportadoAte, proximoBoletoAberto, registrarComDiferencaNoProximo,
+  CONFIG_BANCO_FASE2, mesDoDinheiro, contaDeOrigem, extratoImportadoAte, proximoBoletoAberto, registrarComDiferencaNoProximo, devidoDoPago, pagoAMaisDo, devolucaoPendente,
 } from './regras.js';
 
 export { pastaDoComprovante as escopoDoComprovante, pastaContador as escopoContador, apelidoDaConta, mesDoDinheiro, contaDeOrigem };
@@ -22,6 +23,7 @@ export const CLASSIFICACOES = {
   tarifa: 'Tarifa do banco',
   transferencia: 'Transferência entre as nossas contas',
   devolucao: 'Devolução de Pix ou estorno (dinheiro que voltou ou que devolvemos)',
+  devolucao_inquilino: 'Devolução ao inquilino (pagou a mais um boleto: o valor pago dele volta ao devido; a NF não muda)',
   outro: 'Outro (só comprovante, sem imóvel)',
   ignorar: 'Não é nosso / ignorar',
 };
@@ -181,7 +183,7 @@ export const referenciaNoBanco = (m) => (['ofx', 'csv'].includes(fonteDe(m)) && 
 
 const CAMPOS_DESTINO = { classificacao: null, imovel_id: null, despesa_id: null, cobranca_id: null, iptu_id: null, iptu_parcela: null, guia_imposto_id: null,
   pagamento_banco_id: null, par_movimentacao_id: null, reforma_id: null, nome_arquivo: null, comprovante: null, comprovante_contador: null, comprovante_origem: null,
-  observacoes: '', classificada_em: null, classificada_por: null, despesa_criada: false };
+  observacoes: '', classificada_em: null, classificada_por: null, despesa_criada: false, pago_a_mais: false };
 
 /**
  * Importa o extrato de uma conta. ``lancamentos`` = ``entries[]`` do C6. Nunca repete o mesmo ``reference`` na mesma conta.
@@ -605,6 +607,7 @@ function tipoDoComprovante(d, mov) {
     case 'boleto': { const cb = mov.cobranca_id ? buscar(d, 'cobrancas', mov.cobranca_id) : null; const c = cb ? buscar(d, 'contratos', cb.contrato_id) : null; return `Aluguel${c ? ` ${c.inquilino_nome}` : ''}`; }
     case 'iptu': { const p = mov.iptu_id ? buscar(d, 'iptus', mov.iptu_id) : null; return `IPTU${p ? ` ${p.ano}` : ''} ${mov.iptu_parcela ? `${mov.iptu_parcela}a parcela` : 'cota unica'}`; }
     case 'imposto': { const g = mov.guia_imposto_id ? buscar(d, 'guias_impostos', mov.guia_imposto_id) : null; return g ? `Imposto ${g.imposto} ${g.periodo}` : 'Imposto'; }
+    case 'devolucao_inquilino': { const cb = mov.cobranca_id ? buscar(d, 'cobrancas', mov.cobranca_id) : null; const c = cb ? buscar(d, 'contratos', cb.contrato_id) : null; return `Devolucao${c ? ` ${c.inquilino_nome}` : ''}`; }
     case 'tarifa': return 'Tarifa';
     case 'transferencia': return 'Transferencia';
     default: return mov.titulo || 'Outro';
@@ -633,7 +636,10 @@ export const nomePadraoComprovante = (d, mov) => nomeComprovante(d, mov);
 const emAberto = (cb) => !cb.data_pagamento && cb.situacao !== 'Carência' && cb.situacao !== 'Em acordo';
 const semDigitos = (t) => maiusculaSemAcento(t).replace(/\d+/g, '').replace(/\s+/g, ' ').trim();
 
-/** Uma entrada casa só com boleto que vence até tantos dias depois dela (pagamento adiantado). Ex.: entrada de 10/08 → vencimentos até 24/09. */
+/**
+ * No aviso "Pix sem identificação", contam-se só os boletos que vencem até tantos dias depois da entrada (pagamento adiantado). Ex.:
+ * entrada de 10/08 → vencimentos até 24/09. Nada é ligado por valor e data (decisão do dono, 17/11/2026): o prazo só limita a lista.
+ */
 export const DIAS_ANTECIPACAO = 45;
 /** Boleto já pago à mão que ainda pode receber a linha do extrato (sem outra linha ligada a ele). */
 const ligavel = (cb, movId = null) => !!cb.data_pagamento && (!cb.movimentacao_id || cb.movimentacao_id === movId);
@@ -642,12 +648,13 @@ const pagoEntre = (cb, de, ate) => [cb.data_pagamento, cb.data_pagou].some((x) =
 
 /**
  * A regra de casamento de um recebimento (linha do extrato ou pagamento informado pela listagem do banco) com os boletos, a mesma
- * para a tela Banco e para a tela Boletos: [{ cobranca, certeza, previsto, pagouEmDia, jaPago }].
- * 1) pelo boleto emitido no banco (external_reference_id) ou pelo nosso número: certeza exata;
- * 2) boleto JÁ PAGO com o mesmo valor na mesma data (a contábil ou a do pagamento): é ele (jaPago: só ligar, nunca pagar outro);
- * 3) boletos em aberto pelo valor e pela data (no prazo, até ``dias`` depois do vencimento, ou com multa e juros), vencendo até
- *    DIAS_ANTECIPACAO dias depois da entrada, e os já pagos com o mesmo valor nos 4 dias antes (pago à mão com a outra data):
- *    mais de um → todos 'provavel' (quem escolhe é o usuário).
+ * para a tela Banco e para a tela Boletos: [{ cobranca, certeza, previsto, pagouEmDia, jaPago, peloId, semId }].
+ * 1) pelo identificador (referência do Pix do boleto, nosso número, id do pagamento) ou pelo boleto emitido no banco
+ *    (external_reference_id): certeza exata, pode ser proposto já marcado (o usuário ainda confirma);
+ * 2) SEM identificador igual (decisão do dono, 17/11/2026: Pix feito à mão nunca liga sozinho), só candidatos para o aviso "Pix sem
+ *    identificação: vincular manualmente", sempre 'provavel' e ``semId``: o boleto JÁ PAGO com o mesmo valor na mesma data
+ *    (jaPago), os em aberto pelo valor e pela data (no prazo, até ``dias`` depois do vencimento, ou com multa e juros), vencendo até
+ *    DIAS_ANTECIPACAO dias depois da entrada, e os já pagos com o mesmo valor nos 4 dias antes. Quem escolhe é o usuário.
  * ``movId``: na linha do extrato, o boleto já ligado a outra linha não conta. Ex.: boleto 07/2026 de R$ 1.318,50 pago à mão em 10/08 e
  * a entrada de 10/08 → só o 07/2026 (jaPago), e não o 08/2026 de mesmo valor, que vence em 10/09.
  */
@@ -747,12 +754,13 @@ function casarBoletos(d, valor, data, dias, { idExterno = null, nossoNumero = nu
   // (o boleto em aberto do mesmo contrato, ex.: o do mês seguinte, não conta: o já pago é que é o deste dinheiro)
   if (pagosNaData.length) {
     const contratos = new Set(pagosNaData.map((cb) => cb.contrato_id));
-    return marcarProvaveis([...pagosNaData.map(jaPago), ...lista.filter((x) => !contratos.has(x.cobranca.contrato_id))]);
+    return semIdentificacao([...pagosNaData.map(jaPago), ...lista.filter((x) => !contratos.has(x.cobranca.contrato_id))]);
   }
   for (const cb of pagos) if (ligavel(cb, movId) && pagoEntre(cb, C.somarDias(credito, -4), credito)) lista.push(jaPago(cb));
-  return marcarProvaveis(lista);
+  return semIdentificacao(lista);
 }
-const marcarProvaveis = (lista) => { if (lista.length > 1) for (const x of lista) x.certeza = 'provavel'; return lista; };
+/** Casados só pelo valor e pela data: nunca "exata", nunca marcados nem ligados sozinhos (decisão do dono, 17/11/2026). */
+const semIdentificacao = (lista) => { for (const x of lista) { x.certeza = 'provavel'; x.semId = true; } return lista; };
 
 /**
  * Pagamentos de boletos vindos da listagem do Bolepix (``content[]`` com ``external_reference_id`` e ``payments[]``, ou a lista já
@@ -794,12 +802,13 @@ export function conciliarBoletos(d, contaId, pagamentosC6, { dias = null } = {})
       return;
     }
     let achados = conhecido ? casarBoletos(d, valor, pagou, tol, { idExterno: p.external_reference_id, dataCredito: credito }) : [];
-    if (!achados.length) achados = casarBoletos(d, valor, pagou, tol, { dataCredito: credito, pagouConhecido: !!p.payment_date, pix: ehPix(p) }).map((a) => ({ ...a, certeza: !a.jaPago ? 'provavel' : a.certeza })); // só pelo valor e pela data: nunca "exata"
+    // só pelo valor e pela data (boleto feito fora do sistema): nunca "exata" nem marcado; o usuário confere e marca à mão
+    if (!achados.length) achados = casarBoletos(d, valor, pagou, tol, { dataCredito: credito, pagouConhecido: !!p.payment_date, pix: ehPix(p) });
     const mostrar = achados.filter((a) => !(a.jaPago && a.cobranca.movimentacao_id)); // já pago e ligado ao extrato: nada a mostrar
     for (const a of mostrar) {
       out.push({ cobranca_id: a.cobranca.id, conta_id: contaId, data_credito: credito, data_pagamento: pagou, valor, certeza: a.certeza, previsto: a.previsto,
         pagouEmDia: pagou <= C.limitePagamento(a.cobranca.vencimento) && credito > a.cobranca.vencimento, external_reference_id: p.external_reference_id || null,
-        external_payment_id: p.external_payment_id || null, payment_type: p.payment_type || null, jaPago: !!a.jaPago, alternativas: achados.length, pagamento: n, aguardandoCredito });
+        external_payment_id: p.external_payment_id || null, payment_type: p.payment_type || null, jaPago: !!a.jaPago, alternativas: achados.length, pagamento: n, aguardandoCredito, semId: !!a.semId });
     }
   });
   return out;
@@ -807,40 +816,34 @@ export function conciliarBoletos(d, contaId, pagamentosC6, { dias = null } = {})
 
 /**
  * A sugestão da listagem pode vir marcada para registrar: boleto em aberto, pagamento já creditado, casado com certeza (pela referência
- * do boleto emitido) e com um boleto só. Casado só pelo valor (boleto feito fora do sistema) fica desmarcado: quem marca é o usuário.
+ * do boleto emitido) e com um boleto só. Casado só pelo valor e pela data (boleto feito fora do sistema, ``semId``) fica desmarcado:
+ * quem marca é o usuário.
  */
 export function prontoParaRegistrar(d, s) {
   const cb = s && buscar(d, 'cobrancas', s.cobranca_id);
-  return !!cb && !cb.data_pagamento && !s.jaPago && !s.aguardandoCredito && !s.alerta && s.certeza === 'exata' && (s.alternativas || 1) === 1;
+  return !!cb && !cb.data_pagamento && !s.jaPago && !s.aguardandoCredito && !s.alerta && !s.semId && s.certeza === 'exata' && (s.alternativas || 1) === 1;
 }
 
-/** A entrada do extrato (ainda sem destino) de um recebimento: mesma conta, valor e data de crédito; null se não foi importada. */
-export function entradaDoRecebimento(d, { conta_id = null, valor, data, nome = '', ids = [] }) {
-  // a entrada com o mesmo identificador do pagamento (id do Pix ou do pagamento no banco): é ela, mesmo com outro Pix igual no dia
+/**
+ * A entrada do extrato (ainda sem destino) de um recebimento, SÓ pelo identificador do pagamento (id do Pix ou do pagamento no banco,
+ * referência do boleto), mesmo valor e conta; null se não há (decisão do dono, 17/11/2026: pelo valor, pela data ou pelo nome do
+ * pagador nada é ligado sozinho; o usuário liga na tela Banco).
+ */
+export function entradaDoRecebimento(d, { conta_id = null, valor, ids = [] }) {
   const procurados = new Set((ids || []).map(idNormal).filter(idUtil));
-  if (procurados.size) {
-    const peloId = (d.movimentacoes_banco || []).find((x) => (!conta_id || x.conta_id === conta_id) && x.tipo === 'entrada' && !x.classificacao && x.valor === valor
-      && identificadoresDaMov(x).some((i) => procurados.has(i)));
-    if (peloId) return peloId;
-  }
-  const lista = (d.movimentacoes_banco || []).filter((x) => (!conta_id || x.conta_id === conta_id) && x.tipo === 'entrada' && x.valor === valor && x.data === data && !x.classificacao);
-  if (lista.length <= 1) return lista[0] || null;
-  // mais de uma entrada igual no dia (Pix de dois inquilinos): só a que cita o pagador; sem como saber, nenhuma (o usuário liga na tela Banco)
-  const n = maiusculaSemAcento(nome).trim();
-  const doPagador = n ? lista.filter((x) => textoDaMov(x).includes(n) || textoDaMov(x).includes(n.split(/\s+/)[0])) : [];
-  return doPagador.length === 1 ? doPagador[0] : null;
+  if (!procurados.size) return null;
+  return (d.movimentacoes_banco || []).find((x) => (!conta_id || x.conta_id === conta_id) && x.tipo === 'entrada' && !x.classificacao && x.valor === valor
+    && identificadoresDaMov(x).some((i) => procurados.has(i))) || null;
 }
-/** Nome do inquilino do boleto (para escolher entre entradas iguais no mesmo dia). */
-const nomeDoPagador = (d, cb) => { const c = cb && buscar(d, 'contratos', cb.contrato_id); return c ? c.inquilino_nome : ''; };
 
 /**
  * Depois de o boleto ficar pago (ex.: confirmado na janela da tela Boletos), liga a ele a entrada do extrato desse dinheiro, se já
- * importada (mesma conta, valor pago e data contábil, sem destino). Devolve a movimentação ligada ou null.
+ * importada e com o mesmo identificador (mesma conta e valor pago, sem destino). Devolve a movimentação ligada ou null.
  */
 export function ligarEntradaDoBoleto(d, cobrancaId, contaId, usuario) {
   const cb = buscar(d, 'cobrancas', cobrancaId);
   if (!cb || !cb.data_pagamento || cb.movimentacao_id) return null;
-  const mov = entradaDoRecebimento(d, { conta_id: contaId, valor: cb.valor_pago, data: cb.data_pagamento, nome: nomeDoPagador(d, cb), ids: identificadoresDoBoleto(cb) });
+  const mov = entradaDoRecebimento(d, { conta_id: contaId, valor: cb.valor_pago, ids: identificadoresDoBoleto(cb) });
   if (mov) ligarMovimentacaoAoBoleto(d, mov.id, cb.id, usuario);
   return mov;
 }
@@ -855,7 +858,7 @@ export function ligarEntradaDoBoleto(d, cobrancaId, contaId, usuario) {
 export function registrarPagamentoDoBanco(d, contaId, p, usuario, { pagouEmDia, valorNf = null, justificativa = '' } = {}) {
   const cb = buscar(d, 'cobrancas', p.cobranca_id);
   if (!cb) throw new Error('Boleto não encontrado.');
-  const mov = entradaDoRecebimento(d, { conta_id: contaId, valor: p.valor, data: p.data_credito, nome: nomeDoPagador(d, cb), ids: [p.external_payment_id, p.end_to_end_id, ...identificadoresDoBoleto(cb)] });
+  const mov = entradaDoRecebimento(d, { conta_id: contaId, valor: p.valor, ids: [p.external_payment_id, p.end_to_end_id, ...identificadoresDoBoleto(cb)] });
   if (cb.data_pagamento) {
     if (mov && ligavel(cb, mov.id) && cb.valor_pago === mov.valor) { ligarMovimentacaoAoBoleto(d, mov.id, cb.id, usuario); return { divergente: false, ligada: true, cobranca: cb }; }
     throw new Error(`Este boleto já está pago (${C.dataBr(cb.data_pagamento)}). Nada foi alterado.`);
@@ -871,7 +874,7 @@ export function conciliarMovimentacoes(d, movs, { dias = null, indice = null } =
   for (const m of movs || []) {
     if (m.tipo !== 'entrada' || m.classificacao || ehDevolucao(m)) continue;
     for (const a of casarBoletos(d, m.valor, m.data, tol, { movId: m.id, indice, pix: ehPix(m), ids: identificadoresDaMov(m) })) {
-      out.push({ movimentacao_id: m.id, cobranca_id: a.cobranca.id, certeza: a.certeza, previsto: a.previsto, pagouEmDia: a.pagouEmDia, jaPago: !!a.jaPago, peloId: !!a.peloId });
+      out.push({ movimentacao_id: m.id, cobranca_id: a.cobranca.id, certeza: a.certeza, previsto: a.previsto, pagouEmDia: a.pagouEmDia, jaPago: !!a.jaPago, peloId: !!a.peloId, semId: !!a.semId });
     }
   }
   return out;
@@ -944,7 +947,7 @@ export function ligarMovimentacaoAoBoleto(d, movId, cobrancaId, usuario) {
   if (!cb.data_pagamento) throw new Error('Este boleto ainda não está pago: confirme o pagamento pela linha do extrato ("É o pagamento do boleto…").');
   if (mov.tipo !== 'entrada') throw new Error('Só uma entrada no extrato pode ser o pagamento de um boleto.');
   if (mov.classificacao && !(mov.classificacao === 'boleto' && mov.cobranca_id === cb.id)) throw new Error('Esta movimentação já tem destino. Desfaça antes.');
-  if (cb.movimentacao_id && cb.movimentacao_id !== mov.id && buscar(d, 'movimentacoes_banco', cb.movimentacao_id)) throw new C.ErroUsuario(`O boleto de ${C.compBr(cb.competencia)} já está ligado a outra entrada do extrato.`);
+  if (cb.movimentacao_id && cb.movimentacao_id !== mov.id && buscar(d, 'movimentacoes_banco', cb.movimentacao_id)) throw new C.ErroUsuario(`O boleto de ${C.compBr(cb.competencia)} já está ligado a outra entrada do extrato. Se o inquilino pagou de novo, escolha o boleto na opção "pagou de novo (a mais)".`);
   const c = buscar(d, 'contratos', cb.contrato_id);
   atualizar(d, 'cobrancas', cb.id, { movimentacao_id: mov.id }, usuario, 'Pagamento confirmado pelo extrato do banco');
   atualizar(d, 'movimentacoes_banco', mov.id, { classificacao: 'boleto', cobranca_id: cb.id, imovel_id: c ? c.imovel_id : null, classificada_em: new Date().toISOString(), classificada_por: usuario },
@@ -998,7 +1001,7 @@ export function indiceDeSugestoes(d) {
   const porDocumento = new Map();
   const guardar = (mapa, k, m) => { const l = mapa.get(k); if (l) l.push(m); else mapa.set(k, [m]); };
   for (const m of d.movimentacoes_banco || []) {
-    if (!m.classificacao || ['boleto', 'ignorar', 'transferencia'].includes(m.classificacao)) continue;
+    if (!m.classificacao || ['boleto', 'ignorar', 'transferencia', 'devolucao_inquilino'].includes(m.classificacao)) continue;
     const chave = semDigitos(m.descricao);
     if (chave) guardar(porDescricao, `${m.tipo}|${chave}`, m);
     const doc = m.contrapartida ? String(m.contrapartida.documento || '').replace(/\D/g, '') : '';
@@ -1054,42 +1057,56 @@ export function indiceDaTela(d) {
 
 /**
  * Sugestão de destino para uma movimentação (nada é gravado): { classificacao, imovel_id, tipo_despesa, cobranca_id, iptu, motivo, confianca }
- * ou null. Ordem: pagamento pelo banco pendente de mesma conta/valor/data; transferência entre as nossas contas; liquidação de boleto
- * (valor + data); palavras da descrição (Sanepar, Copel, IPTU, DARF, tarifa…) com o imóvel pela matrícula/UC/nome; memória da última
- * movimentação com a mesma descrição (sem números).
+ * ou null. Ordem: devolução; boleto pelo identificador; pagamento pelo banco pela referência; transferência entre as nossas contas;
+ * boleto pago de novo (pelo identificador); palavras da descrição (Sanepar, Copel, IPTU, DARF, tarifa…) com o imóvel pela
+ * matrícula/UC/nome; memória da última movimentação com a mesma descrição (sem números).
+ * Decisão do dono (17/11/2026): só o identificador igual (código de barras/nosso número, Pix do próprio boleto, end_to_end_id, referência
+ * do pagamento) liga um registro já existente (boleto, pagamento pelo banco, outra ponta). Pelo valor, data, nome ou CPF/CNPJ vem só o aviso
+ * (``semIdentificacao``, com ``candidatos``/``candidatosConta``/``candidatosPar``) e o usuário escolhe na janela; ``soAviso``: nem a janela
+ * resolve (o pagamento pelo banco se confirma em Pagamentos).
  */
 export function sugerirDestino(d, mov, indice = null) {
   const texto = textoDaMov(mov);
-  // 0) devolução de Pix ou estorno: nunca é aluguel nem transferência entre as nossas contas
-  if (ehDevolucao(mov)) return { classificacao: 'devolucao', motivo: mov.tipo === 'entrada' ? 'devolução de Pix recebida (ou estorno): dinheiro que voltou' : 'devolução de Pix enviada: dinheiro devolvido (confira o boleto de quem recebeu)', confianca: 'alta' };
+  // 0) devolução de Pix ou estorno: nunca é aluguel nem transferência entre as nossas contas; a que nós enviamos é, em geral, a
+  // diferença de um boleto pago a mais (devolução ao inquilino, ligada ao boleto)
+  if (ehDevolucao(mov)) return mov.tipo === 'saida' ? sugestaoDeDevolucao(d, mov) : { classificacao: 'devolucao', motivo: 'devolução de Pix recebida (ou estorno): dinheiro que voltou', confianca: 'alta' };
   // 0b) entrada com o identificador de um boleto nosso (referência do Pix, nosso número, id do pagamento): é ele, antes de tudo
   const casa = mov.tipo === 'entrada' && !mov.classificacao ? conciliarMovimentacoes(d, [mov], { indice }) : [];
   if (casa.length === 1 && casa[0].peloId) return sugestaoDeBoleto(d, casa[0]);
-  // 1) saída que é um pagamento feito pelo sistema
+  // 1) saída que é um pagamento feito pelo sistema: só pela referência dele no extrato ("erp-12", ou o id do item no banco); só o
+  // mesmo valor e a data perto viram aviso (confirme em Pagamentos, "Confirmar pelo extrato"), nada é ligado nem marcado sozinho
   if (mov.tipo === 'saida') {
-    const pag = (d.pagamentos_banco || []).find((p) => ['agendado', 'pago'].includes(p.situacao) && !p.movimentacao_id && p.conta_id === mov.conta_id && p.valor === mov.valor
-      && Math.abs(C.diasEntre(p.data_pagamento || p.vencimento || mov.data, mov.data)) <= 2);
-    if (pag) return { classificacao: classificacaoDaOrigem(pag.origem), imovel_id: pag.imovel_id, tipo_despesa: pag.tipo_conta, pagamento_banco_id: pag.id, motivo: `pagamento pelo banco nº ${pag.id} (${pag.beneficiario && pag.beneficiario.nome ? pag.beneficiario.nome : pag.tipo_conta})`, confianca: 'alta' };
+    const pendentes = (d.pagamentos_banco || []).filter((p) => ['agendado', 'pago'].includes(p.situacao) && !p.movimentacao_id && p.conta_id === mov.conta_id && p.valor === mov.valor);
+    const pag = pendentes.find((p) => pagamentoCitado(p, texto));
+    if (pag) return { classificacao: classificacaoDaOrigem(pag.origem), imovel_id: pag.imovel_id, tipo_despesa: pag.tipo_conta, pagamento_banco_id: pag.id, peloId: true, motivo: `pagamento pelo banco nº ${pag.id} (${pag.beneficiario && pag.beneficiario.nome ? pag.beneficiario.nome : pag.tipo_conta}; a referência dele está no extrato)`, confianca: 'alta' };
+    const parecido = pendentes.find((p) => Math.abs(C.diasEntre(p.data_pagamento || p.vencimento || mov.data, mov.data)) <= 2);
+    if (parecido) return { classificacao: classificacaoDaOrigem(parecido.origem), imovel_id: parecido.imovel_id, tipo_despesa: parecido.tipo_conta, semIdentificacao: true, soAviso: true, confianca: 'baixa',
+      motivo: `sem identificação: o pagamento pelo banco nº ${parecido.id} (${parecido.beneficiario && parecido.beneficiario.nome ? parecido.beneficiario.nome : parecido.tipo_conta}) tem o mesmo valor; se for ele, confirme em Pagamentos ("Confirmar pelo extrato")` };
   }
-  // 2) transferência entre as nossas contas: a outra ponta no extrato da outra conta, ou a outra empresa citada. A outra ponta só pelo
-  // valor e pela data não basta (o aluguel de R$ 1.218,50 na JCK e um Pix da ANK ao fornecedor do mesmo valor no mesmo dia): é preciso
-  // que uma das pontas cite a outra empresa; sem isso, uma entrada que casa com boleto vai para o boleto, e a transferência fica incerta
+  // 2) transferência entre as nossas contas. A outra ponta só fica proposta pelo identificador (o mesmo id do Pix nas duas pontas);
+  // pelo valor e pela data, ou porque cita a outra empresa, o destino "transferência" é sugerido, mas a outra ponta quem escolhe é o
+  // usuário, na janela (decisão do dono, 17/11/2026)
+  const parId = parPeloPix(d, mov);
+  if (parId) return { classificacao: 'transferencia', par_movimentacao_id: parId.id, peloId: true, motivo: `a outra ponta está no extrato ${apelidoDaConta(d, parId.conta_id)} (${C.dataBr(parId.data)}, mesmo código do Pix)`, confianca: 'alta' };
   const par = parDaTransferencia(d, mov, indice);
   if (par && (citaEmpresaDaConta(d, texto, par.conta_id) || citaEmpresaDaConta(d, textoDaMov(par), mov.conta_id))) {
-    return { classificacao: 'transferencia', par_movimentacao_id: par.id, motivo: `a outra ponta está no extrato ${apelidoDaConta(d, par.conta_id)} (${C.dataBr(par.data)})`, confianca: 'alta' };
+    return { classificacao: 'transferencia', par_movimentacao_id: null, candidatosPar: [par.id], semIdentificacao: true, motivo: `transferência sem identificação: talvez a outra ponta seja a de ${C.dataBr(par.data)} no extrato ${apelidoDaConta(d, par.conta_id)}; escolha-a na janela`, confianca: 'media' };
   }
   for (const c of contasConfiguradas(d)) {
     if (c.id === mov.conta_id || !citaEmpresaDaConta(d, texto, c.id)) continue;
     if (/TRANSF|TED|PIX|DOC/.test(texto) || /TRANSFER|PIX/.test(String(mov.categoria_banco || ''))) { const e = empresaDaConta(d, c.id); return { classificacao: 'transferencia', motivo: `cita a outra empresa (${c.apelido || (e && e.nome)})`, confianca: 'alta' }; }
   }
-  const parIncerto = par ? { classificacao: 'transferencia', par_movimentacao_id: par.id, motivo: `talvez transferência: há uma ${par.tipo} do mesmo valor no extrato ${apelidoDaConta(d, par.conta_id)} (${C.dataBr(par.data)}), mas nenhuma das duas cita a outra empresa: confira`, confianca: 'baixa' } : null;
+  const parIncerto = par ? { classificacao: 'transferencia', par_movimentacao_id: null, candidatosPar: [par.id], semIdentificacao: true, motivo: `talvez transferência: há uma ${par.tipo} do mesmo valor no extrato ${apelidoDaConta(d, par.conta_id)} (${C.dataBr(par.data)}), mas nenhuma das duas cita a outra empresa: confira e escolha a outra ponta`, confianca: 'baixa' } : null;
   if (parIncerto && mov.tipo !== 'entrada') return parIncerto;
   // 3a) entrada do Airbnb (o Airbnb paga o total; a divisão entre os imóveis é feita na janela)
   if (mov.tipo === 'entrada' && /AIRBNB/.test(texto)) return { classificacao: 'airbnb', motivo: 'descrição do Airbnb', confianca: 'alta' };
-  // 3) entrada que parece boleto
+  // 3) entrada que parece boleto: pelo identificador já saiu acima (0b); pelo valor e pela data, só o aviso "Pix sem identificação"
+  // e a escolha à mão, nada marcado (decisão do dono, 17/11/2026: a chance de erro é grande e evita fraude)
   if (mov.tipo === 'entrada' && !mov.classificacao) {
-    if (casa.length === 1) return sugestaoDeBoleto(d, casa[0]);
-    if (casa.length > 1) return { classificacao: 'boleto', cobranca_id: null, candidatos: casa.map((x) => x.cobranca_id), motivo: `${casa.length} boletos com este valor`, confianca: 'baixa' };
+    const deNovo = pagoDeNovo(d, mov, indice);
+    if (deNovo) return deNovo;
+    if (casa.length) return { classificacao: 'boleto', cobranca_id: null, candidatos: casa.map((x) => x.cobranca_id), semIdentificacao: true, confianca: 'baixa',
+      motivo: `Pix sem identificação: vincular manualmente (${casa.length === 1 ? '1 boleto' : `${casa.length} boletos`} com este valor; escolha o boleto e confirme)` };
   }
   if (parIncerto) return parIncerto;
   // 4) palavras da descrição
@@ -1101,11 +1118,12 @@ export function sugerirDestino(d, mov, indice = null) {
     if (classificacao === 'iptu') {
       const p = imv ? d.iptus.filter((x) => x.imovel_id === imv.imovel.id).sort((a, b) => b.ano - a.ano)[0] : null;
       const pcs = p ? parcelasIptu(d, p).filter((pc) => pc.proprietario) : [];
-      // "PARCELA 3/10", "PARC 3", "3ª PARCELA": a parcela citada vale mais que a primeira em aberto com o mesmo valor
+      // a parcela nunca vem escolhida (decisão do dono, 17/11/2026): nem pelo valor nem pela citada no texto ("PARCELA 3/10" não é
+      // identificador); a citada só aparece no aviso, como lembrete, e o usuário escolhe e confirma na janela
       const nCitado = parcelaCitada(texto);
       const citada = nCitado !== null ? pcs.find((pc) => pc.n === nCitado && !pc.paga) || null : null;
-      const parcela = citada || pcs.find((pc) => !pc.paga && (pc.valor === mov.valor || pc.valorProprietario === mov.valor)) || null;
-      porPalavra = { classificacao: 'iptu', imovel_id: imv ? imv.imovel.id : null, iptu: p ? { id: p.id, n: parcela ? parcela.n : null } : null, motivo: citada ? `descrição de IPTU (${citada.rotulo} parcela citada)` : 'descrição de IPTU', confianca: parcela ? 'alta' : 'media' };
+      porPalavra = { classificacao: 'iptu', imovel_id: imv ? imv.imovel.id : null, iptu: p ? { id: p.id, n: null } : null, semIdentificacao: true, confianca: 'baixa',
+        motivo: `IPTU sem identificação: vincular manualmente (${citada ? `o extrato cita a ${citada.rotulo} parcela; ` : ''}escolha a parcela e confirme)` };
     } else if (classificacao === 'imposto') porPalavra = { classificacao: 'imposto', motivo: 'descrição de imposto', confianca: 'media' };
     else if (classificacao === 'tarifa') porPalavra = { classificacao: 'tarifa', motivo: 'descrição de tarifa', confianca: 'media' };
     else porPalavra = { classificacao: 'conta_imovel', imovel_id: imv ? imv.imovel.id : null, tipo_despesa: imv && imv.tipo && imv.tipo !== 'IPTU' ? imv.tipo : tipo, motivo: imv ? `${tipo} · imóvel pela ${imv.campo === 'nome' ? 'descrição' : 'matrícula/UC cadastrada'}` : `descrição de ${tipo}`, confianca: imv ? 'media' : 'baixa' };
@@ -1134,38 +1152,132 @@ function sugestaoDeBoleto(d, x) {
   const c = buscar(d, 'contratos', cb.contrato_id);
   const quem = `${c ? c.inquilino_nome : ''} (${C.compBr(cb.competencia)})`;
   if (x.jaPago) {
-    return { classificacao: 'boleto', cobranca_id: cb.id, imovel_id: c ? c.imovel_id : null, ligar: true, confianca: 'alta',
-      motivo: `o boleto de ${quem} já está pago desde ${C.dataBr(cb.data_pagamento)} com este valor${x.peloId ? ' (o código do banco é o mesmo)' : ''}: só ligar esta entrada a ele` };
+    return { classificacao: 'boleto', cobranca_id: cb.id, imovel_id: c ? c.imovel_id : null, ligar: true, confianca: 'alta', peloId: !!x.peloId,
+      motivo:`o boleto de ${quem} já está pago desde ${C.dataBr(cb.data_pagamento)} com este valor${x.peloId ? ' (o código do banco é o mesmo)' : ''}: só ligar esta entrada a ele` };
   }
-  return { classificacao: 'boleto', cobranca_id: cb.id, imovel_id: c ? c.imovel_id : null, pagouEmDia: x.pagouEmDia, confianca: 'alta',
-    motivo: x.peloId ? `o código do banco (Pix ou nosso número) é o do boleto de ${quem}` : `valor igual ao boleto de ${quem}` };
+  return { classificacao: 'boleto', cobranca_id: cb.id, imovel_id: c ? c.imovel_id : null, pagouEmDia: x.pagouEmDia, confianca: 'alta', peloId: !!x.peloId,
+    motivo:x.peloId ? `o código do banco (Pix ou nosso número) é o do boleto de ${quem}` : `valor igual ao boleto de ${quem}` };
 }
 
 /**
- * A conta do imóvel já lançada à mão (Contas pagas por nós) que é esta saída do extrato: mesmo imóvel, tipo e valor, sem linha do
- * extrato nem pagamento pelo banco ligados, paga até 7 dias antes ou depois (sem data de pagamento: do mês da saída ou dos 2 antes).
- * A de data mais perto primeiro; null se não há. Ex.: água de R$ 123,45 da Loja 1 lançada com pagamento em 05/11 e a saída de 05/11.
+ * Período em que se procuram as contas já lançadas à mão para uma saída do extrato: do 1º dia do mês anterior ao último dia do mês
+ * da saída (decisão do dono, 17/11/2026). Ex.: saída em 17/11/2026 → de 01/10/2026 a 30/11/2026.
  */
-export function contaJaLancada(d, imovelId, tipo, mov, indice = null) {
-  const ligadas = indice && indice.despesasLigadas ? indice.despesasLigadas() : despesasLigadasAoExtrato(d);
-  const mes = String(mov.data).slice(0, 7);
-  const perto = (x) => (x.data_pagamento ? Math.abs(C.diasEntre(x.data_pagamento, mov.data)) <= 7 : x.competencia <= mes && x.competencia >= C.somarMeses(mes, -2));
-  const distancia = (x) => (x.data_pagamento ? Math.abs(C.diasEntre(x.data_pagamento, mov.data)) : 99);
-  return (d.despesas || []).filter((x) => x.imovel_id === Number(imovelId) && x.tipo === tipo && x.valor === mov.valor && !x.movimentacao_id && !x.pagamento_banco_id
-    && !ligadas.has(x.id) && perto(x)).sort((a, b) => distancia(a) - distancia(b) || b.id - a.id)[0] || null;
+export function periodoContasLancadas(data) {
+  const mes = String(data).slice(0, 7);
+  return { de: `${C.somarMeses(mes, -1)}-01`, ate: C.limitesCompetencia(mes)[1], meses: [C.somarMeses(mes, -1), mes] };
 }
 
-/** Sugestão de "conta do imóvel" com a conta já lançada à mão, para LIGAR (``despesa_id``) em vez de lançar de novo. */
+/**
+ * Contas do imóvel já lançadas à mão (Contas pagas por nós) que podem ser esta saída do extrato: sem linha do extrato nem pagamento
+ * pelo banco ligados, pagas no mês anterior ou no mês da saída (sem data de pagamento: de um desses meses de competência). ``tipo`` e
+ * ``valor`` (opcionais) filtram. A de mesmo valor e data mais perto primeiro. Só para a escolha do usuário: nada é ligado sozinho.
+ * Ex.: saída de luz em 17/11 → a luz de R$ 123,45 paga em 10/10 entra; a de 28/09, não.
+ */
+export function contasLancadasPossiveis(d, imovelId, mov, { tipo = null, valor = null, indice = null } = {}) {
+  const ligadas = indice && indice.despesasLigadas ? indice.despesasLigadas() : despesasLigadasAoExtrato(d);
+  const { de, ate, meses } = periodoContasLancadas(mov.data);
+  const noPeriodo = (x) => (x.data_pagamento ? x.data_pagamento >= de && x.data_pagamento <= ate : meses.includes(x.competencia));
+  const distancia = (x) => (x.data_pagamento ? Math.abs(C.diasEntre(x.data_pagamento, mov.data)) : 99);
+  return (d.despesas || []).filter((x) => x.imovel_id === Number(imovelId) && (!tipo || x.tipo === tipo) && (valor === null || x.valor === valor) && x.valor > 0
+    && !x.movimentacao_id && !x.pagamento_banco_id && !ligadas.has(x.id) && noPeriodo(x))
+    .sort((a, b) => (a.valor === mov.valor ? 0 : 1) - (b.valor === mov.valor ? 0 : 1) || distancia(a) - distancia(b) || b.id - a.id);
+}
+/** A primeira das contas possíveis do mesmo imóvel, tipo e valor (ou null). */
+export const contaJaLancada = (d, imovelId, tipo, mov, indice = null) => contasLancadasPossiveis(d, imovelId, mov, { tipo, valor: mov.valor, indice })[0] || null;
+
+/**
+ * Sugestão de "conta do imóvel" quando há conta já lançada à mão que pode ser esta saída: só o aviso, para o usuário escolher qual
+ * conta e de qual mês é e confirmar (``candidatosConta``); nada é ligado nem marcado sozinho (decisão do dono, 17/11/2026).
+ */
 function comContaLancada(d, mov, s, indice = null) {
   if (!s || s.classificacao !== 'conta_imovel' || !s.imovel_id || !s.tipo_despesa || mov.tipo !== 'saida') return s;
-  const de = contaJaLancada(d, s.imovel_id, s.tipo_despesa, mov, indice);
-  return de ? { ...s, despesa_id: de.id, motivo: `${s.motivo} · conta já lançada em Contas pagas por nós (${de.tipo} de ${C.compBr(de.competencia)}): só ligar` } : s;
+  const lista = contasLancadasPossiveis(d, s.imovel_id, mov, { tipo: s.tipo_despesa, valor: mov.valor, indice });
+  if (!lista.length) return s;
+  const de = lista[0];
+  return { ...s, despesa_id: null, candidatosConta: lista.map((x) => x.id), semIdentificacao: true,
+    motivo: `${s.motivo} · há ${lista.length === 1 ? 'uma conta já lançada' : `${lista.length} contas já lançadas`} em Contas pagas por nós com este valor (ex.: ${de.tipo} de ${C.compBr(de.competencia)}): vincule e confirme qual é` };
 }
 
 const classificacaoDaOrigem = (origem) => ({ despesa: 'conta_imovel', avulso: 'conta_imovel', iptu: 'iptu', guia_imposto: 'imposto' }[(origem || {}).tipo] || 'outro');
 
 /** Devolução de Pix (recebida ou enviada) ou estorno, pela categoria do extrato ou pela descrição. */
 export const ehDevolucao = (m) => /DEVOLUTION|REVERSAL|REFUND|ESTORNO|DEVOLUCAO|DEVOLVID/.test(maiusculaSemAcento(`${m.categoria_banco || ''} ${m.descricao || ''} ${m.titulo || ''}`));
+/** Devolução enviada por nós (saída): pelo tipo do C6 (DEBIT_PIX_DEVOLUTION_SENT) ou, em arquivo de outro banco, pela descrição. */
+export const ehDevolucaoEnviada = (m) => !!m && m.tipo === 'saida' && (m.categoria_banco === M.EXTRATO_TIPOS.devolucao_enviada || ehDevolucao(m));
+
+/** Ids de Pix da linha (end to end: "E…"; o da devolução: "D…"): o do campo e os citados na descrição. Nunca nome, CPF ou valor. */
+const idsDePix = (m) => [...new Set([m && m.end_to_end_id, ...(`${(m && m.descricao) || ''} ${(m && m.titulo) || ''}`.match(/\b[ED][0-9A-Za-z]{20,}\b/g) || [])].map(idNormal).filter(idUtil))];
+
+/**
+ * De onde veio o Pix que esta devolução devolve, SÓ pelo identificador (``end_to_end_id``): a entrada do extrato com o mesmo id (já
+ * ligada a um boleto, como pagamento ou como pagamento a mais, ou ainda sem destino) ou o boleto emitido no banco com esse id de
+ * pagamento. { cobranca, origem } ou { semDestino: entrada } ou null. Ex.: devolução de R$ 2.000,00 com o id E3360…02 → a entrada de
+ * 20/10 com o mesmo id, ligada ao boleto de 10/2026.
+ */
+export function boletoDaDevolucao(d, mov) {
+  const ids = new Set(idsDePix(mov));
+  if (!ids.size) return null;
+  const origem = (d.movimentacoes_banco || []).find((x) => x.id !== mov.id && x.tipo === 'entrada' && idsDePix(x).some((i) => ids.has(i)));
+  if (origem && origem.classificacao === 'boleto' && origem.cobranca_id) {
+    const cb = buscar(d, 'cobrancas', origem.cobranca_id);
+    return cb && cb.data_pagamento ? { cobranca: cb, origem } : null;
+  }
+  const cb = d.cobrancas.find((x) => x.banco && x.data_pagamento && (x.banco.ids_pagamento || []).map(idNormal).some((i) => ids.has(i)));
+  if (cb) return { cobranca: cb, origem: null };
+  return origem && !origem.classificacao ? { semDestino: origem } : null;
+}
+
+/** Até quantos dias antes da devolução se procura o boleto pago a mais (só para a lista de escolha; nada é ligado sozinho). */
+export const DIAS_BUSCA_DEVOLUCAO = 120;
+/** Boletos pagos nos DIAS_BUSCA_DEVOLUCAO dias antes da devolução que receberam a mais pelo menos o valor dela (candidatos para o usuário escolher). */
+export function boletosPagosAMais(d, mov) {
+  const de = C.somarDias(mov.data, -DIAS_BUSCA_DEVOLUCAO);
+  return d.cobrancas.filter((cb) => cb.data_pagamento && cb.data_pagamento <= mov.data && cb.data_pagamento >= de && pagoAMaisDo(cb) >= mov.valor)
+    .sort((a, b) => (pagoAMaisDo(a) === mov.valor ? -1 : 0) - (pagoAMaisDo(b) === mov.valor ? -1 : 0) || String(b.data_pagamento).localeCompare(String(a.data_pagamento)));
+}
+
+const quemDoBoleto = (d, cb) => { const c = buscar(d, 'contratos', cb.contrato_id); return `${c ? c.inquilino_nome : ''} (${C.compBr(cb.competencia)})`; };
+
+/**
+ * Sugestão para uma devolução enviada (decisão do dono, 17/11/2026): com o ``end_to_end_id`` do Pix devolvido, o boleto de onde ele
+ * veio (proposta pronta; o usuário confirma). Sem o identificador, nada é escolhido: "Devolução ao inquilino" sem boleto, com os
+ * boletos pagos a mais como candidatos, e a lembrança da reserva (ficha reprovada ou desistência), que não passa por boleto.
+ */
+function sugestaoDeDevolucao(d, mov) {
+  const achado = boletoDaDevolucao(d, mov);
+  if (achado && achado.cobranca) {
+    const cb = achado.cobranca;
+    const c = buscar(d, 'contratos', cb.contrato_id);
+    return { classificacao: 'devolucao_inquilino', cobranca_id: cb.id, imovel_id: c ? c.imovel_id : null, confianca: 'alta', peloId: true,
+      motivo: `o Pix devolvido (mesmo código) é o que entrou no boleto de ${quemDoBoleto(d, cb)}: recebido ${C.reais(cb.valor_pago || 0)}, devido ${C.reais(devidoDoPago(cb))}` };
+  }
+  if (achado && achado.semDestino) {
+    return { classificacao: 'devolucao_inquilino', cobranca_id: null, confianca: 'baixa', semIdentificacao: true,
+      motivo: `o Pix devolvido é a entrada de ${C.dataBr(achado.semDestino.data)} (${C.reais(achado.semDestino.valor)}), que ainda não tem destino: ligue antes essa entrada ao boleto ("pagou de novo (a mais)") e depois esta devolução` };
+  }
+  const reserva = (d.fichas || []).find((f) => devolucaoPendente(f) && f.reserva_valor === mov.valor);
+  const pagos = boletosPagosAMais(d, mov);
+  const aviso = 'devolução sem o código do Pix devolvido: escolha à mão o boleto que foi pago a mais';
+  return { classificacao: 'devolucao_inquilino', cobranca_id: null, candidatos: pagos.map((cb) => cb.id), confianca: 'baixa', semIdentificacao: true,
+    motivo: reserva ? `${aviso}; se for a devolução da reserva de ${reserva.inquilino_nome} (${C.reais(reserva.reserva_valor)}), escolha "Devolução de Pix ou estorno" e registre a devolução na ficha (a reserva não passa por boleto)` : aviso };
+}
+
+/**
+ * Entrada que é um segundo pagamento de um boleto já pago por outra entrada, SÓ pelo identificador (referência do Pix do boleto, nosso
+ * número, id do pagamento no banco). Pelo valor, nome ou data nada é proposto (decisão do dono, 17/11/2026).
+ */
+function pagoDeNovo(d, mov, indice = null) {
+  const ids = identificadoresDaMov(mov);
+  if (!ids.length) return null;
+  const ib = indice && indice.boletos ? indice.boletos() : null;
+  const porId = ib ? ib.porIdentificador : boletosPorIdentificador(d.cobrancas);
+  const cb = ids.map((i) => porId.get(i)).find(Boolean);
+  if (!cb || !cb.data_pagamento || !cb.movimentacao_id || cb.movimentacao_id === mov.id) return null;
+  const c = buscar(d, 'contratos', cb.contrato_id);
+  return { classificacao: 'boleto', cobranca_id: cb.id, imovel_id: c ? c.imovel_id : null, pago_a_mais: true, confianca: 'alta', peloId: true,
+    motivo: `o código do banco é o do boleto de ${quemDoBoleto(d, cb)}, que já está pago por outra entrada: pagou de novo (a mais); a NF não muda e a diferença é devolvida depois` };
+}
 
 /** O texto cita a empresa dona da conta ``contaId`` (CNPJ, nome ou apelido da conta). */
 function citaEmpresaDaConta(d, texto, contaId) {
@@ -1176,6 +1288,23 @@ function citaEmpresaDaConta(d, texto, contaId) {
   const nome = e ? maiusculaSemAcento(e.nome) : '';
   return !!((cnpj && texto.replace(/\D/g, '').includes(cnpj)) || (nome && texto.includes(nome))
     || (c.apelido && new RegExp(`\\b${maiusculaSemAcento(c.apelido).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(texto)));
+}
+
+/** O extrato cita a referência do pagamento pelo banco ("erp-12", mandada na descrição do pedido) ou o id do item no banco. */
+const pagamentoCitado = (p, texto) => new RegExp(`\\bERP-?${p.id}\\b`).test(texto) || (!!p.id_externo && idUtil(idNormal(p.id_externo)) && texto.replace(/[^A-Z0-9]/g, '').includes(idNormal(p.id_externo)));
+
+/** A outra ponta de uma transferência pelo identificador: na outra conta, sentido contrário, mesmo valor e o mesmo id do Pix (end to end). */
+export function parPeloPix(d, mov) {
+  const ids = new Set(idsDePix(mov));
+  if (!ids.size) return null;
+  return (d.movimentacoes_banco || []).find((m) => m.id !== mov.id && m.conta_id !== mov.conta_id && m.tipo !== mov.tipo && m.valor === mov.valor && podeSerPonta(m)
+    && idsDePix(m).some((i) => ids.has(i))) || null;
+}
+
+/** Possíveis outras pontas de uma transferência, para o usuário escolher: outra conta, sentido contrário, mesmo valor, até 3 dias de diferença. */
+export function pontasPossiveis(d, mov) {
+  return (d.movimentacoes_banco || []).filter((m) => m.id !== mov.id && m.conta_id !== mov.conta_id && m.tipo !== mov.tipo && m.valor === mov.valor
+    && Math.abs(C.diasEntre(m.data, mov.data)) <= 3 && podeSerPonta(m)).sort((a, b) => Math.abs(C.diasEntre(a.data, mov.data)) - Math.abs(C.diasEntre(b.data, mov.data)));
 }
 
 /** A outra ponta de uma transferência entre as nossas contas: mesmo valor, tipo oposto, outra conta, até 1 dia de diferença, ainda sem par. */
@@ -1215,8 +1344,10 @@ export function vincularMovimentacao(d, movId, destino, usuario) {
     if (!destino.cobranca_id) throw new Error('Escolha o boleto que esta entrada pagou.');
     const cb = buscar(d, 'cobrancas', destino.cobranca_id);
     if (cb && cb.data_pagamento) {
+      // o inquilino pagou de novo: a entrada soma no recebido do boleto (a NF não muda) e a diferença é devolvida depois
+      if (destino.pago_a_mais) return registrarPagoAMais(d, mov, cb, base, usuario);
       // já pago à mão: a entrada só fica ligada a ele (nunca paga outro boleto nem o mesmo de novo)
-      if (cb.valor_pago !== mov.valor) throw new C.ErroUsuario(`O boleto de ${C.compBr(cb.competencia)} já está pago (${C.dataBr(cb.data_pagamento)}, ${C.reais(cb.valor_pago)}); esta entrada é de ${C.reais(mov.valor)}. Escolha outro boleto.`);
+      if (cb.valor_pago !== mov.valor) throw new C.ErroUsuario(`O boleto de ${C.compBr(cb.competencia)} já está pago (${C.dataBr(cb.data_pagamento)}, ${C.reais(cb.valor_pago)}); esta entrada é de ${C.reais(mov.valor)}. Escolha outro boleto ou, se o inquilino pagou de novo, a opção "pagou de novo (a mais)".`);
       ligarMovimentacaoAoBoleto(d, mov.id, cb.id, usuario);
       if (obs || destino.nome_arquivo) atualizar(d, 'movimentacoes_banco', mov.id, { observacoes: obs, nome_arquivo: destino.nome_arquivo || null }, usuario, 'Observações da movimentação');
       return { divergente: false, ligada: true, cobranca: cb };
@@ -1290,7 +1421,8 @@ export function vincularMovimentacao(d, movId, destino, usuario) {
     return mov;
   }
   if (cl === 'transferencia') {
-    const par = destino.par_movimentacao_id ? buscar(d, 'movimentacoes_banco', destino.par_movimentacao_id) : parDaTransferencia(d, mov);
+    // a outra ponta: a escolhida pelo usuário ou, sem escolha, só a do mesmo id do Pix (pelo valor e pela data nunca liga sozinho)
+    const par = destino.par_movimentacao_id ? buscar(d, 'movimentacoes_banco', destino.par_movimentacao_id) : parPeloPix(d, mov);
     if (destino.par_movimentacao_id && !par) throw new Error('A outra movimentação da transferência não foi encontrada.');
     if (par && par.classificacao && par.classificacao !== 'transferencia') throw new Error('A outra ponta da transferência já tem outro destino.');
     if (par && par.par_movimentacao_id && par.par_movimentacao_id !== mov.id) throw new C.ErroUsuario('A outra ponta já está ligada a outra transferência. Desfaça aquele destino antes.');
@@ -1299,9 +1431,52 @@ export function vincularMovimentacao(d, movId, destino, usuario) {
     if (par) atualizar(d, 'movimentacoes_banco', par.id, { classificacao: cl, par_movimentacao_id: mov.id, ...carimbo(usuario) }, usuario, 'Destino: transferência entre as contas (outra ponta)');
     return mov;
   }
+  if (cl === 'devolucao_inquilino') return registrarDevolucaoAoInquilino(d, mov, destino, base, usuario);
   // tarifa, outro, ignorar
   atualizar(d, 'movimentacoes_banco', mov.id, { ...base, classificacao: cl, imovel_id: destino.imovel_id ? Number(destino.imovel_id) : null }, usuario, `Destino: ${CLASSIFICACOES[cl]}`);
   return mov;
+}
+
+/**
+ * Segundo pagamento de um boleto já pago (Pix e código de barras, ou o mesmo Pix duas vezes): a entrada fica ligada ao boleto como
+ * "pagou de novo (a mais)" e soma no recebido; a NF não muda. Ex.: boleto de 10/2026 de R$ 2.000,00 pago e, depois, mais R$ 2.000,00
+ * → recebido R$ 4.000,00, NF de R$ 2.000,00; a diferença sai pela "Devolução ao inquilino".
+ */
+function registrarPagoAMais(d, mov, cb, base, usuario) {
+  if (mov.tipo !== 'entrada') throw new C.ErroUsuario('Só uma entrada no extrato pode ser um pagamento a mais de um boleto.');
+  const antes = cb.valor_pago || 0;
+  const novo = antes + mov.valor;
+  const devido = devidoDoPago(cb);
+  const c = buscar(d, 'contratos', cb.contrato_id);
+  atualizar(d, 'cobrancas', cb.id, { valor_pago: novo, valor_a_mais: (cb.valor_a_mais || 0) + mov.valor }, usuario,
+    `Pagou de novo: entraram mais ${C.reais(mov.valor)} em ${C.dataBr(mov.data)} (extrato); recebido ${C.reais(antes)} → ${C.reais(novo)}, devido ${C.reais(devido)}. A NF não muda; a diferença é devolvida ao inquilino (destino "Devolução ao inquilino")`);
+  atualizar(d, 'movimentacoes_banco', mov.id, { ...base, classificacao: 'boleto', cobranca_id: cb.id, imovel_id: c ? c.imovel_id : null, pago_a_mais: true }, usuario,
+    `Destino: pagamento a mais do boleto de ${quemDoBoleto(d, cb)}`);
+  return { divergente: false, aMais: true, cobranca: cb, antes, novo, devido };
+}
+
+/**
+ * Devolução ao inquilino do que ele pagou a mais (decisão do dono, 17/11/2026): a saída fica ligada ao boleto e o recebido dele
+ * diminui o valor devolvido, de volta ao devido; a NF não muda. Ficar abaixo do devido só com ``destino.abaixoDoDevido`` (sem ele,
+ * devolve { abaixoDoDevido, devido, antes, novo } sem gravar, e a tela pergunta). Ex.: recebido R$ 4.000,00 (NF R$ 2.000,00),
+ * devolução de R$ 2.000,00 → recebido R$ 2.000,00, NF igual.
+ */
+function registrarDevolucaoAoInquilino(d, mov, destino, base, usuario) {
+  if (mov.tipo !== 'saida') throw new C.ErroUsuario('Uma entrada no extrato não pode ser devolução ao inquilino (dinheiro que voltou para nós é "Devolução de Pix ou estorno").');
+  const cb = destino.cobranca_id ? buscar(d, 'cobrancas', destino.cobranca_id) : null;
+  if (!cb) throw new C.ErroUsuario('Escolha o boleto que o inquilino pagou a mais.');
+  if (!cb.data_pagamento) throw new C.ErroUsuario(`O boleto de ${C.compBr(cb.competencia)} ainda não está pago: só se devolve o que foi recebido. Confirme antes o pagamento dele.`);
+  const antes = cb.valor_pago || 0;
+  const novo = antes - mov.valor;
+  const devido = devidoDoPago(cb);
+  if (novo < 0) throw new C.ErroUsuario(`A devolução (${C.reais(mov.valor)}) é maior que o recebido no boleto de ${C.compBr(cb.competencia)} (${C.reais(antes)}). Escolha outro boleto. Nada foi alterado.`);
+  if (novo < devido && !destino.abaixoDoDevido) return { abaixoDoDevido: true, cobranca: cb, devido, antes, novo, valor: mov.valor };
+  const c = buscar(d, 'contratos', cb.contrato_id);
+  atualizar(d, 'cobrancas', cb.id, { valor_pago: novo, valor_devolvido: (cb.valor_devolvido || 0) + mov.valor }, usuario,
+    `Devolução ao inquilino de ${C.reais(mov.valor)} em ${C.dataBr(mov.data)} (extrato): recebido ${C.reais(antes)} → ${C.reais(novo)}, devido ${C.reais(devido)}${novo < devido ? ' (fica ABAIXO do devido: confirmado pelo usuário)' : ''}. A NF não muda`);
+  atualizar(d, 'movimentacoes_banco', mov.id, { ...base, classificacao: 'devolucao_inquilino', cobranca_id: cb.id, imovel_id: c ? c.imovel_id : null }, usuario,
+    `Destino: devolução ao inquilino ${quemDoBoleto(d, cb)}`);
+  return { devolvido: true, cobranca: cb, antes, novo, devido };
 }
 
 /** Arquivos (comprovantes) desta movimentação ou pagamento, com escopo e id de pasta: [{ escopo, id, nome }]. */
@@ -1322,8 +1497,21 @@ export function arquivosDaMovimentacao(d, x) {
 export function desvincularMovimentacao(d, movId, usuario) {
   const mov = exigirMov(d, movId);
   if (!mov.classificacao) return { arquivos: [] };
-  if (mov.classificacao === 'boleto') throw new Error("Desfaça o pagamento do boleto na tela Boletos (botão 'Desfazer pagamento').");
+  if (mov.classificacao === 'boleto' && !mov.pago_a_mais) throw new Error("Desfaça o pagamento do boleto na tela Boletos (botão 'Desfazer pagamento').");
   const arquivos = arquivosDaMovimentacao(d, mov);
+  const cb = mov.cobranca_id ? buscar(d, 'cobrancas', mov.cobranca_id) : null;
+  if (cb && cb.data_pagamento && mov.classificacao === 'boleto') {
+    // pagamento a mais desfeito: sai do recebido; com devolução ligada ao boleto, desfaça antes a devolução
+    if ((d.movimentacoes_banco || []).some((x) => x.classificacao === 'devolucao_inquilino' && x.cobranca_id === cb.id)) throw new C.ErroUsuario(`O boleto de ${C.compBr(cb.competencia)} tem devolução ao inquilino ligada: desfaça antes o destino da devolução.`);
+    const novo = (cb.valor_pago || 0) - mov.valor;
+    atualizar(d, 'cobrancas', cb.id, { valor_pago: novo, valor_a_mais: Math.max(0, (cb.valor_a_mais || 0) - mov.valor) || null }, usuario,
+      `Pagamento a mais desfeito: recebido ${C.reais(cb.valor_pago || 0)} → ${C.reais(novo)}`);
+  }
+  if (cb && cb.data_pagamento && mov.classificacao === 'devolucao_inquilino') {
+    const novo = (cb.valor_pago || 0) + mov.valor;
+    atualizar(d, 'cobrancas', cb.id, { valor_pago: novo, valor_devolvido: Math.max(0, (cb.valor_devolvido || 0) - mov.valor) || null }, usuario,
+      `Devolução ao inquilino desfeita: recebido ${C.reais(cb.valor_pago || 0)} → ${C.reais(novo)}`);
+  }
   if (mov.despesa_id) {
     const de = buscar(d, 'despesas', mov.despesa_id);
     if (de && de.pagamento_banco_id) throw new Error('Esta conta foi paga pelo banco; o destino não pode ser desfeito.');
@@ -1683,7 +1871,7 @@ export function salvarConfigBanco2(d, campos, usuario) {
 // Texto do destino de uma movimentação (planilha do contador, D10)
 // --------------------------------------------------------------------------
 /** Nome curto de cada destino, para planilhas e textos (a tela usa o seu). */
-export const DESTINO_CURTO = { boleto: 'Aluguel recebido', airbnb: 'Airbnb', reforma: 'Reforma', conta_imovel: 'Conta do imóvel', iptu: 'IPTU', imposto: 'Imposto da empresa', tarifa: 'Tarifa do banco', transferencia: 'Transferência entre contas', devolucao: 'Devolução / estorno', outro: 'Outro', ignorar: 'Não é nosso' };
+export const DESTINO_CURTO = { boleto: 'Aluguel recebido', airbnb: 'Airbnb', reforma: 'Reforma', conta_imovel: 'Conta do imóvel', iptu: 'IPTU', imposto: 'Imposto da empresa', tarifa: 'Tarifa do banco', transferencia: 'Transferência entre contas', devolucao: 'Devolução / estorno', devolucao_inquilino: 'Devolução ao inquilino', outro: 'Outro', ignorar: 'Não é nosso' };
 
 /**
  * Descreve o destino dado a uma movimentação em texto puro. Ex.: "Conta do imóvel · Loja 1 · Água de 09/2026",
@@ -1697,7 +1885,7 @@ export function descreverDestino(d, m) {
   const desp = m.despesa_id ? buscar(d, 'despesas', m.despesa_id) : null;
   if (desp) partes.push(`${desp.tipo} de ${C.compBr(desp.competencia)}`);
   const cb = m.cobranca_id ? buscar(d, 'cobrancas', m.cobranca_id) : null;
-  if (cb) { const c = buscar(d, 'contratos', cb.contrato_id); partes.push(`boleto ${C.compBr(cb.competencia)}${c ? ` · ${c.inquilino_nome}` : ''}`); }
+  if (cb) { const c = buscar(d, 'contratos', cb.contrato_id); partes.push(`boleto ${C.compBr(cb.competencia)}${c ? ` · ${c.inquilino_nome}` : ''}${m.pago_a_mais ? ' · pagou de novo (a mais)' : ''}`); }
   const p = m.iptu_id ? buscar(d, 'iptus', m.iptu_id) : null;
   if (p) partes.push(`IPTU ${p.ano}${m.iptu_parcela ? ` parcela ${m.iptu_parcela}` : ''}`);
   const g = m.guia_imposto_id ? buscar(d, 'guias_impostos', m.guia_imposto_id) : null;

@@ -86,5 +86,11 @@ export const RESPOSTA = {
   negativacao: 'denial_info', negativacao_situacao: 'status', negativacao_data: 'denial_date', negativacao_data_consulta: 'date', negativacao_erros: 'errors', negativacao_pode_cancelar: 'can_cancel', notificacoes: 'payer_notification', // denial_date na resposta do agendamento; date e errors[] no denial_info da consulta
 };
 
+/**
+ * Tipos de lançamento do extrato (``transaction_type`` de saldo-extrato.yaml) com destino próprio no sistema. A devolução enviada
+ * (DEBIT_PIX_DEVOLUTION_SENT) traz no ``end_to_end_id`` o id do Pix devolvido quando o banco informa: é por ele que se acha o boleto pago a mais.
+ */
+export const EXTRATO_TIPOS = { devolucao_enviada: 'DEBIT_PIX_DEVOLUTION_SENT', devolucao_recebida: 'CREDIT_PIX_DEVOLUTION_RECEIVED', estorno: 'PAYMENT_REVERSAL' };
+
 /** Aviso do webhook: { service, status, information (JSON em texto com id, external_reference_id, amount, status, emission_date, due_date…) }. */
 export const AVISO_WEBHOOK = { servico: 'service', situacao: 'status', dados: 'information', dados_referencia: 'external_reference_id', dados_valor: 'amount' };

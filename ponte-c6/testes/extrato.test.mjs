@@ -61,10 +61,10 @@ test('extrato: erro do banco vira Error em português com o status', async () =>
   await assert.rejects(extrato(c6, { de: '2025-01-01', ate: '2026-11-05' }), /até 366 dias/);
 });
 
-test('extrato simulado: novembro/2026 tem 8 lançamentos na ANK e 4 na JCK; a TED aparece nas duas', async () => {
+test('extrato simulado: novembro/2026 tem 10 lançamentos na ANK (com o Pix pago duas vezes e a devolução) e 4 na JCK; a TED aparece nas duas', async () => {
   const ank = await extrato(criarC6Simulado({ conta: 'ank' }), { de: '2026-11-01', ate: '2026-11-30' });
   const jck = await extrato(criarC6Simulado({ conta: 'jck' }), { de: '2026-11-01', ate: '2026-11-30' });
-  assert.equal(ank.lancamentos.length, 8);
+  assert.equal(ank.lancamentos.length, 10);
   assert.equal(jck.lancamentos.length, 4);
   const ted = ank.lancamentos.find((l) => l.transaction_type === 'TRANSFER');
   const tedJck = jck.lancamentos.find((l) => l.transaction_type === 'TRANSFER');
@@ -77,12 +77,12 @@ test('extrato simulado: novembro/2026 tem 8 lançamentos na ANK e 4 na JCK; a TE
   assert.equal(reaisBr(121950), '1.219,50');
   // outro mês: mesmos lançamentos, referências diferentes (nada se repete na importação)
   const dez = await extrato(criarC6Simulado({ conta: 'ank' }), { de: '2026-12-01', ate: '2026-12-31' });
-  assert.equal(dez.lancamentos.length, 8);
+  assert.equal(dez.lancamentos.length, 10);
   assert.ok(dez.lancamentos.every((l) => l.reference.endsWith('-202612')));
-  // período que cruza dois meses: 2 janelas, 16 lançamentos, nenhum repetido
+  // período que cruza dois meses: 2 janelas, 20 lançamentos, nenhum repetido
   const dois = await extrato(criarC6Simulado({ conta: 'ank' }), { de: '2026-11-01', ate: '2026-12-31' });
-  assert.equal(dois.lancamentos.length, 16);
-  assert.equal(new Set(dois.lancamentos.map((l) => l.reference)).size, 16);
+  assert.equal(dois.lancamentos.length, 20);
+  assert.equal(new Set(dois.lancamentos.map((l) => l.reference)).size, 20);
 });
 
 test('saldo simulado: formato BalanceResponse com conta_id', async () => {

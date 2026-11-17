@@ -17,6 +17,19 @@ import { formNfExterna } from './faturas.js';
 // Cobranças do mês
 // --------------------------------------------------------------------------
 /**
+ * Boleto pago a mais (entrou de novo) e devolução ao inquilino (decisão do dono, 17/11/2026): as linhas do extrato ligadas a ele,
+ * o que ainda falta devolver e o lembrete de que a NF não muda. Ex.: recebido R$ 4.000,00 de R$ 2.000,00 → "falta devolver R$ 2.000,00".
+ */
+function pagoAMaisHtml(cb) {
+  const linhas = (d().movimentacoes_banco || []).filter((m) => m.cobranca_id === cb.id && (m.pago_a_mais || m.classificacao === 'devolucao_inquilino'));
+  if (!linhas.length && !cb.valor_a_mais && !cb.valor_devolvido) return '';
+  const falta = cb.valor_a_mais ? R.pagoAMaisDo(cb) : 0;
+  const lista = linhas.sort((a, b) => String(a.data).localeCompare(String(b.data))).map((m) => `<li><a href="#/banco?conta=${esc(m.conta_id)}&mes=${String(m.data).slice(0, 7)}">${dataBr(m.data)} · ${m.pago_a_mais ? 'entrou de novo (a mais)' : 'devolvido ao inquilino'} · ${reais(m.valor)}</a></li>`).join('');
+  return `<div class="alerta ${falta ? 'aviso' : 'info'}"><b>${falta ? `Pago a mais: falta devolver ${reais(falta)} ao inquilino` : 'Pago a mais e devolvido'}</b> (devido ${reais(R.devidoDoPago(cb))}). A NF não muda.
+    ${lista ? `<ul style="margin:6px 0 0">${lista}</ul>` : ''}${falta ? '<p class="suave">Quando devolver, dê à saída do extrato o destino "Devolução ao inquilino" (tela Banco).</p>' : ''}</div>`;
+}
+
+/**
  * Confirmação do pagamento: data contábil (entrada no banco, vira a data da NF), "pagou em dia" (compensou depois,
  * sem multa e juros) e, se atrasou de verdade, o dia em que pagou (multa e juros até esse dia, como o banco cobra).
  */
@@ -345,6 +358,7 @@ export function telaCobranca(cb) {
       ${!cb.data_pagamento && memoria.pagamentoDivergente && memoria.pagamentoDivergente.id === cb.id ? formNfDivergente(cb, memoria.pagamentoDivergente) : cb.data_pagamento ? `<div class="grade">${item('Pago em', dataBr(cb.data_pagamento))}${item('Situação', `${esc(cb.situacao)}${cb.dias_atraso ? ` (${cb.dias_atraso} dias)` : ''}`)}
         ${R.ehComplementoCaucao(cb) ? '' : `${item(`Multa (${pct(cb.multa_percentual)})`, reais(cb.multa))}${item(`Juros (${pct(cb.juros_mensal_percentual)} ao mês)`, reais(cb.juros))}`}
         ${item('Valor recebido', reais(cb.valor_pago))}${R.ehComplementoCaucao(cb) ? '' : item('Valor da nota fiscal', `<span class="maior">${reais(cb.valor_nf)}</span>${cb.nf_manual ? ` ${etiqueta('digitado à mão', 'aviso')}` : ''}`)}</div>
+        ${pagoAMaisHtml(cb)}
         ${cb.nf_manual ? '<p class="suave">Valor recebido diferente do previsto: a NF saiu com o valor digitado à mão (a justificativa está no histórico).</p>' : R.ehComplementoCaucao(cb) ? '<p class="suave">Complemento da caução: não gera NF. Ao confirmar o pagamento, a caução foi corrigida (veja Garantia, na página do inquilino).</p>' : `<p class="suave">Nota fiscal = ${cb.dias_atraso ? `aluguel ${reais(cb.aluguel)} + multa ${reais(cb.multa)} + juros ${reais(cb.juros)} (pagou atrasado, sem desconto)` : `aluguel ${reais(cb.aluguel)} - desconto ${reais(cb.desconto)} (pagou em dia)`}. IPTU, seguro, tarifa, FCI e ajuste do mês não entram.</p>`}
         ${opera() ? botao('estornar', 'Desfazer pagamento', { id: cb.id }, 'perigo pequeno', validas.length ? 'Desfazer o pagamento? A NF será cancelada e o número não será reaproveitado.' : 'Desfazer o pagamento?') : ''}`
       : R.emAcordo(cb) ? '<p class="suave">Boleto em acordo: não se cobra mais. O pagamento é registrado nos boletos do acordo.</p>'

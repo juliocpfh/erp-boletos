@@ -1822,6 +1822,19 @@ export const totais = (cb) => C.totaisCobranca(cb, cb.reserva_utilizada || 0);
 export const previstoNoPagamento = (cb, dataContabil, { pagouEmDia = false, dataPagou = null } = {}) => C.liquidar(cb, pagouEmDia ? cb.vencimento : (dataPagou || dataContabil));
 
 /**
+ * O que um boleto JÁ PAGO devia ter recebido (o mesmo cálculo da confirmação: desconto se pagou em dia, multa e juros até o dia em
+ * que pagou; a reserva abatida já sai do valor). Recebido acima disso foi pago a mais. Ex.: boleto de R$ 2.000,00 pago em dia duas
+ * vezes → recebido R$ 4.000,00, devido R$ 2.000,00, a mais R$ 2.000,00.
+ */
+export function devidoDoPago(cb) {
+  if (!cb || !cb.data_pagamento) return 0;
+  const v = previstoNoPagamento(cb, cb.data_pagamento, { pagouEmDia: !!cb.pagou_em_dia, dataPagou: cb.data_pagou || null }).valor_devido;
+  return Number.isFinite(v) ? v : 0;
+}
+/** Quanto o boleto pago recebeu a mais do que devia (0 se não recebeu a mais). */
+export const pagoAMaisDo = (cb) => (cb && cb.data_pagamento ? Math.max(0, (cb.valor_pago || 0) - devidoDoPago(cb)) : 0);
+
+/**
  * Valor recebido diferente do previsto (caso excepcional): a NF não sai pelo cálculo. ``valorNf`` é digitado à mão
  * e precisa ser diferente do calculado; ``justificativa`` é obrigatória e fica só no sistema (histórico do boleto).
  */
@@ -1925,10 +1938,11 @@ export function estornarPagamento(d, cobrancaId, usuario) {
   }
   cancelarFaturas(d, 'cobranca', cobrancaId, usuario);
   atualizar(d, 'cobrancas', cobrancaId, { data_pagamento: null, data_pagou: null, valor_pago: null, dias_atraso: null, multa: null,
-    juros: null, valor_nf: null, pagou_em_dia: false, situacao: 'Em aberto', nf_manual: false, divergencia: null, movimentacao_id: null, pagamento_c6: null }, usuario, 'Pagamento desfeito');
-  // confirmado pelo extrato: a movimentação volta a "sem destino"
+    juros: null, valor_nf: null, pagou_em_dia: false, situacao: 'Em aberto', nf_manual: false, divergencia: null, movimentacao_id: null, pagamento_c6: null,
+    ...(cb && (cb.valor_a_mais || cb.valor_devolvido) ? { valor_a_mais: null, valor_devolvido: null } : {}) }, usuario, 'Pagamento desfeito');
+  // confirmado pelo extrato: a movimentação volta a "sem destino" (também a entrada a mais e a devolução ao inquilino ligadas a ele)
   for (const m of (d.movimentacoes_banco || []).filter((x) => x.cobranca_id === Number(cobrancaId))) {
-    atualizar(d, 'movimentacoes_banco', m.id, { cobranca_id: null, classificacao: null, imovel_id: null, classificada_em: null, classificada_por: null }, usuario, 'Pagamento do boleto desfeito: movimentação volta a ficar sem destino');
+    atualizar(d, 'movimentacoes_banco', m.id, { cobranca_id: null, classificacao: null, imovel_id: null, classificada_em: null, classificada_por: null, ...(m.pago_a_mais ? { pago_a_mais: false } : {}) }, usuario, 'Pagamento do boleto desfeito: movimentação volta a ficar sem destino');
   }
 }
 
@@ -6846,7 +6860,8 @@ export function vinculosBancoOrfaos(d) {
       if (!m[campo] || ids[t].has(m[campo])) continue;
       campos[campo] = null;
       if (campo === 'iptu_id') campos.iptu_parcela = null;
-      if (m.classificacao === classe) campos.classificacao = null;
+      // a devolução ao inquilino também aponta para o boleto (cobranca_id): sem ele, perde o destino
+      if (m.classificacao === classe || (classe === 'boleto' && m.classificacao === 'devolucao_inquilino')) campos.classificacao = null;
     }
     if (Object.keys(campos).length) out.push({ m, campos });
   }
@@ -7475,7 +7490,8 @@ export function rotuloDoComprovante(d, x) {
   if (x.origem) return `comprovante do pagamento pelo banco ${conta}: ${x.tipo_conta || 'conta'} ${C.compBr(x.competencia || competenciaDoComprovante(x))} (${data ? C.dataBr(data) : 'a pagar'}, ${valor})`;
   let oque = x.descricao || '';
   if (x.classificacao === 'conta_imovel') { const de = x.despesa_id ? buscar(d, 'despesas', x.despesa_id) : null; oque = de ? `${de.tipo} ${C.compBr(de.competencia)}` : 'conta do imóvel'; }
-  else if (x.classificacao === 'boleto') { const cb = x.cobranca_id ? buscar(d, 'cobrancas', x.cobranca_id) : null; const c = cb ? buscar(d, 'contratos', cb.contrato_id) : null; oque = `aluguel${c ? ` de ${c.inquilino_nome}` : ''}${cb ? ` (${C.compBr(cb.competencia)})` : ''}`; }
+  else if (x.classificacao === 'boleto') { const cb = x.cobranca_id ? buscar(d, 'cobrancas', x.cobranca_id) : null; const c = cb ? buscar(d, 'contratos', cb.contrato_id) : null; oque = `aluguel${c ? ` de ${c.inquilino_nome}` : ''}${cb ? ` (${C.compBr(cb.competencia)})` : ''}${x.pago_a_mais ? ', pago a mais' : ''}`; }
+  else if (x.classificacao === 'devolucao_inquilino') { const cb = x.cobranca_id ? buscar(d, 'cobrancas', x.cobranca_id) : null; const c = cb ? buscar(d, 'contratos', cb.contrato_id) : null; oque = `devolução${c ? ` a ${c.inquilino_nome}` : ' ao inquilino'}${cb ? ` (boleto ${C.compBr(cb.competencia)})` : ''}`; }
   else if (x.classificacao === 'iptu') { const p = x.iptu_id ? buscar(d, 'iptus', x.iptu_id) : null; oque = `IPTU${p ? ` ${p.ano}` : ''} ${x.iptu_parcela ? `${x.iptu_parcela}ª parcela` : 'cota única'}`; }
   else if (x.classificacao === 'imposto') oque = 'imposto da empresa';
   else if (x.classificacao === 'tarifa') oque = 'tarifa do banco';

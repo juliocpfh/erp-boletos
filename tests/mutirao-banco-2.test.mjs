@@ -107,13 +107,14 @@ test('18: devolução de Pix recebida não é aluguel nem transferência', () =>
   assert.equal(R.buscar(d, 'movimentacoes_banco', dv.id).classificacao, 'devolucao');
 });
 
-test('37: com duas entradas iguais no dia, liga a que cita o inquilino (nunca a de outro)', () => {
+test('37: com duas entradas iguais no dia, nenhuma é ligada pelo nome do inquilino; só pelo código do pagamento (decisão de 17/11/2026)', () => {
   const { d, cb } = base();
   const v = R.totais(cb).a_pagar_pontual;
-  const pix = (ref, desc) => ({ reference: ref, entry_date: '2026-08-10', created_at: '2026-08-10T10:00:00', amount: (v / 100).toFixed(2), operation_type: 'INCOMING', transaction_type: 'CREDIT_PIX_PAYMENT_RECEIVED', title: 'Pix', description: desc });
-  const { novas: [bruno, ana] } = Z.importarExtrato(d, 'ank', [pix('x1', 'PIX RECEBIDO BRUNO TESTE'), pix('x2', 'PIX RECEBIDO ANA TESTE')], 'j', { hoje: '2026-09-01' });
-  assert.equal(Z.entradaDoRecebimento(d, { conta_id: 'ank', valor: v, data: '2026-08-10', nome: 'Ana Teste' }).id, ana.id);
-  assert.equal(Z.entradaDoRecebimento(d, { conta_id: 'ank', valor: v, data: '2026-08-10' }), null, 'sem o nome: nenhuma');
+  const pix = (ref, desc, e2e) => ({ reference: ref, entry_date: '2026-08-10', created_at: '2026-08-10T10:00:00', amount: (v / 100).toFixed(2), operation_type: 'INCOMING', transaction_type: 'CREDIT_PIX_PAYMENT_RECEIVED', title: 'Pix', description: desc, end_to_end_id: e2e });
+  const { novas: [bruno, ana] } = Z.importarExtrato(d, 'ank', [pix('x1', 'PIX RECEBIDO BRUNO TESTE', 'E33600000202608101000BRUNO001'), pix('x2', 'PIX RECEBIDO ANA TESTE', 'E33600000202608101000ANA00002')], 'j', { hoje: '2026-09-01' });
+  assert.equal(Z.entradaDoRecebimento(d, { conta_id: 'ank', valor: v, data: '2026-08-10', nome: 'Ana Teste' }), null, 'pelo nome, nenhuma');
+  assert.equal(Z.entradaDoRecebimento(d, { conta_id: 'ank', valor: v }), null, 'sem código, nenhuma');
+  assert.equal(Z.entradaDoRecebimento(d, { conta_id: 'ank', valor: v, ids: ['E33600000202608101000ANA00002'] }).id, ana.id, 'pelo código do Pix, a dele');
   void bruno;
 });
 

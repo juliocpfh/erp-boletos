@@ -37,7 +37,7 @@ test('GET /contas/:conta/extrato devolve os lançamentos do C6 com conta_id; dat
   assert.equal(r.status, 200);
   assert.equal(r.corpo.conta_id, 'ank');
   assert.equal(r.corpo.de, '2026-11-01');
-  assert.equal(r.corpo.lancamentos.length, 8);
+  assert.equal(r.corpo.lancamentos.length, 10);
   assert.ok(r.corpo.lancamentos.every((l) => l.conta_id === 'ank' && l.reference && l.amount));
   assert.ok(registros.some((t) => /\[ank\] extrato/.test(t)));
 

@@ -76,6 +76,30 @@ export const EXTRATO = {
         "transaction_type": "TRANSFER"
       },
       {
+        "local_reference": "01JGHANX8S0T2V4W6X8Y0Z2A4D",
+        "created_at": "2026-11-11T09:05:00",
+        "entry_date": "2026-11-11",
+        "amount": "1500.00",
+        "title": "Pix Recebido",
+        "description": "PIX RECEBIDO JOAO EXEMPLO CPF 529.982.247-25",
+        "reference": "019aeec3-5a71-7183-c495-6f708192a3c1",
+        "operation_type": "INCOMING",
+        "transaction_type": "CREDIT_PIX_PAYMENT_RECEIVED",
+        "end_to_end_id": "E33600000202611110905ANKEXEMPLO04"
+      },
+      {
+        "local_reference": "01JGHANZ9T1V3W5X7Y9Z1A3B5E",
+        "created_at": "2026-11-11T17:40:00",
+        "entry_date": "2026-11-11",
+        "amount": "1500.00",
+        "title": "Devolução de Pix",
+        "description": "DEVOLUCAO PIX JOAO EXEMPLO (pagou duas vezes)",
+        "reference": "019aeec3-6b82-7294-d5a6-708192a3b4d2",
+        "operation_type": "OUTGOING",
+        "transaction_type": "DEBIT_PIX_DEVOLUTION_SENT",
+        "end_to_end_id": "E33600000202611110905ANKEXEMPLO04"
+      },
+      {
         "local_reference": "01JGHAP08S0T2V4W6X8Y0Z2A4B",
         "created_at": "2026-11-12T11:20:33",
         "entry_date": "2026-11-12",

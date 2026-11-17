@@ -184,7 +184,8 @@ test('22: aluguel recebido na JCK não vira "transferência" só porque a ANK pa
   const { novas: [t1] } = Z.importarExtrato(d, 'ank', [{ reference: 's2', entry_date: '2026-08-12', created_at: '2026-08-12T09:00:00', amount: '500.00', operation_type: 'OUTGOING', transaction_type: 'DEBIT_PIX_PAYMENT_REALIZED', title: 'Pix enviado', description: 'PIX ENVIADO JCK LTDA' }], 'j', { hoje: '2026-09-01' });
   Z.importarExtrato(d, 'jck', [pix('e2', '2026-08-12', 50000, 'PIX RECEBIDO ANK LTDA')], 'j', { hoje: '2026-09-01' });
   const st = Z.sugerirDestino(d, t1);
-  assert.deepEqual([st.classificacao, st.confianca], ['transferencia', 'alta']);
+  // cita a outra empresa: transferência; a outra ponta (sem o mesmo código do Pix) só como candidata (decisão de 17/11/2026)
+  assert.deepEqual([st.classificacao, st.par_movimentacao_id, (st.candidatosPar || []).length], ['transferencia', null, 1]);
 });
 
 // ---------------------------------------------------------------- item 10 (decisão do dono, 16/11/2026)
