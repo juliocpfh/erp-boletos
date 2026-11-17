@@ -455,8 +455,13 @@ export const FORMULARIOS = {
     Object.assign(dados, cfg.fixos ? cfg.fixos(registro, rota.q) : {});
     const descricao = cfg.descricao ? cfg.descricao(dados, registro, rota.q) : null;
     let recalculados = 0;
+    let deOutro = [];
+    const aberto = registro && memoria.formularioAberto?.chave === `${tabela}:${registro.id}` ? memoria.formularioAberto.valores : null;
     const salvo = await alterar((db) => {
-      if (registro && !R.buscar(db, tabela, registro.id)) throw new C.ErroUsuario(REGISTRO_EXCLUIDO); // excluído enquanto salvava
+      const agora = registro && R.buscar(db, tabela, registro.id);
+      if (registro && !agora) throw new C.ErroUsuario(REGISTRO_EXCLUIDO); // excluído enquanto salvava
+      // campo que esta pessoa não mexeu e outra mudou com o formulário aberto: fica o da outra (não volta ao valor antigo)
+      if (aberto) deOutro = F.manterMudancasDeOutros(campos, dados, aberto, F.paraFormulario(campos, cfg.valores ? cfg.valores(agora, rota.q) : agora), agora);
       let r;
       if (cfg.salvar) r = cfg.salvar(db, dados, rota.q, registro);
       else if (registro) {
@@ -471,7 +476,9 @@ export const FORMULARIOS = {
     // data do lançamento editada: o nome do comprovante acompanha (comprovante-caucao-AAAA-MM-DD)
     if (['contratos', 'depositos_garantia', 'correcoes_garantia', 'aplicacoes', 'devolucoes_garantia'].includes(tabela)) await acertarNomesDosComprovantes(tabela === 'contratos' ? salvo.id : salvo.contrato_id);
     if (tabela === 'usuarios') renovarUsuario();
+    if (registro) memoria.formularioAberto = null;
     aviso(recalculados ? `Salvo. ${recalculados} boleto(s) em aberto recalculado(s) com os valores novos.` : 'Salvo.');
+    if (deOutro.length) aviso(`Enquanto o formulário estava aberto, outra pessoa mudou: ${deOutro.join(', ')}. Ficou o valor dela (você não tinha mexido nesses campos).`, 'info');
     const destino = tabela === 'imoveis' ? `#/imovel/${salvo.id}` : cfg.destino ? cfg.destino(salvo, rota.q) : cfg.voltar(salvo, rota.q);
     ir(destino);
     return null;

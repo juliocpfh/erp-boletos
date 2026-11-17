@@ -1263,13 +1263,17 @@ test('desfazer pelo histórico: sempre a alteração mais recente de cada campo,
   assert.ok(pode.has(`${tarde}:inquilino_profissao`));
   assert.ok(!pode.has(`${manha}:inquilino_profissao`), 'a da manhã só depois de desfazer a da tarde');
   assert.ok(pode.has(`${manha}:inquilino_nome`), 'o nome tem a própria fila');
-  assert.throws(() => R.desfazerAlteracoes(d, [`${manha}:inquilino_profissao`], 'julio'), /não pode mais ser desfeita/);
+  assert.throws(() => R.desfazerAlteracoes(d, [`${manha}:inquilino_profissao`], 'julio'), /só volta inteira/);
+  // a gravação da manhã só volta inteira (nome e profissão juntos, item 39): o nome sozinho também é barrado
+  assert.equal(R.gravacaoDesfazivel(d, manha), null);
+  assert.throws(() => R.desfazerAlteracoes(d, [`${manha}:inquilino_nome`], 'julio'), /só volta inteira, e "inquilino_profissao" mudou/);
   R.desfazerAlteracoes(d, [`${tarde}:inquilino_profissao`], 'julio');
+  assert.deepEqual(R.gravacaoDesfazivel(d, manha), [`${manha}:inquilino_nome`, `${manha}:inquilino_profissao`]);
   assert.equal(c.inquilino_profissao, 'Engenheira');
   pode = R.alteracoesDesfaziveis(d);
   assert.ok(pode.has(`${manha}:inquilino_profissao`));
   assert.ok(!pode.has(`${tarde}:inquilino_profissao`));
-  R.desfazerAlteracoes(d, [`${manha}:inquilino_profissao`, `${manha}:inquilino_nome`], 'julio');
+  R.desfazerAlteracoes(d, [`${manha}:inquilino_profissao`], 'julio'); // pedir um campo leva a gravação inteira
   assert.equal(c.inquilino_profissao, null, 'voltou ao original (vazio)');
   assert.equal(c.inquilino_nome, 'Maria Exemplo');
   assert.match(d.historico.at(-1).descricao, /^Desfeito pelo administrador \(alteração de ana/);
@@ -2321,10 +2325,11 @@ test('troca de titular sem o termo assinado: o contrato continua no anterior, me
   assert.throws(() => R.aplicarReajuste(d, n.id, '2026-11', 'j', { valor_novo: 160000 }), /ainda é de/);
   assert.throws(() => R.registrarRenovacao(d, n.id, { tipo: 'Novo valor', data: '2026-11-01', novo_valor: 160000 }, 'j'), /ainda é de/);
   assert.ok(!R.reajustesAbertos(d, '2026-11-05').some((x) => x.contrato.id === n.id));
-  // dado antigo: fim de vínculo já gravado sem o termo é desfeito
+  // saída do anterior lançada sem o termo: fica (decisão de 2026-11-17, item 36) e o alerta avisa para anexar o termo
   R.buscar(d, 'contratos', c.id).data_saida = '2026-10-31';
   R.normalizar(d);
-  assert.equal(R.buscar(d, 'contratos', c.id).data_saida, null);
+  assert.equal(R.buscar(d, 'contratos', c.id).data_saida, '2026-10-31');
+  assert.match(R.alertaAditivoHerdeiro(d, n).texto, /já tem saída em 31\/10\/2026; depois dessa data nenhum dos dois recebe boleto/);
   // assinou depois da data: passa na hora
   R.inserir(d, 'aditivos', { contrato_id: n.id, imovel_id: n.imovel_id, tipo: 'Troca de titular', data: '2026-11-10', assunto: 'Troca', texto: 'termo', arquivo: 'termo.pdf' }, 'j');
   assert.equal(R.herancaAgendada(d, n, '2026-11-10'), null);

@@ -729,6 +729,40 @@ export function ler(campos, form, antigo = null) {
   return { dados, erros };
 }
 
+/** Os valores de um formulário (paraFormulario) lidos como se fossem enviados sem mexer em nada. */
+export function lerValores(campos, valores, antigo = null) {
+  const fd = new FormData();
+  for (const [k, v] of Object.entries(valores || {})) {
+    if (v === true) fd.append(k, '1');
+    else if (v !== false && v !== '' && v !== null && v !== undefined) fd.append(k, String(v));
+  }
+  return ler(campos, fd, antigo).dados;
+}
+
+const mesmoValor = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/**
+ * Formulário aberto enquanto outra pessoa (ou outro aparelho) mudava o mesmo registro: o campo que quem está salvando não
+ * mexeu fica com o valor novo, em vez de voltar ao que o formulário mostrava ao abrir (item 15 do mutirão 3000).
+ * `valoresAoAbrir`: o que o formulário mostrou (paraFormulario); `valoresAgora`: o mesmo, montado com o registro de agora.
+ * Muda `dados` e devolve os rótulos dos campos que ficaram com o valor do outro.
+ */
+export function manterMudancasDeOutros(campos, dados, valoresAoAbrir, valoresAgora, antigo = null) {
+  if (!valoresAoAbrir || !valoresAgora) return [];
+  const inicial = lerValores(campos, valoresAoAbrir, antigo);
+  const agora = lerValores(campos, valoresAgora, antigo);
+  const mantidos = [];
+  for (const c of campos) {
+    const k = c.nome;
+    if (!k || c.virtual || c.tipo === 'arquivo' || !(k in dados) || !(k in inicial)) continue;
+    if (mesmoValor(dados[k], inicial[k]) && !mesmoValor(agora[k], inicial[k])) {
+      dados[k] = agora[k];
+      mantidos.push(c.rotulo || k);
+    }
+  }
+  return mantidos;
+}
+
 /** Um item na caixa "Editar lista": o nome e o × que o tira da lista. */
 export const chipDaLista = (lista, v) => `<span class="chip">${esc(v)}<button type="button" class="x-excluir" title="Remover da lista" data-acao="removerDaLista" data-lista="${lista}" data-valor="${esc(v)}">×</button></span>`;
 

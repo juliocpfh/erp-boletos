@@ -831,10 +831,9 @@ export const ACOES = {
   },
 
   async desfazerMarcados() {
-    const itens = [...document.querySelectorAll('input[data-desfazer]:checked')].map((x) => x.value);
+    const itens = [...document.querySelectorAll('input[data-desfazer]:checked')].flatMap((x) => x.value.split(','));
     if (!itens.length) throw new C.ErroUsuario('Marque as alterações que quer desfazer.');
-    if (!(await confirmar(`Cada campo das ${itens.length} alteração(ões) marcada(s) volta ao valor que tinha antes.`, { titulo: 'Desfazer as alterações marcadas?', sim: 'Desfazer', forte: true }))) return;
-    await desfazerItens(itens);
+    await desfazerItens(itens); // a janela mostra tudo o que volta e pede a confirmação
   },
 
   /**

@@ -13,7 +13,7 @@ export const naoEncontrado = (titulo, href = '#/', texto = 'Voltar ao painel') =
   <p class="suave">O endereço pode ser antigo ou o registro foi excluído.</p><p class="acoes">${link(href, texto, 'botao')}${href !== '#/' ? ` ${link('#/', 'Voltar ao painel', 'botao secundario')}` : ''}</p>`;
 
 /** Estado de tela que passa de um assunto a outro: troca de titular escolhida no contrato novo; pagamento com valor diferente aguardando a NF. */
-export const memoria = { continuacao: null, pagamentoDivergente: null };
+export const memoria = { continuacao: null, pagamentoDivergente: null, formularioAberto: null };
 
 // --------------------------------------------------------------------------
 // Pequenos componentes
@@ -90,11 +90,13 @@ export function tabelaHistorico(lista, desfazer = null) {
     let det = '';
     if (h.acao === 'Alteração' && h.detalhes) {
       const i = desfazer ? desfazer.indice.get(h) : -1;
-      const volta = (k) => (desfazer && desfazer.pode.has(`${i}:${k}`) ? ` <label class="check-mini" title="Marcar para desfazer junto com outros"><input type="checkbox" data-desfazer value="${i}:${esc(k)}"></label>
-        ${botao('desfazerAlteracao', '↶ Desfazer', { itens: `${i}:${k}` }, 'secundario pequeno', `Voltar "${k}" de "${textoValor(h.detalhes[k].para)}" para "${textoValor(h.detalhes[k].de)}"?`)}` : '');
+      // a gravação inteira volta junta (item 39): um botão por linha; a janela mostra antes o que volta e os boletos recalculados
+      const itens = desfazer ? R.gravacaoDesfazivel(d(), i, desfazer.pode) : null;
       det = Object.entries(h.detalhes).map(([k, m]) => (m && typeof m === 'object'
-        ? `<div><code>${esc(k)}</code>: ${esc(textoValor(m.de))} → ${esc(textoValor(m.para))}${volta(k)}</div>`
-        : `<div><code>${esc(k)}</code>: ${esc(m)}</div>`)).join('');
+        ? `<div><code>${esc(k)}</code>: ${esc(textoValor(m.de))} → ${esc(textoValor(m.para))}</div>`
+        : `<div><code>${esc(k)}</code>: ${esc(m)}</div>`)).join('')
+        + (itens ? `<div class="acoes"><label class="check-mini" title="Marcar para desfazer junto com outras"><input type="checkbox" data-desfazer value="${esc(itens.join(','))}"></label>
+          ${botao('desfazerAlteracao', '↶ Desfazer esta alteração', { itens: itens.join(',') }, 'secundario pequeno')}</div>` : '');
     } else if (h.detalhes) {
       det = `<details><summary>ver</summary>${Object.entries(h.detalhes).map(([k, v]) => `<div><code>${esc(k)}</code>: ${esc(typeof v === 'object' ? JSON.stringify(v) : v)}</div>`).join('')}</details>`;
     }

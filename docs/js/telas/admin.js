@@ -1,5 +1,5 @@
 // Administração: backup seguro, empresas emitentes, histórico de alterações e Dados e backup.
-import { alterar, aviso, E, login, mostrar, podeUsuario } from '../app.js';
+import { alterar, aviso, E, janela, login, mostrar, podeUsuario } from '../app.js';
 import * as S from '../armazenamento.js';
 import * as AJ from '../ajuda.js';
 import * as AI from '../arquivo-impresso.js';
@@ -11,7 +11,7 @@ import * as R from '../regras.js';
 import { caixaConfigBanco, caixaContaDosBoletos } from './banco-c6.js';
 import { caixaConfigBanco2 } from './banco.js';
 import { CADASTROS } from './cadastros.js';
-import { botao, buscarComLimite, d, etiqueta, item, link, opera, ordenar, tabelaHistorico } from './comum.js';
+import { botao, buscarComLimite, carregarParte, d, etiqueta, item, link, opera, ordenar, tabelaHistorico } from './comum.js';
 import { caixaIcone } from './icone.js';
 
 // --------------------------------------------------------------------------
@@ -122,15 +122,29 @@ export async function desfazerItens(itens) {
   if (E.nuvem && itens.some((x) => Number(String(x).split(':')[0]) >= (E.nuvem.base?.historico?.length || 0))) {
     throw Object.assign(new Error('Esta alteração ainda não foi para a nuvem. Espere a faixa do topo mostrar "tudo enviado" e desfaça de novo.'), { esperado: true });
   }
+  // antes de desfazer: a janela mostra em palavras tudo o que volta junto e os boletos em aberto que serão recalculados, com
+  // o valor de antes e depois (decisão do dono de 2026-11-17, item 39); só desfaz se a pessoa confirmar
+  const { rotuloCampo, valorTexto } = await carregarParte(() => import('../exportar.js'));
+  const previa = R.previaDoDesfazer(d(), itens, (db, lista) => aplicarDesfazer(db, lista), { rotuloCampo, valorTexto });
+  const html = `<p>Volta${previa.campos.length > 1 ? 'm' : ''} junto:</p><ul>${previa.campos.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
+    ${previa.boletos.length ? `<p>Boletos em aberto recalculados (valor do boleto, sem o desconto):</p><ul>${previa.boletos.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`
+      : '<p class="suave">Nenhum boleto em aberto muda.</p>'}`;
+  if (!(await janela({ titulo: 'Desfazer esta alteração?', html, sim: 'Desfazer' }))) return;
   let recalculados = 0;
-  await alterar((db) => {
-    for (const { tabela, id } of R.desfazerAlteracoes(db, itens, login())) {
-      const cfg = CADASTROS[tabela];
-      if (cfg && cfg.recalcular) recalculados += R.recalcularCobrancas(db, cfg.recalcular(R.buscar(db, tabela, id), db), login());
-    }
-  });
+  await alterar((db) => { recalculados = aplicarDesfazer(db, itens); });
   aviso(recalculados ? `Desfeito. ${recalculados} boleto(s) em aberto recalculado(s).` : 'Desfeito.');
   await mostrar();
+}
+
+/** Desfaz no banco ``db`` e recalcula os boletos em aberto ligados ao que voltou (o mesmo da edição do cadastro). */
+function aplicarDesfazer(db, itens) {
+  let recalculados = 0;
+  for (const { tabela, id } of R.desfazerAlteracoes(db, itens, login())) {
+    const cfg = CADASTROS[tabela];
+    const r = R.buscar(db, tabela, id);
+    if (cfg && cfg.recalcular && r) recalculados += R.recalcularCobrancas(db, cfg.recalcular(r, db), login());
+  }
+  return recalculados;
 }
 
 /** Registros por página no Histórico (eram 500 numa página só: 19 mil elementos, 1,3 s no celular para virar cartões). */
@@ -189,7 +203,7 @@ export function telaHistorico(q) {
       <div><label>De</label><input type="date" name="de" value="${esc(q.de || '')}"></div><div><label>Até</label><input type="date" name="ate" value="${esc(q.ate || '')}"></div>
       <div><label>Contém o texto</label><input name="texto" value="${esc(q.texto || '')}"></div>
       <div class="check"><button>Filtrar</button> <a href="#/historico">Limpar</a></div></form>
-    ${desfazer ? `<p class="suave">Administrador: o botão ↶ volta o campo ao valor anterior. Cada campo volta uma alteração por vez, da mais recente para a mais antiga; depois de desfazer a última, aparece o botão na anterior. Boletos, pagamentos, NFs e usuários não entram (use os botões próprios).</p>
+    ${desfazer ? `<p class="suave">Administrador: o botão ↶ volta a alteração inteira (todos os campos dela juntos). Antes, uma janela mostra o que volta e os boletos em aberto que serão recalculados, com o valor de antes e depois. Volta uma alteração por vez, da mais recente para a mais antiga; depois de desfazer a última, aparece o botão na anterior. Boletos, pagamentos, NFs e usuários não entram (use os botões próprios).</p>
       <p>${botao('desfazerMarcados', '↶ Desfazer os marcados', {}, 'secundario pequeno')}</p>` : ''}
     ${navegar}${tabelaHistorico(mostrados, desfazer)}${navegar}</details>`;
 }

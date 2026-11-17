@@ -118,11 +118,10 @@ export function normalizar(d) {
     if (c.conta_iptu === undefined) c.conta_iptu = c.cobrar_iptu ? SITUACOES[0] : SITUACOES[1];
     if (c.conta_seguro === undefined) c.conta_seguro = c.cobrar_seguro === false ? SITUACOES[1] : SITUACOES[0];
   }
-  // troca de titular sem o termo assinado: o anterior não tem fim de vínculo (o contrato só passa com o termo)
-  for (const n of d.contratos) {
-    const a = trocaAguardaAditivo(d, n) && contratoHerdado(d, n);
-    if (a && n.data_entrada && a.data_saida === C.somarDias(n.data_entrada, -1)) a.data_saida = null;
-  }
+  // troca de titular sem o termo assinado: até 16/11/2026, aqui a data de saída do anterior era apagada a cada abertura (sem
+  // histórico; na nuvem, apagava a que o operador tinha gravado). Decisão do dono de 2026-11-17 (item 36 do mutirão 3000): a
+  // data fica como está e o alerta "Aditivo da troca de titular" avisa (alertaAditivoHerdeiro). Os bancos de antes de 30/10/2026
+  // já passaram por esta correção em todas as aberturas desde então; transferirHeranca continua sem pôr a data sem o termo.
   // boleto do complemento da caução nunca tem multa nem juros: acerta os já gerados (e o recebido, se foi calculado com eles)
   for (const cb of d.cobrancas) {
     if (!ehComplementoCaucao(cb) || (!cb.multa_percentual && !cb.juros_mensal_percentual && !cb.multa && !cb.juros)) continue;
@@ -186,8 +185,10 @@ export function normalizar(d) {
   for (const i of d.imoveis) if (!i.uf && C.ufDoCep(i.cep)) i.uf = C.ufDoCep(i.cep);
   // contrato sem imóvel passou a ter prazo para ser vinculado: os que já existiam contam a partir de hoje
   for (const c of d.contratos) if (!c.imovel_id && !c.sem_imovel_desde) c.sem_imovel_desde = C.hojeIso();
-  // caução: a data prevista é a do contrato e o valor vem dos aluguéis × aluguel com bonificação (contratos que ficaram sem)
-  for (const c of d.contratos) if (c.garantia_tipo === 'Caução') completarCaucao(c);
+  // caução: a data prevista é a do contrato e o valor vem dos aluguéis × aluguel com bonificação (contratos que ficaram sem).
+  // Desde 2026-11-17 (item 37 do mutirão 3000): só preenche o valor que falta (vazio), nunca o zero gravado de propósito, e
+  // pela conta padrão (com bonificação), sem depender da regra `caucao_base` do momento (o resultado não muda com a regra)
+  for (const c of d.contratos) if (c.garantia_tipo === 'Caução') completarCaucao(c, { contaPadrao: true });
   // "Possui termo aditivo" só com termo registrado, inativar quem saiu e completar a caução pelos depósitos eram feitos aqui,
   // calados: desde 2026-11-07 (rotina C9) ficam em `rotinaDeAbertura`, que roda com o usuário logado e passa pelo histórico.
   // troca de titular: o prazo continua o do contrato (antes recomeçava na data da troca); só quem ainda não foi renovado
@@ -261,12 +262,14 @@ export function contratoDoSeguro(d, s) {
 
 /**
  * Ordem da caução: 1º as condições do contrato (valor e data prevista = data do contrato), 2º a assinatura,
- * 3º o comprovante. Sem data: a do início do contrato; sem valor: aluguéis × aluguel inicial com bonificação.
+ * 3º o comprovante. Sem data: a do início do contrato; sem valor (vazio; o zero gravado de propósito fica): aluguéis ×
+ * aluguel inicial com bonificação (pela regra `caucao_base`; `contaPadrao`: sempre com bonificação, a conta da migração).
  */
-export function completarCaucao(c) {
+export function completarCaucao(c, { contaPadrao = false } = {}) {
   if (!c.caucao_data) c.caucao_data = c.vigencia_inicio || c.data_entrada || null;
-  if (!(c.caucao_valor > 0) && c.caucao_meses > 0 && c.aluguel_inicial > 0) {
-    c.caucao_valor = c.caucao_meses * aluguelDaCaucao(c.aluguel_inicial, c);
+  if ((c.caucao_valor === null || c.caucao_valor === undefined || c.caucao_valor === '') && c.caucao_meses > 0 && c.aluguel_inicial > 0) {
+    const aluguel = contaPadrao ? c.aluguel_inicial - C.descontoPorPercentual(c.aluguel_inicial, percentualBonificacao(c)) : aluguelDaCaucao(c.aluguel_inicial, c);
+    c.caucao_valor = c.caucao_meses * aluguel;
   }
   return c;
 }
@@ -499,8 +502,23 @@ export function alteracoesDesfaziveis(d, desde = 0) {
 }
 
 /**
- * Desfaz as alterações escolhidas (["índice:campo", ...]): o campo volta ao valor de antes daquela alteração.
- * Cada volta fica no histórico como "Desfeito pelo administrador". Devolve [{ tabela, id }] dos registros mudados.
+ * Campos de uma linha do Histórico que voltam juntos no Desfazer: todos os que ela mudou (menos a pasta). Desde 2026-11-17
+ * (item 39 do mutirão 3000) o Desfazer é da gravação inteira: o seguro que passou de contrato volta com o `contrato_id` e o
+ * `herdado_de` juntos, nunca um sem o outro.
+ */
+export const camposDaGravacao = (h) => (h && h.detalhes ? Object.entries(h.detalhes)
+  .filter(([k, m]) => m && typeof m === 'object' && 'de' in m && !CAMPOS_SEM_DESFAZER.has(k)).map(([k]) => k) : []);
+
+/** Itens ("índice:campo") da linha `i` do Histórico, se ela pode ser desfeita inteira agora (todos os campos); senão null. */
+export function gravacaoDesfazivel(d, i, pode = alteracoesDesfaziveis(d, i)) {
+  const campos = camposDaGravacao(d.historico[i]);
+  return campos.length && campos.every((k) => pode.has(`${i}:${k}`)) ? campos.map((k) => `${i}:${k}`) : null;
+}
+
+/**
+ * Desfaz as alterações escolhidas (["índice:campo", ...]): a gravação inteira volta (todos os campos daquela linha do
+ * histórico, item 39), ao valor de antes dela. Campo da linha que mudou de novo depois barra o Desfazer (desfaça antes a mais
+ * recente). Cada volta fica no histórico como "Desfeito pelo administrador". Devolve [{ tabela, id }] dos registros mudados.
  */
 export function desfazerAlteracoes(d, itens, usuario) {
   const porIndice = new Map();
@@ -523,8 +541,15 @@ export function desfazerAlteracoes(d, itens, usuario) {
       const motivo = h && h.detalhes && h.detalhes[k] ? motivoNaoDesfazer(d, h.tabela, r, k, h.detalhes[k].de) : null;
       if (motivo) throw new C.ErroUsuario(motivo);
     }
-    const campos = porIndice.get(i).filter((k) => pode.has(`${i}:${k}`));
-    if (!campos.length) throw new Error('Esta alteração não pode mais ser desfeita: desfaça antes a mais recente do mesmo campo (ou o valor já mudou).');
+    // a gravação inteira: os campos pedidos e os outros que a mesma linha mudou
+    const campos = h ? [...new Set([...porIndice.get(i), ...camposDaGravacao(h)])].filter((k) => !CAMPOS_SEM_DESFAZER.has(k)) : [];
+    for (const k of campos) {
+      const motivo = h.detalhes && h.detalhes[k] ? motivoNaoDesfazer(d, h.tabela, r, k, h.detalhes[k].de) : null;
+      if (motivo) throw new C.ErroUsuario(motivo);
+    }
+    const presos = campos.filter((k) => !pode.has(`${i}:${k}`));
+    if (!campos.length || presos.length === campos.length) throw new Error('Esta alteração não pode mais ser desfeita: desfaça antes a mais recente do mesmo campo (ou o valor já mudou).');
+    if (presos.length) throw new C.ErroUsuario(`Esta alteração só volta inteira, e ${presos.map((k) => `"${k}"`).join(', ')} mudou de novo depois dela: desfaça antes a alteração mais recente desse campo.`);
     const det = Object.fromEntries(campos.map((k) => [k, { de: r[k] ?? null, para: h.detalhes[k].de ?? null }]));
     for (const k of campos) { r[k] = h.detalhes[k].de ?? null; desfeitosAgora.add(chaveDe(k)); }
     registrar(d, usuario, 'Alteração', h.tabela, r.id, `Desfeito pelo administrador (alteração de ${h.usuario} em ${C.dataHoraBr(h.quando)})${h.descricao ? `: ${h.descricao}` : ''}`,
@@ -533,6 +558,48 @@ export function desfazerAlteracoes(d, itens, usuario) {
     mudados.push({ tabela: h.tabela, id: r.id });
   }
   return mudados;
+}
+
+/** Campo de código que aponta para outro registro: no Desfazer aparece com o nome (ex.: "nº 2 (Ana Herdeira)"). */
+const CODIGO_DE = { contrato_id: 'contratos', herdado_de: 'contratos', contrato_anterior_id: 'contratos', imovel_id: 'imoveis', fiador_id: 'fiadores', emitente_id: 'emitentes' };
+const nomeCurto = (r) => (r ? r.inquilino_nome || r.nome || r.descricao || r.seguradora || null : null);
+
+/**
+ * O que o Desfazer faria, em palavras, sem mudar nada (item 39): { campos, boletos }. `aplicar(copia, itens)` desfaz numa
+ * cópia do banco do mesmo jeito que a tela (com o recálculo dos boletos em aberto). Ex.: campos = ["Inquilino de Ana · Aluguel
+ * inicial: R$ 2.100,00 → R$ 2.000,00"], boletos = ["Boleto 12/2026 de Ana: R$ 2.100,00 → R$ 2.000,00"]. Lança os mesmos erros
+ * do Desfazer (campo preso, pago pelo banco…), antes de qualquer pergunta.
+ */
+export function previaDoDesfazer(d, itens, aplicar, { rotuloCampo = (k) => k, valorTexto = (k, v) => String(v) } = {}) {
+  const copia = structuredClone(d);
+  const antes = new Map(d.cobrancas.map((cb) => [cb.id, cb]));
+  aplicar(copia, itens);
+  const texto = (k, v) => {
+    if (v === null || v === undefined || v === '') return '(vazio)';
+    if (CODIGO_DE[k] && Number.isSafeInteger(Number(v))) { const nome = nomeCurto(buscar(copia, CODIGO_DE[k], v)); return `nº ${v}${nome ? ` (${nome})` : ''}`; }
+    const t = valorTexto(k, v);
+    return t.length > 80 ? `${t.slice(0, 80)}…` : t;
+  };
+  const campos = [];
+  for (const h of copia.historico.slice(d.historico.length)) {
+    if (!/^Desfeito pelo administrador/.test(h.descricao || '') || !h.detalhes) continue;
+    const nome = nomeCurto(buscar(copia, h.tabela, h.registro_id));
+    for (const [k, m] of Object.entries(h.detalhes)) {
+      if (m && typeof m === 'object') campos.push(`${TABELAS[h.tabela] || h.tabela}${nome ? ` de ${nome}` : ''} · ${rotuloCampo(k, h.tabela)}: ${texto(k, m.de)} → ${texto(k, m.para)}`);
+    }
+  }
+  const doContrato = (cb) => nomeCurto(buscar(copia, 'contratos', cb.contrato_id)) || nomeCurto(buscar(d, 'contratos', cb.contrato_id)) || `contrato nº ${cb.contrato_id}`;
+  const boletos = [];
+  const ficaram = new Set();
+  for (const cb of copia.cobrancas) {
+    ficaram.add(cb.id);
+    const velho = antes.get(cb.id);
+    if (!velho) continue;
+    const [a, b] = [totais(velho).total_sem_desconto, totais(cb).total_sem_desconto];
+    if (a !== b) boletos.push(`Boleto ${C.compBr(cb.competencia)} de ${doContrato(cb)}: ${C.reais(a)} → ${C.reais(b)}`);
+  }
+  for (const cb of d.cobrancas) if (!ficaram.has(cb.id)) boletos.push(`Boleto ${C.compBr(cb.competencia)} de ${doContrato(cb)}: excluído (nenhum dia ocupado no mês)`);
+  return { campos, boletos };
 }
 
 export function excluir(d, tabela, id, usuario, descricao) {
@@ -3887,9 +3954,12 @@ export function alertaAditivoHerdeiro(d, c) {
   const ant = contratoHerdado(d, c);
   if (!ant || c.ativo === false || c.data_saida || aditivoDaTroca(d, c)) return null;
   const gerado = aditivosAguardando(d, c.id).find((a) => a.tipo === TIPO_ADITIVO_TROCA);
+  // a saída do anterior já foi lançada sem o termo (item 36): depois dela nenhum dos dois recebe boleto até o termo chegar
+  const saida = ant.data_saida && !c.heranca_transferida
+    ? ` Atenção: ${ant.inquilino_nome} já tem saída em ${C.dataBr(ant.data_saida)}; depois dessa data nenhum dos dois recebe boleto até o termo assinado ser anexado.` : '';
   return { nivel: 'perigo', tipo: 'Aditivo da troca de titular', ancora: 'aditivos',
-    texto: gerado ? `Termo de ${ant.inquilino_nome} para ${c.inquilino_nome}, de ${C.dataBr(gerado.data)}, aguardando assinatura: colha as assinaturas e anexe o arquivo assinado (em "Termos aditivos").`
-      : `Este contrato continua o de ${ant.inquilino_nome}: registre o termo aditivo assinado que coloca ${c.inquilino_nome} como titular (em "Termos aditivos").` };
+    texto: (gerado ? `Termo de ${ant.inquilino_nome} para ${c.inquilino_nome}, de ${C.dataBr(gerado.data)}, aguardando assinatura: colha as assinaturas e anexe o arquivo assinado (em "Termos aditivos").`
+      : `Este contrato continua o de ${ant.inquilino_nome}: registre o termo aditivo assinado que coloca ${c.inquilino_nome} como titular (em "Termos aditivos").`) + saida };
 }
 
 /**

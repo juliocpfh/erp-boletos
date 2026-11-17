@@ -77,7 +77,7 @@ export async function telaConflitos() {
   }).join('');
   return `<h1>Conflitos da nuvem</h1>
     <div class="caixa"><h2>Para escolher</h2>
-      <p class="suave">O mesmo campo foi mudado em dois aparelhos sem internet. O sistema não escolhe sozinho: até o <b>administrador</b> escolher, vale o valor de antes.${pode ? '' : ' Avise o administrador.'}</p>
+      <p class="suave">O mesmo campo foi mudado em dois aparelhos sem internet. O sistema não escolhe sozinho: até o <b>administrador</b> escolher, fica o 1º valor (o que chegou primeiro à nuvem) e o 2º espera.${pode ? '' : ' Avise o administrador.'}</p>
       ${conflitos.length ? `<div class="rolagem"><table class="responsiva"><tr><th>Registro</th><th>Campo</th><th>1º valor</th><th>2º valor</th><th></th></tr>${linhas}</table></div>` : '<p>Nenhum conflito. ✓</p>'}
     </div>
     ${recusas.length ? `<div class="caixa"><h2>Mudanças recusadas pela nuvem</h2>

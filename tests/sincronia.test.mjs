@@ -126,7 +126,7 @@ test('dois aparelhos sem internet criando registros: códigos diferentes (faixas
   for (const s of [a.sinc, b.sinc]) assert.deepEqual(s.atual().imoveis.map((x) => x.nome).sort(), ['Apto 604', 'Sala do PC', 'Sala do celular']);
 });
 
-test('mesmo campo nos dois sem internet: volta ao anterior, os dois veem o conflito e a escolha vale para todos', async () => {
+test('mesmo campo nos dois sem internet: fica o que chegou primeiro, os dois veem o conflito e a escolha vale para todos', async () => {
   const { a, b } = await cenario();
   a.internet = false; b.internet = false;
   await a.sinc.alterar((d) => R.atualizar(d, 'imoveis', 1, { nome: 'Nome do Dono' }, DONO));
@@ -134,7 +134,7 @@ test('mesmo campo nos dois sem internet: volta ao anterior, os dois veem o confl
   a.internet = true; b.internet = true;
   await a.sinc.sincronizar(); await b.sinc.sincronizar(); await a.sinc.sincronizar();
   for (const s of [a.sinc, b.sinc]) {
-    assert.equal(imovel(s).nome, 'Apto 604', 'nenhum vale até escolher');
+    assert.equal(imovel(s).nome, 'Nome do Dono', 'fica o que chegou primeiro à nuvem; o outro espera a escolha');
     assert.equal(s.conflitos.length, 1);
   }
   const [c] = a.sinc.conflitos;

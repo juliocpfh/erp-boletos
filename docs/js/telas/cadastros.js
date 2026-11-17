@@ -1044,6 +1044,9 @@ function montarFormulario(cfg, tabela, registro, q, estado) {
     const padroes = Object.fromEntries(campos.filter((c) => c.nome && c.padrao !== undefined).map((c) => [c.nome, c.padrao]));
     valores = F.paraFormulario(campos, { ...padroes, ...(cfg.padrao ? cfg.padrao(q) : {}) });
   }
+  // o que o formulário mostrou ao abrir: ao salvar, o campo que a pessoa não mexeu e outro mudou fica com o valor do outro
+  // (envios.js, cadastro). O redesenho depois de um erro mantém o da abertura.
+  if (!estado) memoria.formularioAberto = registro ? { chave: `${tabela}:${registro.id}`, valores } : null;
   const base = cfg.base ? cfg.base(registro) : null;
   const avisoTexto = cfg.aviso ? cfg.aviso(registro, q) : '';
   return `<h1>${esc(cfg.titulo(registro, q))}</h1>${avisoTexto ? `<div class="alerta info">${esc(avisoTexto)}</div>` : ''}
