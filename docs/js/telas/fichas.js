@@ -215,7 +215,7 @@ async function novoLinkDaFicha(f, pessoa, { pdf = true } = {}) {
 function caixaFichaOnline(f) {
   if (!opera() || R.fichaSemContrato(f) || f.documentos_no_contrato) return '';
   const titulo = '<h2>Ficha pela internet</h2>';
-  if (!E.nuvem) return `<div class="cartao">${titulo}<p class="suave">Só no sistema na nuvem (erp.ankjck.com.br): o interessado e o fiador recebem um link para preencher os dados, mandar os documentos e a ficha assinada.</p></div>`;
+  if (!E.nuvem) return `<div class="cartao">${titulo}<p class="suave">Só no sistema pela internet (na nuvem): o interessado e o fiador recebem um link para preencher os dados, mandar os documentos e a ficha assinada.</p></div>`;
   const linhas = FO.pessoasDaFicha(f).map((p) => {
     const l = (f.links_ficha || {})[p];
     const valido = linkValido(f, p);
