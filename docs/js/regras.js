@@ -2513,6 +2513,50 @@ export const devolucaoPendente = (f) => fichaSemContrato(f) && f.reserva_valor >
 /** Data em que os documentos da ficha reprovada (ou com desistência) são apagados (3 meses depois da decisão), ou null. */
 export const dataApagarDocumentosFicha = (f) => (fichaSemContrato(f) && f.decisao_data && !f.documentos_apagados_em ? C.somarMesesData(f.decisao_data, CR.regra('meses_documentos_ficha')) : null);
 
+/**
+ * Campos da ficha reprovada (ou com desistência) que ficam depois do prazo (LGPD: guardar só o necessário): o nome, as datas, a
+ * situação e o motivo, a proposta (valores do imóvel, não da pessoa), as ligações (ids) e o dinheiro da reserva com os comprovantes.
+ */
+const FICHA_FICA = new Set(['id', 'inquilino_nome', 'inquilino_tipo', 'situacao', 'decisao_data', 'decisao_por', 'decisao_motivo', 'data_recebida',
+  'imoveis_ids', 'modo_imoveis', 'pasta', 'documentos_apagados_em', 'dados_apagados_em', 'documentos_no_contrato', 'criado_em', 'criado_por', 'alterado_em', 'alterado_por',
+  ...COMPROVANTES_DINHEIRO_FICHA, ...CAMPOS_PROPOSTA_FICHA]);
+const fichaFica = (k) => FICHA_FICA.has(k) || /^(reserva|devolucao)_/.test(k) || /_ids?$/.test(k);
+
+/**
+ * Apaga os dados pessoais da ficha reprovada (ou com desistência), no mesmo prazo dos documentos (regra `meses_documentos_ficha`):
+ * CPF, RG, renda, endereço, contatos, fiadores e o que mais a pessoa informou saem da ficha, das linhas do histórico dela e dos
+ * e-mails registrados para ela (o endereço de e-mail). Ficam o nome, as datas, a situação e o motivo e a reserva com os comprovantes.
+ * O histórico guardado na nuvem fica como está (só o deste aparelho é limpo). Devolve a ficha.
+ */
+export function apagarDadosPessoaisDaFicha(d, fichaId, usuario, hoje = C.hojeIso()) {
+  const f = buscar(d, 'fichas', fichaId);
+  if (!f) throw new C.ErroUsuario('Ficha não encontrada.');
+  if (!fichaSemContrato(f)) throw new C.ErroUsuario('Só a ficha reprovada ou com desistência tem os dados pessoais apagados.');
+  const saem = Object.keys(f).filter((k) => !fichaFica(k) && f[k] !== null && f[k] !== undefined && f[k] !== '');
+  for (const k of saem) f[k] = null;
+  f.dados_apagados_em = hoje;
+  // e-mails mandados para a pessoa: sai o endereço
+  const emails = new Set();
+  for (const e of d.envios_email || []) if (e.ficha_id === f.id && e.para) { emails.add(e.para); e.para = null; }
+  const limparTexto = (t) => [...emails].reduce((s, x) => s.split(x).join('(apagado)'), String(t));
+  const limparDetalhes = (det) => (det && typeof det === 'object' && !Array.isArray(det) ? Object.fromEntries(Object.entries(det).filter(([k]) => fichaFica(k))) : null);
+  // linhas antigas do histórico: trocadas por cópias limpas (nunca mexer no objeto antigo, que a tela anterior ainda usa)
+  d.historico = d.historico.map((h) => {
+    if (h.tabela === 'fichas' && h.registro_id === f.id) return { ...h, detalhes: limparDetalhes(h.detalhes) };
+    if (h.tabela === 'envios_email' && emails.size && (String(h.descricao || '').length || h.detalhes)) {
+      const texto = JSON.stringify(h.detalhes || null);
+      if ([...emails].some((x) => String(h.descricao || '').includes(x) || texto.includes(x))) return { ...h, descricao: limparTexto(h.descricao || ''), detalhes: h.detalhes ? JSON.parse(limparTexto(texto)) : null };
+    }
+    return h;
+  });
+  registrar(d, usuario, 'Alteração', 'fichas', f.id, `Ficha de ${f.inquilino_nome} (${f.situacao.toLocaleLowerCase('pt-BR')}): dados pessoais apagados (${CR.regra('meses_documentos_ficha')} meses depois da decisão; ficam o nome, as datas, a situação e a reserva)`, { campos_apagados: saem.length });
+  return f;
+}
+
+/** Fichas reprovadas (ou com desistência) cujos documentos já saíram e os dados pessoais ainda não. */
+export const fichasComDadosVencidos = (d, hoje = C.hojeIso()) => (d.fichas || []).filter((f) => fichaSemContrato(f) && f.decisao_data && !f.dados_apagados_em
+  && C.somarMesesData(f.decisao_data, CR.regra('meses_documentos_ficha')) <= hoje && f.documentos_apagados_em);
+
 /** Fichas reprovadas com os documentos para apagar hoje. */
 export const fichasComDocumentosVencidos = (d, hoje = C.hojeIso()) => (d.fichas || []).filter((f) => dataApagarDocumentosFicha(f) && dataApagarDocumentosFicha(f) <= hoje);
 
