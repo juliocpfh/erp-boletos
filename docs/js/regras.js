@@ -19,7 +19,7 @@ export const TABELAS = {
   renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'NF avulsa',
   reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino', notificacoes: 'Notificação ao inquilino', fichas: 'Ficha em análise',
   indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', despesas: 'Conta paga por nós', ganhos_airbnb: 'Ganho do Airbnb', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', guias_impostos: 'Guia de imposto',
-  modelos_email: 'Modelo de e-mail', envios_email: 'E-mail enviado',
+  modelos_email: 'Modelo de e-mail', envios_email: 'E-mail enviado', taxas_poupanca: 'Taxas da poupança do Banco Central (um mês)',
   regua_emails: 'E-mail da régua de cobrança (autorizado ou não)',
   movimentacoes_banco: 'Movimentação bancária', pagamentos_banco: 'Pagamento pelo banco', adiamentos_alerta: 'Adiamento de alerta', alertas_desligados: 'Alerta desligado', acordos: 'Acordo de dívida', pastas_fisicas: 'Pasta física (arquivo impresso)', config_regras: 'Regra do sistema', versoes_regras: 'Versão salva das regras', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
@@ -476,7 +476,7 @@ export function atualizar(d, tabela, id, dados, usuario, descricao) {
 // Desfazer alterações pelo histórico (só administrador): sempre da mais recente para a mais antiga, campo a campo.
 // Boletos, pagamentos, NFs e usuários ficam de fora (têm botões próprios); a pasta não volta (a pasta no disco não muda).
 // --------------------------------------------------------------------------
-const SEM_DESFAZER = new Set(['cobrancas', 'faturas', 'recebimentos', 'avulsas', 'usuarios', 'banco', 'listas', 'fechamentos', 'arquivos', 'movimentacoes_banco', 'pagamentos_banco', 'acordos', 'config_regras', 'versoes_regras']);
+const SEM_DESFAZER = new Set(['taxas_poupanca', 'cobrancas', 'faturas', 'recebimentos', 'avulsas', 'usuarios', 'banco', 'listas', 'fechamentos', 'arquivos', 'movimentacoes_banco', 'pagamentos_banco', 'acordos', 'config_regras', 'versoes_regras']);
 const CAMPOS_SEM_DESFAZER = new Set(['pasta']);
 /** Campos de pagamento que, ligados ao banco (extrato ou pagamento pelo C6), só se desfazem pela tela Banco. */
 const CAMPOS_PAGAMENTO_BANCO = { despesas: ['data_pagamento', 'movimentacao_id', 'pagamento_banco_id', 'comprovante'], guias_impostos: ['paga_em', 'movimentacao_id', 'pagamento_banco_id'], iptus: ['pagas', 'data_quitacao'] };
@@ -4451,6 +4451,53 @@ function alertaRotinaEntrada(d, c, hoje) {
 }
 
 /**
+ * Guarda as taxas da poupança trazidas do Banco Central (poupanca.js, pedido do dono de 17/11): um registro por mês em
+ * ``taxas_poupanca`` ({ mes: 'AAAA-MM', taxas: { 'AAAA-MM-DD': % } }). Taxa já guardada nunca é trocada (a mesma conta dá
+ * sempre o mesmo resultado). Uma linha só no histórico. Devolve quantos dias entraram.
+ * Ex.: { '2026-10-10': 0.5936, '2026-11-10': 0.6 } → registros de 2026-10 e 2026-11.
+ */
+export function guardarTaxasPoupanca(d, novas, usuario) {
+  const porMes = new Map();
+  for (const [dia, t] of Object.entries(novas || {})) {
+    if (!C.dataValida(dia) || !Number.isFinite(t)) continue;
+    if (!porMes.has(dia.slice(0, 7))) porMes.set(dia.slice(0, 7), []);
+    porMes.get(dia.slice(0, 7)).push([dia, t]);
+  }
+  let n = 0;
+  for (const [mes, lista] of [...porMes].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const r = d.taxas_poupanca.find((x) => x.mes === mes);
+    const faltam = lista.filter(([dia]) => !(r && Number.isFinite((r.taxas || {})[dia])));
+    if (!faltam.length) continue;
+    n += faltam.length;
+    const taxas = Object.fromEntries([...Object.entries((r && r.taxas) || {}), ...faltam].sort((a, b) => a[0].localeCompare(b[0])));
+    if (r) r.taxas = taxas;
+    else inserir(d, 'taxas_poupanca', { mes, taxas }, usuario, null, { historico: false });
+  }
+  if (n) registrar(d, usuario, 'Inclusão', 'taxas_poupanca', null, `Taxas da poupança do Banco Central guardadas (${n} dia(s))`, null, {}, false);
+  return n;
+}
+
+const tamanhosVistos = new WeakMap();
+/**
+ * Tamanho dos dados (Dados e backup, pedido do dono de 17/11): bytes do banco inteiro como fica gravado (JSON), cada tabela
+ * com o nº de registros e os bytes (da maior para a menor em registros), as linhas do histórico e os anexos ligados a
+ * lançamentos (``arquivosReferenciados``; os anexados à mão nas caixas de arquivos não entram). Calculado uma vez por banco
+ * (cada gravação monta outro objeto). Ex.: { bytes: 2.411.520, historico: { registros: 5.200, bytes: 1.300.000 },
+ * tabelas: [{ tabela: 'faturas', nome: 'NF', registros: 1.800, bytes: 540.000 }, …], anexos: 640 }.
+ */
+export function tamanhoDoBanco(d) {
+  if (tamanhosVistos.has(d)) return tamanhosVistos.get(d);
+  const medir = (x) => new TextEncoder().encode(JSON.stringify(x ?? null)).length;
+  const tabelas = Object.keys(d).filter((k) => Array.isArray(d[k]) && k !== 'historico')
+    .map((k) => ({ tabela: k, nome: TABELAS[k] || k, registros: d[k].length, bytes: medir(d[k]) }))
+    .sort((a, b) => b.registros - a.registros || b.bytes - a.bytes || a.nome.localeCompare(b.nome, 'pt-BR'));
+  const r = { bytes: medir(d), historico: { registros: (d.historico || []).length, bytes: medir(d.historico || []) }, tabelas,
+    registros: tabelas.reduce((s, t) => s + t.registros, 0), anexos: arquivosReferenciados(d).length };
+  tamanhosVistos.set(d, r);
+  return r;
+}
+
+/**
  * Arquivos anexados que algum lançamento usa: [{ escopo, id, nome }] (escopo e id da pasta, como nas caixas de arquivos:
  * "contrato", "assinados", "aditivos" e "seguro" pelo contrato). O que sair desta lista ao excluir ou desfazer
  * um lançamento é apagado da pasta.
@@ -6921,6 +6968,29 @@ export function inadimplencia(d, hoje = C.hojeIso(), { historico: comHistorico =
   return { devedores, historico, total: devedores.reduce((s, x) => s + x.total, 0), totalHoje: devedores.reduce((s, x) => s + x.totalHoje, 0) };
 }
 
+/** Faixas de atraso da Inadimplência (pedido do dono de 17/11): até quantos dias cada uma vai (a última não tem fim). */
+export const FAIXAS_ATRASO = [{ ate: 30, nome: 'Até 30 dias' }, { ate: 60, nome: '31 a 60 dias' }, { ate: 90, nome: '61 a 90 dias' }, { ate: Infinity, nome: 'Mais de 90 dias' }];
+
+/**
+ * Boletos vencidos por tempo de atraso, a partir dos devedores de ``inadimplencia`` (que já usa ``aCobrar`` e ``C.vencido``):
+ * em cada faixa, os boletos, os inquilinos (cada um conta uma vez por faixa), o valor do boleto e o do dia (multa e juros por
+ * ``C.liquidar`` até hoje). Ex.: boleto de R$ 1.200,00 vencido há 45 dias → "31 a 60 dias": 1 boleto, R$ 1.200,00 em aberto e
+ * R$ 1.242,00 hoje (multa 2% e juros 1% ao mês). Devolve [{ nome, ate, boletos, inquilinos, valor, valorHoje }].
+ */
+export function faixasDeAtraso(devedores) {
+  const faixas = FAIXAS_ATRASO.map((f) => ({ ...f, boletos: 0, contratos: new Set(), valor: 0, valorHoje: 0 }));
+  for (const x of devedores || []) {
+    for (const b of x.boletos) {
+      const f = faixas.find((y) => b.dias <= y.ate);
+      f.boletos += 1;
+      f.contratos.add(x.contrato.id);
+      f.valor += b.valor;
+      f.valorHoje += b.hojeValor;
+    }
+  }
+  return faixas.map(({ contratos, ...f }) => ({ ...f, inquilinos: contratos.size }));
+}
+
 /**
  * Régua de cobrança (rotina D8, dono em 2026-11-07): só um aviso do que fazer, nada é enviado sozinho.
  * A partir do dia de atraso do boleto mais antigo: 1 → lembrete por e-mail; 10 → ligar; 30 → avaliar a negativação.
@@ -7463,17 +7533,22 @@ export const assinaturaLembrete = (d, c) => dadoDaEmpresa(d, c, 'assinatura_mens
  * texto diz até quando pode pagar sem multa. Traz o Pix copia e cola e a linha digitável quando o boleto foi emitido no banco.
  * Ex.: boleto de 10/2026 (R$ 1.218,50 em dia) vencendo em 10/11; em 07/11 → "vence em 10/11/2026 … R$ 1.218,50".
  */
-export function textoLembrete(d, cb, hoje = C.hojeIso()) {
+/** De quem e de que é o boleto, para os textos ao inquilino: { c, i, nome (apelido ou 1º nome), oQue ("do aluguel de 10/2026"), onde (" (Casa 3)") }. */
+function boletoNoTexto(d, cb) {
   const c = buscar(d, 'contratos', cb.contrato_id);
   const i = c ? buscar(d, 'imoveis', c.imovel_id) : null;
+  const nome = (c && (c.inquilino_apelido || c.inquilino_nome.split(' ')[0])) || '';
+  const oQue = ehComplementoCaucao(cb) ? 'do complemento da caução'
+    : ehParcelaAcordo(cb) ? `da parcela ${cb.acordo_parcela || ''} do acordo (${cb.acordo_referente || ''})`.replace(/  +/g, ' ') : `do aluguel de ${C.compBr(cb.competencia)}`;
+  return { c, i, nome, oQue, onde: i ? ` (${i.nome})` : '' };
+}
+
+export function textoLembrete(d, cb, hoje = C.hojeIso()) {
+  const { c, nome, oQue, onde } = boletoNoTexto(d, cb);
   const t = totais(cb);
   const limite = C.limitePagamento(cb.vencimento);
   const adiado = limite !== cb.vencimento;
   const fase = limite > hoje ? 'antes' : limite === hoje ? 'dia' : 'atrasado';
-  const nome = (c && (c.inquilino_apelido || c.inquilino_nome.split(' ')[0])) || '';
-  const oQue = ehComplementoCaucao(cb) ? 'do complemento da caução'
-    : ehParcelaAcordo(cb) ? `da parcela ${cb.acordo_parcela || ''} do acordo (${cb.acordo_referente || ''})`.replace(/  +/g, ' ') : `do aluguel de ${C.compBr(cb.competencia)}`;
-  const onde = i ? ` (${i.nome})` : '';
   const linhas = [`Olá, ${nome}!`, ''];
   const bonificacao = cb.desconto ? ' (já com a bonificação de pontualidade)' : '';
   // vencimento em sábado, domingo ou feriado: pode pagar sem multa até o próximo dia útil
@@ -7499,6 +7574,34 @@ export function textoLembrete(d, cb, hoje = C.hojeIso()) {
   linhas.push('', 'Qualquer dúvida, estamos à disposição.', ...(assinatura ? ['', assinatura] : []));
   const assunto = fase === 'atrasado' ? `Boleto ${oQue} em aberto${onde}` : `Lembrete: boleto ${oQue}${onde} vence em ${C.dataBr(cb.vencimento)}`;
   return { fase, assunto, texto: linhas.join('\n'), email: (c && c.inquilino_email) || '', telefone: ((c && c.inquilino_telefone) || '').replace(/\D/g, '') };
+}
+
+/**
+ * 2ª via com o valor do dia (pedido do dono de 17/11), para o boleto vencido e ainda a cobrar (``aCobrar`` e ``C.vencido``;
+ * senão null): o valor para pagar em ``hoje`` com multa e juros por ``C.liquidar`` e o texto pronto ao inquilino. Não emite
+ * boleto novo no banco: só calcula e escreve. Ex.: boleto de R$ 1.200,00 que venceu em 10/10/2026, em 24/11/2026 (45 dias):
+ * multa 2% = R$ 24,00, juros 1% ao mês = R$ 18,00 → R$ 1.242,00.
+ * Devolve { dias, original, multa, juros, valor, assunto, texto, email, telefone } (centavos).
+ */
+export function segundaVia(d, cb, hoje = C.hojeIso()) {
+  if (!cb || !aCobrar(cb) || !C.vencido(cb.vencimento, hoje)) return null;
+  const { c, nome, oQue, onde } = boletoNoTexto(d, cb);
+  const r = C.liquidar(cb, hoje);
+  const original = r.valor_devido - r.multa - r.juros;
+  const linhas = [`Olá, ${nome}!`, '', `Segue a 2ª via do boleto ${oQue}${onde}, que venceu em ${C.dataBr(cb.vencimento)} (${r.dias_atraso} dia(s) de atraso), com o valor atualizado para pagamento hoje, ${C.dataBr(hoje)}:`, ''];
+  linhas.push(`Valor do boleto: ${C.reais(original)}`);
+  if (r.multa) linhas.push(`Multa (${C.pct(cb.multa_percentual)}): ${C.reais(r.multa)}`);
+  if (r.juros) linhas.push(`Juros (${C.pct(cb.juros_mensal_percentual)} ao mês, ${r.dias_atraso} dia(s)): ${C.reais(r.juros)}`);
+  linhas.push(`Total para pagar hoje: ${C.reais(r.valor_devido)}`, '', 'Este valor vale para pagamento hoje. Em outro dia ele muda: se for pagar depois, nos avise para atualizarmos.',
+    'Se o pagamento já foi feito, por favor desconsidere esta mensagem e, se possível, nos envie o comprovante.');
+  const b = cb.banco || null;
+  if (b && b.pix_copia_cola) linhas.push('', 'Pix copia e cola:', b.pix_copia_cola);
+  if (b && b.linha_digitavel) linhas.push('', `Linha digitável do boleto: ${b.linha_digitavel}`);
+  const assinatura = assinaturaLembrete(d, c);
+  linhas.push('', 'Qualquer dúvida, estamos à disposição.', ...(assinatura ? ['', assinatura] : []));
+  return { dias: r.dias_atraso, original, multa: r.multa, juros: r.juros, valor: r.valor_devido,
+    assunto: `2ª via: boleto ${oQue}${onde} com o valor de ${C.dataBr(hoje)}`, texto: linhas.join('\n'),
+    email: (c && c.inquilino_email) || '', telefone: ((c && c.inquilino_telefone) || '').replace(/\D/g, '') };
 }
 
 // --------------------------------------------------------------------------

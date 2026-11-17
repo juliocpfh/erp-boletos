@@ -242,6 +242,20 @@ export const DEFINICOES_REGRAS = [
 const POR_CHAVE = new Map(DEFINICOES_REGRAS.map((x) => [x.chave, x]));
 export const definicaoRegra = (chave) => POR_CHAVE.get(chave) || null;
 
+const paraBusca = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+/**
+ * Busca da tela Regras do sistema (pedido do dono de 17/11): as chaves das regras cujo nome, explicação, consequência, lei ou
+ * opções têm todas as palavras digitadas, sem ligar para acento nem maiúscula. Busca vazia: todas.
+ * Ex.: "caucao reajuste" → as regras que falam da caução e do reajuste (como "A caução acompanha o reajuste").
+ */
+export function buscarRegras(termo) {
+  const palavras = paraBusca(termo).split(/\s+/).filter(Boolean);
+  return DEFINICOES_REGRAS.filter((x) => {
+    const texto = paraBusca([x.rotulo, x.explica, x.consequencia, x.lei, ...(x.opcoes || []).flat()].join(' '));
+    return palavras.every((p) => texto.includes(p));
+  }).map((x) => x.chave);
+}
+
 /** As regras do dono, fixas no código: o "padrão de fábrica" do sistema. */
 export const PADRAO_SISTEMA = Object.freeze(Object.fromEntries(DEFINICOES_REGRAS.map((x) => [x.chave, x.padrao])));
 

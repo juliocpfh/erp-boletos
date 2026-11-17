@@ -101,11 +101,32 @@ export function telaRegras() {
       <p class="acoes">${botao('baixarArquivoRegras', 'Baixar cópia das regras (para carregar depois)', {}, 'secundario pequeno')}
         ${admin ? `<label class="botao secundario pequeno enviar">Carregar arquivo das regras<input type="file" accept=".json,application/json" data-acao-arquivo="carregarArquivoRegras"></label>
         ${botao('voltarRegrasPadrao', 'Voltar tudo ao padrão do sistema', {}, 'perigo pequeno', 'Voltar todas as regras ao padrão do sistema? As regras de agora são trocadas (salve uma versão antes, se quiser guardá-las).')}` : ''}</p></div>
+    <div class="cartao busca-regras"><label for="busca-regras">Procurar uma regra</label>
+      <input type="search" id="busca-regras" data-busca-regras placeholder="Ex.: multa, caução, feriado, reajuste" autocomplete="off">
+      <p class="suave" data-busca-resultado aria-live="polite"></p></div>
     <form data-form="regrasSistema">
-      ${CR.GRUPOS_REGRAS.map(([g, titulo]) => `<div class="cartao"><h2>${esc(titulo)}</h2>
+      ${CR.GRUPOS_REGRAS.map(([g, titulo]) => `<div class="cartao" data-grupo-regras><h2>${esc(titulo)}</h2>
         ${CR.DEFINICOES_REGRAS.filter((x) => x.grupo === g).map((x) => blocoRegra(x, regras, admin)).join('')}</div>`).join('')}
       ${admin ? '<p class="acoes barra-salvar"><button>Salvar as regras</button></p>' : ''}
     </form>`;
+}
+
+/**
+ * Busca da tela: ao digitar, mostra só as regras que têm as palavras (CR.buscarRegras) e esconde os grupos sem nenhuma.
+ * Só esconde (o formulário continua com todas as regras: salvar grava as escondidas como estão).
+ */
+export function ligarBuscaRegras(raiz) {
+  const campo = raiz.querySelector('[data-busca-regras]');
+  if (!campo) return;
+  const resultado = raiz.querySelector('[data-busca-resultado]');
+  const filtrar = () => {
+    const termo = campo.value.trim();
+    const achadas = new Set(CR.buscarRegras(termo));
+    for (const el of raiz.querySelectorAll('.regra-sistema')) el.hidden = !achadas.has(el.id.replace(/^regra-/, ''));
+    for (const g of raiz.querySelectorAll('[data-grupo-regras]')) g.hidden = !g.querySelector('.regra-sistema:not([hidden])');
+    resultado.textContent = !termo ? '' : achadas.size ? `${achadas.size} regra(s) com "${termo}".` : `Nenhuma regra com "${termo}". Tente outra palavra (ex.: multa, juros, caução, IPTU).`;
+  };
+  campo.addEventListener('input', filtrar);
 }
 
 /** Converte o texto digitado num feriado gravado: "20/01" → "01-20"; "15/06/2028" → "2028-06-15". */

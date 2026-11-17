@@ -8,7 +8,7 @@ import * as P from '../poupanca.js';
 import * as R from '../regras.js';
 import { caixaPagarPeloBanco } from './banco.js';
 import { linkComprovante } from './cadastros.js';
-import { botao, buscar, d, etiqueta, link, naoEncontrado, opera, ordenar } from './comum.js';
+import { botao, buscar, d, etiqueta, link, naoEncontrado, opera, ordenar, taxasDaPoupanca } from './comum.js';
 
 /** Acordos em andamento (com boleto ainda em aberto): o que falta pagar de cada um. */
 function caixaAcordos(hoje) {
@@ -23,6 +23,16 @@ function caixaAcordos(hoje) {
         <td class="n">${reais(abertos.reduce((s, cb) => s + R.totais(cb).a_pagar_sem_desconto, 0))}</td></tr>`; }).join('')}</table></div>`;
 }
 
+/** Inadimplência por tempo de atraso (R.faixasDeAtraso): boletos, inquilinos, valor do boleto e valor de hoje em cada faixa. */
+function caixaFaixasAtraso(r) {
+  if (!r.devedores.length) return '';
+  const faixas = R.faixasDeAtraso(r.devedores);
+  return `<div class="cartao rolagem"><h2>Por tempo de atraso</h2><table class="compacta"><tr><th>Atraso</th><th class="n">Boletos</th><th class="n">Inquilinos</th><th class="n">Em aberto</th><th class="n">Hoje, com multa e juros</th></tr>
+    ${faixas.map((f) => `<tr class="${f.boletos ? '' : 'suave'}"><td>${f.ate > 90 && f.boletos ? `<b>${esc(f.nome)}</b>` : esc(f.nome)}</td><td class="n">${f.boletos}</td><td class="n">${f.inquilinos}</td><td class="n">${reais(f.valor)}</td><td class="n">${f.boletos ? `<b>${reais(f.valorHoje)}</b>` : reais(0)}</td></tr>`).join('')}
+    <tr class="total"><td>Total</td><td class="n">${faixas.reduce((s, f) => s + f.boletos, 0)}</td><td class="n">${r.devedores.length}</td><td class="n">${reais(r.total)}</td><td class="n">${reais(r.totalHoje)}</td></tr></table>
+    <p class="suave">Cada boleto vencido entra na faixa dos seus dias de atraso (contados desde o vencimento): um inquilino com dois boletos atrasados pode aparecer em duas faixas, por isso o total de inquilinos pode ser menor que a soma. "Hoje" é o valor se pagar hoje, com multa e juros.</p></div>`;
+}
+
 /** Inadimplência: quem está devendo, há quantos dias, quanto hoje; e quem costuma atrasar. */
 export function telaInadimplencia() {
   const hoje = C.hojeIso();
@@ -34,9 +44,10 @@ export function telaInadimplencia() {
       <div class="cartao"><div class="grande">${r.devedores.reduce((s, x) => s + x.boletos.length, 0)}</div>boleto(s) vencido(s)</div>
       <div class="cartao"><div class="grande">${reais(r.total)}</div>em aberto (valor do boleto)</div>
       <div class="cartao"><div class="grande">${reais(r.totalHoje)}</div>hoje, com multa e juros</div></div>
+    ${caixaFaixasAtraso(r)}
     <div class="cartao rolagem"><h2>Em atraso agora</h2><table><tr><th>Imóvel / inquilino</th><th>Boletos vencidos</th><th class="n">Dias (mais antigo)</th><th class="n">Em aberto</th><th class="n">Hoje, com multa e juros</th><th>Próximo passo</th></tr>
       ${r.devedores.map((x) => `<tr class="${x.diasMax >= R.regra('dias_vermelho') ? 'fora' : ''}"><td><a href="#/contrato/${x.contrato.id}"><b>${esc(imovelDe(x.contrato))}</b></a><br>${esc(x.contrato.inquilino_nome)}${x.contrato.inquilino_telefone ? `<br><span class="suave">${esc(x.contrato.inquilino_telefone)}</span>` : ''}${R.geraNf(x.contrato) ? '' : `<br>${etiqueta('boleto de controle', 'controle')}`}</td>
-        <td>${x.boletos.map((b) => `<a href="#/cobranca/${b.cobranca.id}">${R.ehParcelaAcordo(b.cobranca) ? esc(`acordo ${b.cobranca.acordo_parcela || ''}`.trim()) : compBr(b.cobranca.competencia)}</a> <span class="suave">venceu ${dataBr(b.cobranca.vencimento)} · ${b.dias} dia(s)</span>`).join('<br>')}</td>
+        <td>${x.boletos.map((b) => `<a href="#/cobranca/${b.cobranca.id}">${R.ehParcelaAcordo(b.cobranca) ? esc(`acordo ${b.cobranca.acordo_parcela || ''}`.trim()) : compBr(b.cobranca.competencia)}</a> <span class="suave">venceu ${dataBr(b.cobranca.vencimento)} · ${b.dias} dia(s)</span> ${botao('segundaVia', '2ª via', { id: b.cobranca.id }, 'secundario mini')}`).join('<br>')}</td>
         <td class="n"><b>${x.diasMax}</b></td><td class="n">${reais(x.total)}</td><td class="n"><b>${reais(x.totalHoje)}</b></td>
         <td>${esc(x.passo)}${opera() ? `<br>${botao('lembrete', 'Cobrar', { id: x.boletos[0].cobranca.id }, 'secundario pequeno')} ${x.boletos.some((b) => !R.ehComplementoCaucao(b.cobranca)) ? botao('fazerAcordo', 'Fazer acordo', { contrato: x.contrato.id }, 'secundario pequeno') : ''}` : ''}</td></tr>`).join('')
       || '<tr><td colspan="6" class="suave">Nenhum boleto vencido em aberto. 🎉</td></tr>'}</table>
@@ -90,7 +101,7 @@ export function telaContas(rota) {
     return `<tr><td><b>${esc(tipo)}</b><input type="hidden" name="tipo_${n}" value="${esc(tipo)}">${doInquilino ? '<br><span class="suave">pelo contrato, do inquilino</span>' : ''}</td>
       <td><input name="valor_${n}" data-dinheiro inputmode="decimal" placeholder="${u ? F.dinheiroTexto(u.valor) : '0,00'}" style="width:130px"></td>
       <td><input type="date" name="venc_${n}" style="width:auto"></td>
-      <td><input type="date" name="data_${n}" value="${hoje}" style="width:auto"></td>
+      <td class="nw"><input type="date" name="data_${n}" value="${hoje}" style="width:auto">${F.atalhosData()}</td>
       <td><input name="obs_${n}" placeholder="${tipo === 'Outra' ? 'qual conta? (ex.: taxa de lixo)' : 'opcional'}"></td>
       <td class="suave nw">${u ? `último: ${reais(u.valor)} (${compBr(u.competencia)})` : ''}${ja ? `<br><b>já lançado neste mês: ${reais(ja)}</b>` : ''}</td></tr>`;
   };
@@ -203,7 +214,7 @@ function painelCusto(i, voltar) {
       <label>Conta<select name="tipo">${R.TIPOS_DESPESA.map((t) => `<option>${esc(t)}</option>`).join('')}</select></label>
       <label>Mês de referência<input type="month" name="competencia" value="${C.competenciaDe(hoje)}"></label>
       <label>Vencimento<input type="date" name="vencimento"></label>
-      <label>Pago em<input type="date" name="data_pagamento" value="${hoje}"></label>
+      <label>Pago em<input type="date" name="data_pagamento" value="${hoje}">${F.atalhosData()}</label>
       <label>Valor pago<input name="valor" data-dinheiro inputmode="decimal" placeholder="0,00"></label>
       <label>Observação<input name="observacoes" placeholder="opcional"></label>
       <div><button>Lançar</button></div></form>` : ''}
@@ -220,7 +231,7 @@ function painelAirbnb(i, voltar) {
   const lista = R.ganhosAirbnbDo(d(), i.id).slice(0, 12);
   return `<div class="cartao" id="lancar"><div class="cabecalho"><h2>Ganho do Airbnb · ${esc(i.nome)}</h2>${link(voltar, 'Fechar')}</div>
     ${opera() ? `<form data-form="lancarAirbnb" class="grade-lancar"><input type="hidden" name="imovel" value="${i.id}">
-      <label>Recebido em<input type="date" name="data_recebimento" value="${hoje}"></label>
+      <label>Recebido em<input type="date" name="data_recebimento" value="${hoje}">${F.atalhosData()}</label>
       <label>Mês de referência<input type="month" name="competencia" value="${C.competenciaDe(hoje)}"></label>
       <label>Valor recebido<input name="valor" data-dinheiro inputmode="decimal" placeholder="0,00"></label>
       <label>Observação<input name="observacoes" placeholder="ex.: reserva 2 noites"></label>
@@ -388,7 +399,7 @@ export async function ligarGarantiasCorrigidas(raiz) {
   const preencher = (alvo, html) => { for (const el of caixa.querySelectorAll(`[data-corrigido="${alvo}"]`)) el.innerHTML = html; };
   const g = R.garantiasPorEmpresa(d());
   try {
-    const r = await P.garantiasCorrigidasHoje(g, hojeIso());
+    const r = await P.garantiasCorrigidasHoje(g, hojeIso(), fetch, taxasDaPoupanca());
     if (!caixa.isConnected) return;
     r.lugares.forEach((l, i) => { preencher(`l${i}`, reais(l.corrigido)); l.itens.forEach((v, j) => preencher(`l${i}-${j}`, reais(v))); });
     r.semAplicar.forEach((v, j) => preencher(`s${j}`, reais(v)));

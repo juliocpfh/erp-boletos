@@ -9,7 +9,7 @@ import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
 import { poupancaDaGarantia } from '../poupanca.js';
 import * as R from '../regras.js';
-import { buscar, buscarComLimite, d, endereco, memoria } from './comum.js';
+import { buscar, buscarComLimite, d, endereco, memoria, taxasDaPoupanca } from './comum.js';
 
 // --------------------------------------------------------------------------
 // Campos que ajudam a preencher: máscara, CEP, CNPJ e pessoa já cadastrada
@@ -555,7 +555,7 @@ function ligarPoupancaDoAditivo(raiz) {
   const troca = n && (n.data_entrada || n.vigencia_inicio);
   if (!g || !troca) return;
   mensagemAuto(el, 'Buscando a poupança no Banco Central…');
-  poupancaDaGarantia(R.movimentosGarantia(d(), g), troca).then((r) => {
+  poupancaDaGarantia(R.movimentosGarantia(d(), g), troca, fetch, taxasDaPoupanca()).then((r) => {
     if (!el.isConnected) return;
     if (r.falta.length) return mensagemAuto(el, faltaPoupanca(r));
     if (!r.total) return mensagemAuto(el, 'A garantia de quem sai ainda não tem depósito registrado: sem valor para corrigir.');
@@ -584,7 +584,7 @@ function ligarPoupancaDaGarantia(raiz) {
     const n = (pedido += 1);
     mensagemAuto(el, 'Buscando a poupança no Banco Central…');
     try {
-      const r = await poupancaDaGarantia(movimentos, ate);
+      const r = await poupancaDaGarantia(movimentos, ate, fetch, taxasDaPoupanca());
       if (n !== pedido || !el.isConnected) return;
       if (r.falta.length) return mensagemAuto(el, faltaPoupanca(r));
       if (!r.total) return mensagemAuto(el, '');

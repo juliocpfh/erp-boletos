@@ -54,7 +54,8 @@ test('poupança: taxas do Banco Central (série diária 195), guardadas na sess�
     return { ok: true, json: async () => [{ data: '10/09/2026', dataFim: '10/10/2026', valor: '0.6500' }, { data: '10/10/2026', dataFim: '10/11/2026', valor: '0.5936' }] };
   };
   const r = await P.poupancaDaGarantia([{ data: '2026-09-10', valor: 100000 }], '2026-11-13', falso);
-  assert.match(pedidos[0], /bcdata\.sgs\.195\/dados\?formato=json&dataInicial=10\/09\/2026&dataFinal=13\/11\/2026$/);
+  // só o período que a conta usa (os aniversários dos meses completos): de 10/09 a 10/10/2026
+  assert.match(pedidos[0], /bcdata\.sgs\.195\/dados\?formato=json&dataInicial=10\/09\/2026&dataFinal=10\/10\/2026$/);
   assert.equal(r.corrigido, Math.round(100000 * 1.0065 * 1.005936));
   await P.poupancaDaGarantia([{ data: '2026-10-10', valor: 100000 }], '2026-11-13', falso);
   assert.equal(pedidos.length, 1, 'período já trazido: não pergunta de novo');

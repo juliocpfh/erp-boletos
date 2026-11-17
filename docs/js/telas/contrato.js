@@ -122,7 +122,7 @@ function caixaGarantia(c) {
   const editar = (hash) => (opera() ? link(hash, 'Editar', 'botao secundario mini') : '');
   // caução e depósito: registro em depósitos (data, valor, comprovante opcional) até completar o valor do contrato
   const formDeposito = (qual, falta) => (opera() ? `<form data-form="garantiaPaga" class="acoes linha-deposito"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="qual" value="${qual}">
-      <input type="date" name="data" value="${esc(C.hojeIso())}" title="Data do depósito">
+      <input type="date" name="data" value="${esc(C.hojeIso())}" title="Data do depósito">${F.atalhosData()}
       <input name="valor" value="${esc(C.reais(falta, false))}" title="Valor depositado (R$)" class="valor">
       <label class="botao secundario mini enviar" title="Comprovante (PDF ou foto); pode anexar depois"><span data-nome-escolhido>📎 comprovante</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
       <button class="mini">Registrar depósito</button></form>` : '');
@@ -565,7 +565,7 @@ const rotinaAberta = (c, hoje) => R.contratoAtivo(c, hoje) && !R.resumoRotinaEnt
 /** Marcar um documento de entrada como assinado: data, arquivo assinado e "Marcar" (com "Falta assinatura", se pedido). */
 function formMarcarDocumento(c, k, feito, comParcial = true) {
   return `<form data-form="marcarDocumento" class="acoes" style="justify-content:flex-end"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="campo" value="${k}">
-        <input type="date" name="data" value="${C.hojeIso()}" style="width:auto">
+        <input type="date" name="data" value="${C.hojeIso()}" style="width:auto">${F.atalhosData()}
         <label class="botao secundario pequeno enviar" title="Arquivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
         <button class="secundario pequeno">Marcar ${feito}</button>
         ${comParcial ? botao('documentoParcial', 'Falta assinatura', { contrato: c.id, campo: k }, 'secundario pequeno') : ''}</form>`;
@@ -623,7 +623,7 @@ function caixaRotinaEntrada(c, hoje = C.hojeIso()) {
     const atalho = e.concessionaria !== null ? conta(e) : (atalhos[e.chave] || (() => ''))();
     return `<div class="acoes" style="justify-content:flex-end">${atalho}
       <form data-form="etapaEntrada" class="acoes"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="chave" value="${e.chave}">
-        <input type="date" name="data" value="${hoje}" style="width:auto" title="Data em que foi feita"><button class="secundario mini">Marcar feita</button></form>${pular}</div>`;
+        <input type="date" name="data" value="${hoje}" style="width:auto" title="Data em que foi feita">${F.atalhosData()}<button class="secundario mini">Marcar feita</button></form>${pular}</div>`;
   };
   // contra-vistoria (2026-11-15): o arquivo que o inquilino mandou (com o "×") ou a data + o arquivo para anexar; "Não houve" fecha
   // a etapa. Passado o prazo, continua pendente até um dos dois. Na troca de titular vale a do anterior.
@@ -635,7 +635,7 @@ function caixaRotinaEntrada(c, hoje = C.hojeIso()) {
     if (!opera() || anterior) return '';
     if (e.manual) return botao('desfazerEtapaEntrada', 'Desfazer', { contrato: c.id, chave: e.chave }, 'link-botao');
     return `<div class="acoes" style="justify-content:flex-end"><form data-form="contraVistoria" class="acoes"><input type="hidden" name="contrato" value="${c.id}">
-        <input type="date" name="data" value="${hoje}" style="width:auto" title="Data em que o inquilino mandou">
+        <input type="date" name="data" value="${hoje}" style="width:auto" title="Data em que o inquilino mandou">${F.atalhosData()}
         <label class="botao secundario mini enviar" title="Arquivo que o inquilino mandou (PDF, foto ou o e-mail salvo em PDF)"><span data-nome-escolhido>Escolher arquivo</span><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}" data-arquivo-doc></label>
         <button class="secundario mini">Anexar</button></form>
       ${e.situacao === 'pulada' ? '' : botao('pularEtapaEntrada', 'Não houve', { contrato: c.id, chave: e.chave }, 'link-botao')}</div>`;
@@ -729,7 +729,7 @@ function caixaAditivos(c) {
       <td class="n nw">${a.tipo === K.TIPO_ADITIVO_VALOR ? `${botaoEmail('novo_valor', { contrato: c.id, aditivo: a.id }, '✉ E-mail: termo para assinar')} ` : ''}${ver(a)} ${opera() ? `${a.texto && a.tipo !== K.TIPO_ADITIVO_VALOR ? link(`#/aditivo/${a.id}`, 'Editar') : ''} ${botao('excluir', '×', { tabela: 'aditivos', id: a.id }, 'x-excluir', `Excluir o termo aditivo de ${dataBr(a.data)} (ainda não assinado)?`)}
         ${a.tipo === 'Troca de titular' ? '' : botao('aditivoPerdido', 'Perdido', { id: a.id }, 'perigo pequeno', `Registrar o termo aditivo de ${dataBr(a.data)} como perdido (foi assinado, mas o papel se perdeu)? Passa a valer como assinado, sem o arquivo${a.dia_novo ? `: o vencimento muda para o dia ${a.dia_novo} a partir de ${dataBr(a.primeiro_vencimento)}` : ''}.${adm ? '' : ` O administrador vai analisar${a.dia_novo ? ' (a troca do dia só vale depois da confirmação)' : ''}.`}`)}` : ''}
       ${opera() ? `<form data-form="assinarAditivo" class="acoes" style="justify-content:flex-end;margin-top:4px"><input type="hidden" name="id" value="${a.id}">
-        <input type="date" name="data" value="${C.hojeIso()}" style="width:auto" title="Data da assinatura">
+        <input type="date" name="data" value="${C.hojeIso()}" style="width:auto" title="Data da assinatura">${F.atalhosData()}
         <label class="botao secundario pequeno enviar" title="Termo aditivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
         <button class="pequeno">Marcar assinado</button></form>` : ''}</td></tr>`).join('')}</table></div></div>` : ''}
     ${lista.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Assunto</th><th>Arquivo</th><th></th></tr>${lista.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}${a.ciencia_por ? `<br><span class="suave mini">ciência da herança: ${esc(a.ciencia_por)} em ${dataBr(String(a.ciencia_em).slice(0, 10))}</span>` : ""}</td><td class="nw">${R.aditivoPerdido(a) ? `${abrir(a)} ${acoesPerdido(a)}` : `${abrir(a)}${xAnexo('removerArquivoAditivo', { id: a.id }, `Apagar o arquivo "${a.arquivo}"? O termo aditivo continua e volta a "aguardando assinatura".`)}`}</td>
@@ -738,7 +738,7 @@ function caixaAditivos(c) {
     ${anteriores.map(([x, l]) => `<details open><summary>Histórico: aditivos do contrato anterior de <a href="#/contrato/${x.id}?ir=aditivos">${esc(x.inquilino_nome)}</a> (${l.length})</summary>
       <div class="rolagem"><table>${l.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td><td>${abrir(a)}</td></tr>`).join('')}</table></div></details>`).join('')}
     ${opera() ? `<form data-form="aditivo" class="acoes"><input type="hidden" name="contrato" value="${c.id}">
-      <input type="date" name="data" value="${C.hojeIso()}" style="width:auto">
+      <input type="date" name="data" value="${C.hojeIso()}" style="width:auto">${F.atalhosData()}
       <input name="assunto" placeholder="Assunto (ex.: troca do dia do vencimento para 15)" style="flex:1;min-width:240px">
       <label class="botao secundario pequeno enviar" title="Termo aditivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
       ${faltaTroca ? `<input type="hidden" name="pergunta_troca" value="1"><label class="check" style="margin:0"><input type="checkbox" name="troca" value="1" checked> É o termo da troca de titular (${esc(ant.inquilino_nome)} → ${esc(c.inquilino_nome)})</label>` : ''}

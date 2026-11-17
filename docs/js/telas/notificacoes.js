@@ -140,14 +140,14 @@ function etapasDaNotificacao(n, c, hoje) {
     .replace('📎 comprovante', '📎 notificação assinada').replace('anexar comprovante', 'anexar a assinada').replace('Sem comprovante: buscar no banco e anexar', 'Anexar a notificação assinada');
   const enviada = n.enviada_em ? `enviada em <b>${dataBr(n.enviada_em)}</b> (${esc(n.enviada_por || '')})` : '';
   const marcar = n.situacao === 'Rascunho' && opera() ? `<form data-form="enviadaNotificacao" data-id="${n.id}" class="acoes" style="margin-top:6px;flex-wrap:wrap">
-      <input type="date" name="data" value="${hoje}" aria-label="Data do envio" style="width:auto">
+      <input type="date" name="data" value="${hoje}" aria-label="Data do envio" style="width:auto">${F.atalhosData()}
       <select name="meio" aria-label="Por onde" style="width:auto">${R.MEIOS_NOTIFICACAO.map((m) => `<option>${esc(m)}</option>`).join('')}</select>
       <button class="secundario pequeno">Marcar como enviada</button></form>` : '';
   const prazo = n.situacao === 'Rascunho' ? `até ${dataBr(n.data_limite)} (${n.prazo_dias} dias úteis de ${dataBr(n.data)})`
     : e.vencida ? `<b>venceu em ${dataBr(n.data_limite)}</b>` : e.aberta ? `até <b>${dataBr(n.data_limite)}</b> · ${e.restam === 0 ? 'vence hoje' : `faltam ${e.restam} dia(s) útil(eis)`}` : `até ${dataBr(n.data_limite)}`;
   const baixa = n.situacao === 'Resolvida' ? `resolvida em <b>${dataBr(n.resolvida_em)}</b>${n.observacao_baixa ? `: ${esc(n.observacao_baixa)}` : ''} ${n.comprovante_baixa ? linkComprovante(c.id, n.comprovante_baixa, { tabela: 'notificacoes', id: n.id, campo: 'comprovante_baixa', tipo: 'baixa-notificacao', data: n.resolvida_em }) : ''}`
     : e.podeBaixa && opera() ? `<form data-form="baixaNotificacao" data-id="${n.id}" class="acoes" style="margin-top:6px;flex-wrap:wrap">
-      <input type="date" name="data" value="${hoje}" aria-label="Resolvido em" style="width:auto">
+      <input type="date" name="data" value="${hoje}" aria-label="Resolvido em" style="width:auto">${F.atalhosData()}
       <input name="observacao" placeholder="O que foi feito (ex.: ar-condicionado reinstalado pelo técnico)" style="flex:1;min-width:220px">
       <label class="botao secundario pequeno">📎 Foto ou arquivo<input type="file" name="comprovante" accept="${ACEITA_DOCUMENTOS}" hidden></label>
       <button class="pequeno">Dar baixa (resolvido)</button></form>` : '';

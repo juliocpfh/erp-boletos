@@ -1,5 +1,5 @@
 // ACOES: o que cada botão faz (data-acao="nome"), com os auxiliares de PDF, Excel, exclusão (TABELAS_EXCLUSAO) e reajuste.
-import { alterar, atualizarCopiaAberta, aviso, confirmar, podeSairDaTela, backupCompletoSeguro, baixar, bibliotecasPdf, conectarSeguro, E, escolherPasta, excelJs, ir, janela, jsPdf, jsZip, login, mostrar, naFilaSegura, pastaSeguraDeTeste, podeUsuario, reabrirPastaLembrada, sair } from '../app.js';
+import { alterar, atualizarCopiaAberta, aviso, confirmar, podeSairDaTela, backupCompletoSeguro, baixar, bibliotecasPdf, conectarSeguro, E, escolherPasta, excelJs, ir, janela, jsPdf, jsZip, login, mostrar, naFilaSegura, pastaSeguraDeTeste, podeUsuario, reabrirPastaLembrada, sair, statusDoBotao } from '../app.js';
 import * as S from '../armazenamento.js';
 import { PAPEIS } from '../auth.js';
 import * as B from '../backup-seguro.js';
@@ -11,7 +11,7 @@ import * as CPF from '../conferir-pdf.js';
 import * as Z from '../conciliacao.js';
 import * as K from '../contratos.js';
 import { avisosDeCorte, cortesDaFatura, encaixarFaturas, faturaExcel, faturaHtml } from '../fatura.js';
-import { chipDaLista, dinheiroTexto, esc } from '../formularios.js';
+import { atalhosData, chipDaLista, dinheiroTexto, esc } from '../formularios.js';
 import { MODELOS_PADRAO } from '../modelos-contrato.js';
 import * as R from '../regras.js';
 import { desfazerItens, dispensarAvisoSeguro } from './admin.js';
@@ -25,7 +25,7 @@ import { ACOES_REGUA } from './regua.js';
 import { htmlSaude } from './banco-c6.js';
 import { ANEXOS_COM_X, CADASTROS, nomeComprovante } from './cadastros.js';
 import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria, indicesMensaisFci } from './campos.js';
-import { alterarApagandoAnexos, anexosEmUso, apagarAnexos, apagarPastaDaFicha, nomePastaFicha, arquivoApagadoNoFormulario, buscar, carregarParte, chavePasta, conferirArquivos, conferirHerancas, d, ehMatricula, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, SO_ADMIN_NUMERACAO, vinculoDoEscopo } from './comum.js';
+import { alterarApagandoAnexos, anexosEmUso, botao, apagarAnexos, apagarPastaDaFicha, nomePastaFicha, arquivoApagadoNoFormulario, buscar, carregarParte, chavePasta, conferirArquivos, conferirHerancas, d, ehMatricula, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, SO_ADMIN_NUMERACAO, vinculoDoEscopo } from './comum.js';
 import { ACOES_ICONE } from './icone.js';
 import { alertasAbertos } from './comum.js';
 import { ACOES_PASTA } from './arquivo-impresso.js';
@@ -342,8 +342,8 @@ async function proporPagamentoDoBanco(cb, pagamento = null) {
   const resp = await janela({ titulo: 'O banco confirmou o pagamento. Registrar aqui?',
     html: `<p>Boleto de <b>${esc(buscar('contratos', cb.contrato_id).inquilino_nome)}</b> (${esc(compBr(cb.competencia))}): o C6 informa pagamento${pagoEm ? ` em <b>${esc(dataBr(pagoEm))}</b>` : ''}${valorBanco !== null ? ` de <b>${esc(reais(valorBanco))}</b>` : ''}${creditoEm ? `, creditado em <b>${esc(dataBr(creditoEm))}</b>` : ''}.</p>
       ${pagamento && pagamento.certeza !== 'exata' ? '<p class="texto-aviso">O banco não diz qual boleto é: casado pelo valor e pela data. Confira o inquilino e o mês.</p>' : ''}
-      <p><label>Pagou em</label><input type="date" name="pagou" value="${esc(pagou)}" required></p>
-      <p><label>Dia em que o dinheiro entrou na conta (é a data da NF)</label><input type="date" name="data" value="${esc(credito)}" required></p>
+      <p><label>Pagou em</label><input type="date" name="pagou" value="${esc(pagou)}" required>${atalhosData()}</p>
+      <p><label>Dia em que o dinheiro entrou na conta (é a data da NF)</label><input type="date" name="data" value="${esc(credito)}" required>${atalhosData()}</p>
       <p>Previsto pelo sistema para essa data: <b>${esc(reais(previsto.valor_devido))}</b>${previsto.pontual ? ' (em dia)' : ` (${previsto.dias_atraso} dia(s) de atraso)`}.</p>
       ${difere ? `<div class="alerta aviso">O valor pago no banco (${esc(reais(valorBanco))}) é diferente do previsto. Ao confirmar, o pagamento fica registrado com o valor do banco e você informa a justificativa e o valor da NF na página do boleto.</div>` : ''}
       <p class="suave">Nada é registrado sem a sua confirmação.</p>`,
@@ -604,6 +604,38 @@ async function marcarGeradoNaRotina(tipo, m) {
   await alterar((db) => R.marcarGeradoNaRotina(db, m.c.id, chave, login()));
 }
 
+/** Janela do texto pronto ao inquilino (lembrete e 2ª via): assunto e mensagem editáveis, e-mail (canal oficial), WhatsApp e copiar. */
+function janelaMensagem(titulo, l, topo = '') {
+  const tel = l.telefone ? (l.telefone.length <= 11 ? `55${l.telefone}` : l.telefone) : '';
+  return janela({ titulo, sim: 'Fechar', nao: '',
+      html: `${topo}<p class="suave" style="margin-bottom:6px">Confira o texto (pode editar) e escolha por onde enviar. O e-mail é o canal oficial da empresa.</p>
+        <p><label>Assunto</label><input name="assunto" value="${esc(l.assunto)}"></p>
+        <p><label>Mensagem</label><textarea name="texto" rows="11" style="width:100%;font-family:inherit">${esc(l.texto)}</textarea></p>
+        <div class="acoes"><a class="botao" data-enviar="email" href="#" target="_blank" rel="noopener">✉ Abrir e-mail${l.email ? ` para ${esc(l.email)}` : ' (sem e-mail no cadastro)'}</a>
+          <a class="botao secundario" data-enviar="whatsapp" href="#" target="_blank" rel="noopener">WhatsApp${tel ? '' : ' (sem telefone)'}</a>
+          <button type="button" class="secundario" data-copiar-lembrete>Copiar texto</button></div>`,
+      ligar(dlg) {
+        dlg.querySelector('[data-nao]').hidden = true;
+        const assunto = dlg.querySelector('[name=assunto]');
+        const texto = dlg.querySelector('[name=texto]');
+        const email = dlg.querySelector('[data-enviar=email]');
+        const zap = dlg.querySelector('[data-enviar=whatsapp]');
+        const atualizar = () => {
+          email.href = `mailto:${encodeURIComponent(l.email)}?subject=${encodeURIComponent(assunto.value)}&body=${encodeURIComponent(texto.value)}`;
+          zap.href = tel ? `https://wa.me/${tel}?text=${encodeURIComponent(texto.value)}` : '#';
+        };
+        assunto.addEventListener('input', atualizar);
+        texto.addEventListener('input', atualizar);
+        atualizar();
+        if (!tel) zap.addEventListener('click', (ev) => { ev.preventDefault(); aviso('Este inquilino não tem telefone no cadastro.', 'aviso'); });
+        dlg.querySelector('[data-copiar-lembrete]').addEventListener('click', async (ev) => {
+          await navigator.clipboard.writeText(texto.value);
+          ev.target.textContent = 'Copiado ✓';
+          setTimeout(() => { ev.target.textContent = 'Copiar texto'; }, 1500);
+        });
+      } });
+}
+
 export const ACOES = {
   escolherPasta: () => escolherPasta(),
   reabrir: () => reabrirPastaLembrada(),
@@ -689,21 +721,21 @@ export const ACOES = {
     await mostrar();
   },
 
-  async backupCompletoAgora() {
+  async backupCompletoAgora(_dados, el) {
     const barra = andamentoZip('progresso-backup');
     try { await backupCompletoSeguro(barra.aoAndar); } finally { barra.fim(); }
     if (E.seguroErro) throw new Error(E.seguroErro);
-    aviso('Backup completo gravado na pasta segura.');
     await mostrar();
+    statusDoBotao(el).mostrar(`Backup completo gravado na pasta segura (${C.agoraBr()}).`, 'ok');
   },
 
-  /** Backup seguro: atualiza agora a cópia aberta dos arquivos (copia-aberta.js). */
-  async atualizarCopiaAberta() {
-    const caixa = document.getElementById('progresso-copia');
-    const r = await atualizarCopiaAberta(({ feitos, total }) => { if (caixa) caixa.textContent = `Atualizando: ${feitos} de ${total}…`; });
+  /** Backup seguro: atualiza agora a cópia aberta dos arquivos (copia-aberta.js). Andamento e resultado embaixo do botão. */
+  async atualizarCopiaAberta(_dados, el) {
+    const status = statusDoBotao(el);
+    const r = await atualizarCopiaAberta(({ feitos, total }) => status.mostrar(`Atualizando: ${feitos} de ${total}…`));
     if (!r) throw new C.ErroUsuario('A cópia aberta precisa dos dados na nuvem e do backup seguro ligado neste computador.');
-    aviso(`Pasta atualizada: ${r.baixados} arquivo(s) baixado(s), ${r.apagados} tirado(s)${r.falhas ? `, ${r.falhas} ficaram para a próxima` : ''}. Total: ${r.total}.`, r.falhas ? 'aviso' : 'ok');
     await mostrar();
+    statusDoBotao(el).mostrar(`Pasta atualizada: ${r.baixados} arquivo(s) baixado(s), ${r.apagados} tirado(s)${r.falhas ? `, ${r.falhas} ficaram para a próxima` : ''}. Total: ${r.total}.`, r.falhas ? 'aviso' : 'ok');
   },
 
   async desconectarSeguro() {
@@ -924,7 +956,7 @@ export const ACOES = {
     const r = await janela({ titulo: `Data em que a ${g.nome} foi paga`, sim: 'Gravar data',
       html: `<p>${quem.id !== c.id ? `${esc(c.inquilino_nome)} herdou a ${g.nome} de <b>${esc(quem.inquilino_nome)}</b>: a data é a do pagamento feito por ${esc(quem.inquilino_nome)}. Ela muda lá (no contrato de quem pagou) e aqui.` : `Data em que ${esc(c.inquilino_nome)} pagou a ${g.nome}.`}</p>
         ${quem[`${qual}_por_depositos`] ? '<p class="suave">Paga em depósitos: muda a data do último depósito.</p>' : ''}
-        <label>Paga em</label><input type="date" name="data" value="${esc(atual)}" max="${C.hojeIso()}" required>` });
+        <label>Paga em</label><input type="date" name="data" value="${esc(atual)}" max="${C.hojeIso()}" required>${atalhosData()}` });
     if (!r) return;
     const data = String((r.data || [])[0] || '');
     await alterar((db) => R.corrigirDataGarantiaPaga(db, c.id, qual, data, login()));
@@ -1093,7 +1125,29 @@ export const ACOES = {
   },
 
   /** Arquivos que sobraram de lançamentos excluídos antes (comprovantes, fotos da vistoria, assinados, aditivos): lista e apaga. */
-  async limparAnexosSoltos() {
+  /** Dados e backup: quantos arquivos há na pasta dos anexos e quanto ocupam (na nuvem, numa ida; na pasta, percorrendo as pastas). */
+  async medirAnexos(_dados, el) {
+    const status = statusDoBotao(el);
+    let n = 0; let bytes = 0;
+    if (E.nuvem && E.anexos) {
+      for (const a of await E.anexos.listaCrua([S.PASTA_ARQUIVOS])) { n += 1; bytes += Number(a.tamanho) || 0; }
+    } else {
+      let raiz;
+      try { raiz = await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS); } catch { status.mostrar('Ainda não há anexos na pasta.', 'ok'); return; }
+      const andar = async (dir) => {
+        for await (const [, h] of dir.entries()) {
+          if (h.kind === 'directory') { await andar(h); continue; }
+          n += 1;
+          bytes += h.tamanho ?? (await h.getFile()).size;
+          if (n % 200 === 0) status.mostrar(`Contando os anexos… ${n} até agora`);
+        }
+      };
+      await andar(raiz);
+    }
+    status.mostrar(`${n} arquivo(s) na pasta dos anexos, ${C.tamanhoTexto(bytes)} no total (${C.agoraBr()}).`, 'ok');
+  },
+
+  async limparAnexosSoltos(_dados, el) {
     if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador apaga arquivos sem lançamento.');
     const emUso = anexosEmUso();
     const vistas = new Set();
@@ -1121,15 +1175,18 @@ export const ACOES = {
       // apólices: só os arquivos que já foram de uma apólice (os anexados à mão na caixa ficam)
       for (const a of await S.listar(dir)) if (/^(apolice|seguro)-/i.test(a.nome) && !emUso.has(`${pasta}|${a.nome}`)) soltos.push({ escopo: 'seguro', id: c.id, nome: a.nome, quem: c.inquilino_nome });
     }
-    if (!soltos.length) { aviso('Nenhum arquivo sobrando: todos os anexos têm lançamento.', 'info'); return; }
+    const status = statusDoBotao(el);
+    if (!soltos.length) { status.mostrar('Nenhum arquivo sobrando: todos os anexos têm lançamento.', 'ok'); return; }
+    status.mostrar(`${soltos.length} arquivo(s) sem lançamento encontrados: confira a lista.`);
     const ok = await janela({ titulo: `${soltos.length} arquivo(s) sem lançamento`, forte: true,
       html: `<p>Estes arquivos ficaram na pasta depois que o lançamento foi excluído. Serão <b>apagados de vez</b>:</p>
         <ul style="max-height:300px;overflow:auto">${soltos.map((a) => `<li>${esc(a.quem)}: ${esc(a.nome)}</li>`).join('')}</ul>`,
       sim: `Apagar ${soltos.length} arquivo(s)`, nao: 'Cancelar' });
-    if (!ok) return;
+    if (!ok) { status.mostrar(`${soltos.length} arquivo(s) sem lançamento: nada foi apagado.`); return; }
+    status.mostrar('Apagando…');
     const n = await apagarAnexos(soltos, 'Arquivo sem lançamento apagado na limpeza');
-    aviso(`${n} arquivo(s) apagado(s).`);
     await mostrar();
+    statusDoBotao(el).mostrar(`${n} arquivo(s) apagado(s).`, 'ok');
   },
 
   async removerLogo() {
@@ -1411,35 +1468,27 @@ export const ACOES = {
     if (!cb || cb.data_pagamento) throw new C.ErroUsuario('Este boleto já foi pago ou excluído (talvez por outra pessoa). Atualize a página.');
     const l = R.textoLembrete(d(), cb, C.hojeIso());
     const c = buscar('contratos', cb.contrato_id);
-    const tel = l.telefone ? (l.telefone.length <= 11 ? `55${l.telefone}` : l.telefone) : '';
     const titulo = { antes: 'Lembrete antes do vencimento', dia: 'Lembrete: vence hoje', atrasado: 'Cobrança de boleto em atraso' }[l.fase];
-    await janela({ titulo: `${titulo} · ${c.inquilino_nome}`, sim: 'Fechar', nao: '',
-      html: `<p class="suave" style="margin-bottom:6px">Confira o texto (pode editar) e escolha por onde enviar. O e-mail é o canal oficial da empresa.</p>
-        <p><label>Assunto</label><input name="assunto" value="${esc(l.assunto)}"></p>
-        <p><label>Mensagem</label><textarea name="texto" rows="11" style="width:100%;font-family:inherit">${esc(l.texto)}</textarea></p>
-        <div class="acoes"><a class="botao" data-enviar="email" href="#" target="_blank" rel="noopener">✉ Abrir e-mail${l.email ? ` para ${esc(l.email)}` : ' (sem e-mail no cadastro)'}</a>
-          <a class="botao secundario" data-enviar="whatsapp" href="#" target="_blank" rel="noopener">WhatsApp${tel ? '' : ' (sem telefone)'}</a>
-          <button type="button" class="secundario" data-copiar-lembrete>Copiar texto</button></div>`,
-      ligar(dlg) {
-        dlg.querySelector('[data-nao]').hidden = true;
-        const assunto = dlg.querySelector('[name=assunto]');
-        const texto = dlg.querySelector('[name=texto]');
-        const email = dlg.querySelector('[data-enviar=email]');
-        const zap = dlg.querySelector('[data-enviar=whatsapp]');
-        const atualizar = () => {
-          email.href = `mailto:${encodeURIComponent(l.email)}?subject=${encodeURIComponent(assunto.value)}&body=${encodeURIComponent(texto.value)}`;
-          zap.href = tel ? `https://wa.me/${tel}?text=${encodeURIComponent(texto.value)}` : '#';
-        };
-        assunto.addEventListener('input', atualizar);
-        texto.addEventListener('input', atualizar);
-        atualizar();
-        if (!tel) zap.addEventListener('click', (ev) => { ev.preventDefault(); aviso('Este inquilino não tem telefone no cadastro.', 'aviso'); });
-        dlg.querySelector('[data-copiar-lembrete]').addEventListener('click', async (ev) => {
-          await navigator.clipboard.writeText(texto.value);
-          ev.target.textContent = 'Copiado ✓';
-          setTimeout(() => { ev.target.textContent = 'Copiar texto'; }, 1500);
-        });
-      } });
+    await janelaMensagem(`${titulo} · ${c.inquilino_nome}`, l);
+  },
+
+  /**
+   * 2ª via com o valor do dia (boleto vencido, pedido do dono de 17/11): o valor de hoje com multa e juros (C.liquidar), o
+   * botão para copiar o valor e o texto pronto para mandar ao inquilino. Não emite boleto novo no banco.
+   */
+  async segundaVia({ id }) {
+    const cb = buscar('cobrancas', id);
+    if (!cb || cb.data_pagamento) throw new C.ErroUsuario('Este boleto já foi pago ou excluído (talvez por outra pessoa). Atualize a página.');
+    const hoje = C.hojeIso();
+    const v = R.segundaVia(d(), cb, hoje);
+    if (!v) throw new C.ErroUsuario(`O boleto de ${compBr(cb.competencia)} ainda não venceu (ou não se cobra mais): o valor é o do boleto. Use "Lembrar o inquilino".`);
+    const c = buscar('contratos', cb.contrato_id);
+    const linha = (rotulo, valor) => `<tr><td>${rotulo}</td><td class="n">${valor}</td></tr>`;
+    await janelaMensagem(`2ª via com o valor de hoje · ${c.inquilino_nome}`, v, `<table class="compacta" style="margin-bottom:8px">
+        ${linha(`Valor do boleto (venceu em ${dataBr(cb.vencimento)})`, reais(v.original))}
+        ${v.multa ? linha(`Multa (${C.pct(cb.multa_percentual)})`, reais(v.multa)) : ''}${v.juros ? linha(`Juros (${C.pct(cb.juros_mensal_percentual)} ao mês, ${v.dias} dia(s))`, reais(v.juros)) : ''}
+        <tr class="total"><td>Para pagar hoje, ${dataBr(hoje)}</td><td class="n maior">${reais(v.valor)}</td></tr></table>
+      <p class="acoes">${botao('copiar', `Copiar o valor (${reais(v.valor, false)})`, { texto: reais(v.valor, false) }, 'secundario pequeno')}<span class="suave">Não emite boleto novo no banco: amanhã o valor muda.</span></p>`);
   },
 
   /** Tela de Boletos: confirma o pagamento numa janela (os mesmos campos da página do boleto), sem o formulário na linha. */
@@ -1452,8 +1501,8 @@ export const ACOES = {
     const sim = C.liquidar(cb, hoje);
     const resp = await janela({ titulo: `Confirmar pagamento · ${c ? c.inquilino_nome : ''}`,
       html: `<p class="suave" style="margin-bottom:8px">${i ? `${esc(i.nome)} · ` : ''}boleto ${compBr(cb.competencia)}, vencimento ${dataBr(cb.vencimento)}. Se pago hoje: <b>${reais(sim.valor_devido)}</b>${sim.pontual ? '' : ` (${sim.dias_atraso} dia(s) de atraso)`}.</p>
-        <p><label>Dia em que o dinheiro entrou na conta</label><input type="date" name="data" value="${hoje}" required></p>
-        <p><label>Pagou em (só se atrasou)</label><input type="date" name="pagou"><span class="ajuda">Em branco: o dia em que o dinheiro entrou</span></p>
+        <p><label>Dia em que o dinheiro entrou na conta</label><input type="date" name="data" value="${hoje}" required>${atalhosData()}</p>
+        <p><label>Pagou em (só se atrasou)</label><input type="date" name="pagou">${atalhosData()}<span class="ajuda">Em branco: o dia em que o dinheiro entrou</span></p>
         <p><label>Valor recebido (opcional)</label><input name="valor" inputmode="decimal" placeholder="0,00"></p>
         <p><label class="check-mini"><input type="checkbox" name="em_dia" value="1"> pagou em dia (o banco só compensou depois: sem multa e juros)</label></p>`,
       sim: 'Confirmar pagamento' });
@@ -1542,7 +1591,7 @@ export const ACOES = {
     }
     if (!data) {
       const r = await janela({ titulo: 'Marcar a guia do IPTU como paga', sim: 'Marcar como paga', nao: 'Cancelar',
-        html: `<p>${esc(texto || '')}</p><label>Pago em</label><input type="date" name="data" value="${C.hojeIso()}" required>` });
+        html: `<p>${esc(texto || '')}</p><label>Pago em</label><input type="date" name="data" value="${C.hojeIso()}" required>${atalhosData()}` });
       if (!r) return;
       data = String((r.data || [])[0] || '');
     }
@@ -1622,7 +1671,7 @@ export const ACOES = {
     if (!x) return;
     const r = await janela({ titulo: `Depósito do complemento - ${c.inquilino_nome}`, sim: 'Registrar depósito', nao: 'Cancelar',
       html: `<p>Complemento de <b>${reais(x.complemento)}</b>: a caução passa de ${reais(x.atual)} para <b>${reais(x.necessaria)}</b>.</p>
-        <label>Data do depósito</label><input type="date" name="data" value="${C.hojeIso()}" required>
+        <label>Data do depósito</label><input type="date" name="data" value="${C.hojeIso()}" required>${atalhosData()}
         <label>Comprovante (opcional)</label><input type="file" name="arquivo" accept="application/pdf,image/*">
         <p class="suave">Sem o comprovante, fica o aviso "anexar" até ele chegar.</p>` });
     if (!r) return;
@@ -1963,22 +2012,25 @@ export const ACOES = {
     baixar(await zip.generateAsync({ type: 'blob' }), `NFs ${mes}.zip`);
   },
 
-  async exportar() {
+  async exportar(_dados, el) {
     const JSZip = await jsZip();
     const barra = andamentoZip('progresso-exportar');
     let blob;
     try { blob = await S.exportarZip(JSZip, E.pasta, E.d, barra.aoAndar); } finally { barra.fim(); }
-    baixar(blob, `imoveis-${C.carimboLocal()}.zip`); // data e hora daqui (a UTC passava para o dia seguinte depois das 21h)
+    const nome = `imoveis-${C.carimboLocal()}.zip`; // data e hora daqui (a UTC passava para o dia seguinte depois das 21h)
+    baixar(blob, nome);
     await alterar((db) => R.registrar(db, login(), 'Exportação', 'banco', null, 'Banco e arquivos exportados em ZIP', null, {}, false));
+    statusDoBotao(el).mostrar(`ZIP baixado: ${nome} (${C.tamanhoTexto(blob.size)}). Veja na pasta de downloads.`, 'ok');
   },
 
-  async exportarPlanilhaPdf() {
+  async exportarPlanilhaPdf(_dados, el) {
     // só o jsPDF: este PDF é escrito direto (não fotografa a tela, então não precisa baixar o html2canvas)
     const [ExcelJS, jsPDF, { pdfDeTudo, planilhaDeTudo }] = await Promise.all([excelJs(), jsPdf(), carregarParte(() => import('../exportar.js'))]);
     const quando = C.carimboLocal();
     baixar(await planilhaDeTudo(ExcelJS, E.d), `imoveis-dados-${quando}.xlsx`);
     baixar(pdfDeTudo(jsPDF, E.d), `imoveis-dados-${quando}.pdf`);
     await alterar((db) => R.registrar(db, login(), 'Exportação', 'banco', null, 'Todos os dados exportados em planilha e PDF', null, {}, false));
+    statusDoBotao(el).mostrar(`Baixados: imoveis-dados-${quando}.xlsx e imoveis-dados-${quando}.pdf (pasta de downloads).`, 'ok');
   },
 
   async baixarRegras() {
@@ -2264,26 +2316,26 @@ export const ACOES = {
   },
 
   /** Dados e backup: confere agora os arquivos dos lançamentos (devolve os que estavam em outra pasta; alerta os que sumiram). */
-  async conferirArquivos() {
-    aviso('Conferindo os arquivos…', 'info');
+  async conferirArquivos(_dados, el) {
+    const status = statusDoBotao(el); // "Conferindo os arquivos…" já está embaixo do botão (data-status)
     // trocas de titular: o que ficou no contrato anterior (ex.: aplicação da garantia) passa ao novo antes de conferir
     await conferirHerancas();
     const r = await conferirArquivos();
-    aviso(`${r.conferidos} arquivo(s) conferido(s).${r.devolvidos.length ? ` ${r.devolvidos.length} estavam em outra pasta e voltaram ao lugar.` : ''}${r.faltando.length ? ` ${r.faltando.length} não foram encontrados: veja o alerta no Painel.` : ' Nenhum faltando.'}`, r.faltando.length ? 'aviso' : 'ok');
+    status.mostrar(`${r.conferidos} arquivo(s) conferido(s).${r.devolvidos.length ? ` ${r.devolvidos.length} estavam em outra pasta e voltaram ao lugar.` : ''}${r.faltando.length ? ` ${r.faltando.length} não foram encontrados: veja o alerta no Painel.` : ' Nenhum faltando.'}`, r.faltando.length ? 'aviso' : 'ok');
   },
 
   /**
    * Dados e backup (administrador): compacta as fotos e os PDFs escaneados que já estão no sistema (compactar.js), trocando
    * no lugar com o mesmo nome. PDF assinado fica como está; documento do link da ficha, só depois de conferido.
    */
-  async compactarAnexos() {
+  async compactarAnexos(_dados, el) {
     if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador compacta os anexos que já estão no sistema.');
-    const caixa = document.getElementById('progresso-compactar');
-    const mostrarAndamento = (t) => { if (caixa) caixa.textContent = t; };
+    const status = statusDoBotao(el); // andamento e resultado embaixo do botão
+    const mostrarAndamento = (t, tipo = 'info') => status.mostrar(t, tipo);
     const MB = (b) => `${(b / 1048576).toFixed(1).replace('.', ',')} MB`;
     mostrarAndamento('Procurando os anexos…');
     let raiz;
-    try { raiz = await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS); } catch { aviso('Não há anexos para compactar.', 'info'); mostrarAndamento(''); return; }
+    try { raiz = await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS); } catch { mostrarAndamento('Não há anexos para compactar.'); return; }
     // documentos do link da ficha: só os já conferidos (a conferência guardada na ficha olhou o arquivo como chegou)
     const conferidos = new Map((d().fichas || []).flatMap((f) => Object.keys(f.conferencias_link || {}).map((n) => [`${S.limparNome(f.pasta || nomePastaFicha(f))}|${n}`, f.id])));
     const r = await CP.compactarTodos(raiz, {
@@ -2303,12 +2355,11 @@ export const ACOES = {
     const texto = r.compactados
       ? `${r.compactados} de ${r.vistos} arquivo(s) compactado(s): de ${MB(r.antes)} para ${MB(r.depois)} (${MB(r.antes - r.depois)} a menos).`
       : `Nenhum dos ${r.vistos} arquivo(s) olhados ficaria bem menor: nada foi trocado.`;
-    mostrarAndamento(`${texto}${r.falhas ? ` ${r.falhas} não puderam ser lidos.` : ''}`);
     if (r.compactados) {
       await alterar((db) => R.registrar(db, login(), 'Alteração', 'arquivos', null, `Anexos compactados: ${texto}`, null, {}, false));
       atualizarCopiaAberta().catch(() => {}); // a cópia aberta do PC recebe os arquivos novos (tamanho mudou)
     }
-    aviso(texto, r.falhas ? 'aviso' : 'ok');
+    mostrarAndamento(`${texto}${r.falhas ? ` ${r.falhas} não puderam ser lidos.` : ''}`, r.falhas ? 'aviso' : 'ok');
   },
 
   async excluirArquivo({ escopo, id, nome }) {

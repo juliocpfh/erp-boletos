@@ -58,17 +58,16 @@ export function percentualDaCorrecao(total, corrigido) {
 
 /** Taxas já trazidas nesta sessão ({ 'AAAA-MM-DD': % }): a tela é desenhada de novo a cada ação. */
 const trazidas = {};
-let trazidoDe = null;
-let trazidoAte = null;
+/** Períodos já consultados nesta sessão ([de, ate]): pedido dentro de um deles não vai de novo ao Banco Central. */
+const consultados = [];
 
 /**
- * Taxas diárias da poupança de ``de`` a ``ate`` ('AAAA-MM-DD') no Banco Central: { 'AAAA-MM-DD': % }. O Banco Central
- * aceita até 10 anos por consulta nas séries diárias: vai em partes de 5 anos. Tenta 3 vezes (ele às vezes recusa).
+ * Taxas diárias da poupança de ``de`` a ``ate`` ('AAAA-MM-DD') no Banco Central: { 'AAAA-MM-DD': % } (com as já trazidas nesta
+ * sessão). O Banco Central aceita até 10 anos por consulta nas séries diárias: vai em partes de 5 anos. Tenta 3 vezes (ele às
+ * vezes recusa). Consulta só o período pedido (as taxas guardadas no banco já tiraram o que não falta: taxasDosDias).
  */
 export async function taxasPoupanca(de, ate, buscar = fetch) {
-  if (trazidoDe && trazidoDe <= de && trazidoAte >= ate) return trazidas;
-  // o que já veio fica num período só, sem buracos: a consulta nova emenda no que já tem
-  if (trazidoDe) [de, ate] = [de < trazidoDe ? de : trazidoDe, ate > trazidoAte ? ate : trazidoAte];
+  if (consultados.some(([a, b]) => a <= de && b >= ate)) return trazidas;
   const br = (x) => `${x.slice(8, 10)}/${x.slice(5, 7)}/${x.slice(0, 4)}`;
   for (let ini = de; ini <= ate; ini = C.somarDias(C.somarAnos(ini, 5), 1)) {
     const fim = [C.somarAnos(ini, 5), ate].sort()[0];
@@ -86,17 +85,53 @@ export async function taxasPoupanca(de, ate, buscar = fetch) {
       if (/^\d{2}\/\d{2}\/\d{4}$/.test(x.data || '') && Number.isFinite(taxa)) trazidas[`${x.data.slice(6, 10)}-${x.data.slice(3, 5)}-${x.data.slice(0, 2)}`] = taxa;
     }
   }
-  [trazidoDe, trazidoAte] = [de, ate];
+  consultados.push([de, ate]);
   return trazidas;
 }
 
+/** Dias de taxa que a conta usa: o início de cada mês completo de cada depósito com data até ``ate`` (periodosPoupanca), em ordem. */
+export function diasDaPoupanca(movimentos, ate) {
+  const dias = new Set();
+  for (const m of movimentos || []) if (m.valor && m.data && m.data <= ate) for (const p of periodosPoupanca(m.data, ate)) dias.add(p);
+  return [...dias].sort();
+}
+
 /**
- * Garantia corrigida pela poupança do Banco Central até ``ate``: busca as taxas do período dos depósitos e calcula
- * (corrigirPelaPoupanca). Sem depósito com data até ``ate``, não consulta.
+ * Taxas já guardadas no banco (tabela ``taxas_poupanca``, um registro por mês com { 'AAAA-MM-DD': % }; pedido do dono de
+ * 17/11): o mesmo cálculo dá sempre o mesmo resultado e não depende da internet. Devolve { 'AAAA-MM-DD': % }.
  */
-export async function poupancaDaGarantia(movimentos, ate, buscar = fetch) {
-  const datas = (movimentos || []).filter((m) => m.valor && m.data && m.data <= ate).map((m) => inicioPoupanca(m.data)).sort();
-  const taxas = datas.length && datas[0] <= ate ? await taxasPoupanca(datas[0], ate, buscar) : {};
+export function taxasGuardadas(d) {
+  const out = {};
+  for (const r of (d && d.taxas_poupanca) || []) {
+    for (const [dia, t] of Object.entries((r && r.taxas) || {})) if (Number.isFinite(t) && !(dia in out)) out[dia] = t;
+  }
+  return out;
+}
+
+/**
+ * Taxas para os ``dias``: as guardadas valem; só as que faltam vão ao Banco Central, numa consulta do primeiro ao último dia
+ * que falta. ``guardar(novas)`` recebe as trazidas que ainda não estavam guardadas (todas as do período consultado, para a
+ * próxima conta não precisar da internet); se falhar, ficam só nesta sessão. Devolve { 'AAAA-MM-DD': % }.
+ * Ex.: guardadas de 01/2025 a 09/2026 e depósito de 10/01/2025 até 01/12/2026 → só consulta de 10/10/2026 a 10/10/2026.
+ */
+export async function taxasDosDias(dias, { guardadas = {}, buscar = fetch, guardar = null } = {}) {
+  const faltam = dias.filter((p) => !Number.isFinite(guardadas[p]));
+  if (!faltam.length) return guardadas;
+  const trazidas = await taxasPoupanca(faltam[0], faltam[faltam.length - 1], buscar);
+  const novas = {};
+  for (const [dia, t] of Object.entries(trazidas)) if (!Number.isFinite(guardadas[dia])) novas[dia] = t;
+  if (guardar && Object.keys(novas).length) {
+    try { await guardar(novas); } catch { /* sem permissão para gravar (consulta) ou sem internet: fica só nesta sessão */ }
+  }
+  return { ...novas, ...guardadas };
+}
+
+/**
+ * Garantia corrigida pela poupança do Banco Central até ``ate``: usa as taxas guardadas (``guardadas``, taxasGuardadas) e
+ * busca só as que faltam (taxasDosDias, que entrega as novas a ``guardar``). Sem depósito com data até ``ate``, não consulta.
+ */
+export async function poupancaDaGarantia(movimentos, ate, buscar = fetch, { guardadas = {}, guardar = null } = {}) {
+  const taxas = await taxasDosDias(diasDaPoupanca(movimentos, ate), { guardadas, buscar, guardar });
   return corrigirPelaPoupanca(movimentos, ate, taxas);
 }
 
@@ -130,10 +165,9 @@ export function corrigirGarantiasPorEmpresa(garantias, ate, taxas = {}) {
   return { contratos, lugares, semAplicar, aplicado, faltaAplicar: semAplicar.reduce((s, v) => s + v, 0), falta: [...falta].sort() };
 }
 
-/** Busca as taxas no Banco Central (desde o depósito mais antigo) e corrige (corrigirGarantiasPorEmpresa). */
-export async function garantiasCorrigidasHoje(garantias, ate, buscar = fetch) {
-  const datas = [...garantias.lugares.flatMap((l) => l.itens), ...garantias.semAplicar]
-    .flatMap((x) => x.movimentos).filter((m) => m.valor && m.data && m.data <= ate).map((m) => inicioPoupanca(m.data)).sort();
-  const taxas = datas.length && datas[0] <= ate ? await taxasPoupanca(datas[0], ate, buscar) : {};
+/** Taxas guardadas e, só as que faltam, do Banco Central (taxasDosDias); depois corrige (corrigirGarantiasPorEmpresa). */
+export async function garantiasCorrigidasHoje(garantias, ate, buscar = fetch, { guardadas = {}, guardar = null } = {}) {
+  const movimentos = [...garantias.lugares.flatMap((l) => l.itens), ...garantias.semAplicar].flatMap((x) => x.movimentos);
+  const taxas = await taxasDosDias(diasDaPoupanca(movimentos, ate), { guardadas, buscar, guardar });
   return corrigirGarantiasPorEmpresa(garantias, ate, taxas);
 }
