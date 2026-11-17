@@ -55,6 +55,11 @@ tr.total td { font-weight: 700; border-top: 2px solid var(--texto); }
 .grupo-alerta { margin-bottom: 14px; }
 .grupo-alerta h3 { margin: 0 0 6px; font-size: 15px; }
 .grupo-alerta .alerta { margin-bottom: 4px; }
+.grupo-pendencias { margin: 0 0 10px; }
+.grupo-pendencias summary { cursor: pointer; font-size: 15px; padding: 4px 0; }
+.grupo-pendencias[open] summary { margin-bottom: 6px; }
+.grupo-pendencias .alerta { margin-bottom: 4px; }
+.reajuste-mes-fechado { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--borda, #e5e7eb); }
 .alerta { border-left: 5px solid; padding: 9px 12px; border-radius: 6px; margin-bottom: 8px; background: #fff; }
 .alerta.perigo { border-color: var(--perigo); background: #fef2f2; }
 .alerta.aviso { border-color: #f59e0b; background: #fffbeb; }

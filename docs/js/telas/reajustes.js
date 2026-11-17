@@ -68,6 +68,21 @@ function caixaCaucaoACompletar(q) {
       <td class="nw">${acao(y)}</td></tr>`; }).join('') || '<tr><td colspan="6" class="suave">Nenhuma caução a completar.</td></tr>'}</table></div>`;
 }
 
+/**
+ * Reajustes em aberto por mês do aluguel: [mês, reajustes, aberto]. Com muitos (mais de MOSTRAR_REAJUSTES), só vêm abertos o
+ * mês mais antigo (o primeiro a aplicar), o atual, o próximo, o pedido no endereço (?mes=) e o do inquilino destacado
+ * (?contrato=); os outros ficam numa linha com o número e "Mostrar" (no banco grande eram 9.000 elementos de uma vez).
+ * Com poucos, tudo aberto, como antes.
+ */
+const MOSTRAR_REAJUSTES = 10;
+function porMesDoReajuste(lista, atual, q) {
+  const grupos = new Map();
+  for (const r of lista) grupos.set(r.competencia, [...(grupos.get(r.competencia) || []), r]);
+  const proximo = C.somarMeses(atual, 1);
+  const tudo = lista.length <= MOSTRAR_REAJUSTES;
+  return [...grupos].map(([mes, rs], k) => [mes, rs, tudo || k === 0 || mes === atual || mes === proximo || mes === q.mes || rs.some((r) => String(r.contrato.id) === q.contrato)]);
+}
+
 /** Reajustes: índices acumulados informados por vocês e os contratos que corrigem nos próximos meses. */
 export function telaReajustes(q) {
   const atual = C.competenciaDe(C.hojeIso());
@@ -96,7 +111,8 @@ export function telaReajustes(q) {
     <div class="cartao rolagem" data-caixa="Reajustes"><h2>Reajustes em aberto (${lista.length})</h2>
       <p class="suave">Todos os reajustes do aluguel e da caução, de qualquer ano, são aplicados aqui (na página do inquilino fica só o histórico). O índice e os novos aluguéis vêm preenchidos pelo índice cadastrado: para usar outro índice ou arredondar, mude o % (recalcula os aluguéis), o aluguel cheio ou o bonificado (recalculam o % e o outro aluguel) e clique em "Aplicar correção" antes de gerar a carta: a carta sai com os valores aplicados. De anos anteriores não há carta. Ao aplicar, o sistema pergunta o vencimento e as parcelas do boleto do complemento da caução.</p>
       <div class="reajustes-lista">
-      ${lista.map((r) => { const k = r.calculo; const c = r.contrato; const i = buscar('imoveis', c.imovel_id); const p = partesReajuste(c, r);
+      ${porMesDoReajuste(lista, atual, q).map(([mes, rs, aberto]) => (!aberto ? `<div class="reajuste-mes-fechado"><b>Aluguel de ${compBr(mes)}</b> <span class="suave">${rs.length} reajuste(s)</span>${mes < atual ? ` ${etiqueta('atrasado', 'aviso')}` : ''} ${link(`#/reajustes?mes=${mes}`, 'Mostrar')}</div>`
+    : `${rs.length < lista.length ? `<h3 class="reajuste-grupo">Aluguel de ${compBr(mes)} <span class="suave">(${rs.length})</span></h3>` : ''}${rs.map((r) => { const k = r.calculo; const c = r.contrato; const i = buscar('imoveis', c.imovel_id); const p = partesReajuste(c, r);
     // prévia da caução: segue as Regras do sistema (acompanha o reajuste? pelo aluguel com bonificação ou pelo cheio?), como o boleto do complemento
     const caucao = r.corrigido ? caucaoDoReajuste(c, r.corrigido) : R.regra('caucao_acompanha') && R.temCaucao(c) && R.garantiaDepositada(c) && c.caucao_meses > 0 && k.novo !== null
       ? `${reais(R.valorGarantia(d(), c))} → <b>${reais(c.caucao_meses * R.aluguelDaCaucao(k.novo, c))}</b>` : '<span class="suave">-</span>';
@@ -107,7 +123,7 @@ export function telaReajustes(q) {
       <div class="reajuste-corpo">
         <div class="reajuste-valor"><span class="suave">Aluguel</span><div class="nw">${reais(k.atual)} → ${k.novo !== null ? `<b>${reais(k.novo)}</b>` : '-'}</div>${k.bonificacao ? `<div class="suave nw">(${reais(k.atualBonificado)} → ${k.novoBonificado !== null ? reais(k.novoBonificado) : '-'})</div>` : ''}</div>
         <div class="reajuste-valor"><span class="suave">Caução</span><div>${caucao}</div></div>
-        <div class="reajuste-botoes">${p.correcao ? `<div class="acoes">${p.correcao}</div>` : ''}<div class="acoes">${p.carta}</div></div></div></div>`; }).join('') || '<p class="suave">Nenhum reajuste em aberto.</p>'}
+        <div class="reajuste-botoes">${p.correcao ? `<div class="acoes">${p.correcao}</div>` : ''}<div class="acoes">${p.carta}</div></div></div></div>`; }).join('')}`)).join('') || '<p class="suave">Nenhum reajuste em aberto.</p>'}
       </div>
       <p class="suave">Valores: aluguel cheio e, embaixo entre parênteses, o valor bonificado (só aparece quando o contrato tem bonificação).</p></div>
     ${caixaCaucaoACompletar(q)}
