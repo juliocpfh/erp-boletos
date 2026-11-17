@@ -36,8 +36,10 @@ async function idbOp(modo, fn) {
   });
 }
 
-export const lembrarPasta = (handle) => idbOp('readwrite', (s) => s.put(handle, 'pasta'));
-export const pastaLembrada = () => idbOp('readonly', (s) => s.get('pasta')).catch(() => null);
+// versão PC (arquivo aberto do disco, file:): o IndexedDB é de todo HTML aberto do disco; o atalho da pasta não fica lembrado
+const doDisco = () => typeof location !== 'undefined' && location.protocol === 'file:';
+export const lembrarPasta = (handle) => (doDisco() ? Promise.resolve() : idbOp('readwrite', (s) => s.put(handle, 'pasta')));
+export const pastaLembrada = () => (doDisco() ? Promise.resolve(null) : idbOp('readonly', (s) => s.get('pasta')).catch(() => null));
 // pasta do backup seguro (só no computador do administrador)
 export const lembrarPastaSegura = (handle) => idbOp('readwrite', (s) => s.put(handle, 'pasta_segura'));
 export const pastaSeguraLembrada = () => idbOp('readonly', (s) => s.get('pasta_segura')).catch(() => null);
@@ -163,12 +165,14 @@ export async function listar(dir) {
  * Tipos que o navegador executaria como página (com script e acesso aos dados do sistema) se fossem abertos:
  * não podem ser anexados. O anexo é de quem o inquilino ou o fornecedor entregou: não dá para confiar nele.
  */
-const EXTENSOES_PROIBIDAS = /\.(html?|xhtml|svg|xml|mht|mhtml|m?js)$/i;
-export const ERRO_TIPO_ARQUIVO = 'Este tipo de arquivo não pode ser anexado (página ou script: .html, .svg, .xml, .js). Salve como PDF ou imagem e anexe de novo.';
+// também programas e atalhos do Windows (.exe, .lnk, .hta…): o anexo vai aberto para a pasta do PC (cópia aberta)
+const EXTENSOES_PROIBIDAS = /\.(html?|xht(ml)?|svgz?|xml|xsl|xslt|mht|mhtml|m?js|jse|exe|com|bat|cmd|ps1|psm1|vbs|vbe|wsf|wsh|hta|lnk|scr|msi|msp|dll|cpl|pif|reg|jar|url|scf|inf|chm|application|appx|msix|gadget|iso|img|vhdx?)$/i; // igual a worker.mjs
+export const ERRO_TIPO_ARQUIVO = 'Este tipo de arquivo não pode ser anexado (página, script ou programa: .html, .svg, .xml, .js, .exe…). Salve como PDF ou imagem e anexe de novo.';
 
-/** O arquivo pode ser anexado (não é página nem script)? */
+/** O arquivo pode ser anexado (não é página, script nem programa)? Pontos e espaços no fim saem do nome antes ("planta.svg."). */
 export function nomeAnexavel(nome) {
-  return !EXTENSOES_PROIBIDAS.test(String(nome || '').trim());
+  const limpo = String(nome || '').trim().replace(/[. ]+$/, '');
+  return !EXTENSOES_PROIBIDAS.test(limpo) && !EXTENSOES_PROIBIDAS.test(limparNome(String(nome || '')));
 }
 
 /** Tipos que abrem numa aba nova (PDF e fotos); os outros só se baixam. */

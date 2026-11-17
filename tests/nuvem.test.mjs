@@ -275,6 +275,7 @@ test('ícone do aplicativo: padrão até o administrador gravar; só PNG do tama
 // Crachá do aparelho (programa do PC, nuvem/aparelhos.mjs): entra com e-mail e senha, só lê, desliga, para com o usuário
 // ---------------------------------------------------------------------------
 async function nuvemComCofre() {
+  W.esquecerPedidosPorIp(); W.esquecerCrachas(); // limites por endereço do Worker (em memória) começam do zero
   const db = new DatabaseSync(':memory:');
   const sql = { exec(q, ...p) { if (!p.length && q.trim().split(';').filter((x) => x.trim()).length > 1) { db.exec(q); return { toArray: () => [] }; } const l = db.prepare(q).all(...p).map((x) => ({ ...x })); return { toArray: () => l }; } };
   const tx = (fn) => { db.exec('BEGIN'); try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { db.exec('ROLLBACK'); throw e; } };
@@ -364,7 +365,7 @@ test('crachá do aparelho: a conta da senha é feita no computador (o Workers re
   assert.deepEqual(await (await desafio('antigo@exemplo.com.br')).json(), { desafio: { sal: 'sal3', iteracoes: 150000 } }, 'usuário antigo: as voltas antigas');
   const falso = (await (await desafio('ninguem@exemplo.com.br')).json()).desafio;
   assert.match(falso.sal, /^[0-9a-f]{32}$/, 'parece um sal de verdade (docs/js/auth.js novoSal)');
-  assert.equal(falso.iteracoes, 600000);
+  assert.ok([150000, 600000].includes(falso.iteracoes), 'voltas de mentira entre os dois valores que os usuários de verdade têm (as voltas não dizem quem tem cadastro)');
   assert.deepEqual((await (await desafio('ninguem@exemplo.com.br')).json()).desafio, falso, 'o mesmo a cada pedido');
   assert.notEqual((await (await desafio('outro@exemplo.com.br')).json()).desafio.sal, falso.sal);
   assert.equal(dobj.cofre.q('SELECT COUNT(*) AS n FROM tentativas_aparelho')[0].n, 0, 'pedir o sal não conta como tentativa');
@@ -391,12 +392,14 @@ test('crachá do aparelho: senha errada e limite de tentativas (por e-mail e por
   assert.equal((await entrar('ninguem@exemplo.com.br', 'qualquer coisa')).status, 401, 'e-mail desconhecido: mesma resposta');
   assert.equal((await entrar('', '')).status, 400);
   assert.equal((await entrar('dono@exemplo.com.br', 'senha do dono 2026', { ip: '198.51.100.1' })).status, 200, 'acertou: entra e zera o e-mail');
-  for (let i = 0; i < 5; i += 1) assert.equal((await entrar('leitor@exemplo.com.br', `errada ${i}`, { ip: `198.51.100.${10 + i}` })).status, 401);
-  const barrado = await entrar('leitor@exemplo.com.br', 'senha do leitor 2026', { ip: '198.51.100.99' });
-  assert.equal(barrado.status, 429, '5 erros no mesmo e-mail: espera, mesmo com a senha certa');
+  for (let i = 0; i < 5; i += 1) assert.equal((await entrar('leitor@exemplo.com.br', `errada ${i}`, { ip: '198.51.100.10' })).status, 401);
+  const barrado = await entrar('leitor@exemplo.com.br', 'senha do leitor 2026', { ip: '198.51.100.10' });
+  assert.equal(barrado.status, 429, '5 erros no mesmo e-mail e do mesmo endereço: espera, mesmo com a senha certa');
   assert.match((await barrado.json()).erro, /Espere 15 minutos/);
+  // de outro endereço, o dono do e-mail entra: quem erra de propósito não bloqueia o e-mail dos outros
+  assert.equal((await entrar('leitor@exemplo.com.br', 'senha do leitor 2026', { ip: '198.51.100.98' })).status, 200, 'outro endereço não fica bloqueado');
   dobj.cofre.relogio = () => new Date(Date.now() + 16 * 60000);
-  assert.equal((await entrar('leitor@exemplo.com.br', 'senha do leitor 2026', { ip: '198.51.100.99' })).status, 200, 'passados 15 minutos, entra');
+  assert.equal((await entrar('leitor@exemplo.com.br', 'senha do leitor 2026', { ip: '198.51.100.10' })).status, 200, 'passados 15 minutos, entra');
   // por endereço: 10 erros com e-mails diferentes do mesmo lugar
   for (let i = 0; i < 10; i += 1) await entrar(`x${i}@exemplo.com.br`, 'errada', { ip: '192.0.2.7' });
   assert.equal((await entrar('dono@exemplo.com.br', 'senha do dono 2026', { ip: '192.0.2.7' })).status, 429);
@@ -410,7 +413,7 @@ test('crachá do aparelho: senha errada e limite de tentativas (por e-mail e por
   assert.ok(dobj.cofre.q('SELECT COUNT(*) AS n FROM tentativas_aparelho')[0].n > 50);
   dobj.cofre.relogio = () => new Date(Date.now() + 4 * 3600000);
   await entrar('z@exemplo.com.br', 'errada', { ip: '10.8.8.8' });
-  assert.deepEqual(dobj.cofre.q('SELECT chave FROM tentativas_aparelho ORDER BY chave').map((l) => l.chave), ['email:z@exemplo.com.br', 'geral', 'ip:10.8.8.8']);
+  assert.deepEqual(dobj.cofre.q('SELECT chave FROM tentativas_aparelho ORDER BY chave').map((l) => l.chave), ['email:z@exemplo.com.br|10.8.8.8', 'geral', 'ip:10.8.8.8']);
   assert.equal((await entrar('antigo@exemplo.com.br', 'senha antiga 2026', { ip: '10.9.9.9' })).status, 200, 'senha gravada com as voltas antigas (sem senha_iteracoes)');
   // pedido de acesso ainda não aprovado não liga computador
   const u = dobj.cofre.q("SELECT dados FROM registros WHERE tabela = 'usuarios' AND id = 2").map((x) => JSON.parse(x.dados))[0];

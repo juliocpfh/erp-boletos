@@ -86,7 +86,9 @@ export class Aparelhos {
     return { falhas: Number(l.falhas), desde: l.desde };
   }
   chavesDe(email, ip) {
-    return [['email', `email:${String(email || '').trim().toLowerCase().slice(0, 200)}`], ['ip', ip ? `ip:${String(ip).slice(0, 60)}` : ''], ['geral', 'geral']].filter(([, k]) => k);
+    // por e-mail E endereço juntos: outra pessoa, de outro lugar, não bloqueia o e-mail do dono com 5 senhas erradas
+    const e = String(email || '').trim().toLowerCase().slice(0, 200);
+    return [['email', `email:${e}|${String(ip || '').slice(0, 60)}`], ['ip', ip ? `ip:${String(ip).slice(0, 60)}` : ''], ['geral', 'geral']].filter(([, k]) => k);
   }
   /** Tira as linhas vencidas (a maior janela já passou): a tabela não cresce com e-mails e endereços que nunca mais voltam. */
   limparTentativas() {
@@ -147,8 +149,11 @@ export class Aparelhos {
     const senha = semSenha ? '' : String(pedido.senha);
     if (!email || email.length > 200 || senha.length > 500 || (!semSenha && !senha)) throw new ErroAparelho(400, 'Informe o e-mail e a senha do sistema.');
     const u = this.usuarioPorEmail(email);
-    const iteracoes = u ? Number(u.senha_iteracoes) || ITERACOES_ANTIGAS : ITERACOES_PADRAO;
-    if (semSenha) return { desafio: { sal: String(u?.senha_sal || await this.salDeMentira(email)), iteracoes: Math.min(iteracoes, MAX_ITERACOES) } };
+    // e-mail sem cadastro: sal e voltas de mentira, sempre os mesmos para o mesmo e-mail, sorteados entre os dois valores que os
+    // usuários de verdade têm (as voltas não dizem quem tem cadastro)
+    const mentira = u ? '' : await this.salDeMentira(email);
+    const iteracoes = u ? Number(u.senha_iteracoes) || ITERACOES_ANTIGAS : (parseInt(mentira.slice(-1), 16) % 2 ? ITERACOES_ANTIGAS : ITERACOES_PADRAO);
+    if (semSenha) return { desafio: { sal: String(u?.senha_sal || mentira), iteracoes: Math.min(iteracoes, MAX_ITERACOES) } };
     const computador = nomeDoComputador(pedido?.computador);
     const resumo = FORMATO_RESUMO.exec(senha)?.[1];
     if (!resumo) throw new ErroAparelho(400, 'Este programa do computador é antigo e não consegue mais entrar: baixe a versão nova do programa (Administracao-de-Imoveis.exe) e ligue de novo.');

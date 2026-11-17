@@ -32,6 +32,12 @@ export async function desembrulhar(emb, senha) {
   } catch { return null; }
 }
 
+/** Cópia da chave que não sai em bytes (não extraível): é a que fica guardada no aparelho durante o login lembrado. */
+export async function naoExtraivel(chave) {
+  if (!chave || chave.extractable === false) return chave;
+  return sub().importKey('raw', await sub().exportKey('raw', chave), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+}
+
 /** Cifra um valor (objeto/lista/texto ou Blob). */
 export async function cifrar(chave, valor) {
   const iv = bytes(12);
@@ -48,10 +54,14 @@ export async function decifrar(chave, v) {
   return v.tipo === 'blob' ? new Blob([claro], { type: v.mime }) : JSON.parse(new TextDecoder().decode(claro));
 }
 
-/** Só o necessário para a tela de login (sem dados de inquilinos nem os tokens de sessão, que ficam só na cópia cifrada). */
-export const usuariosParaAcesso = (usuarios = []) => usuarios.map((u) => ({
+/**
+ * Só o necessário para a tela de login (sem dados de inquilinos nem os tokens de sessão, que ficam só na cópia cifrada).
+ * O resumo da senha vai só dos usuários que já entraram neste aparelho (`logins`, os do embrulho da chave): no aparelho do
+ * administrador, a nuvem manda o de todos, e eles não ficam guardados abertos (mutirão de 16/11).
+ */
+export const usuariosParaAcesso = (usuarios = [], logins = null) => usuarios.map((u) => ({
   id: u.id, login: u.login, nome: u.nome, email: u.email, papel: u.papel, ativo: u.ativo, pendente: u.pendente,
-  senha_sal: u.senha_sal, senha_hash: u.senha_hash, senha_iteracoes: u.senha_iteracoes,
+  ...(!logins || logins.includes(u.login) ? { senha_sal: u.senha_sal, senha_hash: u.senha_hash, senha_iteracoes: u.senha_iteracoes } : {}),
 }));
 
 /**
@@ -70,7 +80,7 @@ export function guardarCifrado(cru, obterChave) {
     },
     async gravar(k, v) {
       if (ABERTAS.includes(k)) return cru.gravar(k, v);
-      if (k === 'base' && v?.usuarios) await cru.gravar('acesso', usuariosParaAcesso(v.usuarios));
+      if (k === 'base' && v?.usuarios) await cru.gravar('acesso', usuariosParaAcesso(v.usuarios, Object.keys((await cru.ler('embrulhos')) || {})));
       // quantos lotes/anexos esperam envio fica aberto: outro usuário não pode entrar trocando a chave e perder isso
       if (k === 'pendentes') await cru.gravar('aguardando-dados', (v || []).length);
       if (k === 'fila-anexos') await cru.gravar('aguardando-anexos', (v || []).length);
@@ -117,8 +127,9 @@ export class Cofrinho {
     let chave = emb[login] ? await desembrulhar(emb[login], senha) : null;
     let nova = false;
     if (!chave) {
-      // sem embrulho deste usuário (ou a senha mudou): usa a chave aberta da sessão, se houver; senão cria outra
-      chave = this.chave || (await this.cru.ler('chave-sessao'))?.chave || null;
+      // sem embrulho deste usuário (ou a senha mudou): usa a chave aberta da sessão, se houver; senão cria outra. A guardada
+      // no aparelho não sai em bytes (não dá para embrulhar): só a da memória (esta aba, depois de alguém entrar com a senha)
+      chave = this.chave && this.chave.extractable !== false ? this.chave : null;
       if (!chave) {
         nova = Object.keys(emb).length > 0 || !!(await this.cru.ler('base'));
         const esperando = Number(await this.cru.ler('aguardando-dados') || 0) + Number(await this.cru.ler('aguardando-anexos') || 0);
@@ -131,7 +142,7 @@ export class Cofrinho {
       await this.cru.gravar('embrulhos', emb);
     }
     this.chave = chave;
-    await this.cru.gravar('chave-sessao', { chave, ate: ateMs });
+    await this.cru.gravar('chave-sessao', { chave: await naoExtraivel(chave), ate: ateMs });
     return { chave, nova };
   }
 

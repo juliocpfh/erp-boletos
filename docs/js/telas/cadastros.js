@@ -1,6 +1,6 @@
 // Cadastros (#/novo/TABELA e #/editar/TABELA/ID): CADASTROS define, para cada tabela, os campos, os ajustes antes de salvar,
 // a conferência (avisos.js), como salvar e para onde voltar. telaFormulario desenha o formulário; o envio é FORMULARIOS.cadastro (envios.js).
-import { alterar, aviso, E, login, podeUsuario } from '../app.js';
+import { alterar, aviso, E, login, podeUsuario, tokenDaSessao } from '../app.js';
 import * as S from '../armazenamento.js';
 import { camposDeSenha, ERRO_SENHA_CURTA, senhaCurta } from '../auth.js';
 import * as C from '../calculos.js';
@@ -984,6 +984,8 @@ export const CADASTROS = {
         if (senhaCurta(senha)) erros.login = ERRO_SENHA_CURTA;
         else if (senha !== String(new FormData(form).get('senha2') || '')) erros.login = 'As duas senhas precisam ser iguais (campos "Senha" e "Repita a senha", no fim do formulário)';
         Object.assign(dados, await camposDeSenha(senha));
+        // senha nova: as sessões lembradas desse usuário caem (se for o próprio administrador, fica só a deste navegador)
+        if (r) { const token = r.id === E.usuario.id ? tokenDaSessao() : null; dados.sessoes = token ? [token] : []; }
       } else if (!r) erros.login = 'Informe uma senha inicial';
       if (d().usuarios.some((u) => u.login === dados.login && u.id !== (r && r.id))) erros.login = 'Já existe um usuário com este login';
       if (r && r.id === E.usuario.id && (dados.papel !== 'admin' || !dados.ativo)) erros.papel = 'Você não pode tirar o seu próprio acesso de administrador';

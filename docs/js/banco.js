@@ -45,19 +45,37 @@ let local = { ponte_url: '', senha_ponte: '' };
 /** Lê a ponte lembrada neste navegador (chamado ao abrir o sistema; ``app.js``). */
 export async function carregarPonteLocal() {
   try {
-    const p = typeof indexedDB === 'undefined' ? null : await S.ponteLembrada();
+    const p = lembraNoNavegador() ? await S.ponteLembrada() : null;
     local = { ponte_url: String((p && p.ponte_url) || ''), senha_ponte: String((p && p.senha_ponte) || '') };
   } catch { local = { ponte_url: '', senha_ponte: '' }; }
   return { ...local };
+}
+
+/** A versão PC (arquivo aberto do disco, file:): o IndexedDB é de todo HTML aberto do disco, então a ponte fica só na memória. */
+const lembraNoNavegador = () => typeof indexedDB !== 'undefined' && !(typeof location !== 'undefined' && location.protocol === 'file:');
+
+/** http:// só para este computador (a senha viaja aberta pela rede); outro computador, só https:// (ex.: Cloudflare Tunnel). */
+export function enderecoDaPonteValido(url) {
+  if (!url) return true;
+  if (/^https:\/\//i.test(url)) return true;
+  const m = /^http:\/\/([^/:]+|\[[^\]]+\])(:\d+)?(\/|$)/i.exec(url);
+  return !!m && ['localhost', '127.0.0.1', '[::1]'].includes(m[1].toLowerCase());
 }
 
 /** Guarda o endereço e a senha da ponte só neste navegador. */
 export async function salvarPonteLocal({ ponte_url, senha_ponte }) {
   const url = String(ponte_url || '').trim().replace(/\/+$/, '');
   if (url && !/^https?:\/\//i.test(url)) throw new Error('O endereço da ponte começa com http:// ou https:// (ex.: http://localhost:8765).');
+  if (!enderecoDaPonteValido(url)) throw new Error('Ponte em outro computador só com https:// (ex.: https://banco.ankjck.com.br): com http:// a senha viajaria aberta pela rede. http:// só para este computador (http://localhost:8765).');
   local = { ponte_url: url, senha_ponte: String(senha_ponte || '') };
-  if (typeof indexedDB !== 'undefined') await S.lembrarPonte({ ...local });
+  if (lembraNoNavegador()) await S.lembrarPonte({ ...local });
   return { ...local };
+}
+
+/** Ao sair do sistema: a senha da ponte sai deste navegador (o endereço fica); quem entrar depois digita de novo. */
+export async function esquecerSenhaDaPonte() {
+  local = { ...local, senha_ponte: '' };
+  if (lembraNoNavegador()) await S.lembrarPonte({ ...local });
 }
 
 /** Apaga o endereço e a senha da ponte deste navegador (ex.: computador emprestado ou ponte trocada). */

@@ -186,10 +186,15 @@ export function nomeWindows(parte) {
 }
 export const caminhoLocal = (caminho) => caminho.split('/').map(nomeWindows);
 
+/** Tipos que o Windows ou o navegador executam (programa, atalho, página, script): ficam fora da cópia aberta. */
+const NAO_COPIAR = /\.(html?|xht(ml)?|svgz?|xml|xsl|xslt|mht|mhtml|m?js|jse|exe|com|bat|cmd|ps1|psm1|vbs|vbe|wsf|wsh|hta|lnk|scr|msi|msp|dll|cpl|pif|reg|jar|url|scf|inf|chm|application|appx|msix|gadget|iso|img|vhdx?)$/i;
+export const copiavel = (caminho) => !NAO_COPIAR.test(String(caminho || '').replace(/[. ]+$/, ''));
+
 export function planoCopia(nuvem, anterior = {}) {
   const atual = {};
   const baixar = [];
   for (const a of nuvem) {
+    if (!copiavel(a.caminho)) continue; // programa ou página: não vai aberto para o Windows (o anexo continua na nuvem)
     const info = { tamanho: a.tamanho, alterado: a.alterado || '' };
     atual[a.caminho] = info;
     const ant = anterior[a.caminho];

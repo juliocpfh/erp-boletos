@@ -11,15 +11,17 @@ import { avisarAparelhos } from './push.mjs';
 const primeiro = (n) => String(n || '').trim().split(/\s+/)[0] || '';
 
 /**
- * E-mail da pessoa do link: o que a equipe pôs na ficha; o digitado no link só quando a ficha não tem (assim quem tem o
- * link não faz o Gmail da empresa escrever para um endereço qualquer).
+ * E-mail da pessoa do link: só o que a equipe pôs na ficha (o digitado no link não vale: quem tem o link faria o Gmail da
+ * empresa escrever para um endereço qualquer). Sem e-mail na ficha, a pessoa não recebe o aviso por e-mail.
  */
 export function emailDaPessoa(registro) {
   const campo = registro.pessoa === 'interessado' ? 'inquilino_email' : `${registro.pessoa}_email`;
-  const ultimo = (registro.respostas || []).at(-1);
-  const e = String((registro.valores_iniciais || {})[campo] || (ultimo && ultimo.valores[campo]) || '').trim();
+  const e = String((registro.valores_iniciais || {})[campo] || '').trim();
   return emailValido(e) ? e : '';
 }
+
+/** Aviso no celular aparece na tela bloqueada: sem nome nem imóvel (LGPD); o detalhe aparece ao abrir a ficha. */
+export const AVISO_CELULAR = { titulo: 'Ficha pela internet', texto: 'Chegou novidade por um link de ficha. Toque para abrir.' };
 
 /**
  * Textos dos avisos de um evento: { pessoa: { assunto, texto } | null, equipe: { titulo, texto } | null }.
@@ -74,7 +76,7 @@ export async function avisar(env, registro, evento, detalhe = '', { buscar = fet
     if (gmail.ligado && equipe.length) {
       try { await enviarEmail(env, { para: equipe.join(','), assunto: `Ficha pela internet: ${t.equipe.titulo}`, texto: `${t.equipe.texto}\n\nAbrir a ficha: ${url}` }, { buscar, simular }); feitos.push('equipe'); } catch (e) { console.warn('aviso por e-mail à equipe', e.message); }
     }
-    try { if (await avisarAparelhos(env, { titulo: t.equipe.titulo, texto: t.equipe.texto, url: `./#/ficha/${registro.ficha_id}`, tag: `ficha-${registro.ficha_id}` }, { buscar })) feitos.push('celular'); } catch (e) { console.warn('aviso no celular', e.message); }
+    try { if (await avisarAparelhos(env, { ...AVISO_CELULAR, url: `./#/ficha/${registro.ficha_id}`, tag: `ficha-${registro.ficha_id}` }, { buscar })) feitos.push('celular'); } catch (e) { console.warn('aviso no celular', e.message); }
   }
   return feitos;
 }

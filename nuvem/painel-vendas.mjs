@@ -4,13 +4,14 @@
 // Rotas: GET / (a página) · /api/<rota> (repassa ao cofre das licenças; as rotas cliente/ não passam por aqui).
 
 import { pedirAoCofreDeLicencas } from './cofre-licencas.mjs';
+import { HSTS, lerAteLimite } from './ficha-publica.mjs';
 
 const ROTAS_GET = ['eu', 'planos', 'lista', 'equipe', 'historico'];
 const ROTAS_POST = ['gerar', 'revogar', 'cortesia', 'reenviar', 'equipe', 'casa'];
 const MAX_CORPO = 64 * 1024;
 
 const json = (status, dados) => new Response(JSON.stringify(dados), {
-  status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' },
+  status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...HSTS },
 });
 
 /** O endereço do painel (vendas.ankjck.com.br) é outro aplicativo: só o painel responde lá. */
@@ -41,8 +42,10 @@ export async function atenderVendas(request, env, { conferirLogin }) {
       if (request.headers.get('X-Sistema') !== 'vendas') return json(403, { erro: 'Pedido recusado.' });
       const origem = request.headers.get('Origin');
       if (origem && origem !== `https://${env.HOST_VENDAS || 'vendas.ankjck.com.br'}` && origem !== url.origin) return json(403, { erro: 'Pedido recusado (origem).' });
-      corpo = await request.text();
-      if (corpo.length > MAX_CORPO) return json(413, { erro: 'Pedido grande demais.' });
+      // lido aos pedaços e contado: não lê um corpo enorme inteiro antes de recusar
+      const bytes = await lerAteLimite(request, MAX_CORPO);
+      if (!bytes) return json(413, { erro: 'Pedido grande demais.' });
+      corpo = new TextDecoder().decode(bytes);
     }
     return await pedirAoCofreDeLicencas(env, rota, { method: m, corpo, email, busca: url.search });
   } catch (e) {
@@ -56,7 +59,7 @@ function pagina() {
   const nonce = Array.from(crypto.getRandomValues(new Uint8Array(18)), (b) => b.toString(16).padStart(2, '0')).join('');
   const csp = `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; img-src 'self' data:; form-action 'none'; frame-ancestors 'none'; base-uri 'none'`;
   return new Response(PAGINA.replaceAll('{{NONCE}}', nonce), {
-    headers: { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': csp, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Robots-Tag': 'noindex' },
+    headers: { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': csp, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Robots-Tag': 'noindex', ...HSTS },
   });
 }
 

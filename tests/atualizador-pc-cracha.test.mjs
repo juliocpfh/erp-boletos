@@ -28,7 +28,7 @@ async function nuvem() {
   const r2 = r2Falso();
   const dobj = new CofreDO({ storage: { sql, transactionSync: tx } }, { DADOS: r2 });
   dobj.cofre.importar({ formato: 'imoveis-v1', imoveis: [{ id: 1, nome: 'Sala 101' }], usuarios: [
-    { id: 1, login: 'dono@exemplo.com.br', email: 'dono@exemplo.com.br', nome: 'Dono Exemplo', papel: 'admin', ativo: true, senha_sal: 's1', senha_hash: await resumoSenha(SENHA, 's1', 1000), senha_iteracoes: 1000 },
+    { id: 1, login: 'dono@exemplo.com.br', email: 'dono@exemplo.com.br', nome: 'Dono Exemplo', papel: 'admin', ativo: true, senha_sal: 's1', senha_hash: await resumoSenha(SENHA, 's1', 150000), senha_iteracoes: 150000 },
   ] }, 'dono@exemplo.com.br');
   await r2.put('arquivos/Sala 101/contrato.pdf', 'pdf de teste');
   W.esquecerPapeis(); W.esquecerCrachas();
@@ -190,11 +190,11 @@ test('ligar: a senha não vai para a nuvem (só o resumo calculado aqui, igual a
   assert.match(d.cracha, /^ap1_/);
   assert.equal(corpos.length, 2, 'dois pedidos: o sal e o resumo');
   assert.ok(corpos.every((c) => !c.includes(SENHA)), 'a senha não sai do computador');
-  assert.equal(JSON.parse(corpos[1]).senha, `pbkdf2:${await resumoSenha(SENHA, 's1', 1000)}`);
+  assert.equal(JSON.parse(corpos[1]).senha, `pbkdf2:${await resumoSenha(SENHA, 's1', 150000)}`);
   assert.equal(await L.resumoDaSenha('senha de teste 2026', 'sal', 150000), await resumoSenha('senha de teste 2026', 'sal', 150000), 'mesma conta de docs/js/auth.js');
   await assert.rejects(L.entrarNaNuvem(SITE, { email: 'dono@exemplo.com.br', senha: 'senha errada', computador: 'PC' }, buscar), /E-mail ou senha errados/);
   const resposta = (d2) => async () => new Response(JSON.stringify(d2), { headers: { 'content-type': 'application/json' } });
-  for (const ruim of [{}, { desafio: { sal: 's', iteracoes: 5 } }, { desafio: { sal: 's', iteracoes: 9e9 } }, { desafio: { iteracoes: 600000 } }]) {
+  for (const ruim of [{}, { desafio: { sal: 's', iteracoes: 5 } }, { desafio: { sal: 's', iteracoes: 1000 } }, { desafio: { sal: 's', iteracoes: 9e9 } }, { desafio: { iteracoes: 600000 } }]) {
     await assert.rejects(L.entrarNaNuvem(SITE, { email: 'a@exemplo.com.br', senha: 'x', computador: 'PC' }, resposta(ruim)), /baixe a versão nova do programa/);
   }
 });

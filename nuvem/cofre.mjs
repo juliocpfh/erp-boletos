@@ -5,6 +5,8 @@
 // A lógica fica em `Cofre` (recebe `sql` e `transacao`) para os testes rodarem no Node com node:sqlite.
 // Crachás do programa do PC (aparelhos ligados): aparelhos.mjs, numa tabela própria.
 import { Aparelhos, ErroAparelho } from './aparelhos.mjs';
+import { faxinaDosLinks } from './ficha-publica.mjs';
+import { faxinaDaLixeira } from './lixeira.mjs';
 
 export const FORMATO = 'imoveis-v1';
 export const MAX_OPS = 2000;
@@ -42,6 +44,22 @@ export const SO_ADMIN = {
   tabela: ['emitentes', 'config_regras', 'versoes_regras'],
 };
 const NOMES_PROIBIDOS = ['__proto__', 'constructor', 'prototype'];
+/**
+ * As tabelas do sistema (as de TABELAS em docs/js/regras.js; tests/seguranca-nuvem.test.mjs confere): mudança numa tabela que
+ * não está aqui nem já existe no cofre é recusada (senão qualquer operador criaria tabelas com qualquer nome em todos os aparelhos).
+ * Tabela nova no sistema = entrar aqui também.
+ */
+export const TABELAS_CONHECIDAS = ['imoveis', 'contratos', 'correcoes', 'seguros', 'iptus', 'titularidades', 'cobrancas', 'recebimentos', 'faturas', 'emitentes',
+  'participacoes', 'usuarios', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'depositos_garantia', 'devolucoes_garantia', 'renovacoes', 'trocas_garantia',
+  'leituras', 'encerramentos', 'avulsas', 'reformas', 'solicitacoes', 'fichas', 'indices_acumulados', 'cartas_reajuste', 'modelos_contrato', 'vistorias',
+  'aditivos', 'despesas', 'ganhos_airbnb', 'ressarcimentos', 'fechamentos', 'guias_impostos', 'modelos_email', 'envios_email', 'movimentacoes_banco',
+  'pagamentos_banco', 'adiamentos_alerta', 'alertas_desligados', 'acordos', 'pastas_fisicas', 'config_regras', 'versoes_regras'];
+/** Fora do administrador, o número da próxima NF só anda para a frente, e no máximo isto de uma vez (numerar um lote grande). */
+export const MAX_SALTO_NF = 300;
+/** Gravação por usuário num dia (Brasília): mudanças e bytes. Passou, as próximas esperam o dia seguinte (contra encher o cofre). */
+export const COTA_DIA = { ops: 100000, bytes: 80 * 1024 * 1024 };
+/** E-mails pela conta da empresa por usuário num dia. */
+export const MAX_EMAILS_DIA = 150;
 /**
  * Chaves de negócio que não repetem (dois aparelhos fazendo a mesma coisa antes de um ver o do outro, ou um deles sem internet):
  * registro novo com a mesma chave de um que já está na nuvem é recusado, e o lote inteiro volta (como código repetido; a tela
@@ -147,6 +165,8 @@ export class Cofre {
         atual TEXT, por_atual TEXT, proposto TEXT, por_proposto TEXT, em TEXT NOT NULL, resolvido_em TEXT, escolha TEXT, resolvido_por TEXT);
       CREATE TABLE IF NOT EXISTS excluidos (tabela TEXT NOT NULL, id INTEGER NOT NULL, dados TEXT NOT NULL, por TEXT, em TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS controle (chave TEXT PRIMARY KEY, valor TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS emails_enviados (n INTEGER PRIMARY KEY AUTOINCREMENT, por TEXT NOT NULL, em TEXT NOT NULL, para TEXT NOT NULL, assunto TEXT, anexos TEXT);
+      CREATE TABLE IF NOT EXISTS cotas (chave TEXT PRIMARY KEY, ops INTEGER NOT NULL, bytes INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS log_em ON log (em);
       CREATE INDEX IF NOT EXISTS lotes_em ON lotes (em);
       CREATE INDEX IF NOT EXISTS registros_ordem ON registros (ordem);
@@ -154,6 +174,7 @@ export class Cofre {
     // os dois últimos índices entram também em cofre que já existia (IF NOT EXISTS: roda a cada abertura sem repetir)
     this.maiorOrdem = null; // maior `ordem` de registros, guardada durante um lote (proximaOrdem)
     this.chaves = new Map(); // chaves únicas já lidas no lote: tabela → { porChave, porId }
+    this.dono = ''; // e-mail do dono (DONO_EMAIL do Worker): com o cofre vazio, só ele faz a primeira carga
   }
 
   /** Chaves únicas (CHAVES_UNICAS) dos registros de uma tabela, lidas uma vez por lote (json_extract: sem abrir o registro inteiro). */
@@ -209,6 +230,9 @@ export class Cofre {
     if (CONTADORES.includes(nome) || SO_ADMIN.raiz.includes(nome) || this.q('SELECT 1 AS x FROM raiz WHERE campo = ?', nome).length) {
       throw new ErroCofre(400, `"${nome}" é um campo da configuração geral, não uma tabela.`);
     }
+    if (!TABELAS_CONHECIDAS.includes(nome) && !this.q('SELECT 1 AS x FROM tabelas WHERE nome = ?', nome).length) {
+      throw new ErroCofre(400, `Tabela desconhecida: ${nome}. Atualize o sistema (recarregue a página) e tente de novo.`);
+    }
     return nome;
   }
   registrarLog(tipo, tabela, id, dados, por) {
@@ -221,7 +245,8 @@ export class Cofre {
   papelDe(email) {
     const e = String(email || '').toLowerCase();
     const usuarios = this.q("SELECT dados FROM registros WHERE tabela = 'usuarios'").map((r) => JSON.parse(r.dados));
-    if (!usuarios.length) return 'admin'; // cofre vazio: quem passou pelo Access faz a primeira carga
+    // cofre vazio: quem passou pelo Access faz a primeira carga (com DONO_EMAIL no Worker, só o dono)
+    if (!usuarios.length) return !this.dono || this.dono === e ? 'admin' : null;
     const u = usuarios.find((x) => x.ativo !== false && [x.login, x.email].some((v) => String(v || '').toLowerCase() === e));
     return u ? { papel: u.papel, id: u.id } : null;
   }
@@ -238,6 +263,11 @@ export class Cofre {
   // -------------------------------------------------------------------------
   importar(d, email, { substituir = false, manterUsuarios = false } = {}) {
     if (!d || typeof d !== 'object' || d.formato !== FORMATO) throw new ErroCofre(400, 'Não é um banco deste sistema.');
+    // sem um administrador ativo, o cofre ficaria "vazio de usuários" e qualquer e-mail do Access viraria administrador
+    if (!(Array.isArray(d.usuarios) ? d.usuarios : []).some((u) => u && u.ativo !== false && !u.pendente && u.papel === 'admin')) {
+      throw new ErroCofre(400, 'Este banco não tem nenhum administrador ativo: não pode entrar na nuvem.');
+    }
+    if (this.vazio()) this.exigir(email, 'admin');
     if (!this.vazio()) {
       if (!substituir) throw new ErroCofre(409, 'A nuvem já tem dados. Para trocar tudo, confirme a substituição.');
       this.exigir(email, 'admin');
@@ -315,7 +345,7 @@ export class Cofre {
       d.seq[r.tabela] = Math.max(d.seq[r.tabela] || 0, r.id);
     }
     d.historico = this.q('SELECT dados FROM historico ORDER BY n').map((r) => JSON.parse(r.dados));
-    d._nuvem = { seq: this.ultimoSeq(), conflitos: this.conflitosAbertos() };
+    d._nuvem = { seq: this.ultimoSeq(), conflitos: this.conflitosAbertos(quem) };
     return d;
   }
 
@@ -335,13 +365,15 @@ export class Cofre {
         if (l.tipo === 'registro' && l.tabela === 'usuarios') dados = this.usuarioParaAparelho(dados, quem);
         return { seq: l.seq, tipo: l.tipo, tabela: l.tabela, id: l.id, dados, por: l.por, em: l.em };
       }),
-      conflitos: this.conflitosAbertos(),
+      conflitos: this.conflitosAbertos(quem),
       revisao: Number(this.controle('revisao') || 0), atualizado_em: this.controle('atualizado_em'), atualizado_por: this.controle('atualizado_por'),
     };
   }
 
-  conflitosAbertos() {
+  /** Conflitos em aberto; os de usuários (com dados de acesso) só vão para o administrador. `quem` = { papel } de exigir(). */
+  conflitosAbertos(quem = null) {
     return this.q('SELECT id, tipo, tabela, reg_id, campo, atual, por_atual, proposto, por_proposto, em FROM conflitos WHERE resolvido_em IS NULL ORDER BY id')
+      .filter((c) => !quem || quem.papel === 'admin' || c.tabela !== 'usuarios')
       .map((c) => {
         let proposto = c.proposto === null ? null : JSON.parse(c.proposto);
         // lote em disputa: aos aparelhos vai só o resumo (a gravação inteira fica no cofre para a escolha)
@@ -374,11 +406,13 @@ export class Cofre {
       throw new ErroCofre(409, `Esta mudança ficou mais de ${DIAS_LOG} dias esperando neste aparelho: ela não entrou. Confira e faça de novo o que ainda precisar.`);
     }
     if (quem.papel === 'consulta' && !this.soProprioAcesso(lote.ops, quem)) throw new ErroCofre(403, 'Seu usuário não pode fazer isso.');
+    const contarCota = this.conferirCota(email, lote.ops);
     const emGrupo = lote.ops.filter((o) => o?.op !== 'historico').length > 1 && lote.ops.some((o) => o?.op === 'excluir');
     try {
       return this.transacao(() => {
         this.maiorOrdem = null; // cada lote lê a maior ordem de novo (lote desfeito por erro não deixa número velho)
         this.chaves = new Map(); // chaves únicas (CHAVES_UNICAS) conferidas neste lote
+        contarCota();
         const resultados = []; const novosConflitos = [];
         for (const op of lote.ops) resultados.push(this.aplicarOp(op, email, quem, novosConflitos));
         // exclusão em grupo (contrato e boletos, imóvel e despesas…) é tudo ou nada: um registro disputado segura o lote inteiro,
@@ -424,6 +458,17 @@ export class Cofre {
     return this.fecharLote(lote, email, lote.ops.map(() => ({ ok: false, conflito: true })), [conflito]);
   }
 
+  /** Cota do dia (COTA_DIA) do usuário: recusa (429) se este lote passaria dela; devolve a função que conta o lote (na transação). */
+  conferirCota(email, ops) {
+    const chave = `${hojeBrasilia(this.relogio())}|${String(email).toLowerCase()}`;
+    const bytes = JSON.stringify(ops).length;
+    const usado = this.q('SELECT ops, bytes FROM cotas WHERE chave = ?', chave)[0] || { ops: 0, bytes: 0 };
+    if (Number(usado.ops) + ops.length > COTA_DIA.ops || Number(usado.bytes) + bytes > COTA_DIA.bytes) {
+      throw new ErroCofre(429, 'Limite de gravação do dia atingido para este usuário: as mudanças ficam guardadas neste aparelho e sobem amanhã. Se for engano, fale com o administrador.');
+    }
+    return () => this.sql.exec('INSERT INTO cotas (chave, ops, bytes) VALUES (?, ?, ?) ON CONFLICT(chave) DO UPDATE SET ops = ops + excluded.ops, bytes = bytes + excluded.bytes', chave, ops.length, bytes);
+  }
+
   /**
    * O que o usuário de consulta grava: a própria entrada e saída (sessões do login), a própria senha (trocar, ou o login regravar
    * a do padrão antigo) e a linha do histórico dessa troca. Qualquer outra mudança é recusada.
@@ -441,6 +486,10 @@ export class Cofre {
     if (!op || typeof op !== 'object') throw new ErroCofre(400, 'Mudança inválida.');
     if (op.op === 'historico') {
       if (!op.entrada || typeof op.entrada !== 'object' || Array.isArray(op.entrada)) throw new ErroCofre(400, 'Histórico inválido.');
+      // linha do histórico de algo que só o administrador muda (o "Desfazer" dele aplicaria o valor da linha): só dele
+      const tabelaH = String(op.entrada.tabela || '');
+      if (quem.papel !== 'admin' && (SO_ADMIN.tabela.includes(tabelaH) || SO_ADMIN.raiz.includes(tabelaH)
+        || (tabelaH === 'usuarios' && Number(op.entrada.registro_id) !== quem.id))) throw new ErroCofre(403, `Só o administrador registra mudanças em ${tabelaH}.`);
       const entrada = { ...semSegredos(op.entrada), email_nuvem: email }; // quem gravou de verdade (o login do Access)
       this.sql.exec('INSERT INTO historico (dados) VALUES (?)', texto(entrada));
       this.registrarLog('historico', null, null, entrada, email);
@@ -504,7 +553,7 @@ export class Cofre {
         return { ok: false, conflito: true };
       }
       const dados = JSON.parse(atual.dados); const meta = JSON.parse(atual.meta || '{}');
-      let mudou = false; let conflito = false;
+      let mudou = false; let conflito = false; let trocouSenha = false;
       for (const [c, v] of campos) {
         nomeCampo(c);
         const antes = semSegredos(v?.antes); const depois = semSegredos(v?.depois);
@@ -515,6 +564,14 @@ export class Cofre {
           const juntas = [...new Set([...(Array.isArray(dados[c]) ? dados[c] : []), ...(Array.isArray(depois) ? depois : [])])].filter((t) => !tirados.has(t)).slice(-MAX_SESSOES);
           if (igual(dados[c], juntas)) continue;
           dados[c] = juntas; meta[c] = { por: email, em: this.agora() };
+          mudou = true; continue;
+        }
+        if (tabela === 'usuarios' && CAMPOS_SENHA.includes(c)) {
+          // senha: nunca vira conflito (o resumo iria para a tela de conflitos); vale a última troca
+          if (igual(dados[c], depois)) continue;
+          if (!v || !('depois' in v)) delete dados[c]; else dados[c] = depois;
+          meta[c] = { por: email, em: this.agora() };
+          if (c === 'senha_hash') trocouSenha = !('senha_iteracoes' in op.campos);
           mudou = true; continue;
         }
         const aberto = this.q("SELECT id FROM conflitos WHERE resolvido_em IS NULL AND tipo = 'campo' AND tabela = ? AND reg_id = ? AND campo = ?", tabela, String(id), c)[0];
@@ -540,6 +597,8 @@ export class Cofre {
         this.sql.exec('UPDATE registros SET dados = ?, meta = ? WHERE tabela = ? AND id = ?', texto(dados), JSON.stringify(meta), tabela, id);
         this.registrarLog('registro', tabela, id, dados, email);
       }
+      // senha trocada (não o reforço do login, que muda também as voltas): os computadores ligados por esse usuário param
+      if (trocouSenha) this.desligarAparelhosDe(id, email);
       return conflito ? { ok: false, conflito: true } : { ok: true };
     }
     throw new ErroCofre(400, `Tipo de mudança desconhecido: ${String(op.op).slice(0, 20)}`);
@@ -552,6 +611,10 @@ export class Cofre {
     if (CONTADORES.includes(campo)) {
       const linha = this.q('SELECT valor FROM raiz WHERE campo = ?', campo)[0];
       if (!igual(linha ? JSON.parse(linha.valor) : undefined, op.antes)) throw new ErroCofre(409, 'O número da NF mudou em outro aparelho: refaça com o número novo.', { contador: true });
+      if (quem.papel !== 'admin') {
+        const de = Number(op.antes); const para = Number(op.depois);
+        if (!Number.isSafeInteger(para) || !(para > de) || para - de > MAX_SALTO_NF) throw new ErroCofre(403, 'Só o administrador volta ou pula a numeração da NF.');
+      }
       this.gravarRaiz(campo, op.depois, email);
       return { ok: true };
     }
@@ -570,6 +633,13 @@ export class Cofre {
     }
     this.gravarRaiz(campo, depois, email);
     return { ok: true };
+  }
+
+  /** Desliga os crachás do programa do PC de um usuário (a tabela é de aparelhos.mjs; sem ela, nada a fazer). */
+  desligarAparelhosDe(usuarioId, email) {
+    try {
+      this.sql.exec('UPDATE aparelhos SET desligado_em = ?, desligado_por = ? WHERE usuario_id = ? AND desligado_em IS NULL', this.agora(), `senha trocada (${String(email).toLowerCase()})`, usuarioId);
+    } catch { /* cofre sem a tabela de aparelhos (testes) */ }
   }
 
   gravarRaiz(campo, valor, email) {
@@ -684,7 +754,25 @@ export class Cofre {
     });
   }
 
-  /** Limpa o que já não precisa: fila com mais de DIAS_LOG dias e lotes repetidos antigos. */
+  /**
+   * E-mail pela conta da empresa: registra quem mandou, para quem, o assunto e os nomes dos anexos (não o texto), com limite
+   * por usuário e por dia (MAX_EMAILS_DIA). Só operador ou administrador.
+   */
+  registrarEmail({ para = [], assunto = '', anexos = [] } = {}, email) {
+    this.exigir(email, 'operador');
+    const inicioDoDia = new Date(Date.parse(`${hojeBrasilia(this.relogio())}T00:00:00-03:00`)).toISOString();
+    const n = Number(this.q('SELECT COUNT(*) AS n FROM emails_enviados WHERE por = ? AND em >= ?', String(email).toLowerCase(), inicioDoDia)[0].n);
+    if (n >= MAX_EMAILS_DIA) throw new ErroCofre(429, `Limite de ${MAX_EMAILS_DIA} e-mails por dia para este usuário. Tente amanhã ou fale com o administrador.`);
+    this.sql.exec('INSERT INTO emails_enviados (por, em, para, assunto, anexos) VALUES (?, ?, ?, ?, ?)', String(email).toLowerCase(), this.agora(),
+      (Array.isArray(para) ? para : []).map(String).join(', ').slice(0, 2000), String(assunto).slice(0, 300),
+      JSON.stringify((Array.isArray(anexos) ? anexos : []).map((a) => String(a).slice(0, 200)).slice(0, 30)));
+    return { ok: true, registro: Number(this.q('SELECT MAX(n) AS n FROM emails_enviados')[0].n) };
+  }
+
+  /**
+   * Limpa o que já não precisa: fila com mais de DIAS_LOG dias, lotes repetidos antigos, registros excluídos (DIAS_EXCLUIDOS) e
+   * conflitos resolvidos (DIAS_CONFLITOS_RESOLVIDOS), cotas e registro de e-mails com mais de um ano.
+   */
   limpar() {
     const antes = (dias) => new Date(this.relogio().getTime() - dias * 86400000).toISOString();
     const limite = antes(DIAS_LOG);
@@ -694,6 +782,8 @@ export class Cofre {
     this.sql.exec(`DELETE FROM excluidos WHERE em < ? AND NOT EXISTS (SELECT 1 FROM conflitos c WHERE c.resolvido_em IS NULL
       AND c.tabela = excluidos.tabela AND c.reg_id = CAST(excluidos.id AS TEXT))`, antes(DIAS_EXCLUIDOS));
     this.sql.exec('DELETE FROM conflitos WHERE resolvido_em IS NOT NULL AND resolvido_em < ?', antes(DIAS_CONFLITOS_RESOLVIDOS)); // item 32
+    this.sql.exec('DELETE FROM cotas WHERE chave < ?', hojeBrasilia(new Date(this.relogio().getTime() - 3 * 86400000)));
+    this.sql.exec('DELETE FROM emails_enviados WHERE em < ?', antes(365));
   }
 }
 
@@ -755,6 +845,7 @@ export class CofreDO {
   constructor(ctx, env) {
     this.ctx = ctx; this.env = env;
     this.cofre = new Cofre(ctx.storage.sql, (fn) => ctx.storage.transactionSync(fn));
+    this.cofre.dono = String(env?.DONO_EMAIL || '').trim().toLowerCase();
     this.aparelhos = new Aparelhos(this.cofre);
     this.alarmeMarcado = false;
   }
@@ -774,7 +865,14 @@ export class CofreDO {
   async manutencao(agora = new Date(), so = 'tudo') {
     const c = this.cofre;
     if (so !== 'faxina' && this.env.DADOS) await backupDoDia(c, this.env.DADOS, agora);
-    if (so !== 'backup') { c.limpar(); c.controle('ultima_faxina', agora.toISOString()); }
+    if (so !== 'backup') {
+      c.limpar(); c.controle('ultima_faxina', agora.toISOString());
+      // R2: lixeira dos anexos apagados (30 dias) e links da ficha passados da guarda (LGPD), sem esperar alguém abrir a lista
+      if (this.env.DADOS) {
+        await faxinaDaLixeira(this.env.DADOS, agora).catch((e) => console.error('lixeira', e));
+        await faxinaDosLinks(this.env).catch((e) => console.error('links da ficha', e));
+      }
+    }
   }
 
   /** Alarme diário do Durable Object (Cloudflare chama). */
@@ -815,7 +913,8 @@ export class CofreDO {
       }
       else if (rota === '/tudo' && request.method === 'GET') r = c.tudo(c.exigir(email, 'consulta'));
       else if (rota === '/mudancas' && request.method === 'GET') r = c.mudancas(url.searchParams.get('desde'), c.exigir(email, 'consulta'));
-      else if (rota === '/conflitos' && request.method === 'GET') { c.exigir(email, 'consulta'); r = { conflitos: c.conflitosAbertos() }; }
+      else if (rota === '/conflitos' && request.method === 'GET') r = { conflitos: c.conflitosAbertos(c.exigir(email, 'consulta')) };
+      else if (rota === '/registrar-email' && request.method === 'POST') r = c.registrarEmail(await corpo(), email);
       else if (rota === '/lote' && request.method === 'POST') r = c.aplicar(await corpo(), email);
       else if (rota === '/resolver' && request.method === 'POST') r = c.resolver(await corpo(), email);
       else if (rota === '/faixa' && request.method === 'POST') r = c.faixa(await corpo(), email);

@@ -274,7 +274,9 @@ test('worker: o endereço do painel vai para o painel (fechado sem o Access conf
   const e = { ...env, ACCESS_AUD_VENDAS: '', LICENCAS: doFalso() };
   const r = await worker.fetch(noPainel('/api/eu'), e, {});
   assert.equal(r.status, 503);
-  assert.match((await r.json()).erro, /ACCESS_EQUIPE|ACCESS_AUD/);
+  const erro = (await r.json()).erro;
+  assert.match(erro, /login ainda não foi configurado/);
+  assert.doesNotMatch(erro, /ACCESS_/, 'a resposta pública não revela nomes de variáveis internas');
   const sistema = await worker.fetch(new Request('https://erp.exemplo.com.br/api/saude'), { HOST_VENDAS: 'vendas.exemplo.com.br' }, {});
   assert.equal(sistema.status, 503, 'o sistema continua pedindo o R2 e o login como antes');
 });
