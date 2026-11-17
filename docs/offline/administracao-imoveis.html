@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-UN+9vM7EgKVpY0IUGp3ZhxbvQHNRA9ciawVVgHujKiE='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-REBrVBUvD/6ggVOYr1nA/WL8W2g1nyqw0fssoR4Qltg='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="7abbf140493e263b">
+<meta name="fontes" content="79abf449087ad09e">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1865,6 +1865,43 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           consequencia: "Prazo maior ocupa mais espaço na pasta do backup seguro (cada cópia tem o tamanho do banco); prazo menor guarda menos pontos para voltar.",
           lei: "Sem lei: rotina. LGPD, art. 46 (segurança: proteger contra perda acidental)."
         },
+        // notificação ao inquilino (pedido do dono em 2026-11-17)
+        {
+          chave: "notificacao_prazo_dias",
+          grupo: "rotina",
+          rotulo: "Notificação ao inquilino: prazo que já vem na notificação nova (dias úteis)",
+          tipo: "inteiro",
+          padrao: 10,
+          min: 1,
+          max: 90,
+          explica: "Prazo para o inquilino resolver o que foi notificado, contado em dias úteis (sem sábado, domingo e feriado) a partir da data da notificação. Pode ser mudado em cada notificação. Ex.: 10 → notificação de 17/11/2026 vence em 02/12/2026 (20/11 é feriado).",
+          consequencia: "Só muda o prazo que vem preenchido nas notificações novas; as já feitas continuam com o prazo delas.",
+          lei: "Código Civil, art. 397, parágrafo único (a notificação constitui em mora); Lei 8.245/91, art. 9º, II (infração do contrato). O prazo deve ser razoável para o que foi pedido."
+        },
+        {
+          chave: "notificacao_aviso_dias",
+          grupo: "rotina",
+          rotulo: "Notificação ao inquilino: lembrete quantos dias úteis antes do fim do prazo",
+          tipo: "inteiro",
+          padrao: 3,
+          min: 0,
+          max: 15,
+          explica: 'O alerta "Notificação ao inquilino" aparece este número de dias úteis antes do fim do prazo (e no dia), para mandar o lembrete. Ex.: 3 → prazo até 02/12/2026, lembrete a partir de 27/11/2026.',
+          consequencia: "Só muda quando o lembrete aparece. Depois do prazo, o alerta fica vermelho até a baixa, a nova notificação ou a multa.",
+          lei: "Sem lei: rotina."
+        },
+        {
+          chave: "notificacao_multa_alugueis",
+          grupo: "rotina",
+          rotulo: "Notificação ao inquilino: multa sugerida (em aluguéis)",
+          tipo: "inteiro",
+          padrao: 1,
+          min: 0,
+          max: 3,
+          explica: 'Valor que já vem preenchido no "Gerar multa" (o administrador sempre confere e digita o valor). Ex.: 1 → aluguel de R$ 2.000,00, sugere R$ 2.000,00. 0 → vem em branco.',
+          consequencia: "Só muda a sugestão. O contrato prevê multa de até 3 aluguéis por infração; cobrar menos é sempre possível.",
+          lei: "Código Civil, arts. 408 a 413 (cláusula penal: não passa do valor da obrigação principal e o juiz pode reduzir a multa excessiva, art. 413)."
+        },
         {
           chave: "dias_sem_imovel",
           grupo: "rotina",
@@ -2476,6 +2513,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         quem: /^[^\s<>"']{3,200}$/,
         antes: /^\d{1,12}$/,
         // tela Acessos: e-mail da pessoa e "ver os mais antigos"
+        tema: /^[a-z_]{1,30}$/,
+        prazo: /^\d{1,2}$/,
+        anterior: /^\d+$/,
+        // nova notificação ao inquilino: modelo do texto, prazo em dias úteis e a que ela reitera
         gmail: /^[a-z-]{1,20}$/
         // Dados e backup: aviso da volta do Google ao conectar o Gmail (AVISOS_VOLTA_GMAIL de nuvem/worker.mjs)
       };
@@ -2594,6 +2635,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     }
     for (const a of (d2.acordos || []).filter((x) => x.contrato_id === c.id && x.termo_assinado)) {
       poe({ vaga: `acordo:${a.id}`, grupo: "contrato", rotulo: `Termo do acordo de ${dataBr(a.data)} assinado (${a.referente})`, data: a.data, escopo: "contrato", pasta: c.id, nome: a.termo_assinado });
+    }
+    for (const n of (d2.notificacoes || []).filter((x) => x.contrato_id === c.id && x.arquivo_assinado && x.situacao !== "Cancelada").sort((a, b) => String(a.data).localeCompare(String(b.data)) || a.id - b.id)) {
+      poe({ vaga: `notificacao:${n.id}`, grupo: "contrato", rotulo: `Notificação de ${dataBr(n.data)} assinada (${n.assunto})`, data: n.data, escopo: "contrato", pasta: c.id, nome: n.arquivo_assinado });
     }
     for (const x of (d2.cartas_reajuste || []).filter((y) => y.contrato_id === c.id).sort((a, b) => String(a.competencia).localeCompare(String(b.competencia)))) {
       const base = { vaga: `carta:${x.competencia}`, grupo: "contrato", rotulo: `Carta de reajuste de ${compBr(x.competencia)}${x.enviada_em ? ` (enviada em ${dataBr(x.enviada_em)})` : ""}`, data: x.enviada_em || null };
@@ -4300,6 +4344,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     LIMITE_DESCRICAO_BOLETO: () => LIMITE_DESCRICAO_BOLETO,
     LIMITE_LC224_TRIMESTRE: () => LIMITE_LC224_TRIMESTRE,
     LISTAS: () => LISTAS,
+    MEIOS_NOTIFICACAO: () => MEIOS_NOTIFICACAO,
     MESES_DEPOIS_DE_ALUGAR: () => MESES_DEPOIS_DE_ALUGAR,
     MESES_DOCUMENTOS_REPROVADA: () => MESES_DOCUMENTOS_REPROVADA,
     MESES_FECHAMENTO_ATRASADO: () => MESES_FECHAMENTO_ATRASADO,
@@ -4317,6 +4362,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     SITUACOES: () => SITUACOES,
     SITUACOES_BANCO: () => SITUACOES_BANCO,
     SITUACOES_FICHA: () => SITUACOES_FICHA,
+    SITUACOES_NOTIFICACAO: () => SITUACOES_NOTIFICACAO,
     TABELAS: () => TABELAS,
     TIPOS_ALERTA: () => TIPOS_ALERTA,
     TIPOS_ALERTA_DO_IMOVEL: () => TIPOS_ALERTA_DO_IMOVEL,
@@ -4380,6 +4426,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     bancoVazio: () => bancoVazio,
     baseDaFatura: () => baseDaFatura,
     basesIptu: () => basesIptu,
+    boletoDaMulta: () => boletoDaMulta,
     boletoDoMes: () => boletoDoMes,
     boletosCaucaoDa: () => boletosCaucaoDa,
     boletosDescontadosNaSaida: () => boletosDescontadosNaSaida,
@@ -4387,6 +4434,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     bonificacaoNaCompetencia: () => bonificacaoNaCompetencia,
     buscar: () => buscar,
     buscarGlobal: () => buscarGlobal,
+    cadeiaDaNotificacao: () => cadeiaDaNotificacao,
     cadeiaDeContratos: () => cadeiaDeContratos,
     calcularEncerramento: () => calcularEncerramento,
     calcularReajuste: () => calcularReajuste,
@@ -4396,6 +4444,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     campoPerdidoPendente: () => campoPerdidoPendente,
     camposDaGravacao: () => camposDaGravacao,
     cancelarFaturas: () => cancelarFaturas,
+    cancelarNotificacao: () => cancelarNotificacao,
     cancelarNumero: () => cancelarNumero,
     cancelarTrocaGarantia: () => cancelarTrocaGarantia,
     carteiraDaConta: () => carteiraDaConta,
@@ -4444,9 +4493,11 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     correcoesRecalculadas: () => correcoesRecalculadas,
     corrigirDataGarantiaPaga: () => corrigirDataGarantiaPaga,
     corrigirImovel: () => corrigirImovel,
+    criarNotificacao: () => criarNotificacao,
     dadosBoleto: () => dadosBoleto,
     dadosDaFicha: () => dadosDaFicha,
     dadosDaPessoa: () => dadosDaPessoa,
+    darBaixaNotificacao: () => darBaixaNotificacao,
     dataApagarDocumentosFicha: () => dataApagarDocumentosFicha,
     dataApagarSemImovel: () => dataApagarSemImovel,
     dataBaseCorrecao: () => dataBaseCorrecao,
@@ -4480,6 +4531,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     devolucoesGarantiaDo: () => devolucoesGarantiaDo,
     diaUtilAteh: () => diaUtilAteh2,
     diasBaixaDaConta: () => diasBaixaDaConta,
+    diasUteisAte: () => diasUteisAte,
     divergenciaBancaria: () => divergenciaBancaria,
     documentoEntrada: () => documentoEntrada,
     documentoFalta: () => documentoFalta,
@@ -4490,6 +4542,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     documentosPendentes: () => documentosPendentes,
     donoArquivoSeguro: () => donoArquivoSeguro,
     editarDepositoGarantia: () => editarDepositoGarantia,
+    editarNotificacao: () => editarNotificacao,
     ehBoletoAvulso: () => ehBoletoAvulso,
     ehComplementoCaucao: () => ehComplementoCaucao,
     ehParcelaAcordo: () => ehParcelaAcordo,
@@ -4503,6 +4556,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     enderecoCompleto: () => enderecoCompleto,
     enderecoDoPagador: () => enderecoDoPagador,
     entradasAirbnbSemDestino: () => entradasAirbnbSemDestino,
+    estadoNotificacao: () => estadoNotificacao,
     estiloAlerta: () => estiloAlerta,
     estornarPagamento: () => estornarPagamento,
     etapasAtrasadas: () => etapasAtrasadas,
@@ -4512,6 +4566,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     excluir: () => excluir,
     excluirContaBanco: () => excluirContaBanco,
     excluirContrato: () => excluirContrato,
+    excluirNotificacao: () => excluirNotificacao,
     excluirRenovacao: () => excluirRenovacao,
     extratoImportadoAte: () => extratoImportadoAte,
     faturamentoNf: () => faturamentoNf,
@@ -4547,6 +4602,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     geraNf: () => geraNf,
     gerarBoletosCaucao: () => gerarBoletosCaucao,
     gerarCobrancas: () => gerarCobrancas,
+    gerarMultaNotificacao: () => gerarMultaNotificacao,
     gerarNfAirbnb: () => gerarNfAirbnb,
     gravacaoDesfazivel: () => gravacaoDesfazivel,
     gravarLeitura: () => gravarLeitura,
@@ -4585,6 +4641,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     levarDiferencaAoProximo: () => levarDiferencaAoProximo,
     liberarBoletosDaSaida: () => liberarBoletosDaSaida,
     ligarArquivoSeguro: () => ligarArquivoSeguro,
+    limiteNotificacao: () => limiteNotificacao,
     lista: () => lista2,
     mapaIptuAvista: () => mapaIptuAvista,
     marcarAditivoPerdido: () => marcarAditivoPerdido,
@@ -4599,6 +4656,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     marcarGarantiaDevolvida: () => marcarGarantiaDevolvida,
     marcarGeradoNaRotina: () => marcarGeradoNaRotina,
     marcarIptuPago: () => marcarIptuPago,
+    marcarNotificacaoEnviada: () => marcarNotificacaoEnviada,
     marcarReservaAbatida: () => marcarReservaAbatida,
     marcarVistoriaSaida: () => marcarVistoriaSaida,
     mesBoletoDaParcela: () => mesBoletoDaParcela,
@@ -4616,13 +4674,16 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     movimentosGarantia: () => movimentosGarantia,
     mudarGarantiaNaTroca: () => mudarGarantiaNaTroca,
     mudarRegraSistema: () => mudarRegraSistema,
+    multaSugerida: () => multaSugerida,
     nfAirbnbDe: () => nfAirbnbDe,
     nomeBate: () => nomeBate,
     normalizar: () => normalizar,
     normalizarRespostaC6: () => normalizarRespostaC6,
     notificacaoDoContrato: () => notificacaoDoContrato,
+    notificacoesDo: () => notificacoesDo,
     notificacoesDoPagador: () => notificacoesDoPagador,
     numerarFaturas: () => numerarFaturas,
+    numeroDaNotificacao: () => numeroDaNotificacao,
     numeroFatura: () => numeroFatura,
     ordemGuardada: () => ordemGuardada,
     ordenarCaixas: () => ordenarCaixas,
@@ -4653,6 +4714,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     prazoDoContrato: () => prazoDoContrato,
     previaAcordo: () => previaAcordo,
     previaDoDesfazer: () => previaDoDesfazer,
+    previaMultaNotificacao: () => previaMultaNotificacao,
     previstoNoPagamento: () => previstoNoPagamento,
     proximoBoletoAberto: () => proximoBoletoAberto,
     quitadoNaSaida: () => quitadoNaSaida,
@@ -4704,6 +4766,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     resumoDaHeranca: () => resumoDaHeranca,
     resumoRotinaEntrada: () => resumoRotinaEntrada,
     resumoSolicitacoes: () => resumoSolicitacoes,
+    retirarMultaNotificacao: () => retirarMultaNotificacao,
     roteiroSaida: () => roteiroSaida,
     rotinaDeAbertura: () => rotinaDeAbertura,
     rotinaEntrada: () => rotinaEntrada,
@@ -4728,6 +4791,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     separacaoTotal: () => separacaoTotal,
     separarLeitura: () => separarLeitura,
     sincronizarGarantiaHerdeiro: () => sincronizarGarantiaHerdeiro,
+    sincronizarMultas: () => sincronizarMultas,
     situacaoAplicacao: () => situacaoAplicacao,
     situacaoBancaria: () => situacaoBancaria,
     situacaoCustos: () => situacaoCustos,
@@ -4743,6 +4807,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     textoGarantiaNaTroca: () => textoGarantiaNaTroca,
     textoLeitura: () => textoLeitura,
     textoLembrete: () => textoLembrete,
+    textoMultaNotificacao: () => textoMultaNotificacao,
     textoParte: () => textoParte,
     tirarArquivoSeguro: () => tirarArquivoSeguro,
     todosAlertas: () => todosAlertas,
@@ -5100,6 +5165,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (tabela === "contratos" && r && campo2 === "data_saida") return `A data de saída de ${r.inquilino_nome} não se desfaz pelo Histórico: use "Mudar a data" ou "Desfazer a saída" na página do inquilino${encerramentoDo(d2, r.id) ? " (desfaça antes o cálculo final)" : ""}.`;
     if (tabela === "contratos" && r && campo2 === "ativo" && encerramentoDo(d2, r.id)) return `A saída de ${r.inquilino_nome} já tem o cálculo final: desfaça o cálculo final e depois a saída, na página do inquilino.`;
     if (tabela === "vistorias" && r && campo2 === "reparos" && r.contrato_id && encerramentoDo(d2, r.contrato_id)) return "O cálculo final da saída já usa os valores destes reparos: desfaça antes o cálculo final, na página do inquilino.";
+    if (tabela === "notificacoes" && r && ["multa_valor", "multa_cobranca_id", "multa_data"].includes(campo2) && r.multa_valor > 0) return multaPresa(d2, r);
     const campos = CAMPOS_PAGAMENTO_BANCO[tabela];
     if (!campos || !r || !campos.includes(campo2)) return null;
     if (tabela === "iptus") {
@@ -6006,6 +6072,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         inserir(d2, "cobrancas", dados, usuario, `Boleto ${compBr(comp)} gerado para ${contrato.inquilino_nome}`);
         geradas += 1;
         aplicarDiferencasPendentes(d2, contrato.id, usuario);
+        sincronizarMultas(d2, contrato.id, usuario);
         realocarReserva(d2, contrato, usuario);
       }
     }
@@ -6631,6 +6698,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const cb = buscar(d2, "cobrancas", cobrancaId);
     if (cb.data_pagamento) throw new Error("Este boleto já foi pago. Desfaça o pagamento antes de ajustar.");
     if (emAcordo(cb)) throw new ErroUsuario(MOTIVO_EM_ACORDO(cb, "não pode ser ajustado"));
+    const multas = (cb.multas_notificacao || []).filter((e) => !String(motivo || "").includes(e.texto));
+    if (multas.length) throw new ErroUsuario(`Este boleto tem a ${multas.map((e) => e.texto.toLocaleLowerCase("pt-BR")).join(" e a ")}: para tirá-la, use "Retirar a multa" na notificação; para ajustar o resto, mantenha esse texto no motivo e o valor dela no total.`);
     const texto3 = valor ? `${valor < 0 ? "Ressarcimento" : "Cobrança adicional"} de ${reais(Math.abs(valor))} no boleto ${compBr(cb.competencia)}${motivo ? `: ${motivo}` : ""}` : `Ajuste do boleto ${compBr(cb.competencia)} retirado`;
     atualizar(d2, "cobrancas", cb.id, { outros: valor, outros_descricao: valor ? motivo : "" }, usuario, texto3);
     const contrato = buscar(d2, "contratos", cb.contrato_id);
@@ -7034,7 +7103,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return out;
   }
   function anexarComprovante(d2, tabela, id, campo2, arquivo, usuario) {
-    const ok = { contratos: ["comprovante_caucao", "comprovante_deposito", "comprovante_reserva", "termo_chaves_saida", "contra_vistoria"], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ["comprovante"]])), encerramentos: ["comprovante", "termo_assinado"], acordos: ["termo_assinado"] };
+    const ok = { contratos: ["comprovante_caucao", "comprovante_deposito", "comprovante_reserva", "termo_chaves_saida", "contra_vistoria"], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ["comprovante"]])), encerramentos: ["comprovante", "termo_assinado"], acordos: ["termo_assinado"], notificacoes: ["arquivo_assinado", "comprovante_baixa"] };
     if (!(ok[tabela] || []).includes(campo2)) throw new Error("Comprovante desconhecido.");
     if (!arquivo) throw new Error("Escolha o arquivo do comprovante.");
     const r = buscar(d2, tabela, id);
@@ -7105,7 +7174,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     sincronizarGarantiaHerdeiro(d2, c.id, usuario);
   }
   function removerAnexo(d2, tabela, id, campo2, usuario) {
-    const ok = { contratos: ["comprovante_reserva", "termo_chaves_saida", "contra_vistoria"], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ["comprovante"]])), encerramentos: ["comprovante", "termo_assinado"], acordos: ["termo_assinado"] };
+    const ok = { contratos: ["comprovante_reserva", "termo_chaves_saida", "contra_vistoria"], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ["comprovante"]])), encerramentos: ["comprovante", "termo_assinado"], acordos: ["termo_assinado"], notificacoes: ["arquivo_assinado", "comprovante_baixa"] };
     if (!(ok[tabela] || []).includes(campo2)) throw new Error("Este arquivo não pode ser apagado por aqui.");
     const r = buscar(d2, tabela, id);
     if (!r || !r[campo2]) throw new Error("Arquivo não encontrado.");
@@ -7207,7 +7276,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       alertaAditivoAguardando(d2, contrato),
       alertaCondominio(contrato, hoje3),
       alertaRessarcimentoEmAcordo(d2, contrato),
-      alertaTermoAcordo(d2, contrato)
+      alertaTermoAcordo(d2, contrato),
+      alertaNotificacoes(d2, contrato, hoje3)
     ].filter(Boolean);
   }
   function etapasDoAcordo(d2, a) {
@@ -8056,6 +8126,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     for (const t of TABELAS_COMPROVANTE) for (const x of d2[t] || []) usa("contrato", x.contrato_id, x.comprovante);
     for (const a of d2.aditivos) usa("aditivos", a.contrato_id, a.arquivo);
     for (const a of d2.acordos || []) usa("contrato", a.contrato_id, a.termo_assinado);
+    for (const n of d2.notificacoes || []) {
+      usa("contrato", n.contrato_id, n.arquivo_assinado);
+      usa("contrato", n.contrato_id, n.comprovante_baixa);
+    }
     for (const x of d2.cartas_reajuste || []) usa("aditivos", x.contrato_id, x.arquivo);
     for (const v of d2.vistorias) for (const nome of Object.values(v.fotos || {})) usa("contrato", v.contrato_id, nome);
     for (const s of d2.seguros) for (const nome of [s.arquivo_apolice, ...s.outros_arquivos || []]) usa("seguro", s.contrato_id, nome);
@@ -8103,6 +8177,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     for (const a of d2.aditivos) poe("aditivos", a.contrato_id, a.arquivo, `termo aditivo${a.data ? ` (${dataBr(a.data)})` : ""}`);
     for (const a of d2.acordos || []) poe("contrato", a.contrato_id, a.termo_assinado, `termo do acordo de ${dataBr(a.data)} assinado`);
+    for (const n of d2.notificacoes || []) {
+      poe("contrato", n.contrato_id, n.arquivo_assinado, `notificação de ${dataBr(n.data)} assinada (${n.assunto})`);
+      poe("contrato", n.contrato_id, n.comprovante_baixa, `comprovante da baixa da notificação de ${dataBr(n.data)}${n.resolvida_em ? ` (resolvida em ${dataBr(n.resolvida_em)})` : ""}`);
+    }
     for (const x of d2.cartas_reajuste || []) poe("aditivos", x.contrato_id, x.arquivo, `carta de reajuste de ${compBr(x.competencia)} (enviada em ${dataBr(x.enviada_em)})`);
     for (const v of d2.vistorias) for (const nome of Object.values(v.fotos || {})) poe("contrato", v.contrato_id, nome, `foto da vistoria de ${String(v.tipo || "").toLowerCase()} (${dataBr(v.data)})`);
     for (const f of d2.fichas || []) {
@@ -8456,7 +8534,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (cb.fci) extras.push(`FCI ${rs(cb.fci)}`);
     const iTarifa = extras.length;
     if (cb.taxa_boleto) extras.push(`TARIFA COBRANÇA ${rs(cb.taxa_boleto)}`);
-    if (cb.outros) extras.push(`${(cb.outros_descricao || (cb.outros < 0 ? "RESSARCIMENTO" : "COBRANÇA ADICIONAL")).toLocaleUpperCase("pt-BR")} ${cb.outros < 0 ? `-${rs(-cb.outros)}` : rs(cb.outros)}`);
+    if (cb.outros) extras.push(`${(cb.outros_descricao || (cb.outros < 0 ? "RESSARCIMENTO" : "COBRANÇA ADICIONAL")).replace(/Multa por descumprimento da notificação de /g, "Multa notif. ").toLocaleUpperCase("pt-BR")} ${cb.outros < 0 ? `-${rs(-cb.outros)}` : rs(cb.outros)}`);
     if (cb.reserva_utilizada) extras.push(`RESERVA -${rs(cb.reserva_utilizada)}`);
     if (cb.ressarcimento) extras.push(`RESSARCIMENTO CONDOMÍNIO -${rs(cb.ressarcimento)}`);
     if (extras.length && !ehBoletoAvulso(cb)) linhas2.push(extras.join(" "));
@@ -8962,6 +9040,299 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       r[s] = (r[s] || 0) + 1;
     }
     return r;
+  }
+  function diasUteisAte(hoje3, limite) {
+    if (!limite || hoje3 > limite) return -1;
+    let n = 0;
+    for (let x = somarDias(hoje3, 1); x <= limite; x = somarDias(x, 1)) if (diaUtil(x)) n += 1;
+    return n;
+  }
+  function cadeiaDaNotificacao(d2, n) {
+    const out = [];
+    const vistos = /* @__PURE__ */ new Set();
+    for (let x = n; x && !vistos.has(x.id); x = x.anterior_id ? buscar(d2, "notificacoes", x.anterior_id) : null) {
+      vistos.add(x.id);
+      out.unshift(x);
+    }
+    return out;
+  }
+  function estadoNotificacao(d2, n, hoje3 = hojeIso()) {
+    const situacao2 = n.situacao || "Rascunho";
+    const aberta = NOTIFICACAO_ABERTA.includes(situacao2);
+    const restam = diasUteisAte(hoje3, n.data_limite);
+    const vencida = aberta && restam < 0;
+    const proxima = n.reiterada_por ? buscar(d2, "notificacoes", n.reiterada_por) : null;
+    return {
+      situacao: situacao2,
+      aberta,
+      vencida,
+      restam,
+      avisar: aberta && situacao2 !== "Reiterada" && !n.multa_valor && restam >= 0 && restam <= regra("notificacao_aviso_dias"),
+      podeMulta: vencida && !(n.multa_valor > 0),
+      podeReiterar: aberta && !(proxima && proxima.situacao !== "Cancelada"),
+      podeBaixa: aberta
+    };
+  }
+  function conferirNotificacao(d2, dados) {
+    const c = buscar(d2, "contratos", dados.contrato_id);
+    if (!c) throw new ErroUsuario("Escolha o inquilino.");
+    if (!dataValida(dados.data)) throw new ErroUsuario("Informe a data da notificação.");
+    const prazo = Number(dados.prazo_dias);
+    if (!Number.isInteger(prazo) || prazo < 1 || prazo > 90) throw new ErroUsuario("O prazo vai de 1 a 90 dias úteis.");
+    const assunto = String(dados.assunto || "").trim();
+    const texto3 = String(dados.texto || "").trim();
+    if (!assunto) throw new ErroUsuario("Informe o assunto da notificação.");
+    if (!texto3) throw new ErroUsuario("Escreva o texto da notificação.");
+    const pendente = /\[preencher: [^\]]*\]/.exec(texto3);
+    if (pendente) throw new ErroUsuario(`Complete o texto antes de salvar: ainda há "${pendente[0]}".`);
+    const limite = limiteNotificacao(dados.data, prazo);
+    if (!texto3.includes(dataBr(limite))) throw new ErroUsuario(`O texto não traz a data limite certa (${dataBr(limite)}, ${prazo} dias úteis de ${dataBr(dados.data)}): clique em "Montar o texto de novo" ou corrija a data no texto.`);
+    return { c, campos: {
+      contrato_id: c.id,
+      imovel_id: c.imovel_id || null,
+      data: dados.data,
+      modelo: String(dados.modelo || ""),
+      assunto,
+      texto: texto3,
+      clausula: String(dados.clausula || "").trim(),
+      prazo_dias: prazo,
+      data_limite: limite
+    } };
+  }
+  function criarNotificacao(d2, dados, usuario) {
+    const { c, campos } = conferirNotificacao(d2, dados);
+    const ant = dados.anterior_id ? buscar(d2, "notificacoes", dados.anterior_id) : null;
+    if (dados.anterior_id && (!ant || ant.contrato_id !== c.id)) throw new ErroUsuario("A notificação anterior não é deste inquilino.");
+    if (ant && !estadoNotificacao(d2, ant).podeReiterar) throw new ErroUsuario(`A notificação de ${dataBr(ant.data)} já tem outra depois dela, ou está resolvida ou cancelada.`);
+    const n = inserir(
+      d2,
+      "notificacoes",
+      {
+        ...campos,
+        anterior_id: ant ? ant.id : null,
+        reiterada_por: null,
+        situacao: "Rascunho",
+        enviada_em: null,
+        enviada_por: null,
+        arquivo_assinado: null,
+        resolvida_em: null,
+        comprovante_baixa: null,
+        observacao_baixa: "",
+        multa_valor: null,
+        multa_data: null,
+        multa_cobranca_id: null,
+        cancelada_em: null,
+        motivo_cancelamento: ""
+      },
+      usuario,
+      `${c.inquilino_nome}: ${ant ? `${cadeiaDaNotificacao(d2, ant).length + 1}ª notificação` : "notificação"} de ${dataBr(campos.data)} (${campos.assunto}), prazo até ${dataBr(campos.data_limite)}`
+    );
+    if (ant) atualizar(d2, "notificacoes", ant.id, { reiterada_por: n.id }, usuario, `${c.inquilino_nome}: notificação de ${dataBr(ant.data)} reiterada pela de ${dataBr(n.data)}`);
+    return n;
+  }
+  function editarNotificacao(d2, id, dados, usuario) {
+    const n = buscar(d2, "notificacoes", id);
+    if (!n) throw new ErroUsuario("Notificação não encontrada.");
+    if (n.situacao !== "Rascunho") throw new ErroUsuario("Notificação já enviada: o texto não muda mais. Se precisar, cancele e faça outra.");
+    const { campos } = conferirNotificacao(d2, { ...dados, contrato_id: n.contrato_id });
+    const mudouTexto = campos.texto !== n.texto || campos.data !== n.data || campos.data_limite !== n.data_limite;
+    atualizar(d2, "notificacoes", n.id, { ...campos, ...mudouTexto && n.arquivo_assinado ? { arquivo_assinado: null } : {} }, usuario, `Notificação de ${dataBr(campos.data)}: rascunho alterado`);
+    return n;
+  }
+  function marcarNotificacaoEnviada(d2, id, { data: data2, meio }, usuario) {
+    const n = buscar(d2, "notificacoes", id);
+    if (!n) throw new ErroUsuario("Notificação não encontrada.");
+    if (n.situacao !== "Rascunho") throw new ErroUsuario(`Esta notificação já foi marcada como enviada${n.enviada_em ? ` em ${dataBr(n.enviada_em)}` : ""}.`);
+    if (!dataValida(data2)) throw new ErroUsuario("Informe a data do envio.");
+    if (data2 < n.data) throw new ErroUsuario(`O envio não pode ser antes da data da notificação (${dataBr(n.data)}).`);
+    if (!MEIOS_NOTIFICACAO.includes(meio)) throw new ErroUsuario("Escolha por onde a notificação foi enviada.");
+    atualizar(
+      d2,
+      "notificacoes",
+      n.id,
+      { situacao: "Aguardando resposta", enviada_em: data2, enviada_por: meio },
+      usuario,
+      `Notificação de ${dataBr(n.data)} enviada em ${dataBr(data2)} (${meio}): prazo até ${dataBr(n.data_limite)}`
+    );
+    const ant = n.anterior_id ? buscar(d2, "notificacoes", n.anterior_id) : null;
+    if (ant && ant.situacao === "Aguardando resposta") atualizar(d2, "notificacoes", ant.id, { situacao: "Reiterada" }, usuario, `Notificação de ${dataBr(ant.data)} reiterada (nova enviada em ${dataBr(data2)})`);
+    return n;
+  }
+  function darBaixaNotificacao(d2, id, { data: data2, comprovante: comprovante2 = null, observacao = "" }, usuario) {
+    const n = buscar(d2, "notificacoes", id);
+    if (!n) throw new ErroUsuario("Notificação não encontrada.");
+    if (!estadoNotificacao(d2, n).podeBaixa) throw new ErroUsuario(n.situacao === "Rascunho" ? "Marque antes o envio da notificação." : `Esta notificação está "${n.situacao}".`);
+    if (!dataValida(data2)) throw new ErroUsuario("Informe a data em que foi resolvido.");
+    if (data2 < n.data) throw new ErroUsuario(`A data da baixa não pode ser antes da notificação (${dataBr(n.data)}).`);
+    const obs = String(observacao || "").trim();
+    atualizar(
+      d2,
+      "notificacoes",
+      n.id,
+      { situacao: "Resolvida", resolvida_em: data2, comprovante_baixa: comprovante2 || null, observacao_baixa: obs },
+      usuario,
+      `Notificação de ${dataBr(n.data)} resolvida em ${dataBr(data2)}${obs ? `: ${obs}` : ""}`
+    );
+    for (const a of cadeiaDaNotificacao(d2, n).slice(0, -1).filter((x) => x.situacao === "Reiterada")) {
+      atualizar(d2, "notificacoes", a.id, { situacao: "Resolvida", resolvida_em: data2 }, usuario, `Notificação de ${dataBr(a.data)} resolvida (baixa na de ${dataBr(n.data)})`);
+    }
+    return n;
+  }
+  function cancelarNotificacao(d2, id, motivo, usuario, hoje3 = hojeIso()) {
+    const n = buscar(d2, "notificacoes", id);
+    if (!n) throw new ErroUsuario("Notificação não encontrada.");
+    if (["Resolvida", "Cancelada"].includes(n.situacao)) throw new ErroUsuario(`Esta notificação já está "${n.situacao}".`);
+    if (n.multa_valor > 0) throw new ErroUsuario("Esta notificação tem multa gerada: retire a multa antes de cancelar.");
+    const proxima = n.reiterada_por && buscar(d2, "notificacoes", n.reiterada_por);
+    if (proxima && proxima.situacao !== "Cancelada") throw new ErroUsuario(`Já existe a notificação de ${dataBr(proxima.data)} depois desta: cancele antes aquela.`);
+    atualizar(
+      d2,
+      "notificacoes",
+      n.id,
+      { situacao: "Cancelada", cancelada_em: hoje3, motivo_cancelamento: String(motivo || "").trim() },
+      usuario,
+      `Notificação de ${dataBr(n.data)} cancelada${motivo ? `: ${String(motivo).trim()}` : ""}`
+    );
+    const ant = n.anterior_id ? buscar(d2, "notificacoes", n.anterior_id) : null;
+    if (ant && ant.reiterada_por === n.id) {
+      atualizar(
+        d2,
+        "notificacoes",
+        ant.id,
+        { reiterada_por: null, ...ant.situacao === "Reiterada" ? { situacao: "Aguardando resposta" } : {} },
+        usuario,
+        `Notificação de ${dataBr(ant.data)} volta a esperar a resposta (a de ${dataBr(n.data)} foi cancelada)`
+      );
+    }
+    return n;
+  }
+  function excluirNotificacao(d2, id, usuario) {
+    const n = buscar(d2, "notificacoes", id);
+    if (!n) throw new ErroUsuario("Notificação não encontrada.");
+    if (n.situacao !== "Rascunho") throw new ErroUsuario('Só o rascunho (ainda não enviado) pode ser excluído. A enviada fica no histórico do inquilino: use "Cancelar".');
+    const ant = n.anterior_id ? buscar(d2, "notificacoes", n.anterior_id) : null;
+    if (ant && ant.reiterada_por === n.id) atualizar(d2, "notificacoes", ant.id, { reiterada_por: null }, usuario, `Notificação de ${dataBr(ant.data)}: rascunho da nova notificação excluído`);
+    excluir(d2, "notificacoes", n.id, usuario, `Rascunho da notificação de ${dataBr(n.data)} excluído (${n.assunto})`);
+  }
+  function boletoDaMulta(d2, contratoId, data2) {
+    return d2.cobrancas.filter((x) => x.contrato_id === contratoId && !ehBoletoAvulso(x) && aCobrar(x) && !emitidoNoBanco(x) && !vencido(x.vencimento, data2)).sort((a, b) => a.competencia.localeCompare(b.competencia) || a.id - b.id)[0] || null;
+  }
+  function sincronizarMultas(d2, contratoId, usuario) {
+    let mudou = 0;
+    const notifs = (d2.notificacoes || []).filter((n) => n.contrato_id === contratoId);
+    for (const cb of d2.cobrancas.filter((x) => x.contrato_id === contratoId && (x.multas_notificacao || []).length && !x.data_pagamento && !emitidoNoBanco(x))) {
+      const ficam = [];
+      let tira = 0;
+      const textos = [];
+      for (const e of cb.multas_notificacao) {
+        const n = buscar(d2, "notificacoes", e.notificacao_id);
+        if (n && n.multa_valor === e.valor && n.multa_cobranca_id === cb.id) ficam.push(e);
+        else {
+          tira += e.valor;
+          textos.push(e.texto);
+        }
+      }
+      if (!tira) continue;
+      const descricao = String(cb.outros_descricao || "").split("; ").filter((x) => !textos.includes(x)).join("; ");
+      atualizar(
+        d2,
+        "cobrancas",
+        cb.id,
+        { outros: (cb.outros || 0) - tira, outros_descricao: descricao, multas_notificacao: ficam },
+        usuario,
+        `Boleto ${compBr(cb.competencia)}: sai a multa de ${reais(tira)} (${textos.join("; ")})`
+      );
+      mudou += 1;
+    }
+    for (const n of notifs.filter((x) => !(x.multa_valor > 0) && x.multa_cobranca_id)) atualizar(d2, "notificacoes", n.id, { multa_cobranca_id: null }, usuario, `Notificação de ${dataBr(n.data)}: sem multa no boleto`);
+    for (const n of notifs.filter((x) => x.multa_valor > 0)) {
+      const atual = n.multa_cobranca_id ? buscar(d2, "cobrancas", n.multa_cobranca_id) : null;
+      if (atual && (atual.multas_notificacao || []).some((e) => e.notificacao_id === n.id)) continue;
+      const destino = boletoDaMulta(d2, contratoId, n.multa_data || hojeIso());
+      if (!destino) {
+        if (n.multa_cobranca_id) atualizar(d2, "notificacoes", n.id, { multa_cobranca_id: null }, usuario, `Multa da notificação de ${dataBr(n.data)}: espera o próximo boleto`);
+        continue;
+      }
+      const texto3 = textoMultaNotificacao(n);
+      atualizar(
+        d2,
+        "cobrancas",
+        destino.id,
+        {
+          outros: (destino.outros || 0) + n.multa_valor,
+          outros_descricao: [destino.outros_descricao, texto3].filter(Boolean).join("; "),
+          multas_notificacao: [...destino.multas_notificacao || [], { notificacao_id: n.id, valor: n.multa_valor, texto: texto3 }]
+        },
+        usuario,
+        `Boleto ${compBr(destino.competencia)}: + ${reais(n.multa_valor)} (${texto3})`
+      );
+      atualizar(d2, "notificacoes", n.id, { multa_cobranca_id: destino.id }, usuario, `Multa da notificação de ${dataBr(n.data)} lançada no boleto ${compBr(destino.competencia)}`);
+      mudou += 1;
+    }
+    const c = mudou && buscar(d2, "contratos", contratoId);
+    if (c) realocarReserva(d2, c, usuario);
+    return mudou;
+  }
+  function previaMultaNotificacao(d2, id, hoje3 = hojeIso()) {
+    const n = buscar(d2, "notificacoes", id);
+    const c = n && buscar(d2, "contratos", n.contrato_id);
+    if (!n || !c) throw new ErroUsuario("Notificação não encontrada.");
+    if (!estadoNotificacao(d2, n, hoje3).podeMulta) throw new ErroUsuario(n.multa_valor > 0 ? "A multa desta notificação já foi gerada." : `A multa só pode ser gerada depois do prazo (${dataBr(n.data_limite)}), com a notificação enviada e sem baixa.`);
+    return { notificacao: n, contrato: c, sugerido: multaSugerida(d2, c, hoje3), boleto: boletoDaMulta(d2, c.id, hoje3) };
+  }
+  function gerarMultaNotificacao(d2, id, valor, usuario, hoje3 = hojeIso()) {
+    const { notificacao: n, contrato: c } = previaMultaNotificacao(d2, id, hoje3);
+    if (!Number.isInteger(valor) || valor <= 0) throw new ErroUsuario("Digite o valor da multa.");
+    atualizar(
+      d2,
+      "notificacoes",
+      n.id,
+      { situacao: "Multa gerada", multa_valor: valor, multa_data: hoje3, multa_cobranca_id: null },
+      usuario,
+      `${c.inquilino_nome}: multa de ${reais(valor)} pela notificação de ${dataBr(n.data)} (prazo até ${dataBr(n.data_limite)})`
+    );
+    sincronizarMultas(d2, c.id, usuario);
+    return { notificacao: n, boleto: n.multa_cobranca_id ? buscar(d2, "cobrancas", n.multa_cobranca_id) : null };
+  }
+  function multaPresa(d2, n) {
+    const cb = n.multa_cobranca_id && buscar(d2, "cobrancas", n.multa_cobranca_id);
+    if (cb && cb.data_pagamento) return `A multa já foi paga no boleto de ${compBr(cb.competencia)}: desfaça antes aquele pagamento.`;
+    if (cb && emitidoNoBanco(cb)) return `O boleto de ${compBr(cb.competencia)}, com a multa, já está no banco: cancele lá antes de tirar a multa.`;
+    return null;
+  }
+  function retirarMultaNotificacao(d2, id, usuario) {
+    const n = buscar(d2, "notificacoes", id);
+    if (!n || !(n.multa_valor > 0)) throw new ErroUsuario("Esta notificação não tem multa.");
+    const presa = multaPresa(d2, n);
+    if (presa) throw new ErroUsuario(presa);
+    const proxima = n.reiterada_por && buscar(d2, "notificacoes", n.reiterada_por);
+    const antes = n.situacao !== "Multa gerada" ? n.situacao : proxima && proxima.enviada_em && proxima.situacao !== "Cancelada" ? "Reiterada" : "Aguardando resposta";
+    atualizar(d2, "notificacoes", n.id, { situacao: antes, multa_valor: null, multa_data: null, multa_cobranca_id: null }, usuario, `Multa de ${reais(n.multa_valor)} da notificação de ${dataBr(n.data)} retirada`);
+    sincronizarMultas(d2, n.contrato_id, usuario);
+  }
+  function alertaNotificacoes(d2, c, hoje3) {
+    const l = (d2.notificacoes || []).filter((n) => n.contrato_id === c.id);
+    if (!l.length) return null;
+    const est = l.map((n) => [n, estadoNotificacao(d2, n, hoje3)]);
+    const vencidas = est.filter(([n, e]) => e.podeMulta && n.situacao !== "Reiterada");
+    const vencendo = est.filter(([, e]) => e.avisar);
+    const rascunhos = est.filter(([n]) => n.situacao === "Rascunho");
+    const semBoleto = l.filter((n) => n.multa_valor > 0 && !n.multa_cobranca_id);
+    const texto3 = [
+      ...vencidas.map(([n]) => `o prazo da notificação de ${dataBr(n.data)} (${n.assunto}) terminou em ${dataBr(n.data_limite)}: dê baixa se foi resolvido, mande outra notificação ou gere a multa`),
+      ...vencendo.map(([n, e]) => `o prazo da notificação de ${dataBr(n.data)} (${n.assunto}) termina ${e.restam === 0 ? "hoje" : `em ${dataBr(n.data_limite)} (faltam ${e.restam} dia(s) útil(eis))`}: mande o lembrete ao inquilino`),
+      ...rascunhos.map(([n]) => `a notificação de ${dataBr(n.data)} (${n.assunto}) ainda não foi enviada: imprima, assine, anexe a assinada e envie`),
+      ...semBoleto.map((n) => `a multa de ${reais(n.multa_valor)} da notificação de ${dataBr(n.data)} entra no próximo boleto do aluguel, quando ele for gerado`)
+    ];
+    if (!texto3.length) return null;
+    const alvo = (vencidas[0] || vencendo[0] || rascunhos[0] || [semBoleto[0]])[0];
+    return {
+      nivel: vencidas.length ? "perigo" : vencendo.length ? "aviso" : "info",
+      tipo: "Notificação ao inquilino",
+      ancora: "notificacoes",
+      link: alvo ? `#/notificacao/${alvo.id}` : null,
+      texto: `${texto3.join("; ")}.`.replace(/^./, (x) => x.toLocaleUpperCase("pt-BR"))
+    };
   }
   function airbnbDoMes(d2, comp) {
     const ganhos = (d2.ganhos_airbnb || []).filter((g) => g.competencia === comp);
@@ -10569,7 +10940,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return out;
   }
-  var TABELAS, SITUACOES, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, IMAGEM_FORA_DO_HISTORICO, semPeso, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, camposDaGravacao, CODIGO_DE, nomeCurto, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehBoletoAvulso, emAcordo, MOTIVO_EM_ACORDO, quitadoNaSaida, aCobrar, boletosCaucaoDa, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, IPTU_DIVISAO_NOVA_DESDE, dividirIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, totais, previstoNoPagamento, textoDiferenca, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, cobrancasEmAberto, nomeDebitoSaida, proximoBoletoAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, DIAS_SEM_IMOVEL, MODOS_FICHA, MESES_DOCUMENTOS_REPROVADA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, DOCUMENTOS_RENDA, DICA_DOCUMENTOS, PJ, casadoOuUniao, fichaComConjuge, PARTES_DOCUMENTOS_PF, separacaoTotal, documentosDoFiador, VAGAS_FIADOR_FICHA, fiadoresDaFicha, fichaAberta, fichaAbertaDoImovel, SITUACOES_FICHA, fichaSemContrato, devolucaoPendente, dataApagarDocumentosFicha, FICHA_FICA, fichaFica, fichasComDadosVencidos, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraDo, encerramentoDo, garantiaADevolverNaSaida, COMPROVANTE_SAIDA_DESDE, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, devolucoesDaTrocaDeTitular, devolucaoDaTrocaDeGarantia, garantiaDevolvidaNaTroca, devolucoesDeTrocaPendentes, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, rs, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contaBanco, limparId, contaPreMarcada, EMISSAO_EM_ANDAMENTO_MS, corta, encargosParaComparar, descontoLiberado, diasBaixaDaConta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, vencidosSemEmissao, boletosDoMesSemEmissao, solicitacoesDo, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, MESES_DEPOIS_DE_ALUGAR, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, DIA_GERAR_BOLETOS, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DESTINOS_MOVIMENTACAO, DIAS_VERMELHO, contratoEncerrado, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, pagosAquiAbertosNoBanco, textoDeBusca, assinaturaLembrete, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, alvoDoAlerta, mesmoAlvo, desligamentosOrfaos, TIPOS_ALERTA_DO_IMOVEL, PRAZO_CONTESTAR_SAIDA, prazoContestarSaida, mudarRegraSistema, voltarRegrasAoPadrao;
+  var TABELAS, SITUACOES, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, IMAGEM_FORA_DO_HISTORICO, semPeso, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, camposDaGravacao, CODIGO_DE, nomeCurto, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehBoletoAvulso, emAcordo, MOTIVO_EM_ACORDO, quitadoNaSaida, aCobrar, boletosCaucaoDa, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, IPTU_DIVISAO_NOVA_DESDE, dividirIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, totais, previstoNoPagamento, textoDiferenca, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, cobrancasEmAberto, nomeDebitoSaida, proximoBoletoAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, DIAS_SEM_IMOVEL, MODOS_FICHA, MESES_DOCUMENTOS_REPROVADA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, DOCUMENTOS_RENDA, DICA_DOCUMENTOS, PJ, casadoOuUniao, fichaComConjuge, PARTES_DOCUMENTOS_PF, separacaoTotal, documentosDoFiador, VAGAS_FIADOR_FICHA, fiadoresDaFicha, fichaAberta, fichaAbertaDoImovel, SITUACOES_FICHA, fichaSemContrato, devolucaoPendente, dataApagarDocumentosFicha, FICHA_FICA, fichaFica, fichasComDadosVencidos, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraDo, encerramentoDo, garantiaADevolverNaSaida, COMPROVANTE_SAIDA_DESDE, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, devolucoesDaTrocaDeTitular, devolucaoDaTrocaDeGarantia, garantiaDevolvidaNaTroca, devolucoesDeTrocaPendentes, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, rs, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contaBanco, limparId, contaPreMarcada, EMISSAO_EM_ANDAMENTO_MS, corta, encargosParaComparar, descontoLiberado, diasBaixaDaConta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, vencidosSemEmissao, boletosDoMesSemEmissao, solicitacoesDo, SITUACOES_NOTIFICACAO, MEIOS_NOTIFICACAO, NOTIFICACAO_ABERTA, limiteNotificacao, notificacoesDo, numeroDaNotificacao, textoMultaNotificacao, multaSugerida, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, MESES_DEPOIS_DE_ALUGAR, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, DIA_GERAR_BOLETOS, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DESTINOS_MOVIMENTACAO, DIAS_VERMELHO, contratoEncerrado, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, pagosAquiAbertosNoBanco, textoDeBusca, assinaturaLembrete, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, alvoDoAlerta, mesmoAlvo, desligamentosOrfaos, TIPOS_ALERTA_DO_IMOVEL, PRAZO_CONTESTAR_SAIDA, prazoContestarSaida, mudarRegraSistema, voltarRegrasAoPadrao;
   var init_regras = __esm({
     "docs/js/regras.js"() {
       init_alertas();
@@ -10606,6 +10977,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         avulsas: "NF avulsa",
         reformas: "Reforma / investimento",
         solicitacoes: "Solicitação do inquilino",
+        notificacoes: "Notificação ao inquilino",
         fichas: "Ficha em análise",
         indices_acumulados: "Índice acumulado em 12 meses",
         cartas_reajuste: "Carta de reajuste",
@@ -11022,6 +11394,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         "Aditivo da troca de titular",
         "Aditivo aguardando assinatura",
         "Termo do acordo",
+        "Notificação ao inquilino",
         "Banco",
         "Pasta física",
         "A verificar"
@@ -11040,7 +11413,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         "Seguro obrigatório": "antecedencia_seguro",
         "IPTU do proprietário": "antecedencia_iptu",
         "Reserva do imóvel": "antecedencia_reserva",
-        "Fiador": "antecedencia_fiador"
+        "Fiador": "antecedencia_fiador",
+        "Notificação ao inquilino": "notificacao_aviso_dias"
       };
       estiloAlerta = (d2, tipo) => ({ ...PADRAO_ALERTA, ...ESTILOS_ALERTA_PADRAO[tipo], ...(d2 && d2.estilos_alertas || {})[tipo] });
       ordemGuardada = (d2, pagina, grupo2) => ((d2 && d2.ordem_caixas || {})[pagina] || {})[grupo2] || [];
@@ -11075,6 +11449,14 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       vencidosSemEmissao = (d2, comp, hoje3 = hojeIso()) => boletosDoMesSemEmissao(d2, comp).filter((cb) => cb.vencimento < hoje3);
       boletosDoMesSemEmissao = (d2, comp) => d2.cobrancas.filter((cb) => cb.competencia === comp && aCobrar(cb) && totais(cb).a_pagar_sem_desconto > 0 && !emitidoNoBanco(cb)).sort((a, b) => a.vencimento.localeCompare(b.vencimento) || a.id - b.id);
       solicitacoesDo = (d2, contratoId) => d2.solicitacoes.filter((x) => x.contrato_id === contratoId).sort(maisRecentePrimeiro);
+      SITUACOES_NOTIFICACAO = ["Rascunho", "Aguardando resposta", "Reiterada", "Multa gerada", "Resolvida", "Cancelada"];
+      MEIOS_NOTIFICACAO = ["E-mail", "Entregue em mãos (com assinatura)", "Correios com aviso de recebimento (AR)", "WhatsApp"];
+      NOTIFICACAO_ABERTA = ["Aguardando resposta", "Reiterada", "Multa gerada"];
+      limiteNotificacao = (data2, dias) => somarDiasUteis(data2, Number(dias) || 0);
+      notificacoesDo = (d2, contratoId) => (d2.notificacoes || []).filter((x) => x.contrato_id === contratoId).sort(maisRecentePrimeiro);
+      numeroDaNotificacao = (d2, n) => cadeiaDaNotificacao(d2, n).length;
+      textoMultaNotificacao = (n) => `Multa por descumprimento da notificação de ${dataBr(n.data)}`;
+      multaSugerida = (d2, c, hoje3 = hojeIso()) => Math.round(aluguelAtual(d2, c, hoje3) * (Number(regra("notificacao_multa_alugueis")) || 0));
       reformasDo = (d2, imovelId) => d2.reformas.filter((r) => r.imovel_id === imovelId).sort(maisRecentePrimeiro);
       ganhosAirbnbDo = (d2, imovelId) => (d2.ganhos_airbnb || []).filter((g) => g.imovel_id === imovelId).sort((a, b) => String(b.data_recebimento).localeCompare(String(a.data_recebimento)) || b.id - a.id);
       nfAirbnbDe = (d2, comp) => d2.avulsas.find((a) => a.airbnb_competencia === comp) || null;
@@ -16167,6 +16549,26 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
             'Quando o inquilino for sair, use "Saída do inquilino": o sistema faz o cálculo final.'
           ],
           exemplo: "Aluguel de R$ 2.000,00 com vencimento no dia 10 e bonificação de 10%: pago até 10/12/2026, o boleto de novembro sai por R$ 1.800,00; pago depois, é R$ 2.000,00 mais multa e juros."
+        },
+        notificacoes: {
+          titulo: "Notificações ao inquilino",
+          serve: "Lista as notificações que a administração mandou aos inquilinos para resolver algo num prazo (o contrário das solicitações, que são pedidos do inquilino). As em aberto vêm primeiro; o prazo vencido aparece em vermelho.",
+          primeiro: [
+            'Clique em "Nova notificação", escolha o inquilino e o assunto e clique em "Montar o texto".',
+            'Troque no texto o que estiver em "[preencher: …]" pelo caso real e salve.',
+            "Abra a notificação: imprima o PDF, assine no gov.br, anexe a assinada e envie."
+          ],
+          exemplo: "Ar-condicionado instalado errado: notificação de 17/11/2026 com 10 dias úteis vence em 02/12/2026 (20/11 é feriado). O lembrete aparece no Painel em 27/11; em 03/12, se não resolveu, dá para mandar a 2ª notificação ou gerar a multa no próximo boleto."
+        },
+        notificacao: {
+          titulo: "Notificação ao inquilino",
+          serve: "Acompanha uma notificação do começo ao fim: o PDF para assinar, a assinada, o envio, o prazo em dias úteis, a baixa quando o inquilino resolve e, se não resolver, outra notificação do mesmo assunto ou a multa.",
+          primeiro: [
+            'Clique em "PDF para assinar", baixe e assine no gov.br (assinador.iti.br).',
+            'Anexe a notificação assinada e envie por e-mail (o "Enviar agora" já marca a data do envio) ou entregue à mão e marque como enviada.',
+            "Quando o inquilino resolver, dê a baixa com a data e uma foto."
+          ],
+          exemplo: 'Prazo até 02/12/2026 e nada resolvido: em 03/12 clique em "Gerar multa", digite R$ 2.000,00 (o sistema sugere 1 aluguel) e confira o boleto que recebe. O boleto de 11/2026, que vence em 10/12, passa de R$ 2.000,00 para R$ 4.000,00, e a multa fica fora da NF.'
         },
         ficha: {
           titulo: "Ficha em análise",
@@ -21803,6 +22205,12 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       if (!a) return { ok: false, motivo: "Acordo não encontrado." };
       return a.desfeito_em ? { ok: false, motivo: "Este acordo foi desfeito." } : { ok: true };
     }
+    if (tipo === "notificacao") {
+      if (!c) return { ok: false, motivo: "A notificação é do contrato." };
+      const n = notificacaoDe(d2, c, alvo);
+      if (!n) return { ok: false, motivo: "Notificação não encontrada." };
+      return n.situacao === "Cancelada" ? { ok: false, motivo: "Esta notificação foi cancelada." } : { ok: true };
+    }
     if (tipo === "quitacao") {
       if (!c) return { ok: false, motivo: "O termo de quitação é do contrato." };
       const e = encerramentoDo(d2, c.id);
@@ -21883,6 +22291,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       };
     }
     if (tipo === "acordo") return termoDoAcordo(d2, c, acordoDe(d2, c, alvo), base, { empresa, e, quem, endereco: endereco2, assinaEmpresa, assinaPessoa, nomeArq });
+    if (tipo === "notificacao") return cartaDaNotificacao(d2, c, notificacaoDe(d2, c, alvo), base, { empresa, e, quem, endereco: endereco2, assinaEmpresa, assinaPessoa, nomeArq });
     if (tipo === "devolucao_chaves") return termoDevolucaoChaves(d2, c, base, { empresa, e, quem, endereco: endereco2, assinaEmpresa, assinaPessoa, nomeArq });
     const enc = encerramentoDo(d2, c.id);
     const vist = resultadoVistoriaSaida(d2, c);
@@ -21916,6 +22325,31 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       ],
       assinaturas: [assinaEmpresa, assinaPessoa("LOCATÁRIO"), ...c.solidario_nome ? [{ nome: c.solidario_nome, linha: "LOCATÁRIO SOLIDÁRIO" }] : []],
       arquivo: nomeArq("Termo quitacao", enc.garantia_devolvida_em || enc.data_saida)
+    };
+  }
+  function cartaDaNotificacao(d2, c, n, base, x) {
+    const numero2 = numeroDaNotificacao(d2, n);
+    const ant = n.anterior_id ? buscar(d2, "notificacoes", n.anterior_id) : null;
+    const solidario = c.solidario_nome ? pessoa(c.solidario_nome, c.solidario_cpf ? `CPF/CNPJ ${c.solidario_cpf}` : "") : "";
+    return {
+      ...base,
+      data: n.data,
+      titulo: numero2 > 1 ? `${numero2}ª NOTIFICAÇÃO EXTRAJUDICIAL` : "NOTIFICAÇÃO EXTRAJUDICIAL",
+      paragrafos: [
+        `NOTIFICANTE (LOCADORA): ${x.empresa}${x.e.cnpj ? `, CNPJ ${x.e.cnpj}` : ""}. NOTIFICADO (LOCATÁRIO): ${x.quem}${solidario ? `. LOCATÁRIO SOLIDÁRIO: ${solidario}` : ""}. IMÓVEL: ${x.endereco}.`,
+        `ASSUNTO: ${n.assunto}.`,
+        ...String(n.texto || "").split(/\n\s*\n/).map((p2) => p2.replace(/\s*\n\s*/g, " ").trim()).filter(Boolean)
+      ],
+      tabela: [
+        ["Data desta notificação", dataBr(n.data)],
+        ["Prazo para cumprir", `${n.prazo_dias} ${n.prazo_dias === 1 ? "dia útil" : "dias úteis"}`],
+        ["Data limite", dataBr(n.data_limite)],
+        ...ant ? [["Notificação anterior", `${dataBr(ant.data)} (prazo até ${dataBr(ant.data_limite)})`]] : [],
+        ...n.clausula ? [["Contrato", n.clausula]] : []
+      ],
+      depois: ["Recebi esta notificação em ______/______/__________ (preencher só se entregue em mãos)."],
+      assinaturas: [x.assinaEmpresa, x.assinaPessoa("NOTIFICADO (LOCATÁRIO), ciente")],
+      arquivo: x.nomeArq(numero2 > 1 ? `Notificacao ${numero2}` : "Notificacao", n.data)
     };
   }
   function termoDoAcordo(d2, c, a, base, x) {
@@ -22112,7 +22546,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       arquivo: `${nomeArq("Ficha cadastral do fiador", base.data)}${x.nome ? ` - ${x.nome}` : ""}`
     };
   }
-  var PJ3, TIPOS_RECIBO, documentoDe, pessoa, acordoDe, EM_BRANCO, ou, dataOu, reaisOu, mesOu, casadoOuUniao2, qualificacaoDe, listaDocumentos, declaracao, COMO_ASSINAR;
+  var PJ3, TIPOS_RECIBO, documentoDe, pessoa, notificacaoDe, acordoDe, EM_BRANCO, ou, dataOu, reaisOu, mesOu, casadoOuUniao2, qualificacaoDe, listaDocumentos, declaracao, COMO_ASSINAR;
   var init_recibos = __esm({
     "docs/js/recibos.js"() {
       init_calculos();
@@ -22127,11 +22561,16 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
         devolucao_chaves: "Termo de devolução das chaves",
         quitacao: "Termo de quitação",
         acordo: "Termo de confissão de dívida e acordo",
+        notificacao: "Notificação ao inquilino",
         ficha: "Ficha cadastral",
         ficha_fiador: "Ficha cadastral do fiador"
       };
       documentoDe = (p2, campo2 = "inquilino_cpf", tipo = p2.inquilino_tipo) => p2[campo2] ? `${tipo === PJ3 ? "CNPJ" : "CPF"} ${p2[campo2]}` : "";
       pessoa = (nome, doc2) => [nome, doc2].filter(Boolean).join(", ");
+      notificacaoDe = (d2, c, alvo) => {
+        const n = alvo.notificacao || buscar(d2, "notificacoes", Number(alvo.id));
+        return n && n.contrato_id === c.id ? n : null;
+      };
       acordoDe = (d2, c, alvo) => {
         const a = buscar(d2, "acordos", Number(alvo.acordo));
         return a && a.contrato_id === c.id ? a : null;
@@ -22830,8 +23269,184 @@ LINHA DIGITÁVEL DO BOLETO
 {linha_digitavel}
 [fim]
 Se o pagamento já foi feito, por favor desconsidere esta mensagem e, se possível, responda com o comprovante.`
+        },
+        // Notificação ao inquilino (pedido do dono em 2026-11-17): ``notificacao``: o e-mail é de uma notificação (alvo { contrato,
+        // notificacao }); vai anexada a notificação assinada (ou, sem ela, o PDF para assinar). O contrato aceita notificação por e-mail.
+        {
+          chave: "notificacao_envio",
+          nome: "Notificação ao inquilino",
+          etapa: "Notificação ao inquilino",
+          notificacao: true,
+          assunto: "[se reiteracao]{notificacao_numero} [fim]Notificação: {notificacao_assunto} ({imovel})",
+          anexos: "",
+          prontos: ["notificacao:pdf"],
+          texto: `Olá, {nome},
+
+Segue anexa a [se reiteracao]{notificacao_numero} [fim]notificação de {notificacao_data} sobre {notificacao_assunto_minusculo}, referente ao imóvel da {imovel}.
+
+O prazo para resolver é de {prazo_notificacao}, ou seja, até {data_limite}. Quando terminar, responda este e-mail com uma foto ou um documento que mostre que foi resolvido, para darmos a baixa.
+
+Se tiver alguma dúvida ou precisar combinar algo, é só responder esta mensagem.`
+        },
+        {
+          chave: "notificacao_lembrete",
+          nome: "Lembrete do prazo da notificação",
+          etapa: "Notificação ao inquilino",
+          notificacao: true,
+          assunto: "Lembrete: prazo da notificação de {notificacao_data} termina em {data_limite} ({imovel})",
+          anexos: "",
+          prontos: ["notificacao:pdf"],
+          texto: `Olá, {nome}, tudo bem?
+
+Lembramos que o prazo da notificação de {notificacao_data}, sobre {notificacao_assunto_minusculo}, termina [se vence_hoje]hoje, {data_limite}[senão]em {data_limite}[fim]. Segue a notificação anexa de novo.
+
+Se já resolveu, por favor responda este e-mail com uma foto ou um documento que mostre, para darmos a baixa. Não cumprido o prazo, vale o que está na notificação, inclusive a multa prevista no contrato.`
         }
       ];
+    }
+  });
+
+  // docs/js/notificacoes.js
+  function blocosDoContrato(d2, c) {
+    try {
+      const modelos = modelosDe(d2);
+      const nao = c.finalidade === "Não residencial";
+      const m = modelos.find((x) => (nao ? /não residencial/i : /^residencial/i).test(String(x.nome || ""))) || modelos[0];
+      return m ? montarContrato(m.texto, dadosDoContrato(d2, c, { data: c.vigencia_inicio || c.data_entrada || hojeIso() })) : [];
+    } catch {
+      return [];
+    }
+  }
+  function clausulaCitada(d2, c, chave, blocos = blocosDoContrato(d2, c)) {
+    const cl = CLAUSULAS[chave];
+    if (!cl) return "";
+    for (const b of blocos) {
+      const t = (b.runs || []).map((r) => r.t).join("");
+      if (!cl.busca.test(t)) continue;
+      const n = cl.item ? /^\s*(\d+)\./.exec(t) : /^CLÁUSULA (\d+)ª/.exec(t);
+      if (n) return `${cl.item ? "item" : "cláusula"} ${n[1]}${cl.item ? "" : "ª"} do contrato`;
+    }
+    return cl.sem;
+  }
+  function camposDaNotificacao(d2, c, n, modelo) {
+    const blocos = blocosDoContrato(d2, c);
+    const limite = limiteNotificacao(n.data, n.prazo_dias);
+    const ant = n.anterior_id ? buscar(d2, "notificacoes", n.anterior_id) : null;
+    const campos = {
+      data: dataBr(n.data),
+      prazo: prazoPorExtenso(n.prazo_dias),
+      data_limite: dataBr(limite),
+      clausula: modelo && modelo.clausula ? clausulaCitada(d2, c, modelo.clausula, blocos) : "",
+      clausula_multa: clausulaCitada(d2, c, "multa", blocos),
+      anterior_data: ant ? dataBr(ant.data) : "",
+      anterior_envio: ant && ant.enviada_em ? dataBr(ant.enviada_em) : "",
+      anterior_limite: ant ? dataBr(ant.data_limite) : "",
+      anterior_assunto: ant ? String(ant.assunto || "").toLocaleLowerCase("pt-BR") : ""
+    };
+    return { campos, condicoes: { anterior_envio: !!campos.anterior_envio } };
+  }
+  function textoDoModelo(d2, c, n, chave) {
+    const modelo = n.anterior_id ? MODELO_REITERACAO : modeloNotificacao(chave) || MODELOS_NOTIFICACAO.at(-1);
+    const dados = camposDaNotificacao(d2, c, n, modelo);
+    const ant = n.anterior_id ? buscar(d2, "notificacoes", n.anterior_id) : null;
+    const texto3 = preencherEmail(modelo.texto, dados).replace(/\[preencher: (anterior_[a-z]+)\]/g, "");
+    return {
+      assunto: ant ? ant.assunto : modelo.nome.replace(/ \(ex\.: [^)]*\)$/, "").replace(/ \(texto livre\)$/, ""),
+      texto: texto3,
+      clausula: [dados.campos.clausula, dados.campos.clausula_multa].filter(Boolean).filter((x, i, l) => l.indexOf(x) === i).join("; "),
+      data_limite: limiteNotificacao(n.data, n.prazo_dias)
+    };
+  }
+  var CLAUSULAS, PRAZO_E_MULTA, MODELOS_NOTIFICACAO, MODELO_REITERACAO, modeloNotificacao, prazoPorExtenso;
+  var init_notificacoes = __esm({
+    "docs/js/notificacoes.js"() {
+      init_calculos();
+      init_contratos();
+      init_modelos_email();
+      init_regras();
+      CLAUSULAS = {
+        obra: { busca: /não poderá modificar a estrutura/i, sem: "a cláusula do contrato que proíbe modificar o imóvel sem autorização por escrito" },
+        conservacao: { busca: /obriga-se por todas as outras/i, sem: "a cláusula do contrato sobre a conservação do imóvel" },
+        finalidade: { busca: /DO OBJETO E SUA FINALIDADE/i, sem: "o item do contrato sobre o objeto e a finalidade da locação", item: true },
+        sublocacao: { busca: /Não é permitida a transferência deste contrato/i, sem: "a cláusula do contrato sobre cessão e sublocação" },
+        multa: { busca: /Fica estipulada a multa no valor/i, sem: "a cláusula de multa do contrato" }
+      };
+      PRAZO_E_MULTA = `Fica o LOCATÁRIO notificado a, no prazo de {prazo} contados desta notificação, ou seja, até {data_limite}, {providencia}, e a avisar a LOCADORA quando terminar, para a conferência.
+
+Não cumprida a providência no prazo, fica o LOCATÁRIO sujeito à multa prevista no contrato ({clausula_multa}), sem prejuízo da reparação dos danos e das demais medidas previstas no contrato e na lei, inclusive a rescisão da locação por infração contratual (Lei 8.245/91, artigo 9º, inciso II).`;
+      MODELOS_NOTIFICACAO = [
+        {
+          chave: "obra",
+          nome: "Instalação irregular ou obra sem autorização (ex.: ar-condicionado)",
+          clausula: "obra",
+          texto: `Pela presente, a LOCADORA NOTIFICA o LOCATÁRIO de que foi constatada no imóvel acima a instalação de aparelho de ar-condicionado em desacordo com as regras do imóvel e sem a prévia autorização por escrito da LOCADORA ([preencher: descreva o que foi feito, ex.: furo na fachada e tubulação aparente]).
+
+O contrato de locação proíbe modificar o imóvel ou fazer obras e transformações sem a prévia autorização por escrito da LOCADORA ({clausula}), e a Lei do Inquilinato obriga o locatário a não modificar a forma interna ou externa do imóvel sem esse consentimento (Lei 8.245/91, artigo 23, inciso VI).
+
+${PRAZO_E_MULTA.replace("{providencia}", "regularizar a instalação, por sua conta, desfazendo o que foi feito de forma irregular e devolvendo o imóvel ao estado anterior, ou apresentar à LOCADORA o pedido de autorização com a forma correta de instalar")}`
+        },
+        {
+          chave: "barulho",
+          nome: "Barulho ou perturbação do sossego",
+          clausula: "multa",
+          texto: `Pela presente, a LOCADORA NOTIFICA o LOCATÁRIO de que recebeu reclamações de barulho e perturbação do sossego vindas do imóvel acima ([preencher: datas, horários e o que foi relatado]).
+
+O locatário deve usar o imóvel como combinado, respeitar os vizinhos e cumprir a convenção e o regulamento do condomínio, quando houver (Lei 8.245/91, artigo 23, incisos II e X; Código Civil, artigo 1.277).
+
+${PRAZO_E_MULTA.replace("{providencia}", "cessar imediatamente a perturbação e respeitar os horários de silêncio")}`
+        },
+        {
+          chave: "condominio",
+          nome: "Animal ou regras do condomínio",
+          clausula: "multa",
+          texto: `Pela presente, a LOCADORA NOTIFICA o LOCATÁRIO de que foi informada do descumprimento das regras do condomínio no imóvel acima ([preencher: o que aconteceu, ex.: animal solto nas áreas comuns, sujeira deixada pelo animal]).
+
+O locatário deve cumprir integralmente a convenção e o regulamento interno do condomínio (Lei 8.245/91, artigo 23, inciso X), e responde pelas multas que o condomínio aplicar por sua causa.
+
+${PRAZO_E_MULTA.replace("{providencia}", "corrigir a situação e passar a cumprir as regras do condomínio")}`
+        },
+        {
+          chave: "conservacao",
+          nome: "Sujeira ou falta de conservação",
+          clausula: "conservacao",
+          texto: `Pela presente, a LOCADORA NOTIFICA o LOCATÁRIO de que foi constatada a falta de conservação e limpeza do imóvel acima ([preencher: o que foi visto, ex.: acúmulo de lixo no quintal, calhas entupidas]).
+
+O contrato obriga o LOCATÁRIO a manter o imóvel em boas condições de higiene, limpeza e conservação ({clausula}), e a lei manda tratá-lo com o mesmo cuidado como se fosse seu e reparar os danos que causar (Lei 8.245/91, artigo 23, incisos II e V).
+
+${PRAZO_E_MULTA.replace("{providencia}", "fazer a limpeza e os reparos necessários, por sua conta")}`
+        },
+        {
+          chave: "uso",
+          nome: "Uso do imóvel diferente do combinado",
+          clausula: "finalidade",
+          texto: `Pela presente, a LOCADORA NOTIFICA o LOCATÁRIO de que foi constatado o uso do imóvel acima de forma diferente da combinada no contrato ([preencher: o que foi visto, ex.: comércio funcionando em imóvel residencial, mais moradores que o combinado]).
+
+O imóvel foi alugado só para a finalidade escrita no contrato ({clausula}), e a lei obriga o locatário a usá-lo para o uso convencionado (Lei 8.245/91, artigo 23, inciso II). Cessão, sublocação ou empréstimo dependem de consentimento prévio e por escrito da LOCADORA (Lei 8.245/91, artigo 13).
+
+${PRAZO_E_MULTA.replace("{providencia}", "voltar a usar o imóvel somente como combinado no contrato")}`
+        },
+        {
+          chave: "generica",
+          nome: "Outro assunto (texto livre)",
+          clausula: "multa",
+          texto: `Pela presente, a LOCADORA NOTIFICA o LOCATÁRIO de que [preencher: descreva o que aconteceu].
+
+Isso descumpre [preencher: a cláusula do contrato ou a obrigação descumprida], e o locatário deve cumprir todas as obrigações do contrato e da lei (Lei 8.245/91, artigo 23).
+
+${PRAZO_E_MULTA.replace("{providencia}", "[preencher: o que o inquilino deve fazer]")}`
+        }
+      ];
+      MODELO_REITERACAO = {
+        chave: "reiteracao",
+        nome: "Nova notificação sobre o mesmo assunto",
+        texto: `Pela presente, a LOCADORA REITERA a notificação de {anterior_data}[se anterior_envio] (recebida pelo LOCATÁRIO em {anterior_envio})[fim], sobre {anterior_assunto}, cujo prazo terminou em {anterior_limite} sem que a providência pedida fosse cumprida.
+
+Fica o LOCATÁRIO novamente notificado a, no prazo de {prazo} contados desta notificação, ou seja, até {data_limite}, cumprir integralmente o que foi pedido naquela notificação, e a avisar a LOCADORA quando terminar, para a conferência.
+
+O descumprimento do prazo anterior já sujeita o LOCATÁRIO à multa prevista no contrato ({clausula_multa}). Não cumprida a providência também neste novo prazo, a multa será cobrada no boleto do aluguel, sem prejuízo da reparação dos danos e das demais medidas previstas no contrato e na lei, inclusive a rescisão da locação por infração contratual (Lei 8.245/91, artigo 9º, inciso II).`
+      };
+      modeloNotificacao = (chave) => chave === MODELO_REITERACAO.chave ? MODELO_REITERACAO : MODELOS_NOTIFICACAO.find((m) => m.chave === chave) || null;
+      prazoPorExtenso = (dias) => `${dias} (${numeroPorExtenso(dias)}) ${dias === 1 ? "dia útil" : "dias úteis"}`;
     }
   });
 
@@ -23039,6 +23654,19 @@ ${DICA_DOCUMENTOS}`].join("\n");
       });
       condicoes.novo_bonificacao = (a.percentual || 0) > 0;
     }
+    const n = alvo.notificacao || null;
+    if (n) {
+      const numero2 = numeroDaNotificacao(d2, n);
+      Object.assign(campos, {
+        notificacao_data: dataBr(n.data),
+        notificacao_assunto: n.assunto || "",
+        notificacao_assunto_minusculo: String(n.assunto || "").toLocaleLowerCase("pt-BR"),
+        notificacao_numero: `${numero2}ª`,
+        prazo_notificacao: prazoPorExtenso(n.prazo_dias),
+        data_limite: dataBr(n.data_limite)
+      });
+      Object.assign(condicoes, { reiteracao: numero2 > 1, vence_hoje: n.data_limite === hoje3 });
+    }
     const remetente = {
       assinatura: dadoDaEmpresa(d2, doImovel, "assinatura_email") || (locadorasDoContrato(d2, doImovel)[0] || {}).nome || "",
       email: dadoDaEmpresa(d2, doImovel, "email_contato")
@@ -23069,6 +23697,16 @@ ${DICA_DOCUMENTOS}`].join("\n");
           const doc2 = documentoEntrada(d2, c, campo2);
           const nome = (DOCUMENTOS_ENTRADA.find(([k]) => k === campo2) || [])[1] || "documento";
           if (doc2 && doc2.arquivo) arquivo("assinados", doc2.contrato.id, doc2.arquivo, `${nome.toLowerCase()} assinado por todos`);
+        }
+        continue;
+      }
+      if (tipo === "notificacao") {
+        const n = alvo.notificacao || null;
+        if (!n) continue;
+        if (n.arquivo_assinado) arquivo("contrato", n.contrato_id, n.arquivo_assinado, `notificação de ${dataBr(n.data)} assinada`);
+        else {
+          const disp = reciboDisponivel(d2, "notificacao", alvo);
+          out.push({ tipo: "recibo", recibo: "notificacao", rotulo: `${TIPOS_RECIBO.notificacao} de ${dataBr(n.data)} (sem a assinatura: anexe a assinada na notificação)`, ok: disp.ok, motivo: disp.motivo || "", alvo });
         }
         continue;
       }
@@ -23125,6 +23763,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
       init_ficha_online();
       init_contratos();
       init_modelos_email();
+      init_notificacoes();
       init_recibos();
       init_regras();
       PJ5 = "Pessoa jurídica (empresa)";
@@ -23253,7 +23892,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
 
   // docs/js/telas/emails.js
   function ultimoEnvio(chave, alvo) {
-    return (d().envios_email || []).filter((x) => x.chave === chave && (alvo.contrato && x.contrato_id === Number(alvo.contrato) || alvo.ficha && x.ficha_id === Number(alvo.ficha)) && (!alvo.aditivo || x.aditivo_id === Number(alvo.aditivo))).sort((a, b) => String(b.data).localeCompare(String(a.data)))[0] || null;
+    return (d().envios_email || []).filter((x) => x.chave === chave && (alvo.contrato && x.contrato_id === Number(alvo.contrato) || alvo.ficha && x.ficha_id === Number(alvo.ficha)) && (!alvo.aditivo || x.aditivo_id === Number(alvo.aditivo)) && (!alvo.notificacao || x.notificacao_id === Number(alvo.notificacao))).sort((a, b) => String(b.data).localeCompare(String(a.data)))[0] || null;
   }
   function botaoEmail(chave, alvo, texto3 = "✉ E-mail") {
     if (!opera() || !MODELOS_EMAIL.some((m) => m.chave === chave)) return "";
@@ -23294,6 +23933,10 @@ ${DICA_DOCUMENTOS}`].join("\n");
     if (alvo.aditivo) {
       objeto.aditivo = buscar2("aditivos", alvo.aditivo);
       if (!objeto.aditivo) throw new ErroUsuario("Este termo aditivo não existe mais (pode ter sido excluído). Atualize a página.");
+    }
+    if (alvo.notificacao) {
+      objeto.notificacao = buscar2("notificacoes", alvo.notificacao);
+      if (!objeto.notificacao) throw new ErroUsuario("Esta notificação não existe mais (pode ter sido excluída). Atualize a página.");
     }
     const inicio = dadosDoEmail(d(), objeto);
     const ligado2 = await emailLigado();
@@ -23481,9 +24124,22 @@ ${e.texto}`) ? `Assunto e texto copiados: cole no e-mail.${pendente() ? ` ${pend
       init_documentos();
       LIMITE_ENDERECO = 7e3;
       registrar2 = (chave, alvo, para, assunto, como, id = "") => alterar((db) => {
-        const dados = { data: hojeIso(), chave, contrato_id: alvo.contrato ? Number(alvo.contrato) : null, ficha_id: alvo.ficha ? Number(alvo.ficha) : null, aditivo_id: alvo.aditivo ? Number(alvo.aditivo) : null, para, assunto, como, gmail_id: id || null };
+        const dados = {
+          data: hojeIso(),
+          chave,
+          contrato_id: alvo.contrato ? Number(alvo.contrato) : null,
+          ficha_id: alvo.ficha ? Number(alvo.ficha) : null,
+          aditivo_id: alvo.aditivo ? Number(alvo.aditivo) : null,
+          ...alvo.notificacao ? { notificacao_id: Number(alvo.notificacao) } : {},
+          para,
+          assunto,
+          como,
+          gmail_id: id || null
+        };
+        const n = como === "enviado" && chave === "notificacao_envio" && alvo.notificacao ? buscar(db, "notificacoes", alvo.notificacao) : null;
+        if (n && n.situacao === "Rascunho") marcarNotificacaoEnviada(db, n.id, { data: dados.data, meio: "E-mail" }, login());
         if (como !== "enviado") {
-          const ja = (db.envios_email || []).find((x) => x.como === como && x.data === dados.data && x.chave === chave && x.contrato_id === dados.contrato_id && x.ficha_id === dados.ficha_id && x.aditivo_id === dados.aditivo_id);
+          const ja = (db.envios_email || []).find((x) => x.como === como && x.data === dados.data && x.chave === chave && x.contrato_id === dados.contrato_id && x.ficha_id === dados.ficha_id && x.aditivo_id === dados.aditivo_id && (x.notificacao_id || null) === (dados.notificacao_id || null));
           if (ja) return ja;
           return inserir(db, "envios_email", dados, login(), null, { historico: false });
         }
@@ -23525,9 +24181,9 @@ ${e.texto}`) ? `Assunto e texto copiados: cole no e-mail.${pendente() ? ` ${pend
             aviso("O navegador não deixou copiar: o endereço ficou selecionado, use Ctrl+C.", "info");
           }
         },
-        async abrirEmail({ chave, contrato, ficha, aditivo }) {
+        async abrirEmail({ chave, contrato, ficha, aditivo, notificacao }) {
           if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode enviar e-mails. Peça ao administrador, se precisar.");
-          await janelaEmail(chave, contrato ? { contrato: Number(contrato), ...aditivo ? { aditivo: Number(aditivo) } : {} } : { ficha: Number(ficha) });
+          await janelaEmail(chave, contrato ? { contrato: Number(contrato), ...aditivo ? { aditivo: Number(aditivo) } : {}, ...notificacao ? { notificacao: Number(notificacao) } : {} } : { ficha: Number(ficha) });
         },
         async restaurarModeloEmail({ chave }) {
           const m = (d().modelos_email || []).find((x) => x.chave === chave);
@@ -24490,7 +25146,7 @@ ${m.texto}
       return f ? { ficha: f, ...q.fiador ? { fiador: Number(q.fiador) } : {} } : null;
     }
     const c = buscar2("contratos", q.contrato);
-    return c ? { contrato: c, ...q.id ? { acordo: Number(q.id) } : {} } : null;
+    return c ? { contrato: c, ...q.id ? { acordo: Number(q.id), id: Number(q.id) } : {} } : null;
   }
   function reciboHtml(r) {
     const e = r.emitente;
@@ -25959,6 +26615,265 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     }
   });
 
+  // docs/js/telas/notificacoes.js
+  function etiquetaNotificacao(n, hoje3 = hojeIso()) {
+    const e = estadoNotificacao(d(), n, hoje3);
+    const prazo = e.podeMulta ? ` ${etiqueta(`prazo vencido em ${dataBr(n.data_limite)}`, "perigo")}` : e.aberta && e.situacao !== "Reiterada" && !n.multa_valor ? ` ${etiqueta(e.restam === 0 ? "vence hoje" : `faltam ${e.restam} dia(s) útil(eis)`, e.avisar ? "aviso" : "neutra")}` : "";
+    return `${etiqueta(e.situacao, COR[e.situacao] || "neutra")}${prazo}`;
+  }
+  function ordemNotificacoes(lista3, hoje3) {
+    const peso = (n) => {
+      const e = estadoNotificacao(d(), n, hoje3);
+      return e.podeMulta && e.situacao !== "Reiterada" ? 0 : e.aberta && e.situacao !== "Reiterada" ? 1 : n.situacao === "Rascunho" ? 2 : 3;
+    };
+    return [...lista3].sort((a, b) => peso(a) - peso(b) || (peso(a) < 2 ? String(a.data_limite).localeCompare(String(b.data_limite)) : String(b.data).localeCompare(String(a.data))) || b.id - a.id);
+  }
+  function caixaNotificacoes(c) {
+    const hoje3 = hojeIso();
+    const lista3 = ordemNotificacoes(notificacoesDo(d(), c.id), hoje3);
+    return `<div class="cartao" id="notificacoes"><div class="cabecalho"><h2>Notificações ao inquilino</h2>${opera() ? link(`#/notificacao-nova?contrato=${c.id}`, "Nova notificação") : ""}</div>
+    <p class="suave">Quando o inquilino precisa resolver algo num prazo (ex.: ar-condicionado instalado errado): a notificação com o texto pronto, o PDF para assinar, o envio, o prazo em dias úteis, a baixa e, se não resolver, outra notificação ou a multa no próximo boleto.</p>
+    <div class="rolagem"><table><tr><th>Data</th><th>Assunto</th><th>Prazo até</th><th>Situação</th><th></th></tr>
+    ${lista3.map((n) => `<tr><td class="nw">${dataBr(n.data)}</td><td>${numeroDaNotificacao(d(), n) > 1 ? `<b>${numeroDaNotificacao(d(), n)}ª</b> ` : ""}${esc(n.assunto)}</td>
+      <td class="nw">${dataBr(n.data_limite)}</td><td>${etiquetaNotificacao(n, hoje3)}${n.multa_valor > 0 ? `<br><span class="suave">multa de ${reais(n.multa_valor)}</span>` : ""}</td>
+      <td class="n nw">${link(`#/notificacao/${n.id}`, "Abrir")}</td></tr>`).join("") || '<tr><td colspan="5" class="suave">Nenhuma notificação.</td></tr>'}</table></div></div>`;
+  }
+  function telaNotificacoes(q = {}) {
+    const hoje3 = hojeIso();
+    const todas = d().notificacoes || [];
+    const abertas = q.filtro !== "todas";
+    const lista3 = ordemNotificacoes(todas.filter((n) => !abertas || ["Rascunho", "Aguardando resposta", "Multa gerada"].includes(n.situacao)), hoje3);
+    const vencidas = todas.filter((n) => {
+      const e = estadoNotificacao(d(), n, hoje3);
+      return e.podeMulta && e.situacao !== "Reiterada";
+    }).length;
+    return `<div class="cabecalho"><h1>Notificações ao inquilino</h1>${opera() ? link("#/notificacao-nova", "Nova notificação", "botao") : ""}</div>
+    <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap">${link("#/notificacoes", `Em aberto (${todas.filter((n) => ["Rascunho", "Aguardando resposta", "Multa gerada"].includes(n.situacao)).length})`, `botao ${abertas ? "" : "secundario "}pequeno`)}
+      ${link("#/notificacoes?filtro=todas", `Todas (${todas.length})`, `botao ${abertas ? "secundario " : ""}pequeno`)}
+      ${vencidas ? etiqueta(`${vencidas} com prazo vencido`, "perigo") : ""}</div>
+    <div class="cartao"><div class="rolagem"><table><tr><th>Inquilino</th><th>Data</th><th>Assunto</th><th>Prazo até</th><th>Situação</th><th></th></tr>
+    ${lista3.map((n) => {
+      const c = buscar2("contratos", n.contrato_id);
+      const i = c && buscar2("imoveis", c.imovel_id);
+      return `<tr><td>${c ? `<a href="#/contrato/${c.id}?ir=notificacoes"><b>${esc(c.inquilino_nome)}</b></a>` : "-"}${i ? `<br><span class="suave">${esc(i.nome)}</span>` : ""}</td>
+      <td class="nw">${dataBr(n.data)}</td><td>${numeroDaNotificacao(d(), n) > 1 ? `<b>${numeroDaNotificacao(d(), n)}ª</b> ` : ""}${esc(n.assunto)}</td><td class="nw">${dataBr(n.data_limite)}</td>
+      <td>${etiquetaNotificacao(n, hoje3)}</td><td class="n nw">${link(`#/notificacao/${n.id}`, "Abrir")}</td></tr>`;
+    }).join("") || `<tr><td colspan="6" class="suave">${abertas ? "Nenhuma notificação em aberto." : "Nenhuma notificação."}</td></tr>`}</table></div></div>`;
+  }
+  function feriadosNoPrazo(inicio, limite) {
+    const out = [];
+    for (let x = somarDias(inicio, 1); x <= limite; x = somarDias(x, 1)) {
+      const dia = (/* @__PURE__ */ new Date(`${x}T12:00:00Z`)).getUTCDay();
+      if (dia !== 0 && dia !== 6 && !diaUtil(x)) out.push(dataBr(x));
+    }
+    return out;
+  }
+  function telaNovaNotificacao(q = {}) {
+    if (!opera()) return `<h1>Nova notificação</h1><div class="alerta aviso">${SO_CONSULTA}</div>`;
+    const edicao = q.id ? buscar2("notificacoes", q.id) : null;
+    if (q.id && (!edicao || edicao.situacao !== "Rascunho")) return naoEncontrado("Rascunho de notificação não encontrado", "#/notificacoes", "Ver as notificações");
+    const ant = q.anterior ? buscar2("notificacoes", q.anterior) : edicao && edicao.anterior_id ? buscar2("notificacoes", edicao.anterior_id) : null;
+    if (q.anterior && !ant) return naoEncontrado("Notificação anterior não encontrada", "#/notificacoes", "Ver as notificações");
+    const contratoId = Number(edicao && edicao.contrato_id || ant && ant.contrato_id || q.contrato) || null;
+    const c = contratoId ? buscar2("contratos", contratoId) : null;
+    const remontar = !edicao || !!(q.tema || q.data || q.prazo);
+    const dados = {
+      data: dataValida(q.data) || (edicao ? edicao.data : hojeIso()),
+      prazo_dias: Math.min(90, Math.max(1, Number(q.prazo) || (edicao ? edicao.prazo_dias : regra("notificacao_prazo_dias")))),
+      anterior_id: ant ? ant.id : null
+    };
+    const tema = ant ? MODELO_REITERACAO.chave : modeloNotificacao(q.tema) ? q.tema : edicao && modeloNotificacao(edicao.modelo) ? edicao.modelo : MODELOS_NOTIFICACAO[0].chave;
+    const pronto = c ? remontar ? textoDoModelo(d(), c, dados, tema) : { assunto: edicao.assunto, texto: edicao.texto, clausula: edicao.clausula } : null;
+    const limite = limiteNotificacao(dados.data, dados.prazo_dias);
+    const feriados2 = feriadosNoPrazo(dados.data, limite);
+    const titulo2 = ant ? `${numeroDaNotificacao(d(), ant) + 1}ª notificação sobre o mesmo assunto` : edicao ? "Rascunho da notificação" : "Nova notificação ao inquilino";
+    const volta = edicao ? `#/notificacao/${edicao.id}` : ant ? `#/notificacao/${ant.id}` : c ? `#/contrato/${c.id}?ir=notificacoes` : "#/notificacoes";
+    const opcoesInquilino = inquilinosParaNotificar(contratoId).map((x) => `<option value="${x.id}" ${x.id === contratoId ? "selected" : ""}>${esc(x.inquilino_nome)} · ${esc((buscar2("imoveis", x.imovel_id) || {}).nome || "sem imóvel")}</option>`).join("");
+    return `<p class="suave"><a href="${volta}">← Voltar</a></p><h1>${esc(titulo2)}</h1>
+    ${ant ? `<div class="alerta info">Reitera a notificação de <b>${dataBr(ant.data)}</b> (${esc(ant.assunto)}), com prazo até ${dataBr(ant.data_limite)}. Ao marcar o envio desta, a anterior fica "Reiterada"; a multa pode ser gerada em qualquer uma já vencida.</div>` : ""}
+    <form class="cartao formulario" data-form="ir" data-ir="notificacao-nova">
+      <h2>1. Inquilino, assunto e prazo</h2>
+      ${edicao ? `<input type="hidden" name="id" value="${edicao.id}">` : ""}${ant && !edicao ? `<input type="hidden" name="anterior" value="${ant.id}">` : ""}
+      <div class="grade">
+        ${edicao || ant ? `<div><label>Inquilino</label><p><b>${esc(c ? c.inquilino_nome : "-")}</b></p></div>` : `<div><label for="nt_contrato">Inquilino</label><select id="nt_contrato" name="contrato"><option value="">Escolha…</option>${opcoesInquilino}</select></div>`}
+        ${ant ? "" : `<div><label for="nt_tema">Assunto (modelo do texto)</label><select id="nt_tema" name="tema">${MODELOS_NOTIFICACAO.map((m) => `<option value="${m.chave}" ${m.chave === tema ? "selected" : ""}>${esc(m.nome)}</option>`).join("")}</select></div>`}
+        <div><label for="nt_data">Data da notificação</label><input id="nt_data" type="date" name="data" value="${dados.data}"></div>
+        <div><label for="nt_prazo">Prazo (dias úteis)</label><input id="nt_prazo" type="number" name="prazo" min="1" max="90" value="${dados.prazo_dias}" style="width:100px"></div>
+      </div>
+      <p class="suave">Data limite: <b>${dataBr(limite)}</b> (${dados.prazo_dias} dias úteis contados de ${dataBr(dados.data)}, sem sábado, domingo${feriados2.length ? ` e o(s) feriado(s) ${feriados2.join(", ")}` : " e feriado"}).</p>
+      <div class="acoes"><button class="secundario">${c ? "Montar o texto de novo" : "Montar o texto"}</button></div>
+      ${edicao ? '<p class="suave">Montar de novo troca o texto pelo do modelo (as mudanças feitas à mão se perdem).</p>' : ""}</form>
+    ${c ? `<form class="cartao formulario" data-form="salvarNotificacao">
+      <h2>2. Texto da notificação</h2>
+      <input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="tema" value="${esc(tema)}"><input type="hidden" name="data" value="${dados.data}">
+      <input type="hidden" name="prazo" value="${dados.prazo_dias}">${edicao ? `<input type="hidden" name="id" value="${edicao.id}">` : ""}${ant ? `<input type="hidden" name="anterior" value="${ant.id}">` : ""}
+      <p><label for="nt_assunto">Assunto</label><input id="nt_assunto" name="assunto" value="${esc(pronto.assunto)}" maxlength="120"></p>
+      <p><label for="nt_clausula">Cláusula(s) do contrato citada(s)</label><input id="nt_clausula" name="clausula" value="${esc(pronto.clausula || "")}" maxlength="200"></p>
+      <p class="suave">Confira o número da cláusula no contrato assinado: o sistema conta pelo modelo de hoje, e um contrato antigo pode ter outra numeração.</p>
+      <p><label for="nt_texto">Texto <span class="suave">(troque o que estiver entre colchetes, "[preencher: …]", pelo caso real)</span></label><textarea id="nt_texto" name="texto" rows="18" spellcheck="true">${esc(pronto.texto)}</textarea></p>
+      <div class="acoes"><button>${edicao ? "Salvar o rascunho" : "Salvar a notificação (rascunho)"}</button> <a class="botao secundario" href="${volta}">Cancelar</a></div>
+      <p class="suave">Depois de salvar: imprima o PDF, assine (gov.br), anexe a assinada e envie. O prazo corre a partir da data da notificação.</p></form>` : '<p class="suave">Escolha o inquilino e clique em "Montar o texto".</p>'}`;
+  }
+  function etapasDaNotificacao(n, c, hoje3) {
+    const e = estadoNotificacao(d(), n, hoje3);
+    const alvo = { contrato: c.id, notificacao: n.id };
+    const pdf = link(`#/imprimir/recibo?tipo=notificacao&contrato=${c.id}&id=${n.id}`, "🧾 PDF para assinar (imprimir / baixar)", "botao secundario mini");
+    const assinada = linkComprovante(c.id, n.arquivo_assinado || null, { tabela: "notificacoes", id: n.id, campo: "arquivo_assinado", tipo: "notificacao-assinada", data: n.data }).replace("📎 comprovante", "📎 notificação assinada").replace("anexar comprovante", "anexar a assinada").replace("Sem comprovante: buscar no banco e anexar", "Anexar a notificação assinada");
+    const enviada = n.enviada_em ? `enviada em <b>${dataBr(n.enviada_em)}</b> (${esc(n.enviada_por || "")})` : "";
+    const marcar = n.situacao === "Rascunho" && opera() ? `<form data-form="enviadaNotificacao" data-id="${n.id}" class="acoes" style="margin-top:6px;flex-wrap:wrap">
+      <input type="date" name="data" value="${hoje3}" aria-label="Data do envio" style="width:auto">
+      <select name="meio" aria-label="Por onde" style="width:auto">${MEIOS_NOTIFICACAO.map((m) => `<option>${esc(m)}</option>`).join("")}</select>
+      <button class="secundario pequeno">Marcar como enviada</button></form>` : "";
+    const prazo = n.situacao === "Rascunho" ? `até ${dataBr(n.data_limite)} (${n.prazo_dias} dias úteis de ${dataBr(n.data)})` : e.vencida ? `<b>venceu em ${dataBr(n.data_limite)}</b>` : e.aberta ? `até <b>${dataBr(n.data_limite)}</b> · ${e.restam === 0 ? "vence hoje" : `faltam ${e.restam} dia(s) útil(eis)`}` : `até ${dataBr(n.data_limite)}`;
+    const baixa = n.situacao === "Resolvida" ? `resolvida em <b>${dataBr(n.resolvida_em)}</b>${n.observacao_baixa ? `: ${esc(n.observacao_baixa)}` : ""} ${n.comprovante_baixa ? linkComprovante(c.id, n.comprovante_baixa, { tabela: "notificacoes", id: n.id, campo: "comprovante_baixa", tipo: "baixa-notificacao", data: n.resolvida_em }) : ""}` : e.podeBaixa && opera() ? `<form data-form="baixaNotificacao" data-id="${n.id}" class="acoes" style="margin-top:6px;flex-wrap:wrap">
+      <input type="date" name="data" value="${hoje3}" aria-label="Resolvido em" style="width:auto">
+      <input name="observacao" placeholder="O que foi feito (ex.: ar-condicionado reinstalado pelo técnico)" style="flex:1;min-width:220px">
+      <label class="botao secundario pequeno">📎 Foto ou arquivo<input type="file" name="comprovante" accept="${ACEITA_DOCUMENTOS}" hidden></label>
+      <button class="pequeno">Dar baixa (resolvido)</button></form>` : "";
+    return [
+      { feito: true, titulo: "Notificação montada", detalhe: `${dataBr(n.data)} · ${esc(n.assunto)} ${pdf}` },
+      { feito: !!n.arquivo_assinado, titulo: "Assinada pelo administrador", detalhe: `${n.arquivo_assinado ? "" : '<span class="suave">assine o PDF no gov.br (assinador.iti.br) e anexe aqui: </span>'}${assinada}` },
+      { feito: !!n.enviada_em, titulo: "Enviada ao inquilino", detalhe: `${enviada}${n.situacao === "Rascunho" ? `${botaoEmail("notificacao_envio", alvo, "✉ Enviar por e-mail")} <span class="suave">ou entregue à mão (baixe o PDF acima) e marque abaixo. O "Enviar agora" já marca sozinho.</span>${marcar}` : ` ${botaoEmail("notificacao_envio", alvo, "✉ E-mail de novo")}`}` },
+      { feito: !e.aberta && n.situacao !== "Rascunho", titulo: "Prazo para resolver", detalhe: `${prazo}${e.aberta && !n.multa_valor && n.situacao !== "Reiterada" ? ` ${botaoEmail("notificacao_lembrete", alvo, "✉ Lembrete do prazo")}` : ""}` },
+      { feito: n.situacao === "Resolvida", titulo: "Resolvido (baixa)", detalhe: baixa || (n.situacao === "Cancelada" ? `cancelada em ${dataBr(n.cancelada_em)}${n.motivo_cancelamento ? `: ${esc(n.motivo_cancelamento)}` : ""}` : '<span class="suave">depois de enviada</span>') }
+    ];
+  }
+  function telaNotificacao(id) {
+    const n = buscar2("notificacoes", id);
+    const c = n && buscar2("contratos", n.contrato_id);
+    if (!n || !c) return naoEncontrado("Notificação não encontrada", "#/notificacoes", "Ver as notificações");
+    const hoje3 = hojeIso();
+    const e = estadoNotificacao(d(), n, hoje3);
+    const cadeia = cadeiaDaNotificacao(d(), n);
+    const proxima = n.reiterada_por ? buscar2("notificacoes", n.reiterada_por) : null;
+    const numero2 = cadeia.length;
+    const boleto = n.multa_cobranca_id ? buscar2("cobrancas", n.multa_cobranca_id) : null;
+    const passos = etapasDaNotificacao(n, c, hoje3);
+    const sugerida = e.podeMulta ? multaSugerida(d(), c, hoje3) : 0;
+    return `<p class="suave"><a href="#/contrato/${c.id}?ir=notificacoes">← ${esc(c.inquilino_nome)}</a> · <a href="#/notificacoes">Todas as notificações</a></p>
+    <div class="cabecalho"><h1>${numero2 > 1 ? `${numero2}ª notificação` : "Notificação"} · ${esc(c.inquilino_nome)}</h1><div class="acoes">${etiquetaNotificacao(n, hoje3)}</div></div>
+    ${e.podeMulta && n.situacao !== "Reiterada" ? `<div class="alerta perigo"><b>Prazo vencido em ${dataBr(n.data_limite)}.</b> Se o inquilino resolveu, dê a baixa; senão, mande outra notificação sobre o mesmo assunto ou gere a multa.</div>` : ""}
+    ${proxima ? `<div class="alerta info">${proxima.situacao === "Rascunho" ? "Há uma nova notificação sobre o mesmo assunto em preparo" : "Reiterada pela notificação"} de <a href="#/notificacao/${proxima.id}">${dataBr(proxima.data)}</a> (${esc(proxima.situacao)}).</div>` : ""}
+    <div class="cartao"><h2>Etapas</h2><ol style="margin:4px 0 6px 18px">${passos.map((p2) => `<li style="margin-bottom:6px">${p2.feito ? "✅" : "⬜"} <b>${esc(p2.titulo)}</b>: ${p2.detalhe}</li>`).join("")}</ol>
+      ${opera() ? `<div class="acoes" style="margin-top:10px;flex-wrap:wrap">
+        ${n.situacao === "Rascunho" ? `${link(`#/notificacao-nova?id=${n.id}`, "Editar o rascunho")} ${botao("excluirNotificacao", "Excluir o rascunho", { id: n.id }, "perigo pequeno", "Excluir este rascunho de notificação?")}` : ""}
+        ${e.podeReiterar && n.situacao !== "Rascunho" ? link(`#/notificacao-nova?anterior=${n.id}`, `Nova notificação sobre o mesmo assunto (${numero2 + 1}ª)`, "botao pequeno") : ""}
+        ${!["Resolvida", "Cancelada"].includes(n.situacao) && !(n.multa_valor > 0) && !(proxima && proxima.situacao !== "Cancelada") ? botao("cancelarNotificacao", "Cancelar a notificação", { id: n.id }, "secundario pequeno") : ""}</div>` : ""}</div>
+    ${cadeia.length > 1 ? `<div class="cartao"><h2>Notificações deste assunto</h2><table><tr><th></th><th>Data</th><th>Prazo até</th><th>Situação</th></tr>
+      ${cadeia.map((x, k) => `<tr><td>${x.id === n.id ? `<b>${k + 1}ª</b>` : `${k + 1}ª`}</td><td>${x.id === n.id ? dataBr(x.data) : `<a href="#/notificacao/${x.id}">${dataBr(x.data)}</a>`}</td><td>${dataBr(x.data_limite)}</td><td>${etiquetaNotificacao(x, hoje3)}</td></tr>`).join("")}</table></div>` : ""}
+    <div class="cartao" id="multa"><h2>Multa</h2>
+      ${n.multa_valor > 0 ? `<p>Multa de <b>${reais(n.multa_valor)}</b> gerada em ${dataBr(n.multa_data)}: ${boleto ? `entra no boleto de <a href="#/cobranca/${boleto.id}"><b>${compBr(boleto.competencia)}</b></a> (vence ${dataBr(boleto.vencimento)}) como "${esc(textoMultaNotificacao(n))}", fora da NF.` : "entra no próximo boleto do aluguel, quando ele for gerado."}</p>
+        ${opera() ? botao("retirarMultaNotificacao", "Retirar a multa", { id: n.id }, "perigo pequeno", `Retirar a multa de ${reais(n.multa_valor)}? Ela sai do boleto em aberto.`) : ""}` : e.podeMulta && opera() ? `<p class="suave">O prazo venceu. A multa entra no próximo boleto do aluguel como cobrança adicional (não entra na NF). Sugestão: ${regra("notificacao_multa_alugueis")} aluguel(is) = ${reais(sugerida)}; o contrato prevê até 3 aluguéis. Digite o valor:</p>
+        <form data-form="multaNotificacao" data-id="${n.id}" class="acoes"><input name="valor" inputmode="decimal" value="${sugerida ? esc(dinheiroTexto(sugerida)) : ""}" aria-label="Valor da multa" style="width:140px"><button class="perigo">Gerar multa</button></form>` : `<p class="suave">${n.situacao === "Resolvida" || n.situacao === "Cancelada" ? "Sem multa." : `A multa só pode ser gerada depois do prazo (${dataBr(n.data_limite)}), com a notificação enviada e sem baixa.`}</p>`}</div>
+    <div class="cartao"><h2>Texto</h2><div class="grade">${item("Assunto", esc(n.assunto))}${item("Cláusula(s) citada(s)", esc(n.clausula || "-"))}${item("Prazo", `${n.prazo_dias} dias úteis · até ${dataBr(n.data_limite)}`)}</div>
+      <p class="pre">${esc(n.texto)}</p></div>`;
+  }
+  var COR, SO_CONSULTA, inquilinosParaNotificar, centavosDigitados, FORMULARIOS_NOTIFICACOES, ACOES_NOTIFICACOES;
+  var init_notificacoes2 = __esm({
+    "docs/js/telas/notificacoes.js"() {
+      init_app();
+      init_armazenamento();
+      init_calculos();
+      init_calculos();
+      init_formularios();
+      init_formularios();
+      init_notificacoes();
+      init_regras();
+      init_cadastros();
+      init_comum();
+      init_emails();
+      COR = { Rascunho: "neutra", "Aguardando resposta": "aviso", Reiterada: "info", "Multa gerada": "perigo", Resolvida: "ok", Cancelada: "neutra" };
+      SO_CONSULTA = "Seu usuário só consulta: não pode alterar. Peça ao administrador, se precisar.";
+      inquilinosParaNotificar = (incluir = null) => d().contratos.filter((c) => c.id === incluir || c.ativo !== false && contratoAtivo(c, hojeIso())).sort((a, b) => String(a.inquilino_nome).localeCompare(String(b.inquilino_nome), "pt-BR"));
+      centavosDigitados = (texto3) => centavos(String(texto3 || "").replace(/^R\$\s*/, "").trim());
+      FORMULARIOS_NOTIFICACOES = {
+        async salvarNotificacao(form) {
+          if (!opera()) throw new ErroUsuario(SO_CONSULTA);
+          const f = new FormData(form);
+          const dados = {
+            contrato_id: Number(f.get("contrato")),
+            modelo: String(f.get("tema") || ""),
+            data: String(f.get("data") || ""),
+            prazo_dias: Number(f.get("prazo")),
+            assunto: f.get("assunto"),
+            clausula: f.get("clausula"),
+            texto: f.get("texto"),
+            anterior_id: Number(f.get("anterior")) || null
+          };
+          const id = Number(f.get("id")) || null;
+          const n = id ? await alterarApagandoAnexos((db) => editarNotificacao(db, id, dados, login())) : await alterar((db) => criarNotificacao(db, dados, login()));
+          aviso(`Notificação salva. Prazo até ${dataBr(limiteNotificacao(dados.data, dados.prazo_dias))}. Agora imprima o PDF, assine e envie.`);
+          ir(`#/notificacao/${n.id}`);
+        },
+        async enviadaNotificacao(form) {
+          if (!opera()) throw new ErroUsuario(SO_CONSULTA);
+          const f = new FormData(form);
+          const n = buscar2("notificacoes", form.dataset.id);
+          if (n && !n.arquivo_assinado && !await confirmar("A notificação assinada ainda não foi anexada. Marcar como enviada mesmo assim? (ex.: entregue em papel assinado à mão)", { titulo: "Marcar como enviada?", sim: "Marcar como enviada" })) return;
+          await alterar((db) => marcarNotificacaoEnviada(db, Number(form.dataset.id), { data: String(f.get("data") || ""), meio: String(f.get("meio") || "") }, login()));
+          aviso("Envio marcado: o prazo está correndo.");
+          await mostrar();
+        },
+        async baixaNotificacao(form) {
+          if (!opera()) throw new ErroUsuario(SO_CONSULTA);
+          const f = new FormData(form);
+          const n = buscar2("notificacoes", form.dataset.id);
+          if (!n) throw new ErroUsuario("Esta notificação não existe mais. Atualize a página.");
+          const data2 = String(f.get("data") || "");
+          if (!dataValida(data2)) throw new ErroUsuario("Informe a data em que foi resolvido.");
+          const arq = f.get("comprovante");
+          const comprovante2 = arq && arq.size ? await salvarArquivo(await pastaDoEscopo("contrato", n.contrato_id), new File([arq], nomeComprovante2("baixa-notificacao", data2, arq))) : null;
+          await alterar((db) => darBaixaNotificacao(db, n.id, { data: data2, comprovante: comprovante2, observacao: f.get("observacao") }, login()));
+          aviso("Baixa registrada: notificação resolvida.");
+          await mostrar();
+        },
+        async multaNotificacao(form) {
+          if (!opera()) throw new ErroUsuario(SO_CONSULTA);
+          const valor = centavosDigitados(new FormData(form).get("valor"));
+          if (!(valor > 0)) throw new ErroUsuario("Digite o valor da multa.");
+          const p2 = previaMultaNotificacao(d(), Number(form.dataset.id));
+          const cb = p2.boleto;
+          const antes = cb ? totais(cb).a_pagar_sem_desconto : 0;
+          const html = `<p>Multa de <b>${reais(valor)}</b> para <b>${esc(p2.contrato.inquilino_nome)}</b>, pela notificação de ${dataBr(p2.notificacao.data)} (prazo até ${dataBr(p2.notificacao.data_limite)}).</p>
+      ${cb ? `<p>Entra no boleto do aluguel de <b>${compBr(cb.competencia)}</b>, que vence em <b>${dataBr(cb.vencimento)}</b>, como "${esc(textoMultaNotificacao(p2.notificacao))}". O boleto passa de ${reais(antes)} para <b>${reais(antes + valor)}</b> (valor cheio; a bonificação não desconta a multa).</p>` : "<p>Ainda não há boleto do aluguel em aberto para receber: a multa entra no próximo, quando ele for gerado.</p>"}
+      <p class="suave">A multa não entra na NF (não é aluguel). Para tirar depois: "Retirar a multa" na notificação, enquanto o boleto não for pago nem emitido no banco.</p>`;
+          if (!await janela({ titulo: "Gerar a multa?", html, sim: "Gerar a multa", forte: true })) return;
+          const r = await alterar((db) => gerarMultaNotificacao(db, Number(form.dataset.id), valor, login()));
+          aviso(r.boleto ? `Multa de ${reais(valor)} lançada no boleto de ${compBr(r.boleto.competencia)}.` : `Multa de ${reais(valor)} gerada: entra no próximo boleto, quando ele for gerado.`);
+          await mostrar();
+        }
+      };
+      ACOES_NOTIFICACOES = {
+        async excluirNotificacao({ id }) {
+          if (!opera()) throw new ErroUsuario(SO_CONSULTA);
+          const n = buscar2("notificacoes", id);
+          await alterarApagandoAnexos((db) => excluirNotificacao(db, Number(id), login()));
+          ir(n ? `#/contrato/${n.contrato_id}?ir=notificacoes` : "#/notificacoes");
+        },
+        async cancelarNotificacao({ id }) {
+          if (!opera()) throw new ErroUsuario(SO_CONSULTA);
+          const r = await janela({
+            titulo: "Cancelar a notificação?",
+            sim: "Cancelar a notificação",
+            nao: "Voltar",
+            forte: true,
+            html: '<p>A notificação fica no histórico como "Cancelada" (ex.: feita por engano). O prazo para de correr e o alerta some.</p><p><label>Motivo</label><input name="motivo" placeholder="Ex.: o inquilino mostrou a autorização"></p>'
+          });
+          if (!r) return;
+          await alterar((db) => cancelarNotificacao(db, Number(id), (r.motivo || [""])[0], login()));
+          aviso("Notificação cancelada.");
+          await mostrar();
+        },
+        async retirarMultaNotificacao({ id }) {
+          if (!opera()) throw new ErroUsuario(SO_CONSULTA);
+          await alterar((db) => retirarMultaNotificacao(db, Number(id), login()));
+          aviso("Multa retirada do boleto e da notificação.");
+          await mostrar();
+        }
+      };
+    }
+  });
+
   // docs/js/telas/contrato.js
   function selosContrato(c) {
     const base = dataBaseCorrecao(c);
@@ -25971,6 +26886,10 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     ${(() => {
       const n = solicitacoesDo(d(), c.id).filter((x) => ["Aberta", "Em andamento"].includes(x.situacao || "Aberta")).length;
       return n ? `<a href="#/contrato/${c.id}?ir=solicitacoes">${etiqueta(`${n} solicitação(ões) em aberto`, "perigo")}</a>` : "";
+    })()}
+    ${(() => {
+      const n = notificacoesDo(d(), c.id).filter((x) => ["Aguardando resposta", "Multa gerada"].includes(x.situacao)).length;
+      return n ? `<a href="#/contrato/${c.id}?ir=notificacoes">${etiqueta(`${n} notificação(ões) em aberto`, "aviso")}</a>` : "";
     })()}
     ${c.gerar_nf === false ? seloControle() : ""}
     ${car ? etiqueta(`Carência ${compBr(car[0])}${car[0] !== car[1] ? ` a ${compBr(car[1])}` : ""}`, "aviso") : ""}
@@ -26662,6 +27581,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       ${c.observacoes ? `<h3>Observações</h3><p class="pre">${esc(c.observacoes)}</p>` : ""}</div>
     ${caixaRessarcimentos(c)}
     ${caixaSolicitacoes(c)}
+    ${caixaNotificacoes(c)}
     ${caixaGarantia(c)}
     ${caixaSeguros(c)}
     ${caixaFci(c)}
@@ -26707,6 +27627,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       init_arquivo_impresso2();
       init_emails();
       init_fichas();
+      init_notificacoes2();
       init_app();
       init_calculos();
       init_contratos();
@@ -26881,7 +27802,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       };
       nomeComprovante2 = (tipo, data2, arq) => `comprovante-${tipo}-${data2 || hojeIso()}${extensao(arq.name)}`;
       xAnexo = (acao, dados, confirmar2) => opera() ? botao(acao, "×", dados, "x-excluir", confirmar2).replace("<button ", '<button title="Apagar só o arquivo" ') : "";
-      ANEXOS_COM_X = { contratos: ["comprovante_reserva", "termo_chaves_saida", "contra_vistoria"], correcoes_garantia: ["comprovante"], aplicacoes: ["comprovante"], depositos_garantia: ["comprovante"], devolucoes_garantia: ["comprovante"], encerramentos: ["comprovante", "termo_assinado"], acordos: ["termo_assinado"] };
+      ANEXOS_COM_X = { contratos: ["comprovante_reserva", "termo_chaves_saida", "contra_vistoria"], correcoes_garantia: ["comprovante"], aplicacoes: ["comprovante"], depositos_garantia: ["comprovante"], devolucoes_garantia: ["comprovante"], encerramentos: ["comprovante", "termo_assinado"], acordos: ["termo_assinado"], notificacoes: ["arquivo_assinado", "comprovante_baixa"] };
       linkComprovante = (contratoId, nome, anexo = null) => nome && !(anexo && arquivoSumiu("contrato", contratoId, nome)) ? `<span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="contrato" data-id="${contratoId}" data-nome="${esc(nome)}" title="${esc(nome)}">📎 comprovante</a>${anexo && (ANEXOS_COM_X[anexo.tabela] || []).includes(anexo.campo) ? xAnexo("removerAnexo", { tabela: anexo.tabela, id: anexo.id, campo: anexo.campo }, `Apagar o comprovante "${nome}"? O lançamento continua e volta o aviso para anexar.`) : ""}</span>` : anexo && opera() ? `<label class="anexar-falta" title="${nome ? `O arquivo ${esc(nome)} sumiu da pasta: anexe de novo (PDF ou foto)` : "Sem comprovante: buscar no banco e anexar (PDF ou foto)"}">⚠ ${nome ? "arquivo sumiu: anexar de novo" : "anexar comprovante"}<input type="file" accept="application/pdf,image/*"
     data-acao-arquivo="anexarComprovante" data-contrato="${contratoId}" data-tabela="${anexo.tabela}" data-id="${anexo.id}" data-campo="${anexo.campo}" data-tipo="${anexo.tipo}" data-data="${esc(anexo.data || "")}"></label>` : etiqueta("sem comprovante", "aviso");
       fiadoresMudancas = { novos: [], alterados: [] };
@@ -28323,6 +29244,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       const cfg4 = CADASTROS[tabela];
       const r = buscar(db, tabela, id);
       if (cfg4 && cfg4.recalcular && r) recalculados += recalcularCobrancas(db, cfg4.recalcular(r, db), login());
+      if (tabela === "notificacoes" && r) recalculados += sincronizarMultas(db, r.contrato_id, login());
     }
     return recalculados;
   }
@@ -28615,7 +29537,12 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const resumo = resumoSolicitacoes(d());
     return `<div class="cabecalho"><h1>Inquilinos</h1>${opera() ? `<div class="acoes">${link("#/novo/fichas", "Novo interessado (ficha)", "botao")} ${link("#/novo/contratos", "Novo contrato", "botao secundario")}</div>` : ""}</div>
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="ir" data-ir="inquilinos" style="flex-wrap:nowrap;min-width:0;max-width:100%"><input name="busca" value="${esc(q.busca || "")}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px;max-width:100%;min-width:0"><button class="secundario">Buscar</button>${busca ? link("#/inquilinos", "Limpar") : ""}</form>
-      <a class="botao secundario resumo-solicitacoes" href="#/solicitacoes" title="Ver todas as solicitações dos inquilinos">Solicitações: ${SITUACOES_SOLICITACAO.map((s) => `<span>${s.simbolo} ${resumo[s.nome]} ${s.texto}</span>`).join(" ")}</a></div>
+      <a class="botao secundario resumo-solicitacoes" href="#/solicitacoes" title="Ver todas as solicitações dos inquilinos">Solicitações: ${SITUACOES_SOLICITACAO.map((s) => `<span>${s.simbolo} ${resumo[s.nome]} ${s.texto}</span>`).join(" ")}</a>
+      ${(() => {
+      const l = (d().notificacoes || []).filter((n) => ["Rascunho", "Aguardando resposta", "Multa gerada"].includes(n.situacao));
+      const v = l.filter((n) => estadoNotificacao(d(), n).podeMulta).length;
+      return `<a class="botao secundario" href="#/notificacoes" title="Notificações ao inquilino (prazo para resolver algo)">Notificações: ${l.length} em aberto${v ? ` · ${v} com prazo vencido` : ""}</a>`;
+    })()}</div>
     ${caixaFichas()}
     <div class="cartao rolagem"><h2>Ativos (${atuais.length})</h2><table><tr><th>Imóvel</th><th>Inquilino</th><th class="centro so-pc">Contrato</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
       ${atuais.map((x) => `<tr class="${x.c.verificar ? "amarelo" : ""}"><td>${imovel(x)}${matricula(x)}${x.i ? ` ${botaoContrato(x.c, true)}` : ""}</td><td>${nomeCelular(x)}</td>${registrar3(x.c)}
@@ -31668,6 +32595,7 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
       init_icone();
       init_comum();
       init_arquivo_impresso2();
+      init_notificacoes2();
       init_documentos();
       init_envios();
       init_faturas();
@@ -33536,6 +34464,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       Object.assign(ACOES, ACOES_BANCO, ACOES_NUVEM, ACOES_FICHAS, ACOES_ICONE, ACOES_REGRAS, ACOES_EMAILS, ACOES_PASTA);
       Object.assign(ACOES, ACOES_REGUA);
       Object.assign(ACOES, ACOES_PESSOA);
+      Object.assign(ACOES, ACOES_NOTIFICACOES);
     }
   });
 
@@ -33624,6 +34553,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       init_emails();
       init_regras_sistema();
       init_pessoa2();
+      init_notificacoes2();
       init_cadastros();
       init_campos();
       init_comum();
@@ -34283,7 +35213,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           await mostrar();
         }
       };
-      Object.assign(FORMULARIOS, FORMULARIOS_BANCO, FORMULARIOS_REGRAS, FORMULARIOS_EMAILS, FORMULARIOS_PESSOA);
+      Object.assign(FORMULARIOS, FORMULARIOS_BANCO, FORMULARIOS_REGRAS, FORMULARIOS_EMAILS, FORMULARIOS_PESSOA, FORMULARIOS_NOTIFICACOES);
     }
   });
 
@@ -34307,6 +35237,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       init_comum();
       init_consultas();
       init_contrato();
+      init_notificacoes2();
       init_documentos();
       init_faturas();
       init_fichas();
@@ -34700,6 +35631,9 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         ficha: (rota) => telaFicha(Number(rota.partes[1])),
         buscar: (rota) => telaBusca(rota.q),
         solicitacoes: (rota) => telaSolicitacoes(rota.q),
+        notificacoes: (rota) => telaNotificacoes(rota.q),
+        notificacao: (rota) => telaNotificacao(Number(rota.partes[1])),
+        "notificacao-nova": (rota) => telaNovaNotificacao(rota.q),
         iptu: (rota) => telaIptu(Number(rota.q.ano) || (/* @__PURE__ */ new Date()).getFullYear()),
         historico: (rota) => telaHistorico(rota.q),
         dados: (rota) => telaDados(rota.q),
@@ -35716,7 +36650,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       esperaDoLogin = (erros) => erros < 3 ? 0 : Math.min(30, 2 ** (erros - 2));
       MENU = [
         ["#/", "Painel", "^$|^fechamento|^pendencias"],
-        ["#/inquilinos", "Inquilinos", "^inquilino|^contrato|^vistoria|^solicitacoes"],
+        ["#/inquilinos", "Inquilinos", "^inquilino|^contrato|^vistoria|^solicitacoes|^notificac"],
         ["#/reajustes", "Reajustes", "reajustes"],
         ["#/cobrancas", "Boletos", "cobranca"],
         ["#/faturas", "NF", "fatura"],
