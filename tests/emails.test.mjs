@@ -32,7 +32,7 @@ test('todo e-mail fecha agradecendo e sem campo sobrando, em todos os casos de g
       const { d, c } = base({ garantia_tipo, inquilino_tipo, representante_nome: 'Ana Lima', data_saida: '2026-12-15' });
       R.inserir(d, 'encerramentos', { contrato_id: c.id, data_saida: '2026-12-15', garantia_valor: 690000, garantia_corrigida: 698510, debitos: 195198, saldo: 503312 }, 'j');
       for (const m of MODELOS_EMAIL) {
-        if (m.chave.startsWith('ficha') || m.boleto) continue; // os da régua de cobrança precisam do boleto: tests/regua-email.test.mjs
+        if (m.chave.startsWith('ficha') || m.boleto || m.notificacao) continue; // os da régua precisam do boleto (tests/regua-email.test.mjs); os da notificação, dela (tests/notificacoes.test.mjs)
         const e = texto(d, m.chave, { contrato: c }, { informe: 'x' });
         assert.ok(e.texto.endsWith(FECHO), m.chave);
         assert.doesNotMatch(e.texto, /\[se |\[fim\]|\[senão\]|\{[a-z_]+\}/i, `${m.chave} ${garantia_tipo}`);

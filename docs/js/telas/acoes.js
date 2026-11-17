@@ -28,6 +28,7 @@ import { alterarApagandoAnexos, anexosEmUso, apagarAnexos, apagarPastaDaFicha, n
 import { ACOES_ICONE } from './icone.js';
 import { alertasAbertos } from './comum.js';
 import { ACOES_PASTA } from './arquivo-impresso.js';
+import { ACOES_NOTIFICACOES } from './notificacoes.js';
 import { documentoMontado, guardarCartaNaPasta, logoPng, MODELO_COMODOS, modelosNoBanco, pdfDaCarta, pdfDoDocumento, roteiroTexto } from './documentos.js';
 import { confirmarPagamentoBoleto } from './envios.js';
 import { siglaEmpresa } from './faturas.js';
@@ -2283,3 +2284,4 @@ export const ACOES = {
 Object.assign(ACOES, ACOES_BANCO, ACOES_NUVEM, ACOES_FICHAS, ACOES_ICONE, ACOES_REGRAS, ACOES_EMAILS, ACOES_PASTA);
 Object.assign(ACOES, ACOES_REGUA);
 Object.assign(ACOES, ACOES_PESSOA);
+Object.assign(ACOES, ACOES_NOTIFICACOES);

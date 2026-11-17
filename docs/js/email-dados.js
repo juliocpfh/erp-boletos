@@ -4,6 +4,7 @@ import * as C from './calculos.js';
 import * as FO from './ficha-online.js';
 import * as K from './contratos.js';
 import { MODELOS_EMAIL } from './modelos-email.js';
+import * as NT from './notificacoes.js';
 import * as REC from './recibos.js';
 import * as R from './regras.js';
 
@@ -206,6 +207,14 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
       novo_bonificado: C.reais(a.valor_novo - C.descontoPorPercentual(a.valor_novo, a.percentual || 0)) });
     condicoes.novo_bonificacao = (a.percentual || 0) > 0;
   }
+  // notificação ao inquilino (2026-11-17): a data, o assunto, o prazo e a data limite (o lembrete diz se vence hoje)
+  const n = alvo.notificacao || null;
+  if (n) {
+    const numero = R.numeroDaNotificacao(d, n);
+    Object.assign(campos, { notificacao_data: C.dataBr(n.data), notificacao_assunto: n.assunto || '', notificacao_assunto_minusculo: String(n.assunto || '').toLocaleLowerCase('pt-BR'),
+      notificacao_numero: `${numero}ª`, prazo_notificacao: NT.prazoPorExtenso(n.prazo_dias), data_limite: C.dataBr(n.data_limite) });
+    Object.assign(condicoes, { reiteracao: numero > 1, vence_hoje: n.data_limite === hoje });
+  }
   // quem assina o fecho e o e-mail da administração: do cadastro da empresa (Empresas)
   const remetente = { assinatura: K.dadoDaEmpresa(d, doImovel, 'assinatura_email') || (K.locadorasDoContrato(d, doImovel)[0] || {}).nome || '',
     email: K.dadoDaEmpresa(d, doImovel, 'email_contato') };
@@ -242,6 +251,17 @@ export function anexosProntos(d, modelo, alvo) {
         const doc = R.documentoEntrada(d, c, campo);
         const nome = (R.DOCUMENTOS_ENTRADA.find(([k]) => k === campo) || [])[1] || 'documento';
         if (doc && doc.arquivo) arquivo('assinados', doc.contrato.id, doc.arquivo, `${nome.toLowerCase()} assinado por todos`);
+      }
+      continue;
+    }
+    if (tipo === 'notificacao') {
+      // a notificação assinada (anexada na notificação); sem ela, o PDF para assinar que o sistema monta
+      const n = alvo.notificacao || null;
+      if (!n) continue;
+      if (n.arquivo_assinado) arquivo('contrato', n.contrato_id, n.arquivo_assinado, `notificação de ${C.dataBr(n.data)} assinada`);
+      else {
+        const disp = REC.reciboDisponivel(d, 'notificacao', alvo);
+        out.push({ tipo: 'recibo', recibo: 'notificacao', rotulo: `${REC.TIPOS_RECIBO.notificacao} de ${C.dataBr(n.data)} (sem a assinatura: anexe a assinada na notificação)`, ok: disp.ok, motivo: disp.motivo || '', alvo });
       }
       continue;
     }

@@ -144,6 +144,8 @@ function aplicarDesfazer(db, itens) {
     const cfg = CADASTROS[tabela];
     const r = R.buscar(db, tabela, id);
     if (cfg && cfg.recalcular && r) recalculados += R.recalcularCobrancas(db, cfg.recalcular(r, db), login());
+    // multa de notificação desfeita (ou refeita): sai do boleto em aberto ou volta para o próximo
+    if (tabela === 'notificacoes' && r) recalculados += R.sincronizarMultas(db, r.contrato_id, login());
   }
   return recalculados;
 }

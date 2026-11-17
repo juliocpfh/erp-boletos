@@ -3,6 +3,7 @@
 import { caixaPastaFisica } from './arquivo-impresso.js';
 import { botaoEmail } from './emails.js';
 import { botaoDesistenciaContrato } from './fichas.js';
+import { caixaNotificacoes } from './notificacoes.js';
 import { janela, podeUsuario } from '../app.js';
 import * as C from '../calculos.js';
 import * as K from '../contratos.js';
@@ -28,6 +29,7 @@ function selosContrato(c) {
     ${c.solidario_nome ? etiqueta(`Solidário: ${c.solidario_nome}`, 'neutra') : ''}
     ${R.aditivosValidos(d(), c.id).length ? etiqueta('Possui termo aditivo', 'aviso') : ''}
     ${(() => { const n = R.solicitacoesDo(d(), c.id).filter((x) => ['Aberta', 'Em andamento'].includes(x.situacao || 'Aberta')).length; return n ? `<a href="#/contrato/${c.id}?ir=solicitacoes">${etiqueta(`${n} solicitação(ões) em aberto`, 'perigo')}</a>` : ''; })()}
+    ${(() => { const n = R.notificacoesDo(d(), c.id).filter((x) => ['Aguardando resposta', 'Multa gerada'].includes(x.situacao)).length; return n ? `<a href="#/contrato/${c.id}?ir=notificacoes">${etiqueta(`${n} notificação(ões) em aberto`, 'aviso')}</a>` : ''; })()}
     ${c.gerar_nf === false ? seloControle() : ''}
     ${car ? etiqueta(`Carência ${compBr(car[0])}${car[0] !== car[1] ? ` a ${compBr(car[1])}` : ''}`, 'aviso') : ''}
     ${c.renovacao_automatica ? etiqueta('Renovação automática', 'neutra') : ''}
@@ -845,6 +847,7 @@ export function telaContrato(c) {
       ${c.observacoes ? `<h3>Observações</h3><p class="pre">${esc(c.observacoes)}</p>` : ''}</div>
     ${caixaRessarcimentos(c)}
     ${caixaSolicitacoes(c)}
+    ${caixaNotificacoes(c)}
     ${caixaGarantia(c)}
     ${caixaSeguros(c)}
     ${caixaFci(c)}

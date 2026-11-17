@@ -19,7 +19,7 @@ const LIMITE_ENDERECO = 7000;
 /** Último envio registrado deste e-mail para o contrato ou a ficha (ou null); com ``alvo.aditivo``, só o daquele termo aditivo. */
 export function ultimoEnvio(chave, alvo) {
   return (d().envios_email || []).filter((x) => x.chave === chave && ((alvo.contrato && x.contrato_id === Number(alvo.contrato)) || (alvo.ficha && x.ficha_id === Number(alvo.ficha)))
-    && (!alvo.aditivo || x.aditivo_id === Number(alvo.aditivo)))
+    && (!alvo.aditivo || x.aditivo_id === Number(alvo.aditivo)) && (!alvo.notificacao || x.notificacao_id === Number(alvo.notificacao)))
     .sort((a, b) => String(b.data).localeCompare(String(a.data)))[0] || null;
 }
 
@@ -35,9 +35,14 @@ export function botaoEmail(chave, alvo, texto = '✉ E-mail') {
  * novo no mesmo dia não grava outro (antes, cada clique era uma linha a mais, para sempre: item 48).
  */
 const registrar = (chave, alvo, para, assunto, como, id = '') => alterar((db) => {
-  const dados = { data: C.hojeIso(), chave, contrato_id: alvo.contrato ? Number(alvo.contrato) : null, ficha_id: alvo.ficha ? Number(alvo.ficha) : null, aditivo_id: alvo.aditivo ? Number(alvo.aditivo) : null, para, assunto, como, gmail_id: id || null };
+  const dados = { data: C.hojeIso(), chave, contrato_id: alvo.contrato ? Number(alvo.contrato) : null, ficha_id: alvo.ficha ? Number(alvo.ficha) : null, aditivo_id: alvo.aditivo ? Number(alvo.aditivo) : null,
+    ...(alvo.notificacao ? { notificacao_id: Number(alvo.notificacao) } : {}), para, assunto, como, gmail_id: id || null };
+  // notificação mandada pelo "Enviar agora": fica marcada como enviada por e-mail nesse dia (o prazo passa a correr)
+  const n = como === 'enviado' && chave === 'notificacao_envio' && alvo.notificacao ? R.buscar(db, 'notificacoes', alvo.notificacao) : null;
+  if (n && n.situacao === 'Rascunho') R.marcarNotificacaoEnviada(db, n.id, { data: dados.data, meio: 'E-mail' }, login());
   if (como !== 'enviado') {
-    const ja = (db.envios_email || []).find((x) => x.como === como && x.data === dados.data && x.chave === chave && x.contrato_id === dados.contrato_id && x.ficha_id === dados.ficha_id && x.aditivo_id === dados.aditivo_id);
+    const ja = (db.envios_email || []).find((x) => x.como === como && x.data === dados.data && x.chave === chave && x.contrato_id === dados.contrato_id && x.ficha_id === dados.ficha_id && x.aditivo_id === dados.aditivo_id
+      && (x.notificacao_id || null) === (dados.notificacao_id || null));
     if (ja) return ja;
     return R.inserir(db, 'envios_email', dados, login(), null, { historico: false });
   }
@@ -87,6 +92,10 @@ async function janelaEmail(chave, alvo) {
   if (alvo.aditivo) {
     objeto.aditivo = buscar('aditivos', alvo.aditivo);
     if (!objeto.aditivo) throw new C.ErroUsuario('Este termo aditivo não existe mais (pode ter sido excluído). Atualize a página.');
+  }
+  if (alvo.notificacao) {
+    objeto.notificacao = buscar('notificacoes', alvo.notificacao);
+    if (!objeto.notificacao) throw new C.ErroUsuario('Esta notificação não existe mais (pode ter sido excluída). Atualize a página.');
   }
   const inicio = dadosDoEmail(d(), objeto);
   const ligado = await emailLigado();
@@ -246,9 +255,9 @@ export const ACOES_EMAILS = {
     else { campo.select(); aviso('O navegador não deixou copiar: o endereço ficou selecionado, use Ctrl+C.', 'info'); }
   },
 
-  async abrirEmail({ chave, contrato, ficha, aditivo }) {
+  async abrirEmail({ chave, contrato, ficha, aditivo, notificacao }) {
     if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode enviar e-mails. Peça ao administrador, se precisar.');
-    await janelaEmail(chave, contrato ? { contrato: Number(contrato), ...(aditivo ? { aditivo: Number(aditivo) } : {}) } : { ficha: Number(ficha) });
+    await janelaEmail(chave, contrato ? { contrato: Number(contrato), ...(aditivo ? { aditivo: Number(aditivo) } : {}), ...(notificacao ? { notificacao: Number(notificacao) } : {}) } : { ficha: Number(ficha) });
   },
   async restaurarModeloEmail({ chave }) {
     const m = (d().modelos_email || []).find((x) => x.chave === chave);

@@ -19,6 +19,7 @@ import { telaCobranca, telaCobrancas } from './telas/cobrancas.js';
 import { ACEITA_DOCUMENTOS, acertarNomesUmaVez, apagarDocumentosVencidosDasFichas, alertaAdiado, alertaArquivosFaltando, alertaDesligado, botao, botaoDesligarAlerta, conferirArquivosUmaVez, buscar, caixaHistorico, classeAlerta, classeEstilo, competenciaPadrao, d, etiqueta, gruposDeAlertas, limparSemImovel, link, naoEncontrado, organizarPastasUmaVez, nomeAlerta, listaArquivos, opera, ordenar, PASTA_SEM_IMOVEL, pastasComArquivos, tabelaHistorico, trazerHerancasPendentes, ultimos } from './telas/comum.js';
 import { calendarioDoPainel, SITUACOES_SOLICITACAO, telaBusca, telaInquilinos, telaIptu, telaSolicitacoes } from './telas/consultas.js';
 import { telaContrato, valorBonificado } from './telas/contrato.js';
+import { telaNotificacao, telaNotificacoes, telaNovaNotificacao } from './telas/notificacoes.js';
 import { guardarCartasAntigas, telaAditivo, telaGerarContrato, telaImprimir, telaModelo, telaModelos, telaModeloVistoria, telaVistoria } from './telas/documentos.js';
 import { telaFaturas } from './telas/faturas.js';
 import { alertaFichas, ligarFichaOnline, telaFicha } from './telas/fichas.js';
@@ -418,6 +419,9 @@ export const TELAS = {
   ficha: (rota) => telaFicha(Number(rota.partes[1])),
   buscar: (rota) => telaBusca(rota.q),
   solicitacoes: (rota) => telaSolicitacoes(rota.q),
+  notificacoes: (rota) => telaNotificacoes(rota.q),
+  notificacao: (rota) => telaNotificacao(Number(rota.partes[1])),
+  'notificacao-nova': (rota) => telaNovaNotificacao(rota.q),
   iptu: (rota) => telaIptu(Number(rota.q.ano) || new Date().getFullYear()),
   historico: (rota) => telaHistorico(rota.q),
   dados: (rota) => telaDados(rota.q),

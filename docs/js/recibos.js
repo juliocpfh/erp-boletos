@@ -26,6 +26,7 @@ export const TIPOS_RECIBO = {
   devolucao_chaves: 'Termo de devolução das chaves',
   quitacao: 'Termo de quitação',
   acordo: 'Termo de confissão de dívida e acordo',
+  notificacao: 'Notificação ao inquilino',
   ficha: 'Ficha cadastral',
   ficha_fiador: 'Ficha cadastral do fiador',
 };
@@ -115,6 +116,12 @@ export function reciboDisponivel(d, tipo, alvo) {
     const a = acordoDe(d, c, alvo);
     if (!a) return { ok: false, motivo: 'Acordo não encontrado.' };
     return a.desfeito_em ? { ok: false, motivo: 'Este acordo foi desfeito.' } : { ok: true };
+  }
+  if (tipo === 'notificacao') {
+    if (!c) return { ok: false, motivo: 'A notificação é do contrato.' };
+    const n = notificacaoDe(d, c, alvo);
+    if (!n) return { ok: false, motivo: 'Notificação não encontrada.' };
+    return n.situacao === 'Cancelada' ? { ok: false, motivo: 'Esta notificação foi cancelada.' } : { ok: true };
   }
   if (tipo === 'quitacao') {
     if (!c) return { ok: false, motivo: 'O termo de quitação é do contrato.' };
@@ -208,6 +215,7 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
   }
 
   if (tipo === 'acordo') return termoDoAcordo(d, c, acordoDe(d, c, alvo), base, { empresa, e, quem, endereco, assinaEmpresa, assinaPessoa, nomeArq });
+  if (tipo === 'notificacao') return cartaDaNotificacao(d, c, notificacaoDe(d, c, alvo), base, { empresa, e, quem, endereco, assinaEmpresa, assinaPessoa, nomeArq });
   if (tipo === 'devolucao_chaves') return termoDevolucaoChaves(d, c, base, { empresa, e, quem, endereco, assinaEmpresa, assinaPessoa, nomeArq });
 
   // quitacao: entrega do imóvel, acerto final e quitação recíproca, com os valores discriminados
@@ -245,6 +253,38 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
     ],
     assinaturas: [assinaEmpresa, assinaPessoa('LOCATÁRIO'), ...(c.solidario_nome ? [{ nome: c.solidario_nome, linha: 'LOCATÁRIO SOLIDÁRIO' }] : [])],
     arquivo: nomeArq('Termo quitacao', enc.garantia_devolvida_em || enc.data_saida),
+  };
+}
+
+/** Notificação do documento (``alvo.notificacao``: o registro, ou ``alvo.id``), só se for deste contrato. */
+const notificacaoDe = (d, c, alvo) => {
+  const n = alvo.notificacao || R.buscar(d, 'notificacoes', Number(alvo.id));
+  return n && n.contrato_id === c.id ? n : null;
+};
+
+/**
+ * Notificação extrajudicial ao inquilino (pedido do dono em 2026-11-17): quem notifica, quem é notificado e o imóvel, o texto
+ * (o do rascunho, com a cláusula citada, o prazo e a data limite), o quadro com as datas e as assinaturas (a da empresa, feita
+ * pelo gov.br fora do sistema, e a ciência do inquilino quando entregue em mãos). Ex.: notificação de 17/11/2026, 10 dias
+ * úteis → "Data limite para cumprir: 02/12/2026".
+ */
+function cartaDaNotificacao(d, c, n, base, x) {
+  const numero = R.numeroDaNotificacao(d, n);
+  const ant = n.anterior_id ? R.buscar(d, 'notificacoes', n.anterior_id) : null;
+  const solidario = c.solidario_nome ? pessoa(c.solidario_nome, c.solidario_cpf ? `CPF/CNPJ ${c.solidario_cpf}` : '') : '';
+  return {
+    ...base, data: n.data, titulo: numero > 1 ? `${numero}ª NOTIFICAÇÃO EXTRAJUDICIAL` : 'NOTIFICAÇÃO EXTRAJUDICIAL',
+    paragrafos: [
+      `NOTIFICANTE (LOCADORA): ${x.empresa}${x.e.cnpj ? `, CNPJ ${x.e.cnpj}` : ''}. NOTIFICADO (LOCATÁRIO): ${x.quem}${solidario ? `. LOCATÁRIO SOLIDÁRIO: ${solidario}` : ''}. IMÓVEL: ${x.endereco}.`,
+      `ASSUNTO: ${n.assunto}.`,
+      ...String(n.texto || '').split(/\n\s*\n/).map((p) => p.replace(/\s*\n\s*/g, ' ').trim()).filter(Boolean),
+    ],
+    tabela: [['Data desta notificação', C.dataBr(n.data)], ['Prazo para cumprir', `${n.prazo_dias} ${n.prazo_dias === 1 ? 'dia útil' : 'dias úteis'}`],
+      ['Data limite', C.dataBr(n.data_limite)], ...(ant ? [['Notificação anterior', `${C.dataBr(ant.data)} (prazo até ${C.dataBr(ant.data_limite)})`]] : []),
+      ...(n.clausula ? [['Contrato', n.clausula]] : [])],
+    depois: ['Recebi esta notificação em ______/______/__________ (preencher só se entregue em mãos).'],
+    assinaturas: [x.assinaEmpresa, x.assinaPessoa('NOTIFICADO (LOCATÁRIO), ciente')],
+    arquivo: x.nomeArq(numero > 1 ? `Notificacao ${numero}` : 'Notificacao', n.data),
   };
 }
 
