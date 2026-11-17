@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-C5VSIJAa7fAK8y6dYT5bXu4E9HshCnI4at95SM3rq4k='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-6tlchuoCogYeILdDX7GxdGjUx6vP4mcTpmHbJ0vsML4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="cde42334acc75514">
+<meta name="fontes" content="ccbfd4be43ec509d">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -17689,9 +17689,9 @@ ${xref}
   function juntarIdentificadores(d2, x, m, usuario) {
     const fx = fonteDe(x);
     const fm = fonteDe(m);
-    if (fx === fm || fx === "ofx+api") return;
+    if (fx === fm || fx === "ofx+api" || fx !== "api" && fm !== "api") return;
     const api = fm === "api" ? m : x;
-    const doOfx = fm === "ofx" ? m : x;
+    const doOfx = fm === "api" ? x : m;
     atualizar(
       d2,
       "movimentacoes_banco",
@@ -17704,7 +17704,7 @@ ${xref}
         end_to_end_id: x.end_to_end_id || m.end_to_end_id || null
       },
       usuario,
-      "Mesmo lançamento no arquivo OFX e no extrato pela API: identificadores juntados"
+      "Mesmo lançamento no arquivo do banco e no extrato pela API: identificadores juntados"
     );
   }
   function importarExtrato(d2, contaId, lancamentos, usuario, { de = null, ate = null, hoje: dia = hoje2(), contaDoArquivo = "" } = {}) {
@@ -17796,11 +17796,238 @@ ${xref}
     }
     if (!lancamentos.length) throw new Error("O arquivo OFX não tem lançamentos (período sem movimentação ou arquivo incompleto).");
     const datas = lancamentos.map((l) => l.data).sort();
-    return { banco: marca(s, "ORG") || "", conta: marca(s, "ACCTID") || "", de: dataOfx(marca(s, "DTSTART")) || datas[0], ate: dataOfx(marca(s, "DTEND")) || datas[datas.length - 1], lancamentos };
+    return { banco: marca(s, "ORG") || "", conta: marca(s, "ACCTID") || "", de: dataOfx(marca(s, "DTSTART")) || datas[0], ate: dataOfx(marca(s, "DTEND")) || datas[datas.length - 1], lancamentos, saldo: saldoDoOfx(s) };
   }
   function textoDoOfx(bytes2) {
     const u8 = new TextDecoder("utf-8").decode(bytes2);
     return u8.includes("�") ? new TextDecoder("windows-1252").decode(bytes2) : u8;
+  }
+  function camposCsv(linha, sep) {
+    const out = [];
+    let atual = "";
+    let aspas = false;
+    for (let i = 0; i < linha.length; i += 1) {
+      const ch = linha[i];
+      if (aspas) {
+        if (ch === '"' && linha[i + 1] === '"') {
+          atual += '"';
+          i += 1;
+        } else if (ch === '"') aspas = false;
+        else atual += ch;
+      } else if (ch === '"') aspas = true;
+      else if (ch === sep) {
+        out.push(atual.trim());
+        atual = "";
+      } else atual += ch;
+    }
+    out.push(atual.trim());
+    return out;
+  }
+  function dataCsv(t) {
+    const s = String(t || "").trim();
+    let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+    m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})\b/.exec(s);
+    if (!m) return "";
+    const ano = m[3].length === 2 ? `20${m[3]}` : m[3];
+    const iso2 = `${ano}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    return dataValida(iso2) ? iso2 : "";
+  }
+  function centavosDoCsv(t) {
+    let s = String(t ?? "").trim().toUpperCase().replace(/R\$|\s/g, "");
+    if (!s || s === "-") return null;
+    let neg = false;
+    if (/^\(.*\)$/.test(s)) {
+      neg = true;
+      s = s.slice(1, -1);
+    }
+    if (/D$/.test(s)) {
+      neg = true;
+      s = s.slice(0, -1);
+    } else if (/C$/.test(s)) s = s.slice(0, -1);
+    if (/^[-−]/.test(s)) {
+      neg = !neg;
+      s = s.slice(1);
+    } else if (/^\+/.test(s)) s = s.slice(1);
+    if (!/^[\d.,]+$/.test(s)) throw new Error(`Valor que não entendi no arquivo CSV: "${t}".`);
+    const ponto = s.lastIndexOf(".");
+    const virgula = s.lastIndexOf(",");
+    let numero2;
+    if (ponto >= 0 && virgula >= 0) numero2 = ponto > virgula ? s.replace(/,/g, "") : s.replace(/\./g, "").replace(",", ".");
+    else if (virgula >= 0) numero2 = s.replace(",", ".");
+    else if (/^\d{1,3}(\.\d{3})+$/.test(s)) numero2 = s.replace(/\./g, "");
+    else numero2 = s;
+    const n = Number(numero2);
+    if (!Number.isFinite(n)) throw new Error(`Valor que não entendi no arquivo CSV: "${t}".`);
+    const c = Math.round(n * 100 + 1e-7);
+    return neg ? -c : c;
+  }
+  function lerCsv(texto3) {
+    const linhas2 = String(texto3 || "").replace(/^﻿/, "").split(/\r?\n/);
+    let cab = -1;
+    let sep = ";";
+    let col = null;
+    const achar = (nomes, chave) => {
+      const i = nomes.findIndex((n) => COLUNAS_CSV[chave].includes(n));
+      return i >= 0 ? i : null;
+    };
+    for (let i = 0; i < Math.min(linhas2.length, 30) && cab < 0; i += 1) {
+      const l = linhas2[i];
+      if (!l.trim()) continue;
+      const s = [";", "	", ","].map((x) => [x, camposCsv(l, x).length]).sort((a, b) => b[1] - a[1])[0][0];
+      const nomes = camposCsv(l, s).map(nomeColuna);
+      const c = Object.fromEntries(Object.keys(COLUNAS_CSV).map((k) => [k, achar(nomes, k)]));
+      if (c.data !== null && (c.valor !== null || c.entrada !== null || c.saida !== null)) {
+        cab = i;
+        sep = s;
+        col = c;
+      }
+    }
+    if (cab < 0) {
+      throw new ErroUsuario(`Não reconheci as colunas deste arquivo CSV. Procurei uma coluna de data (${nomesProcurados("data")}) e uma de valor (${nomesProcurados("valor")}) ou as de entrada (${nomesProcurados("entrada")}) e saída (${nomesProcurados("saida")}). Abra o arquivo, confira a linha dos títulos das colunas e, se for preciso, exporte o extrato em OFX no app do C6.`);
+    }
+    const lancamentos = [];
+    const vezes = /* @__PURE__ */ new Map();
+    const comSaldo = [];
+    for (let i = cab + 1; i < linhas2.length; i += 1) {
+      if (!linhas2[i].trim()) continue;
+      const f = camposCsv(linhas2[i], sep);
+      const data2 = dataCsv(f[col.data]);
+      if (!data2) continue;
+      let valor = col.valor !== null ? centavosDoCsv(f[col.valor]) : null;
+      if (valor === null) {
+        const ent = col.entrada !== null ? centavosDoCsv(f[col.entrada]) : null;
+        const sai = col.saida !== null ? centavosDoCsv(f[col.saida]) : null;
+        valor = ent ? Math.abs(ent) : sai ? -Math.abs(sai) : null;
+      }
+      if (valor === null || valor === 0) continue;
+      const tipo = col.tipo !== null ? semAcento(String(f[col.tipo] || "")).toUpperCase().trim() : "";
+      if (/^(D|DEBITO|SAIDA|S)$/.test(tipo)) valor = -Math.abs(valor);
+      else if (/^(C|CREDITO|ENTRADA|E)$/.test(tipo)) valor = Math.abs(valor);
+      const titulo2 = col.titulo !== null ? f[col.titulo] || "" : "";
+      const descricao = (col.descricao !== null ? f[col.descricao] : "") || titulo2;
+      const idArquivo = col.id !== null ? String(f[col.id] || "").trim() : "";
+      const chave = `${data2}|${valor}|${descricaoComparavel(descricao)}`;
+      const n = (vezes.get(chave) || 0) + 1;
+      vezes.set(chave, n);
+      const l = {
+        id_externo: idArquivo ? `csv:${idArquivo}` : `csv:${chave}|${n}`,
+        data: data2,
+        valor_centavos: valor,
+        tipo: valor < 0 ? "saida" : "entrada",
+        descricao,
+        titulo: titulo2 || null,
+        end_to_end_id: /^E\d{8}/.test(idArquivo) ? idArquivo : null,
+        local_reference: idArquivo && !/^E\d{8}/.test(idArquivo) ? idArquivo : null,
+        fonte: "csv"
+      };
+      lancamentos.push(l);
+      if (col.saldo !== null) {
+        const s = centavosDoCsv(f[col.saldo]);
+        if (s !== null) comSaldo.push({ l, saldo: s });
+      }
+    }
+    if (!lancamentos.length) throw new ErroUsuario("O arquivo CSV não tem lançamentos com data e valor (período sem movimentação ou arquivo incompleto).");
+    const datas = lancamentos.map((l) => l.data).sort();
+    return { de: datas[0], ate: datas[datas.length - 1], lancamentos, saldo: saldoDoArquivo(comSaldo) };
+  }
+  function saldoDoArquivo(lista3) {
+    if (lista3.length < 1) return null;
+    const bate = (l) => l.every((x, i) => i === 0 || x.saldo === l[i - 1].saldo + x.l.valor_centavos);
+    const ordem = bate(lista3) ? lista3 : bate([...lista3].reverse()) ? [...lista3].reverse() : null;
+    if (!ordem) return null;
+    const primeiro = ordem[0];
+    const ultimo = ordem[ordem.length - 1];
+    return { inicio: { data: primeiro.l.data, valor: primeiro.saldo - primeiro.l.valor_centavos }, fim: { data: ultimo.l.data, valor: ultimo.saldo } };
+  }
+  function saldoDoOfx(s) {
+    const m = /<LEDGERBAL>([\s\S]*?)(?:<\/LEDGERBAL>|<AVAILBAL>|<\/STMTRS>)/i.exec(s);
+    if (!m || !marca(m[1], "BALAMT")) return null;
+    return { data: dataOfx(marca(m[1], "DTASOF")) || null, valor: centavosDoOfx(marca(m[1], "BALAMT")) };
+  }
+  function somaDoPeriodo(d2, contaId, depoisDe, ate) {
+    return (d2.movimentacoes_banco || []).filter((m) => m.conta_id === contaId && m.data > depoisDe && m.data <= ate).reduce((s, m) => s + (m.tipo === "entrada" ? m.valor : -m.valor), 0);
+  }
+  function repetidosDoPeriodo(d2, contaId, depoisDe, ate) {
+    const grupos = /* @__PURE__ */ new Map();
+    for (const m of d2.movimentacoes_banco || []) {
+      if (m.conta_id !== contaId || m.data <= depoisDe || m.data > ate) continue;
+      const k = `${m.data}|${m.valor}|${m.tipo}`;
+      const l = grupos.get(k);
+      if (l) l.push(m);
+      else grupos.set(k, [m]);
+    }
+    return [...grupos.values()].filter((l) => l.length > 1).flatMap((l) => l.slice(1));
+  }
+  function conferirSaldo(d2, contaId, saldo) {
+    const ancora = saldo.inicio ? { data: somarDias(saldo.inicio.data, -1), valor: saldo.inicio.valor } : ((d2.saldos_banco || {})[contaId] || {}).ancora || null;
+    if (!ancora) return { situacao: "primeira", esperado: null, diferenca: 0, desde: null, repetidos: [] };
+    const depois = ancora.data <= saldo.data;
+    const [de, ate] = depois ? [ancora.data, saldo.data] : [saldo.data, ancora.data];
+    const soma = somaDoPeriodo(d2, contaId, de, ate);
+    const esperado = depois ? ancora.valor + soma : ancora.valor - soma;
+    const diferenca = saldo.valor - esperado;
+    if (diferenca === 0) return { situacao: "ok", esperado, diferenca, desde: ancora.data, repetidos: [] };
+    const repetidos = repetidosDoPeriodo(d2, contaId, de, ate);
+    const aMais = repetidos.reduce((s, m) => s + (m.tipo === "entrada" ? m.valor : -m.valor), 0) * (depois ? 1 : -1);
+    if (repetidos.length && aMais === -diferenca) return { situacao: "dobro", esperado, diferenca, desde: ancora.data, repetidos: repetidos.map((m) => m.id) };
+    return { situacao: "faltam", esperado, diferenca, desde: ancora.data, repetidos: [] };
+  }
+  function registrarSaldo(d2, contaId, saldo, usuario, { hoje: dia = hoje2(), convertido = false, valorBanco = null } = {}) {
+    exigirConta(d2, contaId);
+    let s = { ...saldo };
+    if (s.fonte === "api" && !convertido) {
+      const ate = extratoImportadoAte(d2, contaId);
+      if (!ate || ate < somarDias(dia, -1)) {
+        const r2 = { situacao: "sem_extrato", esperado: null, diferenca: 0, desde: ate, repetidos: [] };
+        d2.saldos_banco = { ...d2.saldos_banco || {}, [contaId]: { ...(d2.saldos_banco || {})[contaId] || {}, ultima: { ...r2, data: dia, valor: s.valor, fonte: "api", em: (/* @__PURE__ */ new Date()).toISOString(), por: usuario || "" } } };
+        return r2;
+      }
+      s = { data: somarDias(dia, -1), valor: s.valor - somaDoPeriodo(d2, contaId, somarDias(dia, -1), dia), fonte: "api" };
+    }
+    const r = conferirSaldo(d2, contaId, s);
+    const antes = (d2.saldos_banco || {})[contaId] || {};
+    const fim = { data: s.data, valor: s.valor, fonte: s.fonte };
+    const ancora = r.situacao === "ok" || r.situacao === "primeira" ? !antes.ancora || s.data >= antes.ancora.data ? fim : antes.ancora : antes.ancora || null;
+    d2.saldos_banco = { ...d2.saldos_banco || {}, [contaId]: { ancora, ultima: { ...r, ...fim, valor_banco: valorBanco ?? saldo.valor, em: (/* @__PURE__ */ new Date()).toISOString(), por: usuario || "" } } };
+    const TXT = { ok: "bate com as movimentações", primeira: "guardado como ponto de partida da conferência", faltam: `não bate: diferença de ${reais(r.diferenca)} (faltam lançamentos)`, dobro: `não bate: ${r.repetidos.length} lançamento(s) importado(s) em dobro` };
+    registrar(d2, usuario, "Alteração", "banco", null, `Saldo da conta ${apelidoDaConta(d2, contaId)} em ${dataBr(s.data)} (${reais(s.valor)}, ${s.fonte === "api" ? "pelo banco" : `arquivo ${s.fonte.toUpperCase()}`}): ${TXT[r.situacao]}`, { conta_id: contaId, ...r });
+    return r;
+  }
+  function aceitarSaldoDoBanco(d2, contaId, usuario) {
+    const atual = (d2.saldos_banco || {})[contaId];
+    if (!atual || !atual.ultima || atual.ultima.valor === void 0 || atual.ultima.situacao === "sem_extrato") throw new ErroUsuario("Não há saldo conferido para usar como ponto de partida. Consulte o saldo ou importe um arquivo antes.");
+    const u = atual.ultima;
+    d2.saldos_banco = { ...d2.saldos_banco, [contaId]: { ancora: { data: u.data, valor: u.valor, fonte: u.fonte }, ultima: { ...u, situacao: "aceito" } } };
+    registrar(d2, usuario, "Alteração", "banco", null, `Saldo da conta ${apelidoDaConta(d2, contaId)} em ${dataBr(u.data)} (${reais(u.valor)}) aceito como novo ponto de partida da conferência`, { conta_id: contaId });
+  }
+  function apagarCopiaRepetida(d2, movId, usuario) {
+    const m = buscar(d2, "movimentacoes_banco", movId);
+    if (!m) throw new Error("Movimentação não encontrada.");
+    if (m.classificacao || m.comprovante || m.comprovante_contador) throw new ErroUsuario("Esta cópia já tem destino ou comprovante: desfaça o destino antes (ou apague a outra cópia).");
+    const outra = (d2.movimentacoes_banco || []).find((x) => x.id !== m.id && x.conta_id === m.conta_id && x.data === m.data && x.valor === m.valor && x.tipo === m.tipo);
+    if (!outra) throw new ErroUsuario("Não há outro lançamento igual a este: não é uma cópia. Nada foi apagado.");
+    excluir(d2, "movimentacoes_banco", m.id, usuario, `Cópia repetida do lançamento de ${dataBr(m.data)} (${reais(m.valor)}) apagada (importado em dobro)`);
+    const u = ((d2.saldos_banco || {})[m.conta_id] || {}).ultima;
+    if (u && u.situacao === "dobro") registrarSaldo(d2, m.conta_id, { data: u.data, valor: u.valor, fonte: u.fonte }, usuario, { convertido: true, valorBanco: u.valor_banco ?? u.valor });
+  }
+  function boletosAvisados(d2, notificacoes, depoisDe = "") {
+    const refs = new Set((notificacoes || []).filter((n) => n && n.external_reference_id && (!depoisDe || String(n.recebida_em || "") > depoisDe)).map((n) => String(n.external_reference_id)));
+    return d2.cobrancas.filter((cb) => cb.banco && refs.has(String(cb.banco.id_externo)) && !cb.data_pagamento && cb.banco.situacao !== "cancelado");
+  }
+  function saudeDoBanco(d2, dia = hoje2()) {
+    const contas2 = contasConfiguradas(d2).map((c) => {
+      const movs2 = (d2.movimentacoes_banco || []).filter((m) => m.conta_id === c.id && m.importada_em);
+      const ultima = movs2.reduce((x, m) => !x || m.importada_em > x ? m.importada_em : x, null);
+      return { id: c.id, apelido: c.apelido || String(c.id).toUpperCase(), importado_ate: extratoImportadoAte(d2, c.id), ultima_importacao: ultima, saldo: ((d2.saldos_banco || {})[c.id] || {}).ultima || null };
+    });
+    const aguardando = d2.cobrancas.filter((cb) => {
+      if (!cb.banco || cb.data_pagamento || !/WAIT|PEND/.test(String(cb.banco.situacao_banco || "").toUpperCase())) return false;
+      const desde = cb.banco.pago_em || String(cb.banco.consultado_em || "").slice(0, 10);
+      return !!desde && somarDiasUteis(desde, DIAS_AGUARDANDO_CREDITO) < dia;
+    });
+    const comErro = d2.cobrancas.filter((cb) => !cb.data_pagamento && (cb.banco && cb.banco.situacao === "erro" || cb.emissao_pendente && cb.emissao_pendente.incerto));
+    return { contas: contas2, aguardando, comErro, pagosSemRegistro: pagosNoBancoSemRegistro(d2).filter((cb) => cb.banco.situacao === "pago") };
   }
   function tipoDoComprovante(d2, mov2) {
     if (mov2.origem) return mov2.tipo_conta || "Conta";
@@ -18778,7 +19005,7 @@ ${xref}
     if (m.observacoes) partes.push(m.observacoes);
     return partes.join(" · ");
   }
-  var CLASSIFICACOES, SITUACOES_PAGAMENTO, SITUACAO_C6, TRANSICOES, cfg, hoje2, dataDe, centavosDoC6, reaisParaC6, contasConfiguradas, empresaDaConta, contaDaEmpresa, fonteDe, maiusculaSemAcento, descricaoComparavel, referenciaNoBanco, CAMPOS_DESTINO, dataOfx, marca, nomeSemAcento, nomePadraoComprovante, emAberto, semDigitos, ligavel, pagoEntre, ehPix, DIAS_COMPENSACAO_BOLETO, idNormal, idUtil, ultimoCreditoEmDia, marcarProvaveis, nomeDoPagador, PALAVRAS, textoDaMov, despesasLigadasAoExtrato, podeSerPonta, indiceGuardado, classificacaoDaOrigem, ehDevolucao, carimbo, codigoDeBarras, conteudoComparavel, mesmoConteudo, pagamentosAtivos, ENVIADO_C6, DESTINO_CURTO;
+  var CLASSIFICACOES, SITUACOES_PAGAMENTO, SITUACAO_C6, TRANSICOES, cfg, hoje2, dataDe, centavosDoC6, reaisParaC6, contasConfiguradas, empresaDaConta, contaDaEmpresa, fonteDe, maiusculaSemAcento, descricaoComparavel, referenciaNoBanco, CAMPOS_DESTINO, dataOfx, marca, nomeColuna, COLUNAS_CSV, nomesProcurados, pagosNoBancoSemRegistro, DIAS_AGUARDANDO_CREDITO, nomeSemAcento, nomePadraoComprovante, emAberto, semDigitos, ligavel, pagoEntre, ehPix, DIAS_COMPENSACAO_BOLETO, idNormal, idUtil, ultimoCreditoEmDia, marcarProvaveis, nomeDoPagador, PALAVRAS, textoDaMov, despesasLigadasAoExtrato, podeSerPonta, indiceGuardado, classificacaoDaOrigem, ehDevolucao, carimbo, codigoDeBarras, conteudoComparavel, mesmoConteudo, pagamentosAtivos, ENVIADO_C6, DESTINO_CURTO;
   var init_conciliacao = __esm({
     "docs/js/conciliacao.js"() {
       init_c6_comum();
@@ -18837,7 +19064,7 @@ ${xref}
       fonteDe = (m) => m.fonte || (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(m.id_externo || "")) ? "api" : "ofx");
       maiusculaSemAcento = (t) => semAcento(String(t || "").toUpperCase());
       descricaoComparavel = (t) => maiusculaSemAcento(t).replace(/[^A-Z0-9]/g, "");
-      referenciaNoBanco = (m) => fonteDe(m) === "ofx" && m.local_reference ? m.local_reference : m.id_externo;
+      referenciaNoBanco = (m) => ["ofx", "csv"].includes(fonteDe(m)) && m.local_reference ? m.local_reference : m.id_externo;
       CAMPOS_DESTINO = {
         classificacao: null,
         imovel_id: null,
@@ -18870,6 +19097,21 @@ ${xref}
         const m = new RegExp(`<${tag}>([^<\\r\\n]*)`, "i").exec(bloco);
         return m ? m[1].trim() : "";
       };
+      nomeColuna = (t) => semAcento(String(t || "")).toLowerCase().replace(/\(?r\$\)?/g, " ").replace(/[^a-z0-9/]+/g, " ").trim();
+      COLUNAS_CSV = {
+        data: ["data lancamento", "data do lancamento", "data", "data contabil", "data movimento", "data da movimentacao", "data da transacao", "data de lancamento"],
+        titulo: ["titulo", "tipo de transacao", "transacao"],
+        descricao: ["descricao", "historico", "lancamento", "detalhes", "descricao do lancamento", "complemento"],
+        valor: ["valor", "valor do lancamento", "montante", "quantia"],
+        entrada: ["entrada", "entradas", "credito", "creditos", "valor de entrada", "valor credito"],
+        saida: ["saida", "saidas", "debito", "debitos", "valor de saida", "valor debito"],
+        tipo: ["tipo", "natureza", "d/c", "c/d", "credito/debito", "entrada/saida"],
+        saldo: ["saldo", "saldo do dia", "saldo apos lancamento", "saldo final", "saldo atual"],
+        id: ["id", "identificador", "referencia", "id da transacao", "codigo da transacao", "end to end", "end to end id", "id end to end", "autenticacao"]
+      };
+      nomesProcurados = (k) => COLUNAS_CSV[k].map((n) => `"${n}"`).join(", ");
+      pagosNoBancoSemRegistro = (d2, contaId = null) => d2.cobrancas.filter((cb) => cb.banco && !cb.data_pagamento && (!contaId || cb.banco.conta_id === contaId) && (cb.banco.situacao === "pago" || /WAIT|PEND/.test(String(cb.banco.situacao_banco || "").toUpperCase())));
+      DIAS_AGUARDANDO_CREDITO = 2;
       nomeSemAcento = (texto3) => semAcento(texto3).replace(/[<>:"/\\|?*\x00-\x1f]/g, " ").replace(/\s+/g, " ").trim().replace(/[. ]+$/, "");
       nomePadraoComprovante = (d2, mov2) => nomeComprovante(d2, mov2);
       emAberto = (cb) => !cb.data_pagamento && cb.situacao !== "Carência" && cb.situacao !== "Em acordo";
@@ -18953,9 +19195,11 @@ ${xref}
       <form data-form="ir" data-ir="banco" class="acoes"><input type="hidden" name="conta" value="${esc(conta)}"><input type="month" name="mes" value="${mes}" style="width:160px"><button class="secundario">Ir</button></form>
       ${link(url({ mes: somarMeses(mes, 1) }), `${compBr(somarMeses(mes, 1))} →`, "botao secundario")}`}</div></div>
     <div class="acoes" style="margin-bottom:12px">${opera() ? botaoPonte("buscarExtrato", `Buscar extrato de ${compBr(mes)} no banco`, { conta, mes }, "botao") : ""} ${botaoPonte("saldoBanco", "Ver saldo", { conta })}
-      ${opera() && contaDe(conta) ? `<label class="botao secundario pequeno enviar" title="Enquanto a ponte não tem as chaves do C6: no app do C6, exporte o extrato em OFX e escolha o arquivo aqui">📄 Importar arquivo OFX do app do C6<input type="file" accept=".ofx,application/x-ofx,text/plain" data-acao-arquivo="importarOfx" data-conta="${esc(conta)}" hidden></label>` : ""}
+      ${opera() && contaDe(conta) ? `<label class="botao secundario pequeno enviar" title="Enquanto a ponte não tem as chaves do C6: no app do C6, exporte o extrato em OFX (ou CSV) e escolha o arquivo aqui">📄 Importar arquivo OFX ou CSV do app do C6<input type="file" accept=".ofx,.csv,application/x-ofx,text/csv,text/plain" data-acao-arquivo="importarOfx" data-conta="${esc(conta)}" hidden></label>` : ""}
       ${saldo ? `<span>Saldo em ${esc(nomeConta(conta))}: <b>${reais(saldo.valor)}</b> <span class="suave">(${esc(saldo.quando)})</span></span>` : ""}
       ${importadoAte ? `<span class="suave">extrato importado até ${dataBr(importadoAte)}</span>` : ""}</div>
+    ${htmlConferenciaSaldo(conta)}
+    ${htmlPagosNoBanco(conta)}
     <div class="numeros">
       <div class="cartao"><div class="grande mov-entrada">${reais(soma("entrada"))}</div>entradas</div>
       <div class="cartao"><div class="grande mov-saida">${reais(soma("saida"))}</div>saídas</div>
@@ -18968,7 +19212,152 @@ ${xref}
       ${filtradas.map(linhaMovimentacao).join("") || `<tr><td colspan="6" class="suave">${doMes.length ? "Nenhuma movimentação com este filtro." : `Nenhuma movimentação importada em ${compBr(mes)}. Clique em "Buscar extrato".`}</td></tr>`}</table>
       <p class="suave">${AJUDA_BANCO}</p></div>
     ${imovelFiltro ? "" : caixaConferirBoletos(conta, mes)}
-    ${imovelFiltro || !e ? "" : caixaPastaContador(e, mes)}`;
+    ${imovelFiltro ? "" : caixaSaudeBanco()}
+    ${imovelFiltro || !e ? "" : caixaPastaContador(e, mes)}${iniciarRotinasDoBanco()}`;
+  }
+  function lerAvisosDoBanco({ silencioso = true } = {}) {
+    if (!lendoAvisos) lendoAvisos = lerAvisosAgora(silencioso).finally(() => {
+      lendoAvisos = null;
+      ultimaLeituraAvisos = Date.now();
+    });
+    return lendoAvisos;
+  }
+  function lerAvisosAoAbrir() {
+    if (avisosAoAbrir) return Promise.resolve();
+    avisosAoAbrir = true;
+    return lerAvisosDoBanco();
+  }
+  async function lerAvisosAgora(silencioso) {
+    if (!opera() || !bancoAtivo2() || !pontePronta(d())) return;
+    const lidos = lidosAte();
+    const pagos = [];
+    let gravou = false;
+    for (const c of contas()) {
+      const depoisDe = lidos[c.id] || new Date(Date.now() - 7 * 864e5).toISOString();
+      let r;
+      try {
+        r = await avisosDoBanco(c.id, depoisDe.slice(0, 10));
+      } catch (e) {
+        if (!silencioso) throw e;
+        continue;
+      }
+      const notificacoes = r && r.notificacoes || [];
+      const alvos = boletosAvisados(d(), notificacoes, depoisDe);
+      const respostas = [];
+      for (const cb of alvos.slice(0, MAX_RECONSULTAS)) {
+        try {
+          respostas.push([cb.id, await consultarBoleto(d(), cb)]);
+        } catch {
+        }
+      }
+      if (respostas.length) {
+        await alterar((db) => respostas.forEach(([id, resposta]) => registrarBoletoBancario(db, id, resposta, login())));
+        gravou = true;
+      }
+      if (respostas.length === alvos.length) {
+        lidos[c.id] = notificacoes.reduce((x, n) => n && String(n.recebida_em || "") > x ? String(n.recebida_em) : x, depoisDe);
+        guardarLidos(lidos);
+      }
+      for (const [id] of respostas) {
+        const cb = buscar2("cobrancas", id);
+        if (cb && !cb.data_pagamento && cb.banco && cb.banco.situacao === "pago") pagos.push(cb);
+      }
+    }
+    if (pagos.length) {
+      const nomes = pagos.slice(0, 3).map((cb) => {
+        const c = buscar2("contratos", cb.contrato_id);
+        return `${c ? c.inquilino_nome : ""} (${compBr(cb.competencia)}${cb.banco.valor_pago ? `, ${reais(cb.banco.valor_pago)}` : ""})`;
+      }).join("; ");
+      aviso(`O banco avisou ${pagos.length} pagamento(s) que ainda não está(ão) registrado(s) aqui: ${nomes}${pagos.length > 3 ? "…" : ""}. Abra a tela Banco e clique em "Registrar o pagamento" em cada um: nada é registrado sem a sua confirmação.`, "info");
+    }
+    if (gravou && String(location.hash || "").startsWith("#/banco")) await mostrar();
+  }
+  function iniciarRotinasDoBanco() {
+    if (typeof window === "undefined") return "";
+    if (!relogioAvisos) {
+      relogioAvisos = setInterval(() => {
+        if (!String(location.hash || "").startsWith("#/banco") || document.visibilityState !== "visible") return;
+        lerAvisosDoBanco().catch(() => {
+        });
+      }, INTERVALO_AVISOS_MS);
+    }
+    if (Date.now() - ultimaLeituraAvisos > INTERVALO_AVISOS_MS) setTimeout(() => lerAvisosDoBanco().catch(() => {
+    }), 0);
+    if (pontePronta(d()) && Date.now() - estado.saudePonteEm > 10 * 6e4) {
+      estado.saudePonteEm = Date.now();
+      setTimeout(() => conferirSaudePonte().catch(() => {
+      }), 0);
+    }
+    return "";
+  }
+  async function conferirSaudePonte() {
+    try {
+      estado.saudePonte = await saudePonte(d());
+      estado.saudePonteErro = "";
+    } catch (e) {
+      estado.saudePonte = null;
+      estado.saudePonteErro = e && e.message ? e.message : String(e);
+    }
+    const alvo = typeof document !== "undefined" && document.getElementById("saude-banco");
+    if (alvo) alvo.outerHTML = caixaSaudeBanco();
+  }
+  function htmlPagosNoBanco(conta) {
+    const lista3 = pagosNoBancoSemRegistro(d(), conta);
+    if (!lista3.length) return "";
+    const item3 = (cb) => {
+      const c = buscar2("contratos", cb.contrato_id);
+      const b = cb.banco;
+      const esperando = b.situacao !== "pago";
+      return `<li><a href="#/cobranca/${cb.id}">${esc(c ? c.inquilino_nome : "")} · boleto ${compBr(cb.competencia)}</a> · ${esperando ? etiqueta("pago, aguardando crédito no banco", "aviso") : `pago no banco${b.pago_em ? ` em ${dataBr(b.pago_em)}` : ""}${b.valor_pago ? ` (${reais(b.valor_pago)})` : ""}`}
+      ${opera() ? botaoPonte("consultarBoletoC6", esperando ? "Consultar de novo" : "Registrar o pagamento", { id: cb.id }) : ""}</li>`;
+    };
+    return `<div class="alerta info" id="pagos-no-banco"><b>${lista3.length} boleto(s) pago(s) no banco e ainda não registrado(s) aqui</b> (o banco avisou ou foi consultado). Confira e registre cada um: nada é registrado sem a sua confirmação.
+    <ul style="margin:6px 0 0">${lista3.map(item3).join("")}</ul></div>`;
+  }
+  function htmlConferenciaSaldo(conta) {
+    const u = ((d().saldos_banco || {})[conta] || {}).ultima;
+    if (!u) return "";
+    const quando3 = `${u.fonte === "api" ? "saldo consultado no banco" : `saldo do arquivo ${esc(String(u.fonte || "").toUpperCase())}`} em ${dataBr(u.data)}`;
+    const aceitar = podeUsuario("admin") ? ` ${botao("aceitarSaldoBanco", "Usar o saldo do banco como novo ponto de partida", { conta }, "secundario mini")}` : "";
+    if (u.situacao === "ok") return `<p class="suave" id="conferencia-saldo">✔ Saldo conferido (${quando3}): ${reais(u.valor)} bate com as movimentações importadas.</p>`;
+    if (u.situacao === "primeira" || u.situacao === "aceito") return `<p class="suave" id="conferencia-saldo">Saldo de ${reais(u.valor)} (${quando3}) guardado como ponto de partida: das próximas vezes o sistema confere se o saldo do banco bate com as movimentações importadas.</p>`;
+    if (u.situacao === "sem_extrato") return `<div class="alerta aviso" id="conferencia-saldo">Para conferir o saldo, busque antes o extrato até hoje (${u.desde ? `está importado só até ${dataBr(u.desde)}` : "ainda não foi importado"}) e clique de novo em "Ver saldo".</div>`;
+    const dif = `o banco diz <b>${reais(u.valor_banco ?? u.valor)}</b> e, pelas movimentações importadas desde ${dataBr(u.desde)}, deveria ser <b>${reais(u.esperado + (u.valor_banco !== void 0 ? u.valor_banco - u.valor : 0))}</b>`;
+    if (u.situacao === "dobro") {
+      const repetidos = (u.repetidos || []).map((id) => movs().find((m) => m.id === id)).filter(Boolean);
+      return `<div class="alerta perigo" id="conferencia-saldo"><b>Importado em dobro:</b> ${dif}. A diferença (${reais(Math.abs(u.diferenca))}) é igual a ${repetidos.length} lançamento(s) que aparece(m) duas vezes aqui:
+      <ul style="margin:6px 0 0">${repetidos.map((m) => `<li>${dataBr(m.data)} · ${esc(m.descricao || "")} · ${valorHtml(m)} ${opera() ? botao("apagarCopiaRepetida", "Apagar esta cópia", { id: m.id }, "secundario mini") : ""}</li>`).join("")}</ul>${aceitar}</div>`;
+    }
+    return `<div class="alerta aviso" id="conferencia-saldo"><b>Faltam lançamentos:</b> ${dif} (diferença de ${reais(Math.abs(u.diferenca))}${u.diferenca > 0 ? ", o banco tem mais dinheiro do que o sistema conta" : ", o banco tem menos dinheiro do que o sistema conta"}). Busque o extrato de novo desde ${dataBr(u.desde)} (ou importe o arquivo do período) e confira outra vez.${aceitar}</div>`;
+  }
+  function caixaSaudeBanco() {
+    const s = saudeDoBanco(d(), hojeIso());
+    const ponte2 = estado.saudePonte && estado.saudePonte.contas ? estado.saudePonte.contas : {};
+    const problemas = [];
+    const linhaConta = (c) => {
+      const p2 = ponte2[c.id];
+      const cert = !p2 ? '<span class="suave">certificado e token: a ponte ainda não respondeu</span>' : p2.simulado ? etiqueta("ponte em modo simulado", "aviso") : `${p2.certificado_valido_ate ? `certificado válido até ${dataBr(p2.certificado_valido_ate)}${p2.certificado_dias !== null && p2.certificado_dias <= 30 ? ` ${etiqueta(p2.certificado_dias < 0 ? "vencido" : `vence em ${p2.certificado_dias} dia(s)`, "perigo")}` : ""}` : p2.certificado === "faltando" ? etiqueta("falta o certificado", "perigo") : "certificado: sem data"}
+          · último token ${p2.token === "falhou" ? `${etiqueta("falhou", "perigo")} <span class="suave">${esc(p2.erro_token || "")}</span>` : p2.ultimo_token_em ? dataHoraBr(p2.ultimo_token_em) : "ainda não pedido"}`;
+      if (p2 && !p2.simulado && (p2.certificado_dias !== null && p2.certificado_dias <= 30 || p2.token === "falhou" || p2.certificado === "faltando")) problemas.push(c.id);
+      const atrasado = !!c.importado_ate && c.importado_ate < somarDias(hojeIso(), -8);
+      if (atrasado) problemas.push(`extrato ${c.id}`);
+      const saldo = c.saldo && ["faltam", "dobro"].includes(c.saldo.situacao) ? ` · ${etiqueta(c.saldo.situacao === "dobro" ? "saldo: importado em dobro" : "saldo: faltam lançamentos", "aviso")}` : c.saldo && c.saldo.situacao === "ok" ? ` · saldo conferido em ${dataBr(c.saldo.data)}` : "";
+      if (c.saldo && ["faltam", "dobro"].includes(c.saldo.situacao)) problemas.push(`saldo ${c.id}`);
+      return `<li><b>${esc(c.apelido)}</b>: ${cert}<br>extrato importado até ${c.importado_ate ? dataBr(c.importado_ate) : "—"}${atrasado ? ` ${etiqueta("mais de uma semana sem importar", "aviso")}` : ""}${c.ultima_importacao ? ` <span class="suave">(última importação em ${dataHoraBr(c.ultima_importacao)})</span>` : ""}${saldo}</li>`;
+    };
+    const boleto = (cb, extra) => {
+      const c = buscar2("contratos", cb.contrato_id);
+      return `<li><a href="#/cobranca/${cb.id}">${esc(c ? c.inquilino_nome : "")} · boleto ${compBr(cb.competencia)}</a> · ${extra}</li>`;
+    };
+    const linhas2 = s.contas.map(linhaConta).join("");
+    if (s.aguardando.length) problemas.push("aguardando");
+    if (s.comErro.length) problemas.push("erro");
+    return `<details class="cartao" id="saude-banco" ${problemas.length ? "open" : ""}><summary><b>Saúde do banco</b> ${problemas.length ? etiqueta(`${problemas.length} ponto(s) a conferir`, "aviso") : etiqueta("tudo em ordem", "ok")} <span class="suave">· clique para ${problemas.length ? "recolher" : "ver"}</span></summary>
+    ${estado.saudePonteErro ? `<div class="alerta aviso">A ponte não respondeu: ${esc(estado.saudePonteErro)}</div>` : ""}
+    <ul style="margin:6px 0">${linhas2 || "<li>Nenhuma conta do banco cadastrada.</li>"}</ul>
+    ${s.aguardando.length ? `<p><b>Pagos, aguardando o crédito há mais de ${DIAS_AGUARDANDO_CREDITO} dias úteis</b> (o normal é o dinheiro entrar em até 3 dias úteis: consulte de novo e, se continuar, fale com o C6):</p><ul>${s.aguardando.map((cb) => boleto(cb, `pago${cb.banco.pago_em ? ` em ${dataBr(cb.banco.pago_em)}` : ""} ${opera() ? botaoPonte("consultarBoletoC6", "Consultar de novo", { id: cb.id }, "secundario mini") : ""}`)).join("")}</ul>` : ""}
+    ${s.comErro.length ? `<p><b>Emissões com erro ou sem resposta, a conferir</b> (abra o boleto: "Conferir no banco" ou "Tentar de novo"):</p><ul>${s.comErro.map((cb) => boleto(cb, cb.emissao_pendente && cb.emissao_pendente.incerto ? etiqueta("sem resposta: pode ter sido emitido", "aviso") : `${etiqueta("erro", "perigo")} <span class="suave">${esc(String(cb.banco && cb.banco.erro || "").slice(0, 140))}</span>`)).join("")}</ul>` : ""}
+    <p class="acoes">${botaoPonte("conferirSaudeBanco", "Conferir a ponte agora")}</p></details>`;
   }
   function caixaPastaContador(e, mes) {
     return `<details class="cartao" id="pasta-contador"><summary><b>Pasta do contador de ${compBr(mes)}</b> <span class="suave">· ${esc(pastaContador3())} › ${esc(e.nome)} › ${mes} · clique para expandir</span></summary>
@@ -19511,11 +19900,12 @@ ${xref}
       }
     }
   }
-  var TITULO_AGUARDANDO, config, contas, contaDe, bancoAtivo2, movs, pagamentos, nomeConta, emitenteDaConta, pastaContador3, rotuloDe, ROTULO_CURTO, SEM_COMPROVANTE2, SEM_IMOVEL, mov, pag, registroDe, valorHtml, precisaComprovante, temComprovante, sugestaoDe, centavosDoBanco, botaoPonte, estado, avisoNaoConfigurado, avisoPagamentosDesligados, AJUDA_BANCO, irmaoDe, comComprovante, AVISO_APROVACAO, CODIGO_PAG, PENDENTES, etiquetaSituacao, CABECALHO_PAG, opcoes, despesasSemExtrato, ondeFoiDiferenca, pagamentosDoLote, ACOES_BANCO, FORMULARIOS_BANCO;
+  var TITULO_AGUARDANDO, config, contas, contaDe, bancoAtivo2, movs, pagamentos, nomeConta, emitenteDaConta, pastaContador3, rotuloDe, ROTULO_CURTO, SEM_COMPROVANTE2, SEM_IMOVEL, mov, pag, registroDe, valorHtml, precisaComprovante, temComprovante, sugestaoDe, centavosDoBanco, botaoPonte, estado, avisoNaoConfigurado, avisoPagamentosDesligados, CHAVE_AVISOS, INTERVALO_AVISOS_MS, MAX_RECONSULTAS, lidosAte, guardarLidos, lendoAvisos, ultimaLeituraAvisos, relogioAvisos, avisosAoAbrir, AJUDA_BANCO, irmaoDe, comComprovante, AVISO_APROVACAO, CODIGO_PAG, PENDENTES, etiquetaSituacao, CABECALHO_PAG, opcoes, despesasSemExtrato, ondeFoiDiferenca, pagamentosDoLote, ACOES_BANCO, FORMULARIOS_BANCO;
   var init_banco2 = __esm({
     "docs/js/telas/banco.js"() {
       init_app();
       init_armazenamento();
+      init_banco();
       init_banco_fase2();
       init_calculos();
       init_calculos();
@@ -19566,10 +19956,30 @@ ${xref}
         }
       };
       botaoPonte = (acao, texto3, dados = {}, cls = "secundario pequeno") => bancoAtivo2() ? botao(acao, texto3, dados, cls) : `<button type="button" class="${cls}" disabled title="${TITULO_AGUARDANDO}">${texto3}</button>`;
-      estado = { saldos: {}, conferencia: null, avisos: null };
+      estado = { saldos: {}, conferencia: null, avisos: null, saudePonte: null, saudePonteEm: 0, saudePonteErro: "" };
       avisoNaoConfigurado = () => `<div class="alerta aviso" id="banco-nao-configurado"><b>O banco ainda não está ligado.</b> As chaves da API do C6 são configuradas em <a href="#/dados">Dados e backup</a> (caixa "Banco (C6)").
   Até lá, os botões que falam com o banco ficam desligados; o que já foi importado continua aqui.</div>`;
       avisoPagamentosDesligados = () => `<div class="alerta aviso"><b>Os pagamentos pelo banco estão desligados.</b> O administrador liga em <a href="#/dados?ir=config-banco2">Dados e backup → Banco: conciliação e pagamentos</a>. Enquanto isso, as contas são pagas fora do sistema e só o extrato é conferido aqui.</div>`;
+      CHAVE_AVISOS = "avisos-banco-lidos";
+      INTERVALO_AVISOS_MS = 5 * 6e4;
+      MAX_RECONSULTAS = 20;
+      lidosAte = () => {
+        try {
+          return JSON.parse(localStorage.getItem(CHAVE_AVISOS) || "{}") || {};
+        } catch {
+          return {};
+        }
+      };
+      guardarLidos = (o) => {
+        try {
+          localStorage.setItem(CHAVE_AVISOS, JSON.stringify(o));
+        } catch {
+        }
+      };
+      lendoAvisos = null;
+      ultimaLeituraAvisos = 0;
+      relogioAvisos = null;
+      avisosAoAbrir = false;
       AJUDA_BANCO = "Busque o extrato uma vez por mês (ou quando quiser). Cada linha precisa de um destino: um imóvel e a conta dele (água, luz, gás, condomínio, IPTU), um boleto de aluguel recebido, um imposto, tarifa do banco ou transferência entre as nossas contas. O comprovante é guardado em PDF com um nome padrão (data, empresa, imóvel, conta e valor) na pasta do imóvel (Contas pagas/ano) e numa cópia para o contador (_Contador/Empresa/AAAA-MM).";
       irmaoDe = (db, x, tabela) => irmaoDoComprovante(db, x, tabela);
       comComprovante = (x, tabela = "movimentacoes_banco") => temComprovante(x) || !!ondeEstaComprovante(x, tabela);
@@ -19617,19 +20027,30 @@ ${xref}
           const arquivo = el && el.files && el.files[0];
           if (!arquivo) return;
           try {
-            const r = lerOfx(textoDoOfx(new Uint8Array(await arquivo.arrayBuffer())));
+            const texto3 = textoDoOfx(new Uint8Array(await arquivo.arrayBuffer()));
+            const ehOfx = /<OFX>/i.test(texto3);
+            const tipo = ehOfx ? "OFX" : "CSV";
+            const r = ehOfx ? lerOfx(texto3) : { ...lerCsv(texto3), banco: "", conta: "" };
             const entradas = r.lancamentos.filter((l) => l.tipo === "entrada").reduce((s, l) => s + l.valor_centavos, 0);
             const saidas = r.lancamentos.filter((l) => l.tipo === "saida").reduce((s, l) => s - l.valor_centavos, 0);
+            const saldo = ehOfx ? r.saldo && r.saldo.data ? { data: r.saldo.data, valor: r.saldo.valor, fonte: "ofx" } : null : r.saldo ? { data: r.saldo.fim.data, valor: r.saldo.fim.valor, inicio: r.saldo.inicio, fonte: "csv" } : null;
             const ok = await janela({
               titulo: `Importar extrato na conta ${nomeConta(conta)}`,
               sim: "Importar",
-              html: `<p>Arquivo <b>${esc(arquivo.name)}</b>${r.banco ? ` · ${esc(r.banco)}` : ""}${r.conta ? ` · conta nº <b>${esc(r.conta)}</b>` : ""}.</p>
+              html: `<p>Arquivo <b>${esc(arquivo.name)}</b> (${tipo})${r.banco ? ` · ${esc(r.banco)}` : ""}${r.conta ? ` · conta nº <b>${esc(r.conta)}</b>` : ""}.</p>
           <p><b>${r.lancamentos.length}</b> lançamento(s) de ${dataBr(r.de)} a ${dataBr(r.ate)}: entradas ${reais(entradas)}, saídas ${reais(saidas)}.</p>
+          ${saldo ? `<p>Saldo no arquivo em ${dataBr(saldo.data)}: <b>${reais(saldo.valor)}</b> (depois de importar, o sistema confere com as movimentações daqui).</p>` : '<p class="suave">O arquivo não traz o saldo: a conferência do saldo fica para o "Ver saldo".</p>'}
           <p class="suave">Confira se o arquivo é mesmo da conta <b>${esc(nomeConta(conta))}</b> (aba aberta). O que já foi importado não entra em dobro.</p>`
             });
             if (!ok) return;
-            const res = await alterar((db) => importarExtrato(db, conta, r.lancamentos, login(), { de: r.de, ate: r.ate, contaDoArquivo: r.conta }));
-            aviso(`${nomeConta(conta)}: ${res.novas.length} movimentação(ões) nova(s) do arquivo OFX, ${res.repetidas} já estava(m).`);
+            let conf = null;
+            const res = await alterar((db) => {
+              const x = importarExtrato(db, conta, r.lancamentos, login(), { de: r.de, ate: r.ate, contaDoArquivo: r.conta });
+              if (saldo) conf = registrarSaldo(db, conta, saldo, login());
+              return x;
+            });
+            const TXT = { ok: " O saldo do arquivo bate com as movimentações daqui.", faltam: " Atenção: o saldo do arquivo não bate (faltam lançamentos): veja o aviso na tela.", dobro: " Atenção: há lançamento importado em dobro: veja o aviso na tela." };
+            aviso(`${nomeConta(conta)}: ${res.novas.length} movimentação(ões) nova(s) do arquivo ${tipo}, ${res.repetidas} já estava(m).${conf ? TXT[conf.situacao] || "" : ""}`, conf && ["faltam", "dobro"].includes(conf.situacao) ? "aviso" : void 0);
             ir(`#/banco?conta=${encodeURIComponent(conta)}&mes=${r.ate.slice(0, 7)}`);
           } finally {
             if (el) el.value = "";
@@ -19640,7 +20061,44 @@ ${xref}
           const s = await saldoDaConta(conta);
           const comLimite = s.total_available !== void 0 && s.available !== void 0 && s.available !== s.total_available ? centavosDoBanco(s.total_available) : null;
           estado.saldos[conta] = { valor: centavosDoBanco(s.available ?? s.total_available ?? 0), quando: `consultado ${agoraBr()}${comLimite !== null ? ` · com o limite do banco: ${reais(comLimite)} (o limite não é dinheiro da conta)` : ""}` };
+          if (opera() && s.available !== void 0) await alterar((db) => registrarSaldo(db, conta, { data: hojeIso(), valor: centavosDoBanco(s.available), fonte: "api" }, login()));
           await mostrar();
+        },
+        /** Administrador: a diferença do saldo foi explicada (ex.: lançamento antigo de antes do sistema); o saldo do banco vira o novo ponto de partida. */
+        async aceitarSaldoBanco({ conta }) {
+          if (!podeUsuario("admin")) throw new Error("Só o administrador muda o ponto de partida da conferência do saldo.");
+          const u = ((d().saldos_banco || {})[conta] || {}).ultima;
+          const ok = await janela({
+            titulo: "Usar o saldo do banco como ponto de partida",
+            sim: "Usar este saldo",
+            forte: true,
+            html: `<p>O saldo de <b>${u ? reais(u.valor) : "-"}</b> em ${u ? dataBr(u.data) : "-"} (conta ${esc(nomeConta(conta))}) passa a ser o ponto de partida: as próximas conferências partem dele.</p>
+        <p>Use só quando souber por que o saldo não bateu (ex.: lançamento de antes do sistema). Se faltar lançamento no extrato, busque o extrato de novo em vez disso.</p>`
+          });
+          if (!ok) return;
+          await alterar((db) => aceitarSaldoDoBanco(db, conta, login()));
+          await mostrar();
+        },
+        /** Conferência do saldo: apaga a cópia de um lançamento importado em dobro (sem destino nem comprovante) e confere de novo. */
+        async apagarCopiaRepetida({ id }) {
+          if (!opera()) throw new Error("Seu usuário não pode mexer no extrato.");
+          const m = mov(id);
+          const ok = await janela({
+            titulo: "Apagar a cópia repetida",
+            sim: "Apagar a cópia",
+            forte: true,
+            html: `<p>${dataBr(m.data)} · ${esc(m.descricao || "")} · <b>${valorHtml(m)}</b></p><p>Este lançamento aparece duas vezes aqui. A cópia sai e a outra fica; o saldo é conferido de novo.</p>`
+          });
+          if (!ok) return;
+          await alterar((db) => apagarCopiaRepetida(db, m.id, login()));
+          await mostrar();
+        },
+        /** Painel de saúde: consulta a ponte agora (certificado, último token). */
+        async conferirSaudeBanco() {
+          if (!bancoAtivo2()) throw new Error(TITULO_AGUARDANDO);
+          estado.saudePonteEm = Date.now();
+          await conferirSaudePonte();
+          if (estado.saudePonteErro) throw new Error(`A ponte não respondeu: ${estado.saudePonteErro}`);
         },
         async darDestino({ id }) {
           const m = mov(id);
@@ -32651,6 +33109,8 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         // ------------------------------------------------------------------------
         painel(rota) {
           organizarPastasUmaVez().catch((e) => aviso(`Organização das pastas: ${e.message}`, "aviso")).then(() => limparSemImovel()).catch((e) => aviso(`Limpeza da pasta "${PASTA_SEM_IMOVEL}": ${e.message}`, "aviso")).then(() => guardarCartasAntigas()).catch((e) => aviso(`Cartas de reajuste na pasta do inquilino: ${e.message}`, "aviso")).then(() => conferirArquivosUmaVez()).catch((e) => aviso(`Conferência dos arquivos: ${e.message}`, "aviso")).then(() => conferirSoltosUmaVez()).catch((e) => aviso(`Pasta física: ${e.message}`, "aviso")).then(() => apagarDocumentosVencidosDasFichas()).catch((e) => aviso(`Documentos das fichas reprovadas: ${e.message}`, "aviso"));
+          lerAvisosAoAbrir().catch(() => {
+          });
           trazerHerancasPendentes().catch((e) => aviso(`Contratos herdados: ${e.message}`, "aviso")).then(() => acertarNomesUmaVez()).catch((e) => aviso(`Nomes dos comprovantes: ${e.message}`, "aviso"));
           const hoje3 = hojeIso();
           const todosOsAlertas = alertasDaTela(hoje3);
