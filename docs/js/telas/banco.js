@@ -16,6 +16,8 @@ import { alterarApagandoAnexos, botao, buscar, caixaArquivos, d, etiqueta, link,
 // Configuração e atalhos
 // --------------------------------------------------------------------------
 const TITULO_AGUARDANDO = 'Aguardando as chaves da API do C6';
+/** Ação do banco com o banco ainda desligado: o que dizer a quem clicou. */
+const BANCO_DESLIGADO = 'O banco ainda não está ligado ao sistema (faltam as chaves do C6). Peça ao administrador para ligar em Dados e backup → Banco.';
 const config = () => d().config_banco || {};
 const contas = () => config().contas || [];
 const contaDe = (id) => contas().find((c) => c.id === id) || null;
@@ -33,8 +35,8 @@ const ROTULO_CURTO = { boleto: 'Boleto nosso', airbnb: 'Airbnb', reforma: 'Refor
 const SEM_COMPROVANTE = ['ignorar'];
 /** Destinos sem imóvel. */
 const SEM_IMOVEL = ['tarifa', 'transferencia', 'ignorar', 'imposto', 'airbnb'];
-const mov = (id) => { const m = movs().find((x) => x.id === Number(id)); if (!m) throw new Error('Movimentação não encontrada.'); return m; };
-const pag = (id) => { const p = pagamentos().find((x) => x.id === Number(id)); if (!p) throw new Error('Pagamento não encontrado.'); return p; };
+const mov = (id) => { const m = movs().find((x) => x.id === Number(id)); if (!m) throw new C.ErroUsuario('Esta movimentação não existe mais (pode ter sido apagada por outra pessoa). Atualize a página.'); return m; };
+const pag = (id) => { const p = pagamentos().find((x) => x.id === Number(id)); if (!p) throw new C.ErroUsuario('Este pagamento não existe mais (pode ter sido apagado por outra pessoa). Atualize a página.'); return p; };
 const registroDe = (tabela, id) => (tabela === 'pagamentos_banco' ? pag(id) : mov(id));
 const valorHtml = (m) => `<span class="mov-${m.tipo}">${m.tipo === 'entrada' ? '+' : '−'} ${reais(m.valor)}</span>`;
 const precisaComprovante = (m) => !!m.classificacao && !SEM_COMPROVANTE.includes(m.classificacao);
@@ -362,11 +364,11 @@ function comprovanteHtml(x, tabela = 'movimentacoes_banco') {
  */
 async function guardarComprovante(x, tabela, nomeBase, blob, origem, { avisar = true } = {}) {
   const base = S.limparNome(C.semAcento(nomeBase).replace(/\.pdf$/i, '').trim());
-  if (!base || base === 'sem nome') throw new Error('Dê um nome ao comprovante.');
+  if (!base || base === 'sem nome') throw new C.ErroUsuario('Escreva um nome para o comprovante antes de guardar.');
   const arquivo = () => new File([blob], `${base}.pdf`, { type: 'application/pdf' });
   const p = Z.escopoDoComprovante(d(), x);
   const c = config().copiar_para_contador !== false ? Z.escopoContador(d(), x) : null;
-  if (!p && !c) throw new Error('Não há pasta para guardar: a movimentação não tem imóvel e a conta não está ligada a uma empresa (Dados e backup → Banco).');
+  if (!p && !c) throw new C.ErroUsuario('Não há pasta para guardar: a movimentação não tem imóvel e a conta não está ligada a uma empresa (Dados e backup → Banco).');
   const comprovante = p ? await S.salvarArquivo(await pastaDoEscopo(p.escopo, p.id), arquivo()) : null;
   const contador = c ? await S.salvarArquivo(await pastaDoEscopo(c.escopo, c.id), arquivo()) : null;
   // registrarComprovante copia o nome para a conta lançada e para o irmão (pagamento ↔ movimentação; as duas pontas da transferência)
@@ -406,15 +408,15 @@ async function janelaComprovante(x, tabela, { soManual = false, nomeFixo = null 
 /** O PDF escolhido na janela (ponte ou PC) como Blob. */
 async function pdfDaJanela(r) {
   if (r.origem === 'ponte') {
-    if (!bancoAtivo()) throw new Error(TITULO_AGUARDANDO);
+    if (!bancoAtivo()) throw new C.ErroUsuario(BANCO_DESLIGADO);
     try {
       return await P.baixarComprovantePonte(r.lanc.conta, r.lanc.referencia, r.lanc.data);
     } catch (e) {
       throw new Error(`Não consegui gerar o comprovante pelo banco agora (${e.message}). Você pode anexar o PDF do computador: clique de novo em "Nomear e guardar" e escolha "Anexar um PDF".`);
     }
   }
-  if (!r.arquivo || !r.arquivo.size) throw new Error('Escolha o arquivo PDF do comprovante.');
-  if (!/\.pdf$/i.test(r.arquivo.name) && r.arquivo.type !== 'application/pdf') throw new Error('O comprovante precisa ser um PDF.');
+  if (!r.arquivo || !r.arquivo.size) throw new C.ErroUsuario('Escolha o arquivo PDF do comprovante.');
+  if (!/\.pdf$/i.test(r.arquivo.name) && r.arquivo.type !== 'application/pdf') throw new C.ErroUsuario('O comprovante precisa ser um PDF.');
   return r.arquivo;
 }
 
@@ -895,11 +897,11 @@ async function conferirAntesDeCancelar(pags) {
 // --------------------------------------------------------------------------
 export const ACOES_BANCO = {
   async buscarExtrato({ conta, mes }) {
-    if (!opera()) throw new Error('Seu usuário não pode importar o extrato.');
-    if (!bancoAtivo()) throw new Error(`${TITULO_AGUARDANDO}: configure o banco em Dados e backup.`);
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode buscar o extrato. Peça ao administrador, se precisar.');
+    if (!bancoAtivo()) throw new C.ErroUsuario(BANCO_DESLIGADO);
     const [inicio, fim] = C.limitesCompetencia(mes);
     const ate = fim < C.hojeIso() ? fim : C.hojeIso();
-    if (inicio > ate) throw new Error(`${compBr(mes)} ainda não começou.`);
+    if (inicio > ate) throw new C.ErroUsuario(`${compBr(mes)} ainda não começou.`);
     // o que faltou do mês anterior vem junto (ex.: buscado em 30/11 às 10h, importado até 29/11: dezembro começa em 30/11);
     // o que já estava não entra em dobro
     const anterior = R.extratoImportadoAte(d(), conta);
@@ -915,7 +917,7 @@ export const ACOES_BANCO = {
    * do arquivo, o período e a quantidade; lançamentos já importados (mesmo FITID) não entram de novo.
    */
   async importarOfx({ conta }, el) {
-    if (!opera()) throw new Error('Seu usuário não pode importar o extrato.');
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode buscar o extrato. Peça ao administrador, se precisar.');
     const arquivo = el && el.files && el.files[0];
     if (!arquivo) return;
     try {
@@ -950,7 +952,7 @@ export const ACOES_BANCO = {
   },
 
   async saldoBanco({ conta }) {
-    if (!bancoAtivo()) throw new Error(TITULO_AGUARDANDO);
+    if (!bancoAtivo()) throw new C.ErroUsuario(BANCO_DESLIGADO);
     const s = await P.saldoDaConta(conta);
     // em destaque o saldo de verdade (available); total_available soma o limite de crédito do banco
     const comLimite = s.total_available !== undefined && s.available !== undefined && s.available !== s.total_available ? centavosDoBanco(s.total_available) : null;
@@ -1000,7 +1002,7 @@ export const ACOES_BANCO = {
   async usarSugestao({ id }) {
     const m = mov(id);
     const s = sugestaoDe(m);
-    if (!s || !s.classificacao) throw new Error('Não há sugestão para esta movimentação.');
+    if (!s || !s.classificacao) throw new C.ErroUsuario('Esta movimentação não tem mais sugestão (a tela mudou). Atualize a página e escolha o destino à mão.');
     if (s.pagamento_banco_id) {
       await alterar((db) => Z.marcarPagoPeloExtrato(db, s.pagamento_banco_id, m.id, login()));
       aviso('Pagamento pelo banco confirmado pelo extrato.');
@@ -1029,7 +1031,7 @@ export const ACOES_BANCO = {
   /** Troca o comprovante gerado (ou anexado antes) pelo PDF oficial do banco, com o mesmo nome: o anterior é apagado da pasta. */
   async trocarComprovante({ id, tabela = 'movimentacoes_banco' }) {
     const onde = ondeEstaComprovante(registroDe(tabela, id), tabela);
-    if (!onde) throw new Error('Este lançamento ainda não tem comprovante: use "Nomear e guardar".');
+    if (!onde) throw new C.ErroUsuario('Este lançamento ainda não tem comprovante: use "Nomear e guardar".');
     const x = registroDe(tabela, id);
     const nome = String(onde.nome).replace(/\.pdf$/i, '').replace(/ \(\d+\)$/, '');
     const r = await janelaComprovante(x, tabela, { soManual: true, nomeFixo: nome });
@@ -1048,8 +1050,8 @@ export const ACOES_BANCO = {
 
   /** Gera pela ponte, de uma vez, os comprovantes do mês que ainda faltam (entradas e saídas com destino). */
   async gerarComprovantesMes({ conta, mes }) {
-    if (!opera()) throw new Error('Seu usuário não pode guardar comprovantes.');
-    if (!bancoAtivo()) throw new Error(TITULO_AGUARDANDO);
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode guardar comprovantes.');
+    if (!bancoAtivo()) throw new C.ErroUsuario(BANCO_DESLIGADO);
     const doMes = movs().filter((m) => m.conta_id === conta && String(m.data).slice(0, 7) === mes);
     const semDestino = doMes.filter((m) => !m.classificacao).length;
     const faltam = doMes.filter((m) => precisaComprovante(m) && !comComprovante(m) && m.id_externo);
@@ -1073,8 +1075,8 @@ export const ACOES_BANCO = {
   async confirmarBoletoPeloBanco({ id, cobranca }) {
     const m = mov(id);
     const cb = buscar('cobrancas', Number(cobranca));
-    if (!cb) throw new Error('Boleto não encontrado.');
-    if (cb.data_pagamento) throw new Error('Este boleto já está pago.');
+    if (!cb) throw new C.ErroUsuario('Este boleto não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.');
+    if (cb.data_pagamento) throw new C.ErroUsuario('Este boleto já está pago: nada a fazer.');
     const c = buscar('contratos', cb.contrato_id);
     const previsto = R.previstoNoPagamento(cb, m.data).valor_devido;
     const r = await janela({ titulo: 'Confirmar o pagamento do boleto', sim: 'Confirmar pagamento', forte: previsto !== m.valor,
@@ -1100,7 +1102,7 @@ export const ACOES_BANCO = {
 
   /** Lê os avisos que o banco mandou à ponte (webhook) e mostra os boletos a reconsultar. Nada é registrado aqui. */
   async avisosDoBanco({ conta }) {
-    if (!bancoAtivo()) throw new Error(TITULO_AGUARDANDO);
+    if (!bancoAtivo()) throw new C.ErroUsuario(BANCO_DESLIGADO);
     const desde = C.somarDias(C.hojeIso(), -30);
     const r = await P.avisosDoBanco(conta, desde);
     const refs = [...new Set(((r && r.notificacoes) || []).map((n) => n.external_reference_id).filter(Boolean))];
@@ -1111,7 +1113,7 @@ export const ACOES_BANCO = {
   },
 
   async conferirBoletosBanco({ conta, mes }) {
-    if (!bancoAtivo()) throw new Error(TITULO_AGUARDANDO);
+    if (!bancoAtivo()) throw new C.ErroUsuario(BANCO_DESLIGADO);
     const [de, fim] = C.limitesCompetencia(mes);
     const r = await P.boletosPagos(conta, de, fim < C.hojeIso() ? fim : C.hojeIso());
     const pagos = Array.isArray(r) ? r : (r && (r.boletos || r.content)) || [];
@@ -1122,11 +1124,11 @@ export const ACOES_BANCO = {
   },
 
   async lerNoBanco({ ids }) {
-    if (!opera()) throw new Error('Seu usuário não pode preparar pagamentos.');
-    if (!bancoAtivo()) throw new Error(TITULO_AGUARDANDO);
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode preparar pagamentos.');
+    if (!bancoAtivo()) throw new C.ErroUsuario(BANCO_DESLIGADO);
     // rascunho, erro de leitura ou aprovado sem lote (dados antigos): todos precisam da leitura do banco antes do envio
     const pags = String(ids).split(',').map((x) => pag(x)).filter((p) => PENDENTES.includes(p.situacao));
-    if (!pags.length) throw new Error('Nenhum pagamento para o banco ler.');
+    if (!pags.length) throw new C.ErroUsuario('Não há pagamento para o banco ler: lance as contas a pagar primeiro.');
     await lerNoBanco(pags[0].conta_id, pags);
     await mostrar();
   },
@@ -1136,11 +1138,11 @@ export const ACOES_BANCO = {
    * registrado. A outra confirmação é no app do C6 (duas ao todo, decisão do dono em 2026-11-07).
    */
   async enviarGrupoAprovacao({ conta, grupo }) {
-    if (!podeUsuario('admin')) throw new Error('Só o administrador envia pagamentos para aprovação.');
-    if (!bancoAtivo()) throw new Error(TITULO_AGUARDANDO);
-    if (!config().permitir_pagamentos) throw new Error('Os pagamentos pelo banco estão desligados em Dados e backup → Banco: conciliação e pagamentos.');
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador envia pagamentos para aprovação.');
+    if (!bancoAtivo()) throw new C.ErroUsuario(BANCO_DESLIGADO);
+    if (!config().permitir_pagamentos) throw new C.ErroUsuario('Os pagamentos pelo banco estão desligados em Dados e backup → Banco: conciliação e pagamentos.');
     const pags = pagamentosDoLote(grupo);
-    if (!pags.length) throw new Error('Nenhum pagamento deste lote está pronto para enviar (prepare de novo).');
+    if (!pags.length) throw new C.ErroUsuario('Nenhum pagamento deste lote está pronto para enviar (prepare de novo).');
     const { items } = await P.itensDoGrupo(conta, grupo);
     const { prontos, jaNoBanco, comErro } = Z.separarParaEnvio(pags, items || []);
     // a resposta do envio anterior se perdeu: o banco já tem estes (na fila de aprovação do app); aqui só se registra
@@ -1149,7 +1151,7 @@ export const ACOES_BANCO = {
       aviso(`${jaNoBanco.length} pagamento(s) já tinha(m) chegado ao banco: a situação foi atualizada para "Enviado ao banco". Aprove no aplicativo do C6.`, 'aviso');
       if (!prontos.length) return mostrar();
     }
-    if (!prontos.length) throw new Error('Nenhum item foi validado pelo banco. Confira os códigos e prepare de novo.');
+    if (!prontos.length) throw new C.ErroUsuario('Nenhum item foi validado pelo banco. Confira os códigos e prepare de novo.');
     // aprovado dias depois de preparado: a data de pagamento não pode ter passado
     const passados = prontos.filter((p) => p.data_pagamento && p.data_pagamento < C.hojeIso());
     if (passados.length) throw new C.ErroUsuario(`${passados.length} pagamento(s) deste lote está(ão) com a data de pagamento já passada (${passados.map((p) => `${esc(p.tipo_conta || '')} ${reais(p.valor)} em ${dataBr(p.data_pagamento)}`).join('; ')}). Descarte e prepare de novo com a data de hoje ou depois. Nada foi enviado ao banco.`);
@@ -1195,7 +1197,7 @@ export const ACOES_BANCO = {
 
   /** Administrador: o pagamento enviado foi cancelado (ou recusado) no C6 e o banco não avisou; aqui passa a "Cancelado" e sai do alerta. */
   async canceladoNoBanco({ id }) {
-    if (!podeUsuario('admin')) throw new Error('Só o administrador marca um pagamento como cancelado no banco.');
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador marca um pagamento como cancelado no banco.');
     const p = pag(id);
     const r = await janela({ titulo: 'Foi cancelado no C6', sim: 'Marcar como cancelado', forte: true,
       html: `<p>${esc(p.tipo_conta || '')} ${compBr(p.competencia)} · <b>${reais(p.valor)}</b> · pagar em ${dataBr(p.data_pagamento)} · conta ${esc(nomeConta(p.conta_id))}</p>
@@ -1210,7 +1212,7 @@ export const ACOES_BANCO = {
   },
 
   async atualizarSituacaoPagamento({ conta, grupo }) {
-    if (!bancoAtivo()) throw new Error(TITULO_AGUARDANDO);
+    if (!bancoAtivo()) throw new C.ErroUsuario(BANCO_DESLIGADO);
     const { items } = await P.itensDoGrupo(conta, grupo);
     const mudados = await alterar((db) => Z.atualizarSituacaoPagamentos(db, items || [], login()));
     const n = mudados.length;
@@ -1233,7 +1235,7 @@ export const ACOES_BANCO = {
     const dist = (m) => (alvo ? Math.abs(C.diasEntre(alvo, m.data)) : 0);
     const candidatas = movs().filter((m) => m.conta_id === p.conta_id && m.tipo === 'saida' && m.valor === p.valor && !m.classificacao && dist(m) <= 5)
       .sort((a, b) => dist(a) - dist(b) || String(b.data).localeCompare(String(a.data)));
-    if (!candidatas.length) throw new Error(`Nenhuma saída de ${reais(p.valor)} sem destino na conta ${nomeConta(p.conta_id)} entre ${dataBr(C.somarDias(alvo, -5))} e ${dataBr(C.somarDias(alvo, 5))}. Busque o extrato do mês na tela Banco e tente de novo.`);
+    if (!candidatas.length) throw new C.ErroUsuario(`Nenhuma saída de ${reais(p.valor)} sem destino na conta ${nomeConta(p.conta_id)} entre ${dataBr(C.somarDias(alvo, -5))} e ${dataBr(C.somarDias(alvo, 5))}. Busque o extrato do mês na tela Banco e tente de novo.`);
     const r = await janela({ titulo: 'Qual saída do extrato é este pagamento?', sim: 'Confirmar pagamento',
       html: `<p>${esc(p.tipo_conta || '')} ${compBr(p.competencia)} · <b>${reais(p.valor)}</b> · pagar em ${dataBr(p.data_pagamento)}</p>
         ${candidatas.map((m, n) => `<p><label><input type="radio" name="mov" value="${m.id}" ${n === 0 ? 'checked' : ''}> ${dataBr(m.data)} · ${esc(m.titulo || '')} ${esc(m.descricao || '')} · ${reais(m.valor)}</label></p>`).join('')}
@@ -1247,7 +1249,7 @@ export const ACOES_BANCO = {
 
 export const FORMULARIOS_BANCO = {
   async registrarPagamentosBanco(form) {
-    if (!opera()) throw new Error('Seu usuário não pode confirmar pagamentos.');
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode confirmar pagamentos.');
     const conf = estado.conferencia;
     const marcados = [...form.querySelectorAll('input[name="pag"]:checked')].map((el) => conf && conf.sugestoes[Number(el.value)]).filter(Boolean);
     if (!marcados.length) throw new C.ErroUsuario('Marque pelo menos um boleto.');
@@ -1285,19 +1287,19 @@ export const FORMULARIOS_BANCO = {
   },
 
   async pagarPeloBanco(form) {
-    if (!opera()) throw new Error('Seu usuário não pode preparar pagamentos.');
-    if (!bancoAtivo()) throw new Error(`${TITULO_AGUARDANDO}: configure o banco em Dados e backup.`);
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode preparar pagamentos.');
+    if (!bancoAtivo()) throw new C.ErroUsuario(BANCO_DESLIGADO);
     const f = Object.fromEntries(new FormData(form));
     const i = buscar('imoveis', Number(f.imovel));
-    if (!i) throw new Error('Imóvel não encontrado.');
-    if (!f.conta) throw new Error('Escolha a conta que paga.');
+    if (!i) throw new C.ErroUsuario('Este imóvel não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.');
+    if (!f.conta) throw new C.ErroUsuario('Escolha a conta do banco que vai pagar.');
     const itens = R.TIPOS_DESPESA.map((t, n) => ({ tipo_conta: f[`tipo_${n}`] || t, codigo: String(f[`codigo_${n}`] || '').trim(), valor: String(f[`valor_${n}`] || '').trim() ? C.centavos(f[`valor_${n}`]) : 0, data_pagamento: f[`data_${n}`] || C.hojeIso() }))
       .filter((x) => x.codigo || x.valor);
-    if (!itens.length) throw new Error('Preencha o código e o valor de pelo menos uma conta.');
+    if (!itens.length) throw new C.ErroUsuario('Preencha o código e o valor de pelo menos uma conta.');
     for (const x of itens) {
-      if (!x.codigo) throw new Error(`${x.tipo_conta}: informe o código de barras ou o Pix.`);
-      if (!(x.valor > 0)) throw new Error(`${x.tipo_conta}: informe o valor.`);
-      if (x.data_pagamento < C.hojeIso()) throw new Error(`${x.tipo_conta}: a data de pagamento não pode ser no passado.`);
+      if (!x.codigo) throw new C.ErroUsuario(`${x.tipo_conta}: informe o código de barras ou o Pix.`);
+      if (!(x.valor > 0)) throw new C.ErroUsuario(`${x.tipo_conta}: informe o valor.`);
+      if (x.data_pagamento < C.hojeIso()) throw new C.ErroUsuario(`${x.tipo_conta}: a data de pagamento não pode ser no passado.`);
     }
     // o código é conferido aqui, antes de ir ao banco: número só vira boleto com 44, 47 ou 48 dígitos (nunca chave Pix, salvo CPF/CNPJ)
     const prontos = itens.map((x) => {
@@ -1312,7 +1314,7 @@ export const FORMULARIOS_BANCO = {
   },
 
   async configBanco2(form) {
-    if (!podeUsuario('admin')) throw new Error('Só o administrador altera a configuração do banco.');
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador altera a configuração do banco.');
     const f = Object.fromEntries(new FormData(form));
     const campos = { permitir_pagamentos: f.permitir_pagamentos === '1', copiar_para_contador: f.copiar_para_contador === '1',
       limite_pagamento: String(f.limite_pagamento || '').trim() ? C.centavos(f.limite_pagamento) : 0,
