@@ -10,7 +10,7 @@ import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 import * as A from '../atualizador-pc/atualizador.mjs';
 import * as L from '../atualizador-pc/ligar.mjs';
-import { resumoSenha } from '../docs/js/auth.js';
+import { resumoSenha, sha256 } from '../docs/js/auth.js';
 import * as B from '../docs/js/backup-seguro.js';
 import { CofreDO } from '../nuvem/cofre.mjs';
 import * as W from '../nuvem/worker.mjs';
@@ -18,6 +18,7 @@ import { r2Falso } from './r2-falso.mjs';
 
 const SITE = 'https://erp.exemplo.com.br';
 const SENHA = 'senha do dono 2026';
+const SAL_VERIFICADOR = `aparelho:${'ab'.repeat(16)}`;
 const proteger = (t) => `P:${Buffer.from(t).toString('base64')}`; // cifra de mentira (a do Windows só existe no Windows)
 const abrir = (t) => Buffer.from(t.slice(2), 'base64').toString();
 
@@ -31,6 +32,9 @@ async function nuvem() {
     { id: 1, login: 'dono@exemplo.com.br', email: 'dono@exemplo.com.br', nome: 'Dono Exemplo', papel: 'admin', ativo: true, senha_sal: 's1', senha_hash: await resumoSenha(SENHA, 's1', 150000), senha_iteracoes: 150000 },
   ] }, 'dono@exemplo.com.br');
   await r2.put('arquivos/Sala 101/contrato.pdf', 'pdf de teste');
+  // o dono já entrou no site com a senha: o verificador do programa do PC está na nuvem (outro sal, fora do banco)
+  const u = dobj.cofre.q("SELECT dados FROM registros WHERE tabela = 'usuarios' AND id = 1").map((x) => JSON.parse(x.dados))[0];
+  await dobj.aparelhos.guardarVerificador({ sal: SAL_VERIFICADOR, iteracoes: 150000, resumo: await resumoSenha(SENHA, SAL_VERIFICADOR, 150000), marca: await sha256(u.senha_hash) }, { id: 1 });
   W.esquecerPapeis(); W.esquecerCrachas();
   const env = { ACCESS_EQUIPE: 'exemplo.cloudflareaccess.com', ACCESS_AUD: 'aud', ORIGEM: SITE, DADOS: r2, COFRE: { idFromName: (n) => n, get: () => ({ fetch: (req) => dobj.fetch(req) }) } };
   const github = async (url, op = {}) => (op.headers?.['If-None-Match'] === '"v1"' ? new Response(null, { status: 304 }) : new Response(op.method === 'HEAD' ? null : '<!doctype html><html>versão PC</html>', { headers: { ETag: '"v1"' } }));
@@ -75,7 +79,7 @@ test('ligar o computador: página só deste computador, senha conferida na nuvem
   assert.equal(vistos.outroSite, 403, 'outro site aberto no navegador não liga nada');
   assert.equal(vistos.pasta, pasta);
   assert.match(vistos.semPasta, /não é a do backup seguro/);
-  assert.equal(vistos.errada, 'E-mail ou senha errados.');
+  assert.match(vistos.errada, /^E-mail ou senha errados. Se a senha está certa: entre uma vez no sistema pelo site/);
   assert.match(vistos.ok, /Pronto: ESCRITORIO-01 está ligado ao sistema com o acesso de Dono Exemplo/);
   assert.deepEqual([lig.computador, lig.login, lig.pasta, lig.cracha], ['ESCRITORIO-01', 'dono@exemplo.com.br', pasta, undefined]);
 
@@ -190,7 +194,8 @@ test('ligar: a senha não vai para a nuvem (só o resumo calculado aqui, igual a
   assert.match(d.cracha, /^ap1_/);
   assert.equal(corpos.length, 2, 'dois pedidos: o sal e o resumo');
   assert.ok(corpos.every((c) => !c.includes(SENHA)), 'a senha não sai do computador');
-  assert.equal(JSON.parse(corpos[1]).senha, `pbkdf2:${await resumoSenha(SENHA, 's1', 150000)}`);
+  // o programa do PC de hoje (sem mudança) faz a conta com o sal do verificador, não com o senha_sal do banco
+  assert.equal(JSON.parse(corpos[1]).senha, `pbkdf2:${await resumoSenha(SENHA, SAL_VERIFICADOR, 150000)}`);
   assert.equal(await L.resumoDaSenha('senha de teste 2026', 'sal', 150000), await resumoSenha('senha de teste 2026', 'sal', 150000), 'mesma conta de docs/js/auth.js');
   await assert.rejects(L.entrarNaNuvem(SITE, { email: 'dono@exemplo.com.br', senha: 'senha errada', computador: 'PC' }, buscar), /E-mail ou senha errados/);
   const resposta = (d2) => async () => new Response(JSON.stringify(d2), { headers: { 'content-type': 'application/json' } });
