@@ -67,6 +67,27 @@ test('item 41: sem internet, cada clique grava só o lote novo (não a fila inte
   for (const x of [s, outra]) if (x.envioMarcado) clearTimeout(x.envioMarcado);
 });
 
+test('desempenho 11: a gravação copia só as tabelas que usa; as outras continuam as mesmas e nem entram na comparação', () => {
+  const d = R.normalizar(R.bancoVazio());
+  R.inserir(d, 'imoveis', { nome: 'Apto' }, 'ana');
+  R.inserir(d, 'cobrancas', { contrato_id: 1, competencia: '2026-11', aluguel: 100 }, 'ana');
+  d.listas.tipos = ['A'];
+  const c = N.copiarSobDemanda(d);
+  R.atualizar(c, 'imoveis', 1, { nome: 'Apto 101' }, 'ana');
+  c.listas = { ...c.listas, tipos: ['B'] }; // trocar o campo inteiro
+  delete c.config_banco; // apagar um campo
+  N.fecharCopia(c);
+  assert.equal(d.imoveis[0].nome, 'Apto', 'o de antes não muda');
+  assert.equal(c.imoveis[0].nome, 'Apto 101');
+  assert.equal(c.cobrancas, d.cobrancas, 'tabela não usada: o mesmo objeto');
+  assert.notEqual(c.imoveis, d.imoveis);
+  assert.deepEqual(Object.keys(c).filter((k) => k !== 'config_banco'), Object.keys(d).filter((k) => k !== 'config_banco'), 'mesma ordem dos campos');
+  assert.ok(!('config_banco' in c));
+  const ops = N.diferencas(d, c);
+  assert.deepEqual(ops.map((o) => o.op === 'raiz' ? `raiz:${o.campo}` : `${o.op}:${o.tabela || ''}`).sort(), ['alterar:imoveis', 'historico:', 'raiz:config_banco', 'raiz:listas']);
+  assert.equal(JSON.stringify(N.copiarSobDemanda(d)), JSON.stringify(d), 'ler tudo dá o mesmo que o original');
+});
+
 test('item 44: a mudança recusada porque o registro veio de uma gravação também recusada aparece ligada a ela', async () => {
   let criado = null;
   const { s } = aparelho((parte) => {

@@ -58,6 +58,43 @@ export function copiar(d) {
   return c;
 }
 
+const SOB_DEMANDA = Symbol('copia-sob-demanda');
+const valorFixo = (c, k, v) => Object.defineProperty(c, k, { value: v, writable: true, configurable: true, enumerable: true });
+
+/**
+ * Cópia para uma gravação que copia cada tabela só quando a gravação a usa (desempenho, item 11 do mutirão 3000): editar um
+ * imóvel não copia mais as 17 mil NFs e os 8 mil boletos (no banco grande, ~120 ms por gravação). Cada campo de cima é uma
+ * "porta": ao ler ou trocar, vira a cópia (ou o valor novo). O histórico é copiado como em `copiar` (a lista, não as entradas).
+ * Depois da gravação, `fecharCopia` deixa os campos que ela não usou apontando para os de `d` (os mesmos objetos: ninguém
+ * os mexe no lugar, a próxima gravação copia de novo o que usar) e `diferencas` nem olha para eles (`va === vb`).
+ */
+export function copiarSobDemanda(d) {
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return structuredClone(d);
+  const c = {}; const fechados = new Set();
+  for (const k of Object.keys(d)) {
+    const v = d[k];
+    if (k === 'historico' && Array.isArray(v)) { c[k] = v.slice(); continue; }
+    if (v === null || typeof v !== 'object') { c[k] = v; continue; }
+    fechados.add(k);
+    Object.defineProperty(c, k, {
+      configurable: true, enumerable: true,
+      get() { fechados.delete(k); const x = structuredClone(v); valorFixo(c, k, x); return x; },
+      set(x) { fechados.delete(k); valorFixo(c, k, x); },
+    });
+  }
+  Object.defineProperty(c, SOB_DEMANDA, { value: { d, fechados }, configurable: true });
+  return c;
+}
+
+/** Fim da gravação sobre `copiarSobDemanda`: o que ela não usou passa a ser o mesmo objeto de antes. Devolve a cópia. */
+export function fecharCopia(c) {
+  const info = c && c[SOB_DEMANDA];
+  if (!info) return c;
+  for (const k of info.fechados) if (Object.getOwnPropertyDescriptor(c, k)?.get) valorFixo(c, k, info.d[k]);
+  delete c[SOB_DEMANDA];
+  return c;
+}
+
 /**
  * O que mudou de `antes` para `depois`, no formato do lote do cofre.
  * Tabelas: inserir / alterar (campo a campo, com antes e depois) / excluir (com o registro como estava).
@@ -484,8 +521,9 @@ export class Sincronia {
       await this.releFila();
       const geracao = this.geracao;
       const antes = this.atual();
-      const depois = copiar(antes);
-      const r = fn(depois);
+      const depois = copiarSobDemanda(antes); // só as tabelas que a gravação usa (item 11)
+      let r;
+      try { r = fn(depois); } finally { fecharCopia(depois); }
       const ops = diferencas(antes, depois);
       if (ops.some(ehContador)) { comContador = true; return undefined; }
       falta = this.faltaDeFaixa(ops);
@@ -524,8 +562,9 @@ export class Sincronia {
         await this.releFila();
         if (this.pendentes.length) throw new ErroNuvem('Ainda há mudanças esperando para ir à nuvem. Tente de novo em instantes.');
         const antes = this.atual();
-        const depois = copiar(antes);
-        const r = fn(depois);
+        const depois = copiarSobDemanda(antes);
+        let r;
+        try { r = fn(depois); } finally { fecharCopia(depois); }
         const ops = diferencas(antes, depois);
         const falta = this.faltaDeFaixa(ops);
         if (falta) return { falta };

@@ -86,13 +86,17 @@ export async function assinaturaDoBanco(pasta) {
   } catch { return null; }
 }
 
+/** JSON de um arquivo: pelo `Response` do navegador (interpreta sem deixar o texto inteiro preso a uma variável) ou pelo texto. */
+const lerJson = async (arq) => (typeof Response === 'function' ? new Response(arq).json() : JSON.parse(await arq.text()));
+
 export async function lerBanco(pasta) {
   if (!(await arquivoExiste(pasta, ARQUIVO_BANCO))) return null;
   const arq = await (await pasta.getFileHandle(ARQUIVO_BANCO)).getFile();
-  const texto = await arq.text();
   let dados;
   try {
-    dados = JSON.parse(texto);
+    // o texto do arquivo (o dobro do tamanho na memória) não fica guardado numa variável: some logo depois de interpretado,
+    // antes de normalizar (banco grande: a memória chegava a 110 MB na abertura; desempenho, item 16)
+    dados = await lerJson(arq);
   } catch {
     throw new Error(`O arquivo ${ARQUIVO_BANCO} está danificado. Restaure uma cópia da pasta ${PASTA_BACKUPS}.`);
   }

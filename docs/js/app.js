@@ -178,8 +178,9 @@ async function alterarNaPasta(fn, soSessao) {
   }
   if (!igualAoDisco && disco) anotarConferido(pasta, E.d, S.assinaturaLida(disco));
   const antes = E.d || disco;
-  const copia = N.copiar(antes); // o histórico (só cresce) não é copiado entrada por entrada
-  const resultado = fn(copia);
+  const copia = N.copiarSobDemanda(antes); // só as tabelas que a gravação usa (desempenho, item 11); o histórico, só a lista
+  let resultado;
+  try { resultado = fn(copia); } finally { N.fecharCopia(copia); }
   copia.revisao = (copia.revisao || 0) + 1;
   copia.revisao_so_sessao = soSessao ? copia.revisao : null;
   const assinatura = await S.gravarBanco(pasta, copia);
