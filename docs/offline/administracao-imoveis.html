@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-Ceh/cC4FrNq8pLAuGlwFeZrS41WOdq4oVYQmHLmBuco='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-FjEYFPJHM0UhyCF1VO7266PtzOuj4pkKcChqyJcIJ0M=' 'sha256-ryxvp875PBAyCsXn/QHZT+XvJIosmLI2rY8Iq0ZSNM8='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="3bf0c3b45558559f">
+<meta name="fontes" content="3dd1b97ae0281bcd">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -65,6 +65,11 @@ tr.total td { font-weight: 700; border-top: 2px solid var(--texto); }
 .grupo-alerta { margin-bottom: 14px; }
 .grupo-alerta h3 { margin: 0 0 6px; font-size: 15px; }
 .grupo-alerta .alerta { margin-bottom: 4px; }
+.grupo-pendencias { margin: 0 0 10px; }
+.grupo-pendencias summary { cursor: pointer; font-size: 15px; padding: 4px 0; }
+.grupo-pendencias[open] summary { margin-bottom: 6px; }
+.grupo-pendencias .alerta { margin-bottom: 4px; }
+.reajuste-mes-fechado { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--borda, #e5e7eb); }
 .alerta { border-left: 5px solid; padding: 9px 12px; border-radius: 6px; margin-bottom: 8px; background: #fff; }
 .alerta.perigo { border-color: var(--perigo); background: #fef2f2; }
 .alerta.aviso { border-color: #f59e0b; background: #fffbeb; }
@@ -2621,7 +2626,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       `${c.inquilino_nome}: pasta física (${MOMENTOS[momento]}) · ${[resumo(l), pastaAnterior && `pasta de ${buscar(d2, "contratos", pastaAnterior.contrato_id).inquilino_nome} posta dentro`].filter(Boolean).join("; ")}`
     );
   }
-  var ligado, soltosConhecidos, anotarSoltos, GRUPOS_PASTA, MOMENTOS, MONTADA, semAcento2, RENDA, PESSOA, PAGAMENTO, montagensDe, pastaMontada, saidaFechada, guardarAte;
+  var ligado, soltosConhecidos, versaoSoltos, anotarSoltos, GRUPOS_PASTA, MOMENTOS, MONTADA, semAcento2, RENDA, PESSOA, PAGAMENTO, montagensDe, pastaMontada, saidaFechada, guardarAte;
   var init_arquivo_impresso = __esm({
     "docs/js/arquivo-impresso.js"() {
       init_calculos();
@@ -2629,8 +2634,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       init_regras();
       ligado = () => !!regra("arquivo_impresso");
       soltosConhecidos = /* @__PURE__ */ new Map();
+      versaoSoltos = 0;
       anotarSoltos = (contratoId, nomes) => {
         soltosConhecidos.set(Number(contratoId), [...nomes]);
+        versaoSoltos += 1;
       };
       GRUPOS_PASTA = [
         ["contrato", "Contrato e termos"],
@@ -4236,6 +4243,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     bancoAtivo: () => bancoAtivo,
     bancoVazio: () => bancoVazio,
     baseDaFatura: () => baseDaFatura,
+    basesIptu: () => basesIptu,
     boletoDoMes: () => boletoDoMes,
     boletosCaucaoDa: () => boletosCaucaoDa,
     boletosDescontadosNaSaida: () => boletosDescontadosNaSaida,
@@ -5538,19 +5546,37 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   }
   function basesIptu(d2) {
     const bases = /* @__PURE__ */ new Map();
+    let porContrato = null;
     return (imovelId) => {
-      if (!bases.has(imovelId)) bases.set(imovelId, baseIptuDoImovel(d2, imovelId));
+      if (!bases.has(imovelId)) {
+        porContrato = porContrato || boletosDoAluguelPorContrato(d2);
+        bases.set(imovelId, baseIptuDoImovel(d2, imovelId, porContrato));
+      }
       return bases.get(imovelId);
     };
   }
-  function baseIptuDoImovel(d2, imovelId) {
-    const contratos = d2.contratos.filter((c) => c.imovel_id === imovelId);
-    const ids = new Set(contratos.map((c) => c.id));
-    const boletos = /* @__PURE__ */ new Map();
+  function boletosDoAluguelPorContrato(d2) {
+    const m = /* @__PURE__ */ new Map();
     for (const cb of d2.cobrancas) {
-      if (!ids.has(cb.contrato_id) || ehBoletoAvulso(cb)) continue;
+      if (ehBoletoAvulso(cb)) continue;
+      const l = m.get(cb.contrato_id);
+      if (l) l.push(cb);
+      else m.set(cb.contrato_id, [cb]);
+    }
+    return m;
+  }
+  function baseIptuDoImovel(d2, imovelId, porContrato = null) {
+    const contratos = d2.contratos.filter((c) => c.imovel_id === imovelId);
+    const boletos = /* @__PURE__ */ new Map();
+    const guardar = (cb) => {
       const k = `${cb.contrato_id}|${cb.competencia}`;
       if (!boletos.has(k)) boletos.set(k, cb);
+    };
+    if (porContrato) {
+      for (const id of new Set(contratos.map((c) => c.id))) for (const cb of porContrato.get(id) || []) guardar(cb);
+    } else {
+      const ids = new Set(contratos.map((c) => c.id));
+      for (const cb of d2.cobrancas) if (ids.has(cb.contrato_id) && !ehBoletoAvulso(cb)) guardar(cb);
     }
     return { contratos, boletos, iptus: d2.iptus.filter((x) => x.imovel_id === imovelId) };
   }
@@ -5642,22 +5668,22 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return [...porMes2.values()].sort((a, b) => a.mesBoleto.localeCompare(b.mesBoleto));
   }
-  function mapaIptuAvista(d2, p2) {
+  function mapaIptuAvista(d2, p2, base = null) {
     if (!p2.pago_avista) return [];
     const n = Number(p2.num_parcelas) || 0;
     const primeiro = p2.primeiro_vencimento_boleto || p2.primeira_competencia && somarMeses(p2.primeira_competencia, 1);
     const esquema = p2.cobranca_inquilino !== COBRANCA_IPTU_QUITADO[1] && n && primeiro ? valoresIptu(p2).map((valor, k) => ({ mesBoleto: somarMeses(primeiro, k), rotulo: `${k + 1}ª parcela`, valor })) : dividirIptu(p2, 12).map((valor, k) => ({ mesBoleto: somarMeses(`${p2.ano}-01`, k + 1), rotulo: `1/12 (${String(k + 1).padStart(2, "0")}/${p2.ano})`, valor }));
     const porMes2 = new Map(esquema.map((x) => [x.mesBoleto, { ...x, valorInquilino: 0 }]));
-    for (const m of mesesIptuAvista(d2, p2)) {
+    for (const m of mesesIptuAvista(d2, p2, base)) {
       const it2 = porMes2.get(m.mesBoleto) || { mesBoleto: m.mesBoleto, rotulo: m.rotulo.replace(" (você pagou à vista)", ""), valor: m.valor, valorInquilino: 0 };
       it2.valorInquilino += m.valor;
       porMes2.set(m.mesBoleto, it2);
     }
     return [...porMes2.values()].map((x) => ({ ...x, valorProprietario: Math.max(0, x.valor - x.valorInquilino) })).sort((a, b) => a.mesBoleto.localeCompare(b.mesBoleto));
   }
-  function totaisIptu(d2, p2) {
-    const ps = parcelasIptu(d2, p2);
-    const inquilino = ps.reduce((s, x) => s + x.valorInquilino, 0) + mesesIptuAvista(d2, p2).reduce((s, x) => s + x.valor, 0);
+  function totaisIptu(d2, p2, base = null) {
+    const ps = parcelasIptu(d2, p2, base);
+    const inquilino = ps.reduce((s, x) => s + x.valorInquilino, 0) + mesesIptuAvista(d2, p2, base).reduce((s, x) => s + x.valor, 0);
     const custo = ps.reduce((s, x) => s + x.valor, 0);
     return {
       custo,
@@ -8792,13 +8818,47 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const meses = Math.max(1, mesesEntre(de.slice(0, 7), ate.slice(0, 7)) + 1);
     const dentro = (x) => x && x >= de && x <= ate;
     const cache = { taxas: /* @__PURE__ */ new Map(), faturamento: indiceFaturamento(d2), nfs: indiceFaturas(d2) };
+    const porImovel = (lista3, imovelDe2) => {
+      const m = /* @__PURE__ */ new Map();
+      for (const x of lista3) {
+        const k = imovelDe2(x);
+        const l = m.get(k);
+        if (l) l.push(x);
+        else m.set(k, [x]);
+      }
+      return (id) => m.get(id) || [];
+    };
+    const pagasDoPeriodo = d2.cobrancas.filter((cb) => dentro(cb.data_pagamento));
+    const imoveisDoContrato = (soNf) => {
+      const m = /* @__PURE__ */ new Map();
+      for (const c of d2.contratos) if (!soNf || geraNf(c)) m.set(c.id, [...m.get(c.id) || [], c.imovel_id]);
+      return m;
+    };
+    const porImovelDosBoletos = (soNf) => {
+      const doContrato = imoveisDoContrato(soNf);
+      const m = /* @__PURE__ */ new Map();
+      for (const cb of pagasDoPeriodo) {
+        for (const im of new Set(doContrato.get(cb.contrato_id) || [])) {
+          const l = m.get(im);
+          if (l) l.push(cb);
+          else m.set(im, [cb]);
+        }
+      }
+      return (id) => m.get(id) || [];
+    };
+    const pagasNfDe = porImovelDosBoletos(true);
+    const pagasTodasDe = porImovelDosBoletos(false);
+    const avulsasDe = porImovel(d2.avulsas.filter((a) => !a.airbnb_competencia && dentro(a.data_pagamento)), (a) => a.imovel_id);
+    const ganhosDe = porImovel((d2.ganhos_airbnb || []).filter((g) => dentro(g.data_recebimento)), (g) => g.imovel_id);
+    const contasDe = porImovel(d2.despesas.filter((x) => dentro(x.data_pagamento)), (x) => x.imovel_id);
+    const iptusDe = porImovel(d2.iptus, (x) => x.imovel_id);
+    const baseDe = basesIptu(d2);
     return d2.imoveis.map((i) => {
-      const contratos = new Set(d2.contratos.filter((c) => c.imovel_id === i.id && geraNf(c)).map((c) => c.id));
-      const pagas = d2.cobrancas.filter((cb) => contratos.has(cb.contrato_id) && dentro(cb.data_pagamento));
+      const pagas = pagasNfDe(i.id);
       const aluguel = pagas.reduce((s, cb) => s + (cb.valor_nf || 0), 0);
-      const listaAvulsas = d2.avulsas.filter((a) => a.imovel_id === i.id && !a.airbnb_competencia && dentro(a.data_pagamento));
+      const listaAvulsas = avulsasDe(i.id);
       const avulsas = listaAvulsas.reduce((s, a) => s + a.valor, 0);
-      const ganhos = (d2.ganhos_airbnb || []).filter((g) => g.imovel_id === i.id && dentro(g.data_recebimento));
+      const ganhos = ganhosDe(i.id);
       const airbnb = ganhos.reduce((s, g) => s + g.valor, 0);
       let impostos = 0;
       let impostosEstimados = 0;
@@ -8816,20 +8876,17 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         } else somar({ valor: Math.round(g.valor * aliquotaImpostos() / 100), confirmado: false });
       }
       let iptu = 0;
-      let baseIptu = null;
-      for (const p2 of d2.iptus.filter((x) => x.imovel_id === i.id)) {
-        baseIptu = baseIptu || baseIptuDoImovel(d2, i.id);
-        for (const pc of parcelasIptu(d2, p2, baseIptu)) if (pc.proprietario && dentro(pc.paga)) iptu += pc.valorProprietario;
+      for (const p2 of iptusDe(i.id)) {
+        for (const pc of parcelasIptu(d2, p2, baseDe(i.id))) if (pc.proprietario && dentro(pc.paga)) iptu += pc.valorProprietario;
         if (p2.pago_avista) {
           const doAno = new RegExp(`IPTU ${p2.ano}\\b`);
-          const doImovel = new Set(d2.contratos.filter((c) => c.imovel_id === i.id).map((c) => c.id));
-          iptu -= d2.cobrancas.filter((cb) => doImovel.has(cb.contrato_id) && dentro(cb.data_pagamento) && cb.iptu > 0 && doAno.test(cb.iptu_parcela || "")).reduce((s, cb) => s + cb.iptu, 0);
+          iptu -= pagasTodasDe(i.id).filter((cb) => cb.iptu > 0 && doAno.test(cb.iptu_parcela || "")).reduce((s, cb) => s + cb.iptu, 0);
         }
       }
       const todasReformas = reformasDo(d2, i.id);
       const reformasPeriodo = todasReformas.filter((r) => dentro(r.data)).reduce((s, r) => s + r.valor, 0);
       const investido = todasReformas.filter((r) => String(r.data) <= ate).reduce((s, r) => s + r.valor, 0);
-      const contas2 = d2.despesas.filter((x) => x.imovel_id === i.id && dentro(x.data_pagamento)).reduce((s, x) => s + x.valor, 0) + pagas.filter((cb) => !cb.ressarcimento_na_nf).reduce((s, cb) => s + (cb.ressarcimento || 0), 0);
+      const contas2 = contasDe(i.id).reduce((s, x) => s + x.valor, 0) + pagas.filter((cb) => !cb.ressarcimento_na_nf).reduce((s, cb) => s + (cb.ressarcimento || 0), 0);
       const receita = aluguel + avulsas + airbnb;
       const resultado = receita - iptu - contas2;
       const liquido = resultado - impostos;
@@ -9444,10 +9501,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     excluir(d2, "correcoes", x.id, usuario, `Reajuste de ${compBr(x.data_vigencia.slice(0, 7))} desfeito: volta a ${reais(x.valor_anterior)}`);
     return x;
   }
-  function reajustesAbertos(d2, hoje3 = hojeIso()) {
+  function reajustesAbertos(d2, hoje3 = hojeIso(), { contratoId = null } = {}) {
     const ate = somarMeses(competenciaDe(hoje3), 3);
     const lista3 = [];
-    for (const c of d2.contratos.filter((x) => x.ativo !== false && x.imovel_id && !trocaAguardaAditivo(d2, x))) {
+    for (const c of d2.contratos.filter((x) => (contratoId === null || x.id === contratoId) && x.ativo !== false && x.imovel_id && !trocaAguardaAditivo(d2, x))) {
       const herdado = contratoHerdado(d2, c) && c.data_entrada ? c.data_entrada.slice(0, 7) : "";
       let doContrato = null;
       for (let n = 1, comp = competenciaDoReajuste(c, 1); comp && comp <= ate; n += 1, comp = competenciaDoReajuste(c, n)) {
@@ -12916,9 +12973,17 @@ ${naoIncluidos.join("\r\n")}\r
     };
   }
   async function nuvemDisponivel(base = "api/") {
-    return await saudeDaNuvem(base) !== null;
+    const resposta = await buscarSaude(base);
+    saudeDaAbertura = resposta ? { base, quando: Date.now(), resposta } : null;
+    return resposta !== null;
   }
   async function saudeDaNuvem(base = "api/") {
+    const guardada = saudeDaAbertura;
+    saudeDaAbertura = null;
+    if (guardada && guardada.base === base && Date.now() - guardada.quando < REAPROVEITAR_SAUDE) return guardada.resposta;
+    return buscarSaude(base);
+  }
+  async function buscarSaude(base) {
     try {
       const r = await fetch(`${base}saude`, { cache: "no-store", credentials: "same-origin", signal: limiteDeTempo(1e4) });
       if (!r.ok || !(r.headers.get("content-type") || "").includes("json")) return null;
@@ -12980,7 +13045,7 @@ ${naoIncluidos.join("\r\n")}\r
       apagar: (k) => op("readwrite", (s) => s.delete(k))
     };
   }
-  var RAIZ_DO_SERVIDOR, CONTADORES, MAX_SESSOES, FAIXA, RESERVA_MINIMA, MAX_FAIXA, ErroNuvem, igual, ehTabela, AGRUPAR_ENVIO, PARTE_MAXIMA, PARTE_BYTES, NOMES_PROIBIDOS, seqDe, raizProibida, ehContador, idsDaFila, passageiro, TEMPO_LIMITE, TEMPO_LIMITE_ANEXO, FATOR_BANCO_INTEIRO, BYTES_POR_SEGUNDO_LENTO, TEMPO_LIMITE_MAXIMO, respostaPerdida, REENVIOS_CONTADOR, ESPERA_REENVIO, limiteDeTempo, erroDeRede, aleatorio2, Sincronia, travaDoNavegador;
+  var RAIZ_DO_SERVIDOR, CONTADORES, MAX_SESSOES, FAIXA, RESERVA_MINIMA, MAX_FAIXA, ErroNuvem, igual, ehTabela, AGRUPAR_ENVIO, PARTE_MAXIMA, PARTE_BYTES, NOMES_PROIBIDOS, seqDe, raizProibida, ehContador, idsDaFila, passageiro, TEMPO_LIMITE, TEMPO_LIMITE_ANEXO, FATOR_BANCO_INTEIRO, BYTES_POR_SEGUNDO_LENTO, TEMPO_LIMITE_MAXIMO, respostaPerdida, REENVIOS_CONTADOR, ESPERA_REENVIO, limiteDeTempo, erroDeRede, aleatorio2, Sincronia, saudeDaAbertura, REAPROVEITAR_SAUDE, travaDoNavegador;
   var init_nuvem = __esm({
     "docs/js/nuvem.js"() {
       RAIZ_DO_SERVIDOR = ["formato", "revisao", "atualizado_em", "atualizado_por", "seq", "revisao_so_sessao", "historico", "_nuvem"];
@@ -13683,6 +13748,8 @@ ${naoIncluidos.join("\r\n")}\r
           return this.atual();
         }
       };
+      saudeDaAbertura = null;
+      REAPROVEITAR_SAUDE = 6e4;
       travaDoNavegador = (fn) => globalThis.navigator?.locks ? navigator.locks.request("imoveis-nuvem-fila", fn) : fn();
     }
   });
@@ -16224,6 +16291,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
   init_calculos();
   init_formularios();
   init_regras();
+  init_arquivo_impresso();
   var naoEncontrado = (titulo2, href = "#/", texto3 = "Voltar ao painel") => `<h1>${esc(titulo2)}</h1>
   <p class="suave">O endereço pode ser antigo ou o registro foi excluído.</p><p class="acoes">${link(href, texto3, "botao")}${href !== "#/" ? ` ${link("#/", "Voltar ao painel", "botao secundario")}` : ""}</p>`;
   var memoria = { continuacao: null, pagamentoDivergente: null };
@@ -16243,7 +16311,19 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
   }
   var SO_ADMIN_NUMERACAO = "Só o administrador desfaz a numeração das NFs (as NFs desfeitas são apagadas da lista).";
   var d = () => E.d;
-  var buscar2 = (t, id) => buscar(E.d, t, id);
+  var indicesPorId = /* @__PURE__ */ new WeakMap();
+  var buscar2 = (t, id) => {
+    const lista3 = E.d && E.d[t];
+    if (!Array.isArray(lista3)) return buscar(E.d, t, id);
+    let ix = indicesPorId.get(lista3);
+    if (!ix || ix.n !== lista3.length) {
+      const porId = /* @__PURE__ */ new Map();
+      for (const r of lista3) if (r && !porId.has(r.id)) porId.set(r.id, r);
+      ix = { n: lista3.length, porId };
+      indicesPorId.set(lista3, ix);
+    }
+    return ix.porId.get(Number(id));
+  };
   var ordenar = (lista3, campo2) => [...lista3].sort((a, b) => String(a[campo2] || "").localeCompare(String(b[campo2] || ""), "pt-BR"));
   var competenciaPadrao = () => somarMeses(competenciaDe(hojeIso()), -1);
   var endereco = (i, sep = " · ") => [enderecoCompleto(i), i.bairro, i.cidade ? `${i.cidade}${i.uf ? `/${i.uf}` : ""}` : "", i.cep ? `CEP ${i.cep}` : ""].filter(Boolean).join(sep);
@@ -16991,6 +17071,14 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     `Desligar o alerta "${a.tipo}" de ${[a.imovel, a.inquilino].filter(Boolean).join(" · ")}? O sistema deixa de avisar sobre isso ${a.contrato_id ? "para este inquilino" : "neste imóvel"} até alguém religar (em "Alertas desligados", no fim dos alertas do Painel${a.contrato_id ? ", ou na página do inquilino" : ""}).`
   ) : "";
   var alertaDesligado = (x, comNome = true) => `<div class="alerta cor-cinza com-adiar"><span>${comNome ? `<a href="${x.link}">${esc(x.nome)}</a>: ` : ""}<b>${esc(x.tipo)}</b> <span class="suave">· desligado por ${esc(x.quem)} em ${dataBr(x.em)}</span>${x.pendentes ? ` ${etiqueta("teria aviso hoje", "aviso")}` : ""}</span> ${opera() ? botao("religarAlerta", "Religar", { id: x.id }, "secundario mini") : ""}</div>`;
+  var alertasGuardados = null;
+  function alertasDaTela(hoje3 = hojeIso()) {
+    const g = alertasGuardados;
+    if (g && g.d === E.d && g.hoje === hoje3 && g.soltos === versaoSoltos) return g.lista;
+    const lista3 = alertasComAdiamento(E.d, hoje3);
+    alertasGuardados = { d: E.d, hoje: hoje3, soltos: versaoSoltos, lista: lista3 };
+    return lista3;
+  }
   var gruposDeAlertas = (alertas) => {
     const grupos = /* @__PURE__ */ new Map();
     for (const a of alertas) grupos.set(a.tipo, [...grupos.get(a.tipo) || [], a]);
@@ -22725,6 +22813,14 @@ ${m.texto}
       <td class="nw">${acao(y)}</td></tr>`;
     }).join("") || '<tr><td colspan="6" class="suave">Nenhuma caução a completar.</td></tr>'}</table></div>`;
   }
+  var MOSTRAR_REAJUSTES = 10;
+  function porMesDoReajuste(lista3, atual, q) {
+    const grupos = /* @__PURE__ */ new Map();
+    for (const r of lista3) grupos.set(r.competencia, [...grupos.get(r.competencia) || [], r]);
+    const proximo = somarMeses(atual, 1);
+    const tudo = lista3.length <= MOSTRAR_REAJUSTES;
+    return [...grupos].map(([mes, rs2], k) => [mes, rs2, tudo || k === 0 || mes === atual || mes === proximo || mes === q.mes || rs2.some((r) => String(r.contrato.id) === q.contrato)]);
+  }
   function telaReajustes(q) {
     const atual = competenciaDe(hojeIso());
     const todos = q.todos === "1";
@@ -22750,7 +22846,7 @@ ${m.texto}
     <div class="cartao rolagem" data-caixa="Reajustes"><h2>Reajustes em aberto (${lista3.length})</h2>
       <p class="suave">Todos os reajustes do aluguel e da caução, de qualquer ano, são aplicados aqui (na página do inquilino fica só o histórico). O índice e os novos aluguéis vêm preenchidos pelo índice cadastrado: para usar outro índice ou arredondar, mude o % (recalcula os aluguéis), o aluguel cheio ou o bonificado (recalculam o % e o outro aluguel) e clique em "Aplicar correção" antes de gerar a carta: a carta sai com os valores aplicados. De anos anteriores não há carta. Ao aplicar, o sistema pergunta o vencimento e as parcelas do boleto do complemento da caução.</p>
       <div class="reajustes-lista">
-      ${lista3.map((r) => {
+      ${porMesDoReajuste(lista3, atual, q).map(([mes, rs2, aberto]) => !aberto ? `<div class="reajuste-mes-fechado"><b>Aluguel de ${compBr(mes)}</b> <span class="suave">${rs2.length} reajuste(s)</span>${mes < atual ? ` ${etiqueta("atrasado", "aviso")}` : ""} ${link(`#/reajustes?mes=${mes}`, "Mostrar")}</div>` : `${rs2.length < lista3.length ? `<h3 class="reajuste-grupo">Aluguel de ${compBr(mes)} <span class="suave">(${rs2.length})</span></h3>` : ""}${rs2.map((r) => {
       const k = r.calculo;
       const c = r.contrato;
       const i = buscar2("imoveis", c.imovel_id);
@@ -22764,7 +22860,7 @@ ${m.texto}
         <div class="reajuste-valor"><span class="suave">Aluguel</span><div class="nw">${reais(k.atual)} → ${k.novo !== null ? `<b>${reais(k.novo)}</b>` : "-"}</div>${k.bonificacao ? `<div class="suave nw">(${reais(k.atualBonificado)} → ${k.novoBonificado !== null ? reais(k.novoBonificado) : "-"})</div>` : ""}</div>
         <div class="reajuste-valor"><span class="suave">Caução</span><div>${caucao}</div></div>
         <div class="reajuste-botoes">${p2.correcao ? `<div class="acoes">${p2.correcao}</div>` : ""}<div class="acoes">${p2.carta}</div></div></div></div>`;
-    }).join("") || '<p class="suave">Nenhum reajuste em aberto.</p>'}
+    }).join("")}`).join("") || '<p class="suave">Nenhum reajuste em aberto.</p>'}
       </div>
       <p class="suave">Valores: aluguel cheio e, embaixo entre parênteses, o valor bonificado (só aparece quando o contrato tem bonificação).</p></div>
     ${caixaCaucaoACompletar(q)}
@@ -25247,7 +25343,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     <div class="cartao"><div class="cabecalho"><h2>Correção anual do aluguel (${esc(c.indice_correcao || "índice não informado")})</h2>${link(`#/reajustes?contrato=${c.id}`, "Ir para Reajustes")}</div>
       <p class="suave">Aqui fica só o histórico. Os reajustes do aluguel e da caução, de qualquer ano, são aplicados e desfeitos na tela Reajustes.</p>
       ${(() => {
-      const abertos = reajustesAbertos(d()).filter((r) => r.contrato.id === c.id);
+      const abertos = reajustesAbertos(d(), hojeIso(), { contratoId: c.id });
       if (!abertos.length) {
         const p2 = mesDeAniversario(c);
         return p2 ? `<p class="suave">Reajuste no 13º mês (${regra("reajuste_inicio") === "mes_seguinte" ? "entrada depois do dia 1º: o 1º mês é o seguinte" : "o mês de entrada conta como o 1º"}): aluguel de ${compBr(competenciaDoReajuste(c, Math.max(1, Math.floor(mesesEntre(p2, competenciaDe(hojeIso())) / 12) + 1)))}.</p>` : "";
@@ -26985,17 +27081,18 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     };
     const rotuloMes = (mes) => `${MESES2[Number(mes.slice(5)) - 1]}${mes.startsWith(String(ano)) ? "" : `/${mes.slice(2, 4)}`}`;
     const mesDaParcela = (pc, p2) => pc.n === 0 ? (p2.data_quitacao || p2.vencimento_primeira || "").slice(0, 7) : pc.mesBoleto || pc.comp && somarMeses(pc.comp, 1) || "";
+    const baseDe = basesIptu(d());
     const mapas = new Map(imoveis.filter(doAno).map((i) => {
       const p2 = doAno(i);
       if (p2.pago_avista) {
-        const mapa2 = new Map(mapaIptuAvista(d(), p2).map((x) => [x.mesBoleto, { avistaMes: x }]));
-        const cota = parcelasIptu(d(), p2)[0];
+        const mapa2 = new Map(mapaIptuAvista(d(), p2, baseDe(p2.imovel_id)).map((x) => [x.mesBoleto, { avistaMes: x }]));
+        const cota = parcelasIptu(d(), p2, baseDe(p2.imovel_id))[0];
         const mq = mesDaParcela(cota, p2);
         if (mq) mapa2.set(mq, { avistaMes: null, ...mapa2.get(mq), cota });
         return [i.id, mapa2];
       }
-      const mapa = new Map(parcelasIptu(d(), p2).map((pc) => [mesDaParcela(pc, p2), pc]));
-      for (const m of mesesIptuAvista(d(), p2)) {
+      const mapa = new Map(parcelasIptu(d(), p2, baseDe(p2.imovel_id)).map((pc) => [mesDaParcela(pc, p2), pc]));
+      for (const m of mesesIptuAvista(d(), p2, baseDe(p2.imovel_id))) {
         const cota = mapa.get(m.mesBoleto);
         if (cota) cota.avista = m;
         else mapa.set(m.mesBoleto, { n: null, rotulo: m.rotulo, avista: m, valor: m.valor, proprietario: false });
@@ -27014,7 +27111,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       const nome = `<a href="#/imovel/${i.id}?ir=iptu"><b>${esc(i.nome)}</b></a> ${guias2}`;
       if (!p2) return `<tr class="amarelo"><td>${nome}</td><td colspan="5">${etiqueta(`sem IPTU de ${ano} lançado`, "aviso")} ${opera() ? link(`#/novo/iptus?imovel=${i.id}&ano=${ano}&de=iptu`, `Lançar ${ano}`, "botao pequeno") : ""}</td></tr>`;
       const mapa = mapas.get(i.id);
-      const t = totaisIptu(d(), p2);
+      const t = totaisIptu(d(), p2, baseDe(p2.imovel_id));
       soma.inquilino += t.inquilino;
       soma.sua += t.proprietario;
       soma.aberto += t.emAberto;
@@ -27146,10 +27243,12 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     }
     return out;
   }
+  var ABERTA_ATE = 5;
+  var caixaPendencias = (titulo2, n, conteudo, aberta) => `<details class="grupo-pendencias"${aberta ? " open" : ""}><summary><b>${esc(titulo2)}</b> <span class="suave">(${n})${aberta ? "" : " · clique para ver"}</span></summary>${conteudo}</details>`;
   function telaPendencias() {
     const hoje3 = hojeIso();
     const mesAtual = competenciaDe(hoje3);
-    const alertas = alertasComAdiamento(d(), hoje3);
+    const alertas = alertasDaTela(hoje3);
     const ativos = alertas.filter((a) => !a.adiamento && !a.desligado);
     const adiados = alertas.filter((a) => a.adiamento && !a.desligado);
     const desligados = alertasDesligados(d(), hoje3, null, alertas);
@@ -27160,11 +27259,9 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     return `<p class="suave"><a href="#/">← Painel</a></p><h1>Pendências <span class="suave">(${total})</span></h1>
     <p class="suave">Tudo o que espera uma ação, num lugar só: os alertas em vigor, as etapas do fechamento do mês ainda não feitas e os cadastros incompletos.</p>
     <div class="cartao" id="alertas"><h2>Alertas <span class="suave">(${ativos.length}${adiados.length ? ` em vigor, ${adiados.length} adiado(s)` : ""})</span></h2>
-      ${gruposDeAlertas(ativos).map(([tipo, l]) => `<h3>${esc(tipo)} <span class="suave">(${l.length})</span></h3>${l.map((a) => `<div class="${classeAlerta(a)}">${nomeAlerta(a)}</div>`).join("")}`).join("") || '<p class="suave">Nenhum alerta em vigor.</p>'}
-      ${adiados.length ? `<h3>Adiados ou em cuidado <span class="suave">(${adiados.length})</span></h3>
-        ${adiados.map((a) => alertaAdiado(a, hoje3)).join("")}` : ""}
-      ${desligados.length ? `<h3>Desligados <span class="suave">(${desligados.length})</span></h3>
-        ${desligados.map((x) => alertaDesligado(x)).join("")}` : ""}
+      ${gruposDeAlertas(ativos).map(([tipo, l]) => caixaPendencias(tipo, l.length, l.map((a) => `<div class="${classeAlerta(a)}">${nomeAlerta(a)}</div>`).join(""), l.length <= ABERTA_ATE)).join("") || '<p class="suave">Nenhum alerta em vigor.</p>'}
+      ${adiados.length ? caixaPendencias("Adiados ou em cuidado", adiados.length, adiados.map((a) => alertaAdiado(a, hoje3)).join(""), false) : ""}
+      ${desligados.length ? caixaPendencias("Desligados", desligados.length, desligados.map((x) => alertaDesligado(x)).join(""), false) : ""}
       <p class="suave">Para adiar um alerta ou marcar que está cuidando, use os botões dele no Painel ("Já estou cuidando" esconde só hoje: amanhã ele volta). "Desligar" deixa de avisar aquele inquilino ou imóvel até alguém religar.</p></div>
     <div class="cartao" id="fechamento"><h2>Fechamento do mês <span class="suave">(${etapas.length})</span></h2>
       ${etapas.map((e) => `<div class="alerta aviso"><a href="#/fechamento?mes=${e.mes}">${esc(e.titulo.split(/ \(|, a partir/)[0])}</a>${e.mes !== mesAtual ? ` <span class="suave">(de ${compBr(e.mes)})</span>` : ""}${e.pendentes ? ` <span class="suave">· ${e.pendentes} pendente(s)</span>` : ""}</div>`).join("") || `<p class="suave">As etapas liberadas de ${compBr(mesAtual)} estão feitas.</p>`}</div>
@@ -28495,7 +28592,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       return recalcularCobrancas(db, (cb) => cb.contrato_id === contratoId, login());
     });
     aviso(`Correção registrada a partir do aluguel de ${compBr(comp)}.${n ? ` ${n} boleto(s) em aberto recalculado(s).` : ""}`);
-    const resta = reajustesAbertos(d()).find((r) => r.contrato.id === contratoId && !r.corrigido && r.competencia <= competenciaDe(hojeIso()));
+    const resta = reajustesAbertos(d(), hojeIso(), { contratoId }).find((r) => !r.corrigido && r.competencia <= competenciaDe(hojeIso()));
     if (resta) aviso(`Caução: o complemento é calculado depois de aplicar também o reajuste de ${compBr(resta.competencia)}.`, "info");
     else await perguntarCaucao(contratoId);
     await mostrar();
@@ -31367,7 +31464,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       organizarPastasUmaVez().catch((e) => aviso(`Organização das pastas: ${e.message}`, "aviso")).then(() => limparSemImovel()).catch((e) => aviso(`Limpeza da pasta "${PASTA_SEM_IMOVEL}": ${e.message}`, "aviso")).then(() => guardarCartasAntigas()).catch((e) => aviso(`Cartas de reajuste na pasta do inquilino: ${e.message}`, "aviso")).then(() => conferirArquivosUmaVez()).catch((e) => aviso(`Conferência dos arquivos: ${e.message}`, "aviso")).then(() => conferirSoltosUmaVez()).catch((e) => aviso(`Pasta física: ${e.message}`, "aviso")).then(() => apagarDocumentosVencidosDasFichas()).catch((e) => aviso(`Documentos das fichas reprovadas: ${e.message}`, "aviso"));
       trazerHerancasPendentes().catch((e) => aviso(`Contratos herdados: ${e.message}`, "aviso")).then(() => acertarNomesUmaVez()).catch((e) => aviso(`Nomes dos comprovantes: ${e.message}`, "aviso"));
       const hoje3 = hojeIso();
-      const todosOsAlertas = alertasComAdiamento(d(), hoje3);
+      const todosOsAlertas = alertasDaTela(hoje3);
       const alertas = todosOsAlertas.filter((a) => !a.adiamento && !a.desligado);
       const adiados = todosOsAlertas.filter((a) => a.adiamento && !a.desligado);
       const desligados = alertasDesligados(d(), hoje3, null, todosOsAlertas);
