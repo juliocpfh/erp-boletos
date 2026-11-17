@@ -301,9 +301,6 @@ export function anexosProntos(d, modelo, alvo) {
   return out;
 }
 
-/** Modelos de uma etapa do sistema (ficha, entrada, saída, anual), na ordem. */
-export const modelosDaEtapa = (etapa) => MODELOS_EMAIL.filter((m) => m.etapa === etapa);
-
 /**
  * Informe anual do IR (pedido do dono em 2026-11-12: todo ano, a todos os inquilinos com NF): de 01/02 a 31/03, os inquilinos
  * com NF de aluguel emitida no ano anterior que ainda não receberam o e-mail do informe neste ano (aberto ou enviado).

@@ -19,12 +19,13 @@ function comRegras(valores, fn) {
 test('sem nada escolhido valem as regras do dono (padrão do sistema), iguais ao comportamento antigo', () => {
   const d = banco();
   assert.deepEqual(R.regrasDe(d), { ...CR.PADRAO_SISTEMA });
-  assert.equal(R.regra('dia_gerar_boletos'), R.DIA_GERAR_BOLETOS);
-  assert.equal(R.regra('meses_documentos_ficha'), R.MESES_DOCUMENTOS_REPROVADA);
+  assert.equal(R.regra('dia_gerar_boletos'), 20);
+  assert.equal(R.regra('meses_documentos_ficha'), 3);
   assert.equal(R.regra('dias_alerta_banco'), R.DIAS_ALERTA_BANCO);
   assert.equal(R.regra('dias_extrato_recente'), R.DIAS_EXTRATO_RECENTE);
-  assert.equal(R.regra('dias_sem_imovel'), R.DIAS_SEM_IMOVEL);
-  assert.equal(R.regra('meses_depois_de_alugar'), R.MESES_DEPOIS_DE_ALUGAR);
+  assert.equal(R.regra('dias_sem_imovel'), 7);
+  assert.equal(R.regra('meses_depois_de_alugar'), 2);
+  assert.equal(R.regra('dias_vermelho'), 5);
   assert.equal(R.regra('dias_antecipacao_banco'), Z.DIAS_ANTECIPACAO);
   assert.deepEqual(R.reguaCobranca(), R.REGUA_COBRANCA);
   assert.equal(R.regra('multa_padrao'), 2);

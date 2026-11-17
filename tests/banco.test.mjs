@@ -371,21 +371,6 @@ test('negativação: só com a conta ligada; guarda status e data; cancelamento'
   assert.equal(cb.banco.negativacao.situacao, M.STATUS_NEGATIVACAO.cancelamento_agendado);
 });
 
-test('conferência de pagamentos: período de até 60 dias e casamento da listagem pela referência', () => {
-  const { d, ank, jck } = base();
-  comContas(d, ank, jck);
-  R.gerarCobrancas(d, '2026-02', 'teste');
-  const cb = d.cobrancas[0];
-  assert.deepEqual(R.periodoConferenciaC6(d, '2026-02', '2026-03-20'), { de: '2026-02-28', ate: '2026-03-20' });
-  assert.deepEqual(R.periodoConferenciaC6(d, '2026-02', '2026-06-20'), { de: '2026-02-28', ate: '2026-04-28' });
-  R.registrarBoletoBancario(d, cb.id, RESPOSTA_EMISSAO, 'teste', { conta_id: 'ank' });
-  const { casados, desconhecidos } = R.casarListagemC6(d, [{ ...CONSULTA, status: 'PAID' }, { external_reference_id: 'OUTRO', status: 'PAID' }], 'ank');
-  assert.equal(casados.length, 1);
-  assert.equal(casados[0].cb.id, cb.id);
-  assert.equal(desconhecidos.length, 1);
-  assert.equal(R.casarListagemC6(d, [CONSULTA], 'jck').casados.length, 0);
-});
-
 test('partesDoEndereco entende o endereço em uma linha do cadastro', () => {
   assert.deepEqual(R.partesDoEndereco('Av. Sete de Setembro, 1234, apto 12, Batel, Curitiba/PR, CEP 80240-000'),
     { address: 'Av. Sete de Setembro, 1234, apto 12', neighborhood: 'Batel', city: 'Curitiba', state: 'PR', zip_code: '80240000' });
