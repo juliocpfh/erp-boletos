@@ -4,7 +4,7 @@ import * as alertas from './alertas.js';
 import * as AI from './arquivo-impresso.js';
 import { soDigitos } from './c6-comum.js';
 import * as C from './calculos.js';
-import { camposAntigosDaEmpresa, dadoDaEmpresa, locadorasDoContrato, modelosDe, resultadoVistoriaSaida, TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR, vistoriaDeEntrada } from './contratos.js';
+import { camposAntigosDaEmpresa, companhiaDoImovel, dadoDaEmpresa, locadorasDoContrato, modelosDe, nomeCurtoCompanhia, resultadoVistoriaSaida, TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR, vistoriaDeEntrada } from './contratos.js';
 import * as CR from './config-regras.js';
 import * as F from './formularios.js';
 import * as M from './mapa-c6.js';
@@ -27,9 +27,25 @@ export const TABELAS = {
 /** Quem paga cada conta prevista no contrato. Só "por conta do inquilino" entra no boleto (IPTU e seguro). */
 export const SITUACOES = ['Por conta do inquilino', 'Incluso no aluguel', 'Não tem'];
 
-/** Listas de opções que o usuário pode editar (incluir e remover itens). */
+/**
+ * Concessionárias que vêm na lista de um banco novo, pelo Estado da sede da empresa (Empresas). Até 2026-11-17 era sempre a
+ * do Paraná, que continua o padrão (também sem empresa cadastrada). Estado fora da tabela: as companhias de energia e de água
+ * do cadastro da empresa, pelo nome curto, e o condomínio. Ex.: empresa em SP com "Enel Distribuição São Paulo (ENEL)" e
+ * "Companhia de Saneamento Básico do Estado de São Paulo (SABESP)" → ['Enel', 'Sabesp', 'Condomínio'].
+ */
+export const CONCESSIONARIAS_POR_UF = { PR: ['Copel', 'Sanepar', 'Supergasbras', 'Condomínio'] };
+export function concessionariasPadrao(d) {
+  if (!d || !(d.emitentes || []).some((e) => e.ativo !== false)) return [...CONCESSIONARIAS_POR_UF.PR];
+  const uf = String(dadoDaEmpresa(d, {}, 'uf_sede') || '').trim().toUpperCase();
+  if (CONCESSIONARIAS_POR_UF[uf]) return [...CONCESSIONARIAS_POR_UF[uf]];
+  const daEmpresa = ['energia', 'agua'].map((q) => nomeCurtoCompanhia(dadoDaEmpresa(d, {}, `${q}_concessionaria`))).filter(Boolean);
+  if (daEmpresa.length) return [...new Set([...daEmpresa, 'Condomínio'])];
+  return uf ? ['Condomínio'] : [...CONCESSIONARIAS_POR_UF.PR];
+}
+
+/** Listas de opções que o usuário pode editar (incluir e remover itens). ``padraoDe``: a lista inicial depende do banco. */
 export const LISTAS = {
-  concessionarias: { nome: 'concessionárias', padrao: ['Copel', 'Sanepar', 'Supergasbras', 'Condomínio'] },
+  concessionarias: { nome: 'concessionárias', padrao: CONCESSIONARIAS_POR_UF.PR, padraoDe: concessionariasPadrao },
   indices: { nome: 'índices de correção', padrao: ['IGP-M', 'IPCA', 'IGP-M/IPCA (o maior)', 'INPC', 'IVAR', 'IGP-DI', 'Poupança'] },
 };
 
@@ -75,7 +91,11 @@ export function normalizar(d) {
   const vazio = bancoVazio();
   for (const [k, v] of Object.entries(vazio)) if (d[k] === undefined) d[k] = v;
   CR.usarRegras(d); // regras escolhidas pelo administrador (as contas abaixo já usam)
-  for (const [k, l] of Object.entries(LISTAS)) if (!Array.isArray(d.listas[k])) d.listas[k] = [...l.padrao];
+  // lista que depende da empresa (concessionárias): num banco novo só é gravada depois de cadastrada a primeira empresa
+  // (até lá, ``lista`` devolve a do Paraná sem gravar); banco que já tem a lista fica como está
+  for (const [k, l] of Object.entries(LISTAS)) {
+    if (!Array.isArray(d.listas[k]) && (!l.padraoDe || d.emitentes.length)) d.listas[k] = [...(l.padraoDe ? l.padraoDe(d) : l.padrao)];
+  }
   // integração com o banco (C6, boleto com Pix): configuração com todos os campos e cada boleto com o campo ``banco`` (nulo = não emitido)
   d.config_banco = { ...CONFIG_BANCO_PADRAO, ...(d.config_banco && typeof d.config_banco === 'object' ? d.config_banco : {}) };
   // a senha e o endereço da ponte passaram a ficar só no navegador: saem do JSON compartilhado
@@ -307,7 +327,7 @@ function migrarAirbnb(d) {
 // --------------------------------------------------------------------------
 // Listas editáveis (concessionárias, índices)
 // --------------------------------------------------------------------------
-export const lista = (d, nome) => d.listas[nome] || LISTAS[nome].padrao;
+export const lista = (d, nome) => d.listas[nome] || (LISTAS[nome].padraoDe ? LISTAS[nome].padraoDe(d) : LISTAS[nome].padrao);
 
 /** Onde um item da lista é usado (para não remover algo que está vinculado). */
 export function usoDoItem(d, nome, valor) {
@@ -2875,13 +2895,21 @@ export function excluirContrato(d, contratoId, usuario, descricao) {
 
 /** Relógios que o contrato tem: o que está como "Não tem" fica de fora; sem a informação, água e energia (gás só se tiver). */
 export const relogiosDoContrato = (c) => RELOGIOS.map(([k]) => k).filter((k) => (c[`conta_${k}`] ? c[`conta_${k}`] !== SITUACOES[2] : k !== 'gas'));
+/** A leitura dos relógios é obrigatória na vistoria e na saída? (regra do administrador; padrão: sim, como sempre foi) */
+export const leituraObrigatoria = () => CR.regra('leitura_relogios_obrigatoria') !== false;
+/** Relógios cuja leitura é obrigatória: os do contrato com a regra ligada (padrão); com ela desligada, nenhum. */
+export const relogiosObrigatorios = (c) => (leituraObrigatoria() ? relogiosDoContrato(c) : []);
 
-/** Leitura de entrada ou de saída do inquilino (uma só por momento): cria ou atualiza. ``valores``: { agua, energia, gas }. */
+/**
+ * Leitura de entrada ou de saída do inquilino (uma só por momento): cria ou atualiza. ``valores``: { agua, energia, gas }.
+ * Com a leitura opcional (regra desligada) e tudo em branco, não cria leitura vazia (devolve null).
+ */
 export function gravarLeitura(d, c, momento, data, valores, usuario) {
-  const falta = relogiosDoContrato(c).filter((k) => !String(valores[k] || '').trim());
+  const falta = relogiosObrigatorios(c).filter((k) => !String(valores[k] || '').trim());
   if (falta.length) throw new Error(`Informe a leitura do relógio de ${falta.map((k) => RELOGIOS.find(([x]) => x === k)[1]).join(' e ')} (${momento.toLocaleLowerCase('pt-BR')}).`);
   const dados = { agua: valores.agua || '', energia: valores.energia || '', gas: valores.gas || '' };
   const atual = d.leituras.find((l) => l.contrato_id === c.id && l.momento === momento);
+  if (!atual && !RELOGIOS.some(([k]) => String(dados[k]).trim())) return null;
   if (atual) return atualizar(d, 'leituras', atual.id, { ...dados, data, imovel_id: c.imovel_id || null }, usuario, `${momento}: ${textoLeitura(dados)}`);
   return registrarLeitura(d, { imovel_id: c.imovel_id || null, contrato_id: c.id, data, momento, ...dados, observacoes: '' }, usuario);
 }
@@ -2935,7 +2963,8 @@ export function encerrarContrato(d, contratoId, dados, usuario) {
   const leitura = separarLeitura(dados);
   if (d.encerramentos.some((e) => e.contrato_id === c.id)) throw new Error('A saída deste inquilino já foi registrada.');
   if (dados.data_saida < c.data_entrada) throw new Error('A saída não pode ser antes da entrada.');
-  // a leitura da saída é obrigatória e é a mesma da vistoria de saída (uma só): sem digitar aqui, vale a da vistoria
+  // a leitura da saída é obrigatória (regra leitura_relogios_obrigatoria; desligada, pode ficar em branco) e é a mesma da
+  // vistoria de saída (uma só): sem digitar aqui, vale a da vistoria
   if (leitura || !leituraDo(d, c.id, 'Saída do inquilino')) gravarLeitura(d, c, 'Saída do inquilino', dados.data_saida, leitura || {}, usuario);
   const calc = calcularEncerramento(dados.garantia_valor, dados.indice_percentual, dados.debitos, dados.fci_credito, dados.fci_danos);
   const r = inserir(d, 'encerramentos', { contrato_id: c.id, ...dados, ...calc }, usuario,
@@ -4256,10 +4285,25 @@ export function registrarContraVistoria(d, contratoId, { data, arquivo }, usuari
 /** Inquilino novo para a rotina: entrou há até 6 meses (ou ainda vai entrar). */
 export const rotinaRecente = (c, hoje = C.hojeIso()) => !c.data_entrada || c.data_entrada >= C.somarMesesData(hoje, -6);
 
-/** Nome da concessionária da conta no imóvel: a dos protocolos já registrados, a da lista ou a padrão (ex.: Sanepar). */
-function concessionariaDaConta(d, c, re, padrao) {
-  const t = d.titularidades.filter((x) => x.imovel_id === c.imovel_id && re.test(x.concessionaria || '')).sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')))[0];
-  return (t && t.concessionaria) || lista(d, 'concessionarias').find((x) => re.test(x)) || padrao;
+/**
+ * Nome curto da companhia de água ou de energia do imóvel (ou da empresa, Empresas). Ex.: "… (SABESP)" → "Sabesp"; '' nas outras
+ * contas. Serve para reconhecer o protocolo e dar o nome da etapa fora do Paraná (as expressões de CONTAS_ENTRADA são as daqui).
+ */
+const companhiaCurtaDaConta = (d, c, k) => (['agua', 'energia'].includes(k) ? nomeCurtoCompanhia(companhiaDoImovel(d, c, buscar(d, 'imoveis', c.imovel_id), k)) : '');
+/** Reconhece o protocolo da conta ``k`` pelo nome da concessionária: a expressão de sempre ou o nome curto da companhia do cadastro. */
+function reconheceConta(d, c, k, re) {
+  const curta = companhiaCurtaDaConta(d, c, k).toLocaleLowerCase('pt-BR');
+  return (nome) => re.test(nome || '') || (!!curta && String(nome || '').toLocaleLowerCase('pt-BR').includes(curta));
+}
+
+/**
+ * Nome da concessionária da conta no imóvel: a dos protocolos já registrados, a da lista, a do cadastro (água e energia) ou a
+ * padrão (ex.: Sanepar).
+ */
+function concessionariaDaConta(d, c, re, padrao, k = '') {
+  const ok = k ? reconheceConta(d, c, k, re) : (x) => re.test(x || '');
+  const t = d.titularidades.filter((x) => x.imovel_id === c.imovel_id && ok(x.concessionaria)).sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')))[0];
+  return (t && t.concessionaria) || lista(d, 'concessionarias').find((x) => re.test(x)) || (k && companhiaCurtaDaConta(d, c, k)) || padrao;
 }
 
 /**
@@ -4362,7 +4406,8 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
     avaliar[k] = () => {
       const sit = c[campo];
       if (soInquilino ? sit !== SITUACOES[0] : [SITUACOES[1], SITUACOES[2]].includes(sit)) return null;
-      const t = d.titularidades.filter((x) => x.contrato_id === c.id && x.tipo !== 'Volta para o proprietário' && re.test(x.concessionaria || ''))
+      const ok = reconheceConta(d, c, k, re);
+      const t = d.titularidades.filter((x) => x.contrato_id === c.id && x.tipo !== 'Volta para o proprietário' && ok(x.concessionaria))
         .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')))[0];
       if (!t) return undefined;
       const prot = t.protocolo ? `protocolo ${t.protocolo}` : 'sem protocolo';
@@ -4378,7 +4423,7 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
     const auto = avaliar[chave]();
     if (auto === null && !doc) continue; // não se aplica
     const conta = CONTAS_ENTRADA.find(([k]) => k === chave);
-    const concessionaria = conta ? concessionariaDaConta(d, c, conta[4], conta[3]) : null;
+    const concessionaria = conta ? concessionariaDaConta(d, c, conta[4], conta[3], conta[0]) : null;
     const nome = chave === 'garantia' ? ({ 'Caução': 'Depósito da caução', 'Depósito garantia': 'Depósito de garantia', Fiador: 'Assinatura do fiador',
       'Fiador + depósito': 'Depósito de garantia e assinatura do fiador', 'Seguro fiança': 'Apólice do seguro fiança' })[c.garantia_tipo] || 'Garantia (tipo não informado)'
       : concessionaria ? `${titulo} (${concessionaria})` : titulo;
@@ -5053,7 +5098,49 @@ export const centavosParaReais = (c) => Number((Math.round(c || 0) / 100).toFixe
 export const reaisParaCentavos = (v) => C.arred(Number(String(v ?? 0).replace(',', '.')) * 100);
 
 export const configBanco = (d) => ({ ...CONFIG_BANCO_PADRAO, ...(d.config_banco || {}), contas: ((d.config_banco || {}).contas || []).map((x) => ({ ...CONTA_BANCO_PADRAO, ...x,
-  notificar: { ...CONTA_BANCO_PADRAO.notificar, ...((x && x.notificar) || {}) }, negativacao: { ...CONTA_BANCO_PADRAO.negativacao, ...((x && x.negativacao) || {}) } })) });
+  notificar: { ...CONTA_BANCO_PADRAO.notificar, ...((x && x.notificar) || {}) }, negativacao: { ...CONTA_BANCO_PADRAO.negativacao, ...((x && x.negativacao) || {}) } })),
+  ...(Array.isArray((d.config_banco || {}).contas_arquivo) ? { contas_arquivo: d.config_banco.contas_arquivo.map((x) => ({ ...x })) } : {}) });
+
+/**
+ * Contas de outros bancos, sem a ponte (mutirão 3000, venda 17): só recebem o extrato por arquivo (OFX ou CSV baixado no site ou
+ * no aplicativo do banco), com as mesmas conferências de saldo e de lançamento repetido. Ficam em ``config_banco.contas_arquivo``
+ * (campo que só existe depois da primeira conta assim: banco sem ele = nenhuma), cada uma { id, apelido, emitente_id, banco }.
+ * Ex.: { id: 'itau', apelido: 'Itaú', emitente_id: 2, banco: 'Itaú' }. Não emitem boleto, não pagam e não falam com a ponte.
+ */
+export const contasSoArquivo = (d) => (Array.isArray((d.config_banco || {}).contas_arquivo) ? d.config_banco.contas_arquivo : []);
+export const contaSoArquivo = (d, contaId) => contasSoArquivo(d).find((x) => x.id === contaId) || null;
+/** Todas as contas que recebem extrato: as do C6 (ponte) e as de outros bancos (só arquivo). */
+export const contasDoExtrato = (d) => [...((d.config_banco || {}).contas || []), ...contasSoArquivo(d)];
+
+/** Inclui ou altera uma conta de outro banco (só extrato por arquivo). ``id`` em branco: sai do apelido (ex.: "Itaú" → "itau"). */
+export function salvarContaArquivo(d, dados, usuario) {
+  const cfg = configBanco(d);
+  const apelido = String(dados.apelido || '').trim();
+  const id = limparId(dados.id) || limparId(C.semAcento(apelido));
+  if (!id) throw new C.ErroUsuario('Dê um apelido à conta (ex.: Itaú).');
+  const emitenteId = dados.emitente_id ? Number(dados.emitente_id) : null;
+  if (!emitenteId || !buscar(d, 'emitentes', emitenteId)) throw new C.ErroUsuario('Escolha a empresa dona da conta.');
+  if (cfg.contas.some((x) => x.id === id)) throw new C.ErroUsuario(`O código "${id}" já é de uma conta do C6. Use outro apelido ou código.`);
+  const atuais = cfg.contas_arquivo || [];
+  const antes = atuais.find((x) => x.id === id) || null;
+  const conta = { ...(antes || {}), id, apelido: apelido || id.toUpperCase(), emitente_id: emitenteId, banco: String(dados.banco || '').trim().slice(0, 60) };
+  cfg.contas_arquivo = antes ? atuais.map((x) => (x.id === id ? conta : x)) : [...atuais, conta];
+  d.config_banco = cfg;
+  registrar(d, usuario, antes ? 'Alteração' : 'Inclusão', 'banco', null, `Conta de outro banco "${conta.apelido}" (${id}, extrato por arquivo) ${antes ? 'alterada' : 'incluída'}`, { conta: { de: antes, para: conta } });
+  return conta;
+}
+
+/** Tira uma conta de outro banco. Com extrato já importado nela, não tira (as movimentações ficariam sem conta). */
+export function excluirContaArquivo(d, contaId, usuario) {
+  const cfg = configBanco(d);
+  const conta = (cfg.contas_arquivo || []).find((x) => x.id === contaId);
+  if (!conta) throw new C.ErroUsuario('Conta não encontrada.');
+  const n = (d.movimentacoes_banco || []).filter((m) => m.conta_id === contaId).length;
+  if (n) throw new C.ErroUsuario(`A conta ${conta.apelido} tem ${n} movimentação(ões) importada(s): não dá para tirar (o extrato ficaria sem conta).`);
+  cfg.contas_arquivo = cfg.contas_arquivo.filter((x) => x.id !== contaId);
+  d.config_banco = cfg;
+  registrar(d, usuario, 'Exclusão', 'banco', null, `Conta de outro banco "${conta.apelido}" (${contaId}) tirada`, { conta: { de: conta, para: null } });
+}
 
 export const contaBanco = (d, contaId) => configBanco(d).contas.find((x) => x.id === contaId) || null;
 
@@ -5066,7 +5153,7 @@ export function bancoAtivo(d) {
 /** Por que os botões do banco estão desabilitados (texto do ``title``); vazio quando a configuração compartilhada está pronta. */
 export function motivoBancoInativo(d) {
   const cfg = configBanco(d);
-  if (!cfg.contas.length) return 'Aguardando as chaves da API do C6: cadastre as contas em Dados e backup (Banco C6)';
+  if (!cfg.contas.length) return 'Aguardando as chaves de acesso do C6: cadastre as contas em Dados e backup (Banco C6)';
   if (!cfg.ativo) return 'Integração com o C6 desligada: ative em Dados e backup (Banco C6)';
   return '';
 }
@@ -5092,6 +5179,7 @@ export function salvarContaBanco(d, dados, usuario) {
   const cfg = configBanco(d);
   const id = limparId(dados.id);
   if (!id) throw new Error('Informe o identificador da conta na ponte (só letras e números, ex.: ank).');
+  if (contasSoArquivo(d).some((x) => x.id === id)) throw new C.ErroUsuario(`O código "${id}" já é de uma conta de outro banco (extrato por arquivo). Use outro código.`);
   const emitenteId = dados.emitente_id ? Number(dados.emitente_id) : null;
   if (!emitenteId || !buscar(d, 'emitentes', emitenteId)) throw new Error('Escolha a empresa dona da conta.');
   const outra = cfg.contas.find((x) => x.id !== id && x.emitente_id === emitenteId);
@@ -7254,7 +7342,8 @@ export const decodificarIdContador = (id) => {
   return { emitenteId: Math.floor(Number(id) / 1000000), comp: `${resto.slice(0, 4)}-${resto.slice(4)}` };
 };
 
-export const contaBancaria = (d, contaId) => ((d.config_banco || {}).contas || []).find((c) => c.id === contaId) || null;
+// as do C6 e as de outros bancos (só extrato por arquivo): o extrato, o saldo e os comprovantes valem para as duas
+export const contaBancaria = (d, contaId) => contasDoExtrato(d).find((c) => c.id === contaId) || null;
 export const apelidoDaConta = (d, contaId) => {
   const c = contaBancaria(d, contaId);
   if (!c) return String(contaId || '').toUpperCase();
@@ -7332,8 +7421,7 @@ export function rotuloDoComprovante(d, x) {
  * 07/11/2026, extrato buscado em 01/11 vale; em 30/10, não) e pagamentos enviados sem confirmação.
  */
 export function pendenciasBancoDoMes(d, mes, hoje = C.hojeIso()) {
-  const cfg = d.config_banco || {};
-  const contas = cfg.contas || [];
+  const contas = contasDoExtrato(d); // as do C6 e as de outros bancos (extrato por arquivo)
   const fim = C.limitesCompetencia(mes)[1];
   const mesFechado = fim < hoje;
   const ate = mesFechado ? fim : C.somarDias(hoje, -CR.regra('dias_extrato_recente'));
@@ -7632,7 +7720,8 @@ export function roteiroSaida(d, c, hoje = C.hojeIso()) {
   const vist = vistoriasDo(d, c.id).find((v) => v.tipo === 'Saída') || null;
   const leitura = leituraDo(d, c.id, 'Saída do inquilino');
   const titularidade = alertaTitularidade(d, c, hoje);
-  const contasOk = !titularidade && !!leitura;
+  // leitura opcional (regra desligada): a etapa fecha só com a titularidade
+  const contasOk = !titularidade && (!!leitura || !leituraObrigatoria());
   const e = encerramentoDo(d, c.id);
   const garantiaAntes = valorGarantia(d, c);
   const comp = C.competenciaDe(c.data_saida);
@@ -7669,7 +7758,7 @@ export function roteiroSaida(d, c, hoje = C.hojeIso()) {
     { chave: 'chaves', titulo: 'Devolução das chaves (termo assinado)', feito: !!termo || (saiu && !!e && semTermoAntigo),
       detalhe: termo ? `chaves devolvidas em ${C.dataBr(c.data_saida)}; termo de devolução assinado ✓` : saiu ? `chaves devolvidas em ${C.dataBr(c.data_saida)}${e && semTermoAntigo ? '; acertada sem termo (saída de antes do termo de devolução)' : '; falta anexar o termo de devolução assinado'}` : `prevista para ${C.dataBr(c.data_saida)}` },
     { chave: 'contas', titulo: 'Contas: titularidade de volta ao proprietário e leitura final', feito: contasOk,
-      detalhe: [titularidade ? 'falta o protocolo da volta da titularidade' : 'titularidade de volta ✓', leitura ? 'leitura da saída ✓' : 'falta a leitura dos relógios na saída'].join(' · ') },
+      detalhe: [titularidade ? 'falta o protocolo da volta da titularidade' : 'titularidade de volta ✓', leitura ? 'leitura da saída ✓' : leituraObrigatoria() ? 'falta a leitura dos relógios na saída' : 'sem a leitura dos relógios (não é obrigatória)'].join(' · ') },
     { chave: 'calculo', titulo: 'Cálculo final (garantia corrigida, débitos, FCI)', feito: !!e, detalhe: e ? `${e.saldo >= 0 ? 'a devolver' : 'a cobrar'} ${C.reais(Math.abs(e.saldo))}` : saiu ? 'pendente' : 'depois da saída' },
     { chave: 'garantia', titulo: 'Devolução da garantia (ou cobrança do saldo)', ...garantia },
     { chave: 'boleto', titulo: `Último boleto (aluguel de ${C.compBr(comp)}, proporcional)`, feito: !!ultimo && (!!ultimo.data_pagamento || quitadoNaSaida(ultimo)) && !abertos.length,

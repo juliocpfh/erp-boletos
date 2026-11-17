@@ -2123,6 +2123,14 @@ export const ACOES = {
     await mostrar();
   },
 
+  /** Tira uma conta de outro banco (só extrato por arquivo), se ainda não tem extrato importado. */
+  async excluirContaArquivo({ conta }) {
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador altera as contas do banco.');
+    await alterar((db) => R.excluirContaArquivo(db, conta, login()));
+    aviso('Conta de outro banco tirada.');
+    await mostrar();
+  },
+
   /** Emite um boleto no C6: escolhe a conta (pergunta se o imóvel tem mais de uma empresa), chama a ponte e grava a resposta. */
   async emitirBoletoC6({ id }) {
     if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode emitir boletos.');

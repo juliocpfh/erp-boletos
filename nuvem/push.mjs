@@ -2,7 +2,7 @@
 // da ficha pela internet). Padrão da web: o aparelho se inscreve no serviço do navegador (Google, Apple, Mozilla, Microsoft)
 // e o Worker manda a mensagem cifrada (RFC 8291, aes128gcm) com a assinatura VAPID (RFC 8292), só com WebCrypto.
 // Chaves VAPID: segredos do Worker VAPID_PUBLICA e VAPID_PRIVADA (gerar com `node tools/gerar-vapid.mjs`) e VAPID_CONTATO
-// (mailto:…). Sem elas, o aviso no celular fica desligado e o resto funciona.
+// (mailto: + o e-mail da empresa; sem ele, o do Gmail: contatoVapid). Sem as chaves, o aviso no celular fica desligado e o resto funciona.
 // Inscrições no R2: publico/push/<hash do endereço>.json { endpoint, p256dh, auth, email, criado_em }.
 
 const enc = new TextEncoder();
@@ -21,8 +21,19 @@ const SERVICOS = /^https:\/\/([a-z0-9-]+\.)*(fcm\.googleapis\.com|push\.services
 export const limparChave = (v) => String(v || '').replace(/^\s*VAPID_[A-Z]+\s*=/, '').replace(/[^A-Za-z0-9_-]/g, '');
 export const publica = (env) => limparChave(env.VAPID_PUBLICA);
 export const pushLigado = (env) => !!(publica(env) && limparChave(env.VAPID_PRIVADA));
-/** Contato do VAPID: "mailto:" + e-mail (a Apple recusa outro formato); fora disso, o padrão. */
-const contato = (env) => (/^mailto:[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(env.VAPID_CONTATO || '').trim()) ? String(env.VAPID_CONTATO).trim() : 'mailto:administracao@ankjck.com.br');
+const EMAIL = /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/;
+/**
+ * Contato do VAPID ("sub"), sempre "mailto:" + e-mail (a Apple recusa outro formato), o da empresa que usa o sistema:
+ * VAPID_CONTATO ("mailto:x@y" ou só "x@y"); sem ele, o remetente do Gmail (GMAIL_REMETENTE) ou o 1º e-mail de AVISOS_EQUIPE.
+ * Sem nenhum: null, e o aviso vai sem contato (até 2026-11-17 ia o e-mail da ANK, fixo no código). Ex.: VAPID_CONTATO vazio e
+ * GMAIL_REMETENTE "contato@exemplo.com.br" → "mailto:contato@exemplo.com.br".
+ */
+export function contatoVapid(env) {
+  const candidatos = [env.VAPID_CONTATO, env.GMAIL_REMETENTE, ...String(env.AVISOS_EQUIPE || '').split(',')]
+    .map((x) => String(x || '').trim().replace(/^mailto:/i, '')).filter(Boolean);
+  const email = candidatos.find((x) => EMAIL.test(x));
+  return email ? `mailto:${email}` : null;
+}
 
 /** Chave privada VAPID (d) com a pública (x, y) como JWK, para assinar com ES256. */
 async function chaveVapid(env) {
@@ -46,7 +57,8 @@ export async function chavesFormamPar(env) {
 export async function autorizacaoVapid(env, endpoint, agora = Date.now()) {
   const aud = new URL(endpoint).origin;
   const cab = b64url(enc.encode(JSON.stringify({ typ: 'JWT', alg: 'ES256' })));
-  const corpo = b64url(enc.encode(JSON.stringify({ aud, exp: Math.floor(agora / 1000) + 12 * 3600, sub: contato(env) })));
+  const sub = contatoVapid(env);
+  const corpo = b64url(enc.encode(JSON.stringify({ aud, exp: Math.floor(agora / 1000) + 12 * 3600, ...(sub ? { sub } : {}) })));
   const assinatura = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, await chaveVapid(env), enc.encode(`${cab}.${corpo}`));
   return `vapid t=${cab}.${corpo}.${b64url(assinatura)}, k=${publica(env)}`;
 }
