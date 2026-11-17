@@ -6032,8 +6032,9 @@ export function eventosDoMes(d, mes, hoje = C.hojeIso()) {
     }
   }
   // fechamento do mês: no dia 20, gerar os boletos (vencem no mês seguinte); no dia 1º, as NFs do mês anterior (depois da
-  // virada); no último dia, quantas etapas faltam (as ainda previstas não contam)
-  if (fim >= `${hoje.slice(0, 7)}-01`) {
+  // virada); no último dia, quantas etapas faltam (as ainda previstas não contam). Sem contrato nenhum (sistema começando),
+  // não há fechamento: o Painel mostra os primeiros passos em vez de "Fechamento concluído"
+  if (fim >= `${hoje.slice(0, 7)}-01` && d.contratos.length) {
     const pendentes = pendentesDeFatura(d);
     const etapas = etapasFechamento(d, mes, hoje, { pendentes });
     const passo = (e, fech) => ({ situacao: e.feito ? 'ok' : e.prevista ? 'neutra' : 'aviso', estado: e.feito ? 'feito' : e.prevista ? 'previsto' : 'a fazer', fechamento: fech });

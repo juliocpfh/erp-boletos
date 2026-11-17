@@ -1,4 +1,5 @@
 // Boletos: lista do mês (#/cobrancas), página do boleto (#/cobranca/ID), baixa em lote, ajuste do mês e demonstrativo.
+import * as AJ from '../ajuda.js';
 import * as C from '../calculos.js';
 import { compBr, dataBr, pct, reais } from '../calculos.js';
 import * as F from '../formularios.js';
@@ -148,7 +149,21 @@ export function telaCobrancas(comp, ordemPedida = 'vencimento', filtroPedido = '
     ${pend.length && opera() ? `<div class="alerta info">${pend.length} pagamento(s) de ${compBr(comp)} aguardando número de NF. ${link('#/faturas', 'Numerar na tela NF', 'botao pequeno')}</div>` : ''}
     ${opera() ? caixaBaixaLote(lista, hoje) : ''}
     ${lista.length ? `<p class="acoes">${botoesMesC6(comp)}</p>` : ''}
-    ${tabelaBoletos(lista, hoje, ordem, url, { comp: false, mes: comp, reajustes, totalLinha: lista.length ? `<tr class="total"><td></td><td colspan="2">Total${controle ? ` <span class="suave">(sem ${controle} boleto(s) de controle)</span>` : ''}</td><td class="n">${reais(soma((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais(soma((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : '' })}`;
+    ${tabelaBoletos(lista, hoje, ordem, url, { comp: false, mes: comp, reajustes, vazio: !todas.length && !busca ? mesSemBoletos(comp, faltando) : '', totalLinha: lista.length ? `<tr class="total"><td></td><td colspan="2">Total${controle ? ` <span class="suave">(sem ${controle} boleto(s) de controle)</span>` : ''}</td><td class="n">${reais(soma((x) => x.t.a_pagar_pontual))}</td><td></td><td></td><td></td><td class="n">${reais(soma((x) => x.cb.valor_nf || 0))}</td><td></td></tr>` : '' })}`;
+}
+
+/** Mês sem nenhum boleto: o próximo passo (cadastrar o contrato ou gerar os boletos do mês). */
+function mesSemBoletos(comp, faltando) {
+  const titulo = `Nenhum boleto gerado para ${compBr(comp)}.`;
+  if (!d().contratos.length) {
+    return AJ.proximoPasso(titulo, `O boleto sai do contrato do inquilino: cadastre ${d().imoveis.length ? 'o contrato' : 'o imóvel e depois o contrato'} primeiro.`,
+      [opera() && (d().imoveis.length ? ['#/novo/contratos', 'Cadastrar o contrato'] : ['#/novo/imoveis', 'Cadastrar o primeiro imóvel'])]);
+  }
+  if (faltando.length) {
+    return AJ.proximoPasso(titulo, `${faltando.length} contrato(s) têm aluguel neste mês. Clique no botão: o sistema calcula o valor de cada boleto (aluguel, IPTU, seguro e descontos), e você confere antes de mandar.`,
+      [opera() && botao('gerarCobrancas', `Gerar boletos de ${compBr(comp)}`, { comp }, 'pequeno')]);
+  }
+  return AJ.proximoPasso(titulo, 'Nenhum contrato tem aluguel neste mês (ex.: inquilino que entra depois ou que já saiu). Veja outro mês nas setas acima.');
 }
 
 /**
@@ -188,7 +203,7 @@ function tabelaBoletos(lista, hoje, ordem, url, opcoes = {}) {
         <td class="n">${cb.valor_nf !== null ? reais(cb.valor_nf) : '-'}</td>
         <td>${fs.length ? link(`#/imprimir/faturas?numero=${fs[0].numero}`, `Nº ${R.numeroFatura(fs[0].numero)}`) : !R.geraNf(c) || R.ehComplementoCaucao(cb) ? etiqueta('sem NF', 'controle') : (cb.data_pagamento ? '<span class="suave">aguardando nº</span>' : '-')}
           ${cb.data_pagamento ? `<br><span class="suave">entrou em ${dataBr(cb.data_pagamento)}${cb.dias_atraso ? ` (${cb.dias_atraso} dias de atraso)` : ''}<br>recebido ${reais(cb.valor_pago)}</span>${opera() && !fs.length ? `<br>${botao('estornar', 'Desfazer pagamento', { id: cb.id }, 'secundario pequeno', 'Desfazer este pagamento?')}` : ''}` : ''}</td></tr>`).join('')
-      || `<tr><td colspan="9" class="suave">${opcoes.comp ? 'Nenhum boleto nesta situação.' : `Nenhum boleto gerado para ${compBr(comp)}.`}</td></tr>`}
+      || (opcoes.vazio ? `<tr><td colspan="9">${opcoes.vazio}</td></tr>` : `<tr><td colspan="9" class="suave">${opcoes.comp ? 'Nenhum boleto nesta situação.' : `Nenhum boleto gerado para ${compBr(comp)}.`}</td></tr>`)}
       ${totalLinha}
     </table></div>
     ${lista.length ? `<div class="acoes barra-lote" data-barra-lote><span class="contagem-lote" data-contagem-lote></span>${selecionados}</div>
