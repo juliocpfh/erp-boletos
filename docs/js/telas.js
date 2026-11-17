@@ -29,7 +29,7 @@ import { conferirSoltosUmaVez, ligarPastaImpressao, telaArquivoImpresso, telaPas
 import { telaImovel } from './telas/imovel.js';
 import { aparelhosLigadosHtml, telaBackupsNuvem, telaConflitos } from './telas/nuvem.js';
 import { telaReajustes } from './telas/reajustes.js';
-import { alertasDaTela } from './telas/comum.js';
+import { alertasDaTela, carregarParte } from './telas/comum.js';
 import { telaRegras } from './telas/regras-sistema.js';
 import { avisoPrimeiraLogo, ligarEditorIcone } from './telas/icone.js';
 import { alertasAbertos, MOSTRAR_ALERTAS } from './telas/comum.js';
@@ -375,6 +375,8 @@ export const TELAS = {
   banco: (rota) => telaBanco(rota),
   inadimplencia: () => telaInadimplencia(),
   garantias: () => telaGarantias(),
+  // painel de Gestão (números do mês para o dono): carregado só quando aberto (ADIADOS do sw.js)
+  gestao: async (rota) => (await carregarParte(() => import('./telas/gestao.js'))).telaGestao(rota.q),
   reajustes: (rota) => telaReajustes(rota.q),
   imprimir: (rota) => telaImprimir(rota),
   'contrato-gerar': (rota) => telaGerarContrato(rota),
