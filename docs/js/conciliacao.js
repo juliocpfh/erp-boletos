@@ -161,20 +161,23 @@ function indiceDaConta(daConta) {
   return { porReferencia, porPix, porDia };
 }
 
-/** Junta os identificadores das duas origens na movimentação que já existe: o ``reference`` da API passa a ser o id (é por ele que a ponte acha o lançamento) e o FITID fica em ``id_ofx``. */
+/**
+ * Junta os identificadores das duas origens na movimentação que já existe: o ``reference`` da API passa a ser o id (é por ele que a
+ * ponte acha o lançamento) e o do arquivo (FITID do OFX ou a chave da linha do CSV) fica em ``id_ofx``. Dois arquivos (OFX × CSV): nada muda.
+ */
 function juntarIdentificadores(d, x, m, usuario) {
   const fx = fonteDe(x);
   const fm = fonteDe(m);
-  if (fx === fm || fx === 'ofx+api') return;
+  if (fx === fm || fx === 'ofx+api' || (fx !== 'api' && fm !== 'api')) return;
   const api = fm === 'api' ? m : x;
-  const doOfx = fm === 'ofx' ? m : x;
+  const doOfx = fm === 'api' ? x : m;
   atualizar(d, 'movimentacoes_banco', x.id, { id_externo: api.id_externo, id_ofx: doOfx.id_ofx || doOfx.id_externo, fonte: 'ofx+api',
     local_reference: x.local_reference || m.local_reference || null, end_to_end_id: x.end_to_end_id || m.end_to_end_id || null }, usuario,
-  'Mesmo lançamento no arquivo OFX e no extrato pela API: identificadores juntados');
+  'Mesmo lançamento no arquivo do banco e no extrato pela API: identificadores juntados');
 }
 
 /** Identificador com que a ponte acha o lançamento no extrato (comprovante): o ``reference`` da API; só do OFX, a referência local (se houver) ou o FITID. */
-export const referenciaNoBanco = (m) => (fonteDe(m) === 'ofx' && m.local_reference ? m.local_reference : m.id_externo);
+export const referenciaNoBanco = (m) => (['ofx', 'csv'].includes(fonteDe(m)) && m.local_reference ? m.local_reference : m.id_externo);
 
 const CAMPOS_DESTINO = { classificacao: null, imovel_id: null, despesa_id: null, cobranca_id: null, iptu_id: null, iptu_parcela: null, guia_imposto_id: null,
   pagamento_banco_id: null, par_movimentacao_id: null, reforma_id: null, nome_arquivo: null, comprovante: null, comprovante_contador: null, comprovante_origem: null,
@@ -278,13 +281,300 @@ export function lerOfx(texto) {
   }
   if (!lancamentos.length) throw new Error('O arquivo OFX não tem lançamentos (período sem movimentação ou arquivo incompleto).');
   const datas = lancamentos.map((l) => l.data).sort();
-  return { banco: marca(s, 'ORG') || '', conta: marca(s, 'ACCTID') || '', de: dataOfx(marca(s, 'DTSTART')) || datas[0], ate: dataOfx(marca(s, 'DTEND')) || datas[datas.length - 1], lancamentos };
+  return { banco: marca(s, 'ORG') || '', conta: marca(s, 'ACCTID') || '', de: dataOfx(marca(s, 'DTSTART')) || datas[0], ate: dataOfx(marca(s, 'DTEND')) || datas[datas.length - 1], lancamentos, saldo: saldoDoOfx(s) };
 }
 
 /** Texto de um arquivo OFX: UTF-8 e, se vier com caracteres quebrados, Windows-1252 (CHARSET: 1252 do cabeçalho). */
 export function textoDoOfx(bytes) {
   const u8 = new TextDecoder('utf-8').decode(bytes);
   return u8.includes('�') ? new TextDecoder('windows-1252').decode(bytes) : u8;
+}
+
+// --------------------------------------------------------------------------
+// Arquivo CSV exportado do app/Web Banking do C6 (sem exemplo oficial: o leitor reconhece as colunas pelo nome)
+// --------------------------------------------------------------------------
+/** Nome de coluna para comparar: sem acento, minúsculo, sem "(R$)" e sem pontuação ("Valor (R$)" → "valor"). */
+const nomeColuna = (t) => C.semAcento(String(t || '')).toLowerCase().replace(/\(?r\$\)?/g, ' ').replace(/[^a-z0-9/]+/g, ' ').trim();
+/** Nomes aceitos de cada coluna (o primeiro que aparecer no cabeçalho vale). */
+export const COLUNAS_CSV = {
+  data: ['data lancamento', 'data do lancamento', 'data', 'data contabil', 'data movimento', 'data da movimentacao', 'data da transacao', 'data de lancamento'],
+  titulo: ['titulo', 'tipo de transacao', 'transacao'],
+  descricao: ['descricao', 'historico', 'lancamento', 'detalhes', 'descricao do lancamento', 'complemento'],
+  valor: ['valor', 'valor do lancamento', 'montante', 'quantia'],
+  entrada: ['entrada', 'entradas', 'credito', 'creditos', 'valor de entrada', 'valor credito'],
+  saida: ['saida', 'saidas', 'debito', 'debitos', 'valor de saida', 'valor debito'],
+  tipo: ['tipo', 'natureza', 'd/c', 'c/d', 'credito/debito', 'entrada/saida'],
+  saldo: ['saldo', 'saldo do dia', 'saldo apos lancamento', 'saldo final', 'saldo atual'],
+  id: ['id', 'identificador', 'referencia', 'id da transacao', 'codigo da transacao', 'end to end', 'end to end id', 'id end to end', 'autenticacao'],
+};
+/** Lista de nomes procurados, para a mensagem de "não reconheci as colunas". */
+const nomesProcurados = (k) => COLUNAS_CSV[k].map((n) => `"${n}"`).join(', ');
+
+/** Uma linha do CSV em campos (aspas duplas com o separador ou "" dentro). */
+function camposCsv(linha, sep) {
+  const out = [];
+  let atual = '';
+  let aspas = false;
+  for (let i = 0; i < linha.length; i += 1) {
+    const ch = linha[i];
+    if (aspas) {
+      if (ch === '"' && linha[i + 1] === '"') { atual += '"'; i += 1; } else if (ch === '"') aspas = false; else atual += ch;
+    } else if (ch === '"') aspas = true;
+    else if (ch === sep) { out.push(atual.trim()); atual = ''; } else atual += ch;
+  }
+  out.push(atual.trim());
+  return out;
+}
+
+/** Data do CSV ('31/10/2026', '31/10/26', '2026-10-31', '31-10-2026', com ou sem hora) → 'AAAA-MM-DD' ou ''. */
+function dataCsv(t) {
+  const s = String(t || '').trim();
+  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})\b/.exec(s);
+  if (!m) return '';
+  const ano = m[3].length === 2 ? `20${m[3]}` : m[3];
+  const iso = `${ano}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  return C.dataValida(iso) ? iso : '';
+}
+
+/**
+ * Valor do CSV em centavos com sinal: "1.234,56", "-1.234,56", "R$ 1.234,56", "1234.56", "(1.234,56)" (negativo), "1.234,56 D" (débito)
+ * e "1.234,56 C". Com ponto e vírgula, o último é o separador dos centavos. Vazio → null.
+ */
+export function centavosDoCsv(t) {
+  let s = String(t ?? '').trim().toUpperCase().replace(/R\$|\s/g, '');
+  if (!s || s === '-') return null;
+  let neg = false;
+  if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1, -1); }
+  if (/D$/.test(s)) { neg = true; s = s.slice(0, -1); } else if (/C$/.test(s)) s = s.slice(0, -1);
+  if (/^[-−]/.test(s)) { neg = !neg; s = s.slice(1); } else if (/^\+/.test(s)) s = s.slice(1);
+  if (!/^[\d.,]+$/.test(s)) throw new Error(`Valor que não entendi no arquivo CSV: "${t}".`);
+  const ponto = s.lastIndexOf('.');
+  const virgula = s.lastIndexOf(',');
+  let numero;
+  if (ponto >= 0 && virgula >= 0) numero = ponto > virgula ? s.replace(/,/g, '') : s.replace(/\./g, '').replace(',', '.');
+  else if (virgula >= 0) numero = s.replace(',', '.');
+  else if (/^\d{1,3}(\.\d{3})+$/.test(s)) numero = s.replace(/\./g, ''); // "1.234" = mil duzentos e trinta e quatro reais
+  else numero = s;
+  const n = Number(numero);
+  if (!Number.isFinite(n)) throw new Error(`Valor que não entendi no arquivo CSV: "${t}".`);
+  const c = Math.round(n * 100 + 1e-7);
+  return neg ? -c : c;
+}
+
+/**
+ * Lê o texto de um extrato em CSV (separador ";", "," ou tabulação; pode ter linhas de cabeçalho da conta antes da linha dos títulos) e
+ * devolve { de, ate, lancamentos, saldo } no formato normalizado de ``importarExtrato`` (fonte 'csv'). As colunas são achadas pelo nome
+ * (COLUNAS_CSV): data, descrição/título, valor (com sinal) ou entrada e saída, tipo (C/D) e saldo. Sem colunas reconhecidas, o erro
+ * diz quais nomes foram procurados. Com a coluna de saldo, ``saldo`` = { inicio, fim } para conferir com as movimentações daqui.
+ * Ex.: "31/10/2026;PIX RECEBIDO ANA;1.218,50;5.000,00" → { data: '2026-10-31', valor_centavos: 121850, tipo: 'entrada' }.
+ */
+export function lerCsv(texto) {
+  const linhas = String(texto || '').replace(/^﻿/, '').split(/\r?\n/);
+  let cab = -1;
+  let sep = ';';
+  let col = null;
+  const achar = (nomes, chave) => { const i = nomes.findIndex((n) => COLUNAS_CSV[chave].includes(n)); return i >= 0 ? i : null; };
+  for (let i = 0; i < Math.min(linhas.length, 30) && cab < 0; i += 1) {
+    const l = linhas[i];
+    if (!l.trim()) continue;
+    const s = [';', '\t', ','].map((x) => [x, camposCsv(l, x).length]).sort((a, b) => b[1] - a[1])[0][0];
+    const nomes = camposCsv(l, s).map(nomeColuna);
+    const c = Object.fromEntries(Object.keys(COLUNAS_CSV).map((k) => [k, achar(nomes, k)]));
+    if (c.data !== null && (c.valor !== null || c.entrada !== null || c.saida !== null)) { cab = i; sep = s; col = c; }
+  }
+  if (cab < 0) {
+    throw new C.ErroUsuario(`Não reconheci as colunas deste arquivo CSV. Procurei uma coluna de data (${nomesProcurados('data')}) e uma de valor (${nomesProcurados('valor')}) ou as de entrada (${nomesProcurados('entrada')}) e saída (${nomesProcurados('saida')}). Abra o arquivo, confira a linha dos títulos das colunas e, se for preciso, exporte o extrato em OFX no app do C6.`);
+  }
+  const lancamentos = [];
+  const vezes = new Map();
+  const comSaldo = [];
+  for (let i = cab + 1; i < linhas.length; i += 1) {
+    if (!linhas[i].trim()) continue;
+    const f = camposCsv(linhas[i], sep);
+    const data = dataCsv(f[col.data]);
+    if (!data) continue; // linha de total, rodapé ou saldo anterior sem data
+    let valor = col.valor !== null ? centavosDoCsv(f[col.valor]) : null;
+    if (valor === null) {
+      const ent = col.entrada !== null ? centavosDoCsv(f[col.entrada]) : null;
+      const sai = col.saida !== null ? centavosDoCsv(f[col.saida]) : null;
+      valor = ent ? Math.abs(ent) : sai ? -Math.abs(sai) : null;
+    }
+    if (valor === null || valor === 0) continue;
+    const tipo = col.tipo !== null ? C.semAcento(String(f[col.tipo] || '')).toUpperCase().trim() : '';
+    if (/^(D|DEBITO|SAIDA|S)$/.test(tipo)) valor = -Math.abs(valor); else if (/^(C|CREDITO|ENTRADA|E)$/.test(tipo)) valor = Math.abs(valor);
+    const titulo = col.titulo !== null ? f[col.titulo] || '' : '';
+    const descricao = (col.descricao !== null ? f[col.descricao] : '') || titulo; // o título fica no campo próprio (a tela mostra os dois)
+    const idArquivo = col.id !== null ? String(f[col.id] || '').trim() : '';
+    // sem identificador no arquivo: data, valor, descrição e a ordem entre os iguais (o mesmo arquivo importado de novo dá os mesmos)
+    const chave = `${data}|${valor}|${descricaoComparavel(descricao)}`;
+    const n = (vezes.get(chave) || 0) + 1;
+    vezes.set(chave, n);
+    const l = { id_externo: idArquivo ? `csv:${idArquivo}` : `csv:${chave}|${n}`, data, valor_centavos: valor, tipo: valor < 0 ? 'saida' : 'entrada', descricao, titulo: titulo || null,
+      end_to_end_id: /^E\d{8}/.test(idArquivo) ? idArquivo : null, local_reference: idArquivo && !/^E\d{8}/.test(idArquivo) ? idArquivo : null, fonte: 'csv' };
+    lancamentos.push(l);
+    if (col.saldo !== null) { const s = centavosDoCsv(f[col.saldo]); if (s !== null) comSaldo.push({ l, saldo: s }); }
+  }
+  if (!lancamentos.length) throw new C.ErroUsuario('O arquivo CSV não tem lançamentos com data e valor (período sem movimentação ou arquivo incompleto).');
+  const datas = lancamentos.map((l) => l.data).sort();
+  return { de: datas[0], ate: datas[datas.length - 1], lancamentos, saldo: saldoDoArquivo(comSaldo) };
+}
+
+/**
+ * Saldo do começo e do fim do período a partir da coluna de saldo (o saldo depois de cada lançamento). O arquivo pode vir do mais antigo
+ * para o mais novo ou ao contrário: vale a ordem em que cada saldo é o anterior mais o valor. Sem ordem que bata, null (não confere).
+ */
+function saldoDoArquivo(lista) {
+  if (lista.length < 1) return null;
+  const bate = (l) => l.every((x, i) => i === 0 || x.saldo === l[i - 1].saldo + x.l.valor_centavos);
+  const ordem = bate(lista) ? lista : bate([...lista].reverse()) ? [...lista].reverse() : null;
+  if (!ordem) return null;
+  const primeiro = ordem[0];
+  const ultimo = ordem[ordem.length - 1];
+  return { inicio: { data: primeiro.l.data, valor: primeiro.saldo - primeiro.l.valor_centavos }, fim: { data: ultimo.l.data, valor: ultimo.saldo } };
+}
+
+/** Saldo do OFX (``<LEDGERBAL><BALAMT>…<DTASOF>``) em centavos, no fim do dia de DTASOF; null se o arquivo não traz. */
+function saldoDoOfx(s) {
+  const m = /<LEDGERBAL>([\s\S]*?)(?:<\/LEDGERBAL>|<AVAILBAL>|<\/STMTRS>)/i.exec(s);
+  if (!m || !marca(m[1], 'BALAMT')) return null;
+  return { data: dataOfx(marca(m[1], 'DTASOF')) || null, valor: centavosDoOfx(marca(m[1], 'BALAMT')) };
+}
+
+// --------------------------------------------------------------------------
+// Conferência do saldo: saldo do banco (arquivo ou API) × saldo pelas movimentações importadas
+// --------------------------------------------------------------------------
+/** Entradas menos saídas da conta com data depois de ``depoisDe`` (exclusive) e até ``ate`` (inclusive). */
+export function somaDoPeriodo(d, contaId, depoisDe, ate) {
+  return (d.movimentacoes_banco || []).filter((m) => m.conta_id === contaId && m.data > depoisDe && m.data <= ate)
+    .reduce((s, m) => s + (m.tipo === 'entrada' ? m.valor : -m.valor), 0);
+}
+
+/** Lançamentos que parecem repetidos no período (mesma data, valor e tipo): os que sobram depois do primeiro de cada grupo. */
+function repetidosDoPeriodo(d, contaId, depoisDe, ate) {
+  const grupos = new Map();
+  for (const m of d.movimentacoes_banco || []) {
+    if (m.conta_id !== contaId || m.data <= depoisDe || m.data > ate) continue;
+    const k = `${m.data}|${m.valor}|${m.tipo}`;
+    const l = grupos.get(k);
+    if (l) l.push(m); else grupos.set(k, [m]);
+  }
+  return [...grupos.values()].filter((l) => l.length > 1).flatMap((l) => l.slice(1));
+}
+
+/**
+ * Confere um saldo do banco com as movimentações daqui, sem gravar. ``saldo``: { data, valor (centavos), fonte: 'api'|'ofx'|'csv',
+ * inicio?: { data, valor } (saldo antes do 1º lançamento do arquivo) }. Sem ``inicio``, parte do último saldo conferido da conta
+ * (``d.saldos_banco[conta].ancora``). Devolve { situacao: 'ok'|'faltam'|'dobro'|'primeira'|'sem_extrato', esperado, diferenca, desde, repetidos }.
+ * Ex.: saldo conferido de R$ 5.000,00 em 31/10; em novembro entraram R$ 1.218,50 e saíram R$ 200,00 → esperado R$ 6.018,50 em 30/11;
+ * o banco diz R$ 6.018,50: ok. Diz R$ 7.237,00: faltam lançamentos (R$ 1.218,50 a mais no banco). Diz R$ 4.800,00 com a entrada de
+ * R$ 1.218,50 importada duas vezes: importado em dobro.
+ */
+export function conferirSaldo(d, contaId, saldo) {
+  const ancora = saldo.inicio ? { data: C.somarDias(saldo.inicio.data, -1), valor: saldo.inicio.valor } : (((d.saldos_banco || {})[contaId] || {}).ancora || null);
+  if (!ancora) return { situacao: 'primeira', esperado: null, diferenca: 0, desde: null, repetidos: [] };
+  const depois = ancora.data <= saldo.data;
+  const [de, ate] = depois ? [ancora.data, saldo.data] : [saldo.data, ancora.data];
+  const soma = somaDoPeriodo(d, contaId, de, ate);
+  const esperado = depois ? ancora.valor + soma : ancora.valor - soma;
+  const diferenca = saldo.valor - esperado;
+  if (diferenca === 0) return { situacao: 'ok', esperado, diferenca, desde: ancora.data, repetidos: [] };
+  // o que está a mais aqui explica a diferença? (o mesmo lançamento importado duas vezes)
+  const repetidos = repetidosDoPeriodo(d, contaId, de, ate);
+  const aMais = repetidos.reduce((s, m) => s + (m.tipo === 'entrada' ? m.valor : -m.valor), 0) * (depois ? 1 : -1);
+  if (repetidos.length && aMais === -diferenca) return { situacao: 'dobro', esperado, diferenca, desde: ancora.data, repetidos: repetidos.map((m) => m.id) };
+  return { situacao: 'faltam', esperado, diferenca, desde: ancora.data, repetidos: [] };
+}
+
+/**
+ * Grava a conferência do saldo da conta em ``d.saldos_banco[conta]`` (na raiz, como o "importado até": o operador também confere):
+ * { ancora: o último saldo que bateu (o ponto de partida da próxima), ultima: a última conferência }. Saldo da API é o de agora: vira
+ * o saldo do fim de ontem tirando o que já entrou hoje, e só confere com o extrato buscado até hoje. Devolve o resultado de ``conferirSaldo``.
+ */
+export function registrarSaldo(d, contaId, saldo, usuario, { hoje: dia = hoje(), convertido = false, valorBanco = null } = {}) {
+  exigirConta(d, contaId);
+  let s = { ...saldo };
+  if (s.fonte === 'api' && !convertido) {
+    const ate = extratoImportadoAte(d, contaId);
+    if (!ate || ate < C.somarDias(dia, -1)) {
+      const r = { situacao: 'sem_extrato', esperado: null, diferenca: 0, desde: ate, repetidos: [] };
+      d.saldos_banco = { ...(d.saldos_banco || {}), [contaId]: { ...((d.saldos_banco || {})[contaId] || {}), ultima: { ...r, data: dia, valor: s.valor, fonte: 'api', em: new Date().toISOString(), por: usuario || '' } } };
+      return r;
+    }
+    s = { data: C.somarDias(dia, -1), valor: s.valor - somaDoPeriodo(d, contaId, C.somarDias(dia, -1), dia), fonte: 'api' };
+  }
+  const r = conferirSaldo(d, contaId, s);
+  const antes = (d.saldos_banco || {})[contaId] || {};
+  const fim = { data: s.data, valor: s.valor, fonte: s.fonte };
+  const ancora = r.situacao === 'ok' || r.situacao === 'primeira' ? (!antes.ancora || s.data >= antes.ancora.data ? fim : antes.ancora) : (antes.ancora || null);
+  d.saldos_banco = { ...(d.saldos_banco || {}), [contaId]: { ancora, ultima: { ...r, ...fim, valor_banco: valorBanco ?? saldo.valor, em: new Date().toISOString(), por: usuario || '' } } };
+  const TXT = { ok: 'bate com as movimentações', primeira: 'guardado como ponto de partida da conferência', faltam: `não bate: diferença de ${C.reais(r.diferenca)} (faltam lançamentos)`, dobro: `não bate: ${r.repetidos.length} lançamento(s) importado(s) em dobro` };
+  registrar(d, usuario, 'Alteração', 'banco', null, `Saldo da conta ${apelidoDaConta(d, contaId)} em ${C.dataBr(s.data)} (${C.reais(s.valor)}, ${s.fonte === 'api' ? 'pelo banco' : `arquivo ${s.fonte.toUpperCase()}`}): ${TXT[r.situacao]}`, { conta_id: contaId, ...r });
+  return r;
+}
+
+/** Usa o saldo do banco da última conferência como novo ponto de partida (o administrador explicou a diferença). */
+export function aceitarSaldoDoBanco(d, contaId, usuario) {
+  const atual = (d.saldos_banco || {})[contaId];
+  if (!atual || !atual.ultima || atual.ultima.valor === undefined || atual.ultima.situacao === 'sem_extrato') throw new C.ErroUsuario('Não há saldo conferido para usar como ponto de partida. Consulte o saldo ou importe um arquivo antes.');
+  const u = atual.ultima;
+  d.saldos_banco = { ...d.saldos_banco, [contaId]: { ancora: { data: u.data, valor: u.valor, fonte: u.fonte }, ultima: { ...u, situacao: 'aceito' } } };
+  registrar(d, usuario, 'Alteração', 'banco', null, `Saldo da conta ${apelidoDaConta(d, contaId)} em ${C.dataBr(u.data)} (${C.reais(u.valor)}) aceito como novo ponto de partida da conferência`, { conta_id: contaId });
+}
+
+/**
+ * Apaga a cópia de um lançamento importado em dobro (aparece na conferência do saldo): só sem destino e sem comprovante, e só se houver
+ * outro lançamento igual (mesma conta, data, valor e tipo). Depois confere o saldo de novo com o último saldo do banco.
+ */
+export function apagarCopiaRepetida(d, movId, usuario) {
+  const m = buscar(d, 'movimentacoes_banco', movId);
+  if (!m) throw new Error('Movimentação não encontrada.');
+  if (m.classificacao || m.comprovante || m.comprovante_contador) throw new C.ErroUsuario('Esta cópia já tem destino ou comprovante: desfaça o destino antes (ou apague a outra cópia).');
+  const outra = (d.movimentacoes_banco || []).find((x) => x.id !== m.id && x.conta_id === m.conta_id && x.data === m.data && x.valor === m.valor && x.tipo === m.tipo);
+  if (!outra) throw new C.ErroUsuario('Não há outro lançamento igual a este: não é uma cópia. Nada foi apagado.');
+  excluir(d, 'movimentacoes_banco', m.id, usuario, `Cópia repetida do lançamento de ${C.dataBr(m.data)} (${C.reais(m.valor)}) apagada (importado em dobro)`);
+  const u = ((d.saldos_banco || {})[m.conta_id] || {}).ultima;
+  if (u && u.situacao === 'dobro') registrarSaldo(d, m.conta_id, { data: u.data, valor: u.valor, fonte: u.fonte }, usuario, { convertido: true, valorBanco: u.valor_banco ?? u.valor });
+}
+
+// --------------------------------------------------------------------------
+// Avisos do banco (webhook guardado pela ponte) e saúde do banco
+// --------------------------------------------------------------------------
+/**
+ * Boletos nossos que o banco avisou (``notificacoes`` da ponte) recebidos depois de ``depoisDe`` (data e hora ISO) e que aqui ainda não
+ * estão pagos nem cancelados: os que vale reconsultar. O aviso não tem assinatura: só diz QUAIS consultar; nada é registrado por ele.
+ */
+export function boletosAvisados(d, notificacoes, depoisDe = '') {
+  const refs = new Set((notificacoes || []).filter((n) => n && n.external_reference_id && (!depoisDe || String(n.recebida_em || '') > depoisDe)).map((n) => String(n.external_reference_id)));
+  return d.cobrancas.filter((cb) => cb.banco && refs.has(String(cb.banco.id_externo)) && !cb.data_pagamento && cb.banco.situacao !== 'cancelado');
+}
+
+/** Boletos que o banco diz pagos (ou pagos aguardando o crédito) e que aqui ainda não estão: o que propor para registrar. */
+export const pagosNoBancoSemRegistro = (d, contaId = null) => d.cobrancas.filter((cb) => cb.banco && !cb.data_pagamento && (!contaId || cb.banco.conta_id === contaId)
+  && (cb.banco.situacao === 'pago' || /WAIT|PEND/.test(String(cb.banco.situacao_banco || '').toUpperCase())));
+
+/** Dias úteis que um boleto pago pode ficar "aguardando crédito" antes de virar alerta no painel de saúde. */
+export const DIAS_AGUARDANDO_CREDITO = 2;
+
+/**
+ * Painel de saúde do banco (sem a ponte: o que está nos dados): por conta, até quando o extrato foi importado e quando foi a última
+ * importação; boletos pagos "aguardando crédito" há mais de 2 dias úteis; emissões com erro ou sem resposta a conferir; a última
+ * conferência do saldo. Ex.: pago em 10/11 (terça), aguardando crédito em 13/11 (sexta) → alerta.
+ */
+export function saudeDoBanco(d, dia = hoje()) {
+  const contas = contasConfiguradas(d).map((c) => {
+    const movs = (d.movimentacoes_banco || []).filter((m) => m.conta_id === c.id && m.importada_em);
+    const ultima = movs.reduce((x, m) => (!x || m.importada_em > x ? m.importada_em : x), null);
+    return { id: c.id, apelido: c.apelido || String(c.id).toUpperCase(), importado_ate: extratoImportadoAte(d, c.id), ultima_importacao: ultima, saldo: ((d.saldos_banco || {})[c.id] || {}).ultima || null };
+  });
+  const aguardando = d.cobrancas.filter((cb) => {
+    if (!cb.banco || cb.data_pagamento || !/WAIT|PEND/.test(String(cb.banco.situacao_banco || '').toUpperCase())) return false;
+    const desde = cb.banco.pago_em || String(cb.banco.consultado_em || '').slice(0, 10);
+    return !!desde && C.somarDiasUteis(desde, DIAS_AGUARDANDO_CREDITO) < dia;
+  });
+  const comErro = d.cobrancas.filter((cb) => !cb.data_pagamento && ((cb.banco && cb.banco.situacao === 'erro') || (cb.emissao_pendente && cb.emissao_pendente.incerto)));
+  return { contas, aguardando, comErro, pagosSemRegistro: pagosNoBancoSemRegistro(d).filter((cb) => cb.banco.situacao === 'pago') };
 }
 
 // --------------------------------------------------------------------------

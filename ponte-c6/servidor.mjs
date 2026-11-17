@@ -285,7 +285,7 @@ async function pedirToken(conta, cfg) {
   }
   const expiraEm = Number(r.dados.expires_in || 300) * 1000;
   const scope = r.dados.scope ?? r.dados.scopes ?? '';
-  tokens.set(conta.id, { token: r.dados.access_token, expira: Date.now() + expiraEm, escopos: Array.isArray(scope) ? scope : String(scope).split(/[\s,]+/).filter(Boolean) });
+  tokens.set(conta.id, { token: r.dados.access_token, expira: Date.now() + expiraEm, obtido: Date.now(), escopos: Array.isArray(scope) ? scope : String(scope).split(/[\s,]+/).filter(Boolean) });
   return r.dados.access_token;
 }
 
@@ -861,12 +861,16 @@ export async function saudeDaConta(cfg, conta, testarToken = true) {
   const r = { id: conta.id, ambiente: conta.ambiente, versao_boleto: conta.versao_boleto, configurado: faltam.length === 0, faltam, webhook: !!conta.webhook_token, valor_maximo: conta.valor_maximo,
     certificado: faltam.some((f) => /certificado|chave/.test(f)) ? 'faltando' : 'ok', certificado_valido_ate: v ? v.valido_ate : null, certificado_dias: v ? v.dias : null,
     avisos: v && v.dias >= 0 && v.dias <= 30 ? [`O certificado vence em ${v.dias} dia(s) (${v.valido_ate}): gere outro no Web Banking do C6 antes disso.`] : [], token: null, simulado: cfg.simulado };
+  // painel de saúde do site: quando a ponte pegou o último token do banco (só a data e a hora; o token nunca sai daqui)
+  const t = tokens.get(conta.id);
+  r.ultimo_token_em = t && t.obtido ? new Date(t.obtido).toISOString() : null;
   if ([conta.certificado, conta.chave].some(permissaoAberta)) r.avisos.push('O certificado ou a chave privada podem ser lidos por outros usuários deste computador: rode chmod 600 neles.');
   if (cfg.simulado) { r.token = 'simulado'; return r; }
   if (!r.configurado || !testarToken) return r;
   try {
     await obterToken(conta, false, cfg);
     r.token = 'ok';
+    r.ultimo_token_em = new Date((tokens.get(conta.id) || {}).obtido || Date.now()).toISOString();
     const escopos = (tokens.get(conta.id) || {}).escopos || [];
     r.escopos = escopos;
     // cada serviço com as permissões dele (boleto, extrato e, com PAGAMENTOS=1, pagamentos): o que falta aparece aqui, não na hora de usar
