@@ -638,9 +638,16 @@ export async function apagarDocumentosVencidosDasFichas() {
     if (dir) for (const a of await S.listar(dir)) if (!ficam.has(a.nome)) { try { await dir.removeEntry(a.nome); apagados.push(a.nome); } catch { falharam.push(a.nome); } }
     // sobrou arquivo (sem internet, arquivo aberto em outro programa…): a ficha não é marcada e tenta de novo na próxima abertura
     if (falharam.length) { console.warn('documentos da ficha reprovada que não saíram', f.id, falharam.length); continue; }
-    await alterar((db) => R.atualizar(db, 'fichas', f.id, { documentos_apagados_em: C.hojeIso(), analise_serasa: null }, login(),
-      `Documentos da ficha reprovada apagados (${R.regra('meses_documentos_ficha')} meses depois da decisão)${apagados.length ? `: ${apagados.join(', ')}` : ''}`));
+    // no mesmo prazo, os dados pessoais da ficha também saem (CPF, RG, renda, endereço, contatos, fiadores; também no histórico)
+    await alterar((db) => {
+      R.atualizar(db, 'fichas', f.id, { documentos_apagados_em: C.hojeIso(), analise_serasa: null }, login(),
+        `Documentos da ficha reprovada apagados (${R.regra('meses_documentos_ficha')} meses depois da decisão)${apagados.length ? `: ${apagados.join(', ')}` : ''}`);
+      R.apagarDadosPessoaisDaFicha(db, f.id, login());
+    });
   }
+  // fichas cujos documentos saíram antes desta regra (17/11/2026): os dados pessoais saem agora
+  const soDados = R.fichasComDadosVencidos(d());
+  if (soDados.length) await alterar((db) => { for (const f of soDados) R.apagarDadosPessoaisDaFicha(db, f.id, login()); });
   const feitas = vencidas.filter((f) => R.buscar(d(), 'fichas', f.id)?.documentos_apagados_em);
   if (feitas.length < vencidas.length) aviso(`Não deu para apagar todos os documentos de ${vencidas.length - feitas.length} ficha(s) reprovada(s): o sistema tenta de novo na próxima vez que abrir.`, 'aviso');
   vencidas.splice(0, vencidas.length, ...feitas);

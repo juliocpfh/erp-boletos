@@ -138,12 +138,22 @@ test('multa e juros só sobre o aluguel; no C6 vão em reais', () => {
   });
 });
 
-test('proporcional em mês de 30 dias só no mês incompleto', () => {
+test('mês comercial: os exemplos do dono (17/11/2026), aluguel R$ 2.000,00', () => {
+  const al = (comp, entrada, saida) => C.calcularCobranca({ competencia: comp, aluguelMensal: 200000, entrada, saida });
+  assert.equal(al('2027-02', '2027-02-15', null).aluguel, 106667); // 16/30
+  assert.equal(al('2027-02', '2026-01-01', '2027-02-27').aluguel, 180000); // 27/30
+  assert.equal(al('2027-02', '2026-01-01', '2027-02-28').aluguel, 200000); // 30/30
+  assert.equal(al('2027-01', '2027-01-02', null).dias_cobrados, 29);
+  assert.equal(al('2027-01', '2027-01-31', null).dias_cobrados, 1);
+  assert.equal(al('2027-01', '2027-01-31', null).dias_mes, 30);
+});
+
+test('proporcional: mês comercial de 30 dias (padrão desde 17/11/2026) ou dias reais', () => {
   const p = { competencia: '2027-02', aluguelMensal: 180000, entrada: '2027-02-15', saida: null };
-  assert.equal(C.calcularCobranca(p).aluguel, 90000); // 14/28 de R$ 1.800,00
-  comRegras({ proporcional: 'mes_30' }, () => {
-    assert.equal(C.calcularCobranca(p).aluguel, 84000); // 14/30
-    assert.equal(C.calcularCobranca({ ...p, entrada: '2027-02-01' }).aluguel, 180000); // mês inteiro: cheio
+  assert.equal(C.calcularCobranca(p).aluguel, 96000); // 16/30 de R$ 1.800,00 (15 a 28/02, o último dia completa 30)
+  assert.equal(C.calcularCobranca({ ...p, entrada: '2027-02-01' }).aluguel, 180000); // mês inteiro: cheio
+  comRegras({ proporcional: 'dias_reais' }, () => {
+    assert.equal(C.calcularCobranca(p).aluguel, 90000); // 14/28
   });
 });
 

@@ -37,7 +37,8 @@ test('troca de titular com data futura: o anterior paga até a véspera; garanti
   assert.ok(!R.alertasContrato(d, novo, '2026-10-28').some((a) => /caução|Comprovante|Reserva/.test(a.tipo)), 'sem alerta de garantia no novo antes da data');
   R.gerarCobrancas(d, '2026-12', 'julio');
   assert.equal(R.boletoDoMes(d, c.id, '2026-12').dias_cobrados, 14, 'anterior: 1 a 14/12');
-  assert.equal(R.boletoDoMes(d, novo.id, '2026-12').dias_cobrados, 17, 'novo: 15 a 31/12');
+  // mês comercial de 30 dias (decisão de 17/11/2026): 14 + 16 = 30, o dia 31 não conta
+  assert.equal(R.boletoDoMes(d, novo.id, '2026-12').dias_cobrados, 16, 'novo: 15 a 31/12 = 16/30');
   R.gerarCobrancas(d, '2027-01', 'julio');
   assert.equal(R.boletoDoMes(d, c.id, '2027-01'), null);
   assert.ok(R.boletoDoMes(d, novo.id, '2027-01'));

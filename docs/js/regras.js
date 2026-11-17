@@ -1357,7 +1357,8 @@ function iptuDoInquilino(c, p, comp, v, base) {
   const cb = base.boletos.get(`${c.id}|${comp}`);
   if (cb) {
     const valor = iptuNoBoleto(cb, c, p, base.iptus);
-    return valor > 0 ? { contrato: c, comp, dias: cb.dias_cobrados, diasMes: cb.dias_mes, valor } : null;
+    // o IPTU é sempre pelos dias reais (mesmo com o aluguel pelo mês comercial de 30 dias)
+    return valor > 0 ? { contrato: c, comp, dias: C.diasOcupados(comp, c.data_entrada, c.data_saida), diasMes: C.diasNoMes(comp), valor } : null;
   }
   if (c.ativo === false || !c.cobrar_iptu) return null;
   // o mês já tem boleto do aluguel em outro contrato do imóvel com IPTU (ex.: troca de titular com boletos no anterior):
@@ -1550,8 +1551,8 @@ export function montarCobranca(d, contrato, comp) {
     taxaBoleto: cobra('taxa') ? contrato.taxa_boleto || 0 : 0,
   });
   // o FCI do mês incompleto é sempre pelos dias reais (regra `proporcional`), também com o mês comercial de 30 dias
-  // Ex.: entrada 15/02/2027, R$ 1.800,00 bonificado, FCI 5%: 14/28 → R$ 45,00 (e não 14/30 → R$ 42,00)
-  const aluguelReal = r.dias_mes === diasMes ? r.aluguel : C.aluguelProporcional(r.aluguel_mensal, r.dias_cobrados, diasMes);
+  // Ex.: entrada 15/02/2027, R$ 1.800,00 bonificado, FCI 5%: 14/28 → R$ 45,00 (e não 16/30 → R$ 48,00)
+  const aluguelReal = r.dias_mes === diasMes ? r.aluguel : C.aluguelProporcional(r.aluguel_mensal, dias, diasMes);
   const descontoReal = r.dias_mes === diasMes ? r.desconto : C.descontoPorPercentual(aluguelReal, bonificacaoNaCompetencia(d, contrato, comp));
   return {
     contrato_id: contrato.id, competencia: comp,
@@ -1903,8 +1904,11 @@ export function baseDaFatura(d, tipo, registro) {
     const acordo = ehParcelaAcordo(registro) && registro.acordo_periodo;
     const [ini, fim] = acordo || C.periodoServico(registro.competencia, contrato.data_entrada, contrato.data_saida);
     const ref = acordo ? `acordo${registro.acordo_parcela ? ` ${registro.acordo_parcela}` : ''} (${registro.acordo_referente})` : '';
+    // mês incompleto (entrada ou saída): a NF mostra a quantidade em dias do mês (ex.: 16/30), não "1 mês"
+    const proporcional = !acordo && registro.dias_cobrados > 0 && registro.dias_cobrados < registro.dias_mes;
     return {
       imovel, valor: registro.valor_nf, periodo_inicio: ini, periodo_fim: fim,
+      ...(proporcional ? { dias: registro.dias_cobrados, dias_mes: registro.dias_mes } : {}),
       descricao: `${contrato.inquilino_nome} · ${imovel.nome} · ${ref || C.compBr(registro.competencia)}`,
       observacoes: registro.observacoes_nf || (ref ? `Parcela do ${ref}` : ''),
       tomador: { nome: contrato.inquilino_nome, documento: contrato.inquilino_cpf || '',
@@ -1997,6 +2001,7 @@ export function numerarFaturas(d, usuario, { forcar = false, ate = null, apenas 
       inserir(d, 'faturas', {
         numero, emissao: p.data, origem_tipo: p.tipo, origem_id: p.registro.id, emitente_id: e.id,
         percentual: parte.percentual, valor: valores[i], periodo_inicio: base.periodo_inicio,
+        ...(base.dias ? { dias: base.dias, dias_mes: base.dias_mes } : {}),
         periodo_fim: base.periodo_fim, municipio: base.municipio || e.municipio || (base.imovel && base.imovel.cidade) || '',
         tomador_nome: base.tomador.nome, tomador_documento: base.tomador.documento,
         tomador_telefone: base.tomador.telefone, tomador_endereco: base.tomador.endereco, observacoes: base.observacoes || '', situacao: 'Emitida', lote,
@@ -2032,6 +2037,7 @@ export function registrarNfExterna(d, tipo, id, numero, emissao, usuario) {
     inserir(d, 'faturas', {
       numero: n, emissao, origem_tipo: tipo, origem_id: registro.id, emitente_id: e.id, percentual: parte.percentual, valor: valores[i],
       periodo_inicio: base.periodo_inicio, periodo_fim: base.periodo_fim, municipio: base.municipio || e.municipio || (base.imovel && base.imovel.cidade) || '',
+      ...(base.dias ? { dias: base.dias, dias_mes: base.dias_mes } : {}),
       tomador_nome: base.tomador.nome, tomador_documento: base.tomador.documento, tomador_telefone: base.tomador.telefone,
       tomador_endereco: base.tomador.endereco, observacoes: base.observacoes || '', situacao: 'Emitida', externa: true,
     }, usuario, `NF nº ${numeroFatura(n)} emitida fora do sistema · ${e.nome} · ${base.descricao}`);
@@ -2532,6 +2538,50 @@ export const devolucaoPendente = (f) => fichaSemContrato(f) && f.reserva_valor >
 
 /** Data em que os documentos da ficha reprovada (ou com desistência) são apagados (3 meses depois da decisão), ou null. */
 export const dataApagarDocumentosFicha = (f) => (fichaSemContrato(f) && f.decisao_data && !f.documentos_apagados_em ? C.somarMesesData(f.decisao_data, CR.regra('meses_documentos_ficha')) : null);
+
+/**
+ * Campos da ficha reprovada (ou com desistência) que ficam depois do prazo (LGPD: guardar só o necessário): o nome, as datas, a
+ * situação e o motivo, a proposta (valores do imóvel, não da pessoa), as ligações (ids) e o dinheiro da reserva com os comprovantes.
+ */
+const FICHA_FICA = new Set(['id', 'inquilino_nome', 'inquilino_tipo', 'situacao', 'decisao_data', 'decisao_por', 'decisao_motivo', 'data_recebida',
+  'imoveis_ids', 'modo_imoveis', 'pasta', 'documentos_apagados_em', 'dados_apagados_em', 'documentos_no_contrato', 'criado_em', 'criado_por', 'alterado_em', 'alterado_por',
+  ...COMPROVANTES_DINHEIRO_FICHA, ...CAMPOS_PROPOSTA_FICHA]);
+const fichaFica = (k) => FICHA_FICA.has(k) || /^(reserva|devolucao)_/.test(k) || /_ids?$/.test(k);
+
+/**
+ * Apaga os dados pessoais da ficha reprovada (ou com desistência), no mesmo prazo dos documentos (regra `meses_documentos_ficha`):
+ * CPF, RG, renda, endereço, contatos, fiadores e o que mais a pessoa informou saem da ficha, das linhas do histórico dela e dos
+ * e-mails registrados para ela (o endereço de e-mail). Ficam o nome, as datas, a situação e o motivo e a reserva com os comprovantes.
+ * O histórico guardado na nuvem fica como está (só o deste aparelho é limpo). Devolve a ficha.
+ */
+export function apagarDadosPessoaisDaFicha(d, fichaId, usuario, hoje = C.hojeIso()) {
+  const f = buscar(d, 'fichas', fichaId);
+  if (!f) throw new C.ErroUsuario('Ficha não encontrada.');
+  if (!fichaSemContrato(f)) throw new C.ErroUsuario('Só a ficha reprovada ou com desistência tem os dados pessoais apagados.');
+  const saem = Object.keys(f).filter((k) => !fichaFica(k) && f[k] !== null && f[k] !== undefined && f[k] !== '');
+  for (const k of saem) f[k] = null;
+  f.dados_apagados_em = hoje;
+  // e-mails mandados para a pessoa: sai o endereço
+  const emails = new Set();
+  for (const e of d.envios_email || []) if (e.ficha_id === f.id && e.para) { emails.add(e.para); e.para = null; }
+  const limparTexto = (t) => [...emails].reduce((s, x) => s.split(x).join('(apagado)'), String(t));
+  const limparDetalhes = (det) => (det && typeof det === 'object' && !Array.isArray(det) ? Object.fromEntries(Object.entries(det).filter(([k]) => fichaFica(k))) : null);
+  // linhas antigas do histórico: trocadas por cópias limpas (nunca mexer no objeto antigo, que a tela anterior ainda usa)
+  d.historico = d.historico.map((h) => {
+    if (h.tabela === 'fichas' && h.registro_id === f.id) return { ...h, detalhes: limparDetalhes(h.detalhes) };
+    if (h.tabela === 'envios_email' && emails.size && (String(h.descricao || '').length || h.detalhes)) {
+      const texto = JSON.stringify(h.detalhes || null);
+      if ([...emails].some((x) => String(h.descricao || '').includes(x) || texto.includes(x))) return { ...h, descricao: limparTexto(h.descricao || ''), detalhes: h.detalhes ? JSON.parse(limparTexto(texto)) : null };
+    }
+    return h;
+  });
+  registrar(d, usuario, 'Alteração', 'fichas', f.id, `Ficha de ${f.inquilino_nome} (${f.situacao.toLocaleLowerCase('pt-BR')}): dados pessoais apagados (${CR.regra('meses_documentos_ficha')} meses depois da decisão; ficam o nome, as datas, a situação e a reserva)`, { campos_apagados: saem.length });
+  return f;
+}
+
+/** Fichas reprovadas (ou com desistência) cujos documentos já saíram e os dados pessoais ainda não. */
+export const fichasComDadosVencidos = (d, hoje = C.hojeIso()) => (d.fichas || []).filter((f) => fichaSemContrato(f) && f.decisao_data && !f.dados_apagados_em
+  && C.somarMesesData(f.decisao_data, CR.regra('meses_documentos_ficha')) <= hoje && f.documentos_apagados_em);
 
 /** Fichas reprovadas com os documentos para apagar hoje. */
 export const fichasComDocumentosVencidos = (d, hoje = C.hojeIso()) => (d.fichas || []).filter((f) => dataApagarDocumentosFicha(f) && dataApagarDocumentosFicha(f) <= hoje);

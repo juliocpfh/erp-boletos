@@ -396,11 +396,29 @@ export function totaisCobranca({ aluguel, desconto, iptu = 0, seguro = 0, taxa_b
   };
 }
 
+/**
+ * Dias ocupados no mês comercial de 30 dias (decisão do dono, 17/11/2026: "considere todos os meses como 30 dias"): o dia 31
+ * não conta e o último dia do mês completa 30 (em fevereiro, 28 ou 29 valem 30). Entrar no último dia do mês (31/01, 28/02,
+ * 30/04) conta 1 dia. Ex.: entrada 15/02 → 16/30; saída 27/02 → 27/30; saída 28/02 (ano não bissexto) → 30/30;
+ * entrada 02/01 → 29/30; entrada 31/01 → 1/30. Mês inteiro = 30.
+ */
+export function diasComerciais(comp, entrada, saida) {
+  const [ini, fim] = periodoServico(comp, entrada, saida);
+  if (ini > fim) return 0;
+  const ultimo = diasNoMes(comp);
+  const dia = (x) => Number(x.slice(8, 10));
+  const s = dia(ini) === ultimo ? 30 : Math.min(dia(ini), 30);
+  const e = dia(fim) === ultimo ? 30 : Math.min(dia(fim), 30);
+  return Math.max(0, Math.min(30, e - s + 1));
+}
+
 export function calcularCobranca({ competencia, aluguelMensal, entrada, saida, descontoPercentual = 0, iptu = 0,
   seguro = 0, taxaBoleto = 0, outros = 0, reservaDisponivel = 0 }) {
-  const dias = diasOcupados(competencia, entrada, saida);
-  // regra `proporcional`: dias reais do mês (padrão) ou mês comercial de 30 dias no mês incompleto (14/30 em vez de 14/28)
-  const diasMes = regra('proporcional') === 'mes_30' && dias < diasNoMes(competencia) ? 30 : diasNoMes(competencia);
+  const diasReais = diasOcupados(competencia, entrada, saida);
+  // regra `proporcional`: mês comercial de 30 dias (padrão desde 17/11/2026, `diasComerciais`) ou dias reais do mês (14/28)
+  const comercial = regra('proporcional') === 'mes_30' && diasReais < diasNoMes(competencia);
+  const dias = comercial ? diasComerciais(competencia, entrada, saida) : diasReais;
+  const diasMes = comercial ? 30 : diasNoMes(competencia);
   const aluguel = aluguelProporcional(aluguelMensal, dias, diasMes);
   const desconto = descontoPorPercentual(aluguel, descontoPercentual);
   const itens = { aluguel, desconto, iptu, seguro, taxa_boleto: taxaBoleto, outros };

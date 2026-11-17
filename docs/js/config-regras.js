@@ -40,13 +40,14 @@ export const DEFINICOES_REGRAS = [
     explica: 'O FCI fica sempre fora da multa e dos juros.',
     consequencia: 'Vale para os pagamentos registrados e os boletos emitidos no banco daqui em diante. Boleto já emitido no C6 continua com a multa com que saiu.',
     lei: LI + ', arts. 23, I, e 25; Código Civil, art. 395 (o devedor em atraso responde pelos prejuízos, juros e multa).' },
-  { chave: 'proporcional', grupo: 'aluguel', rotulo: 'Aluguel proporcional (mês de entrada e de saída)', tipo: 'opcao', padrao: 'dias_reais',
+  { chave: 'proporcional', grupo: 'aluguel', rotulo: 'Aluguel proporcional (mês de entrada e de saída)', tipo: 'opcao', padrao: 'mes_30',
+    // decisão do dono em 17/11/2026: "considere todos os meses como 30 dias" (antes o padrão eram os dias reais)
     opcoes: [
-      ['dias_reais', 'Pelos dias reais do mês (padrão do sistema)', 'Entrada em 15/02/2027, aluguel R$ 1.800,00: 14 dias de 28 = R$ 900,00. Legal: não há lei sobre a conta; é a mais justa e fácil de explicar.'],
-      ['mes_30', 'Mês comercial de 30 dias', 'Mesmo exemplo: 14 ÷ 30 × R$ 1.800,00 = R$ 840,00 (mês inteiro continua o aluguel cheio). Legal, se estiver no contrato.'],
+      ['mes_30', 'Mês comercial de 30 dias (padrão do sistema)', 'Todo mês vale 30 dias: o dia 31 não conta e o último dia de fevereiro completa 30. Aluguel R$ 2.000,00: entrada em 15/02 = 16/30 = R$ 1.066,67; saída em 27/02 = 27/30 = R$ 1.800,00; saída em 28/02 (ano não bissexto) = mês inteiro, R$ 2.000,00; entrada em 02/01 = 29/30; entrada no último dia do mês (31/01) = 1/30. Legal, se estiver no contrato; é a prática do mercado.'],
+      ['dias_reais', 'Pelos dias reais do mês', 'Entrada em 15/02/2027, aluguel R$ 2.000,00: 14 dias de 28 = R$ 1.000,00. Legal: não há lei sobre a conta.'],
     ],
     explica: 'Como se calcula o aluguel dos dias ocupados no mês de entrada e no de saída.',
-    consequencia: 'Vale para os boletos gerados ou recalculados daqui em diante. O IPTU e o FCI do mês continuam pelos dias reais.',
+    consequencia: 'Vale para os boletos gerados ou recalculados daqui em diante; boleto pago, alterado à mão ou emitido no banco não muda. O IPTU e o FCI do mês continuam pelos dias reais.',
     lei: 'Sem lei específica: vale o combinado no contrato (' + LI + ', art. 17).' },
   { chave: 'ressarcimento_na_nf', grupo: 'aluguel', rotulo: 'Ressarcimento de condomínio sai do valor da NF', tipo: 'simnao', padrao: false,
     explica: 'Taxas do proprietário pagas pelo inquilino no condomínio (fundo de obras etc.) voltam para ele no boleto do aluguel. Não (padrão): a NF sai com o aluguel cheio e o ressarcimento conta como gasto do imóvel nos Resultados. Sim: a NF fica com o aluguel menos a taxa e ela não conta de novo como gasto. Ex.: aluguel R$ 1.215,00 e fundo de obras R$ 150,00 → NF de R$ 1.215,00 (não) ou de R$ 1.065,00 (sim).',

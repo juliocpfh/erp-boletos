@@ -241,3 +241,45 @@ test('[27][28] fechamento confere os boletos pelo vencimento, com as parcelas do
   const e = R.etapasFechamento(d, '2026-11', '2026-11-25').find((x) => x.chave === 'pagamentos');
   assert.equal(e.pendentes, 1);
 });
+
+test('[segurança 11] ficha reprovada: no prazo, os dados pessoais saem da ficha, do histórico e dos e-mails', () => {
+  const d = R.bancoVazio();
+  const f = R.inserir(d, 'fichas', { inquilino_nome: 'Ana Exemplo', inquilino_cpf: '529.982.247-25', inquilino_rg: '12.345.678-9', inquilino_email: 'ana@exemplo.com',
+    renda_valor: 500000, endereco: 'Rua B, 2', fiador1_nome: 'Beto Exemplo', fiador1_cpf: '529.982.247-25', reserva_valor: 50000, reserva_data: '2026-07-01',
+    comprovante_reserva: 'reserva.pdf', aluguel_inicial: 200000 }, 'j');
+  R.atualizar(d, 'fichas', f.id, { situacao: 'Reprovada', decisao_data: '2026-07-10', decisao_motivo: 'renda insuficiente', inquilino_telefone: '41 99999-0000' }, 'j', 'Reprovada');
+  d.envios_email = [{ id: 1, ficha_id: f.id, para: 'ana@exemplo.com', assunto: 'Ficha' }];
+  R.registrar(d, 'j', 'Inclusão', 'envios_email', 1, 'E-mail "Ficha" enviado para ana@exemplo.com', { para: 'ana@exemplo.com' });
+  assert.equal(R.fichasComDadosVencidos(d, '2026-11-17').length, 0, 'os documentos saem antes');
+  R.atualizar(d, 'fichas', f.id, { documentos_apagados_em: '2026-10-10' }, 'j', 'docs');
+  assert.equal(R.fichasComDadosVencidos(d, '2026-11-17').length, 1);
+  R.apagarDadosPessoaisDaFicha(d, f.id, 'j', '2026-11-17');
+  const x = R.buscar(d, 'fichas', f.id);
+  for (const k of ['inquilino_cpf', 'inquilino_rg', 'inquilino_email', 'renda_valor', 'endereco', 'fiador1_nome', 'fiador1_cpf', 'inquilino_telefone']) assert.equal(x[k], null, k);
+  assert.equal(x.inquilino_nome, 'Ana Exemplo');
+  assert.equal(x.situacao, 'Reprovada');
+  assert.equal(x.decisao_motivo, 'renda insuficiente');
+  assert.equal(x.reserva_valor, 50000);
+  assert.equal(x.comprovante_reserva, 'reserva.pdf');
+  assert.equal(x.dados_apagados_em, '2026-11-17');
+  const texto = JSON.stringify(d.historico);
+  for (const t of ['529.982.247-25', '12.345.678-9', 'ana@exemplo.com', 'Rua B', 'Beto', '99999']) assert.ok(!texto.includes(t), t);
+  assert.equal(d.envios_email[0].para, null);
+  assert.equal(R.fichasComDadosVencidos(d, '2026-11-17').length, 0);
+});
+
+test('[e2e 30] NF do mês incompleto: quantidade 16/30, unitário do mês inteiro e total proporcional', async () => {
+  const FT = await import('../docs/js/fatura.js');
+  assert.deepEqual(FT.quantidadeDaFatura({ valor: 106667, dias: 16, dias_mes: 30 }), { proporcional: true, quantidade: '16/30', unitario: 200000 });
+  assert.deepEqual(FT.quantidadeDaFatura({ valor: 96000, dias: 16, dias_mes: 30 }), { proporcional: true, quantidade: '16/30', unitario: 180000 });
+  assert.deepEqual(FT.quantidadeDaFatura({ valor: 180000 }), { proporcional: false, quantidade: '1', unitario: 180000 });
+  // a NF numerada guarda os dias do boleto
+  const { d, c } = base({ data_entrada: '2026-11-15', vigencia_inicio: '2026-11-15' });
+  R.gerarCobrancas(d, '2026-11', 'j');
+  const cb = R.boletoDoMes(d, c.id, '2026-11');
+  R.registrarPagamento(d, cb.id, cb.vencimento, null, 'j', { pagouEmDia: true });
+  R.numerarFaturas(d, 'j');
+  const f = d.faturas[0];
+  assert.equal(`${f.dias}/${f.dias_mes}`, '16/30');
+  assert.equal(FT.quantidadeDaFatura(f).quantidade, '16/30');
+});
