@@ -6,6 +6,7 @@ import * as K from '../contratos.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { alertaAdiado, alertaDesligado, botao, buscar, classeAlerta, d, etiqueta, gruposDeAlertas, link, nomeAlerta, opera } from './comum.js';
+import { alertasDaTela } from './comum.js';
 
 // --------------------------------------------------------------------------
 // Fechamento do mês e cadastros incompletos
@@ -62,11 +63,18 @@ export function cadastrosIncompletos() {
   return out;
 }
 
+/**
+ * Grupo da lista de pendências: recolhido, com o número de itens no título (o navegador não desenha o que está fechado; no
+ * banco grande eram 5.700 elementos abertos de uma vez). Grupo pequeno (até ABERTA_ATE itens) já vem aberto.
+ */
+const ABERTA_ATE = 5;
+const caixaPendencias = (titulo, n, conteudo, aberta) => `<details class="grupo-pendencias"${aberta ? ' open' : ''}><summary><b>${esc(titulo)}</b> <span class="suave">(${n})${aberta ? '' : ' · clique para ver'}</span></summary>${conteudo}</details>`;
+
 /** Central de pendências (D14): alertas em vigor, etapas do fechamento não feitas e cadastros incompletos, numa lista só. */
 export function telaPendencias() {
   const hoje = C.hojeIso();
   const mesAtual = C.competenciaDe(hoje);
-  const alertas = R.alertasComAdiamento(d(), hoje);
+  const alertas = alertasDaTela(hoje);
   const ativos = alertas.filter((a) => !a.adiamento && !a.desligado);
   const adiados = alertas.filter((a) => a.adiamento && !a.desligado);
   const desligados = R.alertasDesligados(d(), hoje, null, alertas);
@@ -77,11 +85,9 @@ export function telaPendencias() {
   return `<p class="suave"><a href="#/">← Painel</a></p><h1>Pendências <span class="suave">(${total})</span></h1>
     <p class="suave">Tudo o que espera uma ação, num lugar só: os alertas em vigor, as etapas do fechamento do mês ainda não feitas e os cadastros incompletos.</p>
     <div class="cartao" id="alertas"><h2>Alertas <span class="suave">(${ativos.length}${adiados.length ? ` em vigor, ${adiados.length} adiado(s)` : ''})</span></h2>
-      ${gruposDeAlertas(ativos).map(([tipo, l]) => `<h3>${esc(tipo)} <span class="suave">(${l.length})</span></h3>${l.map((a) => `<div class="${classeAlerta(a)}">${nomeAlerta(a)}</div>`).join('')}`).join('') || '<p class="suave">Nenhum alerta em vigor.</p>'}
-      ${adiados.length ? `<h3>Adiados ou em cuidado <span class="suave">(${adiados.length})</span></h3>
-        ${adiados.map((a) => alertaAdiado(a, hoje)).join('')}` : ''}
-      ${desligados.length ? `<h3>Desligados <span class="suave">(${desligados.length})</span></h3>
-        ${desligados.map((x) => alertaDesligado(x)).join('')}` : ''}
+      ${gruposDeAlertas(ativos).map(([tipo, l]) => caixaPendencias(tipo, l.length, l.map((a) => `<div class="${classeAlerta(a)}">${nomeAlerta(a)}</div>`).join(''), l.length <= ABERTA_ATE)).join('') || '<p class="suave">Nenhum alerta em vigor.</p>'}
+      ${adiados.length ? caixaPendencias('Adiados ou em cuidado', adiados.length, adiados.map((a) => alertaAdiado(a, hoje)).join(''), false) : ''}
+      ${desligados.length ? caixaPendencias('Desligados', desligados.length, desligados.map((x) => alertaDesligado(x)).join(''), false) : ''}
       <p class="suave">Para adiar um alerta ou marcar que está cuidando, use os botões dele no Painel ("Já estou cuidando" esconde só hoje: amanhã ele volta). "Desligar" deixa de avisar aquele inquilino ou imóvel até alguém religar.</p></div>
     <div class="cartao" id="fechamento"><h2>Fechamento do mês <span class="suave">(${etapas.length})</span></h2>
       ${etapas.map((e) => `<div class="alerta aviso"><a href="#/fechamento?mes=${e.mes}">${esc(e.titulo.split(/ \(|, a partir/)[0])}</a>${e.mes !== mesAtual ? ` <span class="suave">(de ${compBr(e.mes)})</span>` : ''}${e.pendentes ? ` <span class="suave">· ${e.pendentes} pendente(s)</span>` : ''}</div>`).join('') || `<p class="suave">As etapas liberadas de ${compBr(mesAtual)} estão feitas.</p>`}</div>

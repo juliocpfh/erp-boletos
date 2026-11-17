@@ -18,8 +18,10 @@ export const ligado = () => !!CR.regra('arquivo_impresso');
  * contratoId → nomes. Com eles, o arquivo solto novo (ex.: notificação posta na pasta) também avisa no Painel e na página.
  */
 const soltosConhecidos = new Map();
-export const anotarSoltos = (contratoId, nomes) => { soltosConhecidos.set(Number(contratoId), [...nomes]); };
-export const esquecerSoltos = () => soltosConhecidos.clear();
+/** Muda a cada lista anotada ou esquecida: a tela que guarda os alertas (alertasDaTela, telas/comum.js) refaz a conta. */
+export let versaoSoltos = 0;
+export const anotarSoltos = (contratoId, nomes) => { soltosConhecidos.set(Number(contratoId), [...nomes]); versaoSoltos += 1; };
+export const esquecerSoltos = () => { soltosConhecidos.clear(); versaoSoltos += 1; };
 
 /** Grupos da lista, na ordem da pasta. */
 export const GRUPOS_PASTA = [

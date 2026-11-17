@@ -438,7 +438,7 @@ export async function aplicarReajusteNaTela(contratoId, comp, manual = null) {
   });
   aviso(`Correção registrada a partir do aluguel de ${compBr(comp)}.${n ? ` ${n} boleto(s) em aberto recalculado(s).` : ''}`);
   // vários reajustes atrasados do mesmo inquilino: a caução é calculada uma vez, depois do último já vencido
-  const resta = R.reajustesAbertos(d()).find((r) => r.contrato.id === contratoId && !r.corrigido && r.competencia <= C.competenciaDe(C.hojeIso()));
+  const resta = R.reajustesAbertos(d(), C.hojeIso(), { contratoId }).find((r) => !r.corrigido && r.competencia <= C.competenciaDe(C.hojeIso()));
   if (resta) aviso(`Caução: o complemento é calculado depois de aplicar também o reajuste de ${compBr(resta.competencia)}.`, 'info');
   else await perguntarCaucao(contratoId);
   await mostrar();

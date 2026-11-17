@@ -29,6 +29,7 @@ import { conferirSoltosUmaVez, ligarPastaImpressao, telaArquivoImpresso, telaPas
 import { telaImovel } from './telas/imovel.js';
 import { aparelhosLigadosHtml, telaBackupsNuvem, telaConflitos } from './telas/nuvem.js';
 import { telaReajustes } from './telas/reajustes.js';
+import { alertasDaTela } from './telas/comum.js';
 import { telaRegras } from './telas/regras-sistema.js';
 import { avisoPrimeiraLogo, ligarEditorIcone } from './telas/icone.js';
 import { alertasAbertos, MOSTRAR_ALERTAS } from './telas/comum.js';
@@ -250,7 +251,7 @@ export const TELAS = {
       .then(() => acertarNomesUmaVez()).catch((e) => aviso(`Nomes dos comprovantes: ${e.message}`, 'aviso'));
     const hoje = C.hojeIso();
     // alertas adiados ("adiar 7 dias" / "já estou cuidando") ficam recolhidos no fim da caixa, com quem marcou
-    const todosOsAlertas = R.alertasComAdiamento(d(), hoje);
+    const todosOsAlertas = alertasDaTela(hoje);
     const alertas = todosOsAlertas.filter((a) => !a.adiamento && !a.desligado);
     const adiados = todosOsAlertas.filter((a) => a.adiamento && !a.desligado);
     // alertas desligados para um inquilino ou imóvel (não aparecem até religar): lista recolhida no fim, de onde se religa

@@ -882,13 +882,27 @@ export function apiDoSite(base = 'api/dados/', { limite = TEMPO_LIMITE, buscar =
   };
 }
 
+// A resposta de /api/saude pedida por nuvemDisponivel na abertura: a abertura da nuvem (saudeDaNuvem) a usa uma vez, em vez
+// de pedir de novo logo em seguida (eram duas idas iguais ao site, ~200 ms cada)
+let saudeDaAbertura = null; // { base, quando, resposta }
+const REAPROVEITAR_SAUDE = 60000; // ms
+
 /** A nuvem está ligada neste endereço? (no GitHub Pages, sem o Worker, /api/ não existe). */
 export async function nuvemDisponivel(base = 'api/') {
-  return (await saudeDaNuvem(base)) !== null;
+  const resposta = await buscarSaude(base);
+  saudeDaAbertura = resposta ? { base, quando: Date.now(), resposta } : null;
+  return resposta !== null;
 }
 
 /** { email } de quem passou pelo login da internet (Access), ou null sem internet / sem a nuvem. */
 export async function saudeDaNuvem(base = 'api/') {
+  const guardada = saudeDaAbertura;
+  saudeDaAbertura = null;
+  if (guardada && guardada.base === base && Date.now() - guardada.quando < REAPROVEITAR_SAUDE) return guardada.resposta;
+  return buscarSaude(base);
+}
+
+async function buscarSaude(base) {
   try {
     const r = await fetch(`${base}saude`, { cache: 'no-store', credentials: 'same-origin', signal: limiteDeTempo(10000) });
     if (!r.ok || !(r.headers.get('content-type') || '').includes('json')) return null;
