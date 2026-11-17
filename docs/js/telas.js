@@ -33,28 +33,15 @@ import { alertasDaTela } from './telas/comum.js';
 import { telaRegras } from './telas/regras-sistema.js';
 import { avisoPrimeiraLogo, ligarEditorIcone } from './telas/icone.js';
 import { alertasAbertos, MOSTRAR_ALERTAS } from './telas/comum.js';
+import * as AJ from './ajuda.js';
 
 // --------------------------------------------------------------------------
 // Telas de abertura
 // --------------------------------------------------------------------------
 const LINK_RESTAURAR = '<p class="suave" style="margin-top:10px">Administrador: <a href="#/restaurar-backup">restaurar um backup seguro</a></p>';
 
-/**
- * Sistema começando (nenhum imóvel ou nenhum contrato): no lugar do "Fechamento: as etapas liberadas estão feitas", os
- * primeiros passos (empresa → imóvel → contrato → boletos), com ✓ no que já foi feito. Some quando os quatro estão feitos.
- */
-function primeirosPassos() {
-  const db = d();
-  if (db.imoveis.length && db.contratos.length) return '';
-  const pode = opera();
-  const passos = [
-    [db.emitentes.length > 0, 'Cadastre a empresa que emite as NFs', pode && podeUsuario('admin') ? '#/novo/emitentes' : ''],
-    [db.imoveis.length > 0, 'Cadastre o primeiro imóvel', pode ? '#/novo/imoveis' : ''],
-    [db.contratos.length > 0, 'Cadastre o contrato do inquilino', pode ? '#/novo/contratos' : ''],
-    [db.cobrancas.length > 0, 'Gere os boletos do mês', '#/cobrancas'],
-  ];
-  return `<div class="alerta info primeiros-passos"><b>Primeiros passos</b><ol>${passos.map(([feito, texto, href]) => `<li>${feito ? '✓ ' : ''}${feito || !href ? esc(texto) : `<a href="${href}">${esc(texto)}</a>`}</li>`).join('')}</ol></div>`;
-}
+/** Primeiros passos do Painel (ajuda.js): só em sistema começando, para quem lança, até o "Já sei usar". */
+const primeirosPassos = () => AJ.caixaPrimeirosPassos(d(), { quem: E.usuario?.login || '', pode: opera(), admin: podeUsuario('admin'), backupLigado: !!(E.seguro && E.seguro.chave) });
 
 export const TELAS = {
   _previaAlerta: (el, cor, enfase) => { el.className = classeEstilo('aviso', { cor, enfase }); },
@@ -65,6 +52,7 @@ export const TELAS = {
   'backups-nuvem': () => telaBackupsNuvem(),
 
   _ligarDesconto(raiz) {
+    AJ.ligarAjuda(raiz);
     ligarCamposAutomaticos(raiz);
     ligarEditorIcone(raiz);
     ligarGarantiasCorrigidas(raiz);
@@ -272,6 +260,7 @@ export const TELAS = {
     for (const a of alertas) porTipo[a.tipo] = (porTipo[a.tipo] || 0) + 1;
     const [tipoMais, qtdMais] = Object.entries(porTipo).sort((a, b) => b[1] - a[1])[0] || ['', 0];
     return `${avisoPrimeiraLogo()}<div class="cabecalho"><h1>Painel</h1>${opera() ? `<div class="acoes">${link('#/cobrancas?filtro=abertos', 'Registrar pagamento', 'botao')} ${link('#/cobrancas', 'Acompanhar boletos', 'botao secundario')}</div>` : ''}</div>
+      ${primeirosPassos()}
       <div class="numeros">
         ${n(d().imoveis.length, 'imóveis', '#/imoveis')}
         ${n(d().contratos.filter((c) => R.contratoAtivo(c, hoje)).length, 'contratos ativos', '#/inquilinos')}
@@ -285,7 +274,7 @@ export const TELAS = {
       ${d().contratos.filter((c) => R.dataApagarSemImovel(c)).map((c) => `<div class="alerta aviso"><b>Contrato sem imóvel:</b> <a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a> será apagado em <b>${dataBr(R.dataApagarSemImovel(c))}</b> se não for vinculado a um imóvel (use "Editar" no contrato).</div>`).join('')}
       ${alertaArquivosFaltando()}
       ${pastasComArquivos.length ? `<div class="alerta aviso"><b>Pasta "${PASTA_SEM_IMOVEL}"</b> tem pasta(s) com arquivos e sem contrato: ${esc(pastasComArquivos.join(', '))}. Confira e apague à mão se não precisar mais.</div>` : ''}
-      ${primeirosPassos() || `<div class="alerta ${faltamEtapas.length ? 'aviso' : 'ok'}"><b>Fechamento de ${compBr(mesAtual)}:</b> ${faltamEtapas.length ? `faltam ${faltamEtapas.length} etapa(s): ${esc(faltamEtapas.map((e) => `${e.titulo.split(/ \(|, a partir/)[0]}${e.mes !== mesAtual ? ` (de ${compBr(e.mes)})` : ''}`).join('; '))}.` : 'as etapas liberadas estão feitas.'}
+      ${!d().contratos.length ? '' : `<div class="alerta ${faltamEtapas.length ? 'aviso' : 'ok'}"><b>Fechamento de ${compBr(mesAtual)}:</b> ${faltamEtapas.length ? `faltam ${faltamEtapas.length} etapa(s): ${esc(faltamEtapas.map((e) => `${e.titulo.split(/ \(|, a partir/)[0]}${e.mes !== mesAtual ? ` (de ${compBr(e.mes)})` : ''}`).join('; '))}.` : 'as etapas liberadas estão feitas.'}
         ${previstas.length ? `<span class="suave">Próximas: ${esc(previstas.map((e) => `${e.titulo.split(/ \(|, a partir/)[0]} a partir de ${dataBr(e.aPartirDe)}`).join('; '))}.</span>` : ''}
         ${link(`#/fechamento?mes=${faltamEtapas.length && faltamEtapas[0].mes !== mesAtual ? faltamEtapas[0].mes : mesAtual}`, 'Abrir o fechamento do mês', 'botao pequeno')}</div>`}
       ${podeUsuario('admin') && E.seguro && E.seguro.desconectado ? `<div class="alerta aviso"><b>Backup seguro</b> desconectado neste computador: o navegador pede para liberar a pasta de novo. ${botao('reconectarSeguro', 'Reconectar o backup seguro', {}, 'secundario pequeno')}</div>` : ''}
@@ -330,7 +319,7 @@ export const TELAS = {
     }).join('');
     return `<div class="cabecalho"><h1>Imóveis</h1><div class="acoes">${link('#/iptu', "IPTU's", 'botao secundario')}${opera() ? link('#/novo/imoveis', 'Novo imóvel', 'botao') : ''}</div></div>
       <div class="cartao"><div class="rolagem"><table class="lista-imoveis"><tr><th>Imóvel</th><th colspan="6">Endereço</th><th class="n">Aluguel (bonif.)<br><span class="suave">Valor do imóvel</span></th></tr>
-      ${linhas || '<tr><td colspan="8" class="suave">Nenhum imóvel cadastrado. Clique em "Novo imóvel".</td></tr>'}
+      ${linhas || `<tr><td colspan="8">${AJ.proximoPasso('Nenhum imóvel cadastrado ainda.', 'Comece pelo primeiro: digite o CEP e o endereço vem sozinho. Depois é só cadastrar o inquilino.', [opera() && ['#/novo/imoveis', 'Cadastrar o primeiro imóvel']])}</td></tr>`}
       ${linhas ? (() => {
     const t = R.totaisImoveis(d(), hoje);
     return `<tr class="total"><td colspan="7">Total esperado por mês <span class="suave">(inquilinos atuais que emitem NF)</span></td><td class="n"><span class="nw">${reais(t.cheio)}</span> <span class="suave nw">(${reais(t.esperado)})</span></td></tr>
