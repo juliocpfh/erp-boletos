@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-SlVHNcT136D7Kqrsa6wxl/35z/ZjGkytx/wTBnyNp5Y=' 'sha256-8Foxnlb8K51UXIO0Sjjh8iMF5kXh5Sx2i8iHVhXrt/M='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-SlVHNcT136D7Kqrsa6wxl/35z/ZjGkytx/wTBnyNp5Y=' 'sha256-NMDPhNroBAHPrjK6tRcRf3+RtjpjCiz5I/gEI53gQA8='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="0652e42d6e9c4c72">
+<meta name="fontes" content="0d22a380d02476df">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -18557,37 +18557,23 @@ ${fechoEmail(dados.remetente)}` };
           perguntas: [["prazo", "Prazo do contrato", "texto"]],
           texto: `Olá, {nome}, tudo bem?
 
-[se reserva]Recebemos o depósito da reserva de {reserva} em {reserva_data} para o imóvel da {endereco}: seguem anexos o recibo e o comprovante. A reserva segura o imóvel durante a análise da ficha: aprovada, o valor é descontado do primeiro aluguel; não aprovada, ou se você desistir antes de assinar o contrato, ele é devolvido por inteiro.[senão]Obrigado pelo interesse no imóvel da {endereco}.[fim]
+[se reserva]Recebemos a reserva de {reserva} em {reserva_data} para o imóvel da {endereco} (recibo e comprovante anexos). Aprovada a ficha, ela é descontada do primeiro aluguel; não aprovada, ou se você desistir antes de assinar, devolvemos tudo.[senão]Obrigado pelo interesse no imóvel da {endereco}.[fim]
 
 ${CONDICOES}
+Condições sujeitas à aprovação da ficha; a locação só vale com o contrato assinado por todos.
 
-Estas condições dependem da aprovação da ficha. A locação só se forma com a assinatura do contrato por todas as partes.
-
-FICHA CADASTRAL
-Segue anexa a ficha cadastral, já com os dados que temos[se fiador], e a ficha [se varios_fiadores]de cada fiador[senão]do fiador[fim][fim]. Confira, complete o que faltar e assine (pelo gov.br, em assinador.iti.br, ou à mão). Depois responda este e-mail com a ficha assinada e os documentos abaixo.
-
-DOCUMENTOS
-{documentos_ficha}[se seguro_fianca]
-
-SEGURO FIANÇA
-A análise da seguradora é feita junto; se ela pedir algum documento a mais, avisaremos.[fim]
-
-[se link]PELA INTERNET
-Se preferir, preencha a ficha, mande os documentos e, depois, a ficha assinada por este link, que é só seu e vale até {link_validade}:
+PRÓXIMO PASSO
+[se link]Preencha a ficha e mande os documentos por este link, só seu, válido até {link_validade}:
 {link}[se link_fiador]
+Link do fiador (encaminhe para ele): {link_fiador}[fim]
 
-Link para o fiador (encaminhe para ele): {link_fiador}[fim]
+Ou, se preferir, responda[senão]Responda[fim] este e-mail com a ficha anexa assinada (gov.br ou à mão)[se fiador], a [se varios_fiadores]de cada fiador[senão]do fiador[fim][fim] e os documentos:
+{documentos_ficha}[se seguro_fianca]
+A seguradora analisa junto e pode pedir algum documento a mais.[fim]
 
-[fim]Se faltar algum documento ou você preferir não seguir, é só nos avisar[se reserva]: a reserva é devolvida por inteiro[fim].
+Depois: análise em até 2 dias úteis, contrato para assinar[se dinheiro], depósito da {tipo_deposito}[fim] e entrega das chaves com a vistoria.
 
-COMO FUNCIONA
-1. Análise da ficha em até 2 dias úteis
-2. Envio do contrato para a sua assinatura
-3. Sua assinatura[se dinheiro] e o depósito da {tipo_deposito}[fim]
-4. Nossa assinatura e envio da via assinada por todos
-5. Entrega das chaves com a vistoria de entrada, feita por nós com o imóvel vazio
-
-Seus dados são tratados conforme a Lei Geral de Proteção de Dados (Lei 13.709/2018).`
+Seus dados são tratados conforme a LGPD (Lei 13.709/2018).`
         },
         {
           chave: "ficha_aprovada",
@@ -18595,25 +18581,18 @@ Seus dados são tratados conforme a Lei Geral de Proteção de Dados (Lei 13.709
           etapa: "Ficha",
           assunto: "Ficha aprovada – {imovel}: próximos passos",
           perguntas: [["prazo", "Prazo do contrato", "texto"]],
-          texto: `Olá, {nome},
+          texto: `Olá, {nome}!
 
-Sua ficha para o imóvel da {imovel} foi aprovada.
-
-CONFIRA OS DADOS DO CONTRATO
+Sua ficha para o imóvel da {imovel} foi aprovada. Confira os dados do contrato:
 - Locatário: {locatario}, {documento}
-- Aluguel: {aluguel}[se bonificacao] ({aluguel_bonificado} até o vencimento)[fim] · Vencimento: dia {vencimento}
+- Aluguel: {aluguel}[se bonificacao] ({aluguel_bonificado} até o vencimento)[fim], todo dia {vencimento}
 - Garantia: {garantia}
 - Prazo: {prazo}
-Se algo estiver diferente, responda antes de prepararmos o contrato.
+Se algo estiver errado, responda antes de prepararmos o contrato.
 
-PRÓXIMOS PASSOS
-- Contrato: enviamos em até 2 dias úteis para você ler e assinar[se fiador] (o fiador e o cônjuge ou companheiro dele também assinam)[fim]
-[se dinheiro]- {Tipo_deposito}: depois da sua assinatura, o depósito de {valor_deposito} na conta da empresa
-[fim][se seguro_fianca]- Seguro fiança: emissão da apólice em seu nome
-[fim]- Nossa assinatura: com tudo recebido, assinamos e enviamos a via assinada por todos
-- Entrega das chaves: combinamos a data; você recebe junto a vistoria de entrada, feita por nós com o imóvel vazio, com fotos
+Próximos passos: contrato para assinar em até 2 dias úteis[se fiador] (o fiador e o cônjuge dele também assinam)[fim][se dinheiro], depósito de {valor_deposito} da {tipo_deposito}[fim][se seguro_fianca], apólice do seguro fiança[fim], nossa assinatura e entrega das chaves com a vistoria.
 
-[se reserva]A reserva de {reserva} será descontada no primeiro boleto. [fim]A locação só se forma com a assinatura de todos, e o imóvel só pode ser ocupado depois da entrega das chaves.`
+[se reserva]A reserva de {reserva} será descontada do primeiro boleto. [fim]O imóvel só pode ser ocupado depois do contrato assinado por todos e da entrega das chaves.`
         },
         {
           chave: "ficha_reprovada",
@@ -18626,7 +18605,7 @@ Agradecemos o interesse no imóvel da {imovel}. Depois da análise, não foi pos
 
 [se reserva]A reserva de {reserva} será devolvida em até 24 horas úteis, na conta de onde veio o depósito.
 
-[fim]Os documentos enviados serão apagados, conforme a Lei Geral de Proteção de Dados (Lei 13.709/2018).`
+[fim]Os documentos enviados serão apagados, conforme a LGPD (Lei 13.709/2018).`
         },
         {
           chave: "ficha_devolucao",
@@ -18637,11 +18616,11 @@ Agradecemos o interesse no imóvel da {imovel}. Depois da análise, não foi pos
           prontos: ["recibo:devolucao_reserva", "comprovante:devolucao"],
           texto: `Olá, {nome},
 
-Confirmamos a devolução de {devolucao} em {devolucao_data}, na conta de onde veio o depósito da reserva do imóvel da {imovel}. Seguem anexos o comprovante da transferência e o termo de devolução e quitação.
+Devolvemos {devolucao} em {devolucao_data}, na conta de onde veio a reserva do imóvel da {imovel}. Anexos: o comprovante e o termo de devolução e quitação.
 
-Com a devolução, a ficha fica encerrada e não há valores pendentes entre as partes. Se puder, responda este e-mail com o termo assinado (pode ser pelo gov.br); o comprovante do banco já vale como prova da devolução.
+A ficha está encerrada, sem valores pendentes. Se puder, responda com o termo assinado (pode ser pelo gov.br); o comprovante do banco já prova a devolução.
 
-Os documentos enviados para a análise serão apagados, conforme a Lei Geral de Proteção de Dados (Lei 13.709/2018).`
+Os documentos da análise serão apagados, conforme a LGPD (Lei 13.709/2018).`
         },
         {
           chave: "contrato_assinar",
@@ -18652,24 +18631,22 @@ Os documentos enviados para a análise serão apagados, conforme a Lei Geral de 
           perguntas: [["prazo_assinatura", "Devolver assinado até", "data"]],
           texto: `Olá, {nome},
 
-Segue anexo o contrato de locação do imóvel da {imovel}. Leia com atenção antes de assinar. Os pontos principais:
+Segue o contrato de locação do imóvel da {imovel}. Pontos principais:
 - Início em {inicio}, prazo de {prazo}
-- Aluguel de {aluguel}[se bonificacao] ({aluguel_bonificado} até o vencimento)[fim], todo dia {vencimento}; depois do vencimento, multa e juros conforme o contrato
+- Aluguel de {aluguel}[se bonificacao] ({aluguel_bonificado} até o vencimento)[fim], todo dia {vencimento}; com atraso, multa e juros do contrato
 - Reajuste anual pelo {indice}
-[se iptu]- IPTU cobrado junto com o aluguel
-[fim][se seguro_incendio]- Seguro contra incêndio cobrado junto com o aluguel
-[fim]- Boletos e avisos chegam por este e-mail, que vale como meio oficial de comunicação
+[se iptu]- IPTU no boleto do aluguel
+[fim][se seguro_incendio]- Seguro contra incêndio no boleto do aluguel
+[fim]- Este e-mail é o meio oficial de comunicação (boletos e avisos)
 
-PASSO A PASSO
-1. Assine o contrato e devolva por este e-mail até {prazo_assinatura}[se fiador] (o fiador e o cônjuge ou companheiro dele também assinam)[fim]
-[se dinheiro]2. Deposite a {tipo_deposito} de {valor_deposito} e envie o comprovante:
+COMO SEGUIR
+1. Assine e devolva por este e-mail até {prazo_assinatura}[se fiador] (o fiador e o cônjuge dele também assinam)[fim]
+[se dinheiro]2. Deposite a {tipo_deposito} de {valor_deposito} e mande o comprovante:
 {conta_deposito}
-[se caucao]A caução fica aplicada em poupança e é devolvida corrigida no fim do contrato, descontados eventuais débitos (Lei 8.245/91, art. 38).
-[fim]3. Com tudo recebido, assinamos em até 2 dias úteis e enviamos a via assinada por todos
-4. Em seguida combinamos a entrega das chaves[senão]2. Com o contrato assinado, assinamos em até 2 dias úteis e enviamos a via assinada por todos
-3. Em seguida combinamos a entrega das chaves[fim]
+[se caucao]A caução fica na poupança e volta corrigida no fim, descontados os débitos (Lei 8.245/91, art. 38).
+[fim]3. Assinamos em até 2 dias úteis, mandamos a via de todos e combinamos as chaves[senão]2. Assinamos em até 2 dias úteis, mandamos a via de todos e combinamos as chaves[fim]
 
-Ficou alguma dúvida sobre as cláusulas? Pergunte antes de assinar.`
+Dúvida em alguma cláusula? Pergunte antes de assinar.`
         },
         {
           chave: "contrato_assinado",
@@ -18681,16 +18658,13 @@ Ficou alguma dúvida sobre as cláusulas? Pergunte antes de assinar.`
           perguntas: [["opcoes_entrega", "Opções de data e horário da entrega das chaves", "texto"]],
           texto: `Olá, {nome},
 
-Confirmamos que o contrato foi assinado por todas as partes: você[se fiador], o(s) fiador(es)[fim] e a locadora. Segue anexa a via assinada por todos: guarde junto com os seus documentos.[se dinheiro] Confirmamos também o recebimento da {tipo_deposito} de {valor_deposito}: seguem o recibo e o comprovante.[fim]
+O contrato foi assinado por todos: segue a via final, para guardar.[se dinheiro] Recebemos também a {tipo_deposito} de {valor_deposito} (recibo e comprovante anexos).[fim]
 
 ENTREGA DAS CHAVES
-Opções: {opcoes_entrega}, no imóvel. Responda com a melhor opção.
-1. Você recebe as chaves e a vistoria de entrada, feita por nós com o imóvel vazio, com fotos[se contas] e a leitura dos relógios[fim]
-2. Você assina o termo de entrega das chaves e o recebimento da vistoria
-3. Você tem 5 dias úteis para conferir o imóvel e nos avisar, por e-mail, o que não estiver na vistoria
+Opções: {opcoes_entrega}, no imóvel. Responda com a melhor.
+Na entrega você recebe as chaves e a vistoria de entrada com fotos[se contas] e a leitura dos relógios[fim] e assina o termo. Depois tem 5 dias úteis para avisar, por e-mail, o que não estiver na vistoria.
 [se contas]
-CONTAS DE {CONTAS_TEXTO}
-Nós pedimos a troca de titularidade das contas de {contas_concessionarias} para o seu nome, com a autorização que está no contrato. Se a companhia pedir alguma assinatura sua, avisamos.
+Nós pedimos a troca das contas de {contas_concessionarias} para o seu nome; se a companhia pedir sua assinatura, avisamos.
 [fim]
 O primeiro boleto ({primeiro_boleto}) chega por este e-mail[se reserva], já com o desconto da reserva[fim].`
         },
@@ -18701,20 +18675,16 @@ O primeiro boleto ({primeiro_boleto}) chega por este e-mail[se reserva], já com
           assunto: "Bem-vindo(a) – {imovel}: vistoria de entrada",
           anexos: "Vistoria de entrada e termo de entrega das chaves (PDF)",
           prontos: ["assinado:doc_vistoria", "assinado:doc_chaves"],
-          texto: `Olá, {nome},
+          texto: `Olá, {nome}! Seja bem-vindo(a).
 
-Seja bem-vindo(a)! As chaves foram entregues em {data_chaves}.
+As chaves foram entregues em {data_chaves}. Segue a vistoria de entrada: é com ela que o imóvel será comparado na saída.
 
-Segue anexa a vistoria de entrada, feita com o imóvel vazio antes da entrega das chaves. Ela descreve o estado do imóvel e é a base da comparação na saída.
-
-Confira com calma: se encontrar algum defeito que não esteja na vistoria (ex.: vazamento, tomada sem funcionar), avise por este e-mail até {data_limite_vistoria} (5 dias úteis), com fotos, para incluirmos no registro. Depois desse prazo, a vistoria vale como aceita, salvo defeito oculto.
+Achou algum defeito que não está nela? Avise por este e-mail, com fotos, até {data_limite_vistoria} (5 dias úteis). Depois disso a vistoria vale como aceita, salvo defeito oculto.
 
 LEMBRETES
-[se contas]- Contas de {contas_texto}: nós cuidamos da troca de titularidade e avisamos quando estiver concluída
-[fim]- Boletos: chegam por este e-mail; o primeiro: {primeiro_boleto}
-- Reparos: avise sempre por escrito, por este e-mail
-- Obras ou mudanças no imóvel só com autorização por escrito
-- Este e-mail é o canal oficial de comunicação com a administradora`
+- Boletos e avisos chegam por este e-mail, o canal oficial; o primeiro: {primeiro_boleto}
+[se contas]- A troca das contas de {contas_texto} fica conosco; avisamos ao concluir
+[fim]- Reparos: avise por escrito. Obras ou mudanças, só com autorização por escrito`
         },
         {
           // novo valor negociado (pedido do dono, 2026-11-13): o termo aditivo vai para assinar; a assinatura é o aceite, anexado no sistema
@@ -18726,15 +18696,11 @@ LEMBRETES
           perguntas: [["prazo_assinatura", "Devolver assinado até", "data"]],
           texto: `Olá, {nome},
 
-Conforme combinado, o aluguel do imóvel da {imovel} passa de {valor_anterior} para {valor_novo} a partir de {novo_inicio}[se novo_bonificacao] ({novo_bonificado} para pagamento até o vencimento)[fim]. O dia do vencimento, o prazo do contrato e o índice de reajuste continuam os mesmos.
+Como combinado, o aluguel do imóvel da {imovel} passa de {valor_anterior} para {valor_novo} a partir de {novo_inicio}[se novo_bonificacao] ({novo_bonificado} até o vencimento)[fim]. O resto do contrato não muda.
 
-Segue anexo o termo aditivo com o novo valor. A sua assinatura no termo é o aceite do novo valor.
+Segue o termo aditivo: assine e devolva até {prazo_assinatura}[se fiador], com a assinatura do fiador e do cônjuge dele (sem ela, a fiança não cobre o novo valor)[fim]. Sua assinatura é o aceite do novo valor. Depois mandamos a via assinada por todos.[se caucao]
 
-PASSO A PASSO
-1. Assine o termo e devolva por este e-mail até {prazo_assinatura}[se fiador] (o fiador e o cônjuge ou companheiro dele também assinam: sem a assinatura dele, a fiança não cobre o novo valor)[fim]
-2. Com o termo assinado, assinamos e enviamos a via assinada por todos
-[se caucao]3. A caução acompanha o novo valor: o boleto da diferença chega separado
-[fim]`
+A caução acompanha o novo valor: o boleto da diferença chega separado.[fim]`
         },
         {
           chave: "aditivo_assinado",
@@ -18745,9 +18711,7 @@ PASSO A PASSO
           prontos: ["assinado:aditivo"],
           texto: `Olá, {nome},
 
-Confirmamos que o termo aditivo de {aditivo_data} ({aditivo_assunto}) foi assinado por todas as partes. Segue anexa a via assinada por todos: guarde junto com o seu contrato.
-
-As demais cláusulas do contrato continuam valendo como estão.`
+O termo aditivo de {aditivo_data} ({aditivo_assunto}) foi assinado por todos: segue a via final, para guardar com o contrato. O resto do contrato continua igual.`
         },
         {
           chave: "saida_aviso",
@@ -18757,26 +18721,20 @@ As demais cláusulas do contrato continuam valendo como estão.`
           perguntas: [["data_aviso", "Data em que o inquilino avisou", "data"]],
           texto: `Olá, {nome},
 
-Recebemos em {data_aviso} o seu aviso de que vai desocupar o imóvel. A data de saída fica {data_saida}. Por favor, responda confirmando esta data.
+Recebemos em {data_aviso} o seu aviso de saída. A data fica {data_saida}: responda confirmando, por favor.
 [se saida_antecipada]
-MULTA DA SAÍDA ANTECIPADA
-Pelo seu contrato, a saída antes do fim do prazo ({fim}) tem multa de 3 aluguéis, proporcional ao tempo que falta, calculada no acerto final. Se a mudança for por transferência do seu empregador, avise: nesse caso a lei dispensa a multa (Lei 8.245/91, art. 4º).
+Saída antes do fim do contrato ({fim}): multa de 3 aluguéis, proporcional ao tempo que falta, no acerto final. Se for transferência pelo seu empregador, avise: a lei dispensa a multa (Lei 8.245/91, art. 4º).
 [fim]
-PRÓXIMOS PASSOS
-- Último aluguel: proporcional aos dias até {data_saida}; o aluguel corre até a devolução das chaves
-- Vistoria de saída: feita por nós logo depois da devolução das chaves, com fotos e vídeo, comparando com a vistoria de entrada. Você é convidado a acompanhar; se vier, acompanha a vistoria inteira. Se não puder, fazemos sem você e mandamos o relatório para você responder em até 5 dias úteis
-[se contas]- Contas de {contas_texto}: a leitura final e a suspensão são pedidas por você (veja abaixo), e os comprovantes de tudo pago vêm junto com as chaves
-[fim]- Devolução das chaves: com o termo de devolução, em que você diz se vai acompanhar a vistoria
-- Acerto final: [se dinheiro]{tipo_deposito} corrigida menos o que estiver em aberto[senão]o que estiver em aberto[fim], enviado para você conferir
+COMO VAI SER
+- O aluguel corre até a devolução das chaves (o último é proporcional)
+- Devolva o imóvel como na vistoria de entrada: vazio, limpo e com os danos reparados (o desgaste natural não conta)
+- Vistoria de saída logo depois das chaves, com fotos e vídeo; você pode acompanhar. Sem você, mandamos o relatório para responder em 5 dias úteis
+- Acerto final: [se dinheiro]{tipo_deposito} corrigida menos o que estiver em aberto[senão]o que estiver em aberto[fim], para você conferir
 [se contas]
-COMO ENCERRAR AS CONTAS ({CONTAS_CONCESSIONARIAS})
-1. No dia da devolução das chaves, tire uma foto de cada relógio (com o número e a leitura aparecendo)
-2. Peça a cada companhia o registro da leitura final de inquilino (consumo final) nessa data e a suspensão temporária do serviço: pelo site ou aplicativo da companhia, na área de autoatendimento, ou numa agência. Tenha em mãos o seu documento, o número da conta (está na fatura) e a foto do relógio
-3. Traga, na devolução das chaves, os comprovantes de todas as contas pagas até ali e o protocolo de cada pedido
-4. Quando a conta final chegar, pague e nos mande o comprovante por este e-mail
-Conta com consumo até a leitura final que chegar depois também é sua e entra no acerto ou é cobrada depois. Nós cuidamos de passar as contas para o nome do proprietário ou do próximo inquilino.
+CONTAS ({CONTAS_CONCESSIONARIAS})
+No dia da entrega das chaves, fotografe cada relógio e peça a cada companhia a leitura final e a suspensão (site, aplicativo ou agência). Traga os comprovantes pagos e os protocolos. A conta final que chegar depois também é sua: pague e mande o comprovante.
 [fim]
-O imóvel deve ser devolvido como na vistoria de entrada: vazio, limpo e com os danos reparados (o desgaste natural do uso não conta). O contrato[se tem_garantia] e a garantia continuam[senão] continua[fim] valendo até a devolução das chaves.`
+O contrato[se tem_garantia] e a garantia continuam[senão] continua[fim] valendo até a devolução das chaves.`
         },
         {
           chave: "saida_vistoria",
@@ -18787,19 +18745,13 @@ O imóvel deve ser devolvido como na vistoria de entrada: vazio, limpo e com os 
           perguntas: [["data_vistoria", "Data e horário da vistoria de saída", "texto"]],
           texto: `Olá, {nome},
 
-A vistoria de saída fica marcada para {data_vistoria}, no imóvel. Se não puder, responda com outro horário até 2 dias antes.
+A vistoria de saída está marcada para {data_vistoria}, no imóvel. Se não puder, responda com outro horário até 2 dias antes.
 
-Você está convidado a acompanhar a vistoria. Se vier, ela é feita do começo ao fim com você, comparando o imóvel com a vistoria de entrada (anexa), e você assina que acompanhou e pode registrar as suas observações; pode também mandar alguém com autorização por escrito. Se não puder ou não quiser, responda este e-mail: faremos a vistoria no horário marcado, com fotos e vídeo de cada cômodo, e enviaremos o relatório para você responder em até 5 dias úteis.
+Você pode acompanhar (ou mandar alguém com autorização por escrito) e anotar suas observações. Se não vier, fazemos com fotos e vídeo e mandamos o relatório para você responder em 5 dias úteis. A vistoria de entrada vai anexa, para comparar.
 
-DEIXE PRONTO
-- Imóvel vazio e limpo
-- Danos reparados (paredes, pisos, portas, louças, chuveiro, tomadas)
-- Todas as chaves e controles
-[se contas]- Comprovantes das contas de {contas_texto} pagas
-- Protocolo do encerramento de cada conta e a foto dos relógios no dia da saída
-[fim]
+Deixe pronto: imóvel vazio e limpo, danos reparados e todas as chaves e controles[se contas]; as contas de {contas_texto} pagas, com os protocolos do encerramento e as fotos dos relógios[fim].
 
-Se faltar algum reparo, você escolhe: fazer antes da vistoria, com a mesma qualidade do que foi entregue, ou [se dinheiro]ter o valor descontado da {tipo_deposito}[senão]pagar o valor do reparo[fim], com orçamento apresentado. O aluguel corre até a devolução das chaves, inclusive nos dias de reparo.`
+Reparo que faltar: você faz antes, com a mesma qualidade, ou [se dinheiro]o valor do orçamento é descontado da {tipo_deposito}[senão]paga o valor do orçamento[fim]. O aluguel corre até a devolução das chaves.`
         },
         {
           chave: "saida_chaves",
@@ -18811,14 +18763,14 @@ Se faltar algum reparo, você escolhe: fazer antes da vistoria, com a mesma qual
           perguntas: [["pendencias", "Pendências da vistoria (uma por linha, com o valor do orçamento)", "area"]],
           texto: `Olá, {nome},
 
-Recebemos as chaves em {data_saida}. Seguem anexos a vistoria de saída e o termo de devolução das chaves.
+Recebemos as chaves em {data_saida}. Seguem a vistoria de saída e o termo de devolução.
 
 PENDÊNCIAS (comparadas com a vistoria de entrada)
 {pendencias}
 
-O valor de cada reparo vem do orçamento (ou da nota do serviço) e é [se dinheiro]descontado da {tipo_deposito}[senão]cobrado[fim] no acerto final. Se discordar de algum item ou valor, responda em até 5 dias úteis, com fotos ou documentos.
+Cada reparo, pelo orçamento ou pela nota, é [se dinheiro]descontado da {tipo_deposito}[senão]cobrado[fim] no acerto final. Discorda de algo? Responda em até 5 dias úteis, com fotos ou documentos.
 
-O recebimento das chaves não dá quitação: os valores em aberto e as pendências da vistoria entram no acerto final, que enviaremos em seguida.`
+Receber as chaves não dá quitação: o acerto final vem em seguida.`
         },
         {
           chave: "saida_calculo",
@@ -18832,9 +18784,9 @@ Segue o acerto final do contrato do imóvel da {imovel}:
 
 {acerto}
 
-[se devolver]Se estiver de acordo, informe a chave Pix ou a conta em seu nome; a devolução é feita em até 5 dias úteis da sua resposta.[fim][se cobrar]Segue o boleto do saldo, com o vencimento indicado nele.[fim]
+[se devolver]De acordo? Informe a chave Pix ou a conta em seu nome: devolvemos em até 5 dias úteis da sua resposta.[fim][se cobrar]Segue o boleto do saldo, com o vencimento nele.[fim]
 
-Se discordar de algum item, responda em até 5 dias úteis explicando o motivo.`
+Discorda de algum item? Responda em até 5 dias úteis com o motivo.`
         },
         {
           chave: "saida_encerramento",
@@ -18845,15 +18797,13 @@ Se discordar de algum item, responda em até 5 dias úteis explicando o motivo.`
           prontos: ["assinado:quitacao", "recibo:quitacao", "comprovante:saida"],
           texto: `Olá, {nome},
 
-Confirmamos [se devolver]a devolução de {saldo} em {data_devolucao} e [fim]o encerramento do contrato de locação do imóvel da {imovel}. Segue anexo o termo de entrega do imóvel, acerto final e quitação[se devolver], com o comprovante da transferência[fim]. Por favor, responda com o termo assinado (pode ser pelo gov.br).
+[se devolver]Devolvemos {saldo} em {data_devolucao} e [fim]encerramos o contrato do imóvel da {imovel}. Segue o termo de entrega, acerto final e quitação[se devolver], com o comprovante[fim]: responda com ele assinado, por favor (pode ser pelo gov.br).
 
-Com o acerto, não há valores pendentes entre as partes referentes a este contrato, salvo as contas de consumo e os tributos do período da locação que ainda não tenham chegado, que serão enviados com a conta ou a guia.
+Não há valores pendentes, salvo contas de consumo e tributos do período que ainda cheguem: mandaremos com a conta ou a guia.
 
-Em fevereiro enviaremos o informe dos aluguéis pagos em {ano_saida}, para a sua declaração do Imposto de Renda.
+Em fevereiro enviamos o informe de {ano_saida} para o Imposto de Renda. Seus dados ficam guardados pelo prazo da lei e depois são apagados (LGPD).
 
-Seus dados e documentos ficam guardados pelo prazo exigido em lei e depois são apagados, conforme a Lei Geral de Proteção de Dados (Lei 13.709/2018).
-
-Desejamos sucesso no novo endereço.`
+Sucesso no novo endereço!`
         },
         {
           chave: "informe_ir",
@@ -18888,17 +18838,15 @@ O aluguel de moradia não reduz o imposto; a informação serve para o cruzament
           prontos: ["boleto:pdf", "boleto:pix"],
           texto: `Olá, {nome}, tudo bem?
 
-Lembramos que o boleto {boleto_referente} do imóvel da {imovel} vence em {vencimento_boleto}[se nao_util], que não é dia útil: pode ser pago sem multa até {limite_pagamento}[fim], no valor de {valor_em_dia}[se bonificacao_boleto] (já com a bonificação de pontualidade)[fim].
-
-Depois de {limite_pagamento}: {valor_cheio}, mais multa de {multa_pct} e juros de {juros_pct} ao mês.
+O boleto {boleto_referente} ({imovel}) vence em {vencimento_boleto}[se nao_util], que não é dia útil: sem multa até {limite_pagamento}[fim]. Valor: {valor_em_dia}[se bonificacao_boleto], já com a bonificação[fim]. Depois de {limite_pagamento}: {valor_cheio}, mais multa de {multa_pct} e juros de {juros_pct} ao mês.
 [se pix]
 PIX COPIA E COLA
 {pix}
 [fim][se linha_digitavel]
-LINHA DIGITÁVEL DO BOLETO
+LINHA DIGITÁVEL
 {linha_digitavel}
 [fim]
-Se o pagamento já foi feito, por favor desconsidere esta mensagem.`
+Já pagou? Desconsidere esta mensagem.`
         },
         {
           chave: "cobranca_dia",
@@ -18910,17 +18858,15 @@ Se o pagamento já foi feito, por favor desconsidere esta mensagem.`
           prontos: ["boleto:pdf", "boleto:pix"],
           texto: `Olá, {nome}, tudo bem?
 
-[se nao_util]O boleto {boleto_referente} do imóvel da {imovel} venceu em {vencimento_boleto}, que não é dia útil, e pode ser pago sem multa até hoje, {limite_pagamento}[senão]Lembramos que o boleto {boleto_referente} do imóvel da {imovel} vence hoje, {vencimento_boleto}[fim], no valor de {valor_em_dia}[se bonificacao_boleto] (já com a bonificação de pontualidade)[fim].
-
-A partir de amanhã: {valor_cheio}, mais multa de {multa_pct} e juros de {juros_pct} ao mês.
+[se nao_util]O boleto {boleto_referente} ({imovel}) venceu em {vencimento_boleto}, que não é dia útil: pode pagar sem multa até hoje, {limite_pagamento}[senão]O boleto {boleto_referente} ({imovel}) vence hoje, {vencimento_boleto}[fim]. Valor: {valor_em_dia}[se bonificacao_boleto], já com a bonificação[fim]. A partir de amanhã: {valor_cheio}, mais multa de {multa_pct} e juros de {juros_pct} ao mês.
 [se pix]
 PIX COPIA E COLA
 {pix}
 [fim][se linha_digitavel]
-LINHA DIGITÁVEL DO BOLETO
+LINHA DIGITÁVEL
 {linha_digitavel}
 [fim]
-Se o pagamento já foi feito, por favor desconsidere esta mensagem.`
+Já pagou? Desconsidere esta mensagem.`
         },
         {
           chave: "cobranca_atraso",
@@ -18932,17 +18878,15 @@ Se o pagamento já foi feito, por favor desconsidere esta mensagem.`
           prontos: ["boleto:pdf", "boleto:pix"],
           texto: `Olá, {nome}, tudo bem?
 
-O boleto {boleto_referente} do imóvel da {imovel}, com vencimento em {vencimento_boleto}, ainda consta em aberto em nosso sistema ({dias_atraso} dia(s) de atraso).
-
-Valor para pagamento hoje ({data_hoje}): {valor_hoje} ({valor_cheio} + multa de {multa_hoje} + juros de {juros_hoje}). Em outro dia o valor muda: se precisar, responda este e-mail que mandamos o valor atualizado.
+O boleto {boleto_referente} ({imovel}), vencido em {vencimento_boleto}, está em aberto ({dias_atraso} dia(s) de atraso). Para pagar hoje ({data_hoje}): {valor_hoje} ({valor_cheio} + multa de {multa_hoje} + juros de {juros_hoje}). Em outro dia o valor muda: responda que mandamos o atualizado.
 [se pix]
 PIX COPIA E COLA
 {pix}
 [fim][se linha_digitavel]
-LINHA DIGITÁVEL DO BOLETO
+LINHA DIGITÁVEL
 {linha_digitavel}
 [fim]
-Se o pagamento já foi feito, por favor desconsidere esta mensagem e, se possível, responda com o comprovante.`
+Já pagou? Desconsidere e, se puder, responda com o comprovante.`
         },
         // Notificação ao inquilino (pedido do dono em 2026-11-17): ``notificacao``: o e-mail é de uma notificação (alvo { contrato,
         // notificacao }); vai anexada a notificação assinada (ou, sem ela, o PDF para assinar). O contrato aceita notificação por e-mail.
@@ -18956,11 +18900,9 @@ Se o pagamento já foi feito, por favor desconsidere esta mensagem e, se possív
           prontos: ["notificacao:pdf"],
           texto: `Olá, {nome},
 
-Segue anexa a [se reiteracao]{notificacao_numero} [fim]notificação de {notificacao_data} sobre {notificacao_assunto_minusculo}, referente ao imóvel da {imovel}.
+Segue a [se reiteracao]{notificacao_numero} [fim]notificação de {notificacao_data} sobre {notificacao_assunto_minusculo} (imóvel da {imovel}).
 
-O prazo para resolver é de {prazo_notificacao}, ou seja, até {data_limite}. Quando terminar, responda este e-mail com uma foto ou um documento que mostre que foi resolvido, para darmos a baixa.
-
-Se tiver alguma dúvida ou precisar combinar algo, é só responder esta mensagem.`
+Prazo para resolver: {prazo_notificacao}, até {data_limite}. Ao terminar, responda com uma foto ou um documento que mostre, para darmos a baixa. Dúvidas, é só responder.`
         },
         {
           chave: "notificacao_lembrete",
@@ -18972,9 +18914,9 @@ Se tiver alguma dúvida ou precisar combinar algo, é só responder esta mensage
           prontos: ["notificacao:pdf"],
           texto: `Olá, {nome}, tudo bem?
 
-Lembramos que o prazo da notificação de {notificacao_data}, sobre {notificacao_assunto_minusculo}, termina [se vence_hoje]hoje, {data_limite}[senão]em {data_limite}[fim]. Segue a notificação anexa de novo.
+O prazo da notificação de {notificacao_data}, sobre {notificacao_assunto_minusculo}, termina [se vence_hoje]hoje, {data_limite}[senão]em {data_limite}[fim] (anexa de novo).
 
-Se já resolveu, por favor responda este e-mail com uma foto ou um documento que mostre, para darmos a baixa. Não cumprido o prazo, vale o que está na notificação, inclusive a multa prevista no contrato.`
+Já resolveu? Responda com uma foto ou um documento, para darmos a baixa. Sem isso no prazo, vale o que está na notificação, inclusive a multa do contrato.`
         }
       ];
     }
