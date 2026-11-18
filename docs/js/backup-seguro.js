@@ -329,3 +329,16 @@ export async function listarBackups(dir) {
   }
   return lista.sort((a, b) => b.alterado - a.alterado);
 }
+
+/**
+ * Aviso do backup seguro da empresa (nuvem, pedido do dono em 2026-11-18): `estado` = { feito_em } lido da nuvem (null =
+ * ainda não leu). Devolve null (não avisa: ainda não leu, ou algum computador fez cópia nos últimos `dias` dias),
+ * { tipo: 'nunca' } (nenhum computador fez cópia) ou { tipo: 'parado', desde } (a última foi antes do prazo).
+ * Ex.: última cópia em 18/11 às 15h e prazo de 3 dias → sem aviso até 21/11 às 15h; depois, "parado desde 18/11".
+ */
+export function avisoDaEmpresa(estado, agora = Date.now(), dias = 3) {
+  if (!estado) return null;
+  const em = estado.feito_em ? new Date(estado.feito_em).getTime() : NaN;
+  if (Number.isNaN(em)) return { tipo: 'nunca' };
+  return agora - em <= dias * 86400000 ? null : { tipo: 'parado', desde: estado.feito_em };
+}

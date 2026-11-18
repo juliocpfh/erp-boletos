@@ -1,5 +1,5 @@
 // Administração: backup seguro, empresas emitentes, histórico de alterações e Dados e backup.
-import { alterar, aviso, E, janela, login, mostrar, podeUsuario } from '../app.js';
+import { alterar, aviso, conferirBackupDaEmpresa, DIAS_BACKUP_EMPRESA, E, janela, login, mostrar, podeUsuario } from '../app.js';
 import * as S from '../armazenamento.js';
 import * as AJ from '../ajuda.js';
 import * as AI from '../arquivo-impresso.js';
@@ -42,6 +42,7 @@ export async function telaBackupSeguro() {
     const nova = E.pastaSeguraNova;
     const chaveExistente = nova ? await B.lerChave(nova) : null;
     return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backup seguro</h1>
+      ${E.nuvem && E.backupEmpresa?.feito_em ? `<div class="alerta ${B.avisoDaEmpresa(E.backupEmpresa, Date.now(), DIAS_BACKUP_EMPRESA) ? 'aviso' : 'ok'}"><b>Backup seguro da empresa:</b> última cópia em ${esc(ultimaCopiaDaEmpresa())}, feita por outro computador. Basta um computador com o backup ligado: ligue neste só se ele for passar a ser o computador do backup (ou um segundo, de reserva).</div>` : ''}
       ${E.seguro && E.seguro.desconectado ? `<div class="alerta aviso">A pasta <b>${esc(E.seguro.dir.name)}</b> já está configurada, mas o navegador pede para liberar o acesso de novo. ${botao('reconectarSeguro', 'Reconectar', {}, 'pequeno')}</div>` : ''}
       <div class="cartao"><h2>1. Escolha a pasta segura</h2>
         <p>Use uma pasta <b>fora</b> da pasta dos dados e que só você acesse (por exemplo, num HD externo ou numa pasta só sua). Ela fica ligada só a <b>este computador</b>: os outros usuários não veem nem gravam nela.</p>
@@ -125,14 +126,34 @@ function caixaAbrirPasta(copia) {
 }
 
 const AVISO_SEGURO_DISPENSADO = 'imoveis-aviso-backup-seguro';
-/** Painel: lembra o administrador de ligar o backup seguro neste computador (dispensável por computador). */
+/** Nome do usuário pelo e-mail que a nuvem guardou (ou o próprio e-mail). */
+const nomePorEmail = (email) => (email && d().usuarios.find((u) => [u.email, u.login].some((x) => String(x || '').toLowerCase() === email))?.nome) || email || '';
+/** Texto da última cópia do backup seguro da empresa: "18/11/2026, 15:02 (Julio)". */
+export const ultimaCopiaDaEmpresa = (e = E.backupEmpresa) => (e?.feito_em ? `${dataHoraBr(e.feito_em).slice(0, 17)}${e.feito_por ? ` (${nomePorEmail(e.feito_por)})` : ''}` : '');
+/**
+ * Painel: lembra o administrador do backup seguro. Na nuvem o aviso é da empresa (pedido do dono em 2026-11-18): basta um
+ * computador com o backup ligado e cópia nos últimos 3 dias (DIAS_BACKUP_EMPRESA) para ninguém mais ser lembrado; parado há
+ * mais tempo, avisa os administradores (também no celular). Sem a nuvem, continua por computador. Dispensável por computador.
+ */
 export function avisoBackupSeguro() {
-  if (!podeUsuario('admin') || E.seguro || !S.suportado() || window.VERSAO_OFFLINE) return '';
-  try { if (localStorage.getItem(AVISO_SEGURO_DISPENSADO)) return ''; } catch { /* sem armazenamento */ }
-  return `<div class="alerta aviso"><b>Backup seguro</b> não está ligado neste computador: sem ele, ${E.nuvem ? 'este computador não guarda a cópia dos dados fora do Cloudflare' : 'não há uma segunda cópia dos dados, fora da pasta que o sistema usa'} (reserva para um desastre).
+  if (!podeUsuario('admin') || E.seguro || window.VERSAO_OFFLINE) return '';
+  const dispensado = (chave) => { try { return !!localStorage.getItem(chave); } catch { return false; } };
+  if (E.nuvem) {
+    conferirBackupDaEmpresa();
+    const a = B.avisoDaEmpresa(E.backupEmpresa, Date.now(), DIAS_BACKUP_EMPRESA);
+    if (!a) return '';
+    if (a.tipo === 'parado') {
+      const chave = `${AVISO_SEGURO_DISPENSADO}-${a.desde}`;
+      if (dispensado(chave)) return '';
+      return `<div class="alerta aviso"><b>Backup seguro parado:</b> a última cópia foi em ${esc(ultimaCopiaDaEmpresa())}, há mais de ${DIAS_BACKUP_EMPRESA} dias. Abra o sistema no computador do backup seguro (ou ligue o backup neste computador).
+        ${S.suportado() ? link('#/backup-seguro', 'Ligar neste computador', 'botao pequeno') : ''} ${botao('dispensarAvisoSeguro', 'Não avisar desta vez', { chave }, 'secundario pequeno')}</div>`;
+    }
+  }
+  if (!S.suportado() || dispensado(AVISO_SEGURO_DISPENSADO)) return '';
+  return `<div class="alerta aviso"><b>Backup seguro</b> não está ligado ${E.nuvem ? 'em nenhum computador da empresa: sem ele, não há cópia dos dados fora do Cloudflare' : 'neste computador: sem ele, não há uma segunda cópia dos dados, fora da pasta que o sistema usa'} (reserva para um desastre).
     ${link('#/backup-seguro', 'Ligar o backup seguro', 'botao pequeno')} ${botao('dispensarAvisoSeguro', 'Não avisar neste computador', {}, 'secundario pequeno')}</div>`;
 }
-export const dispensarAvisoSeguro = () => { try { localStorage.setItem(AVISO_SEGURO_DISPENSADO, '1'); } catch { /* sem armazenamento */ } };
+export const dispensarAvisoSeguro = (chave) => { try { localStorage.setItem(String(chave || '').startsWith(AVISO_SEGURO_DISPENSADO) ? chave : AVISO_SEGURO_DISPENSADO, '1'); } catch { /* sem armazenamento */ } };
 
 // --------------------------------------------------------------------------
 // Empresas, histórico e dados
@@ -332,7 +353,8 @@ export async function telaDados(q = {}) {
       ${E.nuvem ? '<p><b>Sem internet ou com o site fora do ar:</b> abra o sistema pelo ícone do aplicativo instalado (ou pelo endereço de sempre no Chrome). Ele abre com os dados da última vez que este aparelho esteve conectado, você trabalha normalmente e as alterações sobem sozinhas quando a conexão voltar.</p>' : ''}
       ${window.VERSAO_OFFLINE ? `<p>${etiqueta(`Você está na versão PC de ${dataBr(window.VERSAO_OFFLINE)}`, 'info')}</p>` : ''}
       <p>${E.seguro && E.seguro.chave ? etiqueta(`Ligado neste computador · pasta ${E.seguro.dir.name}`, 'ok') : E.seguro && E.seguro.desconectado ? etiqueta('Desconectado: falta liberar a pasta', 'aviso') : etiqueta('Não configurado neste computador', 'neutra')}
-      ${link('#/backup-seguro', 'Abrir o backup seguro')}</p></div>` : ''}
+      ${link('#/backup-seguro', 'Abrir o backup seguro')}</p>
+      ${E.nuvem && E.backupEmpresa ? `<p>Na empresa: ${E.backupEmpresa.feito_em ? `${etiqueta(`última cópia em ${ultimaCopiaDaEmpresa()}`, B.avisoDaEmpresa(E.backupEmpresa, Date.now(), DIAS_BACKUP_EMPRESA) ? 'aviso' : 'ok')} <span class="suave">(basta um computador com o backup ligado; parado há mais de ${DIAS_BACKUP_EMPRESA} dias, o Painel avisa os administradores)</span>` : etiqueta('nenhum computador com o backup seguro ligado', 'aviso')}</p>` : ''}</div>` : ''}
     ${caixaConfigBanco()}
     ${caixaConfigBanco2()}
     <div class="cartao"><h2>Exportar tudo em ZIP</h2><p>Banco de dados e todos os anexos num único arquivo, para guardar ou levar para outro computador.</p>${opera() ? botao('exportar', 'Baixar ZIP com todos os dados', { status: 'Montando o ZIP…' }, '') : ''}<div id="progresso-exportar" aria-live="polite"></div>

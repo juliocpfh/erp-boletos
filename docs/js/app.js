@@ -27,6 +27,7 @@ export const E = {
   seguro: null, // backup seguro: { dir, chave } conectado, ou { dir, desconectado } sem permissão neste momento
   seguroErro: '',
   pastaSeguraNova: null, // pasta escolhida na tela do backup seguro, antes de criar/digitar a senha
+  backupEmpresa: null, // nuvem: { feito_em, feito_por, chave_ligada } da última cópia do backup seguro da empresa (conferirBackupDaEmpresa)
 };
 
 export const login = () => (E.usuario ? E.usuario.login : 'sistema');
@@ -305,7 +306,36 @@ export function atualizarProgramaSeguro() {
  * Cópia cifrada do banco de hoje na pasta segura (se este computador tem o backup seguro ligado). Cada cópia cifra e grava o
  * banco inteiro: gravações seguidas (e mudanças de outros aparelhos) enquanto uma espera a vez viram uma só, com o banco do momento.
  */
-const espelharUmaVez = B.espelhoSemAcumular(naFilaSegura, () => (E.seguro && E.seguro.chave && E.d ? B.espelhar(E.seguro.dir, E.seguro.chave, E.d, { diasHoras: R.regra('dias_copias_backup') }) : undefined));
+const espelharUmaVez = B.espelhoSemAcumular(naFilaSegura, async () => {
+  if (!E.seguro || !E.seguro.chave || !E.d) return;
+  await B.espelhar(E.seguro.dir, E.seguro.chave, E.d, { diasHoras: R.regra('dias_copias_backup') });
+  avisarBackupFeito();
+});
+
+/**
+ * Backup seguro da empresa (pedido do dono em 2026-11-18): na nuvem, o computador com o backup ligado avisa as cópias feitas
+ * (no máximo uma vez por hora) e os outros aparelhos leem quando foi a última (`E.backupEmpresa`: { feito_em, feito_por,
+ * chave_ligada }). O Painel só lembra de ligar o backup quando nenhum computador da empresa fez cópia em DIAS_BACKUP_EMPRESA dias.
+ */
+export const DIAS_BACKUP_EMPRESA = 3;
+const AVISAR_FEITO_A_CADA = 3600000; // ms
+let feitoAvisadoEm = 0;
+function avisarBackupFeito() {
+  if (!E.nuvem || !podeUsuario('admin') || Date.now() - feitoAvisadoEm < AVISAR_FEITO_A_CADA) return;
+  feitoAvisadoEm = Date.now();
+  N.apiDoSite('api/dados/')('POST', 'backup-seguro-feito', {}).then((r) => { E.backupEmpresa = r; }).catch((e) => { feitoAvisadoEm = 0; logarErro(e); });
+}
+let backupEmpresaLidoEm = 0;
+/** Lê da nuvem quando foi a última cópia do backup seguro da empresa (uma vez a cada 10 minutos); mudou o aviso: redesenha. */
+export async function conferirBackupDaEmpresa() {
+  if (!E.nuvem || !E.usuario || Date.now() - backupEmpresaLidoEm < 600000) return;
+  backupEmpresaLidoEm = Date.now();
+  try {
+    const antes = JSON.stringify(E.backupEmpresa || null);
+    E.backupEmpresa = await N.apiDoSite('api/dados/')('GET', 'backup-seguro');
+    if (antes !== JSON.stringify(E.backupEmpresa) && !document.querySelector(SELETOR_FORMULARIO) && ['', 'painel'].includes(rotaAtual().partes[0] || '')) mostrar();
+  } catch (e) { backupEmpresaLidoEm = 0; logarErro(e); }
+}
 function espelharSeguro() {
   if (E.seguro?.falhou) { tentarSeguroDeNovo(); return; }
   if (E.seguro && E.seguro.chave && E.d) espelharUmaVez();
@@ -710,6 +740,7 @@ export async function abrirNuvem() {
   rotinaDeAbertura();
   await mostrar();
   if (E.d) rotinaSegura().catch((e) => { E.seguroErro = e.message; }); // backup seguro no computador do administrador, também na nuvem
+  conferirBackupDaEmpresa();
 }
 
 /** Depois de substituir os dados (restaurar um backup da nuvem): registra a sessão de novo no banco novo, ou volta ao login. */

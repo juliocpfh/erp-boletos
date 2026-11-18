@@ -741,8 +741,8 @@ export const ACOES = {
     await mostrar();
   },
 
-  async dispensarAvisoSeguro() {
-    dispensarAvisoSeguro();
+  async dispensarAvisoSeguro({ chave } = {}) {
+    dispensarAvisoSeguro(chave);
     await mostrar();
   },
 

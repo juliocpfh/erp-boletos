@@ -906,6 +906,25 @@ export class Cofre {
   }
 
   /**
+   * Backup seguro da empresa (pedido do dono em 2026-11-18: o aviso "ligue o backup seguro" é da empresa, não de cada
+   * computador): o computador do administrador com o backup ligado avisa as cópias feitas (no máximo uma vez por hora,
+   * `backupSeguroFeito`); qualquer usuário lê quando foi a última e por quem (`estadoBackupSeguro`), e o Painel só lembra
+   * de ligar quando nenhum computador fez cópia no prazo.
+   */
+  backupSeguroFeito(email) {
+    this.exigir(email, 'admin');
+    this.controle('backup_seguro_feito', JSON.stringify({ em: this.agora(), por: String(email).toLowerCase() }));
+    return this.estadoBackupSeguro(email);
+  }
+
+  estadoBackupSeguro(email) {
+    this.exigir(email, 'consulta');
+    let feito = null;
+    try { feito = JSON.parse(this.controle('backup_seguro_feito') || 'null'); } catch { feito = null; }
+    return { feito_em: feito?.em || null, feito_por: feito?.por || null, chave_ligada: !!this.chaveDoBackup() };
+  }
+
+  /**
    * Rastros dos dados pessoais que saíram de um registro (LGPD): os aparelhos limpam o registro e o histórico deles
    * (R.apagarDadosPessoaisDaFicha), mas o servidor guarda também as linhas do histórico, a fila (cópia do registro a cada
    * mudança), a cópia de registro excluído e os valores dos conflitos. Aqui saem deles os campos que o registro já não tem
@@ -1273,6 +1292,8 @@ export class CofreDO {
       else if (rota === '/gmail/guardar' && request.method === 'POST') r = this.gmail.guardar(await corpo(), email);
       else if (rota === '/gmail/apagar' && request.method === 'POST') r = this.gmail.apagar(email);
       else if (rota === '/chave-backup' && request.method === 'POST') r = await c.ligarChaveDoBackup(await corpo(), email);
+      else if (rota === '/backup-seguro' && request.method === 'GET') r = c.estadoBackupSeguro(email);
+      else if (rota === '/backup-seguro-feito' && request.method === 'POST') r = c.backupSeguroFeito(email);
       else if (rota === '/lote' && request.method === 'POST') r = c.aplicar(await corpo(), email);
       else if (rota === '/resolver' && request.method === 'POST') r = c.resolver(await corpo(), email);
       else if (rota === '/faixa' && request.method === 'POST') r = c.faixa(await corpo(), email);
