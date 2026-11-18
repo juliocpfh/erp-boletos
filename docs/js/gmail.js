@@ -93,10 +93,10 @@ export async function base64DoBlob(blob) {
 
 /**
  * Envia pela conta da empresa. `para` e `cco`: um e-mail ou vários separados por vírgula (até 5);
- * `anexos`: [{ nome, blob }]. Devolve { ok: true, id } (id da mensagem no Gmail).
+ * `anexos`: [{ nome, blob }]; `html` (opcional): a versão com formatação, com `imagens` [{ cid, tipo, base64 }] (a logo). Devolve { ok: true, id } (id da mensagem no Gmail).
  * Erro esperado (sem internet, e-mail inválido, anexos grandes, Gmail não ligado) lança C.ErroUsuario com a mensagem.
  */
-export async function enviarEmail({ para, cco = '', assunto, texto, anexos = [] } = {}) {
+export async function enviarEmail({ para, cco = '', assunto, texto, anexos = [], html = '', imagens = [] } = {}) {
   if (!String(para || '').trim()) throw new C.ErroUsuario('Informe o e-mail do destinatário.');
   const total = anexos.reduce((s, a) => s + (a?.blob?.size || 0), 0);
   if (total > MAX_BYTES_ANEXOS) throw new C.ErroUsuario(`Anexos passam de ${MAX_BYTES_ANEXOS / 1048576} MB.`);
@@ -111,7 +111,7 @@ export async function enviarEmail({ para, cco = '', assunto, texto, anexos = [] 
     r = await cfg.buscar(`${cfg.base}email/enviar`, {
       method: 'POST', cache: 'no-store', credentials: 'same-origin', signal: limiteDeTempo(TEMPO_ENVIO),
       headers: { 'Content-Type': 'application/json', 'X-Sistema': 'imoveis' },
-      body: JSON.stringify({ para: String(para), cco: String(cco || ''), assunto: String(assunto || ''), texto: String(texto || ''), anexos: lista }),
+      body: JSON.stringify({ para: String(para), cco: String(cco || ''), assunto: String(assunto || ''), texto: String(texto || ''), anexos: lista, ...(html ? { html: String(html), imagens } : {}) }),
     });
   } catch (e) {
     if (e?.name === 'TimeoutError') throw new C.ErroUsuario('A nuvem demorou demais para responder. Confira na pasta Enviados do Gmail antes de mandar de novo.');

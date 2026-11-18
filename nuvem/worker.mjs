@@ -17,6 +17,8 @@
 // · dados/acessos (GET, administrador): o registro de acessos (tela Acessos). O Worker anota no cofre quem abriu, anexou,
 //   apagou ou moveu arquivos, baixou backups, mandou e-mail e usou a ficha pela internet (anotarAcesso); o cofre anota
 //   sozinho dados/tudo, a carga/substituição e a entrada do programa do PC.
+// · contatos/… (link, lista, encerrar): o comunicado com confirmação de contatos (contatos-publico.mjs; página em /contatos no
+//   endereço da ficha).
 // · ficha-online/… (link, pdf, lista, atualizar): a ficha cadastral pela internet (ficha-publica.mjs). O endereço da ficha
 //   (HOST_FICHA, ficha.ankjck.com.br) não passa pelo login: lá só respondem a página e as rotas /api/publico/ da ficha.
 // Detalhes e decisões: documentacao/ESTUDO_DADOS_NUVEM.md.
@@ -24,6 +26,7 @@
 import { crachaValido, ERRO_ENTRAR, hashDoCracha } from './aparelhos.mjs';
 import { avisar } from './avisos-ficha.mjs';
 import { SO_SE_NOVO, atenderEquipe, atenderFicha, lerAteLimite } from './ficha-publica.mjs';
+import { atenderEquipeContatos } from './contatos-publico.mjs';
 import {
   ErroEmail, MAX_BYTES_ANEXOS, MAX_PEDIDO, cifrarToken, clienteConfigurado, contaGuardada, decifrarToken, enderecoDeRetorno, enviarEmail,
   esquecerToken, estadoEmail, hashHex, pkce, revogarToken, sorteado, trocarCodigo, urlDeAutorizacao, validarEnvio,
@@ -197,6 +200,7 @@ export function rotaDoRegistro(rota, metodo) {
   if (rota === 'email/enviar') return [rota, true];
   if (rota.startsWith('email/google/')) return [rota, true]; // ligar e desligar o Gmail (só o caminho: o código do Google não entra)
   if (rota.startsWith('ficha-online/')) return [`${metodo === 'GET' ? '' : `${metodo} `}${rota}`, metodo !== 'GET'];
+  if (rota.startsWith('contatos/')) return [`${metodo === 'GET' ? '' : `${metodo} `}${rota}`, metodo !== 'GET'];
   return null;
 }
 
@@ -675,6 +679,11 @@ async function atenderComLogin(request, env, rota, email, url, buscar, ctx) {
     if (m !== 'GET') conferirGravacao(request, env);
     await exigirPapel(env, email, 'operador');
     return await atenderEquipe(request, env, rota.slice(13), email, { avisar: avisador(ctx, buscar) });
+  }
+  if (rota.startsWith('contatos/')) { // comunicado com confirmação de contatos (contatos-publico.mjs)
+    if (m !== 'GET') conferirGravacao(request, env);
+    await exigirPapel(env, email, 'operador');
+    return await atenderEquipeContatos(request, env, rota.slice(9), email);
   }
   if (rota === 'apagar' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await apagarPasta(request, env, email); }
   if (rota === 'mover' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await mover(request, env); }

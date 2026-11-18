@@ -14,6 +14,8 @@
 // - Os dados enviados nunca entram sozinhos na ficha: a equipe confere e traz (telas/fichas.js).
 // - Avisos a cada etapa (e-mail para a pessoa e para a equipe, celular da equipe): avisos-ficha.mjs e push.mjs.
 import { desinscrever, inscrever, publica, pushLigado, testarAparelho } from './push.mjs';
+// import circular de propósito (contatos-publico usa HSTS e hashDaChave daqui só dentro de funções)
+import { atenderContatosPublico, paginaDosContatos } from './contatos-publico.mjs';
 
 export const PESSOAS = ['interessado', 'fiador1', 'fiador2'];
 export const SITUACOES_LINK = ['Aguardando', 'Respondida', 'Falta documento', 'Assinar', 'Assinada', 'Desistiu', 'Encerrado'];
@@ -486,6 +488,7 @@ export async function atenderFicha(request, env, { avisar = null, caminho = null
     if (!env.DADOS) throw new ErroFicha(503, 'Serviço indisponível.');
     const m = request.method;
     if ((rota === '/' || rota === '' || rota === '/ficha') && m === 'GET') return paginaDaFicha();
+    if (rota === '/contatos' && m === 'GET') return paginaDosContatos(); // comunicado com confirmação de contatos (contatos-publico.mjs)
     if (rota === '/robots.txt') return new Response('User-agent: *\nDisallow: /\n', { headers: { 'Content-Type': 'text/plain' } });
     if (!rota.startsWith('/api/publico/')) return json(404, { erro: 'Não encontrado.' });
     if (m !== 'GET') {
@@ -495,6 +498,7 @@ export async function atenderFicha(request, env, { avisar = null, caminho = null
       if (origem && origem !== url.origin) throw new ErroFicha(403, 'Pedido recusado (origem).');
     }
     const r = rota.slice('/api/publico/'.length);
+    if (r === 'contatos' || r.startsWith('contatos/')) return await atenderContatosPublico(request, env, r);
     if (r === 'ficha' && m === 'GET') return await lerFichaPublica(request, env);
     if (r === 'ficha/enviar' && m === 'POST') return await enviarFichaPublica(request, env, avisar);
     if (r === 'ficha/arquivo' && m === 'PUT') return await receberArquivoPublico(request, env, url, avisar);

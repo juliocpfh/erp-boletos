@@ -17,6 +17,7 @@ import { telaFormulario } from './telas/cadastros.js';
 import { crescer, ligarCamposAutomaticos, ligarIndiceBancoCentral } from './telas/campos.js';
 import { telaCobranca, telaCobrancas } from './telas/cobrancas.js';
 import { ACEITA_DOCUMENTOS, acertarNomesUmaVez, apagarDocumentosVencidosDasFichas, alertaAdiado, alertaArquivosFaltando, alertaDesligado, botao, botaoDesligarAlerta, conferirArquivosUmaVez, buscar, caixaHistorico, classeAlerta, classeEstilo, competenciaPadrao, d, etiqueta, gruposDeAlertas, limparSemImovel, link, naoEncontrado, organizarPastasUmaVez, nomeAlerta, listaArquivos, opera, ordenar, PASTA_SEM_IMOVEL, pastasComArquivos, tabelaHistorico, trazerHerancasPendentes, ultimos } from './telas/comum.js';
+import { telaAceiteContatos, telaComunicacoes } from './telas/comunicacoes.js';
 import { calendarioDoPainel, SITUACOES_SOLICITACAO, telaBusca, telaInquilinos, telaIptu, telaSolicitacoes } from './telas/consultas.js';
 import { telaContrato, valorBonificado } from './telas/contrato.js';
 import { telaNotificacao, telaNotificacoes, telaNovaNotificacao } from './telas/notificacoes.js';
@@ -436,6 +437,8 @@ export const TELAS = {
   empresas: () => telaEmpresas(),
   regras: async () => (await parteAdiada('regras')).telaRegras(),
   inquilinos: (rota) => telaInquilinos(rota.q),
+  comunicacoes: (rota) => telaComunicacoes(rota.q),
+  'aceite-contatos': (rota) => telaAceiteContatos(rota.q),
   ficha: (rota) => telaFicha(Number(rota.partes[1])),
   buscar: (rota) => telaBusca(rota.q),
   solicitacoes: (rota) => telaSolicitacoes(rota.q),

@@ -16,6 +16,7 @@ import { confirmarAvisos, dataMuitoAntiga, dataNoFuturo } from './avisos.js';
 import { FORMULARIOS_BANCO } from './banco.js';
 import { FORMULARIOS_EMAILS } from './emails.js';
 import { FORMULARIOS_NOTIFICACOES } from './notificacoes.js';
+import { FORMULARIOS_COMUNICACOES } from './comunicacoes.js';
 import { CADASTROS, nomeComprovante } from './cadastros.js';
 import { apagarRascunhoVistoria } from './campos.js';
 import { acertarNomesDosComprovantes, adiados, alterarApagandoAnexos, buscar, cienciaDaTroca, d, memoria, pastaDoEscopo, registrarCiencia, salvarAssinado, SO_ADMIN_NUMERACAO, trazerHerancaAssinada } from './comum.js';
@@ -725,7 +726,7 @@ export const FORMULARIOS = {
 };
 
 // Banco (extrato, comprovantes e pagamentos pelo C6): formulários em telas/banco.js
-Object.assign(FORMULARIOS, FORMULARIOS_BANCO, FORMULARIOS_EMAILS, FORMULARIOS_NOTIFICACOES, adiados('formularios'));
+Object.assign(FORMULARIOS, FORMULARIOS_BANCO, FORMULARIOS_EMAILS, FORMULARIOS_NOTIFICACOES, FORMULARIOS_COMUNICACOES, adiados('formularios'));
 
 
 /** Pagamento no futuro (31/12/2027) passava com um OK e o sistema calculava multa e juros até lá: agora é recusado. */

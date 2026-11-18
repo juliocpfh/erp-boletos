@@ -245,8 +245,20 @@ export function validarEnvio(pedido) {
     const tipo = RE_TIPO.test(texto(a?.tipo)) ? texto(a.tipo).toLowerCase() : 'application/octet-stream';
     return { nome: nomeDeAnexo(a?.nome), tipo, base64, tamanho };
   });
+  // versão HTML (opcional, ao lado do texto) e as imagens dela (a logo), pelo cid: <img src="cid:logo">
+  const html = texto(pedido.html);
+  if (html.length > MAX_TEXTO * 2) throw new ErroEmail(400, 'A versão HTML do e-mail é grande demais.');
+  const brutasImg = Array.isArray(pedido.imagens) ? pedido.imagens : [];
+  if (brutasImg.length > 3) throw new ErroEmail(400, 'No máximo 3 imagens no corpo do e-mail.');
+  const imagens = html ? brutasImg.map((a) => {
+    const base64 = texto(a?.base64);
+    const cid = texto(a?.cid);
+    if (!/^[a-z0-9-]{1,30}$/.test(cid) || !/^image\/(png|jpeg)$/.test(texto(a?.tipo)) || !base64 || base64.length % 4 !== 0 || !RE_BASE64.test(base64)) throw new ErroEmail(400, 'Imagem do e-mail inválida.');
+    total += (base64.length / 4) * 3;
+    return { cid, tipo: texto(a.tipo), base64 };
+  }) : [];
   if (total > MAX_BYTES_ANEXOS) throw new ErroEmail(413, `Anexos passam de ${MAX_BYTES_ANEXOS / 1048576} MB.`);
-  return { para, cco, assunto, texto: corpo, anexos };
+  return { para, cco, assunto, texto: corpo, anexos, html, imagens };
 }
 
 // ---------------------------------------------------------------------------
@@ -287,7 +299,7 @@ const fronteira = () => `----=_imoveis_${base64DeBytes(crypto.getRandomValues(ne
  * Mensagem completa em texto (só ASCII). `anexos`: { nome, tipo, base64 }.
  * Recusa quebra de linha em qualquer cabeçalho (injeção de cabeçalho: "Bcc:" escondido no assunto).
  */
-export function montarMime({ de, nome = '', para = [], cco = [], assunto, texto: corpo = '', anexos = [], fronteira: f = fronteira() }) {
+export function montarMime({ de, nome = '', para = [], cco = [], assunto, texto: corpo = '', anexos = [], html = '', imagens = [], fronteira: f = fronteira() }) {
   for (const v of [de, nome, assunto, ...para, ...cco]) if (CONTROLE.test(texto(v))) throw new ErroEmail(400, 'Cabeçalho do e-mail com quebra de linha.');
   for (const e of [de, ...para, ...cco]) if (!emailValido(e)) throw new ErroEmail(400, `E-mail inválido: ${texto(e).slice(0, 80)}`);
   if (!para.length) throw new ErroEmail(400, 'Informe o e-mail do destinatário.');
@@ -299,7 +311,18 @@ export function montarMime({ de, nome = '', para = [], cco = [], assunto, texto:
     'MIME-Version: 1.0',
   ];
   const textoCrlf = texto(corpo).replace(/\r\n|\r|\n/g, '\r\n');
-  const parteTexto = ['Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', linhas76(base64DeBytes(utf8(textoCrlf)))];
+  const soTexto = ['Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', linhas76(base64DeBytes(utf8(textoCrlf)))];
+  // com HTML: multipart/alternative (texto e HTML); com imagens, o HTML vai num multipart/related junto delas
+  let parteTexto = soTexto;
+  if (html) {
+    const fa = `${f}_alt`; const fr = `${f}_rel`;
+    const parteHtml = ['Content-Type: text/html; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', linhas76(base64DeBytes(utf8(texto(html).replace(/\r\n|\r|\n/g, '\r\n'))))];
+    const comImagens = imagens.length ? [`Content-Type: multipart/related; boundary="${fr}"`, '', `--${fr}`, ...parteHtml,
+      ...imagens.flatMap((im) => [`--${fr}`, `Content-Type: ${im.tipo}`, 'Content-Transfer-Encoding: base64', `Content-ID: <${im.cid}>`,
+        `Content-Disposition: inline; filename="${im.cid}.${im.tipo === 'image/png' ? 'png' : 'jpg'}"`, '', linhas76(im.base64)]),
+      `--${fr}--`, ''] : parteHtml;
+    parteTexto = [`Content-Type: multipart/alternative; boundary="${fa}"`, '', `--${fa}`, ...soTexto, `--${fa}`, ...comImagens, `--${fa}--`, ''];
+  }
   if (!anexos.length) return [...cab, ...parteTexto, ''].join('\r\n');
   const partes = [...cab, `Content-Type: multipart/mixed; boundary="${f}"`, '', 'This is a multi-part message in MIME format.', '', `--${f}`, ...parteTexto];
   for (const a of anexos) {
@@ -374,7 +397,7 @@ export async function enviarEmail(env, pedido, { buscar = fetch, simular = false
   if (!estado.ligado) throw new ErroEmail(503, 'O envio pelo Gmail ainda não foi ligado.');
   const fixa = listaDeEmails(segredo(env, 'GMAIL_CCO'), { campo: 'cópia oculta (GMAIL_CCO)', maximo: MAX_DESTINATARIOS });
   const cco = [...new Set([...v.cco, ...fixa].map((e) => e.toLowerCase()))].filter((e) => !v.para.some((p) => p.toLowerCase() === e));
-  const mime = montarMime({ de: estado.remetente, nome: segredo(env, 'GMAIL_NOME'), para: v.para, cco, assunto: v.assunto, texto: v.texto, anexos: v.anexos });
+  const mime = montarMime({ de: estado.remetente, nome: segredo(env, 'GMAIL_NOME'), para: v.para, cco, assunto: v.assunto, texto: v.texto, anexos: v.anexos, html: v.html, imagens: v.imagens });
   if (simular) {
     registrar(`[gmail simulado] para ${v.para.join(', ')}${cco.length ? ` (cco ${cco.join(', ')})` : ''}: "${v.assunto}", ${v.anexos.length} anexo(s), ${mime.length} bytes`);
     return { ok: true, id: `simulado-${Date.now().toString(36)}` };

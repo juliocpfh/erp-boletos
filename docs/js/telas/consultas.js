@@ -6,6 +6,7 @@ import { compBr, dataBr, reais } from '../calculos.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { ACEITA_DOCUMENTOS, botao, buscar, d, etiqueta, idGuiasDoAno, link, opera, ordenar } from './comum.js';
+import { abasInquilinos, atalhosComunicacoes } from './comunicacoes.js';
 import { caixaFichas } from './fichas.js';
 
 /** Filtros da busca global (parâmetro ``tipo`` do endereço → grupo devolvido por ``R.buscarGlobal``). */
@@ -43,7 +44,7 @@ export function telaSolicitacoes(q) {
   const lista = d().solicitacoes.filter((x) => !filtro || (x.situacao || 'Aberta') === filtro.nome)
     .sort(C.maisRecentePrimeiro);
   return `<p class="suave"><a href="#/inquilinos">← Inquilinos</a></p>
-    <div class="cabecalho"><h1>Solicitações dos inquilinos</h1>${opera() ? link('#/novo/solicitacoes?de=solicitacoes', 'Abrir nova solicitação', 'botao') : ''}</div>
+    ${atalhosComunicacoes('solicitacoes')}<div class="cabecalho"><h1>Solicitações dos inquilinos</h1>${opera() ? link('#/novo/solicitacoes?de=solicitacoes', 'Abrir nova solicitação', 'botao') : ''}</div>
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap">${link('#/solicitacoes', `Todas (${d().solicitacoes.length})`, `botao ${filtro ? 'secundario ' : ''}pequeno`)}
       ${SITUACOES_SOLICITACAO.map((s) => link(`#/solicitacoes?situacao=${encodeURIComponent(s.nome)}`, `${s.simbolo} ${resumo[s.nome]} ${s.texto}`, `botao ${filtro === s ? '' : 'secundario '}pequeno`)).join(' ')}</div>
     <div class="cartao rolagem"><table><tr><th>Data</th><th>Inquilino / imóvel</th><th>O que pediu</th><th>O que foi feito</th><th>Situação</th><th class="n">Custo</th><th></th></tr>
@@ -106,7 +107,7 @@ export function telaInquilinos(q) {
   const resumo = R.resumoSolicitacoes(d());
   // 1ª etapa de um inquilino novo: a ficha do interessado (botão "Nova ficha em análise", na caixa das fichas); dela sai
   // o contrato. O "Novo contrato" fica na caixa dos contratos ativos (pedido do dono, 2026-11-17: um lugar só para cada um)
-  return `<div class="cabecalho"><h1>Inquilinos</h1></div>
+  return `<div class="cabecalho"><h1>Inquilinos</h1></div>${abasInquilinos('lista')}
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="ir" data-ir="inquilinos" style="flex-wrap:nowrap;min-width:0;max-width:100%"><input name="busca" value="${esc(q.busca || '')}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px;max-width:100%;min-width:0"><button class="secundario">Buscar</button>${busca ? link('#/inquilinos', 'Limpar') : ''}</form>
       <a class="botao secundario resumo-solicitacoes" href="#/solicitacoes" title="Ver todas as solicitações dos inquilinos">Solicitações: ${SITUACOES_SOLICITACAO.map((s) => `<span>${s.simbolo} ${resumo[s.nome]} ${s.texto}</span>`).join(' ')}</a>
       ${(() => { const l = (d().notificacoes || []).filter((n) => ['Rascunho', 'Aguardando resposta', 'Multa gerada'].includes(n.situacao)); const v = l.filter((n) => R.estadoNotificacao(d(), n).podeMulta).length;

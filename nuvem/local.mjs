@@ -48,7 +48,7 @@ http.createServer(async (req, res) => {
   try {
     if (url.pathname === '/__internet') { semInternet = url.searchParams.get('ligar') === '0'; res.end(semInternet ? 'sem internet' : 'com internet'); return; }
     // ficha pela internet: a página (/ficha) e as rotas públicas, como no endereço da ficha
-    if (url.pathname === '/ficha' || url.pathname.startsWith('/api/publico/')) {
+    if (url.pathname === '/ficha' || url.pathname === '/contatos' || url.pathname.startsWith('/api/publico/')) {
       if (semInternet) { req.socket.destroy(); return; }
       const corpo = ['GET', 'HEAD'].includes(req.method) ? undefined : Buffer.concat(await Array.fromAsync(req));
       const r = await atenderFicha(new Request(url, { method: req.method, headers: req.headers, body: corpo }), env, { avisar: avisador() });

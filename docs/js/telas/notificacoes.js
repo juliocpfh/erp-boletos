@@ -13,6 +13,7 @@ import * as NT from '../notificacoes.js';
 import * as R from '../regras.js';
 import { linkComprovante, nomeComprovante } from './cadastros.js';
 import { ACEITA_DOCUMENTOS, alterarApagandoAnexos, botao, buscar, d, etiqueta, item, link, naoEncontrado, opera, pastaDoEscopo } from './comum.js';
+import { atalhosComunicacoes } from './comunicacoes.js';
 import { botaoEmail } from './emails.js';
 
 const COR = { Rascunho: 'neutra', 'Aguardando resposta': 'aviso', Reiterada: 'info', 'Multa gerada': 'perigo', Resolvida: 'ok', Cancelada: 'neutra' };
@@ -52,7 +53,7 @@ export function telaNotificacoes(q = {}) {
   const abertas = q.filtro !== 'todas';
   const lista = ordemNotificacoes(todas.filter((n) => !abertas || ['Rascunho', 'Aguardando resposta', 'Multa gerada'].includes(n.situacao)), hoje);
   const vencidas = todas.filter((n) => { const e = R.estadoNotificacao(d(), n, hoje); return e.podeMulta && e.situacao !== 'Reiterada'; }).length;
-  return `<div class="cabecalho"><h1>Notificações ao inquilino</h1>${opera() ? link('#/notificacao-nova', 'Nova notificação', 'botao') : ''}</div>
+  return `${atalhosComunicacoes('notificacoes')}<div class="cabecalho"><h1>Notificações ao inquilino</h1>${opera() ? link('#/notificacao-nova', 'Nova notificação', 'botao') : ''}</div>
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap">${link('#/notificacoes', `Em aberto (${todas.filter((n) => ['Rascunho', 'Aguardando resposta', 'Multa gerada'].includes(n.situacao)).length})`, `botao ${abertas ? '' : 'secundario '}pequeno`)}
       ${link('#/notificacoes?filtro=todas', `Todas (${todas.length})`, `botao ${abertas ? 'secundario ' : ''}pequeno`)}
       ${vencidas ? etiqueta(`${vencidas} com prazo vencido`, 'perigo') : ''}</div>

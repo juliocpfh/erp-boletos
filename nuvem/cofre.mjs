@@ -7,6 +7,7 @@
 import { Aparelhos, ErroAparelho } from './aparelhos.mjs';
 import { ContaGmail } from './gmail-conta.mjs';
 import { faxinaDosLinks } from './ficha-publica.mjs';
+import { faxinaDosContatos } from './contatos-publico.mjs';
 import { faxinaDaLixeira } from './lixeira.mjs';
 import { chaveDoBackupValida, cifrarBackup, resumoDaChave } from './cifrar-backup.mjs';
 
@@ -96,7 +97,7 @@ export const TABELAS_CONHECIDAS = ['imoveis', 'contratos', 'correcoes', 'seguros
   'leituras', 'encerramentos', 'avulsas', 'reformas', 'solicitacoes', 'notificacoes', 'fichas', 'indices_acumulados', 'cartas_reajuste', 'modelos_contrato', 'vistorias',
   'aditivos', 'despesas', 'ganhos_airbnb', 'ressarcimentos', 'fechamentos', 'guias_impostos', 'modelos_email', 'envios_email', 'movimentacoes_banco',
   'regua_emails',
-  'pagamentos_banco', 'adiamentos_alerta', 'alertas_desligados', 'acordos', 'pastas_fisicas', 'config_regras', 'versoes_regras', 'taxas_poupanca'];
+  'pagamentos_banco', 'adiamentos_alerta', 'alertas_desligados', 'acordos', 'pastas_fisicas', 'config_regras', 'versoes_regras', 'taxas_poupanca', 'comunicados'];
 /** Fora do administrador, o número da próxima NF só anda para a frente, e no máximo isto de uma vez (numerar um lote grande). */
 export const MAX_SALTO_NF = 300;
 /** Gravação por usuário num dia (Brasília): mudanças e bytes. Passou, as próximas esperam o dia seguinte (contra encher o cofre). */
@@ -1227,6 +1228,7 @@ export class CofreDO {
       if (this.env.DADOS) {
         await faxinaDaLixeira(this.env.DADOS, agora, c.regraNumero('dias_lixeira_anexos')).catch((e) => console.error('lixeira', e));
         await faxinaDosLinks(this.env).catch((e) => console.error('links da ficha', e));
+        await faxinaDosContatos(this.env).catch((e) => console.error('links dos contatos', e));
       }
     }
   }
