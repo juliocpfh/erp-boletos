@@ -145,7 +145,7 @@ test('quem recebe: inquilinos e fiadores dos contratos ativos; textos do fiador'
   const com = CM.novoComunicado(d, 'contatos', { prazo: '2026-11-28', email_empresa: 'administracao@exemplo.com.br', telefone_empresa: '(41) 3333-0000' }, '2026-11-18');
   const texto = CM.preencher(com.texto, CM.camposDe(d, com, lista[1], 'https://x/contatos#k'));
   assert.match(texto, /Olá, Diego\./);
-  assert.match(texto, /contrato de locação de Ana Teste, do qual você é fiador/);
+  assert.match(texto, /Você é fiador(a) da locação de Ana Teste/);
   assert.match(texto, /até 28\/11\/2026/);
   assert.ok(!/\[preencher/.test(texto));
   const ctx = CM.contextoDoLink(d, com, lista[0]);
