@@ -1,6 +1,6 @@
 # O que ainda falta no sistema (e como fazer)
 
-Situação em 17/11/2026 (fim do dia). Tudo o que foi feito até hoje está no ar até a PR #308: mutirão 3000, botão "Conectar o Gmail" (#299), notificações ao inquilino (#300/#301), régua em Boletos (#302), abrir a pasta no Explorer (#303), ficha com registro de quem conferiu (#304), NF com aviso de texto cortado e Excel por empresa (#305), melhorias pequenas (#306: Hoje/Ontem, inadimplência por faixa, 2ª via com o valor do dia, status embaixo dos botões), sem ANK fixa e Internet "Não tem" no contrato novo (#307) e publicação pelo GitHub Actions (#308). Depois, aceitas em 17/11: #309 (Pix devolvido e baixa só pelo identificador), #310 (limpeza técnica e 2ª rodada de 16/11), #312 (programa do PC desinstalável), #313 (programa do PC se atualiza sozinho) e #314 (respostas do contador). Conferidos pelo dono em 17/11: o sistema no computador e no celular e o programa novo no PC.
+Situação em 17/11/2026 (fim do dia). Tudo o que foi feito até hoje está no ar até a PR #308: mutirão 3000, botão "Conectar o Gmail" (#299), notificações ao inquilino (#300/#301), régua em Boletos (#302), abrir a pasta no Explorer (#303), ficha com registro de quem conferiu (#304), NF com aviso de texto cortado e Excel por empresa (#305), melhorias pequenas (#306: Hoje/Ontem, inadimplência por faixa, 2ª via com o valor do dia, status embaixo dos botões), sem ANK fixa e Internet "Não tem" no contrato novo (#307) e publicação pelo GitHub Actions (#308). Depois, aceitas em 17/11: #309 (Pix devolvido e baixa só pelo identificador), #310 (limpeza técnica e 2ª rodada de 16/11), #312 (programa do PC desinstalável), #313 (programa do PC se atualiza sozinho) e #314 (respostas do contador). Conferidos pelo dono em 17/11: o sistema no computador e no celular e o programa novo no PC. Depois: #315 e #316 (ícone da casinha no programa do PC) e #317 (página Inquilinos alinhada, conferida no celular em 17/11). **18/11: Gmail ligado** (envio pela conta da krasinski, remetente administracao@ankjck.com.br; teste chegou certo, fora do spam); PR #318 (página de privacidade exigida pelo Google).
 
 Marque com `[x]` o que for concluindo.
 
@@ -10,8 +10,9 @@ Marque com `[x]` o que for concluindo.
 2. [x] Aceitar as PRs em aceite: #309, #310 e #312 aceitas em 17/11. Sair e entrar com a senha: feito no celular em 17/11.
    - Depois do merge da #310: **sair e entrar de novo no site com a senha, uma vez** (e de novo sempre que trocar a senha). Sem isso, ligar um computador **novo** ao programa do PC dá "E-mail ou senha errados…". Os computadores já ligados continuam funcionando.
 3. [x] Programa do PC novo: **conferido pelo dono em 17/11**: baixou e rodou o `.exe` novo, "Administração de Imóveis" aparece em Configurações → Aplicativos e Usuários → Aparelhos ligados mostra o programa "de 17/11/2026 (c60d8b1)". Daqui em diante ele se troca sozinho (todo dia às 20h e ao entrar no Windows).
-4. [ ] Ligar o Gmail com o Claude (item 1).
-5. [ ] Ficha pela internet com um conhecido (item 3).
+4. [x] Ligar o Gmail com o Claude (item 1): **feito em 18/11**, pelo celular.
+5. [ ] Ficha pela internet com um conhecido (item 3). **Próximo.**
+5b. [ ] **Simular todas as etapas com pessoas de teste** (pedido do dono, 18/11): ficha, aprovação, contrato, entrada, boletos, notificação, saída e devolução, com os e-mails de cada etapa saindo de verdade para endereços de teste, e ir corrigindo e melhorando os textos dos e-mails e documentos (item 3b).
 6. [x] Contador: informe do IR (D5), DIMOB e numeração da NF: **encerrado em 17/11** (resposta do contador; nada muda no sistema; ver item 6).
 7. [ ] Quando o C6 liberar: chaves + boleto de teste (decidir o corte do texto e conferir o desconto) (item 5).
 8. [ ] Depois do C6 no ar: rever a sugestão do tipo de despesa pela descrição (ex.: SANEPAR → Água).
@@ -25,10 +26,10 @@ Marque com `[x]` o que for concluindo.
 
 | # | O que falta | Quem faz | Tempo |
 |---|---|---|---|
-| 1 | Envio de e-mail pelo Gmail (o "Enviar agora" e os avisos por e-mail dependem dele): o botão **Conectar o Gmail** está no ar (#299); é o **próximo a fazer com o Claude** | você + Claude, no Google e no Cloudflare | 30 min |
+| ~~1~~ | ~~Envio de e-mail pelo Gmail~~ **ligado em 18/11** | — | — |
 | ~~2~~ | ~~Aviso no celular (ficha pela internet)~~ **concluído em 17/11** | — | — |
-| 3 | Teste da ficha pela internet com uma pessoa de verdade (depois do Gmail) | você + um conhecido | 20 min |
-| 4 | Conferências no celular: falta só o "Enviar agora" (depois do Gmail); ícone e caução da troca conferidos em 15/11 | você | 5 min |
+| 3 | Teste da ficha pela internet com uma pessoa de verdade (**próximo**) e, depois, a simulação de todas as etapas para melhorar os textos (3b) | você + um conhecido / você + Claude | 20 min / algumas sessões |
+| ~~4~~ | ~~Conferências no celular~~ **concluídas em 18/11** ("Enviar agora" testado no celular) | — | — |
 | 5 | Banco C6 (boleto e extrato automáticos): cobrado por e-mail em 17/11, aguardando as chaves | o C6 liberar as chaves | depende do C6 |
 | 6 | Decisões que estão com você: abertas só CBS 2027 e corte do texto do boleto; D5 (IR), DIMOB e numeração da NF encerradas em 17/11 com o contador; as outras decididas em 17/11 | você / contador | — |
 | ~~7~~ | ~~Aceitar a PR #231~~ aceita em 14/11 | — | — |
@@ -37,11 +38,13 @@ Marque com `[x]` o que for concluindo.
 | ~~11~~ | ~~Mutirão de 16/11~~ **concluído em 17/11** (2ª rodada na PR #310, em aceite; compactação do código na #308) | — | — |
 | 13 | Mutirão 3000 (16–17/11): 366 erros confirmados; 314 corrigidos no inventário de 17/11 (até #303) e mais correções em #304–#309 e nas PRs em aceite; faltam NF 16/30 e troca de senha (quando acontecerem) | você + Claude | — |
 
-**Próximos passos (atualizado em 17/11, fim do dia):** siga a lista **"Para confirmar na sequência"** acima. O próximo trabalho com o Claude é **ligar o Gmail** (item 1, passo a passo em `LIGAR_GMAIL.md`; faço junto com você no navegador) e, depois, o teste da ficha com um conhecido (item 3). Em 16/12: CBS 2027.
+**Próximos passos (atualizado em 18/11):** siga a lista **"Para confirmar na sequência"** acima. Gmail ligado em 18/11. O próximo é o teste da ficha com um conhecido (item 3) e, depois, a simulação de todas as etapas para melhorar os textos (3b). Em 16/12: CBS 2027.
 
 ---
 
-## 1. Ligar o envio de e-mail pelo Gmail  `[ ]`
+## 1. Ligar o envio de e-mail pelo Gmail  `[x]` (ligado em 18/11)
+
+**18/11, feito pelo dono no celular, com o Claude:** projeto `ERP Imoveis` no Google Cloud (criado na conta do Cloudflare; o Google exigiu página inicial e política de privacidade para publicar: `https://ficha.ankjck.com.br` e `/privacidade`, PR #318), app **Em produção**, cliente Web, 4 segredos no Cloudflare, SPF com `include:_spf.google.com` (DMARC `p=none`). **A conta conectada é a krasinski.imoveis@gmail.com** (a que já tinha `administracao@ankjck.com.br` em "Enviar e-mail como" e recebe tudo); a conta do projeto no Google Cloud não precisa ser a que envia. A volta do Google passou direto pelo Access. Teste: chegou como "Administradora", fora do spam.
 
 **17/11, fim do dia:** o botão está no ar (PR #299 aceita). É o **próximo a fazer com o Claude**.
 
@@ -63,7 +66,7 @@ Leva uns 30 minutos, uma vez só, no computador. Precisa da conta Gmail da empre
 Se quiser, faço os passos 1 a 3 e 5 a 7 junto com você no navegador (você entra na conta; eu não digito senhas).
 
 **Conferir na ligação de verdade (Claude junto):**
-- [ ] **Volta do Google pelo Access:** no passo 7, ao tocar em **Permitir**, o sistema deve voltar direto com "Gmail conectado", sem pedir de novo o código de login do Cloudflare. Se pedir o código ou der erro, mande um print: o Claude acerta a regra do Access para o endereço `/api/email/google/retorno` (`LIGAR_GMAIL.md` explica).
+- [x] **Volta do Google pelo Access** (18/11: voltou direto, "Gmail conectado"): no passo 7, ao tocar em **Permitir**, o sistema deve voltar direto com "Gmail conectado", sem pedir de novo o código de login do Cloudflare. Se pedir o código ou der erro, mande um print: o Claude acerta a regra do Access para o endereço `/api/email/google/retorno` (`LIGAR_GMAIL.md` explica).
 - [x] **Erros no console** ("An unknown error occurred when fetching the script", vistos no teste de 17/11): eram só do painel de navegador usado nos testes, que recusa registrar o service worker; no Chrome de verdade não aparecem (conferido na PR #310). Não é defeito.
 
 ---
@@ -107,7 +110,7 @@ Quando alguém manda a ficha pelo link, a equipe recebe **e-mail** (depois do it
 
 ## 3. Testar a ficha pela internet com uma pessoa de verdade  `[ ]`
 
-**17/11:** fica para **depois do Gmail** (item 1), para os e-mails da ficha já saírem no teste.
+**18/11:** Gmail ligado: é o **próximo**. Os e-mails da ficha já saem no teste.
 
 Foi testado no computador, numa cópia do sistema. Falta um teste completo no endereço real e num celular de outra pessoa.
 
@@ -130,6 +133,10 @@ Foi testado no computador, numa cópia do sistema. Falta um teste completo no en
 
 Ponto que ainda não testei na tela depois das últimas correções: a janela do **Trazer para a ficha**. Se algo estranho aparecer, me mande um print.
 
+### 3b. Simular todas as etapas e melhorar os textos  `[ ]`
+
+**Pedido do dono em 18/11:** são muitas etapas e muitos e-mails; simular o caminho inteiro com pessoas de teste (e-mails de teste da própria equipe, CPF de teste) e ir corrigindo os textos. Roteiro sugerido, uma etapa por vez, o dono lendo cada e-mail e documento que chega e dizendo o que mudar: ficha pela internet (recebemos seus dados, falta documento, pronta para assinar) → aprovação e contrato → entrada (vistoria, recibos da reserva e da garantia) → boletos e NF → notificação ao inquilino → reajuste → saída (devolução das chaves, vistoria de saída, cálculo final, devolução da garantia). Modelos em `modelos-email.js` (e editáveis na tela); textos dos recibos em `recibos.js`. No fim, excluir as pessoas e contratos de teste.
+
 ---
 
 ## 4. Conferências rápidas no celular  `[ ]`
@@ -137,7 +144,7 @@ Ponto que ainda não testei na tela depois das últimas correções: a janela do
 Coisas que funcionaram no computador mas não foram vistas num celular de verdade:
 
 1. [x] **Ícone do aplicativo** (conferido pelo dono em 15/11: deu certo) (PR #193): em **Empresas**, enquadre a logo e grave. No iPhone, apague o ícone da Tela de Início e adicione de novo para pegar o novo.
-2. [ ] **"Enviar agora" com anexos** (recibos e e-mails por etapa, PR #204; depois do item 1): abra uma ficha ou contrato → botão de e-mail → **Enviar agora** para o seu próprio e-mail. Confira se chegou com o PDF anexado e com o remetente "Administradora".
+2. [x] **"Enviar agora" com anexos** (18/11: testado no celular, chegou certo como "Administradora") (recibos e e-mails por etapa, PR #204; depois do item 1): abra uma ficha ou contrato → botão de e-mail → **Enviar agora** para o seu próprio e-mail. Confira se chegou com o PDF anexado e com o remetente "Administradora".
 3. [x] **Caução na troca de titular** (conferido pelo dono em 15/11: deu certo) (PR #210): abra o **Painel** uma vez (ele corrige as trocas antigas sozinho) e depois confira cada contrato que teve troca de titular. Se a data paga da caução estiver errada, use **✎ corrigir data**.
 
 ---
