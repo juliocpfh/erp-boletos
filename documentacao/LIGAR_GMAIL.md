@@ -14,7 +14,7 @@ Precisa: a conta Gmail que vai enviar, o painel do Cloudflare e o computador (Ch
 ## 2. Tela de permissão (uso próprio)
 1. APIs e serviços → **Tela de permissão OAuth** (pode aparecer como "Google Auth Platform" → Branding / Público).
 2. Tipo de usuário: **Externo** (conta @gmail.com). Se a conta for do Google Workspace do domínio ankjck.com.br, escolha **Interno** e pule o item 4.
-3. Nome do app `ERP Imoveis`, e-mail de suporte e de contato: o da própria conta. Salvar.
+3. Nome do app `ERP Imoveis`, e-mail de suporte e de contato: o da própria conta. Para publicar, o Google exige também (página **Branding**): **Página inicial** `https://ficha.ankjck.com.br`, **Política de privacidade** `https://ficha.ankjck.com.br/privacidade` (página pública servida pelo Worker, `paginaPrivacidade` em `nuvem/ficha-publica.mjs`) e, em **Domínios autorizados**, `ankjck.com.br`. Logotipo e termos de serviço: vazios (logotipo obriga à verificação). O e-mail de contato precisa virar etiqueta (Enter) para o Salvar funcionar. Salvar.
 4. Em **Público**, clique em **Publicar app** (status **Em produção**). Importante: em "Teste" a autorização vence em 7 dias e o envio para de funcionar.
    - Não precisa mandar para verificação do Google: é só para a própria conta. Por isso, no passo 7 o Google vai mostrar "O Google não verificou este app": clique em **Avançado** → **Acessar ERP Imoveis (não seguro)**. É o seu próprio app.
 

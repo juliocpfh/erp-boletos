@@ -212,3 +212,17 @@ test('ficha nova com o código de uma ficha que saiu (outra pasta): o link come�
   assert.deepEqual(ctx.avisos, [['interessado', 'documento']], 'o primeiro documento da ficha nova avisa');
   assert.equal((await ctx.publico(renovada, 'GET', 'ficha')).status, 404, 'o link da antiga não vale mais');
 });
+
+test('política de privacidade: página pública no endereço da ficha, sem script, sem precisar do armazenamento', async () => {
+  const r = await FP.atenderFicha(new Request('https://ficha.ankjck.com.br/privacidade'), {});
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get('Content-Type'), /text\/html/);
+  assert.match(r.headers.get('Content-Security-Policy'), /default-src 'none'/);
+  const html = await r.text();
+  assert.match(html, /Política de privacidade/);
+  assert.match(html, /não lê/);
+  assert.doesNotMatch(html, /<script/);
+  // outro método continua recusado
+  const p = await FP.atenderFicha(new Request('https://ficha.ankjck.com.br/privacidade', { method: 'POST' }), { DADOS: {} });
+  assert.equal(p.status, 404);
+});
