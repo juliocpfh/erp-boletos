@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-SlVHNcT136D7Kqrsa6wxl/35z/ZjGkytx/wTBnyNp5Y=' 'sha256-GRZ2ch8wKyOhADC9BFqF5FASuDIx1glWSRB3Nu6FwaY='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-SlVHNcT136D7Kqrsa6wxl/35z/ZjGkytx/wTBnyNp5Y=' 'sha256-8Foxnlb8K51UXIO0Sjjh8iMF5kXh5Sx2i8iHVhXrt/M='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="892548ffe3e89514">
+<meta name="fontes" content="0652e42d6e9c4c72">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -391,6 +391,11 @@ table.compacta td, table.compacta th { padding: 3px 6px; font-size: 13px; }
 .ct-grupo-assina.um { grid-template-columns: minmax(0, 50%); justify-content: center; }
 .ct-assina { text-align: center; font-size: 13px; break-inside: avoid; }
 .ct-assina .ct-linha { border-top: 1px solid #111; margin: 34px 0 6px; }
+pre.texto-modelo { white-space: pre-wrap; font: inherit; background: #f4f5f7; border-radius: 6px; padding: 10px 12px; margin: 6px 0; }
+.numeros-cartao { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 10px 0; }
+.numero-cartao { background: #f4f5f7; border-radius: 6px; padding: 8px 12px; }
+.numero-cartao .numero { font-size: 22px; font-weight: 600; }
+.numero-cartao .numero.ok { color: var(--ok); } .numero-cartao .numero.perigo { color: var(--perigo); }
 textarea.texto-modelo { min-height: 60vh; font-family: Consolas, 'Courier New', monospace; font-size: 13px; line-height: 1.5; }
 @media (max-width: 640px) { .contrato { padding: 24px 18px 90px; } .ct-grupo-assina, .ct-grupo-assina.um { grid-template-columns: 1fr; } .contrato .ct-rodape { left: 18px; right: 18px; } }
 @media print {
@@ -2571,6 +2576,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         prazo: /^\d{1,2}$/,
         anterior: /^\d+$/,
         // nova notificação ao inquilino: modelo do texto, prazo em dias úteis e a que ela reitera
+        ver: /^[a-z]{1,20}$/,
+        chave: /^[cf]\d{1,10}$/,
+        // Comunicações: a parte da tela (novo, modelos) e a pessoa do aceite (c<contrato> ou f<fiador>)
         gmail: /^[a-z-]{1,20}$/
         // Dados e backup: aviso da volta do Google ao conectar o Gmail (AVISOS_VOLTA_GMAIL de nuvem/worker.mjs)
       };
@@ -2830,7 +2838,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       pasta: i.pasta || null,
       situacao: ["impresso", "ja_tinha", "fora"].includes(i.situacao) ? i.situacao : "impresso"
     }));
-    const resumo2 = (l2) => {
+    const resumo3 = (l2) => {
       const n = (s) => l2.filter((i) => i.situacao === s).length;
       return [n("impresso") && `${n("impresso")} impresso(s)`, n("ja_tinha") && `${n("ja_tinha")} já em papel`, n("fora") && `${n("fora")} fora da pasta`].filter(Boolean).join(", ");
     };
@@ -2839,7 +2847,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       const a = buscar(d2, "contratos", anterior.contrato_id);
       if (!a) throw new Error("Contrato anterior não encontrado.");
       const la = limpa(anterior.itens);
-      if (la.length) inserir(d2, "pastas_fisicas", { contrato_id: a.id, momento: "inicio", data: data2, por: usuario, itens: la, pasta_anterior: null }, usuario, `${a.inquilino_nome}: pasta física completada na troca de titular (${resumo2(la)})`);
+      if (la.length) inserir(d2, "pastas_fisicas", { contrato_id: a.id, momento: "inicio", data: data2, por: usuario, itens: la, pasta_anterior: null }, usuario, `${a.inquilino_nome}: pasta física completada na troca de titular (${resumo3(la)})`);
       if (anterior.guardada) pastaAnterior = { contrato_id: a.id, guardada_em: data2 };
     }
     const l = limpa(itens);
@@ -2849,7 +2857,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       "pastas_fisicas",
       { contrato_id: c.id, momento, data: data2, por: usuario, itens: l, pasta_anterior: pastaAnterior },
       usuario,
-      `${c.inquilino_nome}: pasta física (${MOMENTOS[momento]}) · ${[resumo2(l), pastaAnterior && `pasta de ${buscar(d2, "contratos", pastaAnterior.contrato_id).inquilino_nome} posta dentro`].filter(Boolean).join("; ")}`
+      `${c.inquilino_nome}: pasta física (${MOMENTOS[momento]}) · ${[resumo3(l), pastaAnterior && `pasta de ${buscar(d2, "contratos", pastaAnterior.contrato_id).inquilino_nome} posta dentro`].filter(Boolean).join("; ")}`
     );
   }
   var ligado, soltosConhecidos, versaoSoltos, anotarSoltos, GRUPOS_PASTA, MOMENTOS, MONTADA, semAcento2, RENDA, PESSOA, PAGAMENTO, montagensDe, pastaMontada, saidaFechada, guardarAte;
@@ -9512,39 +9520,39 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     };
   }
   function salvarContaArquivo(d2, dados, usuario) {
-    const cfg4 = configBanco(d2);
+    const cfg5 = configBanco(d2);
     const apelido = String(dados.apelido || "").trim();
     const id = limparId(dados.id) || limparId(semAcento(apelido));
     if (!id) throw new ErroUsuario("Dê um apelido à conta (ex.: Itaú).");
     const emitenteId = dados.emitente_id ? Number(dados.emitente_id) : null;
     if (!emitenteId || !buscar(d2, "emitentes", emitenteId)) throw new ErroUsuario("Escolha a empresa dona da conta.");
-    if (cfg4.contas.some((x) => x.id === id)) throw new ErroUsuario(`O código "${id}" já é de uma conta do C6. Use outro apelido ou código.`);
-    const atuais = cfg4.contas_arquivo || [];
+    if (cfg5.contas.some((x) => x.id === id)) throw new ErroUsuario(`O código "${id}" já é de uma conta do C6. Use outro apelido ou código.`);
+    const atuais = cfg5.contas_arquivo || [];
     const antes = atuais.find((x) => x.id === id) || null;
     const conta = { ...antes || {}, id, apelido: apelido || id.toUpperCase(), emitente_id: emitenteId, banco: String(dados.banco || "").trim().slice(0, 60) };
-    cfg4.contas_arquivo = antes ? atuais.map((x) => x.id === id ? conta : x) : [...atuais, conta];
-    d2.config_banco = cfg4;
+    cfg5.contas_arquivo = antes ? atuais.map((x) => x.id === id ? conta : x) : [...atuais, conta];
+    d2.config_banco = cfg5;
     registrar(d2, usuario, antes ? "Alteração" : "Inclusão", "banco", null, `Conta de outro banco "${conta.apelido}" (${id}, extrato por arquivo) ${antes ? "alterada" : "incluída"}`, { conta: { de: antes, para: conta } });
     return conta;
   }
   function excluirContaArquivo(d2, contaId, usuario) {
-    const cfg4 = configBanco(d2);
-    const conta = (cfg4.contas_arquivo || []).find((x) => x.id === contaId);
+    const cfg5 = configBanco(d2);
+    const conta = (cfg5.contas_arquivo || []).find((x) => x.id === contaId);
     if (!conta) throw new ErroUsuario("Conta não encontrada.");
     const n = (d2.movimentacoes_banco || []).filter((m) => m.conta_id === contaId).length;
     if (n) throw new ErroUsuario(`A conta ${conta.apelido} tem ${n} movimentação(ões) importada(s): não dá para tirar (o extrato ficaria sem conta).`);
-    cfg4.contas_arquivo = cfg4.contas_arquivo.filter((x) => x.id !== contaId);
-    d2.config_banco = cfg4;
+    cfg5.contas_arquivo = cfg5.contas_arquivo.filter((x) => x.id !== contaId);
+    d2.config_banco = cfg5;
     registrar(d2, usuario, "Exclusão", "banco", null, `Conta de outro banco "${conta.apelido}" (${contaId}) tirada`, { conta: { de: conta, para: null } });
   }
   function bancoAtivo(d2) {
-    const cfg4 = configBanco(d2);
-    return !!(cfg4.ativo && cfg4.contas.length);
+    const cfg5 = configBanco(d2);
+    return !!(cfg5.ativo && cfg5.contas.length);
   }
   function motivoBancoInativo(d2) {
-    const cfg4 = configBanco(d2);
-    if (!cfg4.contas.length) return "Aguardando as chaves de acesso do C6: cadastre as contas em Dados e backup (Banco C6)";
-    if (!cfg4.ativo) return "Integração com o C6 desligada: ative em Dados e backup (Banco C6)";
+    const cfg5 = configBanco(d2);
+    if (!cfg5.contas.length) return "Aguardando as chaves de acesso do C6: cadastre as contas em Dados e backup (Banco C6)";
+    if (!cfg5.ativo) return "Integração com o C6 desligada: ative em Dados e backup (Banco C6)";
     return "";
   }
   function salvarConfigBanco(d2, dados, usuario) {
@@ -9563,15 +9571,15 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return novo;
   }
   function salvarContaBanco(d2, dados, usuario) {
-    const cfg4 = configBanco(d2);
+    const cfg5 = configBanco(d2);
     const id = limparId(dados.id);
     if (!id) throw new Error("Informe o identificador da conta na ponte (só letras e números, ex.: ank).");
     if (contasSoArquivo(d2).some((x) => x.id === id)) throw new ErroUsuario(`O código "${id}" já é de uma conta de outro banco (extrato por arquivo). Use outro código.`);
     const emitenteId = dados.emitente_id ? Number(dados.emitente_id) : null;
     if (!emitenteId || !buscar(d2, "emitentes", emitenteId)) throw new Error("Escolha a empresa dona da conta.");
-    const outra = cfg4.contas.find((x) => x.id !== id && x.emitente_id === emitenteId);
+    const outra = cfg5.contas.find((x) => x.id !== id && x.emitente_id === emitenteId);
     if (outra) throw new Error(`A empresa já está ligada à conta "${outra.id}".`);
-    const antes = cfg4.contas.find((x) => x.id === id) || null;
+    const antes = cfg5.contas.find((x) => x.id === id) || null;
     const ou2 = (k, conv) => dados[k] === void 0 && antes ? antes[k] : conv(dados[k]);
     const ambiente = ou2("ambiente", (v) => v === "producao" ? "producao" : "sandbox");
     const tipo = "EVP";
@@ -9606,26 +9614,26 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       notificar,
       negativacao: { ativa: dados.negativacao_ativa === void 0 ? antes ? !!antes.negativacao.ativa : false : marcado2(dados.negativacao_ativa), dias_atraso: diasNeg }
     };
-    cfg4.contas = antes ? cfg4.contas.map((x) => x.id === id ? conta : x) : [...cfg4.contas, conta];
-    if (!cfg4.conta_padrao_id) cfg4.conta_padrao_id = id;
-    d2.config_banco = cfg4;
+    cfg5.contas = antes ? cfg5.contas.map((x) => x.id === id ? conta : x) : [...cfg5.contas, conta];
+    if (!cfg5.conta_padrao_id) cfg5.conta_padrao_id = id;
+    d2.config_banco = cfg5;
     registrar(d2, usuario, antes ? "Alteração" : "Inclusão", "banco", null, `Conta bancária "${conta.apelido}" (${id}) ${antes ? "alterada" : "incluída"} na integração C6`, { conta: { de: antes, para: conta } });
     return conta;
   }
   function excluirContaBanco(d2, contaId, usuario) {
-    const cfg4 = configBanco(d2);
-    const conta = cfg4.contas.find((x) => x.id === contaId);
+    const cfg5 = configBanco(d2);
+    const conta = cfg5.contas.find((x) => x.id === contaId);
     if (!conta) throw new Error("Conta não encontrada.");
     if (d2.cobrancas.some((cb) => cb.banco && cb.banco.conta_id === contaId && cb.banco.situacao === "emitido")) throw new Error("Há boletos emitidos nesta conta ainda em aberto no banco. Cancele-os ou aguarde o pagamento antes de tirar a conta.");
-    cfg4.contas = cfg4.contas.filter((x) => x.id !== contaId);
-    if (cfg4.conta_padrao_id === contaId) cfg4.conta_padrao_id = cfg4.contas.length ? cfg4.contas[0].id : "";
-    if (!cfg4.contas.length) cfg4.ativo = false;
-    d2.config_banco = cfg4;
+    cfg5.contas = cfg5.contas.filter((x) => x.id !== contaId);
+    if (cfg5.conta_padrao_id === contaId) cfg5.conta_padrao_id = cfg5.contas.length ? cfg5.contas[0].id : "";
+    if (!cfg5.contas.length) cfg5.ativo = false;
+    d2.config_banco = cfg5;
     registrar(d2, usuario, "Exclusão", "banco", null, `Conta bancária "${conta.apelido}" (${contaId}) tirada da integração C6`, { conta: { de: conta, para: null } });
   }
   function contaEmissora(d2) {
-    const cfg4 = configBanco(d2);
-    return cfg4.contas.find((x) => x.id === cfg4.conta_padrao_id) || cfg4.contas[0] || null;
+    const cfg5 = configBanco(d2);
+    return cfg5.contas.find((x) => x.id === cfg5.conta_padrao_id) || cfg5.contas[0] || null;
   }
   function contasDoImovel(d2, cb) {
     const c = buscar(d2, "contratos", cb.contrato_id);
@@ -9699,13 +9707,13 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return conta.notificar || CONTA_BANCO_PADRAO.notificar;
   }
   function notificacoesDoPagador(conta, c) {
-    const cfg4 = notificacaoDoContrato(conta, c);
-    if (!cfg4) return [];
-    const destinos = { email: cfg4.email ? String(c.inquilino_email || "").trim() : "", sms: cfg4.sms ? String(c.inquilino_telefone || "").replace(/\D/g, "") : "" };
+    const cfg5 = notificacaoDoContrato(conta, c);
+    if (!cfg5) return [];
+    const destinos = { email: cfg5.email ? String(c.inquilino_email || "").trim() : "", sms: cfg5.sms ? String(c.inquilino_telefone || "").replace(/\D/g, "") : "" };
     const r = [];
     for (const [canal, destino] of Object.entries(destinos)) {
       if (!destino) continue;
-      for (const [k, [momento]] of Object.entries(MOMENTOS_NOTIFICACAO)) if (cfg4[k]) r.push({ [NOTIFICACAO.canal]: NOTIFICACAO.canais[canal], [NOTIFICACAO.destino]: destino, [NOTIFICACAO.momento]: NOTIFICACAO.momentos[momento] });
+      for (const [k, [momento]] of Object.entries(MOMENTOS_NOTIFICACAO)) if (cfg5[k]) r.push({ [NOTIFICACAO.canal]: NOTIFICACAO.canais[canal], [NOTIFICACAO.destino]: destino, [NOTIFICACAO.momento]: NOTIFICACAO.momentos[momento] });
     }
     return r;
   }
@@ -11479,8 +11487,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return { semDestino: movs2.filter((m) => !m.classificacao).length, semComprovante, contasSemImportar: porConta.filter((x) => x.semImportar).map((x) => x.id), pagamentosPendentes, porConta, mesFechado: mesFechado2 };
   }
   function alertaBanco(d2, hoje3 = hojeIso()) {
-    const cfg4 = d2.config_banco || {};
-    if (!cfg4.ativo) return null;
+    const cfg5 = d2.config_banco || {};
+    if (!cfg5.ativo) return null;
     const limite = somarDias(hoje3, -regra("dias_alerta_banco"));
     const semDestino = (d2.movimentacoes_banco || []).filter((m) => !m.classificacao && m.data <= limite);
     const semComprovante = (d2.movimentacoes_banco || []).filter((m) => m.classificacao && m.classificacao !== "ignorar" && !m.comprovante && !m.comprovante_contador && m.data <= limite);
@@ -11993,6 +12001,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         solicitacoes: "Solicitação do inquilino",
         notificacoes: "Notificação ao inquilino",
         fichas: "Ficha em análise",
+        comunicados: "Comunicado aos inquilinos",
         indices_acumulados: "Índice acumulado em 12 meses",
         cartas_reajuste: "Carta de reajuste",
         modelos_contrato: "Modelo de contrato",
@@ -13301,11 +13310,11 @@ ${xref}
     await lembrarPasta(handle);
     return handle;
   }
-  async function temPermissao(handle, pedir2 = false) {
+  async function temPermissao(handle, pedir3 = false) {
     const opcoes2 = { mode: "readwrite" };
     if (!handle.queryPermission) return true;
     if (await handle.queryPermission(opcoes2) === "granted") return true;
-    return pedir2 && await handle.requestPermission(opcoes2) === "granted";
+    return pedir3 && await handle.requestPermission(opcoes2) === "granted";
   }
   async function arquivoExiste(dir, nome) {
     try {
@@ -13827,14 +13836,14 @@ ${naoIncluidos.join("\r\n")}\r
     local = { ponte_url: "", senha_ponte: "" };
     if (typeof indexedDB !== "undefined") await esquecerPonte();
   }
-  function urlDaPonte(cfg4, caminho) {
-    const base = String(cfg4.ponte_url || "").trim().replace(/\/+$/, "");
+  function urlDaPonte(cfg5, caminho) {
+    const base = String(cfg5.ponte_url || "").trim().replace(/\/+$/, "");
     if (!base) throw new Error("Falta o endereço e a senha da ponte neste computador (Dados e backup → Banco C6).");
     return `${base}${caminho.startsWith("/") ? "" : "/"}${caminho}`;
   }
   async function chamarPonteCrua(metodo, caminho, corpo = null, opcoes2 = {}) {
-    const cfg4 = ponteLocal();
-    const url = urlDaPonte(cfg4, caminho);
+    const cfg5 = ponteLocal();
+    const url = urlDaPonte(cfg5, caminho);
     const f = opcoes2.fetch || fetch;
     const controlador = typeof AbortController === "function" ? new AbortController() : null;
     const timer = controlador ? setTimeout(() => controlador.abort(), opcoes2.tempoLimite || TEMPO_LIMITE_MS) : null;
@@ -13844,12 +13853,12 @@ ${naoIncluidos.join("\r\n")}\r
         method: metodo,
         mode: "cors",
         signal: controlador ? controlador.signal : void 0,
-        headers: { Accept: "application/json", ...corpo !== null ? { "Content-Type": "application/json" } : {}, ...cfg4.senha_ponte ? { [CABECALHO_SENHA]: cfg4.senha_ponte } : {} },
+        headers: { Accept: "application/json", ...corpo !== null ? { "Content-Type": "application/json" } : {}, ...cfg5.senha_ponte ? { [CABECALHO_SENHA]: cfg5.senha_ponte } : {} },
         body: corpo !== null ? JSON.stringify(corpo) : void 0
       });
     } catch (e) {
-      if (e && e.name === "AbortError") throw new ErroPonte(`A ponte em ${cfg4.ponte_url} não respondeu a tempo. Confira se ela está ligada e se o banco está no ar.`);
-      throw new ErroPonte(`Não consegui falar com a ponte em ${cfg4.ponte_url}. Ela está ligada neste computador? (${e && e.message ? e.message : e})`);
+      if (e && e.name === "AbortError") throw new ErroPonte(`A ponte em ${cfg5.ponte_url} não respondeu a tempo. Confira se ela está ligada e se o banco está no ar.`);
+      throw new ErroPonte(`Não consegui falar com a ponte em ${cfg5.ponte_url}. Ela está ligada neste computador? (${e && e.message ? e.message : e})`);
     } finally {
       if (timer) clearTimeout(timer);
     }
@@ -17093,22 +17102,22 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     }
     return out;
   }
-  async function taxasDosDias(dias, { guardadas = {}, buscar: buscar3 = fetch, guardar = null } = {}) {
-    const faltam = dias.filter((p2) => !Number.isFinite(guardadas[p2]));
-    if (!faltam.length) return guardadas;
+  async function taxasDosDias(dias, { guardadas: guardadas2 = {}, buscar: buscar3 = fetch, guardar = null } = {}) {
+    const faltam = dias.filter((p2) => !Number.isFinite(guardadas2[p2]));
+    if (!faltam.length) return guardadas2;
     const trazidas2 = await taxasPoupanca(faltam[0], faltam[faltam.length - 1], buscar3);
     const novas = {};
-    for (const [dia, t] of Object.entries(trazidas2)) if (!Number.isFinite(guardadas[dia])) novas[dia] = t;
+    for (const [dia, t] of Object.entries(trazidas2)) if (!Number.isFinite(guardadas2[dia])) novas[dia] = t;
     if (guardar && Object.keys(novas).length) {
       try {
         await guardar(novas);
       } catch {
       }
     }
-    return { ...novas, ...guardadas };
+    return { ...novas, ...guardadas2 };
   }
-  async function poupancaDaGarantia(movimentos, ate, buscar3 = fetch, { guardadas = {}, guardar = null } = {}) {
-    const taxas = await taxasDosDias(diasDaPoupanca(movimentos, ate), { guardadas, buscar: buscar3, guardar });
+  async function poupancaDaGarantia(movimentos, ate, buscar3 = fetch, { guardadas: guardadas2 = {}, guardar = null } = {}) {
+    const taxas = await taxasDosDias(diasDaPoupanca(movimentos, ate), { guardadas: guardadas2, buscar: buscar3, guardar });
     return corrigirPelaPoupanca(movimentos, ate, taxas);
   }
   function corrigirGarantiasPorEmpresa(garantias, ate, taxas = {}) {
@@ -17133,9 +17142,9 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
     const semAplicar = garantias.semAplicar.map((x) => proporcional(x.falta, doContrato(x)));
     return { contratos, lugares, semAplicar, aplicado, faltaAplicar: semAplicar.reduce((s, v) => s + v, 0), falta: [...falta].sort() };
   }
-  async function garantiasCorrigidasHoje(garantias, ate, buscar3 = fetch, { guardadas = {}, guardar = null } = {}) {
+  async function garantiasCorrigidasHoje(garantias, ate, buscar3 = fetch, { guardadas: guardadas2 = {}, guardar = null } = {}) {
     const movimentos = [...garantias.lugares.flatMap((l) => l.itens), ...garantias.semAplicar].flatMap((x) => x.movimentos);
-    const taxas = await taxasDosDias(diasDaPoupanca(movimentos, ate), { guardadas, buscar: buscar3, guardar });
+    const taxas = await taxasDosDias(diasDaPoupanca(movimentos, ate), { guardadas: guardadas2, buscar: buscar3, guardar });
     return corrigirGarantiasPorEmpresa(garantias, ate, taxas);
   }
   var SERIE_POUPANCA, trazidas, consultados;
@@ -19509,7 +19518,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
     for (let i = 0; i < bytes2.length; i += 32768) s += String.fromCharCode.apply(null, bytes2.subarray(i, i + 32768));
     return btoa(s);
   }
-  async function enviarEmail({ para, cco = "", assunto, texto: texto3, anexos = [] } = {}) {
+  async function enviarEmail({ para, cco = "", assunto, texto: texto3, anexos = [], html = "", imagens = [] } = {}) {
     if (!String(para || "").trim()) throw new ErroUsuario("Informe o e-mail do destinatário.");
     const total = anexos.reduce((s, a) => s + (a?.blob?.size || 0), 0);
     if (total > MAX_BYTES_ANEXOS) throw new ErroUsuario(`Anexos passam de ${MAX_BYTES_ANEXOS / 1048576} MB.`);
@@ -19527,7 +19536,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
         credentials: "same-origin",
         signal: limiteDeTempo(TEMPO_ENVIO),
         headers: { "Content-Type": "application/json", "X-Sistema": "imoveis" },
-        body: JSON.stringify({ para: String(para), cco: String(cco || ""), assunto: String(assunto || ""), texto: String(texto3 || ""), anexos: lista3 })
+        body: JSON.stringify({ para: String(para), cco: String(cco || ""), assunto: String(assunto || ""), texto: String(texto3 || ""), anexos: lista3, ...html ? { html: String(html), imagens } : {} })
       });
     } catch (e) {
       if (e?.name === "TimeoutError") throw new ErroUsuario("A nuvem demorou demais para responder. Confira na pasta Enviados do Gmail antes de mandar de novo.");
@@ -21874,7 +21883,7 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
     <label style="margin:0">até</label><input type="date" name="ate" value="${esc(filtro.ate)}" style="width:160px">
     <label style="margin:0">Pessoa</label><select name="quem" style="width:auto"><option value="">Todas</option>${(r.emails || []).map((e) => `<option${e === filtro.email ? " selected" : ""}>${esc(e)}</option>`).join("")}</select>
     <button class="secundario">Ver</button>${filtro.de || filtro.ate || filtro.email ? ` ${link("#/acessos", "Limpar")}` : ""}</form>`;
-    const resumo2 = (r.resumo || []).map((x) => `<tr><td>${esc(x.email)}</td><td class="n">${x.acessos}</td><td class="n">${tamanho(x.bytes)}${x.bytes > MUITO ? ` ${etiqueta("muito", "aviso")}` : ""}</td><td class="n">${x.recusados ? etiqueta(String(x.recusados), "perigo") : "0"}</td></tr>`).join("");
+    const resumo3 = (r.resumo || []).map((x) => `<tr><td>${esc(x.email)}</td><td class="n">${x.acessos}</td><td class="n">${tamanho(x.bytes)}${x.bytes > MUITO ? ` ${etiqueta("muito", "aviso")}` : ""}</td><td class="n">${x.recusados ? etiqueta(String(x.recusados), "perigo") : "0"}</td></tr>`).join("");
     const linhas2 = (r.acessos || []).map((a) => `<tr><td class="nw">${esc(dataHoraBr(a.em))}</td><td>${esc(a.email)}</td><td>${esc(descreverAcesso(a.rota))} ${resultadoDoAcesso(a.resultado)}</td>
     <td class="n">${tamanho(a.bytes)}</td><td>${a.origem === "pc" ? "Programa do PC" : "Site"}${a.ip ? `<br><span class="suave">${esc(a.ip)}</span>` : ""}</td></tr>`).join("");
     const ultimo = (r.acessos || []).at(-1);
@@ -21884,7 +21893,7 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
       <p class="suave">Use para conferir se alguém baixou dados demais ou tentou entrar sem poder (linhas "Recusado"). Abrir telas e listas de anexos não entra.</p></div>
     ${form}
     <div class="cartao"><h2>Por pessoa${filtro.de || filtro.ate ? " no período" : ""}</h2>
-      ${resumo2 ? `<table><tr><th>Pessoa</th><th class="n">Acessos</th><th class="n">Baixou ou enviou</th><th class="n">Recusados</th></tr>${resumo2}</table>` : '<p class="suave">Nenhum acesso anotado.</p>'}</div>
+      ${resumo3 ? `<table><tr><th>Pessoa</th><th class="n">Acessos</th><th class="n">Baixou ou enviou</th><th class="n">Recusados</th></tr>${resumo3}</table>` : '<p class="suave">Nenhum acesso anotado.</p>'}</div>
     <div class="cartao"><h2>Acessos${filtro.antes ? " (mais antigos)" : ""}</h2>
       ${linhas2 ? `<div class="rolagem"><table><tr><th>Quando</th><th>Quem</th><th>O quê</th><th class="n">Tamanho</th><th>De onde</th></tr>${linhas2}</table></div>${mais}` : '<p class="suave">Nenhum acesso anotado.</p>'}</div>`;
   }
@@ -23103,24 +23112,24 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
   }
   function caixaContaDosBoletos() {
     if (!podeUsuario("admin")) return "";
-    const cfg4 = configBanco(d());
+    const cfg5 = configBanco(d());
     const emissora = contaEmissora(d());
     const nomeEmp = (x) => esc((buscar2("emitentes", x.emitente_id) || {}).nome || x.apelido);
     return `<div class="cartao" id="conta-boletos"><h2>Emissão de boletos no banco (C6)</h2>
-    ${cfg4.contas.length ? `<form data-form="modoContaBoleto" class="formulario">
-      <div class="largo"><label class="check-mini"><input type="radio" name="modo" value="padrao" ${cfg4.modo_conta_boleto !== "escolher" ? "checked" : ""}> Sempre pela empresa padrão:</label>
-        <select name="conta_padrao_id" style="width:auto;margin-left:8px">${cfg4.contas.map((x) => `<option value="${esc(x.id)}" ${(emissora || {}).id === x.id ? "selected" : ""}>${nomeEmp(x)} (conta ${esc(x.apelido)})</option>`).join("")}</select></div>
-      <div class="largo"><label class="check-mini"><input type="radio" name="modo" value="escolher" ${cfg4.modo_conta_boleto === "escolher" ? "checked" : ""}> Escolher a empresa boleto a boleto</label>
+    ${cfg5.contas.length ? `<form data-form="modoContaBoleto" class="formulario">
+      <div class="largo"><label class="check-mini"><input type="radio" name="modo" value="padrao" ${cfg5.modo_conta_boleto !== "escolher" ? "checked" : ""}> Sempre pela empresa padrão:</label>
+        <select name="conta_padrao_id" style="width:auto;margin-left:8px">${cfg5.contas.map((x) => `<option value="${esc(x.id)}" ${(emissora || {}).id === x.id ? "selected" : ""}>${nomeEmp(x)} (conta ${esc(x.apelido)})</option>`).join("")}</select></div>
+      <div class="largo"><label class="check-mini"><input type="radio" name="modo" value="escolher" ${cfg5.modo_conta_boleto === "escolher" ? "checked" : ""}> Escolher a empresa boleto a boleto</label>
         <div class="ajuda">Ao emitir, o sistema pergunta sempre a conta, mesmo quando o imóvel tem uma só empresa (ela já vem marcada; senão, a padrão). Em "Emitir todos do mês", pergunta uma vez para o lote.</div></div>
       <div class="acoes" style="align-self:end"><button class="secundario">Salvar</button></div></form>
       <p class="suave">Com a empresa padrão, todos os boletos saem pela conta dela, mesmo quando o imóvel é dividido com outra empresa.</p>` : '<p class="suave">Nenhuma conta bancária cadastrada ainda: cadastre as contas em <a href="#/dados?ir=banco">Dados e backup → Banco (C6)</a>.</p>'}</div>`;
   }
   function caixaConfigBanco() {
     if (!podeUsuario("admin")) return "";
-    const cfg4 = configuracaoBanco(d());
+    const cfg5 = configuracaoBanco(d());
     const emitentes = ordenar(d().emitentes.filter((e) => e.ativo !== false), "nome");
     const nomeEmp = (id) => esc((buscar2("emitentes", id) || {}).nome || "(empresa excluída)");
-    const situacao2 = cfg4.contas.length ? cfg4.ativo ? ponteLocal().configurada ? etiqueta("Ativa", "ok") : etiqueta("Ativa · falta a ponte neste computador", "aviso") : etiqueta("Desligada", "neutra") : etiqueta("Aguardando as chaves de acesso do C6", "aviso");
+    const situacao2 = cfg5.contas.length ? cfg5.ativo ? ponteLocal().configurada ? etiqueta("Ativa", "ok") : etiqueta("Ativa · falta a ponte neste computador", "aviso") : etiqueta("Desligada", "neutra") : etiqueta("Aguardando as chaves de acesso do C6", "aviso");
     const padrao = CONTA_BANCO_PADRAO;
     const emissora = contaEmissora(d());
     const resumoNotif = (x) => {
@@ -23135,12 +23144,12 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
       <div><label>Endereço da ponte (neste computador)</label><input name="ponte_url" value="${esc(ponteLocal().configurada ? ponteLocal().ponte_url : "")}" placeholder="http://localhost:8765"><div class="ajuda">O técnico informa este endereço ao instalar a ponte</div></div>
       <div><label>Senha da ponte (neste computador)</label><input type="password" name="senha_ponte" value="${esc(ponteLocal().senha_ponte)}" autocomplete="off"><div class="ajuda">A senha combinada com o técnico ao instalar a ponte</div></div>
       <div class="largo ajuda">O endereço e a senha ficam <b>só neste computador</b> (não vão para a nuvem nem para o arquivo de dados): informe nos dois campos em cada computador que vai usar o banco.${ponteLocal().configurada ? "" : " <b>Ainda não informados aqui.</b>"}</div>
-      <div class="check"><label class="check-mini"><input type="checkbox" name="ativo" value="1" ${marcado(cfg4.ativo)} ${cfg4.contas.length ? "" : 'disabled title="Cadastre uma conta antes"'}> Integração ativa (liga os botões "Emitir no C6")</label></div>
+      <div class="check"><label class="check-mini"><input type="checkbox" name="ativo" value="1" ${marcado(cfg5.ativo)} ${cfg5.contas.length ? "" : 'disabled title="Cadastre uma conta antes"'}> Integração ativa (liga os botões "Emitir no C6")</label></div>
       <div class="acoes" style="align-self:end"><button class="secundario">Salvar</button> ${botao("testarPonteC6", "Testar conexão", {}, "secundario")}${ponteLocal().configurada ? ` ${botao("esquecerPonteC6", "Esquecer a ponte neste computador", {}, "perigo", "Apagar o endereço e a senha da ponte guardados neste computador? Os botões do banco param de funcionar aqui até informar os dois de novo.")}` : ""}</div></form>
     <div id="saude-ponte"></div>
     <h3>Contas bancárias (uma por empresa)</h3>
     <div class="rolagem"><table><tr><th>Código da conta</th><th>Apelido</th><th>Empresa dona da conta</th><th>Teste ou de verdade</th><th>Chave Pix</th><th>Avisos ao inquilino</th><th>Negativação</th><th></th></tr>
-      ${cfg4.contas.map((x) => `<tr><td><code>${esc(x.id)}</code></td><td><b>${esc(x.apelido)}</b>${(emissora || {}).id === x.id ? ` ${etiqueta("padrão dos boletos", "info")}` : ""}</td><td>${nomeEmp(x.emitente_id)}</td><td>${x.ambiente === "producao" ? "Cobrança de verdade" : etiqueta("Teste do banco", "aviso")}<br><span class="suave">carteira ${esc(carteiraDaConta(x))}</span>${x.desconto_conferido && x.desconto_conferido.tipo === x.tipo_desconto ? `<br><span class="suave">desconto conferido em ${dataBr(x.desconto_conferido.em)}</span>` : x.ambiente === "producao" ? `<br>${etiqueta("desconto não conferido: boleto com bonificação não sai", "perigo")}` : '<br><span class="suave">desconto: conferir no boleto de teste</span>'}</td>
+      ${cfg5.contas.map((x) => `<tr><td><code>${esc(x.id)}</code></td><td><b>${esc(x.apelido)}</b>${(emissora || {}).id === x.id ? ` ${etiqueta("padrão dos boletos", "info")}` : ""}</td><td>${nomeEmp(x.emitente_id)}</td><td>${x.ambiente === "producao" ? "Cobrança de verdade" : etiqueta("Teste do banco", "aviso")}<br><span class="suave">carteira ${esc(carteiraDaConta(x))}</span>${x.desconto_conferido && x.desconto_conferido.tipo === x.tipo_desconto ? `<br><span class="suave">desconto conferido em ${dataBr(x.desconto_conferido.em)}</span>` : x.ambiente === "producao" ? `<br>${etiqueta("desconto não conferido: boleto com bonificação não sai", "perigo")}` : '<br><span class="suave">desconto: conferir no boleto de teste</span>'}</td>
         <td>${x.chave_pix ? esc(x.chave_pix) : '<span class="suave">sem Pix</span>'}</td><td>${esc(resumoNotif(x))}</td><td>${x.negativacao.ativa ? `${x.negativacao.dias_atraso} dias de atraso` : '<span class="suave">desligada</span>'}</td>
         <td class="n nw">${botao("testarContaC6", "Testar conexão", { conta: x.id })} ${botao("editarContaBanco", "Editar", { conta: x.id })} ${botao("excluirContaBanco", "Tirar", { conta: x.id }, "perigo pequeno", `Tirar a conta "${x.apelido}" da integração?`)}</td></tr>`).join("") || '<tr><td colspan="8" class="suave">Nenhuma conta cadastrada. Cadastre abaixo uma conta por empresa, com o mesmo código que o técnico usou na ponte (ex.: loja1).</td></tr>'}</table></div>
     <details id="nova-conta-banco" class="caixa-historico"><summary><b>Incluir ou alterar uma conta</b> <span class="suave">· clique para expandir</span></summary>
@@ -23187,8 +23196,8 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
     const certificado = (c) => c.certificado_valido_ate ? ` · certificado válido até ${dataBr(c.certificado_valido_ate)}${c.certificado_dias !== null && c.certificado_dias <= 30 ? ` ${etiqueta(c.certificado_dias < 0 ? "vencido" : `vence em ${c.certificado_dias} dia(s)`, "perigo")}` : ""}` : "";
     const escopos = (c) => c.escopos && c.escopos.length ? ` · <span title="${esc(c.escopos.join(" "))}">${c.escopos.length} permissão(ões) do banco</span>` : "";
     const linhaConta = (c) => `<li><b>${esc(c.id)}</b> (${c.ambiente === "producao" ? "cobrança de verdade" : "teste do banco"}): ${c.simulado ? etiqueta("modo simulado", "aviso") : c.configurado ? `${etiqueta("chaves ok", "ok")} · entrada no banco ${c.token === "ok" ? etiqueta("ok", "ok") : c.token === "falhou" ? `${etiqueta("falhou", "perigo")} ${esc(c.erro_token || "")}` : etiqueta("não testada", "neutra")}${escopos(c)}` : `${etiqueta("faltam as chaves", "aviso")} ${esc((c.faltam || []).join(", "))}`}${certificado(c)}${(c.avisos || []).map((a) => ` <span class="suave">${esc(a)}</span>`).join("")}</li>`;
-    const cfg4 = configuracaoBanco(d());
-    const semNaPonte = contaId ? [] : cfg4.contas.filter((x) => !contas2[x.id]).map((x) => x.id);
+    const cfg5 = configuracaoBanco(d());
+    const semNaPonte = contaId ? [] : cfg5.contas.filter((x) => !contas2[x.id]).map((x) => x.id);
     return `<div class="alerta ${s.simulado ? "aviso" : s.configurado ? "ok" : "info"}"><b>Ponte respondeu</b>${s.versao ? ` (versão ${esc(s.versao)})` : ""}${s.simulado ? ": <b>modo simulado</b>, os boletos emitidos são fictícios" : s.configurado ? ": pronta para falar com o banco" : ": ainda falta configurar"}${s.senha_exigida === false ? " · <b>sem senha na ponte</b> (peça ao técnico para pôr uma senha nela)" : ""}.
     <ul style="margin:6px 0 0">${Object.values(contas2).map(linhaConta).join("") || "<li>Nenhuma conta na ponte: peça ao técnico para cadastrar nela as contas, com os mesmos códigos daqui.</li>"}</ul>
     ${semNaPonte.length ? `<p style="margin:6px 0 0">Contas cadastradas aqui mas não na ponte: <b>${semNaPonte.map(esc).join(", ")}</b>.</p>` : ""}</div>`;
@@ -24376,15 +24385,15 @@ ${xref}
   }
   function caixaConfigBanco2() {
     if (!podeUsuario("admin")) return "";
-    const cfg4 = { ...CONFIG_BANCO_FASE2, ...config() };
+    const cfg5 = { ...CONFIG_BANCO_FASE2, ...config() };
     return `<div class="cartao" id="config-banco2"><h2>Banco: conciliação e pagamentos</h2>
     <p class="suave">Como o extrato do C6 é casado com os boletos, onde ficam os comprovantes e se o sistema pode preparar pagamentos (que só acontecem depois da aprovação no app do C6). As chaves de acesso e as contas ficam na caixa "Banco (C6)". Os prazos (quantos dias depois do vencimento a entrada ainda casa com o boleto, pagamento adiantado, alerta) ficam em ${link("#/regras", "Regras do sistema", "")}.</p>
     <form data-form="configBanco2" class="formulario">
-      <div class="check largo"><label><input type="checkbox" name="permitir_pagamentos" value="1" ${cfg4.permitir_pagamentos ? "checked" : ""}> Permitir preparar pagamentos pelo banco (caixa "Pagar pelo banco" nas contas do imóvel)</label></div>
-      <div><label>Limite por pagamento (R$)</label><input name="limite_pagamento" data-dinheiro inputmode="decimal" value="${cfg4.limite_pagamento ? esc(reais(cfg4.limite_pagamento, false)) : ""}" placeholder="sem limite"><div class="ajuda">Em branco ou 0,00 = sem limite. Ex.: 5.000,00 recusa um pagamento de R$ 5.000,01.</div></div>
-      <div><label>Pasta do contador</label><input name="pasta_contador" value="${esc(cfg4.pasta_contador)}"><div class="ajuda">Dentro de "arquivos": ${esc(cfg4.pasta_contador)}/Empresa/AAAA-MM. Sem acento.</div></div>
-      <div class="largo"><label>Modelo do nome do comprovante</label><input name="modelo_nome_comprovante" value="${esc(cfg4.modelo_nome_comprovante)}"><div class="ajuda">Campos entre chaves: {data} {empresa} {imovel} {tipo} {valor} {mes} {contrapartida}. Ex.: "2026-11-05 ANK Loja 1 Agua 123,45.pdf".</div></div>
-      <div class="check"><label><input type="checkbox" name="copiar_para_contador" value="1" ${cfg4.copiar_para_contador !== false ? "checked" : ""}> Guardar também uma cópia na pasta do contador</label></div>
+      <div class="check largo"><label><input type="checkbox" name="permitir_pagamentos" value="1" ${cfg5.permitir_pagamentos ? "checked" : ""}> Permitir preparar pagamentos pelo banco (caixa "Pagar pelo banco" nas contas do imóvel)</label></div>
+      <div><label>Limite por pagamento (R$)</label><input name="limite_pagamento" data-dinheiro inputmode="decimal" value="${cfg5.limite_pagamento ? esc(reais(cfg5.limite_pagamento, false)) : ""}" placeholder="sem limite"><div class="ajuda">Em branco ou 0,00 = sem limite. Ex.: 5.000,00 recusa um pagamento de R$ 5.000,01.</div></div>
+      <div><label>Pasta do contador</label><input name="pasta_contador" value="${esc(cfg5.pasta_contador)}"><div class="ajuda">Dentro de "arquivos": ${esc(cfg5.pasta_contador)}/Empresa/AAAA-MM. Sem acento.</div></div>
+      <div class="largo"><label>Modelo do nome do comprovante</label><input name="modelo_nome_comprovante" value="${esc(cfg5.modelo_nome_comprovante)}"><div class="ajuda">Campos entre chaves: {data} {empresa} {imovel} {tipo} {valor} {mes} {contrapartida}. Ex.: "2026-11-05 ANK Loja 1 Agua 123,45.pdf".</div></div>
+      <div class="check"><label><input type="checkbox" name="copiar_para_contador" value="1" ${cfg5.copiar_para_contador !== false ? "checked" : ""}> Guardar também uma cópia na pasta do contador</label></div>
       <div class="check"><button>Salvar</button></div></form></div>`;
   }
   function boletosAbertos(imovelId, m) {
@@ -25412,31 +25421,31 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     }
     return feitos;
   }
-  async function consultarCep(el, cfg4) {
+  async function consultarCep(el, cfg5) {
     const n = soDigitos(el.value);
     if (n.length !== 8) return;
     mensagemAuto(el, "Consultando o CEP…");
     try {
       const r = await (await buscarComLimite(`https://viacep.com.br/ws/${n}/json/`)).json();
       if (r.erro) return mensagemAuto(el, "CEP não encontrado.");
-      if (cfg4.linha) return enderecoNaLinha(el, cfg4, r);
-      const feitos = preencherVazios(el.form, { [cfg4.endereco]: r.logradouro ? `${r.logradouro}, ` : "", [cfg4.bairro]: r.bairro, [cfg4.cidade]: r.localidade });
-      const uf = cfg4.uf && el.form.querySelector(`[name="${cfg4.uf}"]`);
+      if (cfg5.linha) return enderecoNaLinha(el, cfg5, r);
+      const feitos = preencherVazios(el.form, { [cfg5.endereco]: r.logradouro ? `${r.logradouro}, ` : "", [cfg5.bairro]: r.bairro, [cfg5.cidade]: r.localidade });
+      const uf = cfg5.uf && el.form.querySelector(`[name="${cfg5.uf}"]`);
       if (uf && r.uf && uf.value !== r.uf) {
         uf.value = r.uf;
         feitos.push("Estado");
       }
       mensagemAuto(el, feitos.length ? `Preenchido pelo CEP: ${esc(feitos.join(", "))}. Complete o número.` : "CEP conferido.");
-      const end = el.form.querySelector(`[name="${cfg4.endereco}"]`);
+      const end = el.form.querySelector(`[name="${cfg5.endereco}"]`);
       if (feitos.length && end) end.focus();
     } catch (e) {
-      const uf = cfg4.uf && el.form.querySelector(`[name="${cfg4.uf}"]`);
+      const uf = cfg5.uf && el.form.querySelector(`[name="${cfg5.uf}"]`);
       if (uf && ufDoCep(n)) uf.value = ufDoCep(n);
       mensagemAuto(el, e && e.semResposta ? "A consulta do CEP ficou sem resposta, tente de novo (ou preencha à mão)." : "Não deu para consultar o CEP agora (sem internet?). Preencha à mão.");
     }
   }
-  function enderecoNaLinha(el, cfg4, r) {
-    const campo2 = el.form.querySelector(`[name="${el.name.replace(/cep_busca$/, "")}${cfg4.linha}"]`);
+  function enderecoNaLinha(el, cfg5, r) {
+    const campo2 = el.form.querySelector(`[name="${el.name.replace(/cep_busca$/, "")}${cfg5.linha}"]`);
     if (!campo2) return;
     if (campo2.value.trim()) return mensagemAuto(el, "O endereço já está preenchido e ficou como estava. Para usar o do CEP, apague o endereço e digite o CEP de novo.");
     const rua = r.logradouro ? `${r.logradouro}, ` : "";
@@ -25446,7 +25455,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     campo2.focus();
     campo2.setSelectionRange(rua.length, rua.length);
   }
-  async function consultarCnpj(el, cfg4) {
+  async function consultarCnpj(el, cfg5) {
     const n = soDigitos(el.value);
     if (n.length !== 14 || !cnpjValido(n)) return;
     mensagemAuto(el, "Consultando o CNPJ…");
@@ -25460,15 +25469,15 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       const unico = admins.length === 1 ? admins[0] : socios.length === 1 ? socios[0] : null;
       const tel = soDigitos(r.ddd_telefone_1 || "");
       const feitos = preencherVazios(el.form, {
-        [cfg4.razao]: r.razao_social,
-        [cfg4.nome]: cfg4.razao ? r.nome_fantasia || r.razao_social : r.razao_social,
-        [cfg4.fantasia]: r.nome_fantasia,
-        [cfg4.endereco]: endereco2,
-        [cfg4.sede]: endereco2,
-        [cfg4.uf]: r.uf,
-        [cfg4.telefone]: tel.length >= 10 ? mascarar("tel", tel) : "",
-        [cfg4.email]: String(r.email || "").toLowerCase(),
-        [cfg4.representante]: unico && unico.nome_socio ? titulo(unico.nome_socio) : ""
+        [cfg5.razao]: r.razao_social,
+        [cfg5.nome]: cfg5.razao ? r.nome_fantasia || r.razao_social : r.razao_social,
+        [cfg5.fantasia]: r.nome_fantasia,
+        [cfg5.endereco]: endereco2,
+        [cfg5.sede]: endereco2,
+        [cfg5.uf]: r.uf,
+        [cfg5.telefone]: tel.length >= 10 ? mascarar("tel", tel) : "",
+        [cfg5.email]: String(r.email || "").toLowerCase(),
+        [cfg5.representante]: unico && unico.nome_socio ? titulo(unico.nome_socio) : ""
       });
       mensagemAuto(el, `${esc(r.razao_social || "")}${r.descricao_situacao_cadastral ? ` · situação na Receita: <b>${esc(r.descricao_situacao_cadastral)}</b>` : ""}${feitos.length ? `<br>Preenchido: ${esc(feitos.join(", "))}.` : ""}${endereco2 && feitos.length ? '<br><b>Confira os acentos do endereço</b>: a Receita manda sem acento (ex.: "Sao Paulo" → "São Paulo"), e ele vai assim para a NF e o contrato.' : ""}`);
     } catch (e) {
@@ -25964,9 +25973,9 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
         const n = soDigitos(el.value);
         mensagemAuto(el, tipo !== "cep" && tipo !== "tel" && n ? `<span class="etiqueta ok">✓ ${n.length === 11 ? "CPF" : "CNPJ"} válido</span>` : "");
         if (el.dataset.preencher) {
-          const cfg4 = JSON.parse(el.dataset.preencher);
-          if (cfg4.fonte === "cep") consultarCep(el, cfg4);
-          else consultarCnpj(el, cfg4);
+          const cfg5 = JSON.parse(el.dataset.preencher);
+          if (cfg5.fonte === "cep") consultarCep(el, cfg5);
+          else consultarCnpj(el, cfg5);
         }
         if (el.hasAttribute("data-buscar-pessoa")) procurarPessoa(el);
       });
@@ -27454,7 +27463,7 @@ ${m.texto}
     const i = buscar2("imoveis", rota.partes[1]);
     if (!i) return naoEncontrado("Imóvel não encontrado", "#/imoveis", "Ver os imóveis");
     const outros = ordenar(d().imoveis.filter((x) => x.id !== i.id && x.modelo_vistoria), "nome");
-    const resumo2 = lerModeloVistoria(i.modelo_vistoria);
+    const resumo3 = lerModeloVistoria(i.modelo_vistoria);
     const voltar = /^#\/vistoria\//.test(rota.q.voltar || "") ? rota.q.voltar : `#/imovel/${i.id}`;
     return `<p class="suave"><a href="${esc(voltar)}">← ${voltar.startsWith("#/vistoria/") ? "Voltar para a vistoria" : esc(i.nome)}</a></p>
     <h1>Modelo de vistoria · ${esc(i.nome)}</h1>
@@ -27466,7 +27475,7 @@ ${m.texto}
       ${outros.length ? `<div class="acoes" style="margin:8px 0"><label style="margin:0">Copiar de outro imóvel</label><select name="copiar_de" style="width:auto">${outros.map((x) => `<option value="${x.id}">${esc(x.nome)}</option>`).join("")}</select>
         <button type="button" class="secundario pequeno" data-acao="copiarModeloVistoria">Copiar</button></div>` : ""}
       <textarea name="modelo" class="texto-modelo">${esc(i.modelo_vistoria || "")}</textarea>
-      <p class="suave">${resumo2.length ? `Salvo: ${resumo2.length} cômodo(s), ${resumo2.reduce((t, x) => t + x.itens.length, 0)} itens.` : "Ainda sem modelo."}</p>
+      <p class="suave">${resumo3.length ? `Salvo: ${resumo3.length} cômodo(s), ${resumo3.reduce((t, x) => t + x.itens.length, 0)} itens.` : "Ainda sem modelo."}</p>
       <div class="acoes"><button>Salvar modelo</button><a class="botao secundario" href="${esc(voltar)}">Cancelar</a></div></form>`;
   }
   async function reduzirFoto(arquivo) {
@@ -28318,7 +28327,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     for (const l of links.filter((x) => !x.visto_em && ((x.respostas || []).length || (x.arquivos || []).length || x.desistiu_em))) atualizarLinkNaNuvem({ ficha_id: fichaId, pessoa: l.pessoa, visto: true }).catch(() => {
     });
   }
-  function desenharLinksDaFicha(caixa, links, marcar) {
+  function desenharLinksDaFicha(caixa, links, marcar2) {
     for (const l of links) {
       const el = caixa.querySelector(`[data-situacao-link="${l.pessoa}"]`);
       if (!el) continue;
@@ -28332,7 +28341,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     if (area && fichaAqui) {
       area.innerHTML = links.filter((l) => l.situacao !== "Encerrado" || (l.respostas || []).length).map((l) => blocoDoLink(fichaAqui, l)).join("");
       conferirArquivosDoLink(area, fichaAqui).catch((e) => console.warn("conferência dos arquivos do link", e));
-      if (marcar) marcarLinksVistos(fichaAqui.id, links);
+      if (marcar2) marcarLinksVistos(fichaAqui.id, links);
     }
   }
   async function linhaDoAvisoNoAparelho(el) {
@@ -28402,7 +28411,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const itens = [...area.querySelectorAll("[data-conferir]")];
     if (!itens.length) return;
     const pasta = await pastaDoEscopo("ficha", f.id, false);
-    const guardadas = (buscar2("fichas", f.id) || f).conferencias_link || {};
+    const guardadas2 = (buscar2("fichas", f.id) || f).conferencias_link || {};
     const novas = {};
     for (const li of itens) {
       const nome = li.dataset.conferir;
@@ -28411,7 +28420,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         try {
           const bytes2 = new Uint8Array(await (await abrirArquivo(pasta, nome)).arrayBuffer());
           const sha2562 = await resumoDoArquivo(bytes2);
-          const g = guardadas[nome];
+          const g = guardadas2[nome];
           const estado2 = situacaoDaConferencia(g, sha2562);
           const r = ["antiga", "compactado"].includes(estado2) ? g : await conferirArquivo(bytes2);
           let reg = g || null;
@@ -28791,6 +28800,710 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     }
   });
 
+  // docs/js/comunicados.js
+  function telefoneBr(t) {
+    const n = String(t || "").replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "");
+    if (n.length === 11) return `(${n.slice(0, 2)}) ${n.slice(2, 7)}-${n.slice(7)}`;
+    if (n.length === 10) return `(${n.slice(0, 2)}) ${n.slice(2, 6)}-${n.slice(6)}`;
+    return String(t || "");
+  }
+  function telefoneWhats(t) {
+    const n = String(t || "").replace(/\D/g, "");
+    return n.length >= 10 ? n.length <= 11 ? `55${n}` : n : "";
+  }
+  function empresasDoTopo(d2) {
+    const ativas = (d2.emitentes || []).filter((e) => e.ativo !== false);
+    const cidade = (ativas.find((e) => e.cidade_documentos) || {}).cidade_documentos || "";
+    const uf = (ativas.find((e) => e.uf_sede) || {}).uf_sede || "";
+    return {
+      nomes: ativas.map((e) => String(e.razao_social || e.nome || "").trim()).filter(Boolean),
+      cnpjs: ativas.map((e) => String(e.cnpj || "").trim()).filter(Boolean),
+      cidade: [cidade, uf].filter(Boolean).join("/"),
+      curto: ativas.map((e) => String(e.nome || e.razao_social || "").trim()).filter(Boolean).join(" e ")
+    };
+  }
+  function destinatarios(d2, hoje3 = hojeIso()) {
+    const lista3 = [];
+    const ativos = d2.contratos.filter((c) => contratoAtivo(c, hoje3)).map((c) => ({ c, i: c.imovel_id ? buscar(d2, "imoveis", c.imovel_id) : null })).sort((a, b) => String(a.i ? a.i.nome : "~").localeCompare(String(b.i ? b.i.nome : "~"), "pt-BR"));
+    for (const { c, i } of ativos) {
+      lista3.push({ chave: `c${c.id}`, tipo: "inquilino", contrato_id: c.id, fiador_id: null, nome: c.inquilino_nome, email: c.inquilino_email || "", telefone: c.inquilino_telefone || "", whatsapp: !!c.inquilino_whatsapp, imovel: i, contrato: c });
+      for (const f of fiadoresDo(d2, c.id, hoje3)) {
+        lista3.push({ chave: `f${f.id}`, tipo: "fiador", contrato_id: c.id, fiador_id: f.id, nome: f.nome, email: f.email || "", telefone: f.telefone || "", whatsapp: false, imovel: i, contrato: c });
+      }
+    }
+    return lista3;
+  }
+  function enderecoDoImovel(i) {
+    if (!i) return { longo: "", curto: "" };
+    const cidade = [i.cidade, i.uf].filter(Boolean).join("/");
+    return { longo: [enderecoCompleto(i), i.bairro, cidade].filter(Boolean).join(", "), curto: i.nome || enderecoCompleto(i) };
+  }
+  function camposDe(d2, com, p2, link2 = "") {
+    const e = empresasDoTopo(d2);
+    const end = enderecoDoImovel(p2.imovel);
+    return {
+      campos: {
+        nome: String(p2.nome || "").trim().split(/\s+/)[0],
+        nome_completo: p2.nome,
+        imovel: end.longo || end.curto,
+        imovel_curto: end.curto || end.longo,
+        locatario: p2.contrato ? p2.contrato.inquilino_nome : "",
+        prazo: dataBr(com.prazo),
+        link: link2,
+        email_empresa: com.email_empresa,
+        telefone_empresa: com.telefone_empresa,
+        empresas: e.curto || e.nomes.join(" e ")
+      },
+      condicoes: { fiador: p2.tipo === "fiador" }
+    };
+  }
+  function contextoDoLink(d2, com, p2, logo = "") {
+    const e = empresasDoTopo(d2);
+    const dados = camposDe(d2, com, p2);
+    const c = p2.contrato;
+    return {
+      empresas: e.nomes,
+      cnpjs: e.cnpjs,
+      cidade: e.cidade,
+      logo,
+      titulo: com.titulo,
+      nome: p2.nome,
+      tipo: p2.tipo,
+      imovel: dados.campos.imovel,
+      desde: c && c.data_entrada ? compBr(String(c.data_entrada).slice(0, 7)) : "",
+      locatario: p2.tipo === "fiador" && c ? c.inquilino_nome : "",
+      email: p2.email,
+      telefone: p2.telefone,
+      whatsapp: !!p2.whatsapp,
+      prazo: com.prazo,
+      aviso: preencher(com.aviso, dados),
+      ciencia: preencher(com.ciencia, dados),
+      email_empresa: com.email_empresa,
+      telefone_empresa: com.telefone_empresa
+    };
+  }
+  function linkDoCanal(url, canal) {
+    const s = String(url || "");
+    const i = s.indexOf("#");
+    if (i < 0) return s;
+    return `${s.slice(0, i)}?c=${canal === "whatsapp" ? "w" : "e"}${s.slice(i)}`;
+  }
+  function situacaoDe(x) {
+    if (!x) return { texto: "Sem link", cor: "neutra", peso: 4 };
+    if (x.confirmado_em) return { texto: "Confirmou", cor: "ok", peso: 0 };
+    if (x.aberto_em) return { texto: "Abriu, não confirmou", cor: "aviso", peso: 2 };
+    if (x.email_em || x.whats_em) return { texto: "Não abriu", cor: "perigo", peso: 1 };
+    return { texto: "Não enviado", cor: "neutra", peso: 3 };
+  }
+  function resumo2(com) {
+    const ds = com.destinos || [];
+    return {
+      total: ds.length,
+      confirmaram: ds.filter((x) => x.confirmado_em).length,
+      abriram: ds.filter((x) => x.aberto_em && !x.confirmado_em).length,
+      naoAbriram: ds.filter((x) => !x.aberto_em && !x.confirmado_em && (x.email_em || x.whats_em)).length,
+      naoEnviados: ds.filter((x) => !x.email_em && !x.whats_em && !x.confirmado_em).length,
+      mudaram: ds.filter((x) => x.resposta && x.resposta.mudou).length
+    };
+  }
+  function mudancaNoCadastro(d2, x) {
+    const r = x && x.resposta;
+    if (!r) return null;
+    const tel = telefoneBr(r.telefone);
+    const mesmoTel = (a) => String(a || "").replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "") === String(r.telefone || "").replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "");
+    if (x.tipo === "fiador") {
+      const f = buscar(d2, "fiadores", x.fiador_id);
+      if (!f) return null;
+      const dados2 = {};
+      if (String(f.email || "").trim().toLowerCase() !== r.email) dados2.email = r.email;
+      if (!mesmoTel(f.telefone)) dados2.telefone = tel;
+      return Object.keys(dados2).length ? { tabela: "fiadores", id: f.id, dados: dados2 } : null;
+    }
+    const c = buscar(d2, "contratos", x.contrato_id);
+    if (!c) return null;
+    const dados = {};
+    if (String(c.inquilino_email || "").trim().toLowerCase() !== r.email) dados.inquilino_email = r.email;
+    if (!mesmoTel(c.inquilino_telefone)) dados.inquilino_telefone = tel;
+    if (!!c.inquilino_whatsapp !== !!r.whatsapp) dados.inquilino_whatsapp = !!r.whatsapp;
+    return Object.keys(dados).length ? { tabela: "contratos", id: c.id, dados } : null;
+  }
+  function juntarRespostas(db, comId, links, usuario) {
+    const com = buscar(db, "comunicados", comId);
+    if (!com) return 0;
+    const porChave = new Map((links || []).map((l) => [l.destino, l]));
+    let mudaram = 0;
+    const destinos = (com.destinos || []).map((x) => {
+      const l = porChave.get(x.chave);
+      if (!l) return { ...x };
+      const novo = { ...x, aberto_em: l.aberto_em || x.aberto_em || null, aberturas: l.aberturas || x.aberturas || [] };
+      if (l.resposta && l.resposta.em !== (x.resposta && x.resposta.em)) {
+        novo.confirmado_em = l.resposta.em;
+        novo.resposta = { ...l.resposta };
+        novo.aplicado_em = null;
+      }
+      return novo;
+    });
+    for (const x of destinos) {
+      if (!x.resposta || x.aplicado_em) continue;
+      const m = mudancaNoCadastro(db, x);
+      x.resposta = { ...x.resposta, mudou: !!m };
+      if (m) {
+        atualizar(db, m.tabela, m.id, m.dados, usuario, `${x.nome}: contatos confirmados pelo link do comunicado "${com.titulo}"`);
+        mudaram += 1;
+      }
+      x.aplicado_em = (/* @__PURE__ */ new Date()).toISOString();
+    }
+    if (JSON.stringify(destinos) !== JSON.stringify(com.destinos)) atualizar(db, "comunicados", com.id, { destinos }, usuario, `Comunicado "${com.titulo}": respostas atualizadas`);
+    return mudaram;
+  }
+  function novoComunicado(d2, modelo, { prazo, email_empresa, telefone_empresa }, hoje3 = hojeIso()) {
+    const m = MODELOS[modelo];
+    if (!m) throw new ErroUsuario("Modelo de comunicado não encontrado.");
+    return {
+      modelo,
+      titulo: m.titulo,
+      assunto: m.assunto,
+      texto: m.texto,
+      whatsapp: m.whatsapp,
+      lembrete: m.lembrete,
+      aviso: m.aviso,
+      ciencia: m.ciencia,
+      prazo,
+      email_empresa,
+      telefone_empresa,
+      criado_em: (/* @__PURE__ */ new Date()).toISOString(),
+      destinos: destinatarios(d2, hoje3).map((p2) => ({ chave: p2.chave, tipo: p2.tipo, contrato_id: p2.contrato_id, fiador_id: p2.fiador_id, nome: p2.nome }))
+    };
+  }
+  function pessoaDoDestino(d2, x) {
+    const c = buscar(d2, "contratos", x.contrato_id);
+    if (!c) return null;
+    const i = c.imovel_id ? buscar(d2, "imoveis", c.imovel_id) : null;
+    if (x.tipo === "fiador") {
+      const f = buscar(d2, "fiadores", x.fiador_id);
+      if (!f) return null;
+      return { ...x, nome: f.nome, email: f.email || "", telefone: f.telefone || "", whatsapp: false, imovel: i, contrato: c };
+    }
+    return { ...x, nome: c.inquilino_nome, email: c.inquilino_email || "", telefone: c.inquilino_telefone || "", whatsapp: !!c.inquilino_whatsapp, imovel: i, contrato: c };
+  }
+  function htmlDoEmail(texto3, { empresas = [], cnpjs = [], cidade = "", link: link2 = "", logo = false, botao: botao2 = "Confirmar meus contatos", rodape = "" } = {}) {
+    const pars = String(texto3 || "").split(/\n{2,}/).map((p2) => p2.trim()).filter(Boolean);
+    const corpo = pars.map((p2) => {
+      if (link2 && p2 === link2) return `<p style="text-align:center;margin:22px 0"><a href="${escH(link2)}" style="background:#1e3a8a;color:#ffffff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold;display:inline-block">${escH(botao2)}</a></p>`;
+      if (/^Atenção/i.test(p2)) return `<p style="background:#fff7e6;border-left:4px solid #b45309;padding:10px 12px;color:#5c3b00">${escH(p2).replace(/\n/g, "<br>")}</p>`;
+      return `<p style="margin:0 0 14px">${escH(p2).replace(/\n/g, "<br>")}</p>`;
+    }).join("");
+    return `<!doctype html><html lang="pt-BR"><body style="margin:0;padding:0;background:#f4f5f7">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7"><tr><td align="center" style="padding:16px">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border:1px solid #d9dde3;border-radius:10px;font-family:Arial,Helvetica,sans-serif;color:#1f2933;font-size:15px;line-height:1.55">
+<tr><td style="background:#e8edfb;padding:16px 20px;border-radius:10px 10px 0 0">
+<table role="presentation" cellpadding="0" cellspacing="0"><tr>${logo ? '<td style="padding-right:14px"><img src="cid:logo" alt="Logo" style="max-height:56px;max-width:140px;display:block"></td>' : ""}
+<td><div style="font-weight:bold;color:#1e3a8a">${escH(empresas.join(" e "))}</div>${cnpjs.length ? `<div style="font-size:12px;color:#1e3a8a">CNPJ ${escH(cnpjs.join(" · "))}${cidade ? ` · ${escH(cidade)}` : ""}</div>` : ""}</td></tr></table></td></tr>
+<tr><td style="padding:20px">${corpo}</td></tr>
+<tr><td style="padding:12px 20px;border-top:1px solid #d9dde3;font-size:12px;color:#616e7c">${escH(rodape || [empresas.join(" e "), cnpjs.length ? `CNPJ ${cnpjs.join(" · ")}` : "", cidade].filter(Boolean).join(" · "))}</td></tr>
+</table></td></tr></table></body></html>`;
+  }
+  var MODELOS, preencher, escH;
+  var init_comunicados = __esm({
+    "docs/js/comunicados.js"() {
+      init_calculos();
+      init_modelos_email();
+      init_regras();
+      MODELOS = {
+        contatos: {
+          nome: "Atualização de contatos e novo e-mail da empresa",
+          titulo: "Novo e-mail da administração e confirmação dos seus contatos",
+          assunto: "Confirme seus contatos ({imovel_curto})",
+          texto: `Olá, {nome}.
+
+Aqui é a administração [se fiador]do contrato de locação de {locatario}, do qual você é fiador(a), no imóvel {imovel}[senão]do seu imóvel: {imovel}[fim].
+
+A partir de agora, nossos e-mails (boletos, avisos e documentos) saem do endereço {email_empresa}. Salve esse endereço nos seus contatos e confira também a caixa de spam.
+
+Precisamos que você confirme seus contatos até {prazo}. Leva 2 minutos:
+
+{link}
+
+Pelo contrato, as mensagens enviadas para o e-mail e o telefone cadastrados valem como recebidas. Se você não atualizar, continuaremos usando os contatos que temos hoje.
+
+Atenção: a conta e a chave Pix para pagamento não mudam. Nunca pedimos pagamento em outra conta. Na dúvida, ligue {telefone_empresa}.
+
+Atenciosamente,
+{empresas}`,
+          whatsapp: `Olá, {nome}! Aqui é a {empresas}, administração [se fiador]da locação de {locatario} ({imovel_curto})[senão]do seu imóvel ({imovel_curto})[fim].
+Nosso novo e-mail é {email_empresa}. Confirme seus contatos até {prazo}: {link}
+A conta e o Pix de pagamento não mudam. Na dúvida, ligue {telefone_empresa}.`,
+          lembrete: `Olá, {nome}! Ainda não recebemos a confirmação dos seus contatos ([se fiador]locação de {locatario}, [fim]{imovel_curto}). O prazo vai até {prazo}: {link}
+Nosso e-mail é {email_empresa}. A conta e o Pix de pagamento não mudam.`,
+          aviso: `A partir de agora, os e-mails da administração (boletos, avisos, notificações, recibos e documentos) saem do endereço {email_empresa}. Confira com a administração qualquer mensagem de outro endereço que diga falar em nosso nome.
+
+Pelo contrato de locação, as comunicações e notificações enviadas ao e-mail e ao endereço cadastrados são válidas, e você se comprometeu a avisar qualquer mudança de endereço, inclusive de e-mail. Por isso pedimos que confirme ou atualize abaixo o seu e-mail e o seu celular.
+
+Até você nos informar outro contato, continuaremos usando os contatos do seu cadastro, e as mensagens enviadas a eles serão consideradas recebidas. Manter esses contatos atualizados e acompanhar as mensagens que chegam por eles, inclusive na caixa de spam, fica sob a sua responsabilidade.
+
+A conta e a chave Pix para pagamento não mudam. Nunca pedimos pagamento em outra conta. Em caso de dúvida, ligue {telefone_empresa} antes de pagar.`,
+          ciencia: "Li e concordo: os e-mails da administração saem de {email_empresa}; o e-mail e o celular acima são os meus contatos atuais; as mensagens enviadas a eles valem como recebidas; e vou avisar a administração se eles mudarem."
+        }
+      };
+      preencher = (texto3, dados) => preencherEmail(texto3, dados);
+      escH = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+    }
+  });
+
+  // docs/js/telas/comunicacoes.js
+  function atalhosComunicacoes(atual) {
+    const sol = resumoSolicitacoes(d());
+    const abertasSol = (sol.Aberta || 0) + (sol["Em andamento"] || 0);
+    const abertasNot = (d().notificacoes || []).filter((n) => ["Rascunho", "Aguardando resposta", "Multa gerada"].includes(n.situacao)).length;
+    const b = (hash, texto3, chave) => link(hash, texto3, `botao ${atual === chave ? "" : "secundario "}pequeno`);
+    return `${abasInquilinos("comunicacoes")}<div class="acoes" style="margin-bottom:12px;flex-wrap:wrap">
+    ${b("#/comunicacoes", "Comunicados a todos", "comunicados")} ${b("#/solicitacoes", `Solicitações${abertasSol ? ` (${abertasSol})` : ""}`, "solicitacoes")}
+    ${b("#/notificacoes", `Notificações${abertasNot ? ` (${abertasNot})` : ""}`, "notificacoes")} ${b("#/comunicacoes?ver=modelos", "Modelos", "modelos")}</div>`;
+  }
+  async function pedir2(caminho, op = {}) {
+    let r;
+    try {
+      r = await cfg4.buscar(`${cfg4.base}${caminho}`, {
+        cache: "no-store",
+        credentials: "same-origin",
+        signal: limiteDeTempo(3e4),
+        ...op,
+        headers: { ...op.method && op.method !== "GET" ? { "X-Sistema": "imoveis", "Content-Type": "application/json" } : {} }
+      });
+    } catch {
+      throw new ErroUsuario("Sem internet: o comunicado precisa de conexão.");
+    }
+    const tipo = r.headers.get("content-type") || "";
+    if (r.redirected || !tipo.includes("json")) throw new ErroUsuario("A nuvem não respondeu (entre de novo no sistema e tente outra vez).");
+    const dados = await r.json();
+    if (!r.ok) throw new ErroUsuario(dados.erro || "A nuvem recusou o pedido.");
+    return dados;
+  }
+  async function atualizarDaNuvem(comId, { forcar = false } = {}) {
+    if (!E.nuvem) return 0;
+    const g = guardadas.get(comId);
+    if (!forcar && g && Date.now() - g.em < VALIDADE) return 0;
+    const { links } = await pedir2(`lista?comunicado=${Number(comId)}`);
+    guardadas.set(comId, { em: Date.now(), links });
+    let mudaram = 0;
+    const com = buscar2("comunicados", comId);
+    const novidade = (links || []).some((l) => {
+      const x = (com.destinos || []).find((y) => y.chave === l.destino);
+      return x && (l.aberto_em && !x.aberto_em || l.resposta && l.resposta.em !== (x.resposta && x.resposta.em) || x.resposta && !x.aplicado_em);
+    });
+    if (novidade) await alterar((db) => {
+      mudaram = juntarRespostas(db, comId, links, login());
+    });
+    return mudaram;
+  }
+  async function logoReduzida() {
+    const origem = d().logo || "";
+    if (!origem) return "";
+    if (logoGuardada && logoGuardada.origem === origem) return logoGuardada.url;
+    let url = "";
+    try {
+      const img = await new Promise((ok, erro) => {
+        const i = new Image();
+        i.onload = () => ok(i);
+        i.onerror = erro;
+        i.src = origem;
+      });
+      const escala = Math.min(1, 320 / img.naturalWidth, 160 / img.naturalHeight);
+      const cv = document.createElement("canvas");
+      cv.width = Math.max(1, Math.round(img.naturalWidth * escala));
+      cv.height = Math.max(1, Math.round(img.naturalHeight * escala));
+      cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+      url = cv.toDataURL("image/png");
+      if (url.length > 11e4) {
+        const ctx = cv.getContext("2d");
+        ctx.globalCompositeOperation = "destination-over";
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, cv.width, cv.height);
+        url = cv.toDataURL("image/jpeg", 0.85);
+      }
+      if (url.length > 11e4) url = "";
+    } catch {
+      url = "";
+    }
+    logoGuardada = { origem, url };
+    return url;
+  }
+  async function telaComunicacoes(q = {}) {
+    if (q.ver === "modelos") return telaModelosComunicado();
+    if (q.ver === "novo") return telaNovoComunicado(q);
+    const lista3 = [...d().comunicados || []].sort((a, b) => b.id - a.id);
+    if (q.id) return telaComunicado(Number(q.id));
+    return `<div class="cabecalho"><h1>Comunicações</h1>${opera() ? link("#/comunicacoes?ver=novo", "Novo comunicado a todos", "botao") : ""}</div>
+    ${atalhosComunicacoes("comunicados")}
+    ${lista3.length ? lista3.map((com) => cartaoComunicado(com)).join("") : `<div class="cartao"><p>Nenhum comunicado enviado ainda.</p>
+      <p class="suave">O comunicado vai para todos os inquilinos e fiadores com contrato ativo, cada um com um link só dele, por e-mail e por WhatsApp. Ex.: "Atualização de contatos e novo e-mail da empresa".</p>
+      ${opera() ? link("#/comunicacoes?ver=novo", "Novo comunicado a todos", "botao") : ""}</div>`}`;
+  }
+  function cartaoComunicado(com) {
+    const r = resumo2(com);
+    const vencido2 = com.prazo < hojeIso();
+    return `<div class="cartao"><div class="cabecalho"><h2>${esc(com.titulo)}</h2>${etiqueta(vencido2 ? `prazo acabou em ${dataBr(com.prazo)}` : `prazo ${dataBr(com.prazo)}`, vencido2 ? "neutra" : "aviso")}</div>
+    <p class="suave">Criado em ${dataHoraBr(com.criado_em)} · ${r.total} pessoa(s)</p>
+    <div class="numeros-cartao">${quadro("Confirmaram", r.confirmaram, "ok")}${quadro("Abriram", r.abriram)}${quadro("Não abriram", r.naoAbriram, r.naoAbriram ? "perigo" : "")}${quadro("Não enviados", r.naoEnviados)}</div>
+    <p class="acoes">${link(`#/comunicacoes?id=${com.id}`, "Abrir", "botao pequeno")}</p></div>`;
+  }
+  function telaNovoComunicado(q) {
+    if (!opera()) return `<div class="alerta erro">${SO_CONSULTA}</div>`;
+    const m = MODELOS[q.tema] || MODELOS.contatos;
+    const chave = MODELOS[q.tema] ? q.tema : "contatos";
+    const pessoas = destinatarios(d());
+    const prazo = somarDias(hojeIso(), DIAS_PRAZO);
+    const email = dadoDaEmpresa(d(), {}, "email_contato") || "administracao@ankjck.com.br";
+    const area = (nome, rotulo2, valor, linhas2, ajuda = "") => `<p><label>${rotulo2}</label><textarea name="${nome}" rows="${linhas2}" style="width:100%">${esc(valor)}</textarea>${ajuda ? `<span class="suave">${ajuda}</span>` : ""}</p>`;
+    const semContato = pessoas.filter((p2) => !p2.email && !telefoneWhats(p2.telefone));
+    return `<p class="suave"><a href="#/comunicacoes">← Comunicações</a></p><h1>Novo comunicado a todos</h1>
+    <form data-form="criarComunicado" class="cartao"><input type="hidden" name="modelo" value="${esc(chave)}">
+      <p><b>Modelo:</b> ${esc(m.nome)}</p>
+      <p><b>Vai para ${pessoas.length} pessoa(s):</b> ${pessoas.filter((p2) => p2.tipo === "inquilino").length} inquilino(s) e ${pessoas.filter((p2) => p2.tipo === "fiador").length} fiador(es) dos contratos ativos de hoje.
+        ${semContato.length ? `<br>${etiqueta(`${semContato.length} sem e-mail nem celular`, "aviso")} ${esc(semContato.map((p2) => p2.nome).join(", "))}: o link aparece para você copiar e mandar de outro jeito.` : ""}</p>
+      <div class="grade">
+        <p><label>Prazo para confirmar</label><input type="date" name="prazo" value="${prazo}" required></p>
+        <p><label>E-mail da empresa (o novo)</label><input type="email" name="email_empresa" value="${esc(email)}" required></p>
+        <p><label>Telefone da empresa para dúvidas</label><input type="tel" name="telefone_empresa" placeholder="(41) 0000-0000" required><span class="suave">O mesmo para as duas empresas. Aparece no aviso contra golpe: "na dúvida, ligue …".</span></p>
+      </div>
+      <details><summary>Textos (pode mudar antes de criar)</summary>
+        <p class="suave">Campos que o sistema preenche: {nome}, {imovel}, {imovel_curto}, {locatario}, {prazo}, {link}, {email_empresa}, {telefone_empresa}, {empresas}; [se fiador]…[senão]…[fim] muda o texto do fiador.</p>
+        <p><label>Título (aparece na página)</label><input name="titulo" value="${esc(m.titulo)}" style="width:100%"></p>
+        <p><label>Assunto do e-mail</label><input name="assunto" value="${esc(m.assunto)}" style="width:100%"></p>
+        ${area("texto", "Texto do e-mail", m.texto, 14, 'O parágrafo só com {link} vira o botão "Confirmar meus contatos"; o que começa com "Atenção" sai em destaque.')}
+        ${area("whatsapp", "Mensagem do WhatsApp", m.whatsapp, 4)}
+        ${area("lembrete", "Lembrete (WhatsApp e e-mail)", m.lembrete, 4)}
+        ${area("aviso", "Aviso que a pessoa lê na página", m.aviso, 12)}
+        ${area("ciencia", 'Frase da caixa "Li e concordo"', m.ciencia, 3)}
+      </details>
+      <div class="acoes" style="margin-top:12px"><button>Criar o comunicado</button> ${link("#/comunicacoes", "Cancelar")}</div>
+      <p class="suave">Criar não envia nada: na próxima tela você vê a prévia e escolhe "Enviar e-mail a todos" e "WhatsApp a todos".</p></form>`;
+  }
+  function telaModelosComunicado() {
+    return `<div class="cabecalho"><h1>Comunicações</h1></div>${atalhosComunicacoes("modelos")}
+    ${Object.entries(MODELOS).map(([chave, m]) => `<div class="cartao"><div class="cabecalho"><h2>${esc(m.nome)}</h2>${opera() ? link(`#/comunicacoes?ver=novo&tema=${chave}`, "Usar este modelo", "botao pequeno") : ""}</div>
+      <p class="suave">Assunto: ${esc(m.assunto)}</p><pre class="texto-modelo">${esc(m.texto)}</pre>
+      <details><summary>Aviso da página e frase do aceite</summary><pre class="texto-modelo">${esc(m.aviso)}
+
+☐ ${esc(m.ciencia)}</pre></details>
+      <details><summary>WhatsApp e lembrete</summary><pre class="texto-modelo">${esc(m.whatsapp)}
+
+${esc(m.lembrete)}</pre></details></div>`).join("")}
+    <p class="suave">Cada comunicado guarda os textos com que foi criado: mudar aqui não muda os já enviados.</p>`;
+  }
+  async function telaComunicado(id) {
+    const com0 = buscar2("comunicados", id);
+    if (!com0) return naoEncontrado("Comunicado");
+    let erroNuvem = "";
+    try {
+      await atualizarDaNuvem(id);
+    } catch (e) {
+      erroNuvem = e.message;
+    }
+    const com = buscar2("comunicados", id);
+    const r = resumo2(com);
+    const ordem = [...com.destinos].sort((a, b) => situacaoDe(a).peso - situacaoDe(b).peso);
+    const linha = (x) => {
+      const s = situacaoDe(x);
+      const p2 = pessoaDoDestino(d(), x);
+      const imovel = p2 && p2.imovel ? p2.imovel.nome : "";
+      const contatos = p2 ? [p2.email, telefoneBr(p2.telefone)].filter(Boolean).map(esc).join("<br>") : '<span class="suave">saiu do cadastro</span>';
+      const quando3 = x.confirmado_em ? ` ${dataHoraBr(x.confirmado_em)}` : x.aberto_em ? ` ${dataHoraBr(x.aberto_em)}` : "";
+      const envios = [x.email_em && `e-mail ${dataHoraBr(x.email_em)}`, x.whats_em && `WhatsApp ${dataHoraBr(x.whats_em)}`, x.lembrete_em && `lembrete ${dataHoraBr(x.lembrete_em)}`].filter(Boolean).join("<br>");
+      const acoes = x.confirmado_em ? link(`#/aceite-contatos?id=${com.id}&chave=${x.chave}`, "Ver aceite") : opera() && p2 ? `${botao("emailComunicado", "E-mail", { id: com.id, chave: x.chave })} ${botao("whatsComunicado", "WhatsApp", { id: com.id, chave: x.chave })} ${botao("linkComunicado", "Copiar link", { id: com.id, chave: x.chave })}` : "";
+      return `<tr><td><b>${esc(x.nome)}</b>${x.tipo === "fiador" ? ' <span class="suave">(fiador)</span>' : ""}</td><td>${esc(imovel)}</td><td>${contatos}</td>
+      <td>${etiqueta(s.texto, s.cor)}<span class="suave">${quando3}</span>${x.resposta && x.resposta.mudou ? `<br>${etiqueta("mudou o contato", "info")}` : ""}${x.resposta ? `<br><span class="suave">melhor: ${esc(x.resposta.melhor)}</span>` : ""}</td>
+      <td class="suave">${envios || "-"}</td><td class="nw">${acoes}</td></tr>`;
+    };
+    const pendentes = com.destinos.filter((x) => !x.confirmado_em).length;
+    return `<p class="suave"><a href="#/comunicacoes">← Comunicações</a></p>
+    <div class="cabecalho"><h1>${esc(com.titulo)}</h1>${etiqueta(`prazo ${dataBr(com.prazo)}`, com.prazo < hojeIso() ? "neutra" : "aviso")}</div>
+    ${!E.nuvem ? `<div class="alerta aviso">${SO_NUVEM}</div>` : ""}${erroNuvem ? `<div class="alerta aviso">Situação de agora não veio da nuvem: ${esc(erroNuvem)}</div>` : ""}
+    <div class="cartao"><div class="numeros-cartao">${quadro("Confirmaram", r.confirmaram, "ok")}${quadro("Abriram", r.abriram)}${quadro("Não abriram", r.naoAbriram, r.naoAbriram ? "perigo" : "")}${quadro("Não enviados", r.naoEnviados)}${quadro("Mudaram o contato", r.mudaram)}</div>
+      ${opera() ? `<p class="acoes">${botao("emailTodosComunicado", "✉ Enviar e-mail a todos", { id: com.id }, "pequeno")} ${botao("whatsTodosComunicado", "WhatsApp a todos", { id: com.id })}
+        ${pendentes && com.destinos.some((x) => !x.confirmado_em && (x.email_em || x.whats_em)) ? botao("lembrarComunicado", "Lembrar quem falta", { id: com.id }) : ""} ${botao("previaComunicado", "Ver como o inquilino vê", { id: com.id })} ${botao("atualizarComunicado", "Atualizar situação", { id: com.id })}</p>` : ""}
+      <p class="suave">"Enviar e-mail a todos" manda só para quem ainda não recebeu por e-mail. O WhatsApp abre a conversa de cada pessoa com a mensagem copiada: é só colar e enviar. Quem confirma tem o e-mail e o celular atualizados no cadastro (o anterior fica no Histórico).</p></div>
+    <div class="cartao rolagem"><table><tr><th>Pessoa</th><th>Imóvel</th><th>Contatos no cadastro</th><th>Situação</th><th>Enviado</th><th></th></tr>${ordem.map(linha).join("")}</table></div>`;
+  }
+  function telaAceiteContatos(q = {}) {
+    const com = buscar2("comunicados", Number(q.id));
+    const x = com && com.destinos.find((y) => y.chave === q.chave);
+    if (!x || !x.resposta) return naoEncontrado("Aceite");
+    const r = x.resposta;
+    const e = empresasDoTopo(d());
+    const linhas2 = [
+      ["Pessoa", `${x.nome}${x.tipo === "fiador" ? " (fiador)" : ""}`],
+      ["Confirmado em", dataHoraBr(r.em)],
+      ["E-mail", `${r.email} (confirmado por código enviado a ele)`],
+      ["Celular", `${telefoneBr(r.telefone)}${r.whatsapp ? " (WhatsApp)" : ""}`],
+      ["Melhor forma de contato", r.melhor],
+      ["Aberto por", r.canal === "whatsapp" ? "link do WhatsApp" : r.canal === "email" ? "link do e-mail" : "link direto"],
+      ["Endereço de internet (IP)", r.ip || "-"],
+      ["Aparelho", r.aparelho || "-"],
+      ["Código do texto (SHA-256)", r.texto_sha256 || "-"]
+    ];
+    return `<p class="suave nao-imprimir"><a href="#/comunicacoes?id=${com.id}">← ${esc(com.titulo)}</a> · ${botao("imprimir", "Imprimir / salvar em PDF", {}, "pequeno")}</p>
+    <div class="cartao folha-aceite">${d().logo ? `<p><img src="${esc(d().logo)}" alt="Logo" style="max-height:60px"></p>` : ""}
+      <p><b>${esc(e.nomes.join(" e "))}</b>${e.cnpjs.length ? `<br><span class="suave">CNPJ ${esc(e.cnpjs.join(" · "))}</span>` : ""}</p>
+      <h1>Comprovante de confirmação de contatos e ciência</h1>
+      <table>${linhas2.map(([a, b]) => `<tr><th style="text-align:left;width:34%">${esc(a)}</th><td>${esc(b)}</td></tr>`).join("")}</table>
+      ${r.assinatura ? `<p><b>Assinatura na tela:</b><br><img src="${esc(r.assinatura)}" alt="Assinatura" style="max-width:320px;border-bottom:1px solid #999"></p>` : '<p class="suave">Sem assinatura desenhada (aceite pela caixa "Li e concordo" e pelo código no e-mail).</p>'}
+      <h2>Texto que a pessoa leu e aceitou</h2><pre class="texto-modelo">${esc(r.texto_aceito || "")}</pre>
+      ${(x.aberturas || []).length ? `<p class="suave">Aberturas do link: ${x.aberturas.map((a) => `${dataHoraBr(a.em)} (${a.canal === "whatsapp" ? "WhatsApp" : a.canal === "email" ? "e-mail" : "direto"})`).join("; ")}.</p>` : ""}</div>`;
+  }
+  function exigir() {
+    if (!opera()) throw new ErroUsuario(SO_CONSULTA);
+    if (!E.nuvem) throw new ErroUsuario(SO_NUVEM);
+  }
+  async function linkDe(com, x) {
+    if (x.url) return x.url;
+    const p2 = pessoaDoDestino(d(), x);
+    if (!p2) throw new ErroUsuario(`${x.nome}: o contrato ou o fiador não está mais no cadastro.`);
+    const { url } = await pedir2("link", { method: "POST", body: JSON.stringify({ comunicado_id: com.id, destino: x.chave, contexto: contextoDoLink(d(), com, p2, await logoReduzida()) }) });
+    await alterar((db) => {
+      const c = buscar(db, "comunicados", com.id);
+      atualizar(db, "comunicados", c.id, { destinos: c.destinos.map((y) => y.chave === x.chave ? { ...y, url, link_em: (/* @__PURE__ */ new Date()).toISOString() } : { ...y }) }, login(), `Comunicado "${c.titulo}": link de ${x.nome}`);
+    });
+    return url;
+  }
+  async function marcar(comId, chave, campo2) {
+    await alterar((db) => {
+      const c = buscar(db, "comunicados", comId);
+      atualizar(db, "comunicados", c.id, { destinos: c.destinos.map((y) => y.chave === chave ? { ...y, [campo2]: (/* @__PURE__ */ new Date()).toISOString() } : { ...y }) }, login(), `Comunicado "${c.titulo}": ${campo2 === "email_em" ? "e-mail" : campo2 === "whats_em" ? "WhatsApp" : "lembrete"} enviado`);
+    });
+  }
+  async function emailDe(com, x, { lembrete = false } = {}) {
+    const p2 = pessoaDoDestino(d(), x);
+    const url = linkDoCanal(await linkDe(com, x), "email");
+    const dados = camposDe(d(), com, p2, url);
+    const e = empresasDoTopo(d());
+    const logo = await logoReduzida();
+    const texto3 = lembrete ? `${preencher(com.lembrete, dados)}
+
+${preencher("Atenciosamente,\n{empresas}", dados)}` : preencher(com.texto, dados);
+    const assunto = `${lembrete ? "Lembrete: " : ""}${preencher(com.assunto, dados)}`;
+    const html = htmlDoEmail(lembrete ? texto3.replace(url, `
+
+${url}
+
+`) : texto3, { empresas: e.nomes, cnpjs: e.cnpjs, cidade: e.cidade, link: url, logo: !!logo });
+    return { para: p2.email, assunto, texto: texto3, html, imagens: imagemDaLogo(logo) };
+  }
+  async function enviarEmails(com, alvos, { lembrete = false } = {}) {
+    if (!await emailLigado()) throw new ErroUsuario("O envio pelo Gmail não está ligado (Dados e backup → Conectar o Gmail).");
+    let ok = 0;
+    const falhas = [];
+    for (const [n, x] of alvos.entries()) {
+      aviso(`Enviando ${n + 1} de ${alvos.length}: ${x.nome}…`, "info");
+      try {
+        const m = await emailDe(buscar2("comunicados", com.id), x, { lembrete });
+        await enviarEmail(m);
+        await marcar(com.id, x.chave, lembrete ? "lembrete_em" : "email_em");
+        ok += 1;
+      } catch (e) {
+        falhas.push(`${x.nome}: ${e.message}`);
+      }
+    }
+    return { ok, falhas };
+  }
+  async function filaWhatsapp(comId, fila, { lembrete = false } = {}) {
+    for (let i = 0; i < fila.length; i += 1) {
+      const com = buscar2("comunicados", comId);
+      const x = com.destinos.find((y) => y.chave === fila[i].chave);
+      const p2 = pessoaDoDestino(d(), x);
+      const tel = p2 ? telefoneWhats(p2.telefone) : "";
+      const url = linkDoCanal(await linkDe(com, x), "whatsapp");
+      const texto3 = preencher(lembrete ? com.lembrete : com.whatsapp, camposDe(d(), com, p2, url));
+      let abriu = false;
+      const resp = await janela({
+        titulo: `WhatsApp ${i + 1} de ${fila.length}: ${x.nome}${x.tipo === "fiador" ? " (fiador)" : ""}`,
+        sim: i + 1 < fila.length ? "Próximo" : "Terminar",
+        nao: "Parar",
+        html: `<p><textarea rows="6" readonly data-texto style="width:100%">${esc(texto3)}</textarea></p>
+        <p class="acoes">${tel ? `<a class="botao pequeno" target="_blank" rel="noopener noreferrer" href="https://wa.me/${tel}" data-zap>Copiar e abrir o WhatsApp (${esc(telefoneBr(p2.telefone))})</a>` : '<span class="suave">Sem celular no cadastro: copie e mande de outro jeito.</span>'}
+        <button type="button" class="secundario pequeno" data-copiar>Copiar a mensagem</button></p>
+        <p class="suave">No WhatsApp, cole a mensagem (segure e escolha Colar) e envie. Depois volte aqui e toque em "${i + 1 < fila.length ? "Próximo" : "Terminar"}".</p>`,
+        ligar: (dlg) => {
+          const copiar4 = async () => {
+            try {
+              await navigator.clipboard.writeText(dlg.querySelector("[data-texto]").value);
+              return true;
+            } catch {
+              dlg.querySelector("[data-texto]").select();
+              return false;
+            }
+          };
+          dlg.querySelector("[data-copiar]").addEventListener("click", async (ev) => {
+            if (await copiar4()) ev.target.textContent = "Copiado ✓";
+            abriu = true;
+          });
+          const zap = dlg.querySelector("[data-zap]");
+          if (zap) zap.addEventListener("click", () => {
+            copiar4();
+            abriu = true;
+          });
+        }
+      });
+      if (abriu) await marcar(comId, x.chave, lembrete ? "lembrete_em" : "whats_em");
+      if (!resp) break;
+    }
+    await mostrar();
+  }
+  var SO_CONSULTA, SO_NUVEM, DIAS_PRAZO, abasInquilinos, cfg4, guardadas, VALIDADE, logoGuardada, imagemDaLogo, quadro, ACOES_COMUNICACOES, FORMULARIOS_COMUNICACOES;
+  var init_comunicacoes = __esm({
+    "docs/js/telas/comunicacoes.js"() {
+      init_app();
+      init_calculos();
+      init_calculos();
+      init_comunicados();
+      init_contratos();
+      init_formularios();
+      init_gmail();
+      init_nuvem();
+      init_regras();
+      init_comum();
+      SO_CONSULTA = "Seu usuário só consulta: não pode enviar comunicados.";
+      SO_NUVEM = "O comunicado com link só funciona no sistema pela internet (nuvem).";
+      DIAS_PRAZO = 10;
+      abasInquilinos = (atual) => `<nav class="abas">${link("#/inquilinos", "Lista", atual === "lista" ? "ativo" : "")}${link("#/comunicacoes", "Comunicações", atual === "comunicacoes" ? "ativo" : "")}</nav>`;
+      cfg4 = { base: "api/contatos/", buscar: (...a) => fetch(...a) };
+      guardadas = /* @__PURE__ */ new Map();
+      VALIDADE = 9e4;
+      logoGuardada = null;
+      imagemDaLogo = (url) => {
+        const m = /^data:(image\/(?:png|jpeg));base64,(.+)$/.exec(url || "");
+        return m ? [{ cid: "logo", tipo: m[1], base64: m[2] }] : [];
+      };
+      quadro = (rotulo2, n, cor = "") => `<div class="numero-cartao"><div class="suave">${rotulo2}</div><div class="numero${cor ? ` ${cor}` : ""}">${n}</div></div>`;
+      ACOES_COMUNICACOES = {
+        async atualizarComunicado({ id }) {
+          exigir();
+          const n = await atualizarDaNuvem(Number(id), { forcar: true });
+          aviso(n ? `${n} cadastro(s) atualizado(s) com os contatos confirmados.` : "Situação atualizada.");
+          await mostrar();
+        },
+        async emailTodosComunicado({ id }) {
+          exigir();
+          const com = buscar2("comunicados", Number(id));
+          const alvos = com.destinos.filter((x) => !x.email_em && !x.confirmado_em && (pessoaDoDestino(d(), x) || {}).email);
+          const sem = com.destinos.filter((x) => !x.confirmado_em && !(pessoaDoDestino(d(), x) || {}).email);
+          if (!alvos.length) {
+            aviso(`Não há e-mail para enviar: ${sem.length ? `${sem.length} pessoa(s) sem e-mail no cadastro (use o WhatsApp)` : "todos já receberam"}.`, "info");
+            return;
+          }
+          if (!await confirmar(`Enviar o e-mail com o link para ${alvos.length} pessoa(s)?${sem.length ? ` ${sem.length} sem e-mail ficam para o WhatsApp.` : ""}`, { titulo: "Enviar e-mail a todos", sim: "Enviar" })) return;
+          const { ok, falhas } = await enviarEmails(com, alvos);
+          if (falhas.length) await janela({ titulo: `${ok} enviado(s), ${falhas.length} com problema`, sim: "Fechar", nao: "Voltar", html: `<ul>${falhas.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>` });
+          else aviso(`${ok} e-mail(s) enviado(s).`);
+          await mostrar();
+        },
+        async emailComunicado({ id, chave }) {
+          exigir();
+          const com = buscar2("comunicados", Number(id));
+          const x = com.destinos.find((y) => y.chave === chave);
+          if (!(pessoaDoDestino(d(), x) || {}).email) throw new ErroUsuario(`${x.nome} não tem e-mail no cadastro. Use o WhatsApp ou copie o link.`);
+          const { ok, falhas } = await enviarEmails(com, [x], { lembrete: !!x.email_em });
+          if (falhas.length) throw new ErroUsuario(falhas[0]);
+          aviso(ok ? `E-mail enviado para ${x.nome}.` : "Nada enviado.");
+          await mostrar();
+        },
+        async whatsTodosComunicado({ id }) {
+          exigir();
+          const com = buscar2("comunicados", Number(id));
+          const fila = com.destinos.filter((x) => !x.whats_em && !x.confirmado_em && pessoaDoDestino(d(), x));
+          if (!fila.length) {
+            aviso("Todos já receberam pelo WhatsApp (ou já confirmaram).", "info");
+            return;
+          }
+          await filaWhatsapp(com.id, fila);
+        },
+        async whatsComunicado({ id, chave }) {
+          exigir();
+          const com = buscar2("comunicados", Number(id));
+          const x = com.destinos.find((y) => y.chave === chave);
+          await filaWhatsapp(com.id, [x], { lembrete: !!x.whats_em });
+        },
+        async lembrarComunicado({ id }) {
+          exigir();
+          const com = buscar2("comunicados", Number(id));
+          const falta = com.destinos.filter((x) => !x.confirmado_em && (x.email_em || x.whats_em));
+          if (!falta.length) {
+            aviso("Ninguém para lembrar: mande primeiro o e-mail ou o WhatsApp.", "info");
+            return;
+          }
+          const porEmail = falta.filter((x) => (pessoaDoDestino(d(), x) || {}).email);
+          const resp = await janela({
+            titulo: `Lembrar ${falta.length} pessoa(s) que não confirmaram`,
+            sim: "Lembrar",
+            nao: "Cancelar",
+            html: `<p><label><input type="checkbox" name="email" value="1" checked> Por e-mail (${porEmail.length})</label></p><p><label><input type="checkbox" name="whats" value="1" checked> Pelo WhatsApp, um por um (${falta.length})</label></p>`
+          });
+          if (!resp) return;
+          if (resp.email && porEmail.length) {
+            const { ok, falhas } = await enviarEmails(com, porEmail, { lembrete: true });
+            aviso(`${ok} lembrete(s) por e-mail${falhas.length ? `; ${falhas.length} com problema` : ""}.`, falhas.length ? "aviso" : "ok");
+          }
+          if (resp.whats) await filaWhatsapp(com.id, falta, { lembrete: true });
+          else await mostrar();
+        },
+        async linkComunicado({ id, chave }) {
+          exigir();
+          const com = buscar2("comunicados", Number(id));
+          const x = com.destinos.find((y) => y.chave === chave);
+          const url = await linkDe(com, x);
+          await janela({ titulo: `Link de ${x.nome}`, sim: "Fechar", nao: "Voltar", html: `<p>É só desta pessoa: não publique.</p><p><textarea rows="3" readonly style="width:100%">${esc(url)}</textarea></p>` });
+          await mostrar();
+        },
+        async previaComunicado({ id }) {
+          const com = buscar2("comunicados", Number(id));
+          const x = com.destinos.find((y) => pessoaDoDestino(d(), y));
+          if (!x) throw new ErroUsuario("Nenhuma pessoa do comunicado está no cadastro.");
+          const p2 = pessoaDoDestino(d(), x);
+          const exemplo = "https://ficha.ankjck.com.br/contatos#exemplo";
+          const dados = camposDe(d(), com, p2, exemplo);
+          const e = empresasDoTopo(d());
+          const logo = await logoReduzida();
+          const html = htmlDoEmail(preencher(com.texto, dados), { empresas: e.nomes, cnpjs: e.cnpjs, cidade: e.cidade, link: exemplo, logo: !!logo }).replace("cid:logo", logo);
+          const ctx = contextoDoLink(d(), com, p2, logo);
+          await janela({
+            titulo: `Prévia (com os dados de ${x.nome})`,
+            sim: "Fechar",
+            nao: "Voltar",
+            html: `<p><b>Assunto:</b> ${esc(preencher(com.assunto, dados))}</p>
+        <iframe sandbox title="Prévia do e-mail" style="width:100%;height:420px;border:1px solid var(--borda);border-radius:8px;background:#fff" srcdoc="${esc(html)}"></iframe>
+        <h3>WhatsApp</h3><pre class="texto-modelo">${esc(preencher(com.whatsapp, dados))}</pre>
+        <h3>Página do link</h3><div class="cartao" style="margin:0">${logo ? `<p style="text-align:center"><img src="${esc(logo)}" alt="Logo" style="max-height:70px"></p>` : ""}
+          <p style="text-align:center"><b>${esc(ctx.empresas.join(" e "))}</b><br><span class="suave">CNPJ ${esc(ctx.cnpjs.join(" · "))}${ctx.cidade ? ` · ${esc(ctx.cidade)}` : ""}</span></p>
+          <p><b>Olá, ${esc(String(ctx.nome).split(" ")[0])}</b> <span class="suave">· ${esc(ctx.imovel)}${ctx.desde ? ` · contrato desde ${esc(ctx.desde)}` : ""}</span></p>
+          <pre class="texto-modelo">${esc(ctx.aviso)}</pre><p class="suave">Depois: e-mail, celular, se é WhatsApp, melhor forma de contato, o código enviado ao e-mail, a caixa abaixo e a assinatura com o dedo (opcional).</p>
+          <p>☐ ${esc(ctx.ciencia)}</p></div>`
+          });
+        }
+      };
+      FORMULARIOS_COMUNICACOES = {
+        async criarComunicado(form) {
+          if (!opera()) throw new ErroUsuario(SO_CONSULTA);
+          const f = new FormData(form);
+          const prazo = dataValida(String(f.get("prazo") || ""), "");
+          if (!prazo || prazo < hojeIso()) throw new ErroUsuario("Escolha um prazo de hoje em diante.");
+          const email = String(f.get("email_empresa") || "").trim().toLowerCase();
+          if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new ErroUsuario("Confira o e-mail da empresa.");
+          const tel = String(f.get("telefone_empresa") || "").trim();
+          if (String(tel).replace(/\D/g, "").length < 10) throw new ErroUsuario("Informe o telefone da empresa com DDD.");
+          const base = novoComunicado(d(), String(f.get("modelo") || "contatos"), { prazo, email_empresa: email, telefone_empresa: telefoneBr(tel) });
+          if (!base.destinos.length) throw new ErroUsuario("Não há inquilino com contrato ativo hoje.");
+          for (const k of ["titulo", "assunto", "texto", "whatsapp", "lembrete", "aviso", "ciencia"]) {
+            const v = String(f.get(k) || "").trim();
+            if (v) base[k] = v;
+          }
+          const com = await alterar((db) => inserir(db, "comunicados", { ...base, criado_por: login() }, login(), `Comunicado "${base.titulo}" para ${base.destinos.length} pessoa(s)`));
+          aviso("Comunicado criado. Confira a prévia e envie.");
+          ir(`#/comunicacoes?id=${com.id}`);
+        }
+      };
+    }
+  });
+
   // docs/js/telas/notificacoes.js
   function etiquetaNotificacao(n, hoje3 = hojeIso()) {
     const e = estadoNotificacao(d(), n, hoje3);
@@ -28823,7 +29536,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       const e = estadoNotificacao(d(), n, hoje3);
       return e.podeMulta && e.situacao !== "Reiterada";
     }).length;
-    return `<div class="cabecalho"><h1>Notificações ao inquilino</h1>${opera() ? link("#/notificacao-nova", "Nova notificação", "botao") : ""}</div>
+    return `${atalhosComunicacoes("notificacoes")}<div class="cabecalho"><h1>Notificações ao inquilino</h1>${opera() ? link("#/notificacao-nova", "Nova notificação", "botao") : ""}</div>
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap">${link("#/notificacoes", `Em aberto (${todas.filter((n) => ["Rascunho", "Aguardando resposta", "Multa gerada"].includes(n.situacao)).length})`, `botao ${abertas ? "" : "secundario "}pequeno`)}
       ${link("#/notificacoes?filtro=todas", `Todas (${todas.length})`, `botao ${abertas ? "secundario " : ""}pequeno`)}
       ${vencidas ? etiqueta(`${vencidas} com prazo vencido`, "perigo") : ""}</div>
@@ -28845,7 +29558,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     return out;
   }
   function telaNovaNotificacao(q = {}) {
-    if (!opera()) return `<h1>Nova notificação</h1><div class="alerta aviso">${SO_CONSULTA}</div>`;
+    if (!opera()) return `<h1>Nova notificação</h1><div class="alerta aviso">${SO_CONSULTA2}</div>`;
     const edicao = q.id ? buscar2("notificacoes", q.id) : null;
     if (q.id && (!edicao || edicao.situacao !== "Rascunho")) return naoEncontrado("Rascunho de notificação não encontrado", "#/notificacoes", "Ver as notificações");
     const ant = q.anterior ? buscar2("notificacoes", q.anterior) : edicao && edicao.anterior_id ? buscar2("notificacoes", edicao.anterior_id) : null;
@@ -28897,7 +29610,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const pdf = link(`#/imprimir/recibo?tipo=notificacao&contrato=${c.id}&id=${n.id}`, "🧾 PDF para assinar (imprimir / baixar)", "botao secundario mini");
     const assinada = linkComprovante(c.id, n.arquivo_assinado || null, { tabela: "notificacoes", id: n.id, campo: "arquivo_assinado", tipo: "notificacao-assinada", data: n.data }).replace("📎 comprovante", "📎 notificação assinada").replace("anexar comprovante", "anexar a assinada").replace("Sem comprovante: buscar no banco e anexar", "Anexar a notificação assinada");
     const enviada = n.enviada_em ? `enviada em <b>${dataBr(n.enviada_em)}</b> (${esc(n.enviada_por || "")})` : "";
-    const marcar = n.situacao === "Rascunho" && opera() ? `<form data-form="enviadaNotificacao" data-id="${n.id}" class="acoes" style="margin-top:6px;flex-wrap:wrap">
+    const marcar2 = n.situacao === "Rascunho" && opera() ? `<form data-form="enviadaNotificacao" data-id="${n.id}" class="acoes" style="margin-top:6px;flex-wrap:wrap">
       <input type="date" name="data" value="${hoje3}" aria-label="Data do envio" style="width:auto">${atalhosData()}
       <select name="meio" aria-label="Por onde" style="width:auto">${MEIOS_NOTIFICACAO.map((m) => `<option>${esc(m)}</option>`).join("")}</select>
       <button class="secundario pequeno">Marcar como enviada</button></form>` : "";
@@ -28910,7 +29623,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     return [
       { feito: true, titulo: "Notificação montada", detalhe: `${dataBr(n.data)} · ${esc(n.assunto)} ${pdf}` },
       { feito: !!n.arquivo_assinado, titulo: "Assinada pelo administrador", detalhe: `${n.arquivo_assinado ? "" : '<span class="suave">assine o PDF no gov.br (assinador.iti.br) e anexe aqui: </span>'}${assinada}` },
-      { feito: !!n.enviada_em, titulo: "Enviada ao inquilino", detalhe: `${enviada}${n.situacao === "Rascunho" ? `${botaoEmail("notificacao_envio", alvo, "✉ Enviar por e-mail")} <span class="suave">ou entregue à mão (baixe o PDF acima) e marque abaixo. O "Enviar agora" já marca sozinho.</span>${marcar}` : ` ${botaoEmail("notificacao_envio", alvo, "✉ E-mail de novo")}`}` },
+      { feito: !!n.enviada_em, titulo: "Enviada ao inquilino", detalhe: `${enviada}${n.situacao === "Rascunho" ? `${botaoEmail("notificacao_envio", alvo, "✉ Enviar por e-mail")} <span class="suave">ou entregue à mão (baixe o PDF acima) e marque abaixo. O "Enviar agora" já marca sozinho.</span>${marcar2}` : ` ${botaoEmail("notificacao_envio", alvo, "✉ E-mail de novo")}`}` },
       { feito: !e.aberta && n.situacao !== "Rascunho", titulo: "Prazo para resolver", detalhe: `${prazo}${e.aberta && !n.multa_valor && n.situacao !== "Reiterada" ? ` ${botaoEmail("notificacao_lembrete", alvo, "✉ Lembrete do prazo")}` : ""}` },
       { feito: n.situacao === "Resolvida", titulo: "Resolvido (baixa)", detalhe: baixa || (n.situacao === "Cancelada" ? `cancelada em ${dataBr(n.cancelada_em)}${n.motivo_cancelamento ? `: ${esc(n.motivo_cancelamento)}` : ""}` : '<span class="suave">depois de enviada</span>') }
     ];
@@ -28945,7 +29658,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     <div class="cartao"><h2>Texto</h2><div class="grade">${item("Assunto", esc(n.assunto))}${item("Cláusula(s) citada(s)", esc(n.clausula || "-"))}${item("Prazo", `${n.prazo_dias} dias úteis · até ${dataBr(n.data_limite)}`)}</div>
       <p class="pre">${esc(n.texto)}</p></div>`;
   }
-  var COR, SO_CONSULTA, inquilinosParaNotificar, centavosDigitados, FORMULARIOS_NOTIFICACOES, ACOES_NOTIFICACOES;
+  var COR, SO_CONSULTA2, inquilinosParaNotificar, centavosDigitados, FORMULARIOS_NOTIFICACOES, ACOES_NOTIFICACOES;
   var init_notificacoes2 = __esm({
     "docs/js/telas/notificacoes.js"() {
       init_app();
@@ -28958,14 +29671,15 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       init_regras();
       init_cadastros();
       init_comum();
+      init_comunicacoes();
       init_emails();
       COR = { Rascunho: "neutra", "Aguardando resposta": "aviso", Reiterada: "info", "Multa gerada": "perigo", Resolvida: "ok", Cancelada: "neutra" };
-      SO_CONSULTA = "Seu usuário só consulta: não pode alterar. Peça ao administrador, se precisar.";
+      SO_CONSULTA2 = "Seu usuário só consulta: não pode alterar. Peça ao administrador, se precisar.";
       inquilinosParaNotificar = (incluir = null) => d().contratos.filter((c) => c.id === incluir || c.ativo !== false && contratoAtivo(c, hojeIso())).sort((a, b) => String(a.inquilino_nome).localeCompare(String(b.inquilino_nome), "pt-BR"));
       centavosDigitados = (texto3) => centavos(String(texto3 || "").replace(/^R\$\s*/, "").trim());
       FORMULARIOS_NOTIFICACOES = {
         async salvarNotificacao(form) {
-          if (!opera()) throw new ErroUsuario(SO_CONSULTA);
+          if (!opera()) throw new ErroUsuario(SO_CONSULTA2);
           const f = new FormData(form);
           if (!f.get("clausula_conferida")) throw new ErroUsuario('Marque "Conferi o número da(s) cláusula(s) no contrato assinado deste inquilino" antes de salvar.');
           const dados = {
@@ -28984,7 +29698,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
           ir(`#/notificacao/${n.id}`);
         },
         async enviadaNotificacao(form) {
-          if (!opera()) throw new ErroUsuario(SO_CONSULTA);
+          if (!opera()) throw new ErroUsuario(SO_CONSULTA2);
           const f = new FormData(form);
           const n = buscar2("notificacoes", form.dataset.id);
           if (n && !n.arquivo_assinado && !await confirmar("A notificação assinada ainda não foi anexada. Marcar como enviada mesmo assim? (ex.: entregue em papel assinado à mão)", { titulo: "Marcar como enviada?", sim: "Marcar como enviada" })) return;
@@ -28993,7 +29707,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
           await mostrar();
         },
         async baixaNotificacao(form) {
-          if (!opera()) throw new ErroUsuario(SO_CONSULTA);
+          if (!opera()) throw new ErroUsuario(SO_CONSULTA2);
           const f = new FormData(form);
           const n = buscar2("notificacoes", form.dataset.id);
           if (!n) throw new ErroUsuario("Esta notificação não existe mais. Atualize a página.");
@@ -29006,7 +29720,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
           await mostrar();
         },
         async multaNotificacao(form) {
-          if (!opera()) throw new ErroUsuario(SO_CONSULTA);
+          if (!opera()) throw new ErroUsuario(SO_CONSULTA2);
           const valor = centavosDigitados(new FormData(form).get("valor"));
           if (!(valor > 0)) throw new ErroUsuario("Digite o valor da multa.");
           const p2 = previaMultaNotificacao(d(), Number(form.dataset.id));
@@ -29023,13 +29737,13 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       };
       ACOES_NOTIFICACOES = {
         async excluirNotificacao({ id }) {
-          if (!opera()) throw new ErroUsuario(SO_CONSULTA);
+          if (!opera()) throw new ErroUsuario(SO_CONSULTA2);
           const n = buscar2("notificacoes", id);
           await alterarApagandoAnexos((db) => excluirNotificacao(db, Number(id), login()));
           ir(n ? `#/contrato/${n.contrato_id}?ir=notificacoes` : "#/notificacoes");
         },
         async cancelarNotificacao({ id }) {
-          if (!opera()) throw new ErroUsuario(SO_CONSULTA);
+          if (!opera()) throw new ErroUsuario(SO_CONSULTA2);
           const r = await janela({
             titulo: "Cancelar a notificação?",
             sim: "Cancelar a notificação",
@@ -29043,7 +29757,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
           await mostrar();
         },
         async retirarMultaNotificacao({ id }) {
-          if (!opera()) throw new ErroUsuario(SO_CONSULTA);
+          if (!opera()) throw new ErroUsuario(SO_CONSULTA2);
           await alterar((db) => retirarMultaNotificacao(db, Number(id), login()));
           aviso("Multa retirada do boleto e da notificação.");
           await mostrar();
@@ -29544,7 +30258,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       seguro: () => link(`#/novo/seguros?contrato=${c.id}`, "Cadastrar apólice", mini)
     };
     const conta = (e) => e.titularidade ? link(`#/editar/titularidades/${e.titularidade}`, "Atualizar protocolo", mini) : link(`#/novo/titularidades?imovel=${c.imovel_id}&contrato=${c.id}&concessionaria=${encodeURIComponent(e.concessionaria || "")}`, "Registrar protocolo", mini);
-    const situacaoDe = (e) => {
+    const situacaoDe2 = (e) => {
       const data2 = e.data ? ` em ${dataBr(e.data)}` : "";
       const texto3 = e.texto ? ` <span class="suave">${esc(e.texto)}</span>` : "";
       if (e.situacao === "feita") return `${etiqueta(`✓ feita${data2}`, "ok")}${texto3}`;
@@ -29583,7 +30297,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     }
     const extra = (e) => `${EMAIL_ENTRADA[e.chave] ? ` ${botaoEmail(EMAIL_ENTRADA[e.chave], { contrato: c.id })}` : ""}`;
     const tabela = `<div class="rolagem"><table class="compacta">${etapas.map((e, n) => `<tr><td class="n nw">${n + 1}º</td><td><b>${esc(e.titulo)}</b>${extra(e)}</td>
-    <td>${situacaoDe(e)}</td><td class="n">${acoes(e)}</td></tr>`).join("")}</table></div>`;
+    <td>${situacaoDe2(e)}</td><td class="n">${acoes(e)}</td></tr>`).join("")}</table></div>`;
     const ajuda = `<p class="suave">Siga a ordem ou pule etapas. O que for registrado nas caixas abaixo (comprovante, documento assinado, protocolo, apólice) marca a etapa sozinho; o resto, marque com a data em que foi feito. As caixas abaixo continuam com o histórico.</p>`;
     const titulo2 = `Rotina de entrada do inquilino <span class="suave">· ${concluida ? "✓ concluída" : `${feitas} de ${total} feitas`}</span>`;
     return `<details class="cartao" id="rotina"${aberta ? " open" : ""}><summary><b>${titulo2}</b> <span class="suave">· clique para abrir ou fechar</span></summary>${ajuda}${tabela}</details>`;
@@ -29918,31 +30632,31 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     return { ...String(i.gas_relogio || "").trim() ? {} : { conta_gas: nao }, ...String(i.administradora_nome || "").trim() ? {} : { conta_condominio: nao } };
   }
   function telaFormulario(tabela, registro, q, estado2) {
-    const cfg4 = CADASTROS[tabela];
-    if (!cfg4) return naoEncontrado("Página não encontrada");
-    if (!opera() || cfg4.admin && !podeUsuario("admin")) return "<h1>Seu usuário não pode alterar este cadastro</h1>";
-    if (!registro && cfg4.semNovo) return naoEncontrado('Boletos novos saem na tela Boletos ("Gerar boletos" do mês)', "#/cobrancas", "Ir para Boletos");
+    const cfg5 = CADASTROS[tabela];
+    if (!cfg5) return naoEncontrado("Página não encontrada");
+    if (!opera() || cfg5.admin && !podeUsuario("admin")) return "<h1>Seu usuário não pode alterar este cadastro</h1>";
+    if (!registro && cfg5.semNovo) return naoEncontrado('Boletos novos saem na tela Boletos ("Gerar boletos" do mês)', "#/cobrancas", "Ir para Boletos");
     try {
-      return montarFormulario(cfg4, tabela, registro, q, estado2);
+      return montarFormulario(cfg5, tabela, registro, q, estado2);
     } catch (e) {
       if (!(e instanceof TypeError)) throw e;
       return naoEncontrado("Abra este cadastro pela página do inquilino ou do imóvel");
     }
   }
-  function montarFormulario(cfg4, tabela, registro, q, estado2) {
-    const campos = cfg4.campos(registro, q);
-    let valores = estado2 ? estado2.valores : paraFormulario(campos, registro && cfg4.valores ? cfg4.valores(registro, q) : registro);
+  function montarFormulario(cfg5, tabela, registro, q, estado2) {
+    const campos = cfg5.campos(registro, q);
+    let valores = estado2 ? estado2.valores : paraFormulario(campos, registro && cfg5.valores ? cfg5.valores(registro, q) : registro);
     if (!registro && !estado2) {
       const padroes = Object.fromEntries(campos.filter((c) => c.nome && c.padrao !== void 0).map((c) => [c.nome, c.padrao]));
-      valores = paraFormulario(campos, { ...padroes, ...cfg4.padrao ? cfg4.padrao(q) : {} });
+      valores = paraFormulario(campos, { ...padroes, ...cfg5.padrao ? cfg5.padrao(q) : {} });
     }
     if (!estado2) memoria.formularioAberto = registro ? { chave: `${tabela}:${registro.id}`, valores } : null;
-    const base = cfg4.base ? cfg4.base(registro) : null;
-    const avisoTexto = cfg4.aviso ? cfg4.aviso(registro, q) : "";
-    return `<h1>${esc(cfg4.titulo(registro, q))}</h1>${avisoTexto ? `<div class="alerta info">${esc(avisoTexto)}</div>` : ""}
+    const base = cfg5.base ? cfg5.base(registro) : null;
+    const avisoTexto = cfg5.aviso ? cfg5.aviso(registro, q) : "";
+    return `<h1>${esc(cfg5.titulo(registro, q))}</h1>${avisoTexto ? `<div class="alerta info">${esc(avisoTexto)}</div>` : ""}
     <form class="cartao" data-form="cadastro" ${base !== null && base !== void 0 ? `data-base="${base}"` : ""}>
-      ${camposHtml(campos, valores, estado2 ? estado2.erros : {}, { compacto: !!cfg4.compacto })}${cfg4.extraHtml ? cfg4.extraHtml(registro, q) : ""}
-      <p class="acoes" style="margin-top:16px"><button>Salvar</button><a class="botao secundario" href="${esc(cfg4.voltar(registro, q))}">Voltar</a></p></form>`;
+      ${camposHtml(campos, valores, estado2 ? estado2.erros : {}, { compacto: !!cfg5.compacto })}${cfg5.extraHtml ? cfg5.extraHtml(registro, q) : ""}
+      <p class="acoes" style="margin-top:16px"><button>Salvar</button><a class="botao secundario" href="${esc(cfg5.voltar(registro, q))}">Voltar</a></p></form>`;
   }
   var comListas, COMPROVANTES_CONTRATO, COMPROVANTE_APLICACAO, comprovanteDoDeposito, COMPROVANTE_COMPLEMENTO, COMPROVANTES_FICHA, COMPROVANTE_DEVOLUCAO, arquivoEscolhido, nomeComprovante2, xAnexo, ANEXOS_COM_X, linkComprovante, fiadoresMudancas, inquilinosDaSolicitacao, fiadoresDaTroca2, avisoAditivo, guardarModeloAirbnb, imovelVago2, imoveisDaFicha, CONTATO_FICHA, CADASTROS;
   var init_cadastros = __esm({
@@ -30908,7 +31622,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     g.save();
     g.fillStyle = enquadro.fundo;
     g.fillRect(0, 0, lado, lado);
-    const img = imagemDaLogo;
+    const img = imagemDaLogo2;
     if (img && img.width) {
       const diagonal = Math.hypot(img.width, img.height);
       const escala = lado * AREA_SEGURA * enquadro.zoom / diagonal;
@@ -31001,16 +31715,16 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
   }
   async function carregarLogo() {
     const logo = d().logo || "";
-    if (imagemDaLogo && logoCarregada === logo) return imagemDaLogo;
+    if (imagemDaLogo2 && logoCarregada === logo) return imagemDaLogo2;
     const original = await new Promise((ok, falha) => {
       const i = new Image();
       i.onload = () => ok(i);
       i.onerror = () => falha(new Error("Não consegui abrir a logo."));
       i.src = logo;
     });
-    imagemDaLogo = semMargens(original);
+    imagemDaLogo2 = semMargens(original);
     logoCarregada = logo;
-    return imagemDaLogo;
+    return imagemDaLogo2;
   }
   function ligarEditorIcone(raiz) {
     const caixa = raiz.querySelector("#icone-app");
@@ -31090,7 +31804,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     return `<div class="alerta info primeira-logo"><b>Primeiro passo: a logo da empresa.</b> Ela aparece no topo do sistema, nos contratos e cartas e vira o ícone do aplicativo no celular (hoje o quadrado "ERP").
     <span class="acoes" style="margin-top:6px"><a class="botao pequeno" href="#/empresas?ir=logo-empresa">Escolher a logo</a> <button type="button" class="secundario pequeno" data-acao="adiarLogo">Fazer depois</button></span></div>`;
   }
-  var enquadro, GUARDADO, guardarEnquadro, AREA_SEGURA, imagemDaLogo, logoCarregada, chaveAdiada, ACOES_ICONE;
+  var enquadro, GUARDADO, guardarEnquadro, AREA_SEGURA, imagemDaLogo2, logoCarregada, chaveAdiada, ACOES_ICONE;
   var init_icone = __esm({
     "docs/js/telas/icone.js"() {
       init_app();
@@ -31109,7 +31823,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         }
       };
       AREA_SEGURA = 0.8;
-      imagemDaLogo = null;
+      imagemDaLogo2 = null;
       logoCarregada = "";
       chaveAdiada = () => `logo-adiada:${login() || ""}`;
       ACOES_ICONE = {
@@ -31208,11 +31922,11 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
   async function planilhaDeTudo(ExcelJS, d2) {
     const wb = new ExcelJS.Workbook();
     const lista3 = dadosParaExportar(d2);
-    const resumo2 = wb.addWorksheet("Resumo");
-    resumo2.columns = [{ header: "Cadastro", width: 40 }, { header: "Registros", width: 12 }];
-    resumo2.addRow([`Todos os dados em ${agoraBr()}`, ""]);
-    for (const t of lista3) resumo2.addRow([t.titulo, t.registros.length]);
-    resumo2.getRow(1).font = { bold: true };
+    const resumo3 = wb.addWorksheet("Resumo");
+    resumo3.columns = [{ header: "Cadastro", width: 40 }, { header: "Registros", width: 12 }];
+    resumo3.addRow([`Todos os dados em ${agoraBr()}`, ""]);
+    for (const t of lista3) resumo3.addRow([t.titulo, t.registros.length]);
+    resumo3.getRow(1).font = { bold: true };
     const usados = /* @__PURE__ */ new Set(["resumo"]);
     for (const t of lista3) {
       const ws = wb.addWorksheet(nomeAba(t.titulo, usados));
@@ -31457,9 +32171,9 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
   function aplicarDesfazer(db, itens) {
     let recalculados = 0;
     for (const { tabela, id } of desfazerAlteracoes(db, itens, login())) {
-      const cfg4 = CADASTROS[tabela];
+      const cfg5 = CADASTROS[tabela];
       const r = buscar(db, tabela, id);
-      if (cfg4 && cfg4.recalcular && r) recalculados += recalcularCobrancas(db, cfg4.recalcular(r, db), login());
+      if (cfg5 && cfg5.recalcular && r) recalculados += recalcularCobrancas(db, cfg5.recalcular(r, db), login());
       if (tabela === "notificacoes" && r) recalculados += sincronizarMultas(db, r.contrato_id, login());
     }
     return recalculados;
@@ -31715,14 +32429,14 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       ${g.itens.map((x) => `<p style="margin:6px 0"><a href="${x.link}"><b>${esc(x.titulo)}</b></a>${x.extra ? ` ${etiqueta(x.extra, "neutra")}` : ""}<br><span class="suave">${esc(x.detalhe)}</span></p>`).join("")}</div>`).join("") || (texto3 ? `<div class="alerta info">Nada encontrado para "<b>${esc(texto3)}</b>"${filtro ? ` em ${filtro[1].toLocaleLowerCase("pt-BR")}` : ""}. Tente parte do nome, só os números do CPF ou telefone, o número da NF (ex.: 77) ou o valor do boleto (ex.: 1.350,00).</div>` : '<p class="suave">Digite parte do nome do imóvel ou do inquilino, CPF/CNPJ, telefone, e-mail, o número da NF ou o valor de um boleto.</p>')}`;
   }
   function telaSolicitacoes(q) {
-    const resumo2 = resumoSolicitacoes(d());
+    const resumo3 = resumoSolicitacoes(d());
     const filtro = SITUACOES_SOLICITACAO.find((s) => s.nome === q.situacao);
     const simbolo = (sit) => (SITUACOES_SOLICITACAO.find((s) => s.nome === sit) || SITUACOES_SOLICITACAO[0]).simbolo;
     const lista3 = d().solicitacoes.filter((x) => !filtro || (x.situacao || "Aberta") === filtro.nome).sort(maisRecentePrimeiro);
     return `<p class="suave"><a href="#/inquilinos">← Inquilinos</a></p>
-    <div class="cabecalho"><h1>Solicitações dos inquilinos</h1>${opera() ? link("#/novo/solicitacoes?de=solicitacoes", "Abrir nova solicitação", "botao") : ""}</div>
+    ${atalhosComunicacoes("solicitacoes")}<div class="cabecalho"><h1>Solicitações dos inquilinos</h1>${opera() ? link("#/novo/solicitacoes?de=solicitacoes", "Abrir nova solicitação", "botao") : ""}</div>
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap">${link("#/solicitacoes", `Todas (${d().solicitacoes.length})`, `botao ${filtro ? "secundario " : ""}pequeno`)}
-      ${SITUACOES_SOLICITACAO.map((s) => link(`#/solicitacoes?situacao=${encodeURIComponent(s.nome)}`, `${s.simbolo} ${resumo2[s.nome]} ${s.texto}`, `botao ${filtro === s ? "" : "secundario "}pequeno`)).join(" ")}</div>
+      ${SITUACOES_SOLICITACAO.map((s) => link(`#/solicitacoes?situacao=${encodeURIComponent(s.nome)}`, `${s.simbolo} ${resumo3[s.nome]} ${s.texto}`, `botao ${filtro === s ? "" : "secundario "}pequeno`)).join(" ")}</div>
     <div class="cartao rolagem"><table><tr><th>Data</th><th>Inquilino / imóvel</th><th>O que pediu</th><th>O que foi feito</th><th>Situação</th><th class="n">Custo</th><th></th></tr>
     ${lista3.map((x) => {
       const c = buscar2("contratos", x.contrato_id);
@@ -31774,10 +32488,10 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       "Já tem o contrato assinado? Cadastre o contrato. Alguém ainda vai mandar os documentos para análise? Comece pela ficha.",
       [opera() && ["#/novo/contratos", "Cadastrar o contrato"], opera() && ["#/novo/fichas", "Nova ficha em análise"]]
     );
-    const resumo2 = resumoSolicitacoes(d());
-    return `<div class="cabecalho"><h1>Inquilinos</h1></div>
+    const resumo3 = resumoSolicitacoes(d());
+    return `<div class="cabecalho"><h1>Inquilinos</h1></div>${abasInquilinos("lista")}
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="ir" data-ir="inquilinos" style="flex-wrap:nowrap;min-width:0;max-width:100%"><input name="busca" value="${esc(q.busca || "")}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px;max-width:100%;min-width:0"><button class="secundario">Buscar</button>${busca ? link("#/inquilinos", "Limpar") : ""}</form>
-      <a class="botao secundario resumo-solicitacoes" href="#/solicitacoes" title="Ver todas as solicitações dos inquilinos">Solicitações: ${SITUACOES_SOLICITACAO.map((s) => `<span>${s.simbolo} ${resumo2[s.nome]} ${s.texto}</span>`).join(" ")}</a>
+      <a class="botao secundario resumo-solicitacoes" href="#/solicitacoes" title="Ver todas as solicitações dos inquilinos">Solicitações: ${SITUACOES_SOLICITACAO.map((s) => `<span>${s.simbolo} ${resumo3[s.nome]} ${s.texto}</span>`).join(" ")}</a>
       ${(() => {
       const l = (d().notificacoes || []).filter((n) => ["Rascunho", "Aguardando resposta", "Multa gerada"].includes(n.situacao));
       const v = l.filter((n) => estadoNotificacao(d(), n).podeMulta).length;
@@ -31973,6 +32687,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       init_formularios();
       init_regras();
       init_comum();
+      init_comunicacoes();
       init_fichas();
       TIPOS_BUSCA = [["inquilinos", "Inquilinos"], ["imoveis", "Imóveis"], ["boletos", "Boletos com esse valor"], ["nfs", "Notas fiscais"]];
       SITUACOES_SOLICITACAO = [
@@ -32402,10 +33117,10 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
   function caixaGarantiasPorEmpresa() {
     const g = garantiasPorEmpresa(d());
     if (!g.lugares.length && !g.semAplicar.length) return '<div class="cartao"><p class="suave">Nenhuma caução ou depósito de garantia com a empresa.</p></div>';
-    const resumo2 = g.lugares.map((l, i) => `<b>${esc(l.nome)}</b> ${reais(l.total)} (corrigido ${corrigida(`l${i}`)})`).join(" · ");
+    const resumo3 = g.lugares.map((l, i) => `<b>${esc(l.nome)}</b> ${reais(l.total)} (corrigido ${corrigida(`l${i}`)})`).join(" · ");
     return `<div class="cartao" id="garantias-por-empresa" data-garantias-corrigidas><h2>Onde está a caução e o depósito de garantia</h2>
     <p>Depositado: <b>${reais(g.aplicado)}</b> · corrigido hoje pela poupança: <b>${corrigida("aplicado")}</b>${g.total > g.aplicado ? ` · falta aplicar <b>${reais(g.total - g.aplicado)}</b> (corrigido ${corrigida("faltaAplicar")})` : ""}.</p>
-    ${resumo2 ? `<p class="suave">${resumo2}</p>` : ""}
+    ${resumo3 ? `<p class="suave">${resumo3}</p>` : ""}
     <p class="suave" data-corrigido="aviso"></p>
     ${g.lugares.map((l, i) => `<h3>${esc(l.nome)}${l.pessoa ? ` ${etiqueta("outra pessoa", "info")}` : ""} · ${reais(l.total)} <span class="suave">(${new Set(l.itens.map((x) => x.contrato.id)).size} inquilino(s))</span></h3>
       <div class="rolagem"><table class="compacta"><tr><th>Inquilino</th><th>Imóvel</th><th>Garantia</th><th>Aplicado em</th><th class="n">Valor aplicado</th><th class="n">Corrigido hoje</th><th>Depósitos do inquilino</th><th></th></tr>
@@ -32420,7 +33135,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
   async function ligarGarantiasCorrigidas(raiz) {
     const caixa = raiz.querySelector("[data-garantias-corrigidas]");
     if (!caixa) return;
-    const preencher = (alvo, html) => {
+    const preencher2 = (alvo, html) => {
       for (const el of caixa.querySelectorAll(`[data-corrigido="${alvo}"]`)) el.innerHTML = html;
     };
     const g = garantiasPorEmpresa(d());
@@ -32428,17 +33143,17 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       const r = await garantiasCorrigidasHoje(g, hojeIso(), fetch, taxasDaPoupanca());
       if (!caixa.isConnected) return;
       r.lugares.forEach((l, i) => {
-        preencher(`l${i}`, reais(l.corrigido));
-        l.itens.forEach((v, j) => preencher(`l${i}-${j}`, reais(v)));
+        preencher2(`l${i}`, reais(l.corrigido));
+        l.itens.forEach((v, j) => preencher2(`l${i}-${j}`, reais(v)));
       });
-      r.semAplicar.forEach((v, j) => preencher(`s${j}`, reais(v)));
-      preencher("aplicado", reais(r.aplicado));
-      preencher("faltaAplicar", reais(r.faltaAplicar));
-      preencher("aviso", r.falta.length ? `O Banco Central ainda não tem a taxa de ${r.falta.length} período(s) (${r.falta.slice(0, 3).map(dataBr).join(", ")}${r.falta.length > 3 ? "…" : ""}): esses meses ficaram sem rendimento.` : "");
+      r.semAplicar.forEach((v, j) => preencher2(`s${j}`, reais(v)));
+      preencher2("aplicado", reais(r.aplicado));
+      preencher2("faltaAplicar", reais(r.faltaAplicar));
+      preencher2("aviso", r.falta.length ? `O Banco Central ainda não tem a taxa de ${r.falta.length} período(s) (${r.falta.slice(0, 3).map(dataBr).join(", ")}${r.falta.length > 3 ? "…" : ""}): esses meses ficaram sem rendimento.` : "");
     } catch (e) {
       if (!caixa.isConnected) return;
       for (const el of caixa.querySelectorAll("[data-corrigido]")) el.innerHTML = '<span class="suave">-</span>';
-      preencher("aviso", `${esc(e.message)} O corrigido aparece quando abrir de novo com internet.`);
+      preencher2("aviso", `${esc(e.message)} O corrigido aparece quando abrir de novo com internet.`);
     }
   }
   var abasFinanceiro, pctTxt, menos, datasDosDepositos, linkInquilino, BUSCANDO, corrigida, telaGarantias;
@@ -33541,6 +34256,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       init_comum();
       init_arquivo_impresso2();
       init_notificacoes2();
+      init_comunicacoes();
       init_documentos();
       init_envios();
       init_faturas();
@@ -34031,28 +34747,28 @@ ${MODELO_COMODOS[comodo].join("\n")}
         },
         voltar: () => history.back(),
         async excluir({ tabela, id }) {
-          const cfg4 = TABELAS_EXCLUSAO[tabela] || {};
-          if (cfg4.admin && !podeUsuario("admin")) throw new ErroUsuario("Só o administrador exclui este tipo de registro.");
+          const cfg5 = TABELAS_EXCLUSAO[tabela] || {};
+          if (cfg5.admin && !podeUsuario("admin")) throw new ErroUsuario("Só o administrador exclui este tipo de registro.");
           const r = buscar2(tabela, id);
           if (!r) throw new ErroUsuario("Este registro já foi excluído.");
           if (EXCLUSAO_GRANDE[tabela]) {
-            const problema = cfg4.checar ? cfg4.checar(d(), r) : null;
+            const problema = cfg5.checar ? cfg5.checar(d(), r) : null;
             if (problema) throw new ErroUsuario(problema);
             if (!await confirmarExclusaoGrande(tabela, r)) return;
           }
-          const destino = cfg4.voltar ? cfg4.voltar(r) : null;
+          const destino = cfg5.voltar ? cfg5.voltar(r) : null;
           const pastaFicha = tabela === "fichas" && r ? r.pasta || nomePastaFicha(r) : null;
           await (["imoveis", "fichas"].includes(tabela) ? alterar : alterarApagandoAnexos)((db) => {
             const reg = buscar(db, tabela, id);
-            const problema = cfg4.checar ? cfg4.checar(db, reg) : null;
+            const problema = cfg5.checar ? cfg5.checar(db, reg) : null;
             if (problema) throw new ErroUsuario(problema);
             if (tabela === "imoveis") {
               for (const t of TABELAS_DO_IMOVEL) db[t].filter((p2) => p2.imovel_id === reg.id).forEach((p2) => excluir(db, t, p2.id, login()));
             }
             if (tabela === "contratos") excluirContrato(db, reg.id, login());
             else excluir(db, tabela, reg.id, login(), reg.nome || reg.descricao || (tabela === "fichas" ? `Ficha de ${reg.inquilino_nome}` : null));
-            if (cfg4.recalcular) recalcularCobrancas(db, cfg4.recalcular(db, reg), login());
-            if (cfg4.depois) cfg4.depois(db, reg);
+            if (cfg5.recalcular) recalcularCobrancas(db, cfg5.recalcular(db, reg), login());
+            if (cfg5.depois) cfg5.depois(db, reg);
           });
           if (pastaFicha) await apagarPastaDaFicha(pastaFicha);
           if (tabela === "contratos") {
@@ -35453,7 +36169,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           await mostrar();
         }
       };
-      Object.assign(ACOES, ACOES_BANCO, ACOES_FICHAS, ACOES_ICONE, ACOES_EMAILS, ACOES_PASTA, ACOES_NOTIFICACOES);
+      Object.assign(ACOES, ACOES_BANCO, ACOES_FICHAS, ACOES_ICONE, ACOES_EMAILS, ACOES_PASTA, ACOES_NOTIFICACOES, ACOES_COMUNICACOES);
       Object.assign(ACOES, adiados("acoes"));
     }
   });
@@ -35542,6 +36258,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       init_banco2();
       init_emails();
       init_notificacoes2();
+      init_comunicacoes();
       init_cadastros();
       init_campos();
       init_comum();
@@ -35947,50 +36664,50 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         },
         async cadastro(form, rota) {
           const tabela = rota.partes[1];
-          const cfg4 = CADASTROS[tabela];
+          const cfg5 = CADASTROS[tabela];
           const registro = rota.partes[0] === "editar" ? buscar2(tabela, rota.partes[2]) : null;
           if (rota.partes[0] === "editar" && !registro) throw new ErroUsuario(REGISTRO_EXCLUIDO);
           const antigo = registro ? { ...registro } : null;
-          const campos = cfg4.campos(registro, rota.q);
-          const { dados, erros } = ler(campos, form, registro && cfg4.valores ? cfg4.valores(registro) : registro);
-          if (cfg4.ajustar && !Object.keys(erros).length) cfg4.ajustar(dados, erros, registro, form, rota.q);
-          else if (cfg4.ajustar) {
+          const campos = cfg5.campos(registro, rota.q);
+          const { dados, erros } = ler(campos, form, registro && cfg5.valores ? cfg5.valores(registro) : registro);
+          if (cfg5.ajustar && !Object.keys(erros).length) cfg5.ajustar(dados, erros, registro, form, rota.q);
+          else if (cfg5.ajustar) {
             const mais = {};
             try {
-              cfg4.ajustar({ ...dados }, mais, registro, form, rota.q);
+              cfg5.ajustar({ ...dados }, mais, registro, form, rota.q);
             } catch {
             }
             for (const [k, v] of Object.entries(mais)) if (!erros[k]) erros[k] = v;
           }
-          if (cfg4.confirmar && !Object.keys(erros).length && !await cfg4.confirmar(dados, registro)) throw new ErroUsuario("Nada foi salvo. Corrija o que precisar e salve de novo.");
-          if (cfg4.ajustarAsync && !Object.keys(erros).length) await cfg4.ajustarAsync(dados, erros, registro, form, rota.q);
+          if (cfg5.confirmar && !Object.keys(erros).length && !await cfg5.confirmar(dados, registro)) throw new ErroUsuario("Nada foi salvo. Corrija o que precisar e salve de novo.");
+          if (cfg5.ajustarAsync && !Object.keys(erros).length) await cfg5.ajustarAsync(dados, erros, registro, form, rota.q);
           if (Object.keys(erros).length) return { erros, valores: Object.fromEntries(new FormData(form)) };
-          await confirmarAvisos(cfg4.conferir ? cfg4.conferir(dados, registro, rota.q) : []);
-          Object.assign(dados, cfg4.fixos ? cfg4.fixos(registro, rota.q) : {});
-          const descricao = cfg4.descricao ? cfg4.descricao(dados, registro, rota.q) : null;
+          await confirmarAvisos(cfg5.conferir ? cfg5.conferir(dados, registro, rota.q) : []);
+          Object.assign(dados, cfg5.fixos ? cfg5.fixos(registro, rota.q) : {});
+          const descricao = cfg5.descricao ? cfg5.descricao(dados, registro, rota.q) : null;
           let recalculados = 0;
           let deOutro = [];
           const aberto = registro && memoria.formularioAberto?.chave === `${tabela}:${registro.id}` ? memoria.formularioAberto.valores : null;
           const salvo = await alterar((db) => {
             const agora = registro && buscar(db, tabela, registro.id);
             if (registro && !agora) throw new ErroUsuario(REGISTRO_EXCLUIDO);
-            if (aberto) deOutro = manterMudancasDeOutros(campos, dados, aberto, paraFormulario(campos, cfg4.valores ? cfg4.valores(agora, rota.q) : agora), agora);
+            if (aberto) deOutro = manterMudancasDeOutros(campos, dados, aberto, paraFormulario(campos, cfg5.valores ? cfg5.valores(agora, rota.q) : agora), agora);
             let r;
-            if (cfg4.salvar) r = cfg4.salvar(db, dados, rota.q, registro);
+            if (cfg5.salvar) r = cfg5.salvar(db, dados, rota.q, registro);
             else if (registro) {
               atualizar(db, tabela, registro.id, dados, login(), descricao);
               r = buscar(db, tabela, registro.id);
             } else r = inserir(db, tabela, dados, login(), descricao);
-            if (cfg4.recalcular) recalculados = recalcularCobrancas(db, cfg4.recalcular(r, db), login());
+            if (cfg5.recalcular) recalculados = recalcularCobrancas(db, cfg5.recalcular(r, db), login());
             return r;
           });
-          if (cfg4.depois) await cfg4.depois(salvo, antigo);
+          if (cfg5.depois) await cfg5.depois(salvo, antigo);
           if (["contratos", "depositos_garantia", "correcoes_garantia", "aplicacoes", "devolucoes_garantia"].includes(tabela)) await acertarNomesDosComprovantes(tabela === "contratos" ? salvo.id : salvo.contrato_id);
           if (tabela === "usuarios") renovarUsuario();
           if (registro) memoria.formularioAberto = null;
           aviso(recalculados ? `Salvo. ${recalculados} boleto(s) em aberto recalculado(s) com os valores novos.` : "Salvo.");
           if (deOutro.length) aviso(`Enquanto o formulário estava aberto, outra pessoa mudou: ${deOutro.join(", ")}. Ficou o valor dela (você não tinha mexido nesses campos).`, "info");
-          const destino = tabela === "imoveis" ? `#/imovel/${salvo.id}` : cfg4.destino ? cfg4.destino(salvo, rota.q) : cfg4.voltar(salvo, rota.q);
+          const destino = tabela === "imoveis" ? `#/imovel/${salvo.id}` : cfg5.destino ? cfg5.destino(salvo, rota.q) : cfg5.voltar(salvo, rota.q);
           ir(destino);
           return null;
         },
@@ -36210,7 +36927,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           await mostrar();
         }
       };
-      Object.assign(FORMULARIOS, FORMULARIOS_BANCO, FORMULARIOS_EMAILS, FORMULARIOS_NOTIFICACOES, adiados("formularios"));
+      Object.assign(FORMULARIOS, FORMULARIOS_BANCO, FORMULARIOS_EMAILS, FORMULARIOS_NOTIFICACOES, FORMULARIOS_COMUNICACOES, adiados("formularios"));
     }
   });
 
@@ -36248,6 +36965,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       init_campos();
       init_cobrancas();
       init_comum();
+      init_comunicacoes();
       init_consultas();
       init_contrato();
       init_notificacoes2();
@@ -36642,6 +37360,8 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         empresas: () => telaEmpresas(),
         regras: async () => (await parteAdiada("regras")).telaRegras(),
         inquilinos: (rota) => telaInquilinos(rota.q),
+        comunicacoes: (rota) => telaComunicacoes(rota.q),
+        "aceite-contatos": (rota) => telaAceiteContatos(rota.q),
         ficha: (rota) => telaFicha(Number(rota.partes[1])),
         buscar: (rota) => telaBusca(rota.q),
         solicitacoes: (rota) => telaSolicitacoes(rota.q),
@@ -36796,13 +37516,13 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
     const raiz = await navigator.storage.getDirectory();
     return raiz.getDirectoryHandle("teste-backup-seguro", { create: true });
   }
-  async function conectarSeguro(pedir2 = false) {
+  async function conectarSeguro(pedir3 = false) {
     const h = await pastaSeguraLembrada();
     if (!h) {
       E.seguro = null;
       return false;
     }
-    if (!await temPermissao(h, pedir2)) {
+    if (!await temPermissao(h, pedir3)) {
       E.seguro = { dir: h, desconectado: true };
       return false;
     }
