@@ -102,13 +102,13 @@ test('e-mails: anexos do sistema (recibo e comprovante) e proposta com IPTU, seg
   assert.match(e, /Contas de energia: por conta do locatário/);
   assert.match(e, /Incluso no aluguel: água/);
   assert.match(e, /Prazo do contrato: 30 meses/);
-  assert.match(e, /seguem anexos o recibo e o comprovante/);
+  assert.match(e, /recibo e comprovante anexos/);
   // devolução: o termo só depois de registrada
   const dev = anexosProntos(d, modeloEmail(d, 'ficha_devolucao'), { ficha: f });
   assert.equal(dev[0].ok, false);
   Object.assign(f, { situacao: 'Reprovada', devolucao_data: '2026-11-14', comprovante_devolucao: 'comprovante-devolucao-2026-11-14.pdf' });
   assert.deepEqual(anexosProntos(d, modeloEmail(d, 'ficha_devolucao'), { ficha: f }).map((a) => a.ok ?? a.nome), [true, 'comprovante-devolucao-2026-11-14.pdf']);
-  assert.match(montarEmail(modeloEmail(d, 'ficha_devolucao'), dadosDoEmail(d, { ficha: f })).texto, /devolução de R\$ 4\.150,00 em 14\/11\/2026/);
+  assert.match(montarEmail(modeloEmail(d, 'ficha_devolucao'), dadosDoEmail(d, { ficha: f })).texto, /Devolvemos R\$ 4\.150,00 em 14\/11\/2026/);
   // saída: o comprovante do saldo
   const enc = R.inserir(d, 'encerramentos', { contrato_id: c.id, data_saida: '2029-05-14', garantia_valor: 1245000, debitos: 0, saldo: 1245000, garantia_devolvida_em: '2029-05-20', comprovante: 'comprovante-devolucao-saldo-2029-05-20.pdf' }, 'j');
   assert.deepEqual(anexosProntos(d, modeloEmail(d, 'saida_encerramento'), { contrato: c }).map((a) => a.ok ?? a.nome), [true, enc.comprovante]);
@@ -167,7 +167,7 @@ test('ficha cadastral em PDF: dados preenchidos, linhas em branco, documentos pe
   const prontos = anexosProntos(d, modeloEmail(d, 'ficha_envio'), { ficha: f });
   assert.deepEqual(prontos.filter((a) => a.recibo === 'ficha_fiador').map((a) => [a.rotulo, a.alvo.fiador]), [['Ficha cadastral do fiador (Ana Lima)', 1]]);
   const e = montarEmail(modeloEmail(d, 'ficha_envio'), dadosDoEmail(d, { ficha: f }, {}, '2026-11-14')).texto;
-  assert.match(e, /e a ficha do fiador/);
+  assert.match(e, /, a do fiador e os documentos/);
   assert.match(e, /1\. Documento com foto e CPF \(RG ou CNH\)\n2\. Certidão de casamento/);
   assert.match(e, /DO FIADOR\n1\. Documento com foto e CPF/);
   assert.doesNotMatch(e, /\[preencher/);
@@ -188,7 +188,7 @@ test('ficha cadastral em PDF: dados preenchidos, linhas em branco, documentos pe
   Object.assign(f, { fiador2_nome: 'Rui Prado', fiador2_estado_civil: 'Solteiro(a)' });
   const dois = montarEmail(modeloEmail(d, 'ficha_envio'), dadosDoEmail(d, { ficha: f }, {}, '2026-11-14')).texto;
   assert.match(dois, /DO FIADOR \(Ana Lima\)[\s\S]*DO FIADOR \(Rui Prado\)/);
-  assert.match(dois, /e a ficha de cada fiador/);
+  assert.match(dois, /, a de cada fiador e os documentos/);
 });
 
 test('tipos de renda: cada opção do formulário tem a sua lista de documentos', async () => {
