@@ -98,13 +98,13 @@ test('textos da régua: valor em dia, multa, juros, Pix e linha digitável; anex
   const alvo = { contrato: c, cobranca: cb };
   const antes = montarEmail(modeloEmail(d, 'cobranca_antes'), dadosDoEmail(d, alvo, {}, '2026-12-07'));
   assert.match(antes.assunto, /boleto do aluguel de 11\/2026 \(Rua Exemplo, 1\) vence em 10\/12\/2026/);
-  assert.match(antes.texto, /no valor de R\$ 1\.242,00 \(já com a bonificação de pontualidade\)/);
+  assert.match(antes.texto, /Valor: R\$ 1\.242,00, já com a bonificação/);
   assert.match(antes.texto, /R\$ 1\.350,00, mais multa de 2% e juros de 1% ao mês/);
   assert.match(antes.texto, /PIX COPIA E COLA\n00020126PIXTESTE/);
-  assert.match(antes.texto, /LINHA DIGITÁVEL DO BOLETO\n33690/);
+  assert.match(antes.texto, /LINHA DIGITÁVEL\n33690/);
   const atraso = montarEmail(modeloEmail(d, 'cobranca_atraso'), dadosDoEmail(d, alvo, {}, '2026-12-16'));
   assert.match(atraso.texto, /\(6 dia\(s\) de atraso\)/);
-  assert.match(atraso.texto, /Valor para pagamento hoje \(16\/12\/2026\): R\$ 1\.379,70 \(R\$ 1\.350,00 \+ multa de R\$ 27,00 \+ juros de R\$ 2,70\)/);
+  assert.match(atraso.texto, /Para pagar hoje \(16\/12\/2026\): R\$ 1\.379,70 \(R\$ 1\.350,00 \+ multa de R\$ 27,00 \+ juros de R\$ 2,70\)/);
   for (const e of [antes, atraso, montarEmail(modeloEmail(d, 'cobranca_dia'), dadosDoEmail(d, alvo, {}, '2026-12-10'))]) {
     assert.doesNotMatch(e.texto + e.assunto, /\[preencher|\[se |\[fim\]|\{[a-z_]+\}/i);
   }

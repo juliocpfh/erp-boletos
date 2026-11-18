@@ -226,7 +226,7 @@ test('PDF, e-mails e anexos: assinada vai no e-mail; arquivo impresso; excluir o
   const alvo = { contrato: c, notificacao: n };
   const e = montarEmail(modeloEmail(d, 'notificacao_envio'), dadosDoEmail(d, alvo, {}, '2026-11-17'));
   assert.equal(e.assunto, 'Notificação: Instalação irregular ou obra sem autorização (Rua das Flores, 120 – Apto 3)');
-  assert.match(e.texto, /O prazo para resolver é de 10 \(dez\) dias úteis, ou seja, até 02\/12\/2026/);
+  assert.match(e.texto, /Prazo para resolver: 10 \(dez\) dias úteis, até 02\/12\/2026/);
   assert.doesNotMatch(e.texto + e.assunto, /\[preencher|\{[a-z_]+\}/);
   assert.match(montarEmail(modeloEmail(d, 'notificacao_lembrete'), dadosDoEmail(d, alvo, {}, '2026-12-02')).texto, /termina hoje, 02\/12\/2026/);
   assert.deepEqual(anexosProntos(d, modeloEmail(d, 'notificacao_envio'), alvo).map((a) => [a.tipo, a.ok]), [['recibo', true]], 'sem a assinada: o PDF para assinar');
