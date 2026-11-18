@@ -13,6 +13,7 @@
 // · dados/aparelhos (GET) e dados/desligar-aparelho (POST): "Aparelhos ligados" em Usuários (com o login do Access);
 //   dados/verificador-aparelho (POST): o site manda o verificador da senha para ligar o programa do PC (aparelhos.mjs).
 // · dados/chave-backup (POST, administrador): a chave pública do backup seguro, para os backups diários saírem cifrados (cifrar-backup.mjs).
+// · dados/backup-seguro (GET) e dados/backup-seguro-feito (POST, administrador): quando foi a última cópia do backup seguro e por quem.
 // · dados/acessos (GET, administrador): o registro de acessos (tela Acessos). O Worker anota no cofre quem abriu, anexou,
 //   apagou ou moveu arquivos, baixou backups, mandou e-mail e usou a ficha pela internet (anotarAcesso); o cofre anota
 //   sozinho dados/tudo, a carga/substituição e a entrada do programa do PC.
@@ -158,7 +159,7 @@ async function lerCorpo(request, maximo) {
 // ---------------------------------------------------------------------------
 // Dados: repassa ao cofre (Durable Object), com o e-mail já conferido; o Worker não lê o conteúdo (limite de 10 ms)
 // ---------------------------------------------------------------------------
-const ROTAS_COFRE = { tudo: 'GET', mudancas: 'GET', conflitos: 'GET', lote: 'POST', resolver: 'POST', faixa: 'POST', contador: 'POST', importar: 'POST', aparelhos: 'GET', 'desligar-aparelho': 'POST', 'verificador-aparelho': 'POST', 'chave-backup': 'POST', acessos: 'GET' };
+const ROTAS_COFRE = { tudo: 'GET', mudancas: 'GET', conflitos: 'GET', lote: 'POST', resolver: 'POST', faixa: 'POST', contador: 'POST', importar: 'POST', aparelhos: 'GET', 'desligar-aparelho': 'POST', 'verificador-aparelho': 'POST', 'chave-backup': 'POST', 'backup-seguro': 'GET', 'backup-seguro-feito': 'POST', acessos: 'GET' };
 const cofreDe = (env) => env.COFRE.get(env.COFRE.idFromName('principal')); // um cofre só: as filas entram uma por vez
 
 async function repassarAoCofre(request, env, rota, email, url, origem = 'site') {

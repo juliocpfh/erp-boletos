@@ -171,3 +171,20 @@ test('"Apagar tudo desta pessoa" do administrador: o cofre apaga o histórico gu
   assert.equal(c.mudancas(seq).refazer, true, 'os aparelhos baixam tudo de novo');
   assert.ok(c.tudo().historico.some((h) => h.acao === ACAO_APAGAR));
 });
+
+test('backup seguro da empresa: o computador do administrador avisa a cópia e todos os usuários leem quando foi (pedido de 18/11)', () => {
+  const c = novo();
+  assert.deepEqual(c.estadoBackupSeguro(OPERADOR), { feito_em: null, feito_por: null, chave_ligada: false });
+  assert.throws(() => c.backupSeguroFeito(OPERADOR), /Seu usuário não pode/);
+  const r = c.backupSeguroFeito(DONO);
+  assert.equal(r.feito_por, DONO); assert.ok(r.feito_em);
+  assert.deepEqual(c.estadoBackupSeguro(OPERADOR), r);
+});
+
+test('aviso do backup seguro da empresa: só avisa quando nenhum computador fez cópia em 3 dias', () => {
+  const agora = new Date('2026-11-21T14:00:00-03:00').getTime();
+  assert.equal(B.avisoDaEmpresa(null, agora), null, 'ainda não leu a nuvem: não avisa');
+  assert.deepEqual(B.avisoDaEmpresa({ feito_em: null }, agora), { tipo: 'nunca' });
+  assert.equal(B.avisoDaEmpresa({ feito_em: '2026-11-18T18:00:00.000Z' }, agora, 3), null, '18/11 às 15h: ainda dentro dos 3 dias');
+  assert.deepEqual(B.avisoDaEmpresa({ feito_em: '2026-11-18T16:00:00.000Z' }, agora, 3), { tipo: 'parado', desde: '2026-11-18T16:00:00.000Z' });
+});
