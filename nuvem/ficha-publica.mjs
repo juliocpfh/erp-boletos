@@ -482,6 +482,7 @@ export async function atenderFicha(request, env, { avisar = null, caminho = null
   const url = new URL(request.url);
   const rota = caminho ?? url.pathname;
   try {
+    if (rota === '/privacidade' && request.method === 'GET') return paginaPrivacidade();
     if (!env.DADOS) throw new ErroFicha(503, 'Serviço indisponível.');
     const m = request.method;
     if ((rota === '/' || rota === '' || rota === '/ficha') && m === 'GET') return paginaDaFicha();
@@ -542,6 +543,47 @@ function paginaDaFicha() {
     headers: { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': csp, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Robots-Tag': 'noindex', ...HSTS },
   });
 }
+
+/**
+ * Política de privacidade (endereço público exigido pelo Google para publicar o app do "Conectar o Gmail";
+ * pedido do dono, 2026-11-18). Texto fixo, sem script; sem barra invertida no texto (ver PAGINA).
+ */
+export function paginaPrivacidade() {
+  const csp = "default-src 'none'; style-src 'unsafe-inline'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'";
+  return new Response(PRIVACIDADE, {
+    headers: { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': csp, 'Cache-Control': 'public, max-age=3600', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', ...HSTS },
+  });
+}
+
+const PRIVACIDADE = `<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Política de privacidade</title>
+<style>body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#f5f6f8;color:#1d2330;margin:0;padding:16px;line-height:1.55}
+main{max-width:760px;margin:0 auto;background:#fff;border:1px solid #d6dae1;border-radius:10px;padding:20px 24px}
+h1{font-size:1.5rem;margin-top:0}h2{font-size:1.1rem;margin-top:1.4em}p,li{font-size:1rem}.suave{color:#5d6675;font-size:.9rem}</style>
+</head><body><main>
+<h1>Política de privacidade</h1>
+<p class="suave">Sistema de administração de imóveis (ERP Imoveis) · atualizada em 18/11/2026</p>
+<p>Este sistema é usado só pela equipe da administradora de imóveis para cuidar dos contratos de locação: fichas cadastrais, contratos, boletos, notas fiscais e recibos. Não é um serviço aberto ao público.</p>
+<h2>Que dados tratamos</h2>
+<p>Os dados que o interessado ou o inquilino nos informa para a locação: nome, CPF ou CNPJ, contato, endereço, renda e documentos enviados pela ficha cadastral; e os dados do contrato, dos pagamentos e das notas fiscais.</p>
+<h2>Para que usamos</h2>
+<p>Só para analisar a ficha, fazer e cumprir o contrato de locação, cobrar e dar recibo, emitir nota fiscal e cumprir obrigações legais e fiscais.</p>
+<h2>Uso da conta Google (Gmail)</h2>
+<ul>
+<li>O sistema pede à conta Gmail da administradora apenas a permissão de <b>enviar e-mails</b> em nome dela (e de saber qual conta foi ligada).</li>
+<li>O sistema <b>não lê</b>, não guarda, não apaga e não altera os e-mails da caixa de entrada.</li>
+<li>Os e-mails enviados são só os da administração da locação (ficha, contrato, boleto, nota fiscal, recibos e avisos), para os próprios interessados, inquilinos e fiadores.</li>
+<li>A autorização do Google fica guardada cifrada no servidor do sistema e nunca é repassada a ninguém. O uso dos dados recebidos das APIs do Google segue a Política de Dados do Usuário dos Serviços de API do Google, incluindo os requisitos de uso limitado.</li>
+<li>A administradora pode desligar a qualquer momento, no próprio sistema (Desconectar) ou na Conta do Google (Segurança, Apps com acesso à conta).</li>
+</ul>
+<h2>Compartilhamento</h2>
+<p>Não vendemos nem repassamos dados a terceiros. Eles só saem do sistema quando é preciso para a locação ou por obrigação legal: banco (boletos), prefeitura (nota fiscal), contador e órgãos públicos.</p>
+<h2>Guarda e segurança</h2>
+<p>Os dados ficam em servidor com acesso restrito à equipe, com login, conexão cifrada e cópia de segurança. Guardamos pelo tempo do contrato e pelos prazos exigidos em lei.</p>
+<h2>Seus direitos (LGPD)</h2>
+<p>Você pode pedir para ver, corrigir ou apagar os seus dados, quando a lei permitir, falando com a administradora pelo e-mail administracao@ankjck.com.br.</p>
+</main></body></html>`;
 
 const PAGINA = `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
