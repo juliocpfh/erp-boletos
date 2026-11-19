@@ -5,6 +5,7 @@
 // Texto: modelos `cobranca_antes`, `cobranca_dia` e `cobranca_atraso` (modelos-email.js), preenchidos por email-dados.js.
 import * as C from './calculos.js';
 import { DIAS_COMPENSACAO_BOLETO } from './conciliacao.js';
+import * as CR from './config-regras.js';
 import { regra } from './config-regras.js';
 import * as R from './regras.js';
 
@@ -44,7 +45,7 @@ export function dataDaEtapa(cb, dias) {
  * próxima etapa (a última, por JANELA_ULTIMA_ETAPA dias). Ex.: régua -3, 0, 3, 10 e vencimento qui 10/12/2026: 08/12 → -3;
  * 10/12 → 0; 11/12 a 15/12 → nenhuma (prazo do banco); 16/12 a 19/12 → 3; 20/12 a 19/01/2027 → 10.
  */
-export function etapaDoBoleto(cb, hoje, dias = regra('regua_email_dias') || []) {
+export function etapaDoBoleto(cb, hoje, dias = regra('regua_email_dias', cb) || []) {
   const limite = C.limitePagamento(cb.vencimento);
   const etapas = [...dias].sort((a, b) => a - b).map((n) => ({ n, data: dataDaEtapa(cb, n) }));
   let k = -1;
@@ -71,7 +72,8 @@ export const SITUACOES_REGUA = { enviado: 'Enviado pelo sistema', gmail: 'Aberto
  * Ex.: boleto de 11/2026 vencendo em 10/12/2026, em 08/12 → { dias: -3, etapa: '3 dia(s) antes do vencimento', modelo: 'cobranca_antes' }.
  */
 export function filaRegua(d, hoje = C.hojeIso()) {
-  const dias = regra('regua_email_dias') || [];
+  // dias de todas as regras em uso (sistema e regras especiais): a janela cobre todas; cada boleto usa as do contrato dele
+  const dias = CR.valoresEmUso('regua_email_dias').flat();
   if (!dias.length) return [];
   const menor = Math.min(...dias);
   const maior = Math.max(...dias);
@@ -88,7 +90,7 @@ export function filaRegua(d, hoje = C.hojeIso()) {
     if (cb.banco && ['pago', 'cancelado'].includes(cb.banco.situacao)) continue;
     const t = R.totais(cb);
     if (!(t.a_pagar_pontual > 0)) continue;
-    const n = etapaDoBoleto(cb, hoje, dias);
+    const n = etapaDoBoleto(cb, hoje);
     if (n === null || decididos.has(`${cb.id}|${n}`)) continue;
     if (n > 0 && R.aguardandoCredito(cb)) continue; // pagou, o banco ainda não creditou
     const c = R.buscar(d, 'contratos', cb.contrato_id);

@@ -318,16 +318,28 @@ export const CADASTROS = {
       // contrato a partir da ficha: o comprovante da reserva ainda está na pasta da ficha (abre e apaga de lá)
       const ficha = r ? null : fichaDoNovoContrato(q);
       const guardado = ficha && { acao: 'apagarArquivoDaFicha', dados: { ficha: ficha.id }, abrir: { escopo: 'ficha', id: ficha.id } };
+      const perfis = ordenar(d().perfis_regras || [], 'nome');
       return comListas(F.CONTRATO.flatMap((c) => (c.fiador ? (c.fiador === 1 && c.secao ? F.fiadoresNoCadastro(fiadores) : []) : [c]))
         .filter((c) => (r ? !c.soNovo : !c.soEditar))
-        .map((c) => (c.nome === 'contrato_anterior_id' ? { ...c, opcoes: ops } : c.nome === 'imovel_id' ? { ...c, opcoes: imoveis }
+        .filter((c) => c.nome !== 'perfil_regras_id' || perfis.length || (r && r.perfil_regras_id))
+        .map((c) => (c.nome === 'perfil_regras_id' ? { ...c, opcoes: perfis.map((p) => [String(p.id), p.nome]) } : c.nome === 'contrato_anterior_id' ? { ...c, opcoes: ops } : c.nome === 'imovel_id' ? { ...c, opcoes: imoveis }
           : c.nome === 'comprovante_reserva' && guardado ? { ...c, guardado } : c)));
     },
     // cada contrato é único: nada vem do inquilino anterior do imóvel, todas as condições são escolhidas de novo
     // a mesma pessoa em outro imóvel (q.pessoa): só os dados da pessoa vêm preenchidos
     // contrato a partir da ficha aprovada (q.ficha): os dados da pessoa e, no primeiro contrato dela, a reserva
     // (aberto pelo imóvel, sem q.ficha: vale a ficha aprovada que espera o contrato dele)
-    padrao: (q) => ({ ...R.padroesNovoContrato(), ...(q.imovel ? contasDoImovel(buscar('imoveis', q.imovel)) : {}), ...(q.pessoa ? R.dadosDaPessoa(buscar('contratos', q.pessoa)) : {}), ...(fichaDoNovoContrato(q) ? R.dadosDaFicha(d(), fichaDoNovoContrato(q)) : {}), ...(q.imovel ? { imovel_id: Number(q.imovel) } : {}) }),
+    padrao: (q) => ({ ...R.padroesNovoContrato(q.regras), ...(q.imovel ? contasDoImovel(buscar('imoveis', q.imovel)) : {}), ...(q.pessoa ? R.dadosDaPessoa(buscar('contratos', q.pessoa)) : {}), ...(fichaDoNovoContrato(q) ? R.dadosDaFicha(d(), fichaDoNovoContrato(q)) : {}), ...(q.imovel ? { imovel_id: Number(q.imovel) } : {}) }),
+    // Novo contrato com regras especiais: escolher antes de digitar qual regra preenche os valores (multa, juros, bonificação...)
+    topo: (r, q) => {
+      const perfis = ordenar(d().perfis_regras || [], 'nome');
+      if (r || !perfis.length) return '';
+      const base = location.hash.replace(/([?&])regras=\d+(&|$)/, '$1').replace(/[?&]$/, '');
+      const url = (id) => `${base}${id ? `${base.includes('?') ? '&' : '?'}regras=${id}` : ''}`;
+      const atual = Number(q.regras) || null;
+      const op = (id, nome) => (id === atual ? `<b>${esc(nome)}</b>` : `<a href="${esc(url(id))}">${esc(nome)}</a>`);
+      return `<div class="alerta info">Este contrato segue as regras do sistema ou uma regra especial (campo "Regras deste contrato"). Para os valores virem preenchidos com os de uma regra, escolha antes de digitar: ${[op(null, 'Regras do sistema'), ...perfis.map((p) => op(p.id, p.nome))].join(' · ')}.</div>`;
+    },
     compacto: true,
     valores: (r) => ({ ...r, ativo: r.ativo !== false, gerar_nf: r.gerar_nf !== false, bonificacao: r.bonificacao !== false,
       conta_iptu: r.conta_iptu || (r.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1]), conta_seguro: r.conta_seguro || (r.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0]),
@@ -1054,7 +1066,7 @@ function montarFormulario(cfg, tabela, registro, q, estado) {
   if (!estado) memoria.formularioAberto = registro ? { chave: `${tabela}:${registro.id}`, valores } : null;
   const base = cfg.base ? cfg.base(registro) : null;
   const avisoTexto = cfg.aviso ? cfg.aviso(registro, q) : '';
-  return `<h1>${esc(cfg.titulo(registro, q))}</h1>${avisoTexto ? `<div class="alerta info">${esc(avisoTexto)}</div>` : ''}
+  return `<h1>${esc(cfg.titulo(registro, q))}</h1>${avisoTexto ? `<div class="alerta info">${esc(avisoTexto)}</div>` : ''}${cfg.topo ? cfg.topo(registro, q) : ''}
     <form class="cartao" data-form="cadastro" ${base !== null && base !== undefined ? `data-base="${base}"` : ''}>
       ${F.camposHtml(campos, valores, estado ? estado.erros : {}, { compacto: !!cfg.compacto })}${cfg.extraHtml ? cfg.extraHtml(registro, q) : ''}
       <p class="acoes" style="margin-top:16px"><button>Salvar</button><a class="botao secundario" href="${esc(cfg.voltar(registro, q))}">Voltar</a></p></form>`;

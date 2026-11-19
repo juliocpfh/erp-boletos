@@ -47,6 +47,11 @@ export function textoDasRegrasEmUso(hoje = C.hojeIso()) {
     }
   }
   linhas.push('', mudadas ? `${mudadas} regra(s) diferente(s) do padrão do sistema.` : 'Todas as regras estão no padrão do sistema.');
+  for (const p of d().perfis_regras || []) {
+    const dif = R.diferencasDoPerfil(d(), p);
+    linhas.push('', `REGRA ESPECIAL "${p.nome}" (${R.contratosDoPerfil(d(), p.id).length} contrato(s)): vale o de cima, menos:`,
+      ...(dif.length ? dif.map((x) => `- ${x.def.rotulo}: ${valorRegraTexto(x.def, x.valor)}`) : ['- nada (igual às regras do sistema)']));
+  }
   return linhas.join('\n');
 }
 
@@ -83,7 +88,65 @@ function blocoRegra(def, regras, admin) {
     ${mudada ? `<p class="suave">Padrão do sistema: <b>${esc(valorRegraTexto(def, def.padrao))}</b>.</p>` : ''}</div>`;
 }
 
-export function telaRegras() {
+// ---------------------------------------------------------------- regras especiais (de alguns contratos)
+/** Cartão da tela das regras: a lista das regras especiais, o que cada uma muda e quantos contratos a seguem. */
+function cartaoRegrasEspeciais(admin) {
+  const perfis = [...(d().perfis_regras || [])].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  const linhas = perfis.map((p) => {
+    const dif = R.diferencasDoPerfil(d(), p);
+    const contratos = R.contratosDoPerfil(d(), p.id);
+    const ativos = contratos.filter((c) => R.contratoAtivo(c)).length;
+    return `<tr><td><a href="#/regras?perfil=${p.id}"><b>${esc(p.nome)}</b></a>${p.descricao ? `<br><span class="suave">${esc(p.descricao)}</span>` : ''}</td>
+      <td>${dif.length ? dif.map((x) => `${esc(x.def.rotulo)}: <b>${esc(valorRegraTexto(x.def, x.valor))}</b>`).join('<br>') : '<span class="suave">igual às regras do sistema</span>'}</td>
+      <td class="n">${contratos.length ? `${contratos.length}${ativos !== contratos.length ? ` (${ativos} ativo(s))` : ''}` : '-'}</td>
+      <td class="n">${admin ? `<a class="botao secundario pequeno" href="#/regras?perfil=${p.id}">Editar</a>
+        ${botao('excluirPerfilRegras', 'Excluir', { id: p.id }, 'perigo pequeno', `Excluir a regra especial "${p.nome}"?${contratos.length ? ` ${contratos.length} contrato(s) que a seguem voltam às regras do sistema (boletos já gerados não mudam; os próximos seguem as do sistema).` : ''}`)}` : ''}</td></tr>`;
+  }).join('');
+  return `<div class="cartao"><h2>Regras especiais (para alguns contratos)</h2>
+    <p>Para o contrato que foge do habitual. Ex.: "Regra especial A" com o aluguel proporcional pelos dias reais do mês, enquanto os outros contratos seguem o mês de 30 dias. No cadastro do contrato, o campo <b>Regras deste contrato</b> escolhe as regras do sistema ou uma regra especial. O que a regra especial não muda segue as regras do sistema.</p>
+    ${perfis.length ? `<table><tr><th>Regra especial</th><th>O que muda</th><th>Contratos</th><th></th></tr>${linhas}</table>` : '<p class="suave">Nenhuma regra especial: todos os contratos seguem as regras do sistema.</p>'}
+    ${admin ? '<p class="acoes"><a class="botao secundario" href="#/regras?perfil=novo">Criar regra especial</a></p>' : ''}</div>`;
+}
+
+/** Uma regra na tela da regra especial: o valor dela (ou o do sistema, quando não muda) e o do sistema ao lado. */
+function blocoPerfil(def, valores, sistema, admin) {
+  const v = def.chave in valores ? valores[def.chave] : sistema[def.chave];
+  const muda = !CR.mesmoValor(v, sistema[def.chave]);
+  return `<div class="regra-sistema" id="regra-${def.chave}">
+    <h3>${esc(def.rotulo)} ${muda ? etiqueta('diferente do sistema', 'aviso') : etiqueta('igual ao sistema', 'neutra')}</h3>
+    <p>${esc(def.explica)}</p>
+    <div class="campo-regra">${campoRegra(def, v, admin)}</div>
+    <p class="suave"><b>Consequência:</b> ${esc(def.consequencia)}</p>
+    <p class="suave"><b>Lei:</b> ${esc(def.lei)}</p>
+    ${muda ? `<p class="suave">Regras do sistema: <b>${esc(valorRegraTexto(def, sistema[def.chave]))}</b>.</p>` : ''}</div>`;
+}
+
+/** Tela de uma regra especial (#/regras?perfil=<id> ou ?perfil=novo): nome, as regras que podem mudar por contrato e os contratos. */
+export function telaPerfilRegras(id) {
+  const admin = podeUsuario('admin');
+  const p = id === 'novo' ? null : (d().perfis_regras || []).find((x) => x.id === Number(id));
+  if (id !== 'novo' && !p) return '<p class="suave"><a href="#/regras">← Regras do sistema</a></p><h1>Regra especial não encontrada</h1>';
+  if (!p && !admin) return '<p class="suave"><a href="#/regras">← Regras do sistema</a></p><div class="alerta aviso">Só o administrador cria regras especiais.</div>';
+  const valores = p ? CR.valoresDoPerfil(p) : {};
+  const sistema = R.regrasDe(d());
+  const contratos = p ? R.contratosDoPerfil(d(), p.id).sort((a, b) => a.inquilino_nome.localeCompare(b.inquilino_nome, 'pt-BR')) : [];
+  const des = admin ? '' : ' disabled';
+  return `<p class="suave"><a href="#/regras">← Regras do sistema</a></p><h1>${p ? esc(p.nome) : 'Nova regra especial'}</h1>
+    <div class="alerta info">Mude só o que for diferente para os contratos desta regra. O que ficar igual às regras do sistema acompanha as do sistema, mesmo se elas mudarem depois. As regras da rotina da empresa (backup, banco, extrato, dia de gerar os boletos, anexos, ressarcimento na NF) valem para todos e não aparecem aqui.</div>
+    ${p ? `<div class="cartao"><h2>Contratos que seguem esta regra</h2>${contratos.length ? `<ul>${contratos.map((c) => `<li><a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a>${R.contratoAtivo(c) ? '' : ' <span class="suave">(encerrado)</span>'}</li>`).join('')}</ul>` : '<p class="suave">Nenhum ainda. Escolha a regra no cadastro do contrato (Editar → "Regras deste contrato").</p>'}</div>` : ''}
+    <form data-form="perfilRegras" data-id="${p ? p.id : ''}">
+      <div class="cartao"><label>Nome<input name="nome" value="${esc(p ? p.nome : '')}" placeholder="Ex.: Regra especial A, Regra 15 dias" maxlength="60" required${des}></label>
+        <label>Para que serve (opcional)<input name="descricao" value="${esc(p ? p.descricao || '' : '')}" placeholder="Ex.: contratos comerciais da Rua X" maxlength="300"${des}></label></div>
+      ${CR.GRUPOS_REGRAS.map(([g, titulo]) => {
+        const defs = CR.DEFINICOES_REGRAS.filter((x) => x.grupo === g && CR.podePorContrato(x.chave));
+        return defs.length ? `<div class="cartao"><h2>${esc(titulo)}</h2>${defs.map((x) => blocoPerfil(x, valores, sistema, admin)).join('')}</div>` : '';
+      }).join('')}
+      ${admin ? `<p class="acoes barra-salvar"><button>${p ? 'Salvar a regra especial' : 'Criar a regra especial'}</button> <a class="botao secundario" href="#/regras">Cancelar</a></p>` : ''}
+    </form>`;
+}
+
+export function telaRegras(q = {}) {
+  if (q.perfil) return telaPerfilRegras(q.perfil);
   const admin = podeUsuario('admin');
   const regras = R.regrasDe(d());
   const mudadas = CR.DEFINICOES_REGRAS.filter((x) => !CR.mesmoValor(regras[x.chave], x.padrao));
@@ -92,6 +155,7 @@ export function telaRegras() {
     <div class="alerta info">Cada regra mostra o que faz, a consequência de cada escolha e a lei. O <b>padrão do sistema</b> são as regras originais, gravadas no programa: elas valem enquanto nada for mudado e sempre dá para voltar a elas. O sistema avisa quando uma escolha tem risco legal, mas não proíbe.
       ${mudadas.length ? `<br>Hoje <b>${mudadas.length} regra(s)</b> diferente(s) do padrão: ${mudadas.map((x) => esc(x.rotulo)).join('; ')}.` : '<br>Hoje todas as regras estão no padrão do sistema.'}</div>
     ${admin ? '' : '<div class="alerta aviso">Só o administrador muda as regras.</div>'}
+    ${cartaoRegrasEspeciais(admin)}
     <div class="cartao"><h2>Guardar e recuperar as regras</h2>
       <p>Salve uma versão antes de mudar: se algo der errado, volte a ela. O arquivo das regras guarda todas as regras em uso, para levar a outro sistema ou guardar fora.</p>
       ${admin ? `<form data-form="salvarVersaoRegras" class="acoes"><input name="nome" placeholder="Ex.: Regras de novembro de 2026" style="max-width:320px"><button class="secundario">Salvar versão das regras</button></form>` : ''}
@@ -178,6 +242,17 @@ export const FORMULARIOS_REGRAS = {
     aviso(n ? `Regras salvas (${n} mudança(s)).` : 'Nada mudou nas regras.', n ? 'ok' : 'info');
     await mostrar();
   },
+  async perfilRegras(form) {
+    soAdmin();
+    const dados = Object.fromEntries(new FormData(form));
+    const valores = lerFormularioRegras(dados);
+    for (const [k, v] of Object.entries(valores)) valores[k] = CR.limparValorRegra(k, v);
+    const id = Number(form.dataset.id) || null;
+    const p = await alterar((db) => R.salvarPerfilRegras(db, id, { nome: dados.nome, descricao: dados.descricao, valores }, login()));
+    const n = Object.keys(p.valores || {}).length;
+    aviso(`Regra especial "${p.nome}" ${id ? 'salva' : 'criada'}${n ? ` (${n} regra(s) diferente(s) do sistema)` : ': por enquanto igual às regras do sistema'}.`, 'ok');
+    location.hash = '#/regras';
+  },
   async salvarVersaoRegras(form) {
     soAdmin();
     const nome = new FormData(form).get('nome');
@@ -197,6 +272,13 @@ export const ACOES_REGRAS = {
   async excluirVersaoRegras({ id }) {
     soAdmin();
     await alterar((db) => R.excluir(db, 'versoes_regras', Number(id), login(), 'Versão das regras excluída'));
+    await mostrar();
+  },
+  async excluirPerfilRegras({ id }) {
+    soAdmin();
+    const n = await alterar((db) => R.excluirPerfilRegras(db, id, login()));
+    aviso(`Regra especial excluída${n ? `: ${n} contrato(s) voltaram às regras do sistema` : ''}.`, 'ok');
+    location.hash = '#/regras';
     await mostrar();
   },
   async voltarRegrasPadrao() {

@@ -115,7 +115,7 @@ export function telaReajustes(q) {
       ${porMesDoReajuste(lista, atual, q).map(([mes, rs, aberto]) => (!aberto ? `<div class="reajuste-mes-fechado"><b>Aluguel de ${compBr(mes)}</b> <span class="suave">${rs.length} reajuste(s)</span>${mes < atual ? ` ${etiqueta('atrasado', 'aviso')}` : ''} ${link(`#/reajustes?mes=${mes}`, 'Mostrar')}</div>`
     : `${rs.length < lista.length ? `<h3 class="reajuste-grupo">Aluguel de ${compBr(mes)} <span class="suave">(${rs.length})</span></h3>` : ''}${rs.map((r) => { const k = r.calculo; const c = r.contrato; const i = buscar('imoveis', c.imovel_id); const p = partesReajuste(c, r);
     // prévia da caução: segue as Regras do sistema (acompanha o reajuste? pelo aluguel com bonificação ou pelo cheio?), como o boleto do complemento
-    const caucao = r.corrigido ? caucaoDoReajuste(c, r.corrigido) : R.regra('caucao_acompanha') && R.temCaucao(c) && R.garantiaDepositada(c) && c.caucao_meses > 0 && k.novo !== null
+    const caucao = r.corrigido ? caucaoDoReajuste(c, r.corrigido) : R.regra('caucao_acompanha', c) && R.temCaucao(c) && R.garantiaDepositada(c) && c.caucao_meses > 0 && k.novo !== null
       ? `${reais(R.valorGarantia(d(), c))} → <b>${reais(c.caucao_meses * R.aluguelDaCaucao(k.novo, c))}</b>` : '<span class="suave">-</span>';
     return `<div class="reajuste-card ${String(c.id) === q.contrato ? 'amarelo' : ''}"><div class="reajuste-topo">
         <div><a href="#/contrato/${c.id}"><b class="reajuste-nome">${esc(i ? i.nome : '')} – ${esc(c.inquilino_nome)}</b></a>
@@ -182,7 +182,7 @@ export function cartaReajuste(c, comp) {
     : `o aluguel será corrigido pelo <b>${esc(k.escolhido.indice)}</b> acumulado nos últimos 12 meses: <b>${esc(k.escolhido.indice)} ${pct(k.percentual)}</b>`;
   // caução: acompanha o aluguel corrigido (aluguéis × aluguel com bonificação, ou cheio: regras `caucao_acompanha` e `caucao_base`); só aparece quando falta depositar
   const baseCaucao = R.aluguelDaCaucao(k.novo, c);
-  let caucao = R.regra('caucao_acompanha') && R.temCaucao(c) && c.caucao_meses > 0 ? { meses: c.caucao_meses, aluguel: baseCaucao, nova: c.caucao_meses * baseCaucao, atual: R.valorGarantia(d(), c) } : null;
+  let caucao = R.regra('caucao_acompanha', c) && R.temCaucao(c) && c.caucao_meses > 0 ? { meses: c.caucao_meses, aluguel: baseCaucao, nova: c.caucao_meses * baseCaucao, atual: R.valorGarantia(d(), c) } : null;
   if (caucao && !(caucao.nova > caucao.atual)) caucao = null;
   return `${x ? '' : '<div class="alerta info nao-imprimir">Carta com os valores do índice cadastrado. Para usar outro índice ou arredondar, mude o % ou o aluguel acima e clique em "Aplicar correção": a carta passa a sair com os valores aplicados.</div>'}<div class="carta">
     ${d().logo ? `${K.marcaDagua(d().logo)}<p class="ct-capa"><img src="${esc(d().logo)}" alt="Logo"></p>` : ''}

@@ -1,6 +1,7 @@
 // Regras do sistema escolhidas pelo administrador (Dados e backup → Regras do sistema): definição, padrão do sistema e valor em uso.
 // O padrão de cada regra (PADRAO_SISTEMA) é a regra do dono, fixa no código ("padrão de fábrica"): sem nada escolhido, vale ela.
 // O que o administrador muda fica na tabela `config_regras` (uma linha por regra diferente do padrão); versões salvas em `versoes_regras`.
+// Regras especiais (`perfis_regras`): grupos com nome que um contrato pode seguir no lugar das do sistema (`regra(chave, contrato)`).
 // Sem dependências (calculos.js importa daqui). `usarRegras(d)` é chamado por `normalizar` e ao salvar as regras.
 
 /** Grupos da tela, na ordem. */
@@ -346,10 +347,71 @@ export function escolhasDe(d) {
 export const regrasDe = (d) => ({ ...copia(PADRAO_SISTEMA), ...escolhasDe(d) });
 
 let emUso = { ...PADRAO_SISTEMA };
+/**
+ * Regras especiais (pedido do dono de 18/11/2026): grupos de regras com nome (ex.: "Regra especial A") que um contrato pode seguir
+ * no lugar das regras do sistema. Só as regras que fazem sentido mudar de um contrato para outro entram (aluguel, garantia, valores
+ * que vêm no Novo contrato, prazos de aviso, notificação e régua do inquilino); as da rotina da empresa (backup, banco, extrato,
+ * dia de gerar boletos, anexos) e o ressarcimento na NF (escrituração, com o contador) valem sempre para todos.
+ */
+export const REGRAS_POR_CONTRATO = new Set([
+  'reajuste_inicio', 'base_multa', 'proporcional',
+  ...DEFINICOES_REGRAS.filter((x) => x.grupo === 'garantia' || x.grupo === 'contrato').map((x) => x.chave),
+  'regua_email_dias', 'notificacao_prazo_dias', 'notificacao_aviso_dias', 'notificacao_multa_alugueis',
+  'antecedencia_seguro', 'antecedencia_vigencia', 'antecedencia_fiador', 'antecedencia_reajuste', 'dias_vermelho',
+]);
+export const podePorContrato = (chave) => REGRAS_POR_CONTRATO.has(chave);
+
+/** Valores guardados de uma regra especial (tabela `perfis_regras`), conferidos: só as regras por contrato; o que estragou sai. */
+export function valoresDoPerfil(p) {
+  const out = {};
+  for (const [k, v] of Object.entries((p && p.valores && typeof p.valores === 'object') ? p.valores : {})) {
+    if (!REGRAS_POR_CONTRATO.has(k)) continue;
+    try { out[k] = limparValorRegra(k, v); } catch { /* valor estragado: segue a regra do sistema */ }
+  }
+  return out;
+}
+
+let perfis = new Map(); // id da regra especial → { chave: valor } (só o que difere das regras do sistema)
+let perfilDoContrato = new Map(); // id do contrato → id da regra especial (para quem só tem o contrato_id, como o boleto)
+
 /** Passa a usar as regras do banco ``d`` (chamado por `normalizar` e ao salvar as regras). Sem banco: o padrão do sistema. */
-export function usarRegras(d) { emUso = d ? regrasDe(d) : { ...PADRAO_SISTEMA }; }
-/** Valor em uso de uma regra. */
-export const regra = (chave) => (chave in emUso ? emUso[chave] : PADRAO_SISTEMA[chave]);
+export function usarRegras(d) {
+  emUso = d ? regrasDe(d) : { ...PADRAO_SISTEMA };
+  perfis = new Map((d && Array.isArray(d.perfis_regras) ? d.perfis_regras : []).map((p) => [p.id, valoresDoPerfil(p)]));
+  perfilDoContrato = new Map((d && Array.isArray(d.contratos) ? d.contratos : []).filter((c) => c.perfil_regras_id).map((c) => [c.id, c.perfil_regras_id]));
+}
+
+/** Anota a regra especial de um contrato que acabou de ser gravado (`inserir`/`atualizar` de regras.js). */
+export function lembrarContrato(c) {
+  if (!c || !c.id) return;
+  if (c.perfil_regras_id) perfilDoContrato.set(c.id, c.perfil_regras_id); else perfilDoContrato.delete(c.id);
+}
+
+/**
+ * Regra especial que vale para ``x``: um contrato (ou o que o formulário tem, com `perfil_regras_id`) ou qualquer registro com
+ * `contrato_id` (boleto, fiador, notificação). Null: regras do sistema.
+ */
+export function perfilDe(x) {
+  if (!x || typeof x !== 'object') return null;
+  const id = Object.prototype.hasOwnProperty.call(x, 'perfil_regras_id') ? x.perfil_regras_id : x.contrato_id ? perfilDoContrato.get(x.contrato_id) : null;
+  return id && perfis.has(Number(id)) ? Number(id) : null;
+}
+
+/**
+ * Valor em uso de uma regra. Com ``x`` (contrato, boleto ou outro registro do contrato), vale a regra especial do contrato quando
+ * ela muda essa regra. Ex.: contrato na "Regra especial A" (proporcional pelos dias reais) → regra('proporcional', c) = 'dias_reais';
+ * os outros contratos continuam com 'mes_30'.
+ */
+export function regra(chave, x) {
+  if (x && REGRAS_POR_CONTRATO.has(chave)) {
+    const p = perfis.get(perfilDe(x));
+    if (p && chave in p) return p[chave];
+  }
+  return chave in emUso ? emUso[chave] : PADRAO_SISTEMA[chave];
+}
+
+/** Todos os valores de uma regra em uso (sistema e cada regra especial), ex.: para a janela da régua de cobrança. */
+export const valoresEmUso = (chave) => [regra(chave), ...[...perfis.values()].filter((p) => chave in p).map((p) => p[chave])];
 
 /** Feriados da cidade num ano: datas "AAAA-MM-DD" (os "MM-DD" valem todo ano). */
 export function feriadosLocais(ano) {
