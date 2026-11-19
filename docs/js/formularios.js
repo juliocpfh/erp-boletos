@@ -128,7 +128,7 @@ export const SOLICITACAO = [
   campo('descricao', 'O que o inquilino pediu', 'area', { obrig: true, largo: true, ajuda: 'Ex.: vazamento na torneira da cozinha' }),
   campo('providencia', 'O que foi feito', 'area', { largo: true }),
   campo('responsavel', 'Quem fez (prestador)'),
-  campo('data_conclusao', 'Concluído em', 'data'),
+  campo('data_conclusao', 'Concluído em', 'data', { ajuda: 'Preenchida: ao salvar, a situação passa para "Concluída"' }),
   campo('valor', 'Custo', 'dinheiro'),
   campo('pago_por', 'Custo por conta de', 'opcao', { opcoes: ['Proprietário', 'Inquilino', 'Sem custo'] }),
 ];

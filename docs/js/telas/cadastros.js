@@ -289,6 +289,8 @@ export const CADASTROS = {
       const contrato = p.contratos.length > 1 ? p.contratos.find((c) => String(c.id) === fd.get(`imovel_${k}`)) : p.contratos[0];
       if (!contrato) { erros[`imovel_${k}`] = 'Escolha o imóvel do pedido'; return; }
       dados.contrato_id = contrato.id;
+      // data de conclusão preenchida em pedido aberto ou em andamento: fica "Concluída" (pedido do dono, 2026-11-19)
+      if (dados.data_conclusao && ['Aberta', 'Em andamento'].includes(dados.situacao)) dados.situacao = 'Concluída';
       if (dados.situacao === 'Concluída' && !dados.data_conclusao) dados.data_conclusao = C.hojeIso();
     },
   },
