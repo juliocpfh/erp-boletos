@@ -30,23 +30,24 @@ export function telaBusca(q) {
 
 /** Situações da solicitação, com o símbolo do resumo (tela Inquilinos) e da lista de solicitações. */
 export const SITUACOES_SOLICITACAO = [
-  { nome: 'Aberta', simbolo: '🟢', texto: 'abertas' },
-  { nome: 'Em andamento', simbolo: '➡️', texto: 'em andamento' },
-  { nome: 'Concluída', simbolo: '✅', texto: 'concluídas' },
-  { nome: 'Não atendida', simbolo: '❌', texto: 'não atendidas' },
+  { nome: 'Aberta', simbolo: '🟢', texto: 'abertas', chave: 'aberta' },
+  { nome: 'Em andamento', simbolo: '➡️', texto: 'em andamento', chave: 'andamento' },
+  { nome: 'Concluída', simbolo: '✅', texto: 'concluídas', chave: 'concluida' },
+  { nome: 'Não atendida', simbolo: '❌', texto: 'não atendidas', chave: 'nao_atendida' },
 ];
 
-/** Todas as solicitações dos inquilinos, com filtro pela situação. */
+/** Todas as solicitações dos inquilinos, com filtro pela situação (?filtro=aberta|andamento|concluida|nao_atendida). */
 export function telaSolicitacoes(q) {
   const resumo = R.resumoSolicitacoes(d());
-  const filtro = SITUACOES_SOLICITACAO.find((s) => s.nome === q.situacao);
+  // o filtro vai sem acento no endereço: "situacao=Concluída" era descartado por sanearParametros e o botão mostrava todas
+  const filtro = SITUACOES_SOLICITACAO.find((s) => s.chave === q.filtro);
   const simbolo = (sit) => (SITUACOES_SOLICITACAO.find((s) => s.nome === sit) || SITUACOES_SOLICITACAO[0]).simbolo;
   const lista = d().solicitacoes.filter((x) => !filtro || (x.situacao || 'Aberta') === filtro.nome)
     .sort(C.maisRecentePrimeiro);
   return `<p class="suave"><a href="#/inquilinos">← Inquilinos</a></p>
     ${atalhosComunicacoes('solicitacoes')}<div class="cabecalho"><h1>Solicitações dos inquilinos</h1>${opera() ? link('#/novo/solicitacoes?de=solicitacoes', 'Abrir nova solicitação', 'botao') : ''}</div>
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap">${link('#/solicitacoes', `Todas (${d().solicitacoes.length})`, `botao ${filtro ? 'secundario ' : ''}pequeno`)}
-      ${SITUACOES_SOLICITACAO.map((s) => link(`#/solicitacoes?situacao=${encodeURIComponent(s.nome)}`, `${s.simbolo} ${resumo[s.nome]} ${s.texto}`, `botao ${filtro === s ? '' : 'secundario '}pequeno`)).join(' ')}</div>
+      ${SITUACOES_SOLICITACAO.map((s) => link(`#/solicitacoes?filtro=${s.chave}`, `${s.simbolo} ${resumo[s.nome]} ${s.texto}`, `botao ${filtro === s ? '' : 'secundario '}pequeno`)).join(' ')}</div>
     <div class="cartao rolagem"><table><tr><th>Data</th><th>Inquilino / imóvel</th><th>O que pediu</th><th>O que foi feito</th><th>Situação</th><th class="n">Custo</th><th></th></tr>
     ${lista.map((x) => {
     const c = buscar('contratos', x.contrato_id);
