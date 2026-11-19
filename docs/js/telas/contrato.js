@@ -31,6 +31,7 @@ function selosContrato(c) {
     ${(() => { const n = R.solicitacoesDo(d(), c.id).filter((x) => ['Aberta', 'Em andamento'].includes(x.situacao || 'Aberta')).length; return n ? `<a href="#/contrato/${c.id}?ir=solicitacoes">${etiqueta(`${n} solicitação(ões) em aberto`, 'perigo')}</a>` : ''; })()}
     ${(() => { const n = R.notificacoesDo(d(), c.id).filter((x) => ['Aguardando resposta', 'Multa gerada'].includes(x.situacao)).length; return n ? `<a href="#/contrato/${c.id}?ir=notificacoes">${etiqueta(`${n} notificação(ões) em aberto`, 'aviso')}</a>` : ''; })()}
     ${c.gerar_nf === false ? seloControle() : ''}
+    ${c.perfil_regras_id ? `<a href="#/regras?perfil=${Number(c.perfil_regras_id)}">${etiqueta(`Regras: ${R.nomeDasRegras(d(), c)}`, 'aviso')}</a>` : ''}
     ${car ? etiqueta(`Carência ${compBr(car[0])}${car[0] !== car[1] ? ` a ${compBr(car[1])}` : ''}`, 'aviso') : ''}
     ${c.renovacao_automatica ? etiqueta('Renovação automática', 'neutra') : ''}
     ${etiqueta(`Correção anual: ${c.indice_correcao || 'índice não informado'}${base ? ` · todo ${dataBr(base).slice(0, 5)}` : ''}`, 'ok')}
@@ -856,7 +857,7 @@ export function telaContrato(c) {
     <div class="cartao"><div class="cabecalho"><h2>Correção anual do aluguel (${esc(c.indice_correcao || 'índice não informado')})</h2>${link(`#/reajustes?contrato=${c.id}`, 'Ir para Reajustes')}</div>
       <p class="suave">Aqui fica só o histórico. Os reajustes do aluguel e da caução, de qualquer ano, são aplicados e desfeitos na tela Reajustes.</p>
       ${(() => { const abertos = R.reajustesAbertos(d(), C.hojeIso(), { contratoId: c.id });
-    if (!abertos.length) { const p = R.mesDeAniversario(c); return p ? `<p class="suave">Reajuste no 13º mês (${R.regra('reajuste_inicio') === 'mes_seguinte' ? 'entrada depois do dia 1º: o 1º mês é o seguinte' : 'o mês de entrada conta como o 1º'}): aluguel de ${compBr(R.competenciaDoReajuste(c, Math.max(1, Math.floor(C.mesesEntre(p, C.competenciaDe(C.hojeIso())) / 12) + 1)))}.</p>` : ''; }
+    if (!abertos.length) { const p = R.mesDeAniversario(c); return p ? `<p class="suave">Reajuste no 13º mês (${R.regra('reajuste_inicio', c) === 'mes_seguinte' ? 'entrada depois do dia 1º: o 1º mês é o seguinte' : 'o mês de entrada conta como o 1º'}): aluguel de ${compBr(R.competenciaDoReajuste(c, Math.max(1, Math.floor(C.mesesEntre(p, C.competenciaDe(C.hojeIso())) / 12) + 1)))}.</p>` : ''; }
     return `<div class="alerta aviso"><b>Reajuste do aluguel em aberto:</b> ${abertos.map((r) => `${compBr(r.competencia)} (${r.anos} ano(s)${r.corrigido ? ', falta a carta' : ''})`).join(', ')} ${link(`#/reajustes?contrato=${c.id}`, 'Ir para Reajustes', 'botao pequeno')}</div>`; })()}
       ${(() => { const m = R.correcoesRecalculadas(d(), c, c.aluguel_inicial); return m.length ? `<div class="alerta aviso"><b>As correções abaixo não batem com o aluguel inicial de ${reais(c.aluguel_inicial)}</b> (ex.: o inicial foi corrigido depois).
         Refeitas em cadeia: ${m.map((x) => `${dataBr(x.x.data_vigencia)} ${reais(x.x.valor_novo)} → <b>${reais(x.valor_novo)}</b>`).join('; ')}. O novo valor negociado fica como combinado.

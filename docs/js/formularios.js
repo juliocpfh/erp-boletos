@@ -242,6 +242,8 @@ export const CONTRATO = [
   // "Ativo" não é mais campo: o inquilino fica inativo pela saída
   campo('imovel_id', 'Imóvel', 'opcao', { opcoes: [], soNovo: true, obrig: true, ajuda: 'Escolha o imóvel deste inquilino' }),
   campo('gerar_nf', 'Emite NF (desmarcado: boleto de controle)', 'simnao', { padrao: true, ajuda: 'Boleto de controle: o pagamento é controlado (em dia ou atrasado), mas não gera NF nem entra nas somas dos boletos e nos resultados' }),
+  // regras especiais (pedido do dono de 18/11/2026): só aparece quando existe alguma (Dados e backup → Regras do sistema)
+  campo('perfil_regras_id', 'Regras deste contrato', 'opcao', { opcoes: [], vazio: 'Regras do sistema', ajuda: 'Regras do sistema (as de todos) ou uma regra especial criada em Dados e backup → Regras do sistema' }),
   secao('Inquilino (responsável pelo contrato)'),
   // ordem pedida: tipo, documento e RG/inscrição estadual na mesma linha; depois nome, contatos e, numa linha nova, o endereço
   campo('inquilino_tipo', 'Tipo', 'opcao', { obrig: true, padrao: 'Pessoa física', opcoes: ['Pessoa física', 'Pessoa jurídica (empresa)'] }),
@@ -845,7 +847,7 @@ export function camposHtml(campos, valores = {}, erros = {}, { compacto = false 
     else if (c.tipo === 'opcao') {
       const ops = c.opcoes.map((o) => (Array.isArray(o) ? o : [o, o]));
       if (v !== '' && !ops.some(([k]) => String(k) === String(v))) ops.push([v, v]);
-      entrada = `<select id="${id}" name="${c.nome}"><option value=""></option>${ops.map(([k, t]) => `<option value="${esc(k)}" ${String(k) === String(v) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
+      entrada = `<select id="${id}" name="${c.nome}"><option value="">${esc(c.vazio || '')}</option>${ops.map(([k, t]) => `<option value="${esc(k)}" ${String(k) === String(v) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
       if (c.lista) entrada += editorLista(c);
     } else {
       // link fica como texto: o navegador recusaria "onedrive.live.com/..." sem https://, e ler() completa sozinho

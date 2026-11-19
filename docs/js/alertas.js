@@ -13,7 +13,8 @@ export function aniversarios(inicio, hoje) {
   return [ultimo, somarAnos(inicio, anos)];
 }
 
-export function alertaSeguro(inicio, hoje, seguros) {
+// ``c``: o contrato (para valer a regra especial dele, `regra(chave, c)`)
+export function alertaSeguro(inicio, hoje, seguros, c = null) {
   const fins = seguros.map((s) => s.vigencia_fim).filter(Boolean).sort();
   if (!fins.length) {
     return { nivel: 'aviso', tipo: 'Seguro obrigatório', texto: 'Nenhum seguro cadastrado para este inquilino.' };
@@ -23,7 +24,7 @@ export function alertaSeguro(inicio, hoje, seguros) {
   if (faltam < 0) {
     return { nivel: 'perigo', tipo: 'Seguro obrigatório', texto: `Seguro vencido em ${dataBr(fim)}. Renove a apólice.` };
   }
-  if (faltam <= regra('antecedencia_seguro')) {
+  if (faltam <= regra('antecedencia_seguro', c)) {
     return { nivel: 'aviso', tipo: 'Seguro obrigatório',
       texto: `Seguro vence em ${dataBr(fim)} (faltam ${faltam} dias). Providencie a renovação.` };
   }
@@ -36,7 +37,7 @@ export function alertaSeguro(inicio, hoje, seguros) {
   }
   if (inicio) {
     const [, proximo] = aniversarios(inicio, hoje);
-    if (diasEntre(hoje, proximo) <= regra('antecedencia_seguro') && fim <= somarDias(proximo, 15)) {
+    if (diasEntre(hoje, proximo) <= regra('antecedencia_seguro', c) && fim <= somarDias(proximo, 15)) {
       return { nivel: 'aviso', tipo: 'Seguro obrigatório',
         texto: `Aniversário do contrato em ${dataBr(proximo)}: confira a renovação do seguro.` };
     }
@@ -56,14 +57,14 @@ export function alertaReserva(reservaValor, saldo, competenciaAlvo, hoje) {
   return null;
 }
 
-export function alertaVigencia(vigenciaFim, hoje) {
+export function alertaVigencia(vigenciaFim, hoje, c = null) {
   if (!vigenciaFim) return null;
   const faltam = diasEntre(hoje, vigenciaFim);
   if (faltam < 0) {
     return { nivel: 'aviso', tipo: 'Vigência do contrato',
       texto: `Vigência terminou em ${dataBr(vigenciaFim)}. Registre a renovação (nova data ou prazo indeterminado, com o novo valor negociado) ou a saída.` };
   }
-  if (faltam <= regra('antecedencia_vigencia')) {
+  if (faltam <= regra('antecedencia_vigencia', c)) {
     return { nivel: 'aviso', tipo: 'Vigência do contrato',
       texto: `Vigência termina em ${dataBr(vigenciaFim)} (faltam ${faltam} dias). Hora de negociar a renovação e o novo valor.` };
   }

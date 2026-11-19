@@ -45,7 +45,7 @@ const NIVEL = { consulta: 1, operador: 2, admin: 3 };
 export const SO_ADMIN = {
   raiz: ['config_banco', 'logo', 'ordem_caixas', 'ressarcimento_abate_nf', 'estilos_alertas'],
   excluir: ['imoveis', 'contratos', 'encerramentos', 'vistorias', 'modelos_contrato', 'faturas'],
-  tabela: ['emitentes', 'config_regras', 'versoes_regras'],
+  tabela: ['emitentes', 'config_regras', 'versoes_regras', 'perfis_regras'],
 };
 /**
  * Ações "só do administrador" que ficam dentro de tabelas que o operador também muda (item 13 da lista de segurança): o cofre
@@ -97,7 +97,7 @@ export const TABELAS_CONHECIDAS = ['imoveis', 'contratos', 'correcoes', 'seguros
   'leituras', 'encerramentos', 'avulsas', 'reformas', 'solicitacoes', 'notificacoes', 'fichas', 'indices_acumulados', 'cartas_reajuste', 'modelos_contrato', 'vistorias',
   'aditivos', 'despesas', 'ganhos_airbnb', 'ressarcimentos', 'fechamentos', 'guias_impostos', 'modelos_email', 'envios_email', 'movimentacoes_banco',
   'regua_emails',
-  'pagamentos_banco', 'adiamentos_alerta', 'alertas_desligados', 'acordos', 'pastas_fisicas', 'config_regras', 'versoes_regras', 'taxas_poupanca', 'comunicados'];
+  'pagamentos_banco', 'adiamentos_alerta', 'alertas_desligados', 'acordos', 'pastas_fisicas', 'config_regras', 'versoes_regras', 'taxas_poupanca', 'comunicados', 'perfis_regras'];
 /** Fora do administrador, o número da próxima NF só anda para a frente, e no máximo isto de uma vez (numerar um lote grande). */
 export const MAX_SALTO_NF = 300;
 /** Gravação por usuário num dia (Brasília): mudanças e bytes. Passou, as próximas esperam o dia seguinte (contra encher o cofre). */

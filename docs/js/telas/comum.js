@@ -58,8 +58,8 @@ export async function carregarParte(importar) {
  */
 export const PARTES_ADIADAS = {
   pessoa: { importar: () => import('./pessoa.js'), acoes: ['ACOES_PESSOA', ['escolherPessoa', 'baixarDadosPessoa', 'apagarPessoa']], formularios: ['FORMULARIOS_PESSOA', ['buscarPessoa']] },
-  regras: { importar: () => import('./regras-sistema.js'), acoes: ['ACOES_REGRAS', ['restaurarVersaoRegras', 'excluirVersaoRegras', 'voltarRegrasPadrao', 'baixarArquivoRegras', 'carregarArquivoRegras']],
-    formularios: ['FORMULARIOS_REGRAS', ['regrasSistema', 'salvarVersaoRegras']] },
+  regras: { importar: () => import('./regras-sistema.js'), acoes: ['ACOES_REGRAS', ['restaurarVersaoRegras', 'excluirVersaoRegras', 'voltarRegrasPadrao', 'baixarArquivoRegras', 'carregarArquivoRegras', 'excluirPerfilRegras']],
+    formularios: ['FORMULARIOS_REGRAS', ['regrasSistema', 'salvarVersaoRegras', 'perfilRegras']] },
   regua: { importar: () => import('./regua.js'), acoes: ['ACOES_REGUA', ['recusarRegua', 'copiarRegua', 'abrirReguaGmail', 'enviarReguaSelecionados']] },
   nuvem: { importar: () => import('./nuvem.js'), acoes: ['ACOES_NUVEM', ['desligarAparelho', 'levarParaNuvem', 'resolverConflito', 'esquecerRecusas', 'baixarRecusa', 'esquecerRecusa',
     'baixarNaoEnviado', 'baixarBackupNuvem', 'restaurarBackupNuvem', 'esquecerNaoEnviado']] },

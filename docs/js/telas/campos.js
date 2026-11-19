@@ -324,7 +324,7 @@ function ligarCaucao(raiz) {
     const n = Number(meses.value);
     const bonif = form.querySelector('[name=bonificacao]');
     // regra `caucao_base` (Dados e backup → Regras): com bonificação (padrão) ou sempre o aluguel cheio
-    const comBonif = bonif && bonif.checked && R.regra('caucao_base') !== 'cheio';
+    const comBonif = bonif && bonif.checked && R.regra('caucao_base', { perfil_regras_id: Number(form.elements.perfil_regras_id?.value) || null }) !== 'cheio';
     const base = comBonif ? cent((form.querySelector('[name=aluguel_bonificado]') || {}).value) : cent(form.querySelector('[name=aluguel_inicial]').value);
     if (!(n > 0) || !Number.isFinite(base)) return;
     valor.value = F.dinheiroTexto(n * base);

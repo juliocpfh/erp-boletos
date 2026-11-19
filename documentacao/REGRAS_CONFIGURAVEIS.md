@@ -97,3 +97,19 @@ não e o artigo da lei. O sistema avisa, mas não proíbe as escolhas do adminis
 Tabela nova em `TABELAS` (ex.: `config_regras`, só administrador grava), lida pelas regras com padrão igual ao de hoje,
 tela em Empresas ou Dados e backup, testes em `tests/`, `DECISOES.md` e `REGRAS_TEXTO` atualizados. Itens C3–C6 entram no
 contrato como campos que o texto do modelo usa; isso precisa ser combinado com a sessão que revisa o contrato.
+
+## Regras especiais por contrato (18/11/2026)
+
+Pedido do dono: alguns contratos fogem do habitual. Em Regras do sistema → **Regras especiais** o administrador cria grupos com nome
+(ex.: "Regra especial A", "Regra 15 dias") e, no cadastro do contrato, o campo **Regras deste contrato** escolhe "Regras do sistema"
+ou uma delas (só aparece quando existe alguma). No Novo contrato, o aviso do topo deixa preencher os valores com os da regra escolhida.
+
+- Cada regra especial guarda só o que difere das regras do sistema; o resto acompanha as do sistema, mesmo se mudarem depois.
+- Podem mudar por contrato (`REGRAS_POR_CONTRATO`, `config-regras.js`): reajuste, base da multa, proporcional, todo o grupo Garantia e FCI,
+  todo o grupo Novo contrato, régua de e-mail ao inquilino, prazos e multa da notificação, avisos de seguro, fim do contrato, fiador e
+  reajuste, e o vermelho da inadimplência. Ficam da empresa toda: feriados, dia de gerar boletos, ressarcimento na NF (escrituração,
+  com o contador), régua de cobrança (lista de passos), banco e extrato, backup, anexos, fichas e registros.
+- Exemplo: Regra especial A com proporcional pelos dias reais. Entrada em 15/02/2027, aluguel R$ 1.800,00: contrato na regra A paga
+  14/28 = R$ 900,00; os outros 16/30 = R$ 960,00.
+- Troca de titular leva a regra do contrato anterior. Excluir a regra especial volta os contratos dela às regras do sistema
+  (boletos já gerados não mudam). Tabela `perfis_regras` (só o administrador grava, `SO_ADMIN` do cofre). Testes: `tests/regras-especiais.test.mjs`.

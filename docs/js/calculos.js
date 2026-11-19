@@ -383,7 +383,9 @@ export function aluguelVigente(inicial, correcoes, dataRef) {
 // --------------------------------------------------------------------------
 // Composição da cobrança
 // --------------------------------------------------------------------------
-export function totaisCobranca({ aluguel, desconto, iptu = 0, seguro = 0, taxa_boleto = 0, outros = 0, ressarcimento = 0, fci = 0, multas_notificacao = [] }, reservaDisponivel = 0) {
+// ``ctx``: o boleto (com contrato_id) ou o contrato, para valer a regra especial do contrato (`regra(chave, ctx)`, config-regras.js)
+export function totaisCobranca(cobranca, reservaDisponivel = 0, ctx = cobranca) {
+  const { aluguel, desconto, iptu = 0, seguro = 0, taxa_boleto = 0, outros = 0, ressarcimento = 0, fci = 0, multas_notificacao = [] } = cobranca;
   // multa da notificação ao inquilino (vai em `outros`): sem multa nem juros de atraso sobre ela (decisão do dono, 2026-11-17)
   const multaNotif = (multas_notificacao || []).reduce((s, e) => s + (Number(e && e.valor) || 0), 0);
   const encargos = iptu + seguro + taxa_boleto + outros + (fci || 0);
@@ -402,7 +404,7 @@ export function totaisCobranca({ aluguel, desconto, iptu = 0, seguro = 0, taxa_b
     // multa e juros por atraso não incidem sobre o FCI (fundo de conservação do imóvel) nem sobre a multa da notificação
     // (boleto de R$ 2.000,00 + multa da notificação de R$ 1.500,00 → base R$ 2.000,00); regra `base_multa`: boleto inteiro
     // (padrão) ou só o aluguel cheio (ex.: aluguel R$ 2.000,00 + IPTU R$ 200,00 → base R$ 2.200,00 ou R$ 2.000,00)
-    base_multa: regra('base_multa') === 'aluguel'
+    base_multa: regra('base_multa', ctx) === 'aluguel'
       ? Math.max(Math.min(aluguel - (ressarcimento || 0), totalSemDesconto - (fci || 0) - multaNotif) - reserva, 0)
       : Math.max(totalSemDesconto - reserva - (fci || 0) - multaNotif, 0),
   };
@@ -425,10 +427,10 @@ export function diasComerciais(comp, entrada, saida) {
 }
 
 export function calcularCobranca({ competencia, aluguelMensal, entrada, saida, descontoPercentual = 0, iptu = 0,
-  seguro = 0, taxaBoleto = 0, outros = 0, reservaDisponivel = 0 }) {
+  seguro = 0, taxaBoleto = 0, outros = 0, reservaDisponivel = 0, contrato = null }) {
   const diasReais = diasOcupados(competencia, entrada, saida);
   // regra `proporcional`: mês comercial de 30 dias (padrão desde 17/11/2026, `diasComerciais`) ou dias reais do mês (14/28)
-  const comercial = regra('proporcional') === 'mes_30' && diasReais < diasNoMes(competencia);
+  const comercial = regra('proporcional', contrato) === 'mes_30' && diasReais < diasNoMes(competencia);
   const dias = comercial ? diasComerciais(competencia, entrada, saida) : diasReais;
   const diasMes = comercial ? 30 : diasNoMes(competencia);
   const aluguel = aluguelProporcional(aluguelMensal, dias, diasMes);
@@ -436,7 +438,7 @@ export function calcularCobranca({ competencia, aluguelMensal, entrada, saida, d
   const itens = { aluguel, desconto, iptu, seguro, taxa_boleto: taxaBoleto, outros };
   return {
     competencia, dias_cobrados: dias, dias_mes: diasMes, aluguel_mensal: aluguelMensal, ...itens,
-    ...totaisCobranca(itens, reservaDisponivel),
+    ...totaisCobranca(itens, reservaDisponivel, contrato),
   };
 }
 
@@ -574,6 +576,7 @@ const FORMATOS_PARAMETRO = {
   quem: /^[^\s<>"']{3,200}$/, antes: /^\d{1,12}$/, // tela Acessos: e-mail da pessoa e "ver os mais antigos"
   tema: /^[a-z_]{1,30}$/, prazo: /^\d{1,2}$/, anterior: /^\d+$/, // nova notificação ao inquilino: modelo do texto, prazo em dias úteis e a que ela reitera
   ver: /^[a-z]{1,20}$/, chave: /^[cf]\d{1,10}$/, // Comunicações: a parte da tela (novo, modelos) e a pessoa do aceite (c<contrato> ou f<fiador>)
+  perfil: /^(\d+|novo)$/, regras: /^\d+$/, // Regras do sistema: a regra especial aberta; Novo contrato: preencher com uma regra especial
   gmail: /^[a-z-]{1,20}$/, // Dados e backup: aviso da volta do Google ao conectar o Gmail (AVISOS_VOLTA_GMAIL de nuvem/worker.mjs)
 };
 

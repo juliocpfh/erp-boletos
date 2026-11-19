@@ -94,7 +94,7 @@ export function telaNovaNotificacao(q = {}) {
   const remontar = !edicao || !!(q.tema || q.data || q.prazo);
   const dados = {
     data: C.dataValida(q.data) || (edicao ? edicao.data : C.hojeIso()),
-    prazo_dias: Math.min(90, Math.max(1, Number(q.prazo) || (edicao ? edicao.prazo_dias : R.regra('notificacao_prazo_dias')))),
+    prazo_dias: Math.min(90, Math.max(1, Number(q.prazo) || (edicao ? edicao.prazo_dias : R.regra('notificacao_prazo_dias', c)))),
     anterior_id: ant ? ant.id : null,
   };
   const tema = ant ? NT.MODELO_REITERACAO.chave : NT.modeloNotificacao(q.tema) ? q.tema : edicao && NT.modeloNotificacao(edicao.modelo) ? edicao.modelo : NT.MODELOS_NOTIFICACAO[0].chave;
@@ -188,7 +188,7 @@ export function telaNotificacao(id) {
     <div class="cartao" id="multa"><h2>Multa</h2>
       ${n.multa_valor > 0 ? `<p>Multa de <b>${reais(n.multa_valor)}</b> gerada em ${dataBr(n.multa_data)}: ${boleto ? `entra no boleto de <a href="#/cobranca/${boleto.id}"><b>${compBr(boleto.competencia)}</b></a> (vence ${dataBr(boleto.vencimento)}) como "${esc(R.textoMultaNotificacao(n))}", fora da NF.` : 'entra no próximo boleto do aluguel, quando ele for gerado.'}</p>
         ${opera() ? botao('retirarMultaNotificacao', 'Retirar a multa', { id: n.id }, 'perigo pequeno', `Retirar a multa de ${reais(n.multa_valor)}? Ela sai do boleto em aberto.`) : ''}`
-    : e.podeMulta && opera() ? `<p class="suave">O prazo venceu. A multa entra no próximo boleto do aluguel como cobrança adicional (não entra na NF). Sugestão: ${R.regra('notificacao_multa_alugueis')} aluguel(is) = ${reais(sugerida)}; o contrato prevê até 3 aluguéis. Digite o valor:</p>
+    : e.podeMulta && opera() ? `<p class="suave">O prazo venceu. A multa entra no próximo boleto do aluguel como cobrança adicional (não entra na NF). Sugestão: ${R.regra('notificacao_multa_alugueis', n)} aluguel(is) = ${reais(sugerida)}; o contrato prevê até 3 aluguéis. Digite o valor:</p>
         <form data-form="multaNotificacao" data-id="${n.id}" class="acoes"><input name="valor" inputmode="decimal" value="${sugerida ? esc(F.dinheiroTexto(sugerida)) : ''}" aria-label="Valor da multa" style="width:140px"><button class="perigo">Gerar multa</button></form>`
       : `<p class="suave">${n.situacao === 'Resolvida' || n.situacao === 'Cancelada' ? 'Sem multa.' : `A multa só pode ser gerada depois do prazo (${dataBr(n.data_limite)}), com a notificação enviada e sem baixa.`}</p>`}</div>
     <div class="cartao"><h2>Texto</h2><div class="grade">${item('Assunto', esc(n.assunto))}${item('Cláusula(s) citada(s)', esc(n.clausula || '-'))}${item('Prazo', `${n.prazo_dias} dias úteis · até ${dataBr(n.data_limite)}`)}</div>
