@@ -104,14 +104,11 @@ export function telaInquilinos(q) {
     : !d().imoveis.length ? AJ.proximoPasso('Nenhum inquilino ainda.', 'O contrato liga o inquilino a um imóvel: cadastre o imóvel primeiro.', [opera() && ['#/novo/imoveis', 'Cadastrar o primeiro imóvel']])
       : AJ.proximoPasso('Nenhum inquilino ainda.', 'Já tem o contrato assinado? Cadastre o contrato. Alguém ainda vai mandar os documentos para análise? Comece pela ficha.',
         [opera() && ['#/novo/contratos', 'Cadastrar o contrato'], opera() && ['#/novo/fichas', 'Nova ficha em análise']]));
-  const resumo = R.resumoSolicitacoes(d());
+  // solicitações e notificações ficam só em Comunicações (pedido do dono, 2026-11-19)
   // 1ª etapa de um inquilino novo: a ficha do interessado (botão "Nova ficha em análise", na caixa das fichas); dela sai
   // o contrato. O "Novo contrato" fica na caixa dos contratos ativos (pedido do dono, 2026-11-17: um lugar só para cada um)
   return `<div class="cabecalho"><h1>Inquilinos</h1></div>${abasInquilinos('lista')}
-    <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="ir" data-ir="inquilinos" style="flex-wrap:nowrap;min-width:0;max-width:100%"><input name="busca" value="${esc(q.busca || '')}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px;max-width:100%;min-width:0"><button class="secundario">Buscar</button>${busca ? link('#/inquilinos', 'Limpar') : ''}</form>
-      <a class="botao secundario resumo-solicitacoes" href="#/solicitacoes" title="Ver todas as solicitações dos inquilinos">Solicitações: ${SITUACOES_SOLICITACAO.map((s) => `<span>${s.simbolo} ${resumo[s.nome]} ${s.texto}</span>`).join(' ')}</a>
-      ${(() => { const l = (d().notificacoes || []).filter((n) => ['Rascunho', 'Aguardando resposta', 'Multa gerada'].includes(n.situacao)); const v = l.filter((n) => R.estadoNotificacao(d(), n).podeMulta).length;
-    return `<a class="botao secundario" href="#/notificacoes" title="Notificações ao inquilino (prazo para resolver algo)">Notificações: ${l.length} em aberto${v ? ` · ${v} com prazo vencido` : ''}</a>`; })()}</div>
+    <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="ir" data-ir="inquilinos" style="flex-wrap:nowrap;min-width:0;max-width:100%"><input name="busca" value="${esc(q.busca || '')}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px;max-width:100%;min-width:0"><button class="secundario">Buscar</button>${busca ? link('#/inquilinos', 'Limpar') : ''}</form></div>
     ${caixaFichas()}
     <div class="cartao rolagem" id="contratos-ativos"><div class="cabecalho"><h2>Contratos ativos (${atuais.length})</h2>${opera() ? link('#/novo/contratos', 'Novo contrato', 'botao secundario pequeno') : ''}</div>
       <table><tr><th>Imóvel</th><th>Inquilino</th><th class="centro so-pc">Contrato</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>

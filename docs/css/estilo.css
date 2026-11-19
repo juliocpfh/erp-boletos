@@ -469,7 +469,6 @@ input.doc-invalido { border-color: var(--perigo); }
 .historico-iptu summary { cursor: pointer; }
 .caixa-historico summary { cursor: pointer; }
 .caixa-historico[open] summary { margin-bottom: 10px; }
-.resumo-solicitacoes span { margin-left: 8px; white-space: nowrap; }
 .resumo-painel .simbolos { display: grid; grid-template-columns: auto auto; justify-content: center; gap: 2px 14px; font-size: 16px; font-weight: 700; margin: 4px 0 8px; }
 th.centro, td.centro { text-align: center; }
 .indices-compacta { margin-top: 8px; width: auto; }
