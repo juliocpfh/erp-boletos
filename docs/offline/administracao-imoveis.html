@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-7+uR/eZi6lG5F3zHQEkQnAMi9sTFY14N8TArxIDCNuk=' 'sha256-Y+xnAMwN/IEZ7vVliD2cw1hVcYm7t4UoAG7T9aZeASo='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-7+uR/eZi6lG5F3zHQEkQnAMi9sTFY14N8TArxIDCNuk=' 'sha256-Kkmfm7ofXjKkN0kv7jwsQP7ZoKwB5epujC2I17NK1hA='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="ad86dcbd8b467542">
+<meta name="fontes" content="5d1fee0b8e42ce25">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -17003,7 +17003,7 @@ Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: s
           titulo: "Inquilinos",
           serve: "Lista quem aluga hoje (ativos) e quem já saiu, com a vigência do contrato, o aluguel atual e a garantia. Em cima ficam as fichas dos interessados que ainda estão em análise.",
           primeiro: [
-            'Alguém quer alugar? Clique em "Nova ficha em análise": os dados, a reserva e os documentos ficam guardados para análise.',
+            'Alguém quer alugar? Clique em "Nova solicitação de reserva": preencha o imóvel, o contato, a proposta e o que está incluso. Depois, na página da ficha, gere o link para a pessoa preencher o resto.',
             'Ficha aprovada vira o contrato já preenchido. Já tem o contrato? Use "Novo contrato", na caixa "Contratos ativos".',
             "Clique no nome do inquilino para abrir a página dele."
           ],
@@ -28253,9 +28253,9 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const linha = (f) => `<tr><td><a href="#/ficha/${f.id}"><b>${esc(f.inquilino_nome)}</b></a></td><td>${esc(nomesDosImoveis(f).join(", ") || "-")}${(f.imoveis_ids || []).length > 1 ? `<br><span class="suave">${esc(f.modo_imoveis === "Todos juntos" ? "todos juntos" : "apenas um deles")}</span>` : ""}</td>
     <td class="nw">${dataBr(f.data_recebida)}</td><td class="n nw">${f.reserva_valor ? reais(f.reserva_valor) : "-"}</td><td>${situacaoDaFicha(f)}</td></tr>`;
     const tabela = (lista3) => `<table><tr><th>Interessado</th><th>Imóvel(is)</th><th>Recebida em</th><th class="n">Reserva</th><th>Situação</th></tr>${lista3.map(linha).join("")}</table>`;
-    return `<div class="cartao rolagem" id="fichas"><div class="cabecalho"><h2>Fichas em análise (${abertas.length})</h2>${opera() ? link("#/novo/fichas", "Nova ficha em análise", "botao secundario pequeno") : ""}</div>
-    <p class="suave">Interessado que manda os dados, a reserva e os documentos para análise. Aprovada, a ficha vira o contrato já preenchido.</p>
-    ${abertas.length ? tabela(abertas) : `<p class="suave">Nenhuma ficha em análise.${!fichas.length && opera() ? ' Quando alguém quiser alugar um imóvel vago, clique em "Nova ficha em análise": os dados da pessoa, a reserva e os documentos ficam guardados até você aprovar.' : ""}</p>`}
+    return `<div class="cartao rolagem" id="fichas"><div class="cabecalho"><h2>Fichas em análise (${abertas.length})</h2>${opera() ? link("#/novo/fichas", "Nova solicitação de reserva", "botao secundario pequeno") : ""}</div>
+    <p class="suave">1º a solicitação de reserva (imóvel, contato, proposta, o que está incluso e a reserva); depois o interessado preenche a ficha pelo link e manda os documentos. Aprovada, a ficha vira o contrato já preenchido.</p>
+    ${abertas.length ? tabela(abertas) : `<p class="suave">Nenhuma ficha em análise.${!fichas.length && opera() ? ' Quando alguém quiser alugar um imóvel vago, clique em "Nova solicitação de reserva": você preenche o imóvel, o contato e a proposta; o resto a pessoa preenche pelo link da ficha.' : ""}</p>`}
     ${encerradas.length ? `<details id="fichas-encerradas"><summary class="suave">${encerradas.length} ficha(s) encerrada(s): aprovadas que viraram contrato, reprovadas e desistências (clique para ver)</summary>${tabela(encerradas)}</details>` : ""}</div>`;
   }
   function alertaFichas() {
@@ -31137,7 +31137,9 @@ ${url}
           destino: (salvo) => `#/contrato/${salvo.id}`
         },
         fichas: {
-          titulo: (r) => r ? `Ficha em análise - ${r.inquilino_nome}` : "Nova ficha em análise",
+          // começa como solicitação de reserva (pedido do dono, 2026-11-19): a equipe preenche só o imóvel, o contato, a proposta,
+          // o que está incluso e a reserva; o resto o interessado manda pelo link da ficha (a ficha completa aparece ao editar)
+          titulo: (r) => r ? `Ficha em análise - ${r.inquilino_nome}` : "Nova solicitação de reserva",
           // imóveis de interesse: uma caixa de marcar por imóvel VAGO (pedido do dono, 2026-11-10: escolher ocupado dava brecha
           // para erro); o que já está na ficha continua na lista. O que já tem outra ficha aberta aparece avisado
           campos: (r) => {
@@ -31146,8 +31148,7 @@ ${url}
               return { nome: `imovel_${i.id}`, rotulo: `${i.nome}${imovelVago2(i.id) ? "" : " · ocupado"}${outra ? ` · já tem a ficha de ${outra.inquilino_nome}` : ""}`, tipo: "simnao" };
             });
             const p2 = partesDaFicha(camposDaPessoa([...CAMPOS_PESSOA, ...ENDERECO_DO_IMOVEL.map(([caixa]) => caixa)]).map((c) => ENDERECO_DO_IMOVEL.some(([caixa]) => caixa === c.nome) ? { ...c, rotulo: "Usar o endereço do imóvel de interesse", ajuda: "Marcado: o endereço fica igual ao do imóvel marcado acima (com um só imóvel marcado)" } : c));
-            return [
-              ...FICHA_INICIO,
+            const blocoImoveis = [
               { secao: "Imóveis de interesse" },
               {
                 nome: "modo_imoveis",
@@ -31160,7 +31161,22 @@ ${url}
                 ajuda: `Apenas um: o interessado vai alugar um dos imóveis marcados. Todos juntos: aluga todos os marcados (um contrato para cada). Só aparecem os imóveis vagos${imoveis.length ? "" : " (nenhum vago no momento)"}`
               },
               { quebra: true },
-              ...imoveis,
+              ...imoveis
+            ];
+            if (!r) {
+              return [
+                { secao: "Solicitação de reserva" },
+                { ...FICHA_INICIO.find((c) => c.nome === "data_recebida"), rotulo: "Solicitação recebida em" },
+                ...blocoImoveis,
+                ...p2.contato,
+                ...p2.proposta,
+                { secao: "Observações" },
+                FICHA_FIM.find((c) => c.nome === "observacoes")
+              ];
+            }
+            return [
+              ...FICHA_INICIO,
+              ...blocoImoveis,
               ...p2.contato,
               ...p2.proposta,
               ...p2.pessoa,
@@ -31185,6 +31201,11 @@ ${url}
           descricao: (dados) => `Ficha de ${dados.inquilino_nome}`,
           ajustar(dados, erros, r, form) {
             const hoje3 = hojeIso();
+            if (!r) {
+              dados.situacao = dados.situacao || "Em análise";
+              dados.inquilino_tipo = dados.inquilino_tipo || "Pessoa física";
+              if (!dados.inquilino_email && !dados.inquilino_telefone && !dados.inquilino_whatsapp) erros.inquilino_email = "Informe o e-mail ou o telefone: é por eles que vai o link da ficha";
+            }
             const ids = d().imoveis.filter((i) => dados[`imovel_${i.id}`]).map((i) => i.id);
             for (const k of Object.keys(dados)) if (/^imovel_\d+$/.test(k)) delete dados[k];
             dados.imoveis_ids = ids;
@@ -32626,8 +32647,8 @@ ${url}
     const documentosCelular = (x) => x.i ? `<div class="botoes-doc so-celular">${matricula(x, true)}${botaoContrato(x.c, true)}</div>` : "";
     const semAtivos = () => d().contratos.length ? `<span class="suave">${busca ? "Nenhum inquilino ativo encontrado nesta busca." : "Nenhum inquilino ativo hoje."}</span>` : !d().imoveis.length ? proximoPasso("Nenhum inquilino ainda.", "O contrato liga o inquilino a um imóvel: cadastre o imóvel primeiro.", [opera() && ["#/novo/imoveis", "Cadastrar o primeiro imóvel"]]) : proximoPasso(
       "Nenhum inquilino ainda.",
-      "Já tem o contrato assinado? Cadastre o contrato. Alguém ainda vai mandar os documentos para análise? Comece pela ficha.",
-      [opera() && ["#/novo/contratos", "Cadastrar o contrato"], opera() && ["#/novo/fichas", "Nova ficha em análise"]]
+      "Já tem o contrato assinado? Cadastre o contrato. Alguém ainda vai mandar os documentos para análise? Comece pela solicitação de reserva.",
+      [opera() && ["#/novo/contratos", "Cadastrar o contrato"], opera() && ["#/novo/fichas", "Nova solicitação de reserva"]]
     );
     return `<div class="cabecalho"><h1>Inquilinos</h1></div>${abasInquilinos("lista")}
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="ir" data-ir="inquilinos" style="flex-wrap:nowrap;min-width:0;max-width:100%"><input name="busca" value="${esc(q.busca || "")}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px;max-width:100%;min-width:0"><button class="secundario">Buscar</button>${busca ? link("#/inquilinos", "Limpar") : ""}</form></div>
