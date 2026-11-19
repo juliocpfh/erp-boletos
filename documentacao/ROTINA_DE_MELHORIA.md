@@ -176,3 +176,15 @@ Revisão em 4 frentes (regras, telas, nuvem/sem internet, tamanho/multiplataform
   - Conferido: o "An unknown error occurred when fetching the script" do console é do navegador embutido do aplicativo Claude, que não registra service worker (o `sw.js` baixa normal, 200, mas o registro é recusado); no Chromium do Playwright e no Chrome registra sem erro. Não é defeito do sistema.
 - **Descartado:** adiar `gravarBase` (inseguro: `tirarDaFila` e `base-seq` dependem da base gravada na hora).
 - **Não testado em uso real:** R2 com `If-None-Match: *`, troca de versão do `sw.js` (só `tests/sw.test.mjs`), Voltar no celular, ponte contra o C6. Conferências do dono em `PENDENCIAS_DO_DONO.md`, item 11.
+
+## 19/11: erros achados pelo dono e pistas para a busca geral
+
+O dono pediu (19/11) uma busca geral de erros: "links quebrados, fios quebrados". O que apareceu nos últimos dias e o tipo de defeito a procurar:
+
+- [x] **Filtro das Solicitações não filtrava (#326).** O botão mandava `?situacao=Aberta`; `sanearParametros` (`calculos.js`) só aceita `Reprovada|Desistiu` nesse nome (é o da ficha) e jogou o parâmetro fora sem avisar: a lista mostrava todas. **Pista:** parâmetro com valor fora de `FORMATOS_PARAMETRO` some em silêncio. Os links fixos agora são conferidos por `tests/links-parametros.test.mjs`; os montados na hora (`?x=${...}`) não: conferir na tela, um por um (ex.: com acento, espaço ou maiúscula).
+- [x] **Data de conclusão não fechava a solicitação (#325).** Preencher "Concluído em" deixava "Aberta". **Pista:** campo que deveria mudar outro (data → situação) só no `ajustar` do formulário (`CADASTROS` em `telas/cadastros.js`).
+- [x] **Fluxo começava pela etapa errada (#324).** "Nova ficha em análise" abria a ficha inteira; o certo é a solicitação de reserva (formulário curto) e o resto pelo link. **Pista:** conferir se cada botão abre a etapa que o nome diz.
+- [x] **Atalhos repetidos em duas telas (#323).** Solicitações e Notificações estavam em Inquilinos e em Comunicações; ficaram só em Comunicações.
+- **PRs que mexem no mesmo trecho conflitam** (#323 e #324, ambas em `telas/consultas.js`): o dono vê "deu ruim". Abrir uma PR por vez no mesmo arquivo, ou avisar a ordem.
+- **Teste no navegador embutido:** depois de editar, o módulo antigo continua na memória mesmo com `fetch(..., {cache:'reload'})` + recarregar; abrir uma **aba nova** mostra o código novo. #325 e #326 não foram vistos na tela pelo Claude (o `?teste` não tinha solicitações): o dono conferiu #325.
+- **Onde procurar na busca geral:** links `#/…?…` montados na hora; botões cujo nome não bate com a tela que abrem; formulários que gravam mas não mudam a situação esperada; o mesmo atalho em duas telas; textos ainda com "ficha" onde o começo agora é "solicitação de reserva" (ajuda, e-mails, PDFs).
