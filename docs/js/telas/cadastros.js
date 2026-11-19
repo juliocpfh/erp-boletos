@@ -511,7 +511,9 @@ export const CADASTROS = {
     destino: (salvo) => `#/contrato/${salvo.id}`,
   },
   fichas: {
-    titulo: (r) => (r ? `Ficha em análise - ${r.inquilino_nome}` : 'Nova ficha em análise'),
+    // começa como solicitação de reserva (pedido do dono, 2026-11-19): a equipe preenche só o imóvel, o contato, a proposta,
+    // o que está incluso e a reserva; o resto o interessado manda pelo link da ficha (a ficha completa aparece ao editar)
+    titulo: (r) => (r ? `Ficha em análise - ${r.inquilino_nome}` : 'Nova solicitação de reserva'),
     // imóveis de interesse: uma caixa de marcar por imóvel VAGO (pedido do dono, 2026-11-10: escolher ocupado dava brecha
     // para erro); o que já está na ficha continua na lista. O que já tem outra ficha aberta aparece avisado
     campos: (r) => {
@@ -522,11 +524,16 @@ export const CADASTROS = {
       // "Usar o endereço do imóvel": o de interesse (com um só marcado)
       const p = partesDaFicha(F.camposDaPessoa([...R.CAMPOS_PESSOA, ...ENDERECO_DO_IMOVEL.map(([caixa]) => caixa)])
         .map((c) => (ENDERECO_DO_IMOVEL.some(([caixa]) => caixa === c.nome) ? { ...c, rotulo: 'Usar o endereço do imóvel de interesse', ajuda: 'Marcado: o endereço fica igual ao do imóvel marcado acima (com um só imóvel marcado)' } : c)));
-      return [...F.FICHA_INICIO,
-        { secao: 'Imóveis de interesse' },
+      const blocoImoveis = [{ secao: 'Imóveis de interesse' },
         { nome: 'modo_imoveis', rotulo: 'A ficha é para', tipo: 'opcao', obrig: true, padrao: R.MODOS_FICHA[0], opcoes: R.MODOS_FICHA, largo: true,
           ajuda: `Apenas um: o interessado vai alugar um dos imóveis marcados. Todos juntos: aluga todos os marcados (um contrato para cada). Só aparecem os imóveis vagos${imoveis.length ? '' : ' (nenhum vago no momento)'}` },
-        { quebra: true }, ...imoveis,
+        { quebra: true }, ...imoveis];
+      if (!r) {
+        return [{ secao: 'Solicitação de reserva' },
+          { ...F.FICHA_INICIO.find((c) => c.nome === 'data_recebida'), rotulo: 'Solicitação recebida em' },
+          ...blocoImoveis, ...p.contato, ...p.proposta, { secao: 'Observações' }, F.FICHA_FIM.find((c) => c.nome === 'observacoes')];
+      }
+      return [...F.FICHA_INICIO, ...blocoImoveis,
         ...p.contato, ...p.proposta, ...p.pessoa, ...F.FICHA_RENDA, ...F.FICHA_FIADORES, ...p.fim];
     },
     padrao: (q) => ({ data_recebida: C.hojeIso(), ...(q.imovel ? { [`imovel_${q.imovel}`]: true } : {}) }),
@@ -540,6 +547,12 @@ export const CADASTROS = {
     descricao: (dados) => `Ficha de ${dados.inquilino_nome}`,
     ajustar(dados, erros, r, form) {
       const hoje = C.hojeIso();
+      // solicitação de reserva: começa em análise; o link da ficha vai pelo e-mail ou pelo WhatsApp
+      if (!r) {
+        dados.situacao = dados.situacao || 'Em análise';
+        dados.inquilino_tipo = dados.inquilino_tipo || 'Pessoa física';
+        if (!dados.inquilino_email && !dados.inquilino_telefone && !dados.inquilino_whatsapp) erros.inquilino_email = 'Informe o e-mail ou o telefone: é por eles que vai o link da ficha';
+      }
       const ids = d().imoveis.filter((i) => dados[`imovel_${i.id}`]).map((i) => i.id);
       for (const k of Object.keys(dados)) if (/^imovel_\d+$/.test(k)) delete dados[k];
       dados.imoveis_ids = ids;

@@ -102,10 +102,10 @@ export function telaInquilinos(q) {
   // nenhum ativo: sem contrato nenhum, o próximo passo (imóvel primeiro, depois a ficha ou o contrato)
   const semAtivos = () => (d().contratos.length ? `<span class="suave">${busca ? 'Nenhum inquilino ativo encontrado nesta busca.' : 'Nenhum inquilino ativo hoje.'}</span>`
     : !d().imoveis.length ? AJ.proximoPasso('Nenhum inquilino ainda.', 'O contrato liga o inquilino a um imóvel: cadastre o imóvel primeiro.', [opera() && ['#/novo/imoveis', 'Cadastrar o primeiro imóvel']])
-      : AJ.proximoPasso('Nenhum inquilino ainda.', 'Já tem o contrato assinado? Cadastre o contrato. Alguém ainda vai mandar os documentos para análise? Comece pela ficha.',
-        [opera() && ['#/novo/contratos', 'Cadastrar o contrato'], opera() && ['#/novo/fichas', 'Nova ficha em análise']]));
+      : AJ.proximoPasso('Nenhum inquilino ainda.', 'Já tem o contrato assinado? Cadastre o contrato. Alguém ainda vai mandar os documentos para análise? Comece pela solicitação de reserva.',
+        [opera() && ['#/novo/contratos', 'Cadastrar o contrato'], opera() && ['#/novo/fichas', 'Nova solicitação de reserva']]));
   // solicitações e notificações ficam só em Comunicações (pedido do dono, 2026-11-19)
-  // 1ª etapa de um inquilino novo: a ficha do interessado (botão "Nova ficha em análise", na caixa das fichas); dela sai
+  // 1ª etapa de um inquilino novo: a ficha do interessado (botão "Nova solicitação de reserva", na caixa das fichas); dela sai
   // o contrato. O "Novo contrato" fica na caixa dos contratos ativos (pedido do dono, 2026-11-17: um lugar só para cada um)
   return `<div class="cabecalho"><h1>Inquilinos</h1></div>${abasInquilinos('lista')}
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="ir" data-ir="inquilinos" style="flex-wrap:nowrap;min-width:0;max-width:100%"><input name="busca" value="${esc(q.busca || '')}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px;max-width:100%;min-width:0"><button class="secundario">Buscar</button>${busca ? link('#/inquilinos', 'Limpar') : ''}</form></div>
