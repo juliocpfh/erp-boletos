@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-7+uR/eZi6lG5F3zHQEkQnAMi9sTFY14N8TArxIDCNuk=' 'sha256-1kMrRV5mpaOrFmzcDlSMSRnEJ8PBZqk3S2+oH2j5LZ8='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-7+uR/eZi6lG5F3zHQEkQnAMi9sTFY14N8TArxIDCNuk=' 'sha256-Y+xnAMwN/IEZ7vVliD2cw1hVcYm7t4UoAG7T9aZeASo='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="3edaa9837033d7fe">
+<meta name="fontes" content="ad86dcbd8b467542">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -479,7 +479,6 @@ input.doc-invalido { border-color: var(--perigo); }
 .historico-iptu summary { cursor: pointer; }
 .caixa-historico summary { cursor: pointer; }
 .caixa-historico[open] summary { margin-bottom: 10px; }
-.resumo-solicitacoes span { margin-left: 8px; white-space: nowrap; }
 .resumo-painel .simbolos { display: grid; grid-template-columns: auto auto; justify-content: center; gap: 2px 14px; font-size: 16px; font-weight: 700; margin: 4px 0 8px; }
 th.centro, td.centro { text-align: center; }
 .indices-compacta { margin-top: 8px; width: auto; }
@@ -29182,11 +29181,13 @@ A conta e a chave Pix para pagamento não mudam. Nunca pedimos pagamento em outr
   function atalhosComunicacoes(atual) {
     const sol = resumoSolicitacoes(d());
     const abertasSol = (sol.Aberta || 0) + (sol["Em andamento"] || 0);
-    const abertasNot = (d().notificacoes || []).filter((n) => ["Rascunho", "Aguardando resposta", "Multa gerada"].includes(n.situacao)).length;
+    const notAbertas = (d().notificacoes || []).filter((n) => ["Rascunho", "Aguardando resposta", "Multa gerada"].includes(n.situacao));
+    const abertasNot = notAbertas.length;
+    const vencidasNot = notAbertas.filter((n) => estadoNotificacao(d(), n).podeMulta).length;
     const b = (hash, texto3, chave) => link(hash, texto3, `botao ${atual === chave ? "" : "secundario "}pequeno`);
     return `${abasInquilinos("comunicacoes")}<div class="acoes" style="margin-bottom:12px;flex-wrap:wrap">
     ${b("#/comunicacoes", "Comunicados a todos", "comunicados")} ${b("#/solicitacoes", `Solicitações${abertasSol ? ` (${abertasSol})` : ""}`, "solicitacoes")}
-    ${b("#/notificacoes", `Notificações${abertasNot ? ` (${abertasNot})` : ""}`, "notificacoes")} ${b("#/comunicacoes?ver=modelos", "Modelos", "modelos")}</div>`;
+    ${b("#/notificacoes", `Notificações${abertasNot ? ` (${abertasNot}${vencidasNot ? ` · ${vencidasNot} com prazo vencido` : ""})` : ""}`, "notificacoes")} ${b("#/comunicacoes?ver=modelos", "Modelos", "modelos")}</div>`;
   }
   async function pedir2(caminho, op = {}) {
     let r;
@@ -32628,15 +32629,8 @@ ${url}
       "Já tem o contrato assinado? Cadastre o contrato. Alguém ainda vai mandar os documentos para análise? Comece pela ficha.",
       [opera() && ["#/novo/contratos", "Cadastrar o contrato"], opera() && ["#/novo/fichas", "Nova ficha em análise"]]
     );
-    const resumo3 = resumoSolicitacoes(d());
     return `<div class="cabecalho"><h1>Inquilinos</h1></div>${abasInquilinos("lista")}
-    <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="ir" data-ir="inquilinos" style="flex-wrap:nowrap;min-width:0;max-width:100%"><input name="busca" value="${esc(q.busca || "")}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px;max-width:100%;min-width:0"><button class="secundario">Buscar</button>${busca ? link("#/inquilinos", "Limpar") : ""}</form>
-      <a class="botao secundario resumo-solicitacoes" href="#/solicitacoes" title="Ver todas as solicitações dos inquilinos">Solicitações: ${SITUACOES_SOLICITACAO.map((s) => `<span>${s.simbolo} ${resumo3[s.nome]} ${s.texto}</span>`).join(" ")}</a>
-      ${(() => {
-      const l = (d().notificacoes || []).filter((n) => ["Rascunho", "Aguardando resposta", "Multa gerada"].includes(n.situacao));
-      const v = l.filter((n) => estadoNotificacao(d(), n).podeMulta).length;
-      return `<a class="botao secundario" href="#/notificacoes" title="Notificações ao inquilino (prazo para resolver algo)">Notificações: ${l.length} em aberto${v ? ` · ${v} com prazo vencido` : ""}</a>`;
-    })()}</div>
+    <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="ir" data-ir="inquilinos" style="flex-wrap:nowrap;min-width:0;max-width:100%"><input name="busca" value="${esc(q.busca || "")}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px;max-width:100%;min-width:0"><button class="secundario">Buscar</button>${busca ? link("#/inquilinos", "Limpar") : ""}</form></div>
     ${caixaFichas()}
     <div class="cartao rolagem" id="contratos-ativos"><div class="cabecalho"><h2>Contratos ativos (${atuais.length})</h2>${opera() ? link("#/novo/contratos", "Novo contrato", "botao secundario pequeno") : ""}</div>
       <table><tr><th>Imóvel</th><th>Inquilino</th><th class="centro so-pc">Contrato</th><th>Vigência do contrato</th><th class="n">Aluguel atual</th><th>Garantia</th></tr>
