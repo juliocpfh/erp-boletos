@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-7+uR/eZi6lG5F3zHQEkQnAMi9sTFY14N8TArxIDCNuk=' 'sha256-odohZcEvjFFN5Ovc4ieYNUF7XY1dxRc6Rm1731f7+dQ='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-7+uR/eZi6lG5F3zHQEkQnAMi9sTFY14N8TArxIDCNuk=' 'sha256-4KSKvhcmMX91LOcsQ7ZQ7oJd9X0eJu6uersADarB/0U='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="2aeb8e46cc8ca54f">
+<meta name="fontes" content="77f69faea9f38aa9">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -32593,13 +32593,13 @@ ${url}
   }
   function telaSolicitacoes(q) {
     const resumo3 = resumoSolicitacoes(d());
-    const filtro = SITUACOES_SOLICITACAO.find((s) => s.nome === q.situacao);
+    const filtro = SITUACOES_SOLICITACAO.find((s) => s.chave === q.filtro);
     const simbolo = (sit) => (SITUACOES_SOLICITACAO.find((s) => s.nome === sit) || SITUACOES_SOLICITACAO[0]).simbolo;
     const lista3 = d().solicitacoes.filter((x) => !filtro || (x.situacao || "Aberta") === filtro.nome).sort(maisRecentePrimeiro);
     return `<p class="suave"><a href="#/inquilinos">← Inquilinos</a></p>
     ${atalhosComunicacoes("solicitacoes")}<div class="cabecalho"><h1>Solicitações dos inquilinos</h1>${opera() ? link("#/novo/solicitacoes?de=solicitacoes", "Abrir nova solicitação", "botao") : ""}</div>
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap">${link("#/solicitacoes", `Todas (${d().solicitacoes.length})`, `botao ${filtro ? "secundario " : ""}pequeno`)}
-      ${SITUACOES_SOLICITACAO.map((s) => link(`#/solicitacoes?situacao=${encodeURIComponent(s.nome)}`, `${s.simbolo} ${resumo3[s.nome]} ${s.texto}`, `botao ${filtro === s ? "" : "secundario "}pequeno`)).join(" ")}</div>
+      ${SITUACOES_SOLICITACAO.map((s) => link(`#/solicitacoes?filtro=${s.chave}`, `${s.simbolo} ${resumo3[s.nome]} ${s.texto}`, `botao ${filtro === s ? "" : "secundario "}pequeno`)).join(" ")}</div>
     <div class="cartao rolagem"><table><tr><th>Data</th><th>Inquilino / imóvel</th><th>O que pediu</th><th>O que foi feito</th><th>Situação</th><th class="n">Custo</th><th></th></tr>
     ${lista3.map((x) => {
       const c = buscar2("contratos", x.contrato_id);
@@ -32847,10 +32847,10 @@ ${url}
       init_fichas();
       TIPOS_BUSCA = [["inquilinos", "Inquilinos"], ["imoveis", "Imóveis"], ["boletos", "Boletos com esse valor"], ["nfs", "Notas fiscais"]];
       SITUACOES_SOLICITACAO = [
-        { nome: "Aberta", simbolo: "🟢", texto: "abertas" },
-        { nome: "Em andamento", simbolo: "➡️", texto: "em andamento" },
-        { nome: "Concluída", simbolo: "✅", texto: "concluídas" },
-        { nome: "Não atendida", simbolo: "❌", texto: "não atendidas" }
+        { nome: "Aberta", simbolo: "🟢", texto: "abertas", chave: "aberta" },
+        { nome: "Em andamento", simbolo: "➡️", texto: "em andamento", chave: "andamento" },
+        { nome: "Concluída", simbolo: "✅", texto: "concluídas", chave: "concluida" },
+        { nome: "Não atendida", simbolo: "❌", texto: "não atendidas", chave: "nao_atendida" }
       ];
     }
   });
