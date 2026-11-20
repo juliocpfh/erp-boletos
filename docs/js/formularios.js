@@ -2,6 +2,9 @@
 import { soDigitos } from './c6-comum.js';
 import { centavos, ErroUsuario, numero } from './calculos.js';
 
+/** Tipos aceitos nos campos de documento (PDF e fotos): a mesma lista em todos (antes uns aceitavam "qualquer imagem"). */
+export const ACEITA_DOCUMENTOS = '.pdf,.jpg,.jpeg,.png,.webp,.gif';
+
 export const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const campo = (nome, rotulo, tipo = 'texto', extra = {}) => ({ nome, rotulo, tipo, ...extra });
@@ -169,7 +172,7 @@ export const LEITURAS = [['agua', 'Relógio de água'], ['energia', 'Relógio de
 export const LEITURA = [
   campo('data', 'Data da leitura', 'data', { obrig: true }),
   campo('momento', 'Momento', 'opcao', { obrig: true, padrao: 'Entrada do inquilino', opcoes: ['Entrada do inquilino', 'Saída do inquilino', 'Outra'] }),
-  ...LEITURAS.map(([nome, rotulo]) => campo(nome, rotulo)),
+  ...LEITURAS.map(([nome, rotulo]) => campo(nome, rotulo, 'texto', { teclado: 'decimal' })),
   campo('observacoes', 'Observações', 'area'),
 ];
 
@@ -444,7 +447,7 @@ export const CORRECAO = [
   campo('data_vigencia', 'Vale a partir de', 'data', { obrig: true, ajuda: 'O boleto de um mês usa o valor vigente no dia 1º daquele mês' }),
   campo('indice', 'Índice usado nesta correção', 'opcao', { obrig: true, lista: 'indices', ajuda: 'O índice previsto no contrato fica guardado junto, no histórico' }),
   campo('data_indice', 'Mês de referência do índice', 'mes', { ajuda: 'Ex.: índice acumulado até 2026-05' }),
-  campo('percentual', 'Percentual do índice (%)', 'pct', { ajuda: 'Informe o percentual ou o novo valor' }),
+  campo('percentual', 'Percentual do índice (%)', 'pct', { negativo: true, ajuda: 'Informe o percentual ou o novo valor' }),
   campo('valor_novo', 'Novo valor do aluguel', 'dinheiro'),
   campo('observacoes', 'Observações', 'area'),
 ];
@@ -567,7 +570,7 @@ export const RENOVACAO = [
 // (vem preenchida e, se mudar aqui, muda lá também). O "Vistoria de saída" (sem/com pendências, não feita) não é digitado:
 // sai da vistoria de saída registrada (contratos.js, resultadoVistoriaSaida) e é guardado em vistoria_saida ao salvar
 export const ENCERRAMENTO = [
-  ...LEITURAS.map(([nome, rotulo]) => campo(`leitura_${nome}`, `${rotulo} na saída`)),
+  ...LEITURAS.map(([nome, rotulo]) => campo(`leitura_${nome}`, `${rotulo} na saída`, 'texto', { teclado: 'decimal' })),
   campo('garantia_valor', 'Valor da garantia a devolver (caução ou depósito)', 'dinheiro'),
   campo('indice_percentual', 'Correção da garantia: índice da poupança no período (%)', 'pct', { autoMsg: true, ajuda: 'Vem do Banco Central, pelo aniversário de cada depósito (confira com o extrato da poupança)' }),
   campo('debitos', 'Débitos do inquilino a descontar', 'dinheiro', { ajuda: 'Aluguéis e encargos em aberto, reparos da vistoria etc.' }),
@@ -640,8 +643,8 @@ export const COBRANCA = [
   campo('outros', 'Ajuste do mês: cobrança adicional (+) ou ressarcimento (−)', 'dinheiro', { negativo: true, ajuda: 'Valor negativo desconta do boleto. Ex.: -150,00' }),
   campo('outros_descricao', 'Motivo do ajuste', 'texto', { ajuda: 'Ex.: reforma do banheiro, acerto do mês anterior' }),
   campo('reserva_utilizada', 'Reserva utilizada', 'dinheiro'),
-  campo('multa_percentual', 'Multa por atraso (%)', 'pct'),
-  campo('juros_mensal_percentual', 'Juros por atraso (% ao mês)', 'pct'),
+  campo('multa_percentual', 'Multa por atraso (%)', 'pct', { min: 0 }),
+  campo('juros_mensal_percentual', 'Juros por atraso (% ao mês)', 'pct', { min: 0 }),
   campo('observacoes_nf', 'Observações impressas na NF', 'area', { max: LIMITES.observacoes_nf, ajuda: 'Aparecem na caixa grande da NF (até 5 linhas)' }),
   campo('observacoes', 'Observações', 'area'),
 ];
@@ -842,7 +845,7 @@ export function camposHtml(campos, valores = {}, erros = {}, { compacto = false 
       // o nome do arquivo já guardado vem do registro; depois de um erro o navegador esquece o arquivo escolhido
       // ``guardado``: o arquivo está em outro lugar (ex.: o comprovante da ficha no Novo contrato): { acao, dados, abrir }
       const g = c.guardado;
-      entrada = `<input id="${id}" name="${c.nome}" type="file" accept="application/pdf,image/*">${typeof v === 'string' && v ? (g ? arquivoGuardado(c.nome, v, g.acao, g.dados, g.abrir) : arquivoGuardado(c.nome, v)) : ''}`;
+      entrada = `<input id="${id}" name="${c.nome}" type="file" accept="${ACEITA_DOCUMENTOS}">${typeof v === 'string' && v ? (g ? arquivoGuardado(c.nome, v, g.acao, g.dados, g.abrir) : arquivoGuardado(c.nome, v)) : ''}`;
     } else if (c.tipo === 'area') entrada = `<textarea id="${id}" name="${c.nome}" ${c.linha ? 'rows="1" class="cresce"' : ''} ${max}>${esc(v)}</textarea>`;
     else if (c.tipo === 'opcao') {
       const ops = c.opcoes.map((o) => (Array.isArray(o) ? o : [o, o]));
@@ -852,7 +855,10 @@ export function camposHtml(campos, valores = {}, erros = {}, { compacto = false 
     } else {
       // link fica como texto: o navegador recusaria "onedrive.live.com/..." sem https://, e ler() completa sozinho
       const tipo = { data: 'date', mes: 'month', email: 'email', tel: 'tel' }[c.tipo] || 'text';
-      const extra = c.tipo === 'dinheiro' ? 'inputmode="decimal" data-dinheiro placeholder="0,00"' : c.tipo === 'pct' ? 'inputmode="decimal"' : c.tipo === 'inteiro' ? 'inputmode="numeric"'
+      // campo que aceita negativo fica com o teclado completo: o teclado de números do iPhone não tem o sinal de menos
+      const decimal = c.negativo ? '' : 'inputmode="decimal"';
+      // ``teclado``: texto que é número (ex.: leitura do relógio, "1.234,5") abre o teclado de números
+      const extra = c.teclado ? `inputmode="${c.teclado}"` : c.tipo === 'dinheiro' ? `${decimal} data-dinheiro placeholder="0,00"` : c.tipo === 'pct' ? decimal : c.tipo === 'inteiro' ? 'inputmode="numeric"'
         : [...DOCUMENTOS, 'tel'].includes(c.tipo) ? `inputmode="numeric" data-mascara="${c.tipo}"${c.preencher ? ` data-preencher="${esc(JSON.stringify(c.preencher))}"` : ''}${c.buscarPessoa ? ' data-buscar-pessoa' : ''}` : '';
       const vinc = c.vinculo ? `data-vinculo="${c.vinculo}" data-tipo="${c.tipo}"` : c.base ? 'data-vinculo-base' : '';
       // sugestões: o que já foi escrito antes aparece para escolher (e dá para escrever outro)

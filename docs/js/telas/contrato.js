@@ -125,7 +125,7 @@ function caixaGarantia(c) {
   const formDeposito = (qual, falta) => (opera() ? `<form data-form="garantiaPaga" class="acoes linha-deposito"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="qual" value="${qual}">
       <input type="date" name="data" value="${esc(C.hojeIso())}" title="Data do depósito">${F.atalhosData()}
       <input name="valor" value="${esc(C.reais(falta, false))}" title="Valor depositado (R$)" class="valor">
-      <label class="botao secundario mini enviar" title="Comprovante (PDF ou foto); pode anexar depois"><span data-nome-escolhido>📎 comprovante</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
+      <label class="botao secundario mini enviar" title="Comprovante (PDF ou foto); pode anexar depois"><span data-nome-escolhido>📎 comprovante</span><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}" data-arquivo-doc></label>
       <button class="mini">Registrar depósito</button></form>` : '');
   const anexoDeposito = (qual, x) => ({ tabela: 'depositos_garantia', id: x.id, campo: 'comprovante', tipo: qual === 'caucao' ? 'caucao' : 'deposito-garantia', data: x.data });
   /** Depósitos numa tabela curta: data, valor, comprovante (com ×), Editar e Excluir (só onde pode excluir). */
@@ -567,7 +567,7 @@ const rotinaAberta = (c, hoje) => R.contratoAtivo(c, hoje) && !R.resumoRotinaEnt
 function formMarcarDocumento(c, k, feito, comParcial = true) {
   return `<form data-form="marcarDocumento" class="acoes" style="justify-content:flex-end"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="campo" value="${k}">
         <input type="date" name="data" value="${C.hojeIso()}" style="width:auto">${F.atalhosData()}
-        <label class="botao secundario pequeno enviar" title="Arquivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
+        <label class="botao secundario pequeno enviar" title="Arquivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}" data-arquivo-doc></label>
         <button class="secundario pequeno">Marcar ${feito}</button>
         ${comParcial ? botao('documentoParcial', 'Falta assinatura', { contrato: c.id, campo: k }, 'secundario pequeno') : ''}</form>`;
 }
@@ -659,7 +659,7 @@ function caixaDocumentos(c) {
   const abrir = (k) => (doc(k).arquivo ? `<a href="#" data-acao="abrirArquivo" data-escopo="assinados" data-id="${doc(k).contrato.id}" data-nome="${esc(doc(k).arquivo)}">📎 ${esc(doc(k).arquivo)}</a>` : '<span class="suave">sem arquivo</span>');
   // assinado neste contrato: o "×" apaga só o arquivo (continua assinado) e, sem arquivo, "⚠ anexar" põe o arquivo de volta
   const abrirProprio = (k) => (c[R.campoArquivoDoc(k)] ? `<span class="nw">${abrir(k)}${xAnexo('removerArquivoDocumento', { contrato: c.id, campo: k }, `Apagar o arquivo "${c[R.campoArquivoDoc(k)]}"? O documento continua marcado como assinado; anexe o arquivo certo depois.`)}</span>`
-    : opera() ? `<label class="anexar-falta" title="Anexar o arquivo assinado (PDF ou foto)">⚠ anexar arquivo<input type="file" accept="application/pdf,image/*" data-acao-arquivo="anexarArquivoDocumento" data-contrato="${c.id}" data-campo="${k}"></label>` : abrir(k));
+    : opera() ? `<label class="anexar-falta" title="Anexar o arquivo assinado (PDF ou foto)">⚠ anexar arquivo<input type="file" accept="${ACEITA_DOCUMENTOS}" data-acao-arquivo="anexarArquivoDocumento" data-contrato="${c.id}" data-campo="${k}"></label>` : abrir(k));
   // troca de titular: os documentos de entrada vêm do contrato original (não se gera novo, não fica pendente)
   const original = R.contratoHerdado(d(), c);
   const perdido = (k) => R.documentoPerdido(d(), c, k);
@@ -731,7 +731,7 @@ function caixaAditivos(c) {
         ${a.tipo === 'Troca de titular' ? '' : botao('aditivoPerdido', 'Perdido', { id: a.id }, 'perigo pequeno', `Registrar o termo aditivo de ${dataBr(a.data)} como perdido (foi assinado, mas o papel se perdeu)? Passa a valer como assinado, sem o arquivo${a.dia_novo ? `: o vencimento muda para o dia ${a.dia_novo} a partir de ${dataBr(a.primeiro_vencimento)}` : ''}.${adm ? '' : ` O administrador vai analisar${a.dia_novo ? ' (a troca do dia só vale depois da confirmação)' : ''}.`}`)}` : ''}
       ${opera() ? `<form data-form="assinarAditivo" class="acoes" style="justify-content:flex-end;margin-top:4px"><input type="hidden" name="id" value="${a.id}">
         <input type="date" name="data" value="${C.hojeIso()}" style="width:auto" title="Data da assinatura">${F.atalhosData()}
-        <label class="botao secundario pequeno enviar" title="Termo aditivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
+        <label class="botao secundario pequeno enviar" title="Termo aditivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}" data-arquivo-doc></label>
         <button class="pequeno">Marcar assinado</button></form>` : ''}</td></tr>`).join('')}</table></div></div>` : ''}
     ${lista.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Assunto</th><th>Arquivo</th><th></th></tr>${lista.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}${a.ciencia_por ? `<br><span class="suave mini">ciência da herança: ${esc(a.ciencia_por)} em ${dataBr(String(a.ciencia_em).slice(0, 10))}</span>` : ""}</td><td class="nw">${R.aditivoPerdido(a) ? `${abrir(a)} ${acoesPerdido(a)}` : `${abrir(a)}${xAnexo('removerArquivoAditivo', { id: a.id }, `Apagar o arquivo "${a.arquivo}"? O termo aditivo continua e volta a "aguardando assinatura".`)}`}</td>
       <td class="n nw">${a.arquivo ? `${botaoEmail('aditivo_assinado', { contrato: c.id, aditivo: a.id })} ` : ''}${ver(a)} ${opera() ? botao('excluir', '×', { tabela: 'aditivos', id: a.id }, 'x-excluir', `Excluir o termo aditivo de ${dataBr(a.data)}?${a.arquivo ? ' O arquivo assinado também é apagado.' : ''}`) : ''}</td></tr>`).join('')}</table></div>`
@@ -741,7 +741,7 @@ function caixaAditivos(c) {
     ${opera() ? `<form data-form="aditivo" class="acoes"><input type="hidden" name="contrato" value="${c.id}">
       <input type="date" name="data" value="${C.hojeIso()}" style="width:auto">${F.atalhosData()}
       <input name="assunto" placeholder="Assunto (ex.: troca do dia do vencimento para 15)" style="flex:1;min-width:240px">
-      <label class="botao secundario pequeno enviar" title="Termo aditivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
+      <label class="botao secundario pequeno enviar" title="Termo aditivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}" data-arquivo-doc></label>
       ${faltaTroca ? `<input type="hidden" name="pergunta_troca" value="1"><label class="check" style="margin:0"><input type="checkbox" name="troca" value="1" checked> É o termo da troca de titular (${esc(ant.inquilino_nome)} → ${esc(c.inquilino_nome)})</label>` : ''}
       <button class="secundario pequeno">Registrar aditivo</button>
       ${botao('registrarAditivoPerdido', 'Registrar como perdido', { contrato: c.id }, 'perigo pequeno')}</form>
@@ -808,6 +808,7 @@ export function telaContrato(c) {
     <div class="cabecalho"><h1>${esc(c.inquilino_nome)}${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}</h1><div class="acoes">
       ${opera() ? botao('editarContrato', 'Editar contrato', { id: c.id }, 'botao') : ''}
       ${opera() && c.imovel_id && !cobs.some((cb) => cb.data_pagamento) ? botao('corrigirImovel', 'Corrigir imóvel', { id: c.id }, 'secundario') : ''}
+      ${opera() ? link(`#/novo/contratos?pessoa=${c.id}`, 'Novo contrato desta pessoa em outro imóvel', 'botao secundario') : ''}
       ${botaoDesistenciaContrato(c)}
       ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'contratos', id: c.id }, 'perigo') : ''}</div></div>
     ${i ? `<div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>` : `<div class="alerta aviso">Sem imóvel vinculado. Use "Editar contrato" para escolher o imóvel.${R.dataApagarSemImovel(c) ? ` Se não for vinculado, este contrato será apagado em <b>${dataBr(R.dataApagarSemImovel(c))}</b>.` : ''}</div>`}

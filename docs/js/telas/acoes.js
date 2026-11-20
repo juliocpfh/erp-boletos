@@ -11,7 +11,7 @@ import * as CPF from '../conferir-pdf.js';
 import * as Z from '../conciliacao.js';
 import * as K from '../contratos.js';
 import { avisosDeCorte, cortesDaFatura, encaixarFaturas, faturaExcel, faturaHtml } from '../fatura.js';
-import { atalhosData, chipDaLista, dinheiroTexto, esc } from '../formularios.js';
+import { ACEITA_DOCUMENTOS, atalhosData, chipDaLista, dinheiroTexto, esc } from '../formularios.js';
 import { MODELOS_PADRAO } from '../modelos-contrato.js';
 import * as R from '../regras.js';
 import { desfazerItens, dispensarAvisoSeguro } from './admin.js';
@@ -1669,7 +1669,7 @@ export const ACOES = {
     const r = await janela({ titulo: `Depósito do complemento - ${c.inquilino_nome}`, sim: 'Registrar depósito', nao: 'Cancelar',
       html: `<p>Complemento de <b>${reais(x.complemento)}</b>: a caução passa de ${reais(x.atual)} para <b>${reais(x.necessaria)}</b>.</p>
         <label>Data do depósito</label><input type="date" name="data" value="${C.hojeIso()}" required>${atalhosData()}
-        <label>Comprovante (opcional)</label><input type="file" name="arquivo" accept="application/pdf,image/*">
+        <label>Comprovante (opcional)</label><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}">
         <p class="suave">Sem o comprovante, fica o aviso "anexar" até ele chegar.</p>` });
     if (!r) return;
     const data = String((r.data || [])[0] || '');
