@@ -29,8 +29,9 @@ export function atalhosComunicacoes(atual) {
   const abertasNot = notAbertas.length;
   const vencidasNot = notAbertas.filter((n) => R.estadoNotificacao(d(), n).podeMulta).length;
   const b = (hash, texto, chave) => link(hash, texto, `botao ${atual === chave ? '' : 'secundario '}pequeno`);
+  // (os comunicados a todos são a própria aba "Comunicações": sem botão repetido aqui)
   return `${abasInquilinos('comunicacoes')}<div class="acoes" style="margin-bottom:12px;flex-wrap:wrap">
-    ${b('#/comunicacoes', 'Comunicados a todos', 'comunicados')} ${b('#/solicitacoes', `Solicitações${abertasSol ? ` (${abertasSol})` : ''}`, 'solicitacoes')}
+    ${b('#/solicitacoes', `Solicitações${abertasSol ? ` (${abertasSol})` : ''}`, 'solicitacoes')}
     ${b('#/notificacoes', `Notificações${abertasNot ? ` (${abertasNot}${vencidasNot ? ` · ${vencidasNot} com prazo vencido` : ''})` : ''}`, 'notificacoes')} ${b('#/comunicacoes?ver=modelos', 'Modelos', 'modelos')}</div>`;
 }
 
@@ -106,13 +107,19 @@ export async function telaComunicacoes(q = {}) {
   if (q.ver === 'modelos') return telaModelosComunicado();
   if (q.ver === 'novo') return telaNovoComunicado(q);
   const lista = [...(d().comunicados || [])].sort((a, b) => b.id - a.id);
+  if (q.ver === 'editar' && q.id) return telaNovoComunicado(q, Number(q.id));
   if (q.id) return telaComunicado(Number(q.id));
-  return `<div class="cabecalho"><h1>Comunicações</h1>${opera() ? link('#/comunicacoes?ver=novo', 'Novo comunicado a todos', 'botao') : ''}</div>
+  // fora da nuvem o comunicado não tem como ser enviado (o link é da nuvem): não oferece criar
+  const podeCriar = opera() && E.nuvem;
+  return `<div class="cabecalho"><h1>Comunicações</h1>${podeCriar ? link('#/comunicacoes?ver=novo', 'Novo comunicado a todos', 'botao') : ''}</div>
     ${atalhosComunicacoes('comunicados')}
     ${lista.length ? lista.map((com) => cartaoComunicado(com)).join('') : `<div class="cartao"><p>Nenhum comunicado enviado ainda.</p>
       <p class="suave">O comunicado vai para todos os inquilinos e fiadores com contrato ativo, cada um com um link só dele, por e-mail e por WhatsApp. Ex.: "Atualização de contatos e novo e-mail da empresa".</p>
-      ${opera() ? link('#/comunicacoes?ver=novo', 'Novo comunicado a todos', 'botao') : ''}</div>`}`;
+      ${podeCriar ? link('#/comunicacoes?ver=novo', 'Novo comunicado a todos', 'botao') : opera() ? `<p class="suave">${SO_NUVEM}</p>` : ''}</div>`}`;
 }
+
+/** Nada saiu ainda (nenhum e-mail, WhatsApp, lembrete, abertura nem confirmação): o comunicado pode ser corrigido ou excluído. */
+const nadaEnviado = (com) => !(com.destinos || []).some((x) => x.email_em || x.whats_em || x.lembrete_em || x.aberto_em || x.confirmado_em);
 
 function cartaoComunicado(com) {
   const r = CM.resumo(com);
@@ -123,24 +130,35 @@ function cartaoComunicado(com) {
     <p class="acoes">${link(`#/comunicacoes?id=${com.id}`, 'Abrir', 'botao pequeno')}</p></div>`;
 }
 
-function telaNovoComunicado(q) {
+function telaNovoComunicado(q, editarId = null) {
   if (!opera()) return `<div class="alerta erro">${SO_CONSULTA}</div>`;
-  const m = CM.MODELOS[q.tema] || CM.MODELOS.contatos;
-  const chave = CM.MODELOS[q.tema] ? q.tema : 'contatos';
-  const pessoas = CM.destinatarios(d());
-  const prazo = C.somarDias(C.hojeIso(), DIAS_PRAZO); // ex.: hoje 18/11 → 28/11
-  const email = K.dadoDaEmpresa(d(), {}, 'email_contato') || 'administracao@ankjck.com.br';
+  const voltar = '<p class="suave"><a href="#/comunicacoes">← Comunicações</a></p>';
+  if (!E.nuvem) return `${voltar}<h1>Novo comunicado a todos</h1><div class="alerta aviso">${SO_NUVEM}</div>`;
+  const editado = editarId ? buscar('comunicados', editarId) : null;
+  if (editarId && !editado) return naoEncontrado('Comunicado não encontrado', '#/comunicacoes', 'Ver as comunicações');
+  if (editado && !nadaEnviado(editado)) return `${voltar}<h1>${esc(editado.titulo)}</h1><div class="alerta aviso">Este comunicado já foi enviado (ou alguém já abriu o link): não dá mais para mudar. Crie um novo, se precisar.</div>`;
+  const chave = editado ? editado.modelo : CM.MODELOS[q.tema] ? q.tema : 'contatos';
+  const m = { ...(CM.MODELOS[chave] || CM.MODELOS.contatos), ...(editado ? Object.fromEntries(['titulo', 'assunto', 'texto', 'whatsapp', 'lembrete', 'aviso', 'ciencia'].map((k) => [k, editado[k] || ''])) : {}) };
+  const pessoas = editado ? editado.destinos : CM.destinatarios(d());
+  if (!pessoas.length) return `${voltar}<h1>Novo comunicado a todos</h1><div class="alerta aviso">Não há inquilino com contrato ativo hoje: o comunicado não teria para quem ir.</div>`;
+  const prazo = editado ? editado.prazo : C.somarDias(C.hojeIso(), DIAS_PRAZO); // ex.: hoje 18/11 → 28/11
+  const email = editado ? editado.email_empresa : K.dadoDaEmpresa(d(), {}, 'email_contato') || 'administracao@ankjck.com.br';
+  // telefone: o do comunicado editado ou o do último comunicado gravado (não precisa digitar toda vez)
+  const ultimo = [...(d().comunicados || [])].sort((a, b) => b.id - a.id).find((x) => x.telefone_empresa);
+  const telefone = editado ? editado.telefone_empresa : ultimo ? ultimo.telefone_empresa : '';
   const area = (nome, rotulo, valor, linhas, ajuda = '') => `<p><label>${rotulo}</label><textarea name="${nome}" rows="${linhas}" style="width:100%">${esc(valor)}</textarea>${ajuda ? `<span class="suave">${ajuda}</span>` : ''}</p>`;
-  const semContato = pessoas.filter((p) => !p.email && !CM.telefoneWhats(p.telefone));
-  return `<p class="suave"><a href="#/comunicacoes">← Comunicações</a></p><h1>Novo comunicado a todos</h1>
-    <form data-form="criarComunicado" class="cartao"><input type="hidden" name="modelo" value="${esc(chave)}">
-      <p><b>Modelo:</b> ${esc(m.nome)}</p>
-      <p><b>Vai para ${pessoas.length} pessoa(s):</b> ${pessoas.filter((p) => p.tipo === 'inquilino').length} inquilino(s) e ${pessoas.filter((p) => p.tipo === 'fiador').length} fiador(es) dos contratos ativos de hoje.
+  const semContato = editado ? [] : pessoas.filter((p) => !p.email && !CM.telefoneWhats(p.telefone));
+  const comLink = editado ? editado.destinos.filter((x) => x.url).length : 0;
+  return `${voltar}<h1>${editado ? 'Corrigir o comunicado' : 'Novo comunicado a todos'}</h1>
+    <form data-form="criarComunicado" class="cartao"><input type="hidden" name="modelo" value="${esc(chave)}">${editado ? `<input type="hidden" name="id" value="${editado.id}">` : ''}
+      <p><b>Modelo:</b> ${esc((CM.MODELOS[chave] || CM.MODELOS.contatos).nome)}</p>
+      <p><b>Vai para ${pessoas.length} pessoa(s):</b> ${pessoas.filter((p) => p.tipo === 'inquilino').length} inquilino(s) e ${pessoas.filter((p) => p.tipo === 'fiador').length} fiador(es) dos contratos ativos${editado ? ' do dia em que foi criado' : ' de hoje'}.
         ${semContato.length ? `<br>${etiqueta(`${semContato.length} sem e-mail nem celular`, 'aviso')} ${esc(semContato.map((p) => p.nome).join(', '))}: o link aparece para você copiar e mandar de outro jeito.` : ''}</p>
+      ${comLink ? `<div class="alerta aviso">${comLink} link(s) já gerado(s) deixam de valer ao salvar (são gerados de novo, com o texto corrigido, no envio).</div>` : ''}
       <div class="grade">
-        <p><label>Prazo para confirmar</label><input type="date" name="prazo" value="${prazo}" required></p>
+        <p><label>Prazo para confirmar</label><input type="date" name="prazo" value="${esc(prazo)}" required></p>
         <p><label>E-mail da empresa (o novo)</label><input type="email" name="email_empresa" value="${esc(email)}" required></p>
-        <p><label>Telefone da empresa para dúvidas</label><input type="tel" name="telefone_empresa" placeholder="(41) 0000-0000" required><span class="suave">O mesmo para as duas empresas. Aparece no aviso contra golpe: "na dúvida, ligue …".</span></p>
+        <p><label>Telefone da empresa para dúvidas</label><input type="tel" name="telefone_empresa" value="${esc(telefone)}" placeholder="(41) 0000-0000" required><span class="suave">O mesmo para as duas empresas. Aparece no aviso contra golpe: "na dúvida, ligue para …".</span></p>
       </div>
       <details><summary>Textos (pode mudar antes de criar)</summary>
         <p class="suave">Campos que o sistema preenche: {nome}, {imovel}, {imovel_curto}, {locatario}, {prazo}, {link}, {email_empresa}, {telefone_empresa}, {empresas}; [se fiador]…[senão]…[fim] muda o texto do fiador.</p>
@@ -152,24 +170,27 @@ function telaNovoComunicado(q) {
         ${area('aviso', 'Aviso que a pessoa lê na página', m.aviso, 12)}
         ${area('ciencia', 'Frase da caixa "Li e concordo"', m.ciencia, 3)}
       </details>
-      <div class="acoes" style="margin-top:12px"><button>Criar o comunicado</button> ${link('#/comunicacoes', 'Cancelar')}</div>
-      <p class="suave">Criar não envia nada: na próxima tela você vê a prévia e escolhe "Enviar e-mail a todos" e "WhatsApp a todos".</p></form>`;
+      <div class="acoes" style="margin-top:12px"><button>${editado ? 'Salvar as correções' : 'Criar o comunicado'}</button> ${link(editado ? `#/comunicacoes?id=${editado.id}` : '#/comunicacoes', 'Cancelar')}</div>
+      <p class="suave">${editado ? 'Salvar' : 'Criar'} não envia nada: na próxima tela você vê a prévia e escolhe "Enviar e-mail a todos" e "WhatsApp a todos".</p></form>`;
 }
 
 function telaModelosComunicado() {
   return `<div class="cabecalho"><h1>Comunicações</h1></div>${atalhosComunicacoes('modelos')}
-    ${Object.entries(CM.MODELOS).map(([chave, m]) => `<div class="cartao"><div class="cabecalho"><h2>${esc(m.nome)}</h2>${opera() ? link(`#/comunicacoes?ver=novo&tema=${chave}`, 'Usar este modelo', 'botao pequeno') : ''}</div>
+    ${Object.entries(CM.MODELOS).map(([chave, m]) => `<div class="cartao"><div class="cabecalho"><h2>${esc(m.nome)}</h2>${opera() && E.nuvem ? link(`#/comunicacoes?ver=novo&tema=${chave}`, 'Usar este modelo', 'botao pequeno') : ''}</div>
       <p class="suave">Assunto: ${esc(m.assunto)}</p><pre class="texto-modelo">${esc(m.texto)}</pre>
       <details><summary>Aviso da página e frase do aceite</summary><pre class="texto-modelo">${esc(m.aviso)}\n\n☐ ${esc(m.ciencia)}</pre></details>
       <details><summary>WhatsApp e lembrete</summary><pre class="texto-modelo">${esc(m.whatsapp)}\n\n${esc(m.lembrete)}</pre></details></div>`).join('')}
-    <p class="suave">Cada comunicado guarda os textos com que foi criado: mudar aqui não muda os já enviados.</p>`;
+    <p class="suave">Cada comunicado guarda o texto com que foi criado; dá para ajustar o texto ao criar um comunicado novo.</p>`;
 }
 
 async function telaComunicado(id) {
   const com0 = buscar('comunicados', id);
-  if (!com0) return naoEncontrado('Comunicado');
+  if (!com0) return naoEncontrado('Comunicado não encontrado', '#/comunicacoes', 'Ver as comunicações');
   let erroNuvem = '';
-  try { await atualizarDaNuvem(id); } catch (e) { erroNuvem = e.message; }
+  // a lista da nuvem só responde a quem opera: quem só consulta vê o que já foi trazido, sem a faixa de erro
+  if (opera()) { try { await atualizarDaNuvem(id); } catch (e) { erroNuvem = e.message; } }
+  // o código de confirmação vai pelo Gmail da empresa: desligado, ninguém consegue confirmar (nem quem recebeu pelo WhatsApp)
+  const gmailDesligado = E.nuvem && opera() && !(await gmailLigado());
   const com = buscar('comunicados', id);
   const r = CM.resumo(com);
   const ordem = [...com.destinos].sort((a, b) => CM.situacaoDe(a).peso - CM.situacaoDe(b).peso);
@@ -181,7 +202,9 @@ async function telaComunicado(id) {
     const quando = x.confirmado_em ? ` ${C.dataHoraBr(x.confirmado_em)}` : x.aberto_em ? ` ${C.dataHoraBr(x.aberto_em)}` : '';
     const envios = [x.email_em && `e-mail ${C.dataHoraBr(x.email_em)}`, x.whats_em && `WhatsApp ${C.dataHoraBr(x.whats_em)}`, x.lembrete_em && `lembrete ${C.dataHoraBr(x.lembrete_em)}`].filter(Boolean).join('<br>');
     const acoes = x.confirmado_em ? link(`#/aceite-contatos?id=${com.id}&chave=${x.chave}`, 'Ver aceite')
-      : opera() && p ? `${botao('emailComunicado', 'E-mail', { id: com.id, chave: x.chave })} ${botao('whatsComunicado', 'WhatsApp', { id: com.id, chave: x.chave })} ${botao('linkComunicado', 'Copiar link', { id: com.id, chave: x.chave })}` : '';
+      : opera() && p ? `${botao('emailComunicado', 'E-mail', { id: com.id, chave: x.chave })} ${botao('whatsComunicado', 'WhatsApp', { id: com.id, chave: x.chave })} ${botao('linkComunicado', 'Copiar link', { id: com.id, chave: x.chave })}
+        ${x.url ? `<br>${botao('novoLinkComunicado', 'Gerar novo link', { id: com.id, chave: x.chave }, 'secundario mini', `Gerar um link novo para ${x.nome}? O link atual deixa de valer e a contagem de códigos recomeça.`)} ${botao('desligarLinkComunicado', 'Desligar o link', { id: com.id, chave: x.chave }, 'secundario mini', `Desligar o link de ${x.nome}? A pessoa não consegue mais abrir (para mandar de novo, o sistema gera outro).`)}`
+    : x.link_desligado_em ? `<br><span class="suave">link desligado em ${C.dataHoraBr(x.link_desligado_em)}</span>` : ''}` : '';
     return `<tr><td><b>${esc(x.nome)}</b>${x.tipo === 'fiador' ? ' <span class="suave">(fiador)</span>' : ''}</td><td>${esc(imovel)}</td><td>${contatos}</td>
       <td>${etiqueta(s.texto, s.cor)}<span class="suave">${quando}</span>${x.resposta && x.resposta.mudou ? `<br>${etiqueta('mudou o contato', 'info')}` : ''}${x.resposta ? `<br><span class="suave">melhor: ${esc(x.resposta.melhor)}</span>` : ''}</td>
       <td class="suave">${envios || '-'}</td><td class="nw">${acoes}</td></tr>`;
@@ -190,6 +213,8 @@ async function telaComunicado(id) {
   return `<p class="suave"><a href="#/comunicacoes">← Comunicações</a></p>
     <div class="cabecalho"><h1>${esc(com.titulo)}</h1>${etiqueta(`prazo ${dataBr(com.prazo)}`, com.prazo < C.hojeIso() ? 'neutra' : 'aviso')}</div>
     ${!E.nuvem ? `<div class="alerta aviso">${SO_NUVEM}</div>` : ''}${erroNuvem ? `<div class="alerta aviso">Situação de agora não veio da nuvem: ${esc(erroNuvem)}</div>` : ''}
+    ${gmailDesligado ? `<div class="alerta perigo"><b>O envio pelo Gmail está desligado.</b> Para confirmar, a pessoa recebe um código por e-mail: sem o Gmail ligado ninguém consegue confirmar, nem quem recebeu o link pelo WhatsApp. Ligue em Dados e backup → Conectar o Gmail.</div>` : ''}
+    ${opera() && E.nuvem && nadaEnviado(com) ? `<p class="acoes">${link(`#/comunicacoes?ver=editar&id=${com.id}`, 'Corrigir prazo, telefone e textos', 'botao secundario pequeno')} ${botao('excluirComunicado', 'Excluir comunicado', { id: com.id }, 'perigo pequeno', `Excluir o comunicado "${com.titulo}"? Nada foi enviado ainda.`)}</p>` : ''}
     <div class="cartao"><div class="numeros-cartao">${quadro('Confirmaram', r.confirmaram, 'ok')}${quadro('Abriram', r.abriram)}${quadro('Não abriram', r.naoAbriram, r.naoAbriram ? 'perigo' : '')}${quadro('Não enviados', r.naoEnviados)}${quadro('Mudaram o contato', r.mudaram)}</div>
       ${opera() ? `<p class="acoes">${botao('emailTodosComunicado', '✉ Enviar e-mail a todos', { id: com.id }, 'pequeno')} ${botao('whatsTodosComunicado', 'WhatsApp a todos', { id: com.id })}
         ${pendentes && com.destinos.some((x) => !x.confirmado_em && (x.email_em || x.whats_em)) ? botao('lembrarComunicado', 'Lembrar quem falta', { id: com.id }) : ''} ${botao('previaComunicado', 'Ver como o inquilino vê', { id: com.id })} ${botao('atualizarComunicado', 'Atualizar situação', { id: com.id })}</p>` : ''}
@@ -201,7 +226,7 @@ async function telaComunicado(id) {
 export function telaAceiteContatos(q = {}) {
   const com = buscar('comunicados', Number(q.id));
   const x = com && com.destinos.find((y) => y.chave === q.chave);
-  if (!x || !x.resposta) return naoEncontrado('Aceite');
+  if (!x || !x.resposta) return naoEncontrado('Aceite não encontrado', com ? `#/comunicacoes?id=${com.id}` : '#/comunicacoes', com ? 'Ver o comunicado' : 'Ver as comunicações');
   const r = x.resposta;
   const e = CM.empresasDoTopo(d());
   const linhas = [['Pessoa', `${x.nome}${x.tipo === 'fiador' ? ' (fiador)' : ''}`], ['Confirmado em', C.dataHoraBr(r.em)], ['E-mail', `${r.email} (confirmado por código enviado a ele)`],
@@ -225,15 +250,26 @@ function exigir() {
   if (!E.nuvem) throw new C.ErroUsuario(SO_NUVEM);
 }
 
-/** O link da pessoa (cria na nuvem na primeira vez e guarda no comunicado). */
-async function linkDe(com, x) {
-  if (x.url) return x.url;
+/** O Gmail da empresa está ligado? (na dúvida, sem resposta, conta como ligado: o envio confere de novo) */
+async function gmailLigado() {
+  try { return !!(await GM.emailLigado()); } catch { return true; }
+}
+
+/** Antes de mandar link pelo WhatsApp (ou copiar): com o Gmail desligado o código não sai e ninguém consegue confirmar. */
+async function seguirSemGmail() {
+  if (await gmailLigado()) return true;
+  return confirmar('O envio pelo Gmail está desligado: a pessoa abre o link, mas não recebe o código por e-mail e não consegue confirmar. Ligue o Gmail antes (Dados e backup → Conectar o Gmail). Mandar assim mesmo?', { titulo: 'Gmail desligado', sim: 'Mandar assim mesmo' });
+}
+
+/** O link da pessoa (cria na nuvem na primeira vez e guarda no comunicado). ``novo``: troca o link (o anterior deixa de valer). */
+async function linkDe(com, x, { novo = false } = {}) {
+  if (x.url && !novo) return x.url;
   const p = CM.pessoaDoDestino(d(), x);
   if (!p) throw new C.ErroUsuario(`${x.nome}: o contrato ou o fiador não está mais no cadastro.`);
   const { url } = await pedir('link', { method: 'POST', body: JSON.stringify({ comunicado_id: com.id, destino: x.chave, contexto: CM.contextoDoLink(d(), com, p, await logoReduzida()) }) });
   await alterar((db) => {
     const c = R.buscar(db, 'comunicados', com.id);
-    R.atualizar(db, 'comunicados', c.id, { destinos: c.destinos.map((y) => (y.chave === x.chave ? { ...y, url, link_em: new Date().toISOString() } : { ...y })) }, login(), `Comunicado "${c.titulo}": link de ${x.nome}`);
+    R.atualizar(db, 'comunicados', c.id, { destinos: c.destinos.map((y) => (y.chave === x.chave ? { ...y, url, link_em: new Date().toISOString(), link_desligado_em: null } : { ...y })) }, login(), `Comunicado "${c.titulo}": ${novo ? 'link novo' : 'link'} de ${x.nome}`);
   });
   return url;
 }
@@ -265,6 +301,9 @@ async function enviarEmails(com, alvos, { lembrete = false } = {}) {
     aviso(`Enviando ${n + 1} de ${alvos.length}: ${x.nome}…`, 'info');
     try {
       const m = await emailDe(buscar('comunicados', com.id), x, { lembrete });
+      // dado faltando no cadastro (ex.: contrato "Sem imóvel"): não sai e-mail com buraco
+      const buraco = /\[preencher: ([a-z_]+)\]/.exec(`${m.assunto}\n${m.texto}`);
+      if (buraco) throw new C.ErroUsuario(`falta um dado no cadastro (${buraco[1]}): o e-mail não foi enviado`);
       await GM.enviarEmail(m);
       await marcar(com.id, x.chave, lembrete ? 'lembrete_em' : 'email_em');
       ok += 1;
@@ -278,7 +317,12 @@ async function filaWhatsapp(comId, fila, { lembrete = false } = {}) {
   for (let i = 0; i < fila.length; i += 1) {
     const com = buscar('comunicados', comId);
     const x = com.destinos.find((y) => y.chave === fila[i].chave);
-    const p = CM.pessoaDoDestino(d(), x);
+    const p = x ? CM.pessoaDoDestino(d(), x) : null;
+    if (!p) continue; // contrato ou fiador excluído depois do envio: pula
+    if (CM.preencher(lembrete ? com.lembrete : com.whatsapp, CM.camposDe(d(), com, p, 'x')).includes('[preencher: ')) {
+      aviso(`${x.nome}: falta um dado no cadastro (a mensagem sairia com "[preencher: …]"). Pulado.`, 'aviso');
+      continue;
+    }
     const tel = p ? CM.telefoneWhats(p.telefone) : '';
     const url = CM.linkDoCanal(await linkDe(com, x), 'whatsapp');
     const texto = CM.preencher(lembrete ? com.lembrete : com.whatsapp, CM.camposDe(d(), com, p, url));
@@ -317,7 +361,7 @@ export const ACOES_COMUNICACOES = {
     if (!alvos.length) { aviso(`Não há e-mail para enviar: ${sem.length ? `${sem.length} pessoa(s) sem e-mail no cadastro (use o WhatsApp)` : 'todos já receberam'}.`, 'info'); return; }
     if (!(await confirmar(`Enviar o e-mail com o link para ${alvos.length} pessoa(s)?${sem.length ? ` ${sem.length} sem e-mail ficam para o WhatsApp.` : ''}`, { titulo: 'Enviar e-mail a todos', sim: 'Enviar' }))) return;
     const { ok, falhas } = await enviarEmails(com, alvos);
-    if (falhas.length) await janela({ titulo: `${ok} enviado(s), ${falhas.length} com problema`, sim: 'Fechar', nao: 'Voltar', html: `<ul>${falhas.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` });
+    if (falhas.length) await janela({ titulo: `${ok} enviado(s), ${falhas.length} com problema`, sim: 'Fechar', nao: null, html: `<ul>${falhas.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` });
     else aviso(`${ok} e-mail(s) enviado(s).`);
     await mostrar();
   },
@@ -336,39 +380,81 @@ export const ACOES_COMUNICACOES = {
     const com = buscar('comunicados', Number(id));
     const fila = com.destinos.filter((x) => !x.whats_em && !x.confirmado_em && CM.pessoaDoDestino(d(), x));
     if (!fila.length) { aviso('Todos já receberam pelo WhatsApp (ou já confirmaram).', 'info'); return; }
+    if (!(await seguirSemGmail())) return;
     await filaWhatsapp(com.id, fila);
   },
   async whatsComunicado({ id, chave }) {
     exigir();
     const com = buscar('comunicados', Number(id));
     const x = com.destinos.find((y) => y.chave === chave);
+    if (!(await seguirSemGmail())) return;
     await filaWhatsapp(com.id, [x], { lembrete: !!x.whats_em });
   },
   async lembrarComunicado({ id }) {
     exigir();
     const com = buscar('comunicados', Number(id));
-    const falta = com.destinos.filter((x) => !x.confirmado_em && (x.email_em || x.whats_em));
-    if (!falta.length) { aviso('Ninguém para lembrar: mande primeiro o e-mail ou o WhatsApp.', 'info'); return; }
+    const recebeu = com.destinos.filter((x) => !x.confirmado_em && (x.email_em || x.whats_em));
+    // só quem ainda está no cadastro, com o contrato ativo (e o fiador ainda fiador): ex-inquilino não recebe lembrete
+    const falta = recebeu.filter((x) => CM.destinoAtivo(d(), x));
+    const fora = recebeu.length - falta.length;
+    if (!falta.length) { aviso(fora ? `Ninguém para lembrar: ${fora} pessoa(s) que não confirmaram já saíram (contrato encerrado, fiador trocado ou excluído).` : 'Ninguém para lembrar: mande primeiro o e-mail ou o WhatsApp.', 'info'); return; }
     const porEmail = falta.filter((x) => (CM.pessoaDoDestino(d(), x) || {}).email);
     const resp = await janela({
       titulo: `Lembrar ${falta.length} pessoa(s) que não confirmaram`, sim: 'Lembrar', nao: 'Cancelar',
-      html: `<p><label><input type="checkbox" name="email" value="1" checked> Por e-mail (${porEmail.length})</label></p><p><label><input type="checkbox" name="whats" value="1" checked> Pelo WhatsApp, um por um (${falta.length})</label></p>`,
+      html: `<p><label><input type="checkbox" name="email" value="1" checked> Por e-mail (${porEmail.length})</label></p><p><label><input type="checkbox" name="whats" value="1" checked> Pelo WhatsApp, um por um (${falta.length})</label></p>
+        ${fora ? `<p class="suave">${fora} pessoa(s) que não confirmaram ficam de fora: já saíram (contrato encerrado, fiador trocado ou excluído).</p>` : ''}`,
     });
     if (!resp) return;
     if (resp.email && porEmail.length) {
       const { ok, falhas } = await enviarEmails(com, porEmail, { lembrete: true });
       aviso(`${ok} lembrete(s) por e-mail${falhas.length ? `; ${falhas.length} com problema` : ''}.`, falhas.length ? 'aviso' : 'ok');
     }
-    if (resp.whats) await filaWhatsapp(com.id, falta, { lembrete: true });
+    if (resp.whats && (await seguirSemGmail())) await filaWhatsapp(com.id, falta, { lembrete: true });
     else await mostrar();
   },
   async linkComunicado({ id, chave }) {
     exigir();
     const com = buscar('comunicados', Number(id));
     const x = com.destinos.find((y) => y.chave === chave);
+    if (!(await seguirSemGmail())) return;
     const url = await linkDe(com, x);
-    await janela({ titulo: `Link de ${x.nome}`, sim: 'Fechar', nao: 'Voltar', html: `<p>É só desta pessoa: não publique.</p><p><textarea rows="3" readonly style="width:100%">${esc(url)}</textarea></p>` });
+    await janela({ titulo: `Link de ${x.nome}`, sim: 'Fechar', nao: null, html: `<p>É só desta pessoa: não publique.</p><p><textarea rows="3" readonly style="width:100%">${esc(url)}</textarea></p>` });
     await mostrar();
+  },
+  /** Link novo para a pessoa (o anterior deixa de valer; a contagem de códigos recomeça). */
+  async novoLinkComunicado({ id, chave }) {
+    exigir();
+    const com = buscar('comunicados', Number(id));
+    const x = com && com.destinos.find((y) => y.chave === chave);
+    if (!x) throw new C.ErroUsuario('Pessoa não encontrada no comunicado.');
+    const url = await linkDe(com, x, { novo: true });
+    await janela({ titulo: `Link novo de ${x.nome}`, sim: 'Fechar', nao: null, html: `<p>O link anterior deixou de valer. Mande este (é só desta pessoa: não publique).</p><p><textarea rows="3" readonly style="width:100%">${esc(url)}</textarea></p>` });
+    await mostrar();
+  },
+  /** Desliga o link mandado (ex.: à pessoa errada): ela não abre mais; para mandar de novo, o sistema gera outro. */
+  async desligarLinkComunicado({ id, chave }) {
+    exigir();
+    const com = buscar('comunicados', Number(id));
+    const x = com && com.destinos.find((y) => y.chave === chave);
+    if (!x) throw new C.ErroUsuario('Pessoa não encontrada no comunicado.');
+    await pedir('encerrar', { method: 'POST', body: JSON.stringify({ comunicado_id: com.id, destino: x.chave }) });
+    await alterar((db) => {
+      const c = R.buscar(db, 'comunicados', com.id);
+      R.atualizar(db, 'comunicados', c.id, { destinos: c.destinos.map((y) => (y.chave === x.chave ? { ...y, url: null, link_desligado_em: new Date().toISOString() } : { ...y })) }, login(), `Comunicado "${c.titulo}": link de ${x.nome} desligado`);
+    });
+    aviso(`Link de ${x.nome} desligado.`);
+    await mostrar();
+  },
+  /** Excluir o comunicado enquanto nada foi enviado (os links gerados são desligados na nuvem). */
+  async excluirComunicado({ id }) {
+    exigir();
+    const com = buscar('comunicados', Number(id));
+    if (!com) throw new C.ErroUsuario('Este comunicado já foi excluído.');
+    if (!nadaEnviado(com)) throw new C.ErroUsuario('Este comunicado já foi enviado (ou alguém já abriu o link): não dá para excluir.');
+    for (const x of com.destinos.filter((y) => y.url)) await pedir('encerrar', { method: 'POST', body: JSON.stringify({ comunicado_id: com.id, destino: x.chave }) }).catch(() => {});
+    await alterar((db) => { if (R.buscar(db, 'comunicados', com.id)) R.excluir(db, 'comunicados', com.id, login(), `Comunicado "${com.titulo}" excluído (nada tinha sido enviado)`); });
+    aviso('Comunicado excluído.');
+    ir('#/comunicacoes');
   },
   async previaComunicado({ id }) {
     const com = buscar('comunicados', Number(id));
@@ -382,7 +468,7 @@ export const ACOES_COMUNICACOES = {
     const html = CM.htmlDoEmail(CM.preencher(com.texto, dados), { empresas: e.nomes, cnpjs: e.cnpjs, cidade: e.cidade, link: exemplo, logo: !!logo }).replace('cid:logo', logo);
     const ctx = CM.contextoDoLink(d(), com, p, logo);
     await janela({
-      titulo: `Prévia (com os dados de ${x.nome})`, sim: 'Fechar', nao: 'Voltar',
+      titulo: `Prévia (com os dados de ${x.nome})`, sim: 'Fechar', nao: null,
       html: `<p><b>Assunto:</b> ${esc(CM.preencher(com.assunto, dados))}</p>
         <iframe sandbox title="Prévia do e-mail" style="width:100%;height:420px;border:1px solid var(--borda);border-radius:8px;background:#fff" srcdoc="${esc(html)}"></iframe>
         <h3>WhatsApp</h3><pre class="texto-modelo">${esc(CM.preencher(com.whatsapp, dados))}</pre>
@@ -398,6 +484,7 @@ export const ACOES_COMUNICACOES = {
 export const FORMULARIOS_COMUNICACOES = {
   async criarComunicado(form) {
     if (!opera()) throw new C.ErroUsuario(SO_CONSULTA);
+    if (!E.nuvem) throw new C.ErroUsuario(SO_NUVEM);
     const f = new FormData(form);
     const prazo = C.dataValida(String(f.get('prazo') || ''), '');
     if (!prazo || prazo < C.hojeIso()) throw new C.ErroUsuario('Escolha um prazo de hoje em diante.');
@@ -405,6 +492,23 @@ export const FORMULARIOS_COMUNICACOES = {
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new C.ErroUsuario('Confira o e-mail da empresa.');
     const tel = String(f.get('telefone_empresa') || '').trim();
     if (String(tel).replace(/\D/g, '').length < 10) throw new C.ErroUsuario('Informe o telefone da empresa com DDD.');
+    const editarId = Number(f.get('id') || 0);
+    if (editarId) {
+      // correção enquanto nada foi enviado: prazo, telefone, e-mail e textos; os links já gerados saem (são feitos de novo no envio)
+      const antes = buscar('comunicados', editarId);
+      if (!antes) throw new C.ErroUsuario('Este comunicado foi excluído.');
+      if (!nadaEnviado(antes)) throw new C.ErroUsuario('Este comunicado já foi enviado (ou alguém já abriu o link): não dá mais para mudar.');
+      const textos = Object.fromEntries(['titulo', 'assunto', 'texto', 'whatsapp', 'lembrete', 'aviso', 'ciencia'].map((k) => [k, String(f.get(k) || '').trim() || antes[k]]));
+      for (const x of antes.destinos.filter((y) => y.url)) await pedir('encerrar', { method: 'POST', body: JSON.stringify({ comunicado_id: antes.id, destino: x.chave }) }).catch(() => {});
+      await alterar((db) => {
+        const c = R.buscar(db, 'comunicados', editarId);
+        R.atualizar(db, 'comunicados', c.id, { ...textos, prazo, email_empresa: email, telefone_empresa: CM.telefoneBr(tel), destinos: c.destinos.map(({ url, link_em, ...y }) => y) }, login(), `Comunicado "${textos.titulo}" corrigido antes do envio`); // eslint-disable-line no-unused-vars
+      });
+      guardadas.delete(editarId);
+      aviso('Comunicado corrigido. Confira a prévia e envie.');
+      ir(`#/comunicacoes?id=${editarId}`);
+      return;
+    }
     const base = CM.novoComunicado(d(), String(f.get('modelo') || 'contatos'), { prazo, email_empresa: email, telefone_empresa: CM.telefoneBr(tel) });
     if (!base.destinos.length) throw new C.ErroUsuario('Não há inquilino com contrato ativo hoje.');
     for (const k of ['titulo', 'assunto', 'texto', 'whatsapp', 'lembrete', 'aviso', 'ciencia']) { const v = String(f.get(k) || '').trim(); if (v) base[k] = v; }

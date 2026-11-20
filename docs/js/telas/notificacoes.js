@@ -53,7 +53,7 @@ export function telaNotificacoes(q = {}) {
   const abertas = q.filtro !== 'todas';
   const lista = ordemNotificacoes(todas.filter((n) => !abertas || ['Rascunho', 'Aguardando resposta', 'Multa gerada'].includes(n.situacao)), hoje);
   const vencidas = todas.filter((n) => { const e = R.estadoNotificacao(d(), n, hoje); return e.podeMulta && e.situacao !== 'Reiterada'; }).length;
-  return `${atalhosComunicacoes('notificacoes')}<div class="cabecalho"><h1>Notificações ao inquilino</h1>${opera() ? link('#/notificacao-nova', 'Nova notificação', 'botao') : ''}</div>
+  return `<div class="cabecalho"><h1>Notificações ao inquilino</h1>${opera() ? link('#/notificacao-nova', 'Nova notificação', 'botao') : ''}</div>${atalhosComunicacoes('notificacoes')}
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap">${link('#/notificacoes', `Em aberto (${todas.filter((n) => ['Rascunho', 'Aguardando resposta', 'Multa gerada'].includes(n.situacao)).length})`, `botao ${abertas ? '' : 'secundario '}pequeno`)}
       ${link('#/notificacoes?filtro=todas', `Todas (${todas.length})`, `botao ${abertas ? 'secundario ' : ''}pequeno`)}
       ${vencidas ? etiqueta(`${vencidas} com prazo vencido`, 'perigo') : ''}</div>

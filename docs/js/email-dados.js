@@ -199,6 +199,7 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
     link: !!linkDaFicha(f, 'interessado', hoje).url, link_fiador: fiadoresLink.length > 0,
     garantia_depositada: !!c && REC.reciboDisponivel(d, 'garantia', { contrato: c }).ok,
     varios_fiadores: !!f && R.fiadoresDaFicha(f).length > 1,
+    devolucao: !!(f && f.devolucao_data),
   };
   if (alvo.cobranca) Object.assign(condicoes, camposDoBoleto(alvo.cobranca, campos, hoje));
   const a = alvo.aditivo || null;

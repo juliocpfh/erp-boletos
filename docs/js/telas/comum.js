@@ -8,6 +8,7 @@ import { ACEITA_DOCUMENTOS, esc } from '../formularios.js';
 import * as P from '../poupanca.js';
 import * as R from '../regras.js';
 import * as AI from '../arquivo-impresso.js';
+import * as FO from '../ficha-online.js';
 
 /** Tela de "não encontrado" com caminho de volta (ex.: endereço antigo ou registro excluído). */
 export const naoEncontrado = (titulo, href = '#/', texto = 'Voltar ao painel') => `<h1>${esc(titulo)}</h1>
@@ -638,6 +639,18 @@ export async function levarDocumentosDaFicha(fichaId, contratoId) {
     `Documentos da ficha levados para a pasta do inquilino${nomes.length ? `: ${nomes.join(', ')}` : ''}`));
   await apagarPastaDaFichaSeVazia(f.pasta || nomePastaFicha(f));
   return nomes.length;
+}
+
+/**
+ * Links da ficha pela internet encerrados na nuvem (mutirão 19/11, entrada-022): na reprovação, na desistência, na exclusão e
+ * depois que os documentos foram para o contrato. Só na nuvem e para quem opera; ficha que ainda existe fica anotada.
+ * ``pessoas``: só essas (padrão: todas). Devolve quantos links foram encerrados.
+ */
+export async function encerrarLinksDaFicha(fichaId, pessoas) {
+  if (!E.nuvem || !opera()) return 0;
+  const feitas = await FO.encerrarLinksDaFicha(fichaId, pessoas);
+  if (feitas.length && buscar('fichas', fichaId)) await alterar((db) => FO.anotarLinksEncerrados(db, Number(fichaId), feitas, login()));
+  return feitas.length;
 }
 
 /**

@@ -162,6 +162,28 @@ export function dadosParaFicha(f, l) {
   return out;
 }
 
+/**
+ * O que a pessoa mandou pelo link e não passa na conferência dos cadastros (mutirão 19/11, entrada-001/002): CPF/CNPJ com
+ * dígitos errados, e-mail incompleto, telefone sem DDD e nascimento no futuro. Devolve a mensagem ou ''.
+ * Ex.: ({ tipo: 'cpf' }, '11111111111') → 'CPF inválido (confira os números)'; ({ tipo: 'tel' }, '123') → 'Telefone sem DDD…'.
+ */
+export function problemaDoEnviado(c, v, hoje = C.hojeIso()) {
+  if (!c || v === null || v === undefined || v === '') return '';
+  if (c.tipo === 'cpf' || c.tipo === 'cpfcnpj') return F.conferirDocumento(c.tipo, v);
+  if (c.tipo === 'email') return /^[^\s@]+@[^\s@]+\.[^\s@.]{2,}$/.test(String(v).trim()) ? '' : 'E-mail incompleto';
+  if (c.tipo === 'tel') return [10, 11].includes(String(v).replace(/\D/g, '').replace(/^55(?=\d{10,11}$)/, '').length) ? '' : 'Telefone sem DDD (10 ou 11 números)';
+  if (c.tipo === 'data' && /nascimento$/.test(c.nome || '') && String(v) >= hoje) return 'Data de nascimento no futuro';
+  return '';
+}
+/** O valor enviado com a máscara dos cadastros. Ex.: CPF '52998224725' → '529.982.247-25'; telefone '41999990000' → '(41) 99999-0000'. */
+export function formatarEnviado(c, v) {
+  if (!c || typeof v !== 'string' || !v) return v;
+  if (c.tipo === 'cpf' || c.tipo === 'cpfcnpj') return F.mascarar(c.tipo, v);
+  if (c.tipo === 'tel') return F.mascarar('tel', v.replace(/\D/g, '').replace(/^55(?=\d{10,11}$)/, ''));
+  if (c.tipo === 'email') return v.trim().toLowerCase();
+  return v;
+}
+
 /** Telefone para o WhatsApp (só números, com o 55). */
 export function telefoneWhatsapp(f, pessoa) {
   const t = String((pessoa === 'interessado' ? f.inquilino_telefone : R.fiadorDaFicha(f, pessoa.slice(6)).telefone) || '').replace(/\D/g, '');
@@ -215,6 +237,28 @@ export async function linksRecentes(fichaId = null, agora = Date.now()) {
   return g && agora - g.em < VALIDADE_LINKS ? g.links : linksNaNuvem(fichaId);
 }
 export const atualizarLinkNaNuvem = (corpo) => esquecendo(pedir('atualizar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) }));
+
+/**
+ * Encerra na nuvem os links da ficha (mutirão 19/11, entrada-022): na reprovação, na desistência, na exclusão e depois que os
+ * documentos foram para o contrato, para ninguém mandar mais nada para a pasta antiga. Pessoa sem link (ou sem internet) é
+ * pulada. Devolve as pessoas encerradas. Ex.: ficha 7 reprovada com links do interessado e do fiador → ['interessado', 'fiador1'].
+ */
+export async function encerrarLinksDaFicha(fichaId, pessoas = PESSOAS_LINK) {
+  const feitas = [];
+  for (const pessoa of pessoas) {
+    try { await atualizarLinkNaNuvem({ ficha_id: Number(fichaId), pessoa, situacao: 'Encerrado' }); feitas.push(pessoa); } catch { /* sem link dessa pessoa ou sem internet */ }
+  }
+  return feitas;
+}
+/** Anota na ficha (dentro de alterar) os links encerrados: a validade vira agora e a marca "encerrado". */
+export function anotarLinksEncerrados(db, fichaId, pessoas, usuario) {
+  const f = R.buscar(db, 'fichas', fichaId);
+  if (!f || !pessoas.length) return;
+  const links = { ...(f.links_ficha || {}) };
+  const agora = new Date().toISOString();
+  for (const p of pessoas) if (links[p] && !links[p].encerrado) links[p] = { ...links[p], vence_em: agora, encerrado: true };
+  R.atualizar(db, 'fichas', f.id, { links_ficha: links }, usuario, `Links da ficha de ${f.inquilino_nome} encerrados`);
+}
 
 // ---------------------------------------------------------------------------
 // Aviso no celular (Web Push): cada aparelho da equipe liga o seu (o navegador pergunta a permissão)
