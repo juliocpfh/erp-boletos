@@ -957,8 +957,8 @@ export const ehParcelaAcordo = (cb) => !!cb.acordo_parcela_de;
 export const ehSaldoSaida = (cb) => !!cb.saldo_saida_de;
 /** Boleto à parte (complemento da caução, parcela de acordo ou saldo da saída): não é o boleto do aluguel do mês. */
 export const ehBoletoAvulso = (cb) => ehComplementoCaucao(cb) || ehParcelaAcordo(cb) || ehSaldoSaida(cb);
-/** Boleto sem multa e juros: o complemento da caução (garantia) e o saldo da saída (o saldo já leva os encargos dos débitos). */
-export const semMultaJuros = (cb) => ehComplementoCaucao(cb) || ehSaldoSaida(cb);
+/** Boleto sem multa e juros: o complemento da caução (garantia). O do saldo da saída tem a multa e os juros do contrato (2026-11-20). */
+export const semMultaJuros = (cb) => ehComplementoCaucao(cb);
 /** Boleto vencido trocado por um acordo: fica guardado, mas não se cobra mais (valem as parcelas do acordo). */
 export const emAcordo = (cb) => cb.situacao === 'Em acordo';
 /** Boleto em acordo fica como estava no dia do acordo: não recebe pagamento, ajuste nem ressarcimento (valem as parcelas do acordo). */
@@ -1957,11 +1957,12 @@ export function registrarPagamento(d, cobrancaId, dataContabil, valorPago, usuar
   conferirValorRecebido(cb, valorPago, r.valor_devido);
   const compensadoDepois = pagouEmDia && dataContabil > cb.vencimento;
   const caucao = ehComplementoCaucao(cb);
-  const manual = valorNf !== null && !caucao;
+  const saldoSaida = ehSaldoSaida(cb); // boleto do saldo da saída: sem NF, como o complemento da caução
+  const manual = valorNf !== null && !caucao && !saldoSaida;
   if (manual) conferirDivergencia(cb, r, valorPago, valorNf, justificativa);
   atualizar(d, 'cobrancas', cb.id, {
     data_pagamento: dataContabil, data_pagou: pagouEmDia ? null : (dataPagou || null), valor_pago: valorPago ?? r.valor_devido,
-    dias_atraso: r.dias_atraso, multa: r.multa, juros: r.juros, valor_nf: caucao ? 0 : manual ? valorNf : r.valor_nf, pagou_em_dia: compensadoDepois,
+    dias_atraso: r.dias_atraso, multa: r.multa, juros: r.juros, valor_nf: caucao || saldoSaida ? 0 : manual ? valorNf : r.valor_nf, pagou_em_dia: compensadoDepois,
     situacao: r.pontual ? 'Paga em dia' : 'Paga com atraso', nf_manual: manual, divergencia: manual ? String(justificativa).trim() : null,
   }, usuario, `${compensadoDepois ? `Pagamento confirmado (pagou em dia, entrou em ${C.dataBr(dataContabil)})` : 'Pagamento confirmado'}: boleto ${ehParcelaAcordo(cb) ? `do acordo ${cb.acordo_parcela || ''}`.trim() : C.compBr(cb.competencia)} de ${buscar(d, 'contratos', cb.contrato_id)?.inquilino_nome || 'inquilino'}${manual
     ? `. Recebido ${C.reais(valorPago)}, previsto ${C.reais(r.valor_devido)}; NF digitada ${C.reais(valorNf)} (calculada ${C.reais(r.valor_nf)}). Justificativa: ${String(justificativa).trim()}` : ''}`);
@@ -1975,6 +1976,12 @@ export function registrarPagamento(d, cobrancaId, dataContabil, valorPago, usuar
       observacoes: `Boleto do complemento${cb.caucao_parcela ? ` (${cb.caucao_parcela})` : ''} pago em ${C.dataBr(dataContabil)}` },
     usuario, `Caução corrigida para ${C.reais(atual + cb.caucao_complemento)} (complemento pago)`);
     atualizar(d, 'cobrancas', cb.id, { caucao_correcao_id: x.id }, usuario, 'Correção da caução registrada');
+  }
+  // boleto do saldo da saída pago (na tela ou pelo extrato/banco que reconheceu o pagamento): marca sozinho o saldo cobrado
+  // no roteiro da saída, na data do pagamento (decisão do dono, 2026-11-20)
+  if (saldoSaida) {
+    const e = buscar(d, 'encerramentos', cb.saldo_saida_de);
+    if (e && !e.garantia_devolvida_em) marcarGarantiaDevolvida(d, e.id, dataPagou && !pagouEmDia ? dataPagou : dataContabil, usuario);
   }
   return r;
 }
@@ -2069,6 +2076,11 @@ function soltarDoBoletoExcluido(d, cbId, usuario) {
 export function estornarPagamento(d, cobrancaId, usuario) {
   const cb = buscar(d, 'cobrancas', cobrancaId);
   if (cb) retirarDiferenca(d, cb, usuario);
+  // boleto do saldo da saída: o "saldo cobrado" marcado pelo pagamento volta a ficar por fazer
+  if (cb && ehSaldoSaida(cb)) {
+    const e = buscar(d, 'encerramentos', cb.saldo_saida_de);
+    if (e && e.garantia_devolvida_em && [cb.data_pagamento, cb.data_pagou].includes(e.garantia_devolvida_em)) marcarGarantiaDevolvida(d, e.id, '', usuario);
+  }
   if (cb && cb.caucao_correcao_id) {
     const depois = d.correcoes_garantia.find((x) => x.contrato_id === cb.contrato_id && x.id > cb.caucao_correcao_id);
     if (depois) throw new Error(`A caução foi corrigida de novo depois deste pagamento (${C.dataBr(depois.data)}): desfaça antes o pagamento da parcela mais recente.`);
@@ -3193,8 +3205,9 @@ export const boletoDoSaldo = (d, e) => (e ? d.cobrancas.find((cb) => cb.saldo_sa
 /**
  * Gera o boleto do saldo que o inquilino deve no cálculo final (o saldo devedor é cobrado por boleto: título executivo
  * extrajudicial). Boleto avulso (``ehBoletoAvulso``) como o do complemento da caução: o valor vai em ``outros``, sem aluguel,
- * por isso sem NF (o aluguel de cada mês já teve, ou tem, o boleto e a NF dele), e sem multa e juros (os débitos já os
- * trazem até a data do cálculo). Pode ser emitido no C6 como os outros. Ex.: garantia R$ 2.000,00, débitos R$ 2.300,00 →
+ * por isso sem NF (o aluguel de cada mês já teve, ou tem, o boleto e a NF dele). Pago depois do vencimento, tem a multa e os
+ * juros do contrato (decisão do dono, 2026-11-20), sem bonificação nem desconto. Pago, marca sozinho o saldo cobrado no
+ * roteiro da saída (``registrarPagamento``). Pode ser emitido no C6 como os outros. Ex.: garantia R$ 2.000,00, débitos R$ 2.300,00 →
  * saldo −R$ 300,00 → boleto de R$ 300,00 com o vencimento escolhido.
  */
 export function gerarBoletoDoSaldo(d, encerramentoId, vencimento, usuario, hoje = C.hojeIso()) {
@@ -3214,7 +3227,7 @@ export function gerarBoletoDoSaldo(d, encerramentoId, vencimento, usuario, hoje 
     dias_cobrados: C.diasNoMes(mes), dias_mes: C.diasNoMes(mes), aluguel_mensal: 0, aluguel: 0, desconto: 0,
     iptu: 0, iptu_parcela: '', seguro: 0, seguro_parcela: '', taxa_boleto: 0, fci: 0, outros: valor, outros_descricao: 'Saldo do cálculo final da saída',
     reserva_utilizada: 0, carencia: false, ressarcimento: 0, ressarcimento_descricao: '', ressarcimento_na_nf: false,
-    multa_percentual: 0, juros_mensal_percentual: 0, saldo_saida_de: e.id,
+    multa_percentual: c.multa_percentual || 0, juros_mensal_percentual: c.juros_mensal_percentual || 0, saldo_saida_de: e.id,
     situacao: 'Em aberto', data_pagamento: null, valor_pago: null, dias_atraso: null, multa: null, juros: null, valor_nf: null, banco: null,
   }, usuario, `Boleto do saldo da saída de ${c.inquilino_nome}: ${C.reais(valor)}, vence em ${C.dataBr(vencimento)}`);
 }

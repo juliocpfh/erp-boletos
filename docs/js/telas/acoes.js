@@ -1436,7 +1436,7 @@ export const ACOES = {
     const e = buscar('encerramentos', id);
     if (!e) throw new C.ErroUsuario('O cálculo final da saída não existe mais (pode ter sido desfeito por outra pessoa). Atualize a página.');
     const r = await janela({ titulo: 'Boleto do saldo da saída', sim: 'Gerar o boleto',
-      html: `<p>O inquilino deve <b>${reais(-e.saldo)}</b> no cálculo final. O boleto sai sem NF e sem multa e juros (os débitos já os trazem) e pode ser emitido no C6 como os outros.</p>
+      html: `<p>O inquilino deve <b>${reais(-e.saldo)}</b> no cálculo final. O boleto sai sem NF; pago depois do vencimento, tem a multa e os juros do contrato. Quando for pago, o saldo fica marcado como cobrado sozinho. Pode ser emitido no C6 como os outros.</p>
         <label>Vencimento</label><input type="date" name="vencimento" value="${C.somarDias(C.hojeIso(), 5)}" min="${C.hojeIso()}" required>` });
     if (!r) return;
     const cb = await alterar((db) => R.gerarBoletoDoSaldo(db, e.id, String((r.vencimento || [])[0] || ''), login(), C.hojeIso()));
