@@ -113,7 +113,7 @@ export function telaNovaNotificacao(q = {}) {
         ${edicao || ant ? `<div><label>Inquilino</label><p><b>${esc(c ? c.inquilino_nome : '-')}</b></p></div>`
     : `<div><label for="nt_contrato">Inquilino</label><select id="nt_contrato" name="contrato"><option value="">Escolha…</option>${opcoesInquilino}</select></div>`}
         ${ant ? '' : `<div><label for="nt_tema">Assunto (modelo do texto)</label><select id="nt_tema" name="tema">${NT.MODELOS_NOTIFICACAO.map((m) => `<option value="${m.chave}" ${m.chave === tema ? 'selected' : ''}>${esc(m.nome)}</option>`).join('')}</select></div>`}
-        <div><label for="nt_data">Data da notificação</label><input id="nt_data" type="date" name="data" value="${dados.data}"></div>
+        <div><label for="nt_data">Data da notificação</label><input id="nt_data" type="date" name="data" value="${dados.data}" max="${C.hojeIso()}"></div>
         <div><label for="nt_prazo">Prazo (dias úteis)</label><input id="nt_prazo" type="number" name="prazo" min="1" max="90" value="${dados.prazo_dias}" style="width:100px"></div>
       </div>
       <p class="suave">Data limite: <b>${dataBr(limite)}</b> (${dados.prazo_dias} dias úteis contados de ${dataBr(dados.data)}, sem sábado, domingo${feriados.length ? ` e o(s) feriado(s) ${feriados.join(', ')}` : ' e feriado'}).</p>
@@ -156,7 +156,8 @@ function etapasDaNotificacao(n, c, hoje) {
     { feito: true, titulo: 'Notificação montada', detalhe: `${dataBr(n.data)} · ${esc(n.assunto)} ${pdf}` },
     { feito: !!n.arquivo_assinado, titulo: 'Assinada pelo administrador', detalhe: `${n.arquivo_assinado ? '' : '<span class="suave">assine o PDF no gov.br (assinador.iti.br) e anexe aqui: </span>'}${assinada}` },
     { feito: !!n.enviada_em, titulo: 'Enviada ao inquilino', detalhe: `${enviada}${n.situacao === 'Rascunho' ? `${botaoEmail('notificacao_envio', alvo, '✉ Enviar por e-mail')} <span class="suave">ou entregue à mão (baixe o PDF acima) e marque abaixo. O "Enviar agora" já marca sozinho.</span>${marcar}` : ` ${botaoEmail('notificacao_envio', alvo, '✉ E-mail de novo')}`}` },
-    { feito: !e.aberta && n.situacao !== 'Rascunho', titulo: 'Prazo para resolver', detalhe: `${prazo}${e.aberta && !n.multa_valor && n.situacao !== 'Reiterada' ? ` ${botaoEmail('notificacao_lembrete', alvo, '✉ Lembrete do prazo')}` : ''}` },
+    // a etapa só fecha com a notificação enviada e encerrada (cancelada sem envio não conta); o lembrete, só antes de vencer
+    { feito: !e.aberta && !!n.enviada_em && n.situacao !== 'Cancelada', titulo: 'Prazo para resolver', detalhe: `${prazo}${e.aberta && !e.vencida && e.restam >= 0 && !n.multa_valor && n.situacao !== 'Reiterada' ? ` ${botaoEmail('notificacao_lembrete', alvo, '✉ Lembrete do prazo')}` : ''}` },
     { feito: n.situacao === 'Resolvida', titulo: 'Resolvido (baixa)', detalhe: baixa || (n.situacao === 'Cancelada' ? `cancelada em ${dataBr(n.cancelada_em)}${n.motivo_cancelamento ? `: ${esc(n.motivo_cancelamento)}` : ''}` : '<span class="suave">depois de enviada</span>') },
   ];
 }
@@ -205,6 +206,8 @@ export const FORMULARIOS_NOTIFICACOES = {
     if (!f.get('clausula_conferida')) throw new C.ErroUsuario('Marque "Conferi o número da(s) cláusula(s) no contrato assinado deste inquilino" antes de salvar.');
     const dados = { contrato_id: Number(f.get('contrato')), modelo: String(f.get('tema') || ''), data: String(f.get('data') || ''), prazo_dias: Number(f.get('prazo')),
       assunto: f.get('assunto'), clausula: f.get('clausula'), texto: f.get('texto'), anterior_id: Number(f.get('anterior')) || null };
+    // data no futuro: o "Enviar agora" mandaria o e-mail e depois não conseguiria marcar o envio (que não pode ser antes da data)
+    if (C.dataValida(dados.data) && dados.data > C.hojeIso()) throw new C.ErroUsuario(`A notificação não pode ter data no futuro (${dataBr(dados.data)}): use a data de hoje ou de antes.`);
     const id = Number(f.get('id')) || null;
     const n = id ? (await alterarApagandoAnexos((db) => R.editarNotificacao(db, id, dados, login()))) : await alterar((db) => R.criarNotificacao(db, dados, login()));
     aviso(`Notificação salva. Prazo até ${dataBr(R.limiteNotificacao(dados.data, dados.prazo_dias))}. Agora imprima o PDF, assine e envie.`);

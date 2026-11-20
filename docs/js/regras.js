@@ -2457,6 +2457,25 @@ export const cobrancasEmAberto = (d, contratoId) => d.cobrancas.filter((cb) => c
  * dois aluguéis em acordo de R$ 4.200,00 → só as parcelas do acordo (R$ 4.200,00), nunca os dois boletos de novo.
  * Devolve { itens: [{ cobranca, valor, texto }], total }.
  */
+/**
+ * Multa da saída antes do fim do contrato (cláusula do modelo: 3 aluguéis, proporcional ao tempo que falta), só como
+ * sugestão para o cálculo final (o operador inclui ou dispensa; a lei dispensa na transferência pelo empregador, art. 4º).
+ * Proporção pelos dias que faltam do prazo; aluguel cheio vigente na saída. Sem prazo determinado, troca de titular ou saída
+ * no fim: null. Ex.: aluguel R$ 2.000,00, contrato de 01/01/2026 a 01/07/2028 (30 meses), saída em 01/09/2027 (faltam 10)
+ * → R$ 6.000,00 × 304/912 dias = R$ 2.000,00. Devolve { valor, aluguel, fim, restam, total }.
+ */
+export function multaSaidaAntecipada(d, c) {
+  if (!c || !c.data_saida || c.prazo_tipo === 'Indeterminado' || fimDeVinculo(d, c)) return null;
+  const inicio = c.data_entrada || c.vigencia_inicio;
+  const fim = fimDoContrato(d, c);
+  if (!inicio || !fim || c.data_saida >= fim || c.data_saida < inicio) return null;
+  const total = C.diasEntre(inicio, fim);
+  const restam = C.diasEntre(c.data_saida, fim);
+  const aluguel = aluguelAtual(d, c, c.data_saida);
+  if (!(total > 0) || !(aluguel > 0)) return null;
+  return { valor: Math.round((3 * aluguel * restam) / total), aluguel, fim, restam, total };
+}
+
 /** Nome do boleto na lista de débitos do cálculo final ("Aluguel 10/2026", "Parcela 2/3 do acordo (vence 10/12/2026)"). */
 const nomeDebitoSaida = (cb) => (ehParcelaAcordo(cb) ? `Parcela ${cb.acordo_parcela || 'única'} do acordo (vence ${C.dataBr(cb.vencimento)})` : `Aluguel ${C.compBr(cb.competencia)}`);
 
@@ -4208,6 +4227,15 @@ export const ETAPAS_ENTRADA = [
  * para o sistema). Troca de titular: a do contrato anterior vale (a vistoria de entrada é a mesma).
  * Ex.: chaves em 02/03/2026 (segunda) → prazo até 09/03/2026; em 05/03 aguardando; em 10/03, sem arquivo, "prazo acabou".
  */
+/**
+ * Dia da entrega das chaves: o do termo das chaves assinado (``doc_chaves_em``) ou, sem ele, a data de entrada. Conta daí o
+ * prazo da contra-vistoria (etapa e e-mail de boas-vindas). Ex.: entrada 01/12/2026 e termo de 04/12/2026 → 04/12/2026.
+ */
+export function dataDasChaves(c) {
+  const t = c && String(c.doc_chaves_em || '').slice(0, 10);
+  return (t && /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : null) || (c && c.data_entrada) || null;
+}
+
 function situacaoContraVistoria(d, c, hoje) {
   if (c.contra_vistoria) return { situacao: 'feita', data: c.contra_vistoria_em || null, texto: 'recebida' };
   const anterior = contratoHerdado(d, c);
@@ -4216,7 +4244,7 @@ function situacaoContraVistoria(d, c, hoje) {
     return { situacao: 'feita', data: a ? a.contra_vistoria_em || null : null, texto: a ? `herdada de ${a.inquilino_nome}` : `herdado de ${anterior.inquilino_nome}` };
   }
   if (!c.data_entrada) return undefined;
-  const limite = C.limiteVistoriaEntrada(c.data_entrada);
+  const limite = C.limiteVistoriaEntrada(dataDasChaves(c));
   if (hoje > limite) return { situacao: 'andamento', texto: `prazo acabou em ${C.dataBr(limite)}: anexe o que o inquilino mandou ou marque "Não houve"` };
   return { situacao: 'andamento', texto: `aguardando o inquilino até ${C.dataBr(limite)} (5 dias úteis da entrega das chaves)` };
 }

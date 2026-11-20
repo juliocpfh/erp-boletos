@@ -44,16 +44,9 @@ const condicoesDaGarantia = (tipo) => ({
   seguro_fianca: tipo === 'Seguro fiança', sem_garantia: !tipo || tipo === 'Sem garantia', tem_garantia: !!tipo && tipo !== 'Sem garantia',
 });
 
-/** Linhas do acerto final (cálculo da saída). Ex.: "Caução corrigida: R$ 6.985,10 · (-) Débitos: R$ 1.951,98 · = Saldo a devolver: R$ 5.033,12". */
+/** Linhas do acerto final, as mesmas do termo de quitação (REC.linhasDoAcerto). Ex.: "Garantia corrigida até 30/11/2026: R$ 5.940,00 · ... · = Saldo a devolver: R$ 5.340,00". */
 function textoAcerto(e) {
-  if (!e) return '';
-  const l = [];
-  if (e.garantia_valor > 0) l.push(`Garantia depositada: ${C.reais(e.garantia_valor)}`, `Garantia corrigida até ${C.dataBr(e.data_saida)}: ${C.reais(e.garantia_corrigida || e.garantia_valor)}`);
-  if (e.fci_credito) l.push(`FCI corrigido: ${C.reais(e.fci_credito)}`);
-  l.push(`(-) Débitos: ${C.reais(e.debitos || 0)}`);
-  if (e.debitos_descricao) l.push(...String(e.debitos_descricao).split(/\n+/).filter(Boolean).map((x) => `   ${x.trim()}`));
-  l.push(`= Saldo ${e.saldo >= 0 ? 'a devolver' : 'a pagar'}: ${C.reais(Math.abs(e.saldo || 0))}`);
-  return l.join('\n');
+  return REC.linhasDoAcerto(e).map(([r, v]) => (v ? `${r}: ${v}` : r)).join('\n');
 }
 
 /** Valores pagos no ano por empresa (código 70 do IRPF). Ex.: "- ANK ADMINISTRADORA DE BENS LTDA · CNPJ 58.492.818/0001-59 · R$ 16.560,00". */
@@ -150,7 +143,13 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
   const desconto = aluguel ? C.descontoPorPercentual(aluguel, pct) : 0;
   const tipo = p.garantia_tipo || '';
   const g = condicoesDaGarantia(tipo);
+  // na ficha não há valor da caução nem do depósito: o texto sai sem o valor ([se valor_deposito] nos modelos)
   const valorDeposito = c ? (g.caucao ? (c.caucao_valor || (c.caucao_meses || 0) * (aluguel - desconto)) : c.deposito_valor || 0) : 0;
+  const chaves = c ? R.dataDasChaves(c) : null;
+  // um link por fiador da ficha que tenha link válido nesta aba
+  const fiadoresLink = f ? (R.fiadoresDaFicha(f).length ? R.fiadoresDaFicha(f) : [{ n: 1 }]).map((x) => ({ ...x, ...linkDaFicha(f, `fiador${x.n}`, hoje) })).filter((x) => x.url) : [];
+  const variosLinks = fiadoresLink.length > 1;
+  const linksFiadores = fiadoresLink.map((x) => `${variosLinks && x.nome ? `Link de ${x.nome} (fiador, encaminhe para ele ou ela)` : 'Link do fiador (encaminhe para ele)'}: ${x.url}`).join('\n');
   // contas: do contrato; na ficha, as da proposta (o que está incluso) ou, sem ela, as do último contrato do imóvel
   const fichaDiz = f && CONTAS_FICHA.some((k) => f[k]);
   const base = c || (fichaDiz ? f : d.contratos.filter((x) => imoveis[0] && x.imovel_id === imoveis[0].id).sort((a, b) => String(b.data_entrada || '').localeCompare(String(a.data_entrada || '')))[0] || {});
@@ -174,8 +173,8 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
     inicio: inicio ? C.dataBr(inicio) : '', fim: fim ? C.dataBr(fim) : '', indice: c ? (c.indice_correcao || '') : '',
     reserva: p.reserva_valor > 0 ? C.reais(p.reserva_valor) : '', reserva_data: p.reserva_data ? C.dataBr(p.reserva_data) : '',
     contas_texto: juntar(contas.map((x) => x[0])), contas_concessionarias: juntar(contas.map((x) => x[1])),
-    primeiro_boleto: c ? primeiroBoleto(d, c) : '', data_chaves: inicio ? C.dataBr(inicio) : '',
-    data_limite_vistoria: inicio ? C.dataBr(C.limiteVistoriaEntrada(inicio)) : '',
+    primeiro_boleto: c ? primeiroBoleto(d, c) : '', data_chaves: chaves ? C.dataBr(chaves) : '',
+    data_limite_vistoria: chaves ? C.dataBr(C.limiteVistoriaEntrada(chaves)) : '',
     data_saida: c && c.data_saida ? C.dataBr(c.data_saida) : '', ano_saida: c && c.data_saida ? c.data_saida.slice(0, 4) : String(Number(hoje.slice(0, 4))),
     acerto: textoAcerto(e), saldo: e ? C.reais(Math.abs(e.saldo || 0)) : '', data_devolucao: e && e.garantia_devolvida_em ? C.dataBr(e.garantia_devolvida_em) : '',
     informe: c ? textoInforme(d, c, ano) : '',
@@ -185,7 +184,7 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
     devolucao: f && f.devolucao_data ? C.reais(f.devolucao_valor || f.reserva_valor) : '', devolucao_data: f && f.devolucao_data ? C.dataBr(f.devolucao_data) : '',
     documentos_ficha: f ? documentosDoEmail(f) : '',
     link: linkDaFicha(f, 'interessado', hoje).url, link_validade: linkDaFicha(f, 'interessado', hoje).validade,
-    link_fiador: linkDaFicha(f, 'fiador1', hoje).url,
+    link_fiador: fiadoresLink.length ? fiadoresLink[0].url : '', links_fiadores: linksFiadores,
     conta_deposito: K.dadoDaEmpresa(d, doImovel, 'conta_deposito'),
   };
   const condicoes = {
@@ -195,7 +194,8 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
     inclusos: inclusos.length > 0, iptu_valor: !!(f && f.iptu_estimado > 0), seguro_valor: !!(f && f.seguro_estimado > 0),
     saida_antecipada: !!(c && c.data_saida && c.prazo_tipo !== 'Indeterminado' && fim && c.data_saida < fim),
     devolver: !!(e && e.saldo > 0), cobrar: !!(e && e.saldo < 0),
-    link: !!linkDaFicha(f, 'interessado', hoje).url, link_fiador: !!linkDaFicha(f, 'fiador1', hoje).url,
+    link: !!linkDaFicha(f, 'interessado', hoje).url, link_fiador: fiadoresLink.length > 0,
+    garantia_depositada: !!c && REC.reciboDisponivel(d, 'garantia', { contrato: c }).ok,
     varios_fiadores: !!f && R.fiadoresDaFicha(f).length > 1,
   };
   if (alvo.cobranca) Object.assign(condicoes, camposDoBoleto(alvo.cobranca, campos, hoje));

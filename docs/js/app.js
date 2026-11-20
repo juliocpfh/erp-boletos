@@ -539,6 +539,7 @@ function janelaErro(texto) {
   dlg.querySelector('button').addEventListener('click', () => dlg.close());
   dlg.addEventListener('close', () => dlg.remove());
   document.body.appendChild(dlg);
+  voltarFecha(dlg);
   dlg.showModal();
 }
 
@@ -587,6 +588,23 @@ export function janela({ titulo, html, sim = 'Confirmar', nao = 'Cancelar', fort
 
 const janelasAbertas = new Set(); // marcas das janelas abertas agora (uma por cima da outra tem entrada própria)
 const ESPERA_VOLTAR = 500; // ms: navegador que não avisa o "voltar" (popstate) não segura a resposta da janela além disto
+
+/**
+ * Voltar do aparelho (ou do navegador) fecha esta janela própria (``<dialog>`` que não sai de ``janela()``, como a do e-mail
+ * e a de erro), em vez de trocar a tela de trás com a janela aberta por cima. Chame antes do ``showModal()``.
+ * Fechada pelos botões ou Esc, a entrada do histórico sai sozinha.
+ */
+export function voltarFecha(dlg) {
+  const marca = entradaDaJanela();
+  if (!marca) return;
+  const aoVoltar = () => { if (history.state && history.state.janela === marca) return; dlg.close(); };
+  window.addEventListener('popstate', aoVoltar);
+  dlg.addEventListener('close', () => {
+    window.removeEventListener('popstate', aoVoltar);
+    janelasAbertas.delete(marca);
+    if (history.state && history.state.janela === marca) history.back();
+  });
+}
 
 /** Põe no histórico a entrada da janela que se abre (mesmo endereço) e devolve a marca dela; null se o navegador não deixa. */
 function entradaDaJanela() {
@@ -1094,7 +1112,7 @@ export async function mostrar(estadoForm = null) {
     app.innerHTML = html;
     // título da aba: o nome da tela (com várias abas abertas, ou no histórico do navegador, dá para saber qual é qual)
     const h1 = typeof app.querySelector === 'function' ? app.querySelector('h1') : null;
-    const nomeTela = h1 ? h1.textContent.replace(/\s+/g, ' ').trim() : '';
+    const nomeTela = h1 ? (h1.dataset?.titulo || h1.textContent).replace(/\s+/g, ' ').trim() : ''; // data-titulo: nome próprio da aba (ex.: "Financeiro · Impostos")
     document.title = nomeTela && nomeTela !== 'Administração de Imóveis' ? `${nomeTela.slice(0, 60)} · Imóveis` : 'Administração de Imóveis';
     ligarRotulos(app);
     if (subir) window.scrollTo(0, 0);

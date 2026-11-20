@@ -1,7 +1,7 @@
 // E-mails por etapa: botão "E-mail" nas etapas da ficha, da entrada e da saída (e no informe anual do IR), a janela com o
 // texto preenchido (Copiar texto · Abrir no Gmail · Enviar agora) e a tela de edição dos modelos (Dados e backup).
 // Modelos e preenchimento: modelos-email.js e email-dados.js. Envio direto: gmail.js (Worker, só na nuvem com o Gmail ligado).
-import { alterar, aviso, baixar, confirmar, E, ir, login, mostrar, podeUsuario } from '../app.js';
+import { alterar, aviso, baixar, confirmar, E, ir, login, mostrar, podeUsuario, voltarFecha } from '../app.js';
 import * as S from '../armazenamento.js';
 import * as C from '../calculos.js';
 import { dataBr } from '../calculos.js';
@@ -103,7 +103,7 @@ async function janelaEmail(chave, alvo) {
   const prontos = anexosProntos(d(), modelo, objeto);
   const dlg = document.createElement('dialog');
   dlg.className = 'janela-erro janela-pergunta janela-email';
-  dlg.innerHTML = `<form method="dialog"><h3>${esc(modelo.nome)} · ${esc(reg.inquilino_nome || '')}</h3><div class="corpo">
+  dlg.innerHTML = `<form method="dialog"><h3><span>${esc(modelo.nome)} · ${esc(reg.inquilino_nome || '')}</span><button type="button" class="fechar-janela" data-fechar title="Fechar" aria-label="Fechar">✕</button></h3><div class="corpo">
     ${perguntas ? `<div class="cartao" style="margin:0 0 8px">${perguntas}</div>` : ''}
     <p class="suave">De: ${esc(inicio.remetente.assinatura || 'Administradora')}${inicio.remetente.email ? ` &lt;${esc(inicio.remetente.email)}&gt;` : ''}${modelo.anexos ? ` · Anexar: <b>${esc(modelo.anexos)}</b>` : ''}</p>
     ${listaProntos(prontos, ligado)}
@@ -115,6 +115,7 @@ async function janelaEmail(chave, alvo) {
     ${ligado ? `<p><label>${prontos.length ? 'Outros anexos' : 'Anexos'} para o "Enviar agora" <span class="suave">(PDF ou foto)</span></label><input type="file" name="anexos" multiple accept="${ACEITA_DOCUMENTOS}"></p>` : ''}
     <p class="suave">${alvo.contrato && /saida_aviso/.test(chave) ? 'Confira no contrato do inquilino a multa da saída antecipada antes de enviar. ' : ''}${ligado ? '' : 'Envio direto ainda não ligado: use "Copiar texto" ou "Abrir no Gmail".'}</p>
   </div><div class="acoes" style="justify-content:flex-end;flex-wrap:wrap">
+    <p class="alerta aviso-janela" data-aviso-janela role="status" aria-live="polite" hidden style="flex-basis:100%"></p>
     <button type="button" class="secundario" data-fechar>Fechar</button>
     <button type="button" class="secundario" data-copiar>Copiar texto</button>
     <button type="button" class="secundario" data-gmail>Abrir no Gmail</button>
@@ -122,25 +123,35 @@ async function janelaEmail(chave, alvo) {
   document.body.appendChild(dlg);
   const q = (s) => dlg.querySelector(s);
   let editado = false;
+  let assuntoEditado = false;
   let registrou = false;
+  // aviso dos botões dentro da própria janela (no topo da página ele ficaria atrás dela, sem ninguém ver)
+  const avisar = (texto, tipo = 'ok') => {
+    const el = q('[data-aviso-janela]');
+    el.className = `alerta aviso-janela ${tipo}`;
+    el.textContent = texto;
+    el.hidden = false;
+    el.scrollIntoView({ block: 'nearest' });
+  };
   const respostas = () => Object.fromEntries((modelo.perguntas || []).map(([n]) => [n, q(`[name=p_${n}]`).value]));
   const desenhar = () => {
     const e = montarEmail(modelo, dadosDoEmail(d(), objeto, respostas()));
-    q('[name=assunto]').value = e.assunto;
+    if (!assuntoEditado) q('[name=assunto]').value = e.assunto;
     if (!editado) q('[name=texto]').value = e.texto;
   };
   desenhar();
   q('[name=texto]').addEventListener('input', () => { editado = true; q('[data-editado]').hidden = false; });
+  q('[name=assunto]').addEventListener('input', () => { assuntoEditado = true; });
   dlg.querySelectorAll('[name^=p_]').forEach((el) => el.addEventListener('input', desenhar));
   const atual = () => ({ para: q('[name=para]').value.trim(), assunto: q('[name=assunto]').value.trim(), texto: q('[name=texto]').value });
   const pendente = () => (/\[preencher: /.test(atual().texto + atual().assunto) ? 'Ainda há "[preencher: ...]" no texto: complete antes de mandar.' : '');
-  q('[data-fechar]').addEventListener('click', () => dlg.close());
+  dlg.querySelectorAll('[data-fechar]').forEach((b) => b.addEventListener('click', () => dlg.close()));
   const baixarProntos = q('[data-baixar-prontos]');
   if (baixarProntos) baixarProntos.addEventListener('click', async () => {
     baixarProntos.disabled = true;
     try {
       const lista = await arquivosProntos(dlg, prontos, objeto);
-      if (!lista.length) { aviso('Marque pelo menos um anexo.', 'aviso'); return; }
+      if (!lista.length) { avisar('Marque pelo menos um anexo.', 'aviso'); return; }
       for (const a of lista) baixar(a.blob, a.nome);
     } catch (erro) {
       aviso(erro.message || 'Não consegui preparar os anexos.', 'erro');
@@ -148,28 +159,41 @@ async function janelaEmail(chave, alvo) {
   });
   q('[data-copiar]').addEventListener('click', async () => {
     const e = atual();
-    aviso(await copiar(`${e.assunto}\n\n${e.texto}`) ? `Assunto e texto copiados: cole no e-mail.${pendente() ? ` ${pendente()}` : ''}` : 'O navegador não deixou copiar: selecione o texto e copie.', pendente() ? 'aviso' : 'ok');
+    const ok = await copiar(`${e.assunto}\n\n${e.texto}`);
+    avisar(ok ? `Assunto e texto copiados: cole no e-mail.${pendente() ? ` ${pendente()}` : ''}` : 'O navegador não deixou copiar: selecione o texto e copie.', !ok || pendente() ? 'aviso' : 'ok');
   });
   q('[data-gmail]').addEventListener('click', async () => {
     const e = atual();
+    if (pendente() && !(await confirmar(`${pendente()}\n\nAbrir o Gmail mesmo assim? O texto vai com o buraco, e você completa por lá.`, { titulo: 'Texto incompleto', sim: 'Abrir mesmo assim' }))) return;
     const comCorpo = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(e.para)}&su=${encodeURIComponent(e.assunto)}&body=${encodeURIComponent(e.texto)}`;
     const cabe = comCorpo.length <= LIMITE_ENDERECO;
     const copiado = await copiar(e.texto);
-    window.open(cabe ? comCorpo : `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(e.para)}&su=${encodeURIComponent(e.assunto)}`, '_blank', 'noopener');
+    // sem 'noopener' no open (com ele o navegador devolve null sempre e não se sabe se a aba abriu); o opener sai à mão
+    const aba = window.open(cabe ? comCorpo : `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(e.para)}&su=${encodeURIComponent(e.assunto)}`, '_blank');
+    if (!aba) { avisar(`O navegador bloqueou a aba do Gmail (bloqueador de janelas): permita janelas deste site e clique de novo, ou use "Copiar texto".${copiado ? ' O texto já foi copiado.' : ''}`, 'aviso'); return; }
+    try { aba.opener = null; } catch { /* outra origem */ }
     await registrar(chave, alvo, e.para, e.assunto, 'aberto no Gmail');
     registrou = true;
-    aviso(cabe ? 'Gmail aberto com o texto. Anexe os arquivos e envie por lá.' : copiado ? 'Gmail aberto. O texto é comprido para ir pelo endereço: ele foi copiado, cole no corpo do e-mail.' : 'Gmail aberto. Copie o texto da janela e cole no corpo do e-mail.', cabe ? 'ok' : 'aviso');
+    avisar(cabe ? 'Gmail aberto com o texto. Anexe os arquivos e envie por lá.' : copiado ? 'Gmail aberto. O texto é comprido para ir pelo endereço: ele foi copiado, cole no corpo do e-mail.' : 'Gmail aberto. Copie o texto da janela e cole no corpo do e-mail.', cabe ? 'ok' : 'aviso');
   });
   const enviar = q('[data-enviar]');
   if (enviar) enviar.addEventListener('click', async () => {
     const e = atual();
-    if (!e.para) { aviso('Digite o e-mail do destinatário.', 'aviso'); return; }
-    if (pendente()) { aviso(pendente(), 'aviso'); return; }
+    if (!e.para) { avisar('Digite o e-mail do destinatário.', 'aviso'); return; }
+    if (pendente()) { avisar(pendente(), 'aviso'); return; }
+    // notificação: confere antes de mandar se o envio poderá ser marcado (senão o e-mail sairia e o prazo não correria)
+    const n = chave === 'notificacao_envio' && alvo.notificacao ? buscar('notificacoes', alvo.notificacao) : null;
+    if (n && n.situacao === 'Rascunho' && n.data > C.hojeIso()) { avisar(`A notificação está datada de ${dataBr(n.data)}, no futuro: o envio não poderia ser marcado. Corrija a data no rascunho (hoje ou antes) e mande depois.`, 'aviso'); return; }
     let arquivos;
     try {
       arquivos = [...await arquivosProntos(dlg, prontos, objeto), ...[...(q('[name=anexos]').files || [])].map((f) => ({ nome: f.name, blob: f }))];
     } catch (erro) { aviso(`Não consegui preparar os anexos: ${erro.message}`, 'erro'); return; }
-    if (!(await confirmar(`O e-mail vai agora para ${e.para}${arquivos.length ? `, com ${arquivos.length} anexo(s)` : ', sem anexo'}.`, { titulo: 'Enviar o e-mail?', sim: 'Enviar agora' }))) return;
+    // o que merece destaque na pergunta: texto que fala em anexo sem nenhum arquivo, e notificação sem a assinatura
+    const alertas = [];
+    if (!arquivos.length && modelo.anexos) alertas.push(`ATENÇÃO: o texto fala em anexo (${modelo.anexos}), mas nenhum arquivo vai junto. Anexe em "${prontos.length ? 'Outros anexos' : 'Anexos'}" antes de enviar.`);
+    const marcados = [...dlg.querySelectorAll('[name=pronto]:checked')].map((el) => prontos[Number(el.value)]);
+    if (n && !n.arquivo_assinado && marcados.some((a) => a.tipo === 'recibo' && a.recibo === 'notificacao')) alertas.push('ATENÇÃO: vai o PDF da notificação SEM a assinatura (a assinada não foi anexada na notificação). Ao enviar, a notificação fica marcada como enviada hoje e o prazo começa a correr.');
+    if (!(await confirmar(`${alertas.length ? `${alertas.join('\n\n')}\n\n` : ''}O e-mail vai agora para ${e.para}${arquivos.length ? `, com ${arquivos.length} anexo(s)` : ', sem anexo'}.`, { titulo: alertas.length ? 'Enviar mesmo assim?' : 'Enviar o e-mail?', sim: 'Enviar agora', forte: alertas.length > 0 }))) return;
     enviar.disabled = true;
     try {
       const r = await enviarEmail({ para: e.para, assunto: e.assunto, texto: e.texto, anexos: arquivos });
@@ -183,6 +207,7 @@ async function janelaEmail(chave, alvo) {
   });
   // ao fechar, a página mostra a data do e-mail aberto no Gmail ao lado do botão
   dlg.addEventListener('close', () => { dlg.remove(); if (registrou) mostrar(); });
+  voltarFecha(dlg);
   dlg.showModal();
 }
 
@@ -192,10 +217,10 @@ const VOLTA_GMAIL = {
   cancelado: ['aviso', 'Você cancelou na tela do Google: nada foi ligado.'],
   recusado: ['erro', 'O pedido venceu ou foi aberto em outro navegador. Clique em <b>Conectar o Gmail</b> de novo e termine em até 10 minutos, no mesmo navegador.'],
   'sem-permissao': ['erro', 'Faltou marcar, na tela do Google, a caixa de <b>enviar e-mail em seu nome</b>. Clique em <b>Conectar o Gmail</b> de novo e marque essa caixa.'],
-  credencial: ['erro', 'O Google não reconheceu o aplicativo: confira os segredos GMAIL_CLIENT_ID e GMAIL_CLIENT_SECRET no Cloudflare (copiados da credencial "Aplicativo da Web").'],
-  retorno: ['erro', 'O endereço de retorno cadastrado no Google Cloud está diferente. Copie o endereço abaixo e cole na credencial, em "URIs de redirecionamento autorizados".'],
+  credencial: ['erro', 'O Google não reconheceu o aplicativo: falta terminar a configuração do Gmail na nuvem. Peça ao técnico para conferir (para ele: segredos GMAIL_CLIENT_ID e GMAIL_CLIENT_SECRET no Cloudflare).'],
+  retorno: ['erro', 'O endereço de retorno cadastrado no Google está diferente. Copie o endereço abaixo e mande ao técnico, para ele cadastrar no Google Cloud.'],
   'sem-rede': ['erro', 'Não deu para falar com o Google agora. Tente de novo daqui a pouco.'],
-  erro: ['erro', 'Não deu para ligar o Gmail. Tente de novo; se repetir, veja o passo a passo (documentacao/LIGAR_GMAIL.md).'],
+  erro: ['erro', 'Não deu para ligar o Gmail. Tente de novo; se repetir, peça ajuda ao técnico.'],
 };
 
 /**
@@ -217,17 +242,17 @@ export async function caixaGmailHtml(volta = '') {
     situacao = `<p>${etiqueta('Ligado', 'ok')} Os e-mails saem pela conta <b>${esc(s.conta || '')}</b>${s.remetente && s.remetente !== s.conta ? `, com o remetente <b>${esc(s.remetente)}</b>` : ''}${s.ligado_em ? ` <span class="suave">(conectado em ${dataBr(String(s.ligado_em).slice(0, 10))})</span>` : ''}.</p>`;
   } else if (s.origem === 'segredo' && s.ligado) {
     situacao = `<p>${etiqueta('Ligado', 'ok')} Pelo jeito antigo (código colado no Cloudflare), com o remetente <b>${esc(s.remetente || '')}</b>.</p>
-      <p class="suave">Para passar ao botão: clique em <b>Conectar o Gmail</b>. Depois disso o código antigo deixa de ser usado e pode ser apagado no Cloudflare (segredo GMAIL_REFRESH_TOKEN).</p>`;
+      <p class="suave">Para passar ao botão: clique em <b>Conectar o Gmail</b>. Depois disso o jeito antigo deixa de ser usado e o técnico pode apagá-lo da nuvem (para ele: segredo GMAIL_REFRESH_TOKEN no Cloudflare).</p>`;
   } else if (s.origem === 'simulado') {
     situacao = `<p>${etiqueta('Simulado', 'info')} Teste no computador: os e-mails só aparecem na janela do programa, nada vai ao Google.</p>`;
   } else {
     situacao = `<p>${etiqueta('Desligado', 'neutra')} Os e-mails saem por <b>Copiar texto</b> ou <b>Abrir no Gmail</b>.</p>`;
   }
-  const ilegivel = s.ilegivel ? '<div class="alerta aviso">A autorização guardada não abre mais (o Client Secret foi trocado no Google Cloud?). Clique em <b>Conectar o Gmail</b> de novo.</div>' : '';
-  const falta = s.cliente ? '' : '<div class="alerta info">Falta um passo antes de conectar: no Cloudflare, os segredos <b>GMAIL_CLIENT_ID</b> e <b>GMAIL_CLIENT_SECRET</b> da credencial "Aplicativo da Web" do Google Cloud (passo a passo em documentacao/LIGAR_GMAIL.md).</div>';
+  const ilegivel = s.ilegivel ? '<div class="alerta aviso">A autorização guardada não abre mais (a configuração do Google pode ter sido trocada). Clique em <b>Conectar o Gmail</b> de novo.</div>' : '';
+  const falta = s.cliente ? '' : '<div class="alerta info">Falta terminar a configuração do Gmail na nuvem antes de conectar: peça ao técnico <span class="suave">(para ele: segredos GMAIL_CLIENT_ID e GMAIL_CLIENT_SECRET no Cloudflare)</span>.</div>';
   const botoes = s.origem === 'simulado' ? '' : `<p>${s.cliente ? botao('conectarGmail', s.origem === 'conta' && s.ligado ? 'Trocar a conta do Gmail' : 'Conectar o Gmail', {}, 'pequeno') : ''}
     ${s.origem === 'conta' ? botao('desconectarGmail', 'Desconectar', {}, 'perigo pequeno', 'Desconectar o Gmail? O botão "Enviar agora" some até alguém conectar de novo; a permissão também é retirada na conta do Google.') : ''}</p>`;
-  const retorno = s.retorno ? `<p><label>Endereço de retorno (cole no Google Cloud, na credencial, em "URIs de redirecionamento autorizados")</label>
+  const retorno = s.retorno ? `<p><label>Endereço de retorno <span class="suave">(para o técnico: Google Cloud, credencial, "URIs de redirecionamento autorizados")</span></label>
     <span class="nw"><input readonly value="${esc(s.retorno)}" data-retorno-gmail style="max-width:480px"> ${botao('copiarRetornoGmail', 'Copiar', {}, 'secundario pequeno')}</span></p>` : '';
   return `${topo}${avisoVolta}${ilegivel}
     <p class="suave">Com o Gmail conectado, os e-mails das etapas (boleto, NF, recibos, avisos) saem pelo botão <b>Enviar agora</b>, pela conta da empresa. Conectar é como entrar com o Google em qualquer site: <b>Conectar o Gmail → escolher a conta → Permitir</b>. O sistema só <b>envia</b>: não lê a caixa de entrada.</p>
@@ -243,7 +268,7 @@ export const ACOES_EMAILS = {
 
   async desconectarGmail() {
     const r = await desconectarGmail();
-    aviso(r.segredo_antigo ? 'Gmail desconectado. Atenção: ainda existe o código antigo no Cloudflare (GMAIL_REFRESH_TOKEN), que continua enviando até ser apagado lá.'
+    aviso(r.segredo_antigo ? 'Gmail desconectado. Atenção: o jeito antigo ainda está guardado na nuvem e continua enviando até o técnico apagá-lo (para ele: segredo GMAIL_REFRESH_TOKEN no Cloudflare).'
       : r.havia && !r.revogado ? 'Gmail desconectado aqui. O Google não confirmou a retirada da permissão: confira em Conta do Google → Segurança → Apps com acesso.' : 'Gmail desconectado.', r.segredo_antigo || (r.havia && !r.revogado) ? 'aviso' : 'ok');
     if (/[?&]gmail=/.test(window.location.hash)) ir('#/dados'); else await mostrar();
   },
@@ -251,7 +276,7 @@ export const ACOES_EMAILS = {
   async copiarRetornoGmail() {
     const campo = document.querySelector('[data-retorno-gmail]');
     if (!campo) return;
-    if (await copiar(campo.value)) aviso('Endereço copiado. Cole no Google Cloud, na credencial.');
+    if (await copiar(campo.value)) aviso('Endereço copiado. Mande ao técnico, para ele colar no Google Cloud.');
     else { campo.select(); aviso('O navegador não deixou copiar: o endereço ficou selecionado, é só copiar.', 'info'); }
   },
 
@@ -295,11 +320,14 @@ export const FORMULARIOS_EMAILS = {
 const AJUDA = `<div class="cartao"><h2>Como escrever</h2>
   <p><b>{campo}</b> entra com o dado do inquilino ou da ficha: {nome} (primeiro nome), {locatario}, {documento}, {imovel}, {endereco}, {aluguel}, {aluguel_bonificado}, {bonificacao},
   {vencimento}, {garantia}, {tipo_deposito}, {valor_deposito}, {prazo}, {inicio}, {fim}, {indice}, {reserva}, {reserva_data}, {contas_texto}, {contas_concessionarias}, {primeiro_boleto},
-  {data_chaves}, {data_limite_vistoria}, {data_saida}, {acerto}, {saldo}, {data_devolucao}, {informe}, {ano}, {conta_deposito} (conta para depósito da caução, do cadastro da empresa) e as respostas da janela ({prazo_assinatura}, {opcoes_entrega}, {data_aviso}, {data_vistoria}, {pendencias}).
+  {data_chaves}, {data_limite_vistoria}, {data_saida}, {ano_saida}, {acerto}, {saldo}, {data_devolucao}, {informe}, {ano}, {conta_deposito} (conta para depósito da caução, do cadastro da empresa) e as respostas da janela ({prazo_assinatura}, {opcoes_entrega}, {data_aviso}, {data_vistoria}, {pendencias}).
+  Na ficha: {inclusos}, {iptu_valor}, {seguro_valor}, {devolucao}, {devolucao_data}, {documentos_ficha}, {link}, {link_validade}, {link_fiador} (o do 1º fiador) e {links_fiadores} (uma linha para cada fiador com link).
+  No termo aditivo: {aditivo_data}, {aditivo_assunto}, {valor_anterior}, {valor_novo}, {novo_inicio}, {novo_bonificado}. Na notificação: {notificacao_data}, {notificacao_numero}, {notificacao_assunto}, {notificacao_assunto_minusculo}, {prazo_notificacao}, {data_limite}.
   Nos e-mails da régua de cobrança, também os do boleto: {boleto_referente}, {vencimento_boleto}, {limite_pagamento}, {valor_em_dia}, {valor_cheio}, {multa_pct}, {juros_pct}, {valor_hoje}, {multa_hoje}, {juros_hoje}, {dias_atraso}, {data_hoje}, {pix}, {linha_digitavel} (condições nao_util, bonificacao_boleto, pix, linha_digitavel).
   Com a 1ª letra maiúscula ({Nome}) sai com maiúscula; todo em maiúsculas ({NOME}), em maiúsculas.</p>
   <p><b>[se condição]</b> texto <b>[senão]</b> outro <b>[fim]</b>: pj, caucao, deposito, dinheiro (caução ou depósito), fiador, seguro_fianca, sem_garantia, tem_garantia, contas, iptu, seguro_incendio,
-  bonificacao, reserva, saida_antecipada, devolver, cobrar. Também "[se não pj]".</p>
+  bonificacao, reserva, saida_antecipada, devolver, cobrar, garantia_depositada (caução ou depósito já registrado), inclusos, iptu_valor, seguro_valor, link, link_fiador, varios_fiadores,
+  novo_bonificacao (termo do novo valor), reiteracao e vence_hoje (notificação). Também "[se não pj]". Qualquer campo serve de condição: "[se valor_deposito]" sai só quando o campo tem valor.</p>
   <p class="suave">O fecho ("Agradecemos e ficamos à disposição em caso de dúvidas." e a assinatura) entra sozinho no fim de todo e-mail.</p></div>`;
 
 export function telaModelosEmail() {

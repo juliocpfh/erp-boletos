@@ -44,7 +44,7 @@ Condições sujeitas à aprovação da ficha; a locação só vale com o contrat
 PRÓXIMO PASSO
 [se link]Preencha a ficha e mande os documentos por este link, só seu, válido até {link_validade}:
 {link}[se link_fiador]
-Link do fiador (encaminhe para ele): {link_fiador}[fim]
+{links_fiadores}[fim]
 
 Ou, se preferir, responda[senão]Responda[fim] este e-mail com a ficha anexa assinada (gov.br ou à mão)[se fiador], a [se varios_fiadores]de cada fiador[senão]do fiador[fim][fim] e os documentos:
 {documentos_ficha}[se seguro_fianca]
@@ -67,7 +67,7 @@ Sua ficha para o imóvel da {imovel} foi aprovada. Confira os dados do contrato:
 - Prazo: {prazo}
 Se algo estiver errado, responda antes de prepararmos o contrato.
 
-Próximos passos: contrato para assinar em até 2 dias úteis[se fiador] (o fiador e o cônjuge dele também assinam)[fim][se dinheiro], depósito de {valor_deposito} da {tipo_deposito}[fim][se seguro_fianca], apólice do seguro fiança[fim], nossa assinatura e entrega das chaves com a vistoria.
+Próximos passos: contrato para assinar em até 2 dias úteis[se fiador] (o fiador e o cônjuge dele também assinam)[fim][se dinheiro], depósito[se valor_deposito] de {valor_deposito}[fim] da {tipo_deposito}[fim][se seguro_fianca], apólice do seguro fiança[fim], nossa assinatura e entrega das chaves com a vistoria.
 
 [se reserva]A reserva de {reserva} será descontada do primeiro boleto. [fim]O imóvel só pode ser ocupado depois do contrato assinado por todos e da entrega das chaves.`,
   },
@@ -125,7 +125,7 @@ Dúvida em alguma cláusula? Pergunte antes de assinar.`,
     perguntas: [['opcoes_entrega', 'Opções de data e horário da entrega das chaves', 'texto']],
     texto: `Olá, {nome},
 
-O contrato foi assinado por todos: segue a via final, para guardar.[se dinheiro] Recebemos também a {tipo_deposito} de {valor_deposito} (recibo e comprovante anexos).[fim]
+O contrato foi assinado por todos: segue a via final, para guardar.[se dinheiro][se garantia_depositada] Recebemos também a {tipo_deposito} de {valor_deposito} (recibo e comprovante anexos).[senão] Falta o depósito da {tipo_deposito} de {valor_deposito}: mande o comprovante por este e-mail.[fim][fim]
 
 ENTREGA DAS CHAVES
 Opções: {opcoes_entrega}, no imóvel. Responda com a melhor.
@@ -234,7 +234,8 @@ Segue o acerto final do contrato do imóvel da {imovel}:
 
 {acerto}
 
-[se devolver]De acordo? Informe a chave Pix ou a conta em seu nome: devolvemos em até 5 dias úteis da sua resposta.[fim][se cobrar]Segue o boleto do saldo, com o vencimento nele.[fim]
+[se devolver]De acordo? Informe a chave Pix ou a conta em seu nome: devolvemos em até 5 dias úteis da sua resposta.[fim][se cobrar]Falta pagar o saldo de {saldo}: deposite ou faça o Pix na conta abaixo e responda com o comprovante.
+{conta_deposito}[fim]
 
 Discorda de algum item? Responda em até 5 dias úteis com o motivo.`,
   },
@@ -345,12 +346,32 @@ Já resolveu? Responda com uma foto ou um documento, para darmos a baixa. Sem is
   },
 ];
 
+/**
+ * Trechos dos textos padrão que mudaram (mutirão de 19/11) e também precisam mudar nos modelos já editados e gravados:
+ * [chave, texto antigo exato, texto novo]. O trecho só é trocado se ainda estiver igual ao antigo (o resto do texto editado fica).
+ */
+export const ATUALIZACOES_EMAIL = [
+  ['ficha_envio', 'Link do fiador (encaminhe para ele): {link_fiador}', '{links_fiadores}'],
+  ['ficha_aprovada', 'depósito de {valor_deposito} da {tipo_deposito}', 'depósito[se valor_deposito] de {valor_deposito}[fim] da {tipo_deposito}'],
+  ['contrato_assinado', '[se dinheiro] Recebemos também a {tipo_deposito} de {valor_deposito} (recibo e comprovante anexos).[fim]',
+    '[se dinheiro][se garantia_depositada] Recebemos também a {tipo_deposito} de {valor_deposito} (recibo e comprovante anexos).[senão] Falta o depósito da {tipo_deposito} de {valor_deposito}: mande o comprovante por este e-mail.[fim][fim]'],
+  ['saida_calculo', '[se cobrar]Segue o boleto do saldo, com o vencimento nele.[fim]',
+    '[se cobrar]Falta pagar o saldo de {saldo}: deposite ou faça o Pix na conta abaixo e responda com o comprovante.\n{conta_deposito}[fim]'],
+];
+
+/** Aplica ATUALIZACOES_EMAIL num texto gravado do modelo ``chave``. */
+export function atualizarTextoEmail(chave, texto) {
+  let t = String(texto ?? '');
+  for (const [k, antigo, novo] of ATUALIZACOES_EMAIL) if (k === chave && t.includes(antigo)) t = t.split(antigo).join(novo);
+  return t;
+}
+
 /** Modelo de e-mail em uso: o gravado (Dados e backup → Modelos de e-mail) ou o padrão. */
 export function modeloEmail(d, chave) {
   const padrao = MODELOS_EMAIL.find((m) => m.chave === chave);
   if (!padrao) return null;
   const salvo = (d.modelos_email || []).find((m) => m.chave === chave);
-  return salvo ? { ...padrao, assunto: salvo.assunto ?? padrao.assunto, texto: salvo.texto ?? padrao.texto, id: salvo.id, editado: true } : { ...padrao };
+  return salvo ? { ...padrao, assunto: salvo.assunto ?? padrao.assunto, texto: salvo.texto == null ? padrao.texto : atualizarTextoEmail(chave, salvo.texto), id: salvo.id, editado: true } : { ...padrao };
 }
 
 /**
