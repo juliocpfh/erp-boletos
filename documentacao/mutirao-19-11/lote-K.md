@@ -3,94 +3,96 @@
 21 itens (0 graves, 6 médios, 15 leves). Arquivos: `telas/acoes.js`.
 Como trabalhar: ver `../MUTIRAO_19_11.md`. Marque `[x]` ao corrigir. G = grave, M = médio, L = leve.
 
-- [ ] **fios-013** [M] "Excluir boletos selecionados" pergunta "Excluir 5 boleto(s) de 10/2026?" quando os boletos são de quatro meses diferentes
+- [x] **fios-013** [M] "Excluir boletos selecionados" pergunta "Excluir 5 boleto(s) de 10/2026?" quando os boletos são de quatro meses diferentes
   - Vê-se: Na lista "Em aberto · todos os meses", com 5 boletos marcados (1 de 10/2026, 2 de 11/2026, 1 de 12/2026 e 1 de 01/2027), o botão vermelho "Excluir boletos selecionados" abre a janela "EXCLUIR 5 BOLETO(S) DE 10/2026? Eles podem ser gerados de novo depois.". Confirmando, o sistema apaga os 5, de todos os meses, e não só os de 10/2026. A pergunta de uma exclusão cita o mês errado: quem lê pensa que está apagando só outubro.
   - Causa: `docs/js/telas/acoes.js:1765 (título com compBr(comp)) e :1767-1775 (laço por todos os ids); docs/js/telas/cobrancas.js:193 e :198`
   - Fazer: Montar o título com os meses dos boletos marcados (um mês, ou "de 10/2026 a 01/2027").
   - Certo é: "Excluir 5 boleto(s) (10/2026 a 01/2027)?", ou a lista dos marcados com o mês de cada um.
-- [ ] **entrada-023** [M] Excluir ficha com reserva paga não avisa do dinheiro e apaga o comprovante da reserva
+- [x] **entrada-023** [M] Excluir ficha com reserva paga não avisa do dinheiro e apaga o comprovante da reserva
   - Vê-se: O administrador pode excluir uma ficha em análise (ou reprovada) que tem reserva de R$ 1.000,00 recebida e ainda não devolvida. A janela de confirmação só diz 'Os documentos da pasta da ficha são apagados juntos': não fala da reserva. Depois de digitar APAGAR, somem o registro da reserva, o comprovante do depósito e o alerta 'registrar a devolução da reserva'. Fica dinheiro de terceiro na conta sem nenhum registro no sistema.
   - Causa: `docs/js/telas/acoes.js:215 (checar), :132-149 e :161; docs/js/telas/comum.js:680-684`
   - Fazer: Barrar a exclusão de ficha com reserva recebida e não devolvida ("registre a devolução antes") ou avisar em destaque o valor da reserva na janela.
   - Certo é: Barrar a exclusão de ficha com reserva recebida e não devolvida (ou, no mínimo, avisar em destaque 'reserva de R$ 1.000,00 não devolvida' e guardar os comprovantes de dinheiro).
-- [ ] **saida-008** [M] Excluir o contrato apaga boleto que está emitido no C6 e em aberto no banco
+- [x] **saida-008** [M] Excluir o contrato apaga boleto que está emitido no C6 e em aberto no banco
   - Vê-se: Excluir um boleto sozinho é barrado quando ele foi emitido no banco ("Cancele no banco antes de excluir"). Mas excluir o contrato inteiro (digitando APAGAR) só confere se há NF emitida: os boletos emitidos no C6 e ainda em aberto são apagados junto. O boleto continua valendo no banco, o inquilino pode pagar, e o dinheiro chega sem ter a que ligar.
   - Causa: `docs/js/telas/acoes.js:194 (checar de contratos) comparado com 195; docs/js/regras.js:2891-2905`
   - Fazer: No checar de contratos, barrar também quando algum boleto tem banco.situacao "emitido", com a mesma mensagem do boleto.
   - Certo é: Barrar a exclusão do contrato enquanto houver boleto emitido no banco em aberto, com a mesma mensagem do boleto.
-- [ ] **saida-034** [M] Excluir o contrato apaga boletos pagos (quando não têm NF) e deixa a entrada do extrato apontando para um boleto que não existe
+- [x] **saida-034** [M] Excluir o contrato apaga boletos pagos (quando não têm NF) e deixa a entrada do extrato apontando para um boleto que não existe
   - Vê-se: A exclusão do contrato só é barrada quando há NF emitida. Contrato sem NF (ex.: "gerar NF" desligado, ou boletos pagos ainda sem número de NF) pode ser excluído mesmo com boletos pagos e confirmados pelo extrato. Os boletos somem, mas as movimentações do banco ficam com o destino "Boleto" ligado a um boleto que não existe mais: na tela Banco a linha aparece como classificada, sem link e sem inquilino, e o dinheiro (ex.: R$ 1.800,00 de 10/11/2026) fica sem dono. Para o imóvel e para o IPTU essa conferência já exist…
   - Causa: `docs/js/telas/acoes.js:194 (checar só NF; compare com 180-190 e 198-199); docs/js/regras.js:2884 (FICAM_SEM_O_CONTRATO) e 2898-2901 (excluir sem voltar a movimentação, o que desfazerPagamento faz em 1946-1948)`
   - Fazer: No checar do contrato, recusar quando houver movimentação do banco (cobranca_id) ou pagamento do C6 ligado a boleto dele: "desfaça o destino das movimentações na tela Banco antes" (mesmo texto do imóvel).
   - Certo é: Barrar a exclusão ("desfaça o destino das movimentações na tela Banco antes"), como já é feito ao excluir o imóvel, ou devolver as movimentações a "sem destino".
-- [ ] **saida-035** [M] O contrato de quem saiu numa troca de titular pode ser excluído, e o novo titular perde o que herdava dele
+- [x] **saida-035** [M] O contrato de quem saiu numa troca de titular pode ser excluído, e o novo titular perde o que herdava dele
   - Vê-se: Nada impede excluir o contrato do titular anterior depois da troca (se ele não tiver NF). O novo titular continua apontando para um contrato que não existe: deixa de ser tratado como continuação. Os documentos de entrada que valiam "herdados do contrato original" (contrato assinado, vistoria de entrada, termo das chaves) passam a ser cobrados dele como faltando; a vistoria de entrada (que o sistema busca subindo a cadeia) some; nas trocas antigas com caução herdada, o comprovante e os depósitos iniciais, que ficam…
   - Causa: `docs/js/telas/acoes.js:194 (checar só NF); docs/js/regras.js:2891-2905 (excluirContrato só cuida de garantia_transferida_para igual ao excluído e de seguros herdado_de); regras.js:3392 (contratoHerdado vira null) e 4022 (documentoFalta)`
   - Fazer: No checar do contrato: se existir contrato com contrato_anterior_id igual a ele, recusar ("este contrato continua com Fulano: exclua antes o do novo titular").
   - Certo é: Barrar a exclusão do contrato que tem continuação (ou avisar com clareza o que o novo titular perde).
-- [ ] **financeiro-banco-004** [M] O ZIP do contador sai sem as entradas e saídas das contas de outros bancos (extrato por arquivo)
+- [x] **financeiro-banco-004** [M] O ZIP do contador sai sem as entradas e saídas das contas de outros bancos (extrato por arquivo)
   - Vê-se: Na aba de uma conta de outro banco (ex.: Itaú da JCK) aparece a "Pasta do contador de nov/2026" com o botão "Baixar ZIP de nov/2026 para o contador". A planilha "Movimentacoes JCK 2026-11.xlsx" dentro do ZIP só traz as contas do C6 da empresa: as movimentações importadas do Itaú não entram (a planilha sai com "0 movimentação(ões)" se a empresa só tem a conta do Itaú), embora os comprovantes delas estejam na pasta.
   - Causa: `docs/js/telas/acoes.js:1901`
   - Fazer: Usar R.contasDoExtrato(E.d) no lugar de E.d.config_banco.contas.
   - Certo é: A planilha do contador traz as movimentações de todas as contas da empresa, do C6 e de outros bancos.
-- [ ] **fios-008** [L] Aviso manda clicar em "Numerar estas NFs", mas o botão se chama "Numerar as NFs marcadas"
+- [x] **fios-008** [L] Aviso manda clicar em "Numerar estas NFs", mas o botão se chama "Numerar as NFs marcadas"
   - Vê-se: Depois de desfazer a última numeração (ou números escolhidos), o aviso diz: "Numeração nº 0152 a 0156 desfeita. Corrija o que precisar, inclua o que faltou e clique em \"Numerar estas NFs\"." Na tela NF não existe botão com esse nome: o botão é "Numerar as NF…
   - Causa: `docs/js/telas/acoes.js:1624 e docs/js/telas/envios.js:546 (botão em docs/js/telas/faturas.js:74)`
   - Fazer: Trocar o texto dos dois avisos para "Numerar as NFs marcadas".
-- [ ] **links-pc-002** [L] Desfazer o acordo pela página do boleto do acordo termina em "Boleto não encontrado"
+- [x] **links-pc-002** [L] Desfazer o acordo pela página do boleto do acordo termina em "Boleto não encontrado"
   - Vê-se: Na página do boleto "do acordo 1/3" (ex.: #/cobranca/14, Maria Teste da Silva), o botão "Desfazer o acordo" pergunta, e ao confirmar aparece o aviso verde "Acordo desfeito: os boletos originais voltaram a ser cobrados" em cima de uma tela "Boleto não encontra…
   - Causa: `docs/js/telas/acoes.js:1453-1457; docs/js/regras.js:7121`
   - Fazer: Depois de desfazer, se o boleto da página foi excluído, ir para a página do inquilino (#/contrato/<id>) em vez de mostrar().
-- [ ] **links-pc-009** [L] Clicar num anexo que não está mais na pasta mostra erro em inglês
+- [x] **links-pc-009** [L] Clicar num anexo que não está mais na pasta mostra erro em inglês
   - Vê-se: No inquilino Pedro Novo Titular a página avisa "1 arquivo(s) não encontrado(s) na pasta". Clicando no próprio anexo (📎 termo aditivo de 01/12/2026) ou em "abrir" na Pasta física, abre a janela vermelha "A requested file or directory could not be found at the…
   - Causa: `docs/js/telas/acoes.js:2081-2087; docs/js/armazenamento.js:223-225; docs/js/pasta-nuvem.js:13`
   - Fazer: Em abrirArquivo, pegar e.name === 'NotFoundError' e lançar C.ErroUsuario explicando que o arquivo saiu da pasta e que é só tirar com o × e anexar de novo.
-- [ ] **entrada-017** [L] Desfazer o depósito responde "Comprovante removido"
+- [x] **entrada-017** [L] Desfazer o depósito responde "Comprovante removido"
   - Vê-se: Ao clicar em "Desfazer último depósito" (o depósito de 01/01/2027, que nem tinha comprovante), o depósito some e a mensagem é 'Comprovante removido: anexe o certo em "Incluir … e anexar comprovante"'. Não existe botão com esse nome e o que saiu foi o depósito…
   - Causa: `docs/js/telas/acoes.js:964-966; docs/js/telas/contrato.js:144`
   - Fazer: Quando sai um depósito, avisar "Depósito de R$ X de DD/MM/AAAA desfeito; falta R$ Y".
-- [ ] **mensal-020** [L] Desfazer o acordo pela página da parcela termina em "Boleto não encontrado"
+- [x] **mensal-020** [L] Desfazer o acordo pela página da parcela termina em "Boleto não encontrado"
   - Vê-se: Na página do boleto "acordo 1/3" da Beatriz cliquei em "Desfazer o acordo" e confirmei. Apareceu o aviso verde "Acordo desfeito: os boletos originais voltaram a ser cobrados" e, logo abaixo, a tela "Boleto não encontrado. O endereço pode ser antigo ou o regis…
   - Causa: `docs/js/telas/acoes.js:1453-1457 (mostrar() na mesma rota) e docs/js/regras.js:7121`
   - Fazer: Depois de desfazer, ir para o boleto original mais antigo (ou para a Inadimplência).
-- [ ] **mensal-021** [L] Ao anexar o termo do acordo assinado o aviso diz "Comprovante anexado" e o arquivo se chama "comprovante-termo-acordo..."
+- [x] **mensal-021** [L] Ao anexar o termo do acordo assinado o aviso diz "Comprovante anexado" e o arquivo se chama "comprovante-termo-acordo..."
   - Vê-se: Anexei o termo do acordo assinado na etapa "Termo do acordo assinado". O aviso foi "Comprovante anexado." e o arquivo ficou gravado como "comprovante-termo-acordo-assinado-2026-11-19.pdf". Não é comprovante de pagamento; é o termo.
   - Causa: `docs/js/telas/acoes.js:874-879 e docs/js/telas/cadastros.js:76 (nomeComprovante)`
   - Fazer: Aviso e nome do arquivo conforme o tipo do anexo (ex.: "Termo assinado anexado.").
-- [ ] **mensal-030** [L] Aviso manda clicar em "Numerar estas NFs", botão que não existe (o nome é "Numerar as NFs marcadas")
+- [x] **mensal-030** [L] Aviso manda clicar em "Numerar estas NFs", botão que não existe (o nome é "Numerar as NFs marcadas")
   - Vê-se: Depois de "Voltar a última numeração" ou de desfazer a partir de um número, o aviso diz: "Corrija o que precisar … e clique em "Numerar estas NFs"". O botão da tela chama "Numerar as NFs marcadas".
   - Causa: `docs/js/telas/acoes.js:1624 e docs/js/telas/envios.js:546 contra docs/js/telas/faturas.js:74`
   - Fazer: Trocar o nome do botão nos dois avisos.
-- [ ] **mensal-035** [L] Guia do IPTU pode ser marcada como paga com data no futuro
+- [x] **mensal-035** [L] Guia do IPTU pode ser marcada como paga com data no futuro
   - Vê-se: Na janela "Marcar a guia do IPTU como paga" a data 05/05/2027 foi aceita sem pergunta: a guia saiu das "Guias suas a pagar" como paga em 05/05/2027. Nas outras telas (pagamento de boleto) data futura é recusada.
   - Causa: `docs/js/telas/acoes.js:1590-1598; docs/js/regras.js:1642-1652`
   - Fazer: Antes de gravar, recusar (ou perguntar) data depois de hoje, com dataNoFuturo/confirmar; pôr max=hoje no campo da janela.
-- [ ] **mensal-037** [L] Histórico mostra "Exclusão · Seguro" e "Exclusão · IPTU" sem dizer qual nem de quem
+- [x] **mensal-037** [L] Histórico mostra "Exclusão · Seguro" e "Exclusão · IPTU" sem dizer qual nem de quem
   - Vê-se: Ao excluir uma apólice, um IPTU ou um boleto pelo botão da página, a linha do Histórico fica só "Exclusão · Seguro" (ou "· IPTU", "· Boleto"), sem a seguradora, o ano, o mês nem o inquilino/imóvel. A inclusão do mesmo seguro tinha o texto completo ("Seguro ob…
   - Causa: `docs/js/telas/acoes.js:1113; docs/js/regras.js:674-679`
   - Fazer: Na exclusão, montar a descrição pelo cadastro (a mesma função descricao de CADASTROS) ou por tabela, com o inquilino/imóvel (ex.: "Seguro Outra, vigência ... · Carlos Em Dia").
-- [ ] **saida-031** [L] Excluir o termo aditivo do vencimento não volta o dia do vencimento nem os boletos
+- [x] **saida-031** [L] Excluir o termo aditivo do vencimento não volta o dia do vencimento nem os boletos
   - Vê-se: Ao anexar o termo assinado (dia 10 → dia 15) o cadastro e os boletos em aberto mudam. Se o termo for excluído depois (anexado por engano), o contrato continua no dia 15 e os boletos também; nada avisa. E como o termo sumiu, os boletos antigos gerados de novo …
   - Causa: `docs/js/telas/acoes.js:211 (aditivos: depois = só marcarAditivos); docs/js/regras.js:4706-4719 (aplicarAditivoVencimento não tem o caminho de volta); regras.js:4695-4700 (vencimentoDoContrato depende de o termo existir)`
+  - Feito (20/11): o mínimo pedido, a pergunta da exclusão avisa que o dia do vencimento continua o novo e manda corrigir em "Editar" (cadastro e boletos não voltam sozinhos).
   - Fazer: Ao excluir termo do tipo Vencimento já assinado, voltar o cadastro ao dia_anterior e os boletos em aberto a partir do 1º vencimento (ou, no mínimo, avisar na pergunta que o dia do vencimento precisa ser corrigido à mão).
-- [ ] **saida-043** [L] Termo da troca de titular (ou do novo valor) já assinado pode ser excluído sem aviso, e o que ele mudou continua valendo
+- [x] **saida-043** [L] Termo da troca de titular (ou do novo valor) já assinado pode ser excluído sem aviso, e o que ele mudou continua valendo
   - Vê-se: A exclusão de termo aditivo não confere nada. Excluir o termo da troca de titular assinado depois que o contrato já passou ao novo titular apaga o arquivo; a troca continua feita e o Painel volta a cobrar "falta o termo aditivo da troca". Excluir o termo do n…
   - Causa: `docs/js/telas/acoes.js:211 (aditivos sem checar); pergunta em docs/js/telas/contrato.js:737; docs/js/regras.js:3452 (aditivoDaTroca) e 4026-4030 (o alerta volta); regras.js:3458 (com heranca_transferida a troca não se desfaz)`
   - Fazer: Manter a exclusão, mas com pergunta própria: termo da troca com a troca já feita (heranca_transferida) ou termo do novo valor em vigor: avisar que a troca ou o valor continuam valendo e que o termo assinado terá de ser anexado de novo.
   - Atenção (conferente): A exclusão de termo aditivo não tem conferência nenhuma. A pergunta avisa só que "o arquivo assinado também é apagado" (o achado diz "sem aviso": há esse aviso, mas nada sobre a troca). Excluir o termo da troca de titular depois de o contrato já ter passado apaga o arquivo, a troca continua valendo e o Painel volta a …
-- [ ] **impressos-009** [L] Botão "Voltar" não faz nada na tela de impressão aberta em aba nova
+- [x] **impressos-009** [L] Botão "Voltar" não faz nada na tela de impressão aberta em aba nova
   - Vê-se: O botão "Imprimir todas as NFs de 01/2026" abre a tela de impressão numa aba nova. Nessa aba, o botão "Voltar" só manda o navegador "voltar uma página", e como a aba acabou de abrir não há página anterior: clicar em "Voltar" não faz nada. O mesmo vale para qu…
   - Causa: `docs/js/telas/acoes.js:1085 (voltar: () => history.back()); docs/js/telas/documentos.js:22; docs/js/telas/faturas.js:87`
   - Fazer: Quando não houver página anterior (history.length <= 1), ir para a tela de origem (ex.: #/faturas?mes=...) em vez de history.back().
-- [ ] **comunicacoes-025** [L] Anexar vários arquivos de uma vez com um tipo proibido no meio: os primeiros ficam gravados, mas a tela mostra só o erro
+- [x] **comunicacoes-025** [L] Anexar vários arquivos de uma vez com um tipo proibido no meio: os primeiros ficam gravados, mas a tela mostra só o erro
   - Vê-se: Escolhendo 3 arquivos (ex.: RG.pdf, planta.svg, Serasa.pdf), o sistema grava o RG.pdf, para no planta.svg com "Este tipo de arquivo não pode ser anexado…" e não continua: o Serasa.pdf não é anexado, o RG.pdf já está na pasta mas a lista não é atualizada e o H…
   - Causa: `docs/js/telas/acoes.js:2067-2077; docs/js/armazenamento.js:207`
   - Fazer: Conferir todos os nomes antes de gravar o primeiro, ou tratar o erro por arquivo e mostrar o resumo (anexados e recusados), com Histórico e lista atualizados.
-- [ ] **iphone-016** [L] Mensagens mandam usar "Ctrl+C" também no celular
+- [x] **iphone-016** [L] Mensagens mandam usar "Ctrl+C" também no celular
   - Vê-se: Quando o navegador não deixa copiar sozinho, os avisos dizem: "Não deu para copiar sozinho. Selecione e copie (Ctrl+C): …", "O navegador não deixou copiar: selecione o texto e use Ctrl+C." e "o endereço ficou selecionado, use Ctrl+C." No celular não existe Ct…
   - Causa: `docs/js/telas/acoes.js:1358; docs/js/telas/emails.js:151 e 255`
+  - Feito (20/11): já estava corrigido na base (nenhum "Ctrl+C" sobrou em docs/js).
   - Fazer: Trocar por texto neutro: "selecione o texto e copie".
-- [ ] **iphone-017** [L] "Copiar texto" do lembrete de cobrança não avisa quando a cópia falha
+- [x] **iphone-017** [L] "Copiar texto" do lembrete de cobrança não avisa quando a cópia falha
   - Vê-se: Os outros botões de copiar do sistema têm um plano B (selecionam o texto e avisam). O "Copiar texto" da janela "Cobrar o inquilino" não tem: se o navegador recusar a cópia, o botão não muda para "Copiado ✓" e nenhuma mensagem aparece; a pessoa cola no WhatsAp…
   - Causa: `docs/js/telas/acoes.js:628-632`
   - Fazer: Usar a mesma rotina de ACOES.copiar (acoes.js:1350-1359) nesse botão, ou pôr try/catch com texto.select() e aviso.

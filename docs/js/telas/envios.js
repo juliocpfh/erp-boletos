@@ -586,7 +586,7 @@ export const FORMULARIOS = {
     const n = Number(new FormData(form).get('numero'));
     if (!(await confirmar(`Todas as NFs com este número ou maior saem da lista (ficam no Histórico), os pagamentos voltam para a fila e o próximo número volta a ser ${R.numeroFatura(n)}.`, { titulo: `Desfazer a numeração a partir da NF nº ${R.numeroFatura(n)}?`, sim: 'Desfazer a numeração', forte: true }))) return;
     const qtd = await alterar((db) => R.desfazerNumeracao(db, n, login()));
-    aviso(`${qtd} número(s) desfeito(s). Corrija o que precisar e clique em "Numerar estas NFs".`);
+    aviso(`${qtd} número(s) desfeito(s). Corrija o que precisar e clique em "Numerar as NFs marcadas".`);
     await mostrar();
   },
   async nfExterna(form) {

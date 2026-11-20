@@ -212,9 +212,54 @@ async function pdfNaLarguraDaFolha(el, rodape, opcoes) {
   }
 }
 
+/**
+ * Por que o contrato não pode ser excluído (texto) ou null (mutirão 19/11, saida-008/034/035): NF emitida; boleto emitido no
+ * C6 e em aberto no banco (o inquilino ainda pode pagá-lo); movimentação do extrato ligada a um boleto dele (ficaria apontando
+ * para um boleto apagado); contrato que continua com o novo titular numa troca (o novo perderia o que herda dele).
+ */
+export function motivoNaoExcluirContrato(db, r) {
+  const boletos = db.cobrancas.filter((cb) => cb.contrato_id === r.id);
+  if (boletos.some((cb) => R.faturasDe(db, 'cobranca', cb.id, false).length)) return 'Este contrato tem NFs emitidas e não pode ser excluído.';
+  if (boletos.some((cb) => cb.banco && cb.banco.situacao === 'emitido')) return 'Este contrato tem boleto emitido no C6 e em aberto no banco. Cancele no banco antes de excluir.';
+  const ids = new Set(boletos.map((cb) => cb.id));
+  if ((db.movimentacoes_banco || []).some((m) => m.cobranca_id && ids.has(m.cobranca_id))) return 'Este contrato tem boletos ligados ao extrato: desfaça o destino das movimentações na tela Banco antes.';
+  const novo = R.continuadoPor(db, r);
+  if (novo) return `Este contrato continua com ${novo.inquilino_nome} (troca de titular): exclua antes o contrato do novo titular.`;
+  return null;
+}
+
+/**
+ * Texto do Histórico na exclusão pelo botão da página: o mesmo da inclusão (``descricao`` de CADASTROS) com o inquilino ou o
+ * imóvel (mutirão 19/11, mensal-037). Ex.: "Seguro obrigatório: Outra, vigência 01/01/2026 a 31/12/2026 · Carlos Em Dia".
+ */
+export function descricaoDaExclusao(db, tabela, reg) {
+  let t = null;
+  if (tabela === 'fichas') return `Ficha de ${reg.inquilino_nome}`;
+  if (tabela === 'cobrancas') t = `Boleto de ${compBr(reg.competencia)}`;
+  else { try { t = (CADASTROS[tabela] && CADASTROS[tabela].descricao) ? CADASTROS[tabela].descricao(reg, reg, { contrato: reg.contrato_id, imovel: reg.imovel_id }) : null; } catch { t = null; } }
+  t = t || reg.nome || reg.descricao || null;
+  const c = reg.contrato_id ? R.buscar(db, 'contratos', reg.contrato_id) : null;
+  const im = !c && reg.imovel_id ? R.buscar(db, 'imoveis', reg.imovel_id) : null;
+  const quem = c ? c.inquilino_nome : im ? im.nome : '';
+  if (!t) return quem ? `${R.TABELAS[tabela] || tabela} · ${quem}` : null;
+  return quem && !String(t).includes(quem) ? `${t} · ${quem}` : t;
+}
+
+/** Tela de onde vem uma impressão (para o "Voltar" da aba nova). Ex.: #/imprimir/faturas?mes=2026-01 → #/faturas?mes=2026-01. */
+export function origemDaImpressao(hash) {
+  const [caminho, consulta = ''] = String(hash || '').replace(/^#\/?/, '').split('?');
+  const q = new URLSearchParams(consulta);
+  const tela = caminho.split('/')[1] || '';
+  if (tela === 'faturas') return q.get('mes') ? `#/faturas?mes=${q.get('mes')}` : '#/faturas';
+  if (tela === 'demonstrativos' && q.get('comp')) return `#/cobrancas?comp=${q.get('comp')}`;
+  if (/^\d+$/.test(q.get('contrato') || '')) return `#/contrato/${q.get('contrato')}`;
+  if (/^\d+$/.test(q.get('ficha') || '')) return `#/ficha/${q.get('ficha')}`;
+  return '#/';
+}
+
 const TABELAS_EXCLUSAO = {
   imoveis: { admin: true, checar: (db, r) => motivoNaoExcluirImovel(db, r), voltar: () => '#/imoveis' },
-  contratos: { admin: true, checar: (db, r) => (db.cobrancas.some((cb) => cb.contrato_id === r.id && R.faturasDe(db, 'cobranca', cb.id, false).length) ? 'Este contrato tem NFs emitidas e não pode ser excluído.' : null), voltar: (r) => (r.imovel_id ? `#/imovel/${r.imovel_id}` : '#/inquilinos') },
+  contratos: { admin: true, checar: (db, r) => motivoNaoExcluirContrato(db, r), voltar: (r) => (r.imovel_id ? `#/imovel/${r.imovel_id}` : '#/inquilinos') },
   cobrancas: { checar: (db, r) => (R.emAcordo(r) || R.ehParcelaAcordo(r) ? 'Este boleto faz parte de um acordo: use "Desfazer o acordo" na página do boleto.' : R.faturasDe(db, 'cobranca', r.id, false).length ? 'Este boleto tem NF. Desfaça o pagamento antes.' : r.banco && r.banco.situacao === 'emitido' ? 'Este boleto foi emitido no C6 e está em aberto no banco. Cancele no banco antes de excluir.' : R.motivoNaoExcluirParcelaCaucao(db, r)),
     // parcela do complemento da caução: as outras (em aberto) saem juntas e o complemento volta a "Caução a completar"
     depois: (db, r) => R.excluirParcelasIrmas(db, r, login()), voltar: (r) => `#/cobrancas?comp=${r.competencia}` },
@@ -237,7 +282,9 @@ const TABELAS_EXCLUSAO = {
   // a devolução da troca de titular descontava boletos em aberto: eles voltam a ser cobrados
   devolucoes_garantia: { depois: (db, r) => R.liberarBoletosDaDevolucao(db, r.id, login()), voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },
   // ficha: só o administrador exclui; os documentos da pasta dela saem juntos (ACOES.excluir)
-  fichas: { admin: true, checar: (db, r) => (db.contratos.some((c) => c.ficha_id === r.id) ? 'Esta ficha já virou contrato e não pode ser excluída.' : null), voltar: () => '#/inquilinos?ir=fichas' },
+  // reserva recebida e não devolvida: o registro e o comprovante do dinheiro de terceiro sumiriam (mutirão 19/11, entrada-023)
+  fichas: { admin: true, checar: (db, r) => (db.contratos.some((c) => c.ficha_id === r.id) ? 'Esta ficha já virou contrato e não pode ser excluída.'
+    : r.reserva_valor > 0 && (r.reserva_data || r.comprovante_reserva) && !r.devolucao_data ? `Esta ficha tem reserva de ${reais(r.reserva_valor)} recebida e não devolvida: registre a devolução da reserva antes de excluir.` : null), voltar: () => '#/inquilinos?ir=fichas' },
   depositos_garantia: { depois: (db, r) => (r.complementar ? null : R.acertarGarantiaDepositada(db, r.contrato_id, r.qual, login())), voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },
   despesas: { checar: (db, r) => (r.movimentacao_id || r.pagamento_banco_id ? 'Esta conta veio do banco: desfaça o destino da movimentação na tela Banco.' : null) },
   ganhos_airbnb: {
@@ -661,10 +708,12 @@ function janelaMensagem(titulo, l, topo = '') {
         texto.addEventListener('input', atualizar);
         atualizar();
         if (!tel) zap.addEventListener('click', (ev) => { ev.preventDefault(); aviso('Este inquilino não tem telefone no cadastro.', 'aviso'); });
+        // a mesma rotina dos outros botões de copiar: com plano B e aviso se o navegador recusar (iphone-017)
         dlg.querySelector('[data-copiar-lembrete]').addEventListener('click', async (ev) => {
-          await navigator.clipboard.writeText(texto.value);
-          ev.target.textContent = 'Copiado ✓';
-          setTimeout(() => { ev.target.textContent = 'Copiar texto'; }, 1500);
+          try { await ACOES.copiar({ texto: texto.value }, ev.target); } catch {
+            texto.select();
+            aviso('O navegador não deixou copiar: o texto ficou selecionado, copie e cole na mensagem.', 'aviso');
+          }
         });
       } });
 }
@@ -909,9 +958,12 @@ export const ACOES = {
   /** Comprovante de depósito que faltava: grava na pasta do inquilino e liga ao registro (some o alerta). */
   async anexarComprovante({ contrato, tabela, id, campo, tipo, data }, el) {
     const arq = el.files[0];
-    const nome = await S.salvarArquivo(await pastaDoEscopo('contrato', Number(contrato)), new File([arq], nomeComprovante(tipo, data, arq)));
+    // termo assinado (acordo, quitação, chaves) e contra-vistoria não são comprovante de pagamento: nome e aviso próprios (mensal-021)
+    const termo = /^(termo-|contra-vistoria)/.test(String(tipo || ''));
+    const nomeNovo = termo ? `${tipo}-${data || C.hojeIso()}${extensao(arq.name)}` : nomeComprovante(tipo, data, arq);
+    const nome = await S.salvarArquivo(await pastaDoEscopo('contrato', Number(contrato)), new File([arq], nomeNovo));
     await alterar((db) => R.anexarComprovante(db, tabela, Number(id), campo, nome, login()));
-    aviso('Comprovante anexado.');
+    aviso(!termo ? 'Comprovante anexado.' : /^contra-vistoria/.test(tipo) ? 'Contra-vistoria anexada.' : 'Termo assinado anexado.');
     await mostrar();
   },
 
@@ -998,8 +1050,13 @@ export const ACOES = {
   },
 
   async removerComprovanteGarantia({ contrato, qual }) {
+    const c = buscar('contratos', contrato);
+    const ultimo = c && c[`${qual}_por_depositos`] ? R.depositosGarantiaDo(d(), c, qual).filter((x) => !x.complementar).pop() : null;
     await alterarApagandoAnexos((db) => R.removerComprovanteGarantia(db, Number(contrato), qual, login()));
-    aviso('Comprovante removido: anexe o certo em "Incluir … e anexar comprovante".');
+    // paga em depósitos: saiu o último depósito, não só o comprovante (entrada-017)
+    const depois = ultimo && buscar('contratos', contrato);
+    if (ultimo) aviso(`Depósito de ${reais(ultimo.valor)} de ${dataBr(ultimo.data)} desfeito${depois ? `; falta ${reais(R.garantiaADepositar(d(), depois, qual).falta)}` : ''}.`);
+    else aviso('Comprovante removido: anexe o certo na garantia (o aviso para anexar volta a aparecer).');
     await mostrar();
   },
 
@@ -1118,7 +1175,8 @@ export const ACOES = {
     });
     await mostrar();
   },
-  voltar: () => history.back(),
+  // tela de impressão aberta em aba nova não tem página anterior: vai à tela de origem (impressos-009)
+  voltar: () => (history.length > 1 ? history.back() : ir(origemDaImpressao(location.hash))),
 
   async excluir({ tabela, id }) {
     const cfg = TABELAS_EXCLUSAO[tabela] || {};
@@ -1144,7 +1202,7 @@ export const ACOES = {
         for (const t of TABELAS_DO_IMOVEL) db[t].filter((p) => p.imovel_id === reg.id).forEach((p) => R.excluir(db, t, p.id, login()));
       }
       if (tabela === 'contratos') R.excluirContrato(db, reg.id, login());
-      else R.excluir(db, tabela, reg.id, login(), reg.nome || reg.descricao || (tabela === 'fichas' ? `Ficha de ${reg.inquilino_nome}` : null));
+      else R.excluir(db, tabela, reg.id, login(), descricaoDaExclusao(db, tabela, reg));
       if (cfg.recalcular) R.recalcularCobrancas(db, cfg.recalcular(db, reg), login());
       if (cfg.depois) cfg.depois(db, reg);
     });
@@ -1503,8 +1561,17 @@ export const ACOES = {
   },
 
   async desfazerAcordo({ id }) {
+    const a = buscar('acordos', id);
+    const origens = a ? R.origensDoAcordo(d(), a).map((cb) => cb.id) : [];
     await alterar((db) => R.desfazerAcordo(db, id, login()));
     aviso('Acordo desfeito: os boletos originais voltaram a ser cobrados.', 'ok');
+    // na página da parcela do acordo (que foi excluída): vai ao boleto original mais antigo (links-pc-002 = mensal-020)
+    const [, tela, idDaTela] = location.hash.split('?')[0].split('/');
+    if (tela === 'cobranca' && !buscar('cobrancas', Number(idDaTela))) {
+      if (origens.length && buscar('cobrancas', origens[0])) ir(`#/cobranca/${origens[0]}`);
+      else ir(a ? `#/contrato/${a.contrato_id}` : '#/inquilinos');
+      return;
+    }
     await mostrar();
   },
 
@@ -1640,11 +1707,13 @@ export const ACOES = {
     }
     if (!data) {
       const r = await janela({ titulo: 'Marcar a guia do IPTU como paga', sim: 'Marcar como paga', nao: 'Cancelar',
-        html: `<p>${esc(texto || '')}</p><label>Pago em</label><input type="date" name="data" value="${C.hojeIso()}" required>${atalhosData()}` });
+        html: `<p>${esc(texto || '')}</p><label>Pago em</label><input type="date" name="data" value="${C.hojeIso()}" max="${C.hojeIso()}" required>${atalhosData()}` });
       if (!r) return;
       data = String((r.data || [])[0] || '');
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new C.ErroUsuario('Informe a data do pagamento.');
+    // pagamento ainda não feito não se marca (mensal-035): como no pagamento do boleto, data depois de hoje é recusada
+    if (data > C.hojeIso()) throw new C.ErroUsuario(`A data do pagamento (${dataBr(data)}) é depois de hoje: marque a guia como paga quando ela for paga.`);
     await alterar((db) => R.marcarIptuPago(db, Number(id), Number(n), data, login()));
     aviso('Parcela do IPTU marcada como paga.');
     await mostrar();
@@ -1673,7 +1742,7 @@ export const ACOES = {
   async desfazerUltimaNumeracao() {
     if (!podeUsuario('admin')) throw new C.ErroUsuario(SO_ADMIN_NUMERACAO);
     const ciclo = await alterar((db) => R.desfazerUltimaNumeracao(db, login()));
-    aviso(`Numeração nº ${R.numeroFatura(ciclo.de)} a ${R.numeroFatura(ciclo.ate)} desfeita. Corrija o que precisar, inclua o que faltou e clique em "Numerar estas NFs".`);
+    aviso(`Numeração nº ${R.numeroFatura(ciclo.de)} a ${R.numeroFatura(ciclo.ate)} desfeita. Corrija o que precisar, inclua o que faltou e clique em "Numerar as NFs marcadas".`);
     await mostrar();
   },
 
@@ -1953,7 +2022,7 @@ export const ACOES = {
       }
     }
     // 2) entradas e saídas das contas desta empresa no mês, com o destino de cada uma
-    const contas = (E.d.config_banco.contas || []).filter((c) => c.emitente_id === e.id).map((c) => c.id);
+    const contas = R.contasDoExtrato(E.d).filter((c) => c.emitente_id === e.id).map((c) => c.id);
     const movs = (E.d.movimentacoes_banco || []).filter((m) => contas.includes(m.conta_id) && String(m.data).slice(0, 7) === mes).sort((a, b) => a.data.localeCompare(b.data) || a.id - b.id);
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Movimentações');
@@ -2123,19 +2192,36 @@ export const ACOES = {
   async enviarArquivos({ upload }, el) {
     const [escopo, id] = upload.split(':');
     if (escopo === 'seguro') return enviarArquivosSeguro(Number(id), el);
+    // tipo proibido no meio da escolha: confere todos antes de gravar o primeiro e anexa só os aceitos (comunicacoes-025)
+    const todos = [...el.files];
+    const recusados = todos.filter((f) => !S.nomeAnexavel(f.name)).map((f) => f.name);
+    const aceitos = todos.filter((f) => S.nomeAnexavel(f.name));
+    if (!aceitos.length) throw new C.ErroUsuario(`Nada foi anexado (${recusados.join(', ')}). ${S.ERRO_TIPO_ARQUIVO}`);
     const dir = await pastaDoEscopo(escopo, Number(id));
     const nomes = [];
-    for (const f of el.files) nomes.push(await S.salvarArquivo(dir, escopo === 'matricula' && !ehMatricula(f.name) ? new File([f], `Matricula ${f.name}`, { type: f.type }) : f));
     const vinc = vinculoDoEscopo(escopo, id);
-    await alterar((db) => R.registrar(db, login(), 'Inclusão', 'arquivos', null, `${nomes.length} arquivo(s) anexado(s)`, { arquivos: nomes.join(', ') }, vinc));
-    aviso(`${nomes.length} arquivo(s) anexado(s).`);
+    const registrar = () => alterar((db) => R.registrar(db, login(), 'Inclusão', 'arquivos', null, `${nomes.length} arquivo(s) anexado(s)`, { arquivos: nomes.join(', ') }, vinc));
+    try {
+      for (const f of aceitos) nomes.push(await S.salvarArquivo(dir, escopo === 'matricula' && !ehMatricula(f.name) ? new File([f], `Matricula ${f.name}`, { type: f.type }) : f));
+    } catch (e) {
+      // o que já foi gravado entra no Histórico e na lista mesmo se um arquivo do meio falhar
+      if (nomes.length) { await registrar(); await mostrar(); }
+      throw e;
+    }
+    await registrar();
+    aviso(`${nomes.length} arquivo(s) anexado(s).${recusados.length ? ` Não anexado(s), tipo de arquivo não aceito: ${recusados.join(', ')}.` : ''}`, recusados.length ? 'aviso' : undefined);
     await mostrar();
   },
 
   // Só PDF e fotos abrem na aba nova, com o tipo forçado (o tipo do arquivo em disco vem da extensão e não é confiável):
   // um .html/.svg anexado abriria como página na origem do sistema, com acesso à sessão e à pasta. Os outros tipos são baixados.
   async abrirArquivo({ escopo, id, nome }) {
-    const arq = await S.abrirArquivo(await pastaDoEscopo(escopo, Number(id)), nome);
+    let arq;
+    try { arq = await S.abrirArquivo(await pastaDoEscopo(escopo, Number(id)), nome); } catch (e) {
+      // arquivo apagado ou movido da pasta por fora do sistema: explica em vez do erro do navegador em inglês (links-pc-009)
+      if (e && e.name === 'NotFoundError') throw new C.ErroUsuario(`O arquivo "${nome}" não está mais na pasta (foi apagado ou movido por fora do sistema). Tire-o com o × e anexe de novo.`);
+      throw e;
+    }
     const tipo = S.tipoParaAbrir(nome);
     if (!tipo) return baixar(arq, nome);
     if (await noVisualizador(arq, nome, tipo)) return; // celular: mostra na tela em vez de baixar
