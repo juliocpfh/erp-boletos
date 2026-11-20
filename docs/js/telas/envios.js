@@ -163,7 +163,7 @@ export const FORMULARIOS = {
       const texto = String(f[`valor_${n}`] || '').trim();
       return { tipo: f[`tipo_${n}`], valor: texto ? C.centavos(texto) : null, data_pagamento: f[`data_${n}`], vencimento: f[`venc_${n}`] || null, observacoes: String(f[`obs_${n}`] || '').trim() };
     });
-    if (!f.competencia) throw new C.ErroUsuario('Informe o mês da conta.');
+    if (!f.competencia) throw new C.ErroUsuario('Informe o mês de referência da conta.');
     // data do pagamento no futuro tira a conta dos Resultados do mês (entra pela data do pagamento): pergunta antes
     await confirmarAvisos(linhas.filter((l) => l.valor !== null).map((l) => dataNoFuturo(l.data_pagamento, `${l.tipo}: a data do pagamento`)).filter(Boolean));
     let n = 0;

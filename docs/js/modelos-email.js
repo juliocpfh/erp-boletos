@@ -227,15 +227,17 @@ Receber as chaves não dá quitação: o acerto final vem em seguida.`,
   {
     chave: 'saida_calculo', nome: 'Acerto final', etapa: 'Cálculo final',
     assunto: 'Acerto final do contrato – {imovel}',
-    anexos: 'Cálculo final e comprovantes (PDF)',
+    anexos: 'Cálculo final e comprovantes (PDF)', prontos: ['boleto:pdf', 'boleto:pix'], // o boleto do saldo, quando emitido no C6
     texto: `Olá, {nome},
 
 Segue o acerto final do contrato do imóvel da {imovel}:
 
 {acerto}
 
-[se devolver]De acordo? Informe a chave Pix ou a conta em seu nome: devolvemos em até 5 dias úteis da sua resposta.[fim][se cobrar]Falta pagar o saldo de {saldo}: deposite ou faça o Pix na conta abaixo e responda com o comprovante.
-{conta_deposito}[fim]
+[se devolver]De acordo? Informe a chave Pix ou a conta em seu nome: devolvemos em até 5 dias úteis da sua resposta.[fim][se cobrar][se boleto_saldo]Segue o boleto do saldo de {saldo}, com vencimento em {boleto_saldo_vencimento}.[se boleto_saldo_linha]
+Linha digitável: {boleto_saldo_linha}[fim][se boleto_saldo_pix]
+Pix copia e cola: {boleto_saldo_pix}[fim][senão]Falta pagar o saldo de {saldo}: deposite ou faça o Pix na conta abaixo e responda com o comprovante.
+{conta_deposito}[fim][fim]
 
 Discorda de algum item? Responda em até 5 dias úteis com o motivo.`,
   },
@@ -357,6 +359,9 @@ export const ATUALIZACOES_EMAIL = [
     '[se dinheiro][se garantia_depositada] Recebemos também a {tipo_deposito} de {valor_deposito} (recibo e comprovante anexos).[senão] Falta o depósito da {tipo_deposito} de {valor_deposito}: mande o comprovante por este e-mail.[fim][fim]'],
   ['saida_calculo', '[se cobrar]Segue o boleto do saldo, com o vencimento nele.[fim]',
     '[se cobrar]Falta pagar o saldo de {saldo}: deposite ou faça o Pix na conta abaixo e responda com o comprovante.\n{conta_deposito}[fim]'],
+  // boleto do saldo da saída (decisão do dono, 2026-11-20): com o boleto gerado, o e-mail volta a dizer "Segue o boleto do saldo"
+  ['saida_calculo', '[se cobrar]Falta pagar o saldo de {saldo}: deposite ou faça o Pix na conta abaixo e responda com o comprovante.\n{conta_deposito}[fim]',
+    '[se cobrar][se boleto_saldo]Segue o boleto do saldo de {saldo}, com vencimento em {boleto_saldo_vencimento}.[se boleto_saldo_linha]\nLinha digitável: {boleto_saldo_linha}[fim][se boleto_saldo_pix]\nPix copia e cola: {boleto_saldo_pix}[fim][senão]Falta pagar o saldo de {saldo}: deposite ou faça o Pix na conta abaixo e responda com o comprovante.\n{conta_deposito}[fim][fim]'],
 ];
 
 /** Aplica ATUALIZACOES_EMAIL num texto gravado do modelo ``chave``. */

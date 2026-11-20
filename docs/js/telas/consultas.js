@@ -148,7 +148,7 @@ export function telaIptu(ano) {
     if (pc && pc.avistaMes !== undefined) return quadradoAvista(pc, p, mes);
     if (!pc) return `<span class="q q-vazio" title="${rotuloMes(mes)}: sem parcela"></span>`;
     const nome = `${rotuloMes(mes)} · ${pc.n === 0 ? 'cota única' : pc.avista ? pc.rotulo : `${pc.rotulo} parcela`}`;
-    if (!pc.proprietario) return `<span class="q q-inq" title="${nome}: inquilino paga ${reais(pc.valor)} no boleto"></span>`;
+    if (!pc.proprietario) return `<span class="q q-inq" title="${nome}: inquilino paga ${reais(pc.valorCobrado ?? pc.valor)} no boleto"></span>`;
     // cota única paga por você; no mesmo mês pode haver um boleto do inquilino com a parcela (IPTU à vista repassado)
     const inq = pc.valorInquilino ? ` (inquilino ${reais(pc.valorInquilino)})` : pc.avista ? ` · inquilino paga ${reais(pc.avista.valor)} no boleto (${pc.avista.rotulo})` : '';
     const venc = pc.vencimento ? ` · vence ${dataBr(pc.vencimento)}` : '';
@@ -242,7 +242,7 @@ export function telaIptu(ano) {
     ${linhas ? `<h3>Resumo de ${ano}</h3><table class="compacta resumo-iptu">
       <tr><td>Inquilinos pagam nos boletos</td><td class="n nw"><b>${reais(soma.inquilino)}</b></td></tr>
       <tr><td>Você paga à prefeitura (guias e cotas únicas)</td><td class="n nw"><b>${reais(soma.custo)}</b></td></tr>
-      <tr><td>Sobra para você <span class="suave">(desconto do IPTU pago à vista: o inquilino paga parcelado)</span></td><td class="n nw"><b>${reais(soma.sobra)}</b></td></tr>
+      <tr><td>Sobra para você <span class="suave">(desconto do IPTU pago à vista, ou parcela arredondada para cima: o inquilino paga o valor do boleto e você paga a guia real)</span></td><td class="n nw"><b>${reais(soma.sobra)}</b></td></tr>
       <tr><td>Fica por sua conta <span class="suave">(imóvel vazio, mês de entrada ou saída, IPTU não cobrado)</span></td><td class="n nw"><b>${reais(soma.parte)}</b></td></tr>
       <tr><td>Em aberto <span class="suave">(guias suas ainda não pagas)</span></td><td class="n nw">${soma.aberto ? `<b class="texto-perigo">${reais(soma.aberto)}</b>` : reais(0)}</td></tr>
       <tr class="total"><td>${soma.sua < 0 ? 'Resultado: sobra para você' : 'Resultado: sai do seu bolso'}</td><td class="n nw">${reais(Math.abs(soma.sua))}</td></tr></table>` : ''}

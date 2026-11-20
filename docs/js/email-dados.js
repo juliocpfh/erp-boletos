@@ -158,6 +158,9 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
   const doImovel = c || { imovel_id: imoveis[0] ? imoveis[0].id : null };
   const contas = contasDoInquilino(d, base, doImovel, imoveis[0]);
   const e = c ? R.encerramentoDo(d, c.id) : null;
+  // boleto do saldo da saída (2026-11-20): o e-mail do acerto final diz "Segue o boleto do saldo" quando ele existe e está em aberto
+  const bs = e && e.saldo < 0 ? R.boletoDoSaldo(d, e) : null;
+  const boletoSaldo = bs && !bs.data_pagamento ? bs : null;
   const fim = c ? R.fimDoContrato(d, c) : null;
   const inicio = c ? (c.data_entrada || c.vigencia_inicio) : null;
   const r = { ...respostasPadrao(d, c, hoje), ...(f && f.prazo_meses ? { prazo: `${f.prazo_meses} meses` } : {}), ...Object.fromEntries(Object.entries(respostas).filter(([, v]) => v !== undefined && v !== null && v !== '')) };
@@ -177,6 +180,9 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
     primeiro_boleto: c ? primeiroBoleto(d, c) : '', data_chaves: chaves ? C.dataBr(chaves) : '',
     data_limite_vistoria: chaves ? C.dataBr(C.limiteVistoriaEntrada(chaves)) : '',
     data_saida: c && c.data_saida ? C.dataBr(c.data_saida) : '', ano_saida: c && c.data_saida ? c.data_saida.slice(0, 4) : String(Number(hoje.slice(0, 4))),
+    boleto_saldo_vencimento: boletoSaldo ? C.dataBr(boletoSaldo.vencimento) : '',
+    boleto_saldo_linha: boletoSaldo && boletoSaldo.banco && R.emitidoNoBanco(boletoSaldo) ? boletoSaldo.banco.linha_digitavel || '' : '',
+    boleto_saldo_pix: boletoSaldo && boletoSaldo.banco && R.emitidoNoBanco(boletoSaldo) ? boletoSaldo.banco.pix_copia_cola || '' : '',
     acerto: textoAcerto(e), saldo: e ? C.reais(Math.abs(e.saldo || 0)) : '', data_devolucao: e && e.garantia_devolvida_em ? C.dataBr(e.garantia_devolvida_em) : '',
     informe: c ? textoInforme(d, c, ano) : '',
     prazo_assinatura: data(r.prazo_assinatura), opcoes_entrega: r.opcoes_entrega, data_aviso: data(r.data_aviso), data_vistoria: r.data_vistoria,
@@ -196,7 +202,9 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
     seguro_incendio: c ? c.conta_seguro === 'Por conta do inquilino' : (!f.conta_seguro || f.conta_seguro === 'Por conta do inquilino'),
     inclusos: inclusos.length > 0, iptu_valor: !!(f && f.iptu_estimado > 0), seguro_valor: !!(f && f.seguro_estimado > 0),
     saida_antecipada: !!(c && c.data_saida && c.prazo_tipo !== 'Indeterminado' && fim && c.data_saida < fim),
-    devolver: !!(e && e.saldo > 0), cobrar: !!(e && e.saldo < 0),
+    devolver: !!(e && e.saldo > 0), cobrar: !!(e && e.saldo < 0), boleto_saldo: !!boletoSaldo,
+    boleto_saldo_linha: !!(boletoSaldo && boletoSaldo.banco && R.emitidoNoBanco(boletoSaldo) && boletoSaldo.banco.linha_digitavel),
+    boleto_saldo_pix: !!(boletoSaldo && boletoSaldo.banco && R.emitidoNoBanco(boletoSaldo) && boletoSaldo.banco.pix_copia_cola),
     link: !!linkDaFicha(f, 'interessado', hoje).url, link_fiador: fiadoresLink.length > 0,
     garantia_depositada: !!c && REC.reciboDisponivel(d, 'garantia', { contrato: c }).ok,
     varios_fiadores: !!f && R.fiadoresDaFicha(f).length > 1,
@@ -271,7 +279,9 @@ export function anexosProntos(d, modelo, alvo) {
     }
     if (tipo === 'boleto') {
       // régua de cobrança: o PDF do boleto vem do C6 pela ponte na hora de enviar; o QR Code do Pix já está guardado no boleto
-      const cb = alvo.cobranca || null;
+      // e-mail do acerto final: o boleto do saldo da saída (2026-11-20), quando existe e está em aberto
+      const saldo = !alvo.cobranca && c ? R.boletoDoSaldo(d, R.encerramentoDo(d, c.id)) : null;
+      const cb = alvo.cobranca || (saldo && !saldo.data_pagamento ? saldo : null);
       const b = cb && cb.banco;
       if (!b || !R.emitidoNoBanco(cb)) continue;
       if (qual === 'pdf' && b.id_externo && !b.simulado) out.push({ tipo: 'boleto', qual, id: cb.id, nome: `boleto-${cb.competencia}.pdf`, rotulo: 'boleto do C6 (PDF)' });

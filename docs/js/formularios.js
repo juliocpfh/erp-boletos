@@ -158,6 +158,12 @@ export const RESSARCIMENTO = [
 export const CONTAS = [['conta_agua', 'Água'], ['conta_energia', 'Energia'], ['conta_gas', 'Gás'], ['conta_internet', 'Internet / TV'], ['conta_condominio', 'Condomínio']];
 export const SITUACOES_CONTA = ['Por conta do inquilino', 'Incluso no aluguel', 'Não tem'];
 /**
+ * Seguro contra incêndio: sempre existe (obrigatório por lei; decisão do dono de 2026-11-20). Só se escolhe quem paga: o
+ * inquilino (no boleto) ou a locadora (incluso no aluguel). Contrato antigo gravado como "Não tem" continua assim até alguém
+ * escolher (o formulário mostra o valor antigo e o alerta "Seguro contra incêndio" pede a escolha; nada é apagado).
+ */
+export const SITUACOES_SEGURO = SITUACOES_CONTA.slice(0, 2);
+/**
  * Quem paga cada conta no contrato (ou na ficha) novo: "Por conta do inquilino", salvo a Internet / TV, que vem "Não tem"
  * (decisão do dono em 2026-11-17; quem tiver internet no contrato troca no formulário). Gás e condomínio sem o dado no
  * imóvel também começam em "Não tem" (contasDoImovel, telas/cadastros.js). Contrato já gravado não muda.
@@ -307,7 +313,7 @@ export const CONTRATO = [
   campo('reserva_competencia', 'Usar a reserva no aluguel de', 'mes', { ajuda: 'Em branco: usa no primeiro aluguel' }),
   secao('O que está incluso no contrato'),
   campo('conta_iptu', 'IPTU', 'opcao', { obrig: true, padrao: 'Por conta do inquilino', opcoes: SITUACOES_CONTA, ajuda: 'Por conta do inquilino: as parcelas entram no boleto' }),
-  campo('conta_seguro', 'Seguro obrigatório', 'opcao', { obrig: true, padrao: 'Por conta do inquilino', opcoes: SITUACOES_CONTA, ajuda: 'Por conta do inquilino: as parcelas entram no boleto' }),
+  campo('conta_seguro', 'Seguro contra incêndio (obrigatório)', 'opcao', { obrig: true, padrao: 'Por conta do inquilino', opcoes: SITUACOES_SEGURO, ajuda: 'Sempre existe (obrigatório por lei). Por conta do inquilino: as parcelas entram no boleto; incluso no aluguel: a locadora paga' }),
   campo('fci_percentual', 'FCI: fundo de conservação (% do aluguel bonificado)', 'pct', { ajuda: 'Em branco: não cobra. Ex.: 5 → 5% de R$ 1.800,00 = R$ 90,00 por mês no boleto, guardados para os reparos na saída' }),
   campo('fci_indice', 'Correção mensal do FCI', 'opcao', { opcoes: INDICES_FCI, ...quando('fci_percentual', '*'), ajuda: 'Índice do Banco Central usado para corrigir o saldo do FCI mês a mês' }),
   ...CONTAS.map(([nome, rotulo]) => campo(nome, rotulo, 'opcao', { opcoes: SITUACOES_CONTA, padrao: contaPadrao(nome) })),
@@ -428,7 +434,7 @@ export const FICHA_FIM = [
   secao('O que está incluso (vai na proposta e no contrato)'),
   campo('conta_iptu', 'IPTU', 'opcao', { opcoes: SITUACOES_CONTA, padrao: SITUACOES_CONTA[0] }),
   campo('iptu_estimado', 'IPTU por mês (estimado)', 'dinheiro', { ...quando('conta_iptu', 'Por conta do inquilino'), ajuda: 'Ex.: R$ 153,00 (as parcelas do ano ÷ 10). Só informa: o valor certo vem das guias' }),
-  campo('conta_seguro', 'Seguro contra incêndio', 'opcao', { opcoes: SITUACOES_CONTA, padrao: SITUACOES_CONTA[0] }),
+  campo('conta_seguro', 'Seguro contra incêndio', 'opcao', { opcoes: SITUACOES_SEGURO, padrao: SITUACOES_CONTA[0] }),
   campo('seguro_estimado', 'Seguro por ano (estimado)', 'dinheiro', { ...quando('conta_seguro', 'Por conta do inquilino'), ajuda: 'Ex.: R$ 250,00, parcelado no boleto. Só informa: o valor certo vem da apólice' }),
   ...CONTAS.map(([nome, rotulo]) => campo(nome, rotulo, 'opcao', { opcoes: SITUACOES_CONTA, padrao: contaPadrao(nome) })),
   secao('Reserva'),
@@ -491,7 +497,6 @@ export const TITULARIDADE = [
   campo('observacoes', 'Observações', 'area'),
 ];
 
-export const TROCA_FIADOR = [campo('data_troca', 'Data da troca', 'data', { obrig: true, ajuda: 'É o início do vínculo do novo fiador' }), ...FIADOR.filter((c) => c.nome !== 'data_entrada')];
 
 /** Campos do fiador na troca de garantia (o início do vínculo é a data da troca; o fim, quando ele sair). */
 const FORM_FIADOR_TROCA = FORM_FIADOR.filter((c) => !['data_entrada', 'data_saida'].includes(c.nome));

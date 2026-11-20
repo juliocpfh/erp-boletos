@@ -295,7 +295,7 @@ function ligarEnderecoDoImovel(raiz) {
     // ficha em análise: o imóvel de interesse marcado (precisa ser um só)
     const marcados = () => [...form.querySelectorAll('input[type=checkbox][name^="imovel_"]')].filter((x) => x.checked).map((x) => x.name.slice(7));
     const naFicha = !!form.querySelector('input[type=checkbox][name^="imovel_"]');
-    const imovelId = () => (naFicha ? (marcados().length === 1 ? marcados()[0] : null) : (form.querySelector('[name=imovel_id]') || {}).value || q.imovel || q.vincular);
+    const imovelId = () => (naFicha ? (marcados().length === 1 ? marcados()[0] : null) : (form.querySelector('[name=imovel_id]') || {}).value || q.imovel);
     const aplicar = () => {
       const i = imovelId() && buscar('imoveis', imovelId());
       const campo = form.querySelector(`[name=${nomeCampo}]`);

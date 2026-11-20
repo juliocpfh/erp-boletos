@@ -4,7 +4,7 @@
 export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 
 1. FORMATOS
-- Dinheiro é guardado em centavos inteiros. Datas aparecem como dia/mês/ano. Competência = mês de uso do imóvel (ex.: 10/2026).
+- Dinheiro é guardado em centavos inteiros. Datas aparecem como dia/mês/ano. Mês de referência = o mês do aluguel ou da conta (ex.: 10/2026).
 - Empresas: as cadastradas em Empresas. Cada imóvel tem um percentual entre elas, usado para dividir as NFs. Nos documentos do inquilino (contrato, vistoria, recibo, carta, e-mails) aparece como locadora só a empresa marcada em "Assina os documentos do inquilino" (sem nenhuma marcada, as empresas do imóvel).
 - CPF e CNPJ são conferidos pelos dígitos, só como ajuda: se falhar, avisa, mas não é grave.
 

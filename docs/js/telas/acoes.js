@@ -274,8 +274,9 @@ const TABELAS_EXCLUSAO = {
   avulsas: { checar: (db, r) => (R.faturasDe(db, 'avulsa', r.id).length ? 'Esta NF avulsa já tem número.' : null) },
   // desfazer o cálculo final: os boletos que ele descontava da garantia voltam a ser cobrados; com a devolução do saldo e da
   // caução já registrada, é barrado (desfazer apagaria o registro e o comprovante: item 46)
-  encerramentos: { admin: true, checar: (db, r) => (r.garantia_devolvida_em ? `A devolução já foi registrada em ${dataBr(r.garantia_devolvida_em)}. Desfaça a devolução antes (botão "Desfazer" na etapa "Devolução da garantia" do roteiro da saída, na página do inquilino) e depois desfaça o cálculo final.` : null),
-    depois: (db, reg) => R.liberarBoletosDaSaida(db, reg.id, login()) },
+  encerramentos: { admin: true, checar: (db, r) => (r.garantia_devolvida_em ? `A devolução já foi registrada em ${dataBr(r.garantia_devolvida_em)}. Desfaça a devolução antes (botão "Desfazer" na etapa "Devolução da garantia" do roteiro da saída, na página do inquilino) e depois desfaça o cálculo final.` : R.motivoNaoDesfazerSaldo(db, r)),
+    // boleto do saldo (2026-11-20): em aberto sai junto; pago, emitido no C6 ou em acordo, barra com a explicação
+    depois: (db, reg) => { R.liberarBoletosDaSaida(db, reg.id, login()); R.excluirBoletoDoSaldo(db, reg.id, login()); } },
   vistorias: { admin: true, voltar: (r) => `#/contrato/${r.contrato_id}?ir=documentos` },
   aditivos: { depois: (db, r) => R.marcarAditivos(db, r.contrato_id, login()), voltar: (r) => `#/contrato/${r.contrato_id}?ir=aditivos` },
   fiadores: { voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },
@@ -1412,6 +1413,37 @@ export const ACOES = {
     await mostrar();
   },
 
+  /** Conta paga pelo banco lançada errada (2026-11-20): o administrador corrige só o lançamento; o pagamento no banco fica. */
+  async corrigirContaBanco({ id }) {
+    if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador corrige uma conta paga pelo banco.');
+    const x = buscar('despesas', id);
+    if (!x) throw new C.ErroUsuario('Esta conta não existe mais (pode ter sido excluída por outra pessoa). Atualize a página.');
+    const imoveis = [...d().imoveis].sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
+    const r = await janela({ titulo: `Corrigir ${x.tipo} paga pelo banco`, sim: 'Salvar a correção',
+      html: `<p>Muda só o lançamento desta conta (o que entra nos Resultados). O pagamento feito no banco (${reais((buscar('pagamentos_banco', x.pagamento_banco_id) || x).valor)} em ${dataBr(x.data_pagamento)}) continua como foi.</p>
+        <label>Valor da conta</label><input name="valor" inputmode="decimal" data-dinheiro value="${esc(dinheiroTexto(x.valor))}" required>
+        <label>Mês de referência</label><input type="month" name="competencia" value="${esc(x.competencia || '')}" required>
+        <label>Imóvel</label><select name="imovel">${imoveis.map((i) => `<option value="${i.id}"${i.id === x.imovel_id ? ' selected' : ''}>${esc(i.nome)}</option>`).join('')}</select>` });
+    if (!r) return;
+    const valor = C.centavos(String((r.valor || [])[0] || ''));
+    await alterar((db) => R.corrigirContaPagaPeloBanco(db, x.id, { valor, competencia: String((r.competencia || [])[0] || ''), imovel_id: Number((r.imovel || [])[0]) }, login(), 'admin'));
+    aviso('Lançamento corrigido. O pagamento no banco não mudou.');
+    await mostrar();
+  },
+
+  /** Saldo da saída a pagar pelo inquilino (2026-11-20): gera o boleto avulso do saldo, com o vencimento escolhido. */
+  async boletoDoSaldo({ id }) {
+    const e = buscar('encerramentos', id);
+    if (!e) throw new C.ErroUsuario('O cálculo final da saída não existe mais (pode ter sido desfeito por outra pessoa). Atualize a página.');
+    const r = await janela({ titulo: 'Boleto do saldo da saída', sim: 'Gerar o boleto',
+      html: `<p>O inquilino deve <b>${reais(-e.saldo)}</b> no cálculo final. O boleto sai sem NF e sem multa e juros (os débitos já os trazem) e pode ser emitido no C6 como os outros.</p>
+        <label>Vencimento</label><input type="date" name="vencimento" value="${C.somarDias(C.hojeIso(), 5)}" min="${C.hojeIso()}" required>` });
+    if (!r) return;
+    const cb = await alterar((db) => R.gerarBoletoDoSaldo(db, e.id, String((r.vencimento || [])[0] || ''), login(), C.hojeIso()));
+    aviso(`Boleto do saldo gerado: ${reais(cb.outros)}, vence em ${dataBr(cb.vencimento)}. Emita no C6 pela página do boleto, se quiser.`);
+    await mostrar();
+  },
+
   async garantiaDevolvida({ id, desfazer }) {
     const e = buscar('encerramentos', id);
     if (!e) throw new C.ErroUsuario('O cálculo final da saída não existe mais (pode ter sido desfeito por outra pessoa). Atualize a página.');
@@ -2094,7 +2126,7 @@ export const ACOES = {
     ws.views = [{ state: 'frozen', ySplit: 4 }];
     // contas pagas por nós no período, uma por linha
     const wc = wb.addWorksheet('Contas pagas por nós');
-    wc.addRow(['Imóvel', 'Mês da conta', 'Conta', 'Valor', 'Pago em', 'Observação', 'Vencimento']).font = { bold: true };
+    wc.addRow(['Imóvel', 'Mês de referência', 'Conta', 'Valor', 'Pago em', 'Observação', 'Vencimento']).font = { bold: true };
     [30, 14, 14, 15, 13, 40, 13].forEach((w, i) => { wc.getColumn(i + 1).width = w; });
     E.d.despesas.filter((x) => x.data_pagamento >= de && x.data_pagamento <= ate)
       .sort((a, b) => String(a.data_pagamento).localeCompare(String(b.data_pagamento)))

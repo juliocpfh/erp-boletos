@@ -22,7 +22,7 @@ const foraDoPadrao = () => R.regra('fora_do_padrao') / 100;
 /** Avisos do cadastro do inquilino: aluguel muito diferente do anterior, imóvel ainda ocupado, entrada muito no futuro. */
 export function conferirContrato(dados, r, q) {
   const out = [];
-  const imovelId = r ? r.imovel_id : Number(dados.imovel_id || q.vincular || q.imovel) || null;
+  const imovelId = r ? r.imovel_id : Number(dados.imovel_id || q.imovel) || null;
   const anterior = imovelId ? d().contratos.filter((x) => x.imovel_id === imovelId && (!r || x.id !== r.id))
     .sort((a, b) => String(b.data_entrada || '').localeCompare(String(a.data_entrada || '')))[0] : null;
   const base = r ? r.aluguel_inicial : anterior ? R.aluguelAtual(d(), anterior) : null;

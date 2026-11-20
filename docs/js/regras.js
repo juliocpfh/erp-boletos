@@ -953,8 +953,12 @@ export const ehComplementoCaucao = (cb) => cb.caucao_complemento > 0;
 export const boletoDoMes = (d, contratoId, comp) => d.cobrancas.find((x) => x.contrato_id === contratoId && x.competencia === comp && !ehBoletoAvulso(x)) || null;
 /** Boleto de uma parcela de acordo de dívida (rotina D8): não é o aluguel do mês. */
 export const ehParcelaAcordo = (cb) => !!cb.acordo_parcela_de;
-/** Boleto à parte (complemento da caução ou parcela de acordo): não é o boleto do aluguel do mês. */
-export const ehBoletoAvulso = (cb) => ehComplementoCaucao(cb) || ehParcelaAcordo(cb);
+/** Boleto do saldo devedor do cálculo final da saída (2026-11-20, ``saldo_saida_de`` = id do ``encerramentos``). */
+export const ehSaldoSaida = (cb) => !!cb.saldo_saida_de;
+/** Boleto à parte (complemento da caução, parcela de acordo ou saldo da saída): não é o boleto do aluguel do mês. */
+export const ehBoletoAvulso = (cb) => ehComplementoCaucao(cb) || ehParcelaAcordo(cb) || ehSaldoSaida(cb);
+/** Boleto sem multa e juros: o complemento da caução (garantia) e o saldo da saída (o saldo já leva os encargos dos débitos). */
+export const semMultaJuros = (cb) => ehComplementoCaucao(cb) || ehSaldoSaida(cb);
 /** Boleto vencido trocado por um acordo: fica guardado, mas não se cobra mais (valem as parcelas do acordo). */
 export const emAcordo = (cb) => cb.situacao === 'Em acordo';
 /** Boleto em acordo fica como estava no dia do acordo: não recebe pagamento, ajuste nem ressarcimento (valem as parcelas do acordo). */
@@ -1441,7 +1445,7 @@ export function emCarencia(c, comp) {
 // --------------------------------------------------------------------------
 export const COBRANCA_IPTU_QUITADO = ['Parcelas normais nos meses em que ocupar', 'Proporcional: 1/12 do valor por mês ocupado no ano', 'Não cobrar do inquilino'];
 
-/** Valores das parcelas do IPTU parcelado (o que é repassado ao inquilino). */
+/** Valores das parcelas do IPTU parcelado (o que é repassado ao inquilino; com "valor fixo por parcela", o valor arredondado). */
 const valoresIptu = (p) => (p.valor_parcela > 0 ? Array(p.num_parcelas).fill(p.valor_parcela) : dividirIptu(p, p.num_parcelas));
 /**
  * Divisão do IPTU em parcelas: a nova (última menor, decisão de 2026-11-15) só do IPTU de 2027 em diante; o de 2026 e anteriores
@@ -1592,6 +1596,11 @@ function inquilinosDaParcela(d, p, n, valor, base = baseIptuDoImovel(d, p.imovel
  * Parcelas do IPTU na prefeitura (o proprietário paga todas as guias). Em cada uma: a parte dos inquilinos (no boleto,
  * proporcional aos dias) e a parte do proprietário (dias vazios, IPTU não cobrado, carência). paga = guia paga.
  * Quitado à vista: uma linha só (cota única, com o valor pago à vista).
+ * ``valor`` é a guia real da prefeitura (o total dividido); ``valorCobrado`` é o que vai ao boleto (com "valor fixo por parcela",
+ * o arredondado). Decisão do dono (2026-11-20, mutirão 19/11 mensal-033): a sobra do arredondamento abate o custo do proprietário.
+ * Ex.: guia de R$ 2.125,37 em 10 × R$ 213,00 (R$ 2.130,00): cada parcela da prefeitura sai pelo valor dividido e a sobra
+ * de R$ 4,63 no ano fica como parte do proprietário negativa (``valorProprietario`` < 0). ``pagoInquilinoEm``: quando o
+ * inquilino pagou a parcela inteira (último boleto pago), para os Resultados contarem a sobra sem a guia marcada como paga.
  */
 export function parcelasIptu(d, p, base = null) {
   if (p.pago_avista) {
@@ -1600,12 +1609,16 @@ export function parcelasIptu(d, p, base = null) {
       vencimento: p.vencimento_primeira || null, proprietario: true, paga: p.data_quitacao || null }];
   }
   base = base || baseIptuDoImovel(d, p.imovel_id);
-  return valoresIptu(p).map((valor, i) => {
-    const inquilinos = inquilinosDaParcela(d, p, i + 1, valor, base);
-    const valorInquilino = Math.min(valor, inquilinos.reduce((s, x) => s + x.valor, 0));
-    return { n: i + 1, rotulo: `${i + 1}ª`, comp: inquilinos.length ? inquilinos[0].comp : null, mesBoleto: mesBoletoDaParcela(p, i + 1), valor,
+  const guias = dividirIptu(p, p.num_parcelas);
+  return valoresIptu(p).map((cobrado, i) => {
+    const valor = guias[i] ?? cobrado;
+    const inquilinos = inquilinosDaParcela(d, p, i + 1, cobrado, base);
+    const valorInquilino = Math.min(cobrado, inquilinos.reduce((s, x) => s + x.valor, 0));
+    const pagos = inquilinos.map((x) => (base.boletos.get(`${x.contrato.id}|${x.comp}`) || {}).data_pagamento || null);
+    return { n: i + 1, rotulo: `${i + 1}ª`, comp: inquilinos.length ? inquilinos[0].comp : null, mesBoleto: mesBoletoDaParcela(p, i + 1), valor, valorCobrado: cobrado,
       inquilinos, inquilino: inquilinos.length ? inquilinos[0].contrato : null, valorInquilino, valorProprietario: valor - valorInquilino,
-      vencimento: vencimentoParcela(p, i + 1), proprietario: valorInquilino < valor, paga: (p.pagas || {})[i + 1] || null };
+      pagoInquilinoEm: pagos.length && pagos.every(Boolean) ? pagos.sort().pop() : null,
+      vencimento: vencimentoParcela(p, i + 1), proprietario: valorInquilino < cobrado, paga: (p.pagas || {})[i + 1] || null };
   });
 }
 
@@ -2546,18 +2559,6 @@ export function cancelarTrocaGarantia(d, trocaId, usuario) {
   excluir(d, 'trocas_garantia', t.id, usuario, texto);
 }
 
-/** Substitui um fiador: o antigo fica guardado com data de saída e o novo entra no lugar. */
-export function trocarFiador(d, fiadorId, dados, usuario) {
-  const antigo = buscar(d, 'fiadores', fiadorId);
-  if (!antigo || antigo.data_saida) throw new Error('Este fiador já foi substituído.');
-  const { data_troca: data, ...novo } = dados;
-  const r = inserir(d, 'fiadores', { ...novo, contrato_id: antigo.contrato_id, data_entrada: data, substitui_id: antigo.id }, usuario,
-    `Fiador ${antigo.nome} substituído por ${novo.nome}`);
-  // o antigo sai na véspera (como na troca de garantia): no dia da troca só o novo é fiador atual
-  atualizar(d, 'fiadores', antigo.id, { data_saida: data ? C.somarDias(data, -1) : data, substituido_por_id: r.id }, usuario, `Fiador substituído por ${novo.nome}`);
-  return r;
-}
-
 /** Ajuste do mês no boleto: cobrança adicional (valor positivo) ou ressarcimento (negativo), com o motivo no histórico. */
 export function ajustarBoleto(d, cobrancaId, valor, motivo, usuario) {
   const cb = buscar(d, 'cobrancas', cobrancaId);
@@ -2584,7 +2585,7 @@ export function ajustarBoleto(d, cobrancaId, valor, motivo, usuario) {
  * Boletos ainda a cobrar do contrato (``aCobrar``): os que estão em acordo ficam de fora (valem as parcelas do acordo, que
  * entram), a carência também, e o complemento da caução, que é garantia e nunca entrou nela (não se desconta da caução).
  */
-export const cobrancasEmAberto = (d, contratoId) => d.cobrancas.filter((cb) => cb.contrato_id === contratoId && aCobrar(cb) && !ehComplementoCaucao(cb));
+export const cobrancasEmAberto = (d, contratoId) => d.cobrancas.filter((cb) => cb.contrato_id === contratoId && aCobrar(cb) && !ehComplementoCaucao(cb) && !ehSaldoSaida(cb));
 
 /**
  * Débitos de aluguel da saída (cálculo final e devolução da garantia na troca de titular), na ``data``: cada boleto a cobrar
@@ -3185,6 +3186,57 @@ export function liberarBoletosDaSaida(d, encerramentoId, usuario) {
 
 export const encerramentoDo = (d, contratoId) => d.encerramentos.find((e) => e.contrato_id === contratoId) || null;
 
+// ---------------------------------------------------------------- boleto do saldo do cálculo final (decisão do dono, 2026-11-20)
+/** Boleto do saldo devedor de um cálculo final (ou null). */
+export const boletoDoSaldo = (d, e) => (e ? d.cobrancas.find((cb) => cb.saldo_saida_de === e.id) || null : null);
+
+/**
+ * Gera o boleto do saldo que o inquilino deve no cálculo final (o saldo devedor é cobrado por boleto: título executivo
+ * extrajudicial). Boleto avulso (``ehBoletoAvulso``) como o do complemento da caução: o valor vai em ``outros``, sem aluguel,
+ * por isso sem NF (o aluguel de cada mês já teve, ou tem, o boleto e a NF dele), e sem multa e juros (os débitos já os
+ * trazem até a data do cálculo). Pode ser emitido no C6 como os outros. Ex.: garantia R$ 2.000,00, débitos R$ 2.300,00 →
+ * saldo −R$ 300,00 → boleto de R$ 300,00 com o vencimento escolhido.
+ */
+export function gerarBoletoDoSaldo(d, encerramentoId, vencimento, usuario, hoje = C.hojeIso()) {
+  const e = buscar(d, 'encerramentos', Number(encerramentoId));
+  if (!e) throw new Error('Cálculo final não encontrado.');
+  const c = buscar(d, 'contratos', e.contrato_id);
+  if (!c) throw new Error('Inquilino não encontrado.');
+  if (!(e.saldo < 0)) throw new C.ErroUsuario('O saldo deste cálculo final não é a pagar pelo inquilino: não há boleto a gerar.');
+  if (boletoDoSaldo(d, e)) throw new C.ErroUsuario('O boleto do saldo já foi gerado (veja os boletos do inquilino).');
+  if (e.garantia_devolvida_em) throw new C.ErroUsuario(`O saldo já foi marcado como cobrado em ${C.dataBr(e.garantia_devolvida_em)}: desfaça a marcação antes de gerar o boleto.`);
+  if (!C.dataValida(vencimento)) throw new C.ErroUsuario('Informe o vencimento do boleto do saldo.');
+  if (vencimento < hoje) throw new C.ErroUsuario('O vencimento do boleto do saldo não pode ser antes de hoje.');
+  const valor = -e.saldo;
+  const mes = c.cobranca_mes_seguinte !== false ? C.somarMeses(vencimento.slice(0, 7), -1) : vencimento.slice(0, 7);
+  return inserir(d, 'cobrancas', {
+    contrato_id: c.id, competencia: mes, vencimento,
+    dias_cobrados: C.diasNoMes(mes), dias_mes: C.diasNoMes(mes), aluguel_mensal: 0, aluguel: 0, desconto: 0,
+    iptu: 0, iptu_parcela: '', seguro: 0, seguro_parcela: '', taxa_boleto: 0, fci: 0, outros: valor, outros_descricao: 'Saldo do cálculo final da saída',
+    reserva_utilizada: 0, carencia: false, ressarcimento: 0, ressarcimento_descricao: '', ressarcimento_na_nf: false,
+    multa_percentual: 0, juros_mensal_percentual: 0, saldo_saida_de: e.id,
+    situacao: 'Em aberto', data_pagamento: null, valor_pago: null, dias_atraso: null, multa: null, juros: null, valor_nf: null, banco: null,
+  }, usuario, `Boleto do saldo da saída de ${c.inquilino_nome}: ${C.reais(valor)}, vence em ${C.dataBr(vencimento)}`);
+}
+
+/** Por que o cálculo final não pode ser desfeito por causa do boleto do saldo (texto) ou null (em aberto: sai junto). */
+export function motivoNaoDesfazerSaldo(d, e) {
+  const cb = boletoDoSaldo(d, e);
+  if (!cb) return null;
+  if (cb.data_pagamento) return `O boleto do saldo (${C.reais(cb.outros)}) já foi pago em ${C.dataBr(cb.data_pagamento)}: desfaça o pagamento antes (na página do boleto) e depois desfaça o cálculo final.`;
+  if (cb.banco && ['emitido', 'pago'].includes(cb.banco.situacao)) return `O boleto do saldo (${C.reais(cb.outros)}) foi emitido no C6: cancele no banco antes (na página do boleto) e depois desfaça o cálculo final.`;
+  if (emAcordo(cb)) return 'O boleto do saldo entrou num acordo: desfaça o acordo antes e depois desfaça o cálculo final.';
+  return null;
+}
+
+/** Cálculo final desfeito: o boleto do saldo em aberto sai junto (``motivoNaoDesfazerSaldo`` já barrou o pago ou no banco). */
+export function excluirBoletoDoSaldo(d, encerramentoId, usuario) {
+  for (const cb of d.cobrancas.filter((x) => x.saldo_saida_de === Number(encerramentoId))) {
+    if (cb.data_pagamento || (cb.banco && ['emitido', 'pago'].includes(cb.banco.situacao)) || emAcordo(cb)) continue;
+    excluir(d, 'cobrancas', cb.id, usuario, 'Boleto do saldo da saída excluído (cálculo final desfeito)');
+  }
+}
+
 /**
  * Na saída, a garantia é devolvida pela conta em que foi depositada: o valor corrigido dividido na proporção do que foi
  * aplicado em cada lugar. Ex.: R$ 3.000,00 na ANK e R$ 2.400,00 com Maria; corrigida R$ 5.940,00 → ANK R$ 3.300,00 e
@@ -3489,6 +3541,7 @@ export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
     alertaAditivoHerdeiro(d, contrato),
     alertaAditivoAguardando(d, contrato),
     alertaCondominio(contrato, hoje),
+    alertaSeguroSemQuemPaga(contrato),
     alertaRessarcimentoEmAcordo(d, contrato),
     alertaTermoAcordo(d, contrato),
     alertaNotificacoes(d, contrato, hoje),
@@ -4253,6 +4306,16 @@ export const documentoFalta = (d, c, campo) => !contratoHerdado(d, c) && !docume
   && !((c.rotina_entrada || {})[(ETAPAS_ENTRADA.find((e) => e[2] === campo) || [])[0]] || {}).pulada;
 
 /** Troca de titular: o termo aditivo que coloca o novo titular no contrato é obrigatório (alerta até registrar um aditivo neste contrato). */
+/**
+ * Seguro contra incêndio sempre existe (decisão do dono de 2026-11-20): contrato em vigor gravado antes como "Não tem" pede que
+ * se escolha quem paga (o inquilino, no boleto, ou a locadora, incluso no aluguel). Nada é mudado sozinho.
+ */
+export function alertaSeguroSemQuemPaga(c) {
+  if (!c || c.conta_seguro !== SITUACOES[2] || c.ativo === false || c.data_saida) return null;
+  return { nivel: 'aviso', tipo: 'Seguro contra incêndio',
+    texto: 'O seguro contra incêndio é obrigatório e este contrato está como "Não tem": edite o contrato e escolha quem paga ("Por conta do inquilino" ou "Incluso no aluguel").' };
+}
+
 export function alertaAditivoHerdeiro(d, c) {
   const ant = contratoHerdado(d, c);
   if (!ant || c.ativo === false || c.data_saida || aditivoDaTroca(d, c)) return null;
@@ -5193,7 +5256,7 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
 // Aparência dos alertas: cor, ênfase e prioridade de cada tipo (editável em #/alertas-config)
 // --------------------------------------------------------------------------
 export const TIPOS_ALERTA = ['Vigência do contrato', 'Reajuste do aluguel', 'Inadimplência',
-  'Seguro obrigatório', 'IPTU do proprietário', 'Reserva do imóvel', 'Condomínio', 'Fiador', 'Aplicação da garantia', 'Correção da caução', 'Devolver garantia',
+  'Seguro obrigatório', 'Seguro contra incêndio', 'IPTU do proprietário', 'Reserva do imóvel', 'Condomínio', 'Fiador', 'Aplicação da garantia', 'Correção da caução', 'Devolver garantia',
   'Titularidade', 'Rotina de entrada', 'Comprovante a buscar no banco', 'Incluir caução e anexar comprovante', 'Incluir depósito e anexar comprovante', 'Assinatura faltante', 'Documento perdido a confirmar', 'Aditivo da troca de titular', 'Aditivo aguardando assinatura', 'Termo do acordo', 'Notificação ao inquilino', 'Banco', 'Pasta física', 'A verificar'];
 /** "Padrão" = cor pela gravidade do aviso (vermelho quando urgente, laranja quando aviso, azul quando informação). */
 export const CORES_ALERTA = ['Padrão', 'Vermelho', 'Laranja', 'Amarelo', 'Verde', 'Azul', 'Roxo', 'Cinza'];
@@ -5300,6 +5363,7 @@ export function dadosBoleto(d, cb) {
     linhas.push(`COMPLEMENTO DA CAUÇÃO${cb.caucao_parcela ? ` PARC. ${cb.caucao_parcela}` : ''} ${rs(cb.caucao_complemento)}`,
       cb.caucao_parcela ? `CAUÇÃO DEPOSITADA ${rs(cb.caucao_anterior)} APÓS ESTA PARC. ${rs(cb.caucao_nova)}` : `CAUÇÃO DEPOSITADA ${rs(cb.caucao_anterior)} NOVA CAUÇÃO ${rs(cb.caucao_nova)}`);
   }
+  else if (ehSaldoSaida(cb)) linhas.push(`SALDO DO ACERTO FINAL DA LOCAÇÃO ${rs(t.a_pagar_sem_desconto)}`);
   else if (ehParcelaAcordo(cb)) linhas.push(`ACORDO ${cb.acordo_parcela || ''} ${rs(t.a_pagar_sem_desconto)}`.replace(/  +/g, ' '), `REF. ${(cb.acordo_referente || '').toLocaleUpperCase('pt-BR')}`.slice(0, 60));
   else if (cb.carencia) linhas.push(`CARÊNCIA DO ALUGUEL ${C.compBr(cb.competencia)}`);
   else linhas.push(cb.dias_cobrados < cb.dias_mes ? `ALUGUEL ${cb.dias_cobrados}/${cb.dias_mes} DIAS ${rs(cb.aluguel)}` : `ALUGUEL ${rs(cb.aluguel)}`);
@@ -6474,7 +6538,12 @@ export function resultadosFinanceiros(d, de, ate) {
     // a parte do proprietário em cada guia paga no período (a do inquilino volta nos boletos), como em totaisIptu
     // (contratos, boletos e IPTUs do imóvel: montados uma vez, e só se o imóvel tem IPTU)
     for (const p of iptusDe(i.id)) {
-      for (const pc of parcelasIptu(d, p, baseDe(i.id))) if (pc.proprietario && dentro(pc.paga)) iptu += pc.valorProprietario;
+      for (const pc of parcelasIptu(d, p, baseDe(i.id))) {
+        if (pc.proprietario) { if (dentro(pc.paga)) iptu += pc.valorProprietario; }
+        // parcela toda do inquilino, com o valor fixo arredondado (2026-11-20): a diferença para a guia real (sobra ou falta de
+        // centavos) entra no custo quando a guia foi paga ou, sem ela marcada, quando o inquilino pagou o boleto
+        else if (pc.valorProprietario && dentro(pc.paga || pc.pagoInquilinoEm)) iptu += pc.valorProprietario;
+      }
       // à vista: o inquilino devolve nos boletos; sai do custo só o que ele já devolveu em boleto pago no período (caixa, não a
       // previsão do ano). Ex.: cota única de R$ 900,00 paga em 02/2026 e nenhum boleto pago ainda → IPTU de R$ 900,00 em fevereiro
       if (p.pago_avista) {
@@ -6505,6 +6574,29 @@ export const TIPOS_DESPESA = ['Água', 'Luz', 'Gás', 'Condomínio', 'Internet',
 
 export const despesasDo = (d, imovelId) => d.despesas.filter((x) => x.imovel_id === imovelId)
   .sort((a, b) => String(b.competencia).localeCompare(String(a.competencia)) || String(b.data_pagamento).localeCompare(String(a.data_pagamento)) || b.id - a.id);
+
+/**
+ * Conta paga pelo banco lançada errada (decisão do dono, 2026-11-20): o administrador corrige só o lançamento da conta
+ * (valor, mês de referência, imóvel); o pagamento no banco (``pagamentos_banco``) fica como foi feito. Ex.: conta de luz paga
+ * pelo C6 com R$ 210,00, lançada como R$ 120,00 em 10/2026 no imóvel errado → R$ 210,00, 11/2026, no imóvel certo.
+ */
+export function corrigirContaPagaPeloBanco(d, despesaId, { valor, competencia, imovel_id }, usuario, papel = 'admin') {
+  if (papel !== 'admin') throw new C.ErroUsuario('Só o administrador corrige uma conta paga pelo banco.');
+  const x = buscar(d, 'despesas', Number(despesaId));
+  if (!x) throw new Error('Conta não encontrada.');
+  if (!x.pagamento_banco_id) throw new C.ErroUsuario('Esta conta não foi paga pelo banco: exclua e lance de novo.');
+  if (!Number.isInteger(valor) || valor < 0) throw new C.ErroUsuario('Informe o valor da conta.');
+  if (!C.competenciaValida(competencia)) throw new C.ErroUsuario('Informe o mês de referência da conta.');
+  const im = buscar(d, 'imoveis', Number(imovel_id));
+  if (!im) throw new C.ErroUsuario('Escolha o imóvel.');
+  const mudou = [];
+  if (valor !== x.valor) mudou.push(`valor ${C.reais(x.valor)} → ${C.reais(valor)}`);
+  if (competencia !== x.competencia) mudou.push(`mês ${C.compBr(x.competencia)} → ${C.compBr(competencia)}`);
+  if (im.id !== x.imovel_id) mudou.push(`imóvel ${(buscar(d, 'imoveis', x.imovel_id) || {}).nome || '?'} → ${im.nome}`);
+  if (!mudou.length) throw new C.ErroUsuario('Nada mudou.');
+  return atualizar(d, 'despesas', x.id, { valor, competencia, imovel_id: im.id }, usuario,
+    `Conta paga pelo banco (pagamento nº ${x.pagamento_banco_id}) corrigida: ${mudou.join('; ')} (o pagamento no banco não muda)`);
+}
 
 /** Último valor lançado de cada tipo (para sugerir no próximo mês). */
 export function ultimosValores(d, imovelId) {
@@ -7872,7 +7964,7 @@ function boletoNoTexto(d, cb) {
   const c = buscar(d, 'contratos', cb.contrato_id);
   const i = c ? buscar(d, 'imoveis', c.imovel_id) : null;
   const nome = (c && (c.inquilino_apelido || c.inquilino_nome.split(' ')[0])) || '';
-  const oQue = ehComplementoCaucao(cb) ? 'do complemento da caução'
+  const oQue = ehComplementoCaucao(cb) ? 'do complemento da caução' : ehSaldoSaida(cb) ? 'do saldo do acerto final do contrato'
     : ehParcelaAcordo(cb) ? `da parcela ${cb.acordo_parcela || ''} do acordo (${cb.acordo_referente || ''})`.replace(/  +/g, ' ') : `do aluguel de ${C.compBr(cb.competencia)}`;
   return { c, i, nome, oQue, onde: i ? ` (${i.nome})` : '' };
 }
@@ -7890,15 +7982,15 @@ export function textoLembrete(d, cb, hoje = C.hojeIso()) {
   if (fase === 'antes') {
     const quando = cb.vencimento > hoje ? `vence em ${C.dataBr(cb.vencimento)}` : cb.vencimento === hoje ? `vence hoje, ${C.dataBr(cb.vencimento)}` : `venceu em ${C.dataBr(cb.vencimento)}`;
     linhas.push(`Lembrete: o boleto ${oQue}${onde} ${quando}${naoUtil}, no valor de ${C.reais(t.a_pagar_pontual)}${bonificacao}.`);
-    if (!ehComplementoCaucao(cb)) linhas.push(`${adiado ? `Depois de ${C.dataBr(limite)}` : 'Após o vencimento'}: ${C.reais(t.a_pagar_sem_desconto)} mais multa de ${C.pct(cb.multa_percentual)} e juros de ${C.pct(cb.juros_mensal_percentual)} ao mês.`);
+    if (!semMultaJuros(cb)) linhas.push(`${adiado ? `Depois de ${C.dataBr(limite)}` : 'Após o vencimento'}: ${C.reais(t.a_pagar_sem_desconto)} mais multa de ${C.pct(cb.multa_percentual)} e juros de ${C.pct(cb.juros_mensal_percentual)} ao mês.`);
   } else if (fase === 'dia') {
     linhas.push(adiado ? `Lembrete: o boleto ${oQue}${onde} venceu em ${C.dataBr(cb.vencimento)}, que não é dia útil, e pode ser pago sem multa até hoje, ${C.dataBr(limite)}, no valor de ${C.reais(t.a_pagar_pontual)}${bonificacao}.`
       : `Lembrete: o boleto ${oQue}${onde} vence hoje, ${C.dataBr(cb.vencimento)}, no valor de ${C.reais(t.a_pagar_pontual)}${bonificacao}.`);
-    if (!ehComplementoCaucao(cb)) linhas.push(`A partir de amanhã: ${C.reais(t.a_pagar_sem_desconto)} mais multa de ${C.pct(cb.multa_percentual)} e juros de ${C.pct(cb.juros_mensal_percentual)} ao mês.`);
+    if (!semMultaJuros(cb)) linhas.push(`A partir de amanhã: ${C.reais(t.a_pagar_sem_desconto)} mais multa de ${C.pct(cb.multa_percentual)} e juros de ${C.pct(cb.juros_mensal_percentual)} ao mês.`);
   } else {
     const r = C.liquidar(cb, hoje);
     linhas.push(`O boleto ${oQue}${onde}, com vencimento em ${C.dataBr(cb.vencimento)}, consta em aberto (${C.plural(r.dias_atraso, 'dia')} de atraso).`);
-    linhas.push(ehComplementoCaucao(cb) ? `Valor: ${C.reais(r.valor_devido)}.` : `Valor para pagamento hoje (${C.dataBr(hoje)}): ${C.reais(r.valor_devido)} (${C.reais(t.a_pagar_sem_desconto)} + multa ${C.reais(r.multa)} + juros ${C.reais(r.juros)}). Em outro dia o valor muda: se precisar, pedimos que nos avise para atualizarmos.`);
+    linhas.push(semMultaJuros(cb) ? `Valor: ${C.reais(r.valor_devido)}.` : `Valor para pagamento hoje (${C.dataBr(hoje)}): ${C.reais(r.valor_devido)} (${C.reais(t.a_pagar_sem_desconto)} + multa ${C.reais(r.multa)} + juros ${C.reais(r.juros)}). Em outro dia o valor muda: se precisar, pedimos que nos avise para atualizarmos.`);
     linhas.push('Se o pagamento já foi feito, por favor desconsidere esta mensagem e, se possível, nos envie o comprovante.');
   }
   const b = cb.banco || null;

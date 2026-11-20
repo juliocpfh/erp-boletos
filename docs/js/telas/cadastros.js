@@ -658,30 +658,11 @@ export const CADASTROS = {
       }
     },
   },
+  // correção do aluguel avulsa (sem botão desde 24/10/2026; apagada em 2026-11-20, mutirão 19/11 fios-019): reajuste e novo
+  // valor só pela tela Reajustes. Fica o recálculo dos boletos em aberto quando uma correção é desfeita pelo Histórico.
   correcoes: {
-    titulo: (r, q) => `Correção do aluguel - ${buscar('contratos', q.contrato).inquilino_nome}`,
-    campos: () => comListas(F.CORRECAO),
-    fixos: (r, q) => ({ contrato_id: Number(q.contrato), indice_contrato: buscar('contratos', q.contrato).indice_correcao || '' }),
-    padrao: (q) => { const ind = buscar('contratos', q.contrato).indice_correcao || ''; return { indice: ind.includes('/') ? '' : ind }; },
+    semFormulario: ['A correção do aluguel é feita na tela Reajustes', '#/reajustes', 'Ir para Reajustes'],
     recalcular: (salvo) => (cb) => cb.contrato_id === salvo.contrato_id,
-    destino: (salvo) => {
-      const c = buscar('contratos', salvo.contrato_id);
-      if (!R.temCaucao(c)) return `#/contrato/${c.id}`;
-      aviso('O aluguel foi corrigido: corrija também a caução.', 'aviso');
-      return `#/novo/correcoes_garantia?contrato=${c.id}`;
-    },
-    aviso: (r, q) => { const c = buscar('contratos', q.contrato); return `Aluguel atual: ${reais(R.aluguelAtual(d(), c))}. Índice previsto no contrato: ${c.indice_correcao || 'não informado'}${(c.indice_correcao || '').includes('/') ? ' (escolha abaixo qual índice foi usado nesta correção)' : ''}.`; },
-    voltar: (r, q) => `#/contrato/${q.contrato}`,
-    descricao: (dados, r, q) => `Correção do aluguel de ${buscar('contratos', q.contrato).inquilino_nome}`,
-    ajustar(dados, erros, r, form, q) {
-      const c = buscar('contratos', q.contrato);
-      if (!dados.data_vigencia) return;
-      const anterior = R.aluguelAtual(d(), c, C.somarDias(dados.data_vigencia, -1));
-      dados.valor_anterior = anterior;
-      if (dados.valor_novo === null && dados.percentual === null) erros.percentual = 'Informe o percentual ou o novo valor';
-      else if (dados.valor_novo === null) dados.valor_novo = C.aplicarCorrecao(anterior, dados.percentual);
-      else if (dados.percentual === null) dados.percentual = anterior ? C.percentualPorDesconto(anterior, dados.valor_novo - anterior) : 0;
-    },
   },
   seguros: {
     titulo: (r, q) => { const c = buscar('contratos', r ? r.contrato_id : q.contrato); return `Seguro obrigatório - ${c.inquilino_nome}${buscar('imoveis', c.imovel_id) ? ` (${buscar('imoveis', c.imovel_id).nome})` : ''}`; },
@@ -773,23 +754,11 @@ export const CADASTROS = {
     voltar: (r, q) => (q.contrato ? `#/contrato/${q.contrato}` : `#/imovel/${r ? r.imovel_id : q.imovel}`),
     descricao: (dados) => `${dados.concessionaria} ${dados.protocolo || ''}`.trim(),
   },
+  // fiador avulso e "trocar fiador" (sem botão; apagados em 2026-11-20, mutirão 19/11 fios-019): fiador entra no Novo contrato,
+  // no Editar contrato ou em "Trocar garantia ou fiador" (página do inquilino). Fica o texto do Histórico na exclusão.
   fiadores: {
-    titulo: (r, q) => `${q.substitui ? 'Trocar fiador' : 'Fiador'} - ${buscar('contratos', r ? r.contrato_id : q.contrato).inquilino_nome}`,
-    campos: (r, q) => (q && q.substitui ? F.TROCA_FIADOR : F.FIADOR),
-    padrao: (q) => (q.substitui ? { data_troca: C.hojeIso() } : {}),
-    ajustar(dados, erros) {
-      if (dados.data_entrada && dados.data_saida && dados.data_saida < dados.data_entrada) erros.data_saida = 'O fim do vínculo não pode ser antes do início';
-    },
-    aviso: (r, q) => (q && q.substitui ? `Substitui ${buscar('fiadores', q.substitui).nome}, que fica guardado em "Fiadores anteriores".` : ''),
-    fixos: (r, q) => (r || q.substitui ? {} : { contrato_id: Number(q.contrato) }),
-    salvar(db, dados, q, r) {
-      if (q.substitui) return R.trocarFiador(db, Number(q.substitui), dados, login());
-      if (r) { R.atualizar(db, 'fiadores', r.id, dados, login(), `Fiador ${dados.nome}`); return R.buscar(db, 'fiadores', r.id); }
-      return R.inserir(db, 'fiadores', dados, login(), `Fiador ${dados.nome}`);
-    },
-    voltar: (r, q) => `#/contrato/${r ? r.contrato_id : q.contrato}`,
+    semFormulario: ['O fiador é incluído ou trocado na página do inquilino ("Trocar garantia ou fiador") ou no Editar contrato', '#/inquilinos', 'Ver os inquilinos'],
     descricao: (dados) => `Fiador ${dados.nome}`,
-    conferir: (dados, r) => conferirPessoa(dados, r, '', `do fiador ${dados.nome}`),
   },
   aplicacoes: {
     titulo: (r, q) => `Aplicação da garantia - ${buscar('contratos', r ? r.contrato_id : q.contrato).inquilino_nome}`,
@@ -1145,6 +1114,7 @@ export function telaFormulario(tabela, registro, q, estado) {
   const cfg = Object.hasOwn(CADASTROS, String(tabela)) ? CADASTROS[tabela] : null;
   if (!cfg) return naoEncontrado('Página não encontrada');
   if (!opera() || (cfg.admin && !podeUsuario('admin'))) return '<h1>Seu usuário não pode alterar este cadastro</h1>';
+  if (cfg.semFormulario) return naoEncontrado(...cfg.semFormulario, '');
   if (!registro && cfg.semNovo) return naoEncontrado('Boletos novos saem na tela Boletos ("Gerar boletos" do mês)', '#/cobrancas', 'Ir para Boletos', '');
   // cadastro que depende de outro (ex.: depósito da garantia de um contrato) aberto sem ele: endereço incompleto
   try {

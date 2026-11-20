@@ -49,8 +49,8 @@ Como trabalhar: ver `../MUTIRAO_19_11.md`. Marque `[x]` ao corrigir. G = grave, 
   - Causa: `docs/js/modelos-contrato.js:232 (e o mesmo texto em :504)`
   - Fazer: Escrever "[se fiador] e {f:o FIADOR|os FIADORES} aceitam[senão] aceita[fim] como válidas" e pôr a troca em ATUALIZACOES_MODELO para os modelos já gravados.
   - Certo é: "O LOCATÁRIO aceita como válidas…" sem fiador; "O LOCATÁRIO e o FIADOR aceitam…" com fiador.
-- [ ] **impressos-011** [M] Contrato com seguro incluso no aluguel diz, em outra cláusula, que o inquilino paga o seguro junto com o aluguel
-  - Feito (20/11): Feito para o seguro "Incluso no aluguel". Com o seguro "Não tem", o parágrafo continua como antes: falta o dono dizer o texto.
+- [x] **impressos-011** [M] Contrato com seguro incluso no aluguel diz, em outra cláusula, que o inquilino paga o seguro junto com o aluguel
+  - Feito (20/11): Feito para o seguro "Incluso no aluguel". Decisão do dono (20/11): o seguro contra incêndio sempre existe; saiu a opção "Não tem" (contrato e ficha); contrato antigo "Não tem" ganha o alerta "Seguro contra incêndio" e a pendência no Gerar contrato (o parágrafo sai como por conta do inquilino até alguém escolher).
   - Vê-se: Com o seguro marcado como "Incluso no aluguel", a cláusula 3ª diz: "O valor do aluguel contempla água e esgoto, IPTU e seguro incêndio, que ficam a cargo da LOCADORA". Mas a cláusula do incêndio, parágrafo primeiro, continua dizendo: "o LOCATÁRIO autoriza desde já que seja feito o seguro de incêndio do imóvel locado, sendo seus prêmios e despesas por sua exclusiva conta, cobrados juntamente com o aluguel, já a partir do primeiro a vencer" (no modelo comercial: "deve apresentar apólice … sendo os prêmios e despesas…
   - Causa: `docs/js/modelos-contrato.js:154; a condição seguro_inquilino existe em docs/js/contratos.js:340 e já é usada em docs/js/modelos-contrato.js:90`
   - Fazer: Envolver o parágrafo em [se seguro_inquilino] ... [senão] texto para o seguro por conta da locadora [fim], com a redação aprovada pelo dono, e levar a ATUALIZACOES_MODELO.

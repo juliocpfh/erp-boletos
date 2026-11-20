@@ -3,6 +3,7 @@
 // Modelos e preenchimento: modelos-email.js e email-dados.js. Envio direto: gmail.js (Worker, só na nuvem com o Gmail ligado).
 import { alterar, aviso, baixar, confirmar, E, ir, login, mostrar, podeUsuario, voltarFecha } from '../app.js';
 import * as S from '../armazenamento.js';
+import * as BANCO from '../banco.js';
 import * as C from '../calculos.js';
 import { dataBr } from '../calculos.js';
 import { anexosProntos, dadosDoEmail, informesPendentes } from '../email-dados.js';
@@ -69,9 +70,38 @@ async function arquivosProntos(dlg, prontos, objeto) {
   for (const el of dlg.querySelectorAll('[name=pronto]:checked')) {
     const a = prontos[Number(el.value)];
     if (a.tipo === 'recibo') { const r = await pdfDoRecibo(a.recibo, a.alvo || objeto); out.push({ nome: r.nome, blob: r.blob }); }
+    else if (a.tipo === 'boleto') {
+      // boleto emitido no C6 (ex.: o do saldo da saída, 2026-11-20): o PDF vem pela ponte; o QR Code do Pix já está guardado
+      const cb = buscar('cobrancas', a.id);
+      const blob = cb && cb.banco ? (a.qual === 'pdf' ? await pdfDoBoleto(cb) : qrDoPix(cb.banco)) : null;
+      if (!blob) throw new C.ErroUsuario(`Não consegui pegar o ${a.rotulo}: confira se a ponte do C6 está ligada neste computador, ou desmarque esse anexo.`);
+      out.push({ nome: a.nome, blob });
+    }
     else out.push({ nome: a.nome, blob: await S.abrirArquivo(await pastaDoEscopo(a.escopo, Number(a.id)), a.nome) });
   }
   return out;
+}
+
+/** PDF do boleto no C6, pela ponte deste computador (null se a ponte não responder). Igual ao da régua (telas/regua.js). */
+async function pdfDoBoleto(cb) {
+  let blob = null;
+  try {
+    await BANCO.chamarPonteCrua('GET', `/contas/${encodeURIComponent(cb.banco.conta_id)}/boletos/${encodeURIComponent(cb.banco.id_externo)}/pdf`, null, { fetch: async (url, o) => {
+      const r = await fetch(url, o);
+      if (!r.ok) return r;
+      blob = await r.blob();
+      return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
+    } });
+  } catch { blob = null; }
+  return blob;
+}
+
+function qrDoPix(b) {
+  if (!b.pix_qr_base64) return null;
+  const bin = atob(b.pix_qr_base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: b.pix_qr_mime || 'image/png' });
 }
 
 const campoPergunta = ([nome, rotulo, tipo], valor) => {

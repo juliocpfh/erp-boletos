@@ -328,6 +328,12 @@ function roteiroSaidaHtml(c, e) {
     if (x.chave === 'vistoria') return `${botao('marcarVistoriaSaida', c.vistoria_saida_data ? 'Mudar a data marcada' : 'Marcar data e hora', { id: c.id }, 'secundario pequeno')} ${link(`#/vistoria/novo?contrato=${c.id}&tipo=Sa%C3%ADda`, 'Registrar vistoria de saída', 'botao pequeno')}`;
     if (x.chave === 'contas') return `${/falta o protocolo/.test(x.detalhe) && c.imovel_id ? link(`#/novo/titularidades?imovel=${c.imovel_id}&contrato=${c.id}&tipo=volta`, 'Registrar protocolo', 'botao pequeno') : ''} ${/falta a leitura/.test(x.detalhe) && c.imovel_id ? link(`#/novo/leituras?imovel=${c.imovel_id}&contrato=${c.id}`, 'Registrar leitura', 'botao pequeno') : ''}`;
     if (x.chave === 'calculo' && c.data_saida <= hoje) return link(`#/novo/encerramentos?contrato=${c.id}`, 'Fazer cálculo final', 'botao pequeno');
+    if (x.chave === 'garantia' && e && e.saldo < 0) {
+      // saldo a pagar pelo inquilino (2026-11-20): cobrado por boleto avulso (sem NF), que pode ser emitido no C6
+      const bs = R.boletoDoSaldo(d(), e);
+      return `${bs ? link(`#/cobranca/${bs.id}`, `Ver o boleto do saldo (${reais(bs.outros)}, vence ${dataBr(bs.vencimento)})`, 'botao secundario pequeno')
+        : botao('boletoDoSaldo', `Gerar boleto do saldo (${reais(-e.saldo)})`, { id: e.id }, 'pequeno')} ${botao('garantiaDevolvida', 'Marcar saldo cobrado', { id: e.id }, bs && bs.data_pagamento ? 'pequeno' : 'secundario pequeno')}`;
+    }
     if (x.chave === 'garantia' && e) return botao('garantiaDevolvida', e.saldo >= 0 ? 'Marcar garantia devolvida' : 'Marcar saldo cobrado', { id: e.id }, 'pequeno');
     if (x.chave === 'boleto') return x.cobranca_id ? link(`#/cobranca/${x.cobranca_id}`, 'Ver o boleto', 'botao pequeno') : link(`#/cobrancas?comp=${C.competenciaDe(c.data_saida)}`, 'Gerar na tela Boletos', 'botao pequeno');
     if (x.chave === 'arquivo' && c.data_saida <= hoje) return `${link(`#/contrato/${c.id}?ir=documentos`, 'Ver os documentos', 'botao secundario pequeno')} ${botao('arquivoFisico', 'Marcar arquivado', { id: c.id }, 'pequeno')}`;
@@ -534,7 +540,7 @@ function caixaBoletosInquilino(c, cobs, hoje) {
       <td>${situacaoBoleto(x, hoje)}${x.data_pagamento ? ` <span class="suave">em ${dataBr(x.data_pagamento)}</span>` : ''}${atraso}${R.aCobrar(x) && opera() ? ` ${botao('lembrete', C.vencido(x.vencimento, hoje) ? 'Cobrar' : 'Lembrete', { id: x.id }, 'secundario mini')}` : ''}</td>
       <td class="n">${x.valor_nf !== null ? reais(x.valor_nf) : '-'}</td><td class="nw">${fs.length ? `Nº ${R.numeroFatura(fs[0].numero)}` : (c.gerar_nf === false ? etiqueta('controle', 'controle') : '-')}</td></tr>`;
   };
-  const cab = '<tr><th>Competência</th><th>Vencimento</th><th class="n">Valor pontual</th><th>Situação</th><th class="n">Valor NF</th><th>NF</th></tr>';
+  const cab = '<tr><th>Mês de referência</th><th>Vencimento</th><th class="n">Valor pontual</th><th>Situação</th><th class="n">Valor NF</th><th>NF</th></tr>';
   const recentes = cobs.slice(0, BOLETOS_INQUILINO);
   const antigos = cobs.slice(BOLETOS_INQUILINO);
   const anoDecl = new Date().getFullYear() - 1;
