@@ -255,7 +255,7 @@ export function telaPastaImpressao(id) {
   const sel = memoria.pastaFisica;
   const t = memoria.pastaTela;
   if (!c || !sel || sel.contrato !== c.id || !t || t.contrato !== c.id) {
-    return naoEncontrado('Escolha os documentos na pasta do inquilino', c ? `#/pasta-fisica/${c.id}` : '#/arquivo-impresso', 'Abrir a pasta');
+    return naoEncontrado('Escolha os documentos na pasta do inquilino', c ? `#/pasta-fisica/${c.id}` : '#/arquivo-impresso', 'Abrir a pasta', '');
   }
   const escolhidos = t.itens.filter((i) => sel.vagas.includes(i.vaga));
   const a = t.anterior ? buscar('contratos', t.anterior.id) : null;

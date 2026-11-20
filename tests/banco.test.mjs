@@ -73,10 +73,10 @@ test('contas por empresa: id normalizado, uma empresa por conta, padrão (ANK), 
   assert.deepEqual(cfg.contas[1].notificar, { email: true, sms: false, emissao: true, antes: false, vencimento: false, depois: false });
   assert.throws(() => R.salvarContaBanco(d, { id: 'outra', emitente_id: ank.id }, 'teste'), /já está ligada à conta "ank"/);
   assert.throws(() => R.salvarContaBanco(d, { id: 'x', emitente_id: 999 }, 'teste'), /empresa dona/);
-  // histórico sem as contas (que têm o próprio registro)
+  // histórico sem as contas (que têm o próprio registro): só os campos que mudaram, um por linha
   const h = d.historico.find((x) => x.descricao === 'Configuração do banco (C6) alterada');
-  assert.equal(h.detalhes.config_banco.para.contas, undefined);
-  assert.equal(h.detalhes.config_banco.para.ativo, true);
+  assert.equal(h.detalhes.contas, undefined);
+  assert.deepEqual(h.detalhes.ativo, { de: false, para: true });
   // negativação por conta
   R.salvarContaBanco(d, { id: 'ank', emitente_id: ank.id, negativacao_ativa: '1', negativacao_dias: '45' }, 'teste');
   assert.deepEqual(R.contaBanco(d, 'ank').negativacao, { ativa: true, dias_atraso: 45 });

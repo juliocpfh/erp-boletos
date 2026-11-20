@@ -31,10 +31,19 @@ export function conferirContrato(dados, r, q) {
     out.push(`Aluguel de ${reais(dados.aluguel_inicial)} está ${Math.abs(p)}% ${p > 0 ? 'acima' : 'abaixo'} ${r ? 'do valor anterior' : `do aluguel atual do inquilino anterior (${anterior.inquilino_nome})`} de ${reais(base)}.`);
   }
   if (imovelId && dados.data_entrada) {
-    const ocupando = d().contratos.find((x) => x.imovel_id === imovelId && (!r || x.id !== r.id) && x.id !== dados.contrato_anterior_id && x.data_entrada && x.data_entrada < dados.data_entrada
-      && (x.data_saida ? x.data_saida >= dados.data_entrada : x.ativo !== false));
-    if (ocupando) out.push(`${ocupando.inquilino_nome} ainda está neste imóvel em ${dataBr(dados.data_entrada)}${ocupando.data_saida ? ` (sai em ${dataBr(ocupando.data_saida)})` : ' (sem data de saída)'}.`);
+    // os dois períodos se cruzam, em qualquer ordem das datas (o outro pode começar no mesmo dia ou depois); a troca de titular
+    // (o anterior e o que continua este) não conta
+    const fimNovo = dados.data_saida || '9999-12-31';
+    const anteriorId = Number(dados.contrato_anterior_id || (r && r.contrato_anterior_id)) || null;
+    const ocupando = d().contratos.find((x) => x.imovel_id === imovelId && (!r || x.id !== r.id) && x.id !== anteriorId && (!r || Number(x.contrato_anterior_id) !== r.id)
+      && x.data_entrada && x.data_entrada <= fimNovo && (x.data_saida ? x.data_saida >= dados.data_entrada : x.ativo !== false));
+    if (ocupando && ocupando.data_entrada < dados.data_entrada) out.push(`${ocupando.inquilino_nome} ainda está neste imóvel em ${dataBr(dados.data_entrada)}${ocupando.data_saida ? ` (sai em ${dataBr(ocupando.data_saida)})` : ' (sem data de saída)'}.`);
+    else if (ocupando) out.push(`${ocupando.inquilino_nome} já tem contrato neste imóvel com entrada em ${dataBr(ocupando.data_entrada)}${ocupando.data_saida ? ` (até ${dataBr(ocupando.data_saida)})` : ''}: os dois ficariam no imóvel ao mesmo tempo, e os dois gerando boleto.`);
   }
+  // ficha em análise (ou aprovada) de outra pessoa para este imóvel: o contrato feito direto passaria por cima dela
+  const fichaDeste = Number(dados.ficha_id || (r && r.ficha_id) || q?.ficha) || null;
+  const ficha = imovelId ? R.fichaAbertaDoImovel(d(), imovelId, fichaDeste) : null;
+  if (ficha && !r) out.push(`Há uma ficha ${ficha.situacao === 'Aprovada' ? 'aprovada' : 'em análise'} de ${ficha.inquilino_nome || 'outro interessado'} para este imóvel${ficha.reserva_valor > 0 ? `, com reserva de ${reais(ficha.reserva_valor)}` : ''}. Se o contrato é de outra pessoa, resolva a ficha antes (reprovar ou desistência devolve a reserva).`);
   if (dados.data_entrada && dados.data_entrada > C.somarDias(C.hojeIso(), diasFuturo())) out.push(`A entrada (${dataBr(dados.data_entrada)}) está a mais de ${diasFuturo()} dias no futuro.`);
   out.push(...R.avisosLegaisDoContrato(dados)); // prazo, bonificação, multa, juros, caução e garantia, com o artigo da lei
   // inquilino novo que emite NF num imóvel ainda sem empresa emitente: lembrar agora (sem isso a NF não é numerada)

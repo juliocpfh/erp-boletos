@@ -10,7 +10,7 @@ import { abasInquilinos, atalhosComunicacoes } from './comunicacoes.js';
 import { caixaFichas } from './fichas.js';
 
 /** Filtros da busca global (parâmetro ``tipo`` do endereço → grupo devolvido por ``R.buscarGlobal``). */
-const TIPOS_BUSCA = [['inquilinos', 'Inquilinos'], ['imoveis', 'Imóveis'], ['boletos', 'Boletos com esse valor'], ['nfs', 'Notas fiscais']];
+const TIPOS_BUSCA = [['inquilinos', 'Inquilinos'], ['imoveis', 'Imóveis'], ['boletos', 'Boletos com esse valor'], ['nfs', 'NFs']];
 
 /** Busca global (campo do cabeçalho): resultados em grupos, com filtro por tipo. */
 export function telaBusca(q) {
@@ -44,7 +44,8 @@ export function telaSolicitacoes(q) {
   const simbolo = (sit) => (SITUACOES_SOLICITACAO.find((s) => s.nome === sit) || SITUACOES_SOLICITACAO[0]).simbolo;
   const lista = d().solicitacoes.filter((x) => !filtro || (x.situacao || 'Aberta') === filtro.nome)
     .sort(C.maisRecentePrimeiro);
-  return `<div class="cabecalho"><h1>Solicitações dos inquilinos</h1>${opera() ? link('#/novo/solicitacoes?de=solicitacoes', 'Abrir nova solicitação', 'botao') : ''}</div>
+  const volta = filtro ? `&filtro=${filtro.chave}` : ''; // o Editar volta para a lista com o mesmo filtro
+  return `<div class="cabecalho"><h1>Solicitações dos inquilinos</h1>${opera() ? link(`#/novo/solicitacoes?de=solicitacoes${volta}`, 'Nova solicitação', 'botao') : ''}</div>
     ${atalhosComunicacoes('solicitacoes')}
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap">${link('#/solicitacoes', `Todas (${d().solicitacoes.length})`, `botao ${filtro ? 'secundario ' : ''}pequeno`)}
       ${SITUACOES_SOLICITACAO.map((s) => link(`#/solicitacoes?filtro=${s.chave}`, `${s.simbolo} ${resumo[s.nome]} ${s.texto}`, `botao ${filtro === s ? '' : 'secundario '}pequeno`)).join(' ')}</div>
@@ -58,7 +59,7 @@ export function telaSolicitacoes(q) {
       <td class="pre">${esc(x.providencia || '')}${x.responsavel ? `<br><span class="suave">${esc(x.responsavel)}</span>` : ''}</td>
       <td class="nw">${simbolo(x.situacao || 'Aberta')} ${esc(x.situacao || 'Aberta')}${x.data_conclusao ? `<br><span class="suave">em ${dataBr(x.data_conclusao)}</span>` : ''}</td>
       <td class="n">${x.valor ? `${reais(x.valor)}${x.pago_por ? `<br><span class="suave">${esc(x.pago_por)}</span>` : ''}` : '-'}</td>
-      <td class="n nw">${opera() ? link(`#/editar/solicitacoes/${x.id}?de=solicitacoes`, 'Editar') : ''}</td></tr>`;
+      <td class="n nw">${opera() ? link(`#/editar/solicitacoes/${x.id}?de=solicitacoes${volta}`, 'Editar') : ''}</td></tr>`;
   }).join('') || `<tr><td colspan="7" class="suave">Nenhuma solicitação${filtro ? ' nesta situação' : ''}.</td></tr>`}</table>
 </div>`;
 }
@@ -66,9 +67,14 @@ export function telaSolicitacoes(q) {
 /** Inquilinos atuais e anteriores, com o resumo da saída. */
 export function telaInquilinos(q) {
   const hoje = C.hojeIso();
-  const busca = String(q.busca || '').trim().toLocaleLowerCase('pt-BR');
+  // como a busca do topo e a de Boletos: sem acento ("joao" acha "João") e CPF/CNPJ com ou sem pontos
+  const busca = R.textoDeBusca(q.busca || '');
+  const digitos = /^[\d.\-/\s]+$/.test(busca) ? busca.replace(/\D/g, '') : '';
   let todos = d().contratos.map((c) => ({ c, i: c.imovel_id ? buscar('imoveis', c.imovel_id) : null, e: R.encerramentoDo(d(), c.id) }));
-  if (busca) todos = todos.filter((x) => [x.c.inquilino_nome, x.c.inquilino_apelido, x.c.inquilino_cpf, x.i && x.i.nome].some((t) => String(t || '').toLocaleLowerCase('pt-BR').includes(busca)));
+  if (busca) {
+    todos = todos.filter((x) => [x.c.inquilino_nome, x.c.inquilino_apelido, x.c.inquilino_cpf, x.i && x.i.nome].some((t) => R.textoDeBusca(t || '').includes(busca))
+      || (digitos.length >= 3 && String(x.c.inquilino_cpf || '').replace(/\D/g, '').includes(digitos)));
+  }
   const porNome = (a, b) => (a.i ? a.i.nome : '~').localeCompare(b.i ? b.i.nome : '~', 'pt-BR') || a.c.inquilino_nome.localeCompare(b.c.inquilino_nome, 'pt-BR');
   const atuais = todos.filter((x) => R.contratoAtivo(x.c, hoje)).sort(porNome);
   const anteriores = todos.filter((x) => !R.contratoAtivo(x.c, hoje)).sort((a, b) => String(b.c.data_saida || '9').localeCompare(String(a.c.data_saida || '9')));

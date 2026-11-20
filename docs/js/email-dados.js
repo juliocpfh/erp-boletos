@@ -30,7 +30,7 @@ function contasDoInquilino(d, c, alvo, imovel) {
 
 /** Texto da garantia. Ex.: "caução de R$ 6.900,00 (3 aluguéis com bonificação), aplicada em poupança e devolvida corrigida...". */
 function textoGarantia(tipo, valor, meses) {
-  if (tipo === 'Caução') return `caução de ${valor ? C.reais(valor) : 'até 3 aluguéis'}${valor && meses ? ` (${meses} aluguéis com bonificação)` : ''}, aplicada em poupança e devolvida corrigida no fim do contrato, descontados eventuais débitos`;
+  if (tipo === 'Caução') return `caução de ${valor ? C.reais(valor) : 'até 3 aluguéis'}${valor && meses ? ` (${C.plural(meses, 'aluguel', 'aluguéis')} com bonificação)` : ''}, aplicada em poupança e devolvida corrigida no fim do contrato, descontados eventuais débitos`;
   if (tipo === 'Depósito garantia') return `depósito de garantia${valor ? ` de ${C.reais(valor)}` : ''}, devolvido no fim do contrato, descontados eventuais débitos`;
   if (tipo === 'Fiador') return 'fiador com imóvel próprio';
   if (tipo === 'Fiador + depósito') return `fiador e depósito de garantia${valor ? ` de ${C.reais(valor)}` : ''}`;

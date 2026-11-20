@@ -79,7 +79,18 @@ export function partesDaPessoa(d, cpf) {
   const boletos = new Set(ligados.filter((x) => x.tabela === 'cobrancas').map((x) => x.id));
   for (const f of d.faturas || []) if (f.origem_tipo === 'cobranca' && boletos.has(Number(f.origem_id)) && !ligados.some((x) => x.tabela === 'faturas' && x.id === f.id)) ligados.push({ tabela: 'faturas', id: f.id });
   const saem = new Set([...proprios, ...ligados].map((x) => `${x.tabela}:${x.id}`));
-  return { achados, contratos: [...contratos], fichas: [...fichas], proprios, ligados, outros: outros.filter((x) => !saem.has(`${x.tabela}:${x.id}`)), bloqueios, nome: nomeDa(d, achados) };
+  // respostas aos comunicados (nome, contatos, IP, aparelho, assinatura): ficam dentro do comunicado, na lista `destinos`, pelo
+  // contrato (inquilino) ou pelo fiador; o comunicado continua, só sai o item dela
+  const fiadoresDela = new Set(proprios.filter((x) => x.tabela === 'fiadores').map((x) => Number(x.id)));
+  const destinos = [];
+  for (const com of d.comunicados || []) {
+    for (const x of com.destinos || []) {
+      if (!x) continue;
+      const dela = x.tipo === 'fiador' ? fiadoresDela.has(Number(x.fiador_id)) : contratos.has(Number(x.contrato_id));
+      if (dela) destinos.push({ comunicado_id: com.id, chave: x.chave });
+    }
+  }
+  return { achados, contratos: [...contratos], fichas: [...fichas], proprios, ligados, outros: outros.filter((x) => !saem.has(`${x.tabela}:${x.id}`)), destinos, bloqueios, nome: nomeDa(d, achados) };
 }
 
 /**
@@ -98,9 +109,48 @@ export function dadosDaPessoa(d, cpf) {
   }
   const contratos = new Set(p.contratos);
   const historico = (d.historico || []).filter((h) => chaves.has(`${h.tabela}:${Number(h.registro_id)}`) || (h.contrato_id && contratos.has(Number(h.contrato_id))));
+  // comunicados: só o item dela (o aceite), nunca o dos outros; o Histórico do comunicado, também só com o item dela
+  const chavesCom = chavesDosComunicados(p);
+  for (const com of d.comunicados || []) {
+    const minhas = chavesCom.get(com.id);
+    if (!minhas) continue;
+    (registros.comunicados ||= []).push({ id: com.id, titulo: com.titulo, criado_em: com.criado_em, destinos: (com.destinos || []).filter((x) => x && minhas.has(x.chave)) });
+  }
+  for (const h of d.historico || []) {
+    const minhas = h.tabela === 'comunicados' && chavesCom.get(Number(h.registro_id));
+    if (minhas && !historico.includes(h)) historico.push({ ...h, detalhes: destinosNosDetalhes(h.detalhes, (x) => minhas.has(x.chave)) });
+  }
   const fichas = new Set(p.fichas);
   const anexos = R.arquivosReferenciados(d).filter((a) => (a.escopo === 'ficha' ? fichas.has(Number(a.id)) : contratos.has(Number(a.id))));
   return { nome: p.nome, achados: p.achados, registros, historico, anexos, partes: p };
+}
+
+/** { comunicado_id → Set(chave do item dela) }. */
+function chavesDosComunicados(p) {
+  const m = new Map();
+  for (const x of p.destinos || []) { if (!m.has(x.comunicado_id)) m.set(x.comunicado_id, new Set()); m.get(x.comunicado_id).add(x.chave); }
+  return m;
+}
+
+/** Cópia dos detalhes de uma linha do Histórico do comunicado com a lista `destinos` filtrada (inclusão: a lista; alteração: de/para). */
+function destinosNosDetalhes(det, fica) {
+  if (!det || typeof det !== 'object' || !('destinos' in det)) return det;
+  const filtrar = (v) => (Array.isArray(v) ? v.filter((x) => x && typeof x === 'object' && fica(x)) : v);
+  const v = det.destinos;
+  const novo = v && typeof v === 'object' && !Array.isArray(v) && ('de' in v || 'para' in v) ? { ...v, de: filtrar(v.de), para: filtrar(v.para) } : filtrar(v);
+  return { ...det, destinos: novo };
+}
+
+/** Contratos que continuam o contrato `id` pela troca de titular (contrato_anterior_id), em cadeia: [contrato]. */
+function sucessores(d, id) {
+  const out = []; const vistos = new Set([Number(id)]);
+  let fila = [Number(id)];
+  while (fila.length) {
+    const prox = [];
+    for (const c of d.contratos || []) if (c.contrato_anterior_id && fila.includes(Number(c.contrato_anterior_id)) && !vistos.has(c.id)) { vistos.add(c.id); out.push(c); prox.push(c.id); }
+    fila = prox;
+  }
+  return out;
 }
 
 /** Data em que termina cada vínculo da pessoa: [{ texto, fim }] (fim null = ainda vale ou sem data). */
@@ -111,7 +161,12 @@ function vinculos(d, p) {
   const nomeC = (c) => (c ? `${c.inquilino_nome || 'contrato'}${c.data_entrada ? ` (entrada em ${C.dataBr(c.data_entrada)})` : ''}` : 'contrato excluído');
   const vistos = new Set();
   const usar = (texto, fim) => { const k = `${texto}|${fim}`; if (!vistos.has(k)) { vistos.add(k); out.push({ texto, fim }); } };
-  for (const id of p.contratos) { const c = contrato(id); usar(`contrato de ${nomeC(c)}`, fimContrato(c)); }
+  for (const id of p.contratos) {
+    const c = contrato(id); usar(`contrato de ${nomeC(c)}`, fimContrato(c));
+    // troca de titular: o contrato novo continua este (vistoria de entrada, garantia e boletos ficam aqui); os 10 anos contam do
+    // fim do último da cadeia, e enquanto ele vale não se apaga
+    for (const s of sucessores(d, id)) usar(`contrato de ${nomeC(s)}, que continua o dela (troca de titular)`, fimContrato(s));
+  }
   for (const id of p.fichas) {
     const f = R.buscar(d, 'fichas', id);
     const feitos = (d.contratos || []).filter((c) => Number(c.ficha_id) === id);
@@ -150,7 +205,15 @@ export function situacaoParaApagar(d, cpf, hoje = C.hojeIso()) {
 /** Pessoas que já podem ser apagadas (10 anos depois do fim do último vínculo): [{ cpf, nome, libera_em, vinculos }]. */
 export function pessoasParaApagar(d, hoje = C.hojeIso()) {
   const docs = new Map();
-  for (const [t, campo] of Object.entries(DONO)) for (const r of d[t] || []) { const n = soDigitos(r[campo]); if (documentoValido(n) && !docs.has(n)) docs.set(n, r[campo]); }
+  // todos os papéis: inquilino, interessado da ficha, fiador e também solidário, cônjuge, representante (e o fiador dentro da ficha)
+  const juntar = (v) => {
+    if (Array.isArray(v)) { v.forEach((x) => { if (x && typeof x === 'object') juntar(x); }); return; }
+    for (const [k, x] of Object.entries(v)) {
+      if (typeof x === 'string' && CAMPO_DOC.test(k)) { const n = soDigitos(x); if (documentoValido(n) && !docs.has(n)) docs.set(n, x); }
+      else if (x && typeof x === 'object') juntar(x);
+    }
+  };
+  for (const t of Object.keys(DONO)) for (const r of d[t] || []) if (r && typeof r === 'object') juntar(r);
   const out = [];
   for (const [n, cpf] of docs) {
     const s = situacaoParaApagar(d, n, hoje);
@@ -200,6 +263,14 @@ export function apagarPessoa(d, cpf, usuario, hoje = C.hojeIso()) {
   }
   const tirarMarcas = (v) => { if (Array.isArray(v)) { for (let i = v.length - 1; i >= 0; i -= 1) if (v[i] === SAI) v.splice(i, 1); else tirarMarcas(v[i]); } else if (v && typeof v === 'object') Object.values(v).forEach(tirarMarcas); };
   for (const x of limpos) tirarMarcas(R.buscar(d, x.tabela, x.id));
+  // comunicados: sai o item dela (o aceite com contatos, IP e assinatura); o comunicado fica para os outros
+  const chavesCom = chavesDosComunicados(p);
+  for (const com of d.comunicados || []) {
+    const minhas = chavesCom.get(com.id);
+    if (!minhas) continue;
+    com.destinos = (com.destinos || []).filter((x) => !(x && minhas.has(x.chave)));
+    limpos.push({ tabela: 'comunicados', id: com.id });
+  }
   for (const t of new Set(saem.map((x) => x.tabela))) d[t] = d[t].filter((r) => !chave.has(`${t}:${r.id}`));
   const contratos = new Set(p.contratos);
   // histórico: as linhas dos registros que saíram viram uma linha vazia (o tamanho da lista não muda: a nuvem manda só as linhas
@@ -209,6 +280,8 @@ export function apagarPessoa(d, cpf, usuario, hoje = C.hojeIso()) {
       if (chave.has(`${h.tabela}:${Number(h.registro_id)}`) || (h.contrato_id && contratos.has(Number(h.contrato_id)))) {
         return { quando: h.quando, usuario: null, acao: 'Apagado (LGPD)', tabela: null, registro_id: null, descricao: '(dados de uma pessoa apagados)', detalhes: null, imovel_id: null, contrato_id: null };
       }
+      const minhas = h.tabela === 'comunicados' && chavesCom.get(Number(h.registro_id));
+      if (minhas) return { ...h, detalhes: destinosNosDetalhes(h.detalhes, (x) => !minhas.has(x.chave)) };
       const set = camposLimpos.get(`${h.tabela}:${Number(h.registro_id)}`);
       if (!set || !h.detalhes || typeof h.detalhes !== 'object') return h;
       return { ...h, detalhes: Object.fromEntries(Object.entries(h.detalhes).filter(([k]) => !set.has(k))) };

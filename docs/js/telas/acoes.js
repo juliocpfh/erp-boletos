@@ -205,7 +205,7 @@ const TABELAS_EXCLUSAO = {
   avulsas: { checar: (db, r) => (R.faturasDe(db, 'avulsa', r.id).length ? 'Esta NF avulsa já tem número.' : null) },
   // desfazer o cálculo final: os boletos que ele descontava da garantia voltam a ser cobrados; com a devolução do saldo e da
   // caução já registrada, é barrado (desfazer apagaria o registro e o comprovante: item 46)
-  encerramentos: { admin: true, checar: (db, r) => (r.garantia_devolvida_em ? `A devolução já foi registrada em ${dataBr(r.garantia_devolvida_em)}. Desfaça a devolução antes de desfazer o cálculo final.` : null),
+  encerramentos: { admin: true, checar: (db, r) => (r.garantia_devolvida_em ? `A devolução já foi registrada em ${dataBr(r.garantia_devolvida_em)}. Desfaça a devolução antes (botão "Desfazer" na etapa "Devolução da garantia" do roteiro da saída, na página do inquilino) e depois desfaça o cálculo final.` : null),
     depois: (db, reg) => R.liberarBoletosDaSaida(db, reg.id, login()) },
   vistorias: { admin: true, voltar: (r) => `#/contrato/${r.contrato_id}?ir=documentos` },
   aditivos: { depois: (db, r) => R.marcarAditivos(db, r.contrato_id, login()), voltar: (r) => `#/contrato/${r.contrato_id}?ir=aditivos` },
@@ -341,10 +341,10 @@ async function proporPagamentoDoBanco(cb, pagamento = null) {
       ${pagamento && pagamento.certeza !== 'exata' ? '<p class="texto-aviso">O banco não diz qual boleto é: casado pelo valor e pela data. Confira o inquilino e o mês.</p>' : ''}
       <p><label>Pagou em</label><input type="date" name="pagou" value="${esc(pagou)}" required>${atalhosData()}</p>
       <p><label>Dia em que o dinheiro entrou na conta (é a data da NF)</label><input type="date" name="data" value="${esc(credito)}" required>${atalhosData()}</p>
-      <p>Previsto pelo sistema para essa data: <b>${esc(reais(previsto.valor_devido))}</b>${previsto.pontual ? ' (em dia)' : ` (${previsto.dias_atraso} dia(s) de atraso)`}.</p>
+      <p>Previsto pelo sistema para essa data: <b>${esc(reais(previsto.valor_devido))}</b>${previsto.pontual ? ' (em dia)' : ` (${C.plural(previsto.dias_atraso, 'dia')} de atraso)`}.</p>
       ${difere ? `<div class="alerta aviso">O valor pago no banco (${esc(reais(valorBanco))}) é diferente do previsto. Ao confirmar, o pagamento fica registrado com o valor do banco e você informa a justificativa e o valor da NF na página do boleto.</div>` : ''}
       <p class="suave">Nada é registrado sem a sua confirmação.</p>`,
-    sim: 'Registrar pagamento', nao: 'Agora não' });
+    sim: 'Confirmar pagamento', nao: 'Agora não' });
   if (!resp) { aviso(cb.banco ? 'Pagamento não registrado. O boleto continua como pago no banco; registre quando quiser pelo botão "Consultar situação".' : 'Pagamento não registrado. Registre quando quiser pela tela Banco ("Conferir boletos pagos no banco") ou na página do boleto.', 'info'); return; }
   const data = String((resp.data || [])[0] || '');
   const dataPagou = String((resp.pagou || [])[0] || '');
@@ -367,7 +367,7 @@ async function proporPagamentoDoBanco(cb, pagamento = null) {
     return res;
   });
   const extrato = ligada ? ` A entrada de ${dataBr(ligada.data)} no extrato ficou ligada ao boleto.` : '';
-  aviso(r.pontual ? `Pagamento em dia registrado${pagouEmDia ? ' (sem multa e juros)' : ''}. Data da NF: ${dataBr(data)}.${extrato}` : `Pagamento registrado com ${r.dias_atraso} dia(s) de atraso: multa ${reais(r.multa)} e juros ${reais(r.juros)}. Data da NF: ${dataBr(data)}.${extrato}`, r.pontual ? 'ok' : 'aviso');
+  aviso(r.pontual ? `Pagamento em dia registrado${pagouEmDia ? ' (sem multa e juros)' : ''}. Data da NF: ${dataBr(data)}.${extrato}` : `Pagamento registrado com ${C.plural(r.dias_atraso, 'dia')} de atraso: multa ${reais(r.multa)} e juros ${reais(r.juros)}. Data da NF: ${dataBr(data)}.${extrato}`, r.pontual ? 'ok' : 'aviso');
 }
 
 /**
@@ -1316,12 +1316,19 @@ export const ACOES = {
     await mostrar();
   },
 
-  async garantiaDevolvida({ id }) {
+  async garantiaDevolvida({ id, desfazer }) {
     const e = buscar('encerramentos', id);
     if (!e) throw new C.ErroUsuario('O cálculo final da saída não existe mais (pode ter sido desfeito por outra pessoa). Atualize a página.');
+    if (desfazer) {
+      if (!(await confirmar(`Desfazer a ${e.saldo >= 0 ? 'devolução da garantia' : 'cobrança do saldo'} marcada em ${dataBr(e.garantia_devolvida_em)}? A etapa volta a ficar por fazer.`, { titulo: 'Desfazer a devolução', sim: 'Desfazer' }))) return;
+      await alterar((db) => R.marcarGarantiaDevolvida(db, e.id, '', login()));
+      aviso('Devolução desfeita: a etapa voltou a ficar por fazer.', 'info');
+      await mostrar();
+      return;
+    }
     const r = await janela({ titulo: e.saldo >= 0 ? 'Garantia devolvida' : 'Saldo cobrado do inquilino', sim: 'Marcar',
       html: `<p>${e.saldo >= 0 ? `Devolução de <b>${reais(e.saldo)}</b> ao inquilino.` : `Cobrança de <b>${reais(-e.saldo)}</b> do inquilino.`} Informe o dia em que aconteceu (fica no histórico).</p>
-        <label>Data</label><input type="date" name="data" value="${C.hojeIso()}" required>` });
+        <label>Data</label><input type="date" name="data" value="${esc(e.garantia_devolvida_em || C.hojeIso())}" required>` });
     if (!r) return;
     await alterar((db) => R.marcarGarantiaDevolvida(db, e.id, String((r.data || [])[0] || ''), login()));
     aviso('Etapa marcada no roteiro da saída.');
@@ -1485,7 +1492,7 @@ export const ACOES = {
     const linha = (rotulo, valor) => `<tr><td>${rotulo}</td><td class="n">${valor}</td></tr>`;
     await janelaMensagem(`2ª via com o valor de hoje · ${c.inquilino_nome}`, v, `<table class="compacta" style="margin-bottom:8px">
         ${linha(`Valor do boleto (venceu em ${dataBr(cb.vencimento)})`, reais(v.original))}
-        ${v.multa ? linha(`Multa (${C.pct(cb.multa_percentual)})`, reais(v.multa)) : ''}${v.juros ? linha(`Juros (${C.pct(cb.juros_mensal_percentual)} ao mês, ${v.dias} dia(s))`, reais(v.juros)) : ''}
+        ${v.multa ? linha(`Multa (${C.pct(cb.multa_percentual)})`, reais(v.multa)) : ''}${v.juros ? linha(`Juros (${C.pct(cb.juros_mensal_percentual)} ao mês, ${C.plural(v.dias, 'dia')})`, reais(v.juros)) : ''}
         <tr class="total"><td>Para pagar hoje, ${dataBr(hoje)}</td><td class="n maior">${reais(v.valor)}</td></tr></table>
       <p class="acoes">${botao('copiar', `Copiar o valor (${reais(v.valor, false)})`, { texto: reais(v.valor, false) }, 'secundario pequeno')}<span class="suave">Não emite boleto novo no banco: amanhã o valor muda.</span></p>`);
   },
@@ -1499,7 +1506,7 @@ export const ACOES = {
     const hoje = C.hojeIso();
     const sim = C.liquidar(cb, hoje);
     const resp = await janela({ titulo: `Confirmar pagamento · ${c ? c.inquilino_nome : ''}`,
-      html: `<p class="suave" style="margin-bottom:8px">${i ? `${esc(i.nome)} · ` : ''}boleto ${compBr(cb.competencia)}, vencimento ${dataBr(cb.vencimento)}. Se pago hoje: <b>${reais(sim.valor_devido)}</b>${sim.pontual ? '' : ` (${sim.dias_atraso} dia(s) de atraso)`}.</p>
+      html: `<p class="suave" style="margin-bottom:8px">${i ? `${esc(i.nome)} · ` : ''}boleto ${compBr(cb.competencia)}, vencimento ${dataBr(cb.vencimento)}. Se pago hoje: <b>${reais(sim.valor_devido)}</b>${sim.pontual ? '' : ` (${C.plural(sim.dias_atraso, 'dia')} de atraso)`}.</p>
         <p><label>Dia em que o dinheiro entrou na conta</label><input type="date" name="data" value="${hoje}" required>${atalhosData()}</p>
         <p><label>Pagou em (só se atrasou)</label><input type="date" name="pagou">${atalhosData()}<span class="ajuda">Em branco: o dia em que o dinheiro entrou</span></p>
         <p><label>Valor recebido (opcional)</label><input name="valor" inputmode="decimal" placeholder="0,00"></p>

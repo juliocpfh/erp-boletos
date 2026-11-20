@@ -754,6 +754,10 @@ form[data-alterado] .barra-salvar::before { content: "Há mudanças não salvas:
   input:not([type=checkbox]):not([type=radio]), select, textarea, header.topo .busca-topo input { font-size: 16px; }
   .faixa { white-space: normal; overflow: visible; text-overflow: clip; }
   main button, main .botao, main .link-botao, main button.mini, main .botao.mini { min-height: 40px; }
+  /* janelas (dialog ficam fora do main) e os atalhos Hoje/Ontem também com 40 px; caixas de marcar com 22 px */
+  dialog button, .atalhos-data button { min-height: 40px; min-width: 56px; }
+  input[type=checkbox], input[type=radio] { width: 22px; height: 22px; min-width: 22px; }
+  td > input[type=checkbox]:only-child, th > input[type=checkbox]:only-child { margin: 6px; }
   main .link-botao { display: inline-flex; align-items: center; padding: 0 6px; }
   main table button.x-excluir { min-width: 40px; }
   .alca-caixa { display: none !important; }

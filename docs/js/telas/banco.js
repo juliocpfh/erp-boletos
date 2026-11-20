@@ -137,7 +137,7 @@ export function telaBanco(rota) {
 
 // --------------------------------------------------------------------------
 // Avisos automáticos do banco (webhook guardado pela ponte): lidos ao abrir o sistema e a cada 5 minutos com a tela Banco aberta.
-// Só os boletos avisados são consultados de novo; quem registra o pagamento é o usuário (botão "Registrar o pagamento").
+// Só os boletos avisados são consultados de novo; quem registra o pagamento é o usuário (botão "Confirmar pagamento").
 // --------------------------------------------------------------------------
 const CHAVE_AVISOS = 'avisos-banco-lidos'; // localStorage: até quando os avisos de cada conta já foram lidos neste navegador
 const INTERVALO_AVISOS_MS = 5 * 60000;
@@ -191,7 +191,7 @@ async function lerAvisosAgora(silencioso) {
   }
   if (pagos.length) {
     const nomes = pagos.slice(0, 3).map((cb) => { const c = buscar('contratos', cb.contrato_id); return `${c ? c.inquilino_nome : ''} (${compBr(cb.competencia)}${cb.banco.valor_pago ? `, ${reais(cb.banco.valor_pago)}` : ''})`; }).join('; ');
-    aviso(`O banco avisou ${pagos.length} pagamento(s) que ainda não está(ão) registrado(s) aqui: ${nomes}${pagos.length > 3 ? '…' : ''}. Abra a tela Banco e clique em "Registrar o pagamento" em cada um: nada é registrado sem a sua confirmação.`, 'info');
+    aviso(`O banco avisou ${pagos.length} pagamento(s) que ainda não está(ão) registrado(s) aqui: ${nomes}${pagos.length > 3 ? '…' : ''}. Abra a tela Banco e clique em "Confirmar pagamento" em cada um: nada é registrado sem a sua confirmação.`, 'info');
   }
   if (gravou && String(location.hash || '').startsWith('#/banco')) await mostrar();
 }
@@ -226,7 +226,7 @@ async function conferirSaudePonte() {
   if (alvo) alvo.outerHTML = caixaSaudeBanco();
 }
 
-/** Boletos que o banco diz pagos (ou pagos aguardando o crédito) e que aqui ainda não estão: cada um com "Registrar o pagamento". */
+/** Boletos que o banco diz pagos (ou pagos aguardando o crédito) e que aqui ainda não estão: cada um com "Confirmar pagamento". */
 function htmlPagosNoBanco(conta) {
   const lista = Z.pagosNoBancoSemRegistro(d(), conta);
   if (!lista.length) return '';
@@ -235,7 +235,7 @@ function htmlPagosNoBanco(conta) {
     const b = cb.banco;
     const esperando = b.situacao !== 'pago';
     return `<li><a href="#/cobranca/${cb.id}">${esc(c ? c.inquilino_nome : '')} · boleto ${compBr(cb.competencia)}</a> · ${esperando ? etiqueta('pago, aguardando crédito no banco', 'aviso') : `pago no banco${b.pago_em ? ` em ${dataBr(b.pago_em)}` : ''}${b.valor_pago ? ` (${reais(b.valor_pago)})` : ''}`}
-      ${opera() ? botaoPonte('consultarBoletoC6', esperando ? 'Consultar de novo' : 'Registrar o pagamento', { id: cb.id }) : ''}</li>`;
+      ${opera() ? botaoPonte('consultarBoletoC6', esperando ? 'Consultar de novo' : 'Confirmar pagamento', { id: cb.id }) : ''}</li>`;
   };
   return `<div class="alerta info" id="pagos-no-banco"><b>${lista.length} boleto(s) pago(s) no banco e ainda não registrado(s) aqui</b> (o banco avisou ou foi consultado). Confira e registre cada um: nada é registrado sem a sua confirmação.
     <ul style="margin:6px 0 0">${lista.map(item).join('')}</ul></div>`;

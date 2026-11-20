@@ -80,10 +80,10 @@ test('2ª via com o valor do dia: só boleto vencido e a cobrar; valor com multa
   assert.deepEqual([v.dias, v.original, v.multa, v.juros, v.valor], [75, 120000, 2400, 3000, 125400]);
   assert.equal(v.valor, C.liquidar(b.b, HOJE).valor_devido);
   assert.match(v.texto, /^Olá, Ana!/);
-  assert.match(v.texto, /2ª via do boleto do aluguel de 08\/2026 \(Casa 3\), que venceu em 10\/09\/2026 \(75 dia\(s\) de atraso\)/);
+  assert.match(v.texto, /2ª via do boleto do aluguel de 08\/2026 \(Casa 3\), que venceu em 10\/09\/2026 \(75 dias de atraso\)/);
   assert.match(v.texto, /Valor do boleto: R\$\s1\.200,00/);
   assert.match(v.texto, /Multa \(2%\): R\$\s24,00/);
-  assert.match(v.texto, /Juros \(1% ao mês, 75 dia\(s\)\): R\$\s30,00/);
+  assert.match(v.texto, /Juros \(1% ao mês, 75 dias\): R\$\s30,00/);
   assert.match(v.texto, /Total para pagar hoje: R\$\s1\.254,00/);
   assert.match(v.assunto, /24\/11\/2026/);
   assert.equal(v.telefone, '41999990000');

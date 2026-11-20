@@ -25,7 +25,7 @@ export const abasInquilinos = (atual) => `<nav class="abas">${link('#/inquilinos
 export function atalhosComunicacoes(atual) {
   const sol = R.resumoSolicitacoes(d());
   const abertasSol = (sol.Aberta || 0) + (sol['Em andamento'] || 0);
-  const notAbertas = (d().notificacoes || []).filter((n) => ['Rascunho', 'Aguardando resposta', 'Multa gerada'].includes(n.situacao));
+  const notAbertas = (d().notificacoes || []).filter(R.notificacaoEmAberto);
   const abertasNot = notAbertas.length;
   const vencidasNot = notAbertas.filter((n) => R.estadoNotificacao(d(), n).podeMulta).length;
   const b = (hash, texto, chave) => link(hash, texto, `botao ${atual === chave ? '' : 'secundario '}pequeno`);

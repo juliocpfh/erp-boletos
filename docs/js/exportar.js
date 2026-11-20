@@ -40,12 +40,18 @@ const FORM_DA_TABELA = { imoveis: F.IMOVEL, contratos: F.CONTRATO, correcoes: F.
   renovacoes: F.RENOVACAO, encerramentos: F.ENCERRAMENTO, avulsas: F.AVULSA, emitentes: F.EMITENTE, usuarios: F.USUARIO,
   reformas: F.REFORMA, solicitacoes: F.SOLICITACAO, ressarcimentos: F.RESSARCIMENTO, leituras: F.LEITURA };
 
+/** Campos que não estão em formulário nenhum, com o nome em português (Histórico, planilha). */
+const NOMES_CAMPOS = { ativo: 'Ligado', conta_padrao_id: 'Conta padrão', modo_conta_boleto: 'Conta do boleto', perfil_regras_id: 'Regras deste contrato',
+  data_pagamento: 'Data do pagamento', valor_pago: 'Valor pago', valor_nf: 'Valor da NF', dias_atraso: 'Dias de atraso', pagou_em_dia: 'Pagou em dia',
+  data_pagou: 'Pagou em', situacao: 'Situação', competencia: 'Mês', vencimento: 'Vencimento', destinos: 'Destinatários' };
+
 /** Nome da coluna: o rótulo no formulário do cadastro ou o nome do campo escrito por extenso (ex.: valor_pago → Valor pago). */
 export function rotuloCampo(nome, tabela = '') {
   if (nome === 'id') return 'Nº';
   const doForm = (FORM_DA_TABELA[tabela] || []).find((c) => c && c.nome === nome && c.rotulo);
   if (doForm) return doForm.rotulo.replace(/\s*\*$/, '');
-  if (ROTULOS[nome]) return ROTULOS[nome];
+  if (Object.hasOwn(ROTULOS, nome)) return ROTULOS[nome];
+  if (Object.hasOwn(NOMES_CAMPOS, nome)) return NOMES_CAMPOS[nome];
   if (/^desconto_pontualidade/.test(nome)) return nome === 'desconto_pontualidade_percentual' ? 'Desconto de pontualidade (%)' : 'Desconto de pontualidade';
   const t = nome.replace(/_/g, ' ');
   return t.charAt(0).toLocaleUpperCase('pt-BR') + t.slice(1);

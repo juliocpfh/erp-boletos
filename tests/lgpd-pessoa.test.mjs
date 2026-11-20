@@ -55,7 +55,7 @@ test('lista das pessoas que já podem ser apagadas', () => {
   const { d } = banco();
   d.contratos[1].data_saida = '2016-08-31';
   const lista = P.pessoasParaApagar(d, '2026-11-17');
-  assert.deepEqual(lista.map((x) => x.nome), ['Beltrano Teste', 'Fulano de Teste'], 'mesma data: ordem do nome');
+  assert.deepEqual(lista.map((x) => x.nome), ['Fiador Um', 'Beltrano Teste', 'Fulano de Teste'], 'fiador do contrato (até 31/03/2016) antes; mesma data: ordem do nome');
   assert.deepEqual(P.pessoasParaApagar(d, '2026-01-01'), []);
 });
 
@@ -99,4 +99,46 @@ test('registro que é dela e também ligado ao contrato dela conta uma vez só',
   const p = P.partesDaPessoa(d, CPF);
   const chaves = [...p.proprios, ...p.ligados].map((x) => `${x.tabela}:${x.id}`);
   assert.equal(new Set(chaves).size, chaves.length);
+});
+
+test('comunicados: o aceite dela entra no ZIP e sai no "Apagar tudo"; o dos outros fica (mutirão 19/11, comunicacoes-011)', () => {
+  const { d, c, c2 } = banco();
+  d.contratos[1].data_saida = '2016-08-31';
+  const resposta = { em: '2016-01-10T10:00:00Z', email: 'fulano@exemplo.com', ip: '200.1.2.3', assinatura: 'Fulano de Teste' };
+  const com = R.inserir(d, 'comunicados', { titulo: 'Contatos', destinos: [
+    { chave: `c${c.id}`, tipo: 'inquilino', contrato_id: c.id, fiador_id: null, nome: 'Fulano de Teste' },
+    { chave: `c${c2.id}`, tipo: 'inquilino', contrato_id: c2.id, fiador_id: null, nome: 'Beltrano Teste' }] }, 't');
+  R.atualizar(d, 'comunicados', com.id, { destinos: com.destinos.map((x, i) => (i === 0 ? { ...x, resposta } : x)) }, 't', 'respostas');
+  const x = P.dadosDaPessoa(d, CPF);
+  assert.equal(x.registros.comunicados.length, 1);
+  assert.deepEqual(x.registros.comunicados[0].destinos.map((y) => y.nome), ['Fulano de Teste']);
+  assert.equal(x.registros.comunicados[0].destinos[0].resposta.ip, '200.1.2.3');
+  const hist = x.historico.filter((h) => h.tabela === 'comunicados');
+  assert.equal(hist.length, 2);
+  assert.ok(!JSON.stringify(hist).includes('Beltrano'), 'no ZIP não vai o item dos outros');
+  P.apagarPessoa(d, CPF, 'dono', '2026-11-17');
+  assert.deepEqual(R.buscar(d, 'comunicados', com.id).destinos.map((y) => y.nome), ['Beltrano Teste']);
+  const texto = JSON.stringify(d);
+  for (const v of ['Fulano de Teste', 'fulano@exemplo.com', '200.1.2.3']) assert.ok(!texto.includes(v), `${v} ainda está no banco`);
+});
+
+test('troca de titular: enquanto o contrato que continua o dela vale, não apaga; os 10 anos contam do fim do último (admin-007)', () => {
+  const { d, c } = banco();
+  d.contratos[1].data_saida = '2016-08-31';
+  const novo = R.inserir(d, 'contratos', { imovel_id: c.imovel_id, inquilino_nome: 'Sucessor Teste', inquilino_cpf: '', data_entrada: '2016-04-01', contrato_anterior_id: c.id }, 't');
+  let s = P.situacaoParaApagar(d, CPF, '2026-11-17');
+  assert.equal(s.pode, false); assert.match(s.motivo, /Sucessor Teste.*troca de titular/);
+  assert.ok(!P.pessoasParaApagar(d, '2026-11-17').some((x) => x.nome === 'Fulano de Teste'));
+  novo.data_saida = '2020-05-31';
+  s = P.situacaoParaApagar(d, CPF, '2026-11-17');
+  assert.equal(s.pode, false); assert.match(s.motivo, /31\/05\/2030/);
+  assert.equal(P.situacaoParaApagar(d, CPF, '2030-05-31').pode, true);
+});
+
+test('lista de 10 anos inclui quem só foi solidário (admin-018)', () => {
+  const { d } = banco();
+  const SOLID = '714.602.380-01';
+  d.contratos[0].solidario_nome = 'Só Solidário'; d.contratos[0].solidario_cpf = SOLID;
+  d.contratos[1].data_saida = '2016-08-31';
+  assert.ok(P.pessoasParaApagar(d, '2026-11-17').some((x) => x.cpf === SOLID));
 });

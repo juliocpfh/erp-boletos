@@ -277,7 +277,7 @@ export const CADASTROS = {
     },
     valores: (r) => ({ ...r, ...escolhaDoContrato(r.contrato_id, r) }),
     padrao: (q) => ({ data: C.hojeIso(), ...(q.contrato ? escolhaDoContrato(Number(q.contrato)) : {}) }),
-    voltar: (r, q) => ({ inquilinos: '#/inquilinos', solicitacoes: '#/solicitacoes' }[q && q.de]
+    voltar: (r, q) => ({ inquilinos: '#/inquilinos', solicitacoes: `#/solicitacoes${q && q.filtro ? `?filtro=${q.filtro}` : ''}` }[q && q.de]
       || (r || (q && q.contrato) ? `#/contrato/${r ? r.contrato_id : q.contrato}?ir=solicitacoes` : '#/solicitacoes')),
     descricao: (dados) => `Solicitação: ${String(dados.descricao || '').slice(0, 80)}`,
     ajustar(dados, erros, r, form) {
@@ -1033,7 +1033,7 @@ export const CADASTROS = {
       for (const k of R.relogiosObrigatorios(c)) if (!dados[`leitura_${k}`]) erros[`leitura_${k}`] = 'Informe a leitura na saída';
       dados.vistoria_saida = resultadoVistoriaSaida(d(), c).texto;
     },
-    salvar: (db, dados, q) => R.encerrarContrato(db, Number(q.contrato), dados, login()),
+    salvar: (db, dados, q) => R.encerrarContrato(db, Number(q.contrato), dados, login(), C.hojeIso()),
   },
   avulsas: {
     titulo: (r) => (r ? (r.airbnb_competencia ? `Editar a NF do Airbnb de ${compBr(r.airbnb_competencia)}` : 'Editar NF avulsa') : 'Nova NF avulsa'),
@@ -1132,16 +1132,16 @@ export const CADASTROS = {
 };
 
 export function telaFormulario(tabela, registro, q, estado) {
-  const cfg = CADASTROS[tabela];
+  const cfg = Object.hasOwn(CADASTROS, String(tabela)) ? CADASTROS[tabela] : null;
   if (!cfg) return naoEncontrado('Página não encontrada');
   if (!opera() || (cfg.admin && !podeUsuario('admin'))) return '<h1>Seu usuário não pode alterar este cadastro</h1>';
-  if (!registro && cfg.semNovo) return naoEncontrado('Boletos novos saem na tela Boletos ("Gerar boletos" do mês)', '#/cobrancas', 'Ir para Boletos');
+  if (!registro && cfg.semNovo) return naoEncontrado('Boletos novos saem na tela Boletos ("Gerar boletos" do mês)', '#/cobrancas', 'Ir para Boletos', '');
   // cadastro que depende de outro (ex.: depósito da garantia de um contrato) aberto sem ele: endereço incompleto
   try {
     return montarFormulario(cfg, tabela, registro, q, estado);
   } catch (e) {
     if (!(e instanceof TypeError)) throw e;
-    return naoEncontrado('Abra este cadastro pela página do inquilino ou do imóvel');
+    return naoEncontrado('Abra este cadastro pela página do inquilino ou do imóvel', '#/', 'Voltar ao painel', '');
   }
 }
 

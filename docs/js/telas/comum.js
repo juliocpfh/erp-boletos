@@ -5,14 +5,19 @@ import * as S from '../armazenamento.js';
 import * as C from '../calculos.js';
 import { dataBr, pct, reais } from '../calculos.js';
 import { ACEITA_DOCUMENTOS, esc } from '../formularios.js';
+import { rotuloCampo, valorTexto } from '../exportar.js';
 import * as P from '../poupanca.js';
 import * as R from '../regras.js';
 import * as AI from '../arquivo-impresso.js';
 import * as FO from '../ficha-online.js';
 
-/** Tela de "não encontrado" com caminho de volta (ex.: endereço antigo ou registro excluído). */
-export const naoEncontrado = (titulo, href = '#/', texto = 'Voltar ao painel') => `<h1>${esc(titulo)}</h1>
-  <p class="suave">O endereço pode ser antigo ou o registro foi excluído.</p><p class="acoes">${link(href, texto, 'botao')}${href !== '#/' ? ` ${link('#/', 'Voltar ao painel', 'botao secundario')}` : ''}</p>`;
+/**
+ * Tela de "não encontrado" com caminho de volta (ex.: endereço antigo ou registro excluído). `explica`: a frase de baixo
+ * (vazia nas telas que só orientam, como "Escolha os documentos na pasta do inquilino").
+ */
+export const ENDERECO_ANTIGO = 'O endereço pode ser antigo ou o registro foi excluído.';
+export const naoEncontrado = (titulo, href = '#/', texto = 'Voltar ao painel', explica = ENDERECO_ANTIGO) => `<h1>${esc(titulo)}</h1>
+  ${explica ? `<p class="suave">${esc(explica)}</p>` : ''}<p class="acoes">${link(href, texto, 'botao')}${href !== '#/' ? ` ${link('#/', 'Voltar ao painel', 'botao secundario')}` : ''}</p>`;
 
 /** Estado de tela que passa de um assunto a outro: troca de titular escolhida no contrato novo; pagamento com valor diferente aguardando a NF. */
 export const memoria = { continuacao: null, pagamentoDivergente: null, formularioAberto: null };
@@ -112,10 +117,29 @@ export const endereco = (i, sep = ' · ') => [R.enderecoCompleto(i), i.bairro, i
 export function multaJurosTexto(cb) {
   if (!cb.data_pagamento) return '';
   if (!cb.dias_atraso || !(cb.multa || cb.juros)) return '<span class="suave">sem multa e juros</span>';
-  return `Multa ${pct(cb.multa_percentual)} = <b>${reais(cb.multa)}</b><br>Juros ${pct(cb.juros_mensal_percentual)} a.m. × ${cb.dias_atraso} dias = <b>${reais(cb.juros)}</b>`;
+  return `Multa ${pct(cb.multa_percentual)} = <b>${reais(cb.multa)}</b><br>Juros ${pct(cb.juros_mensal_percentual)} a.m. × ${C.plural(cb.dias_atraso, 'dia')} = <b>${reais(cb.juros)}</b>`;
 }
 
-const textoValor = (v) => (v === null || v === undefined || v === '' ? '(vazio)' : typeof v === 'object' ? JSON.stringify(v) : v);
+/** Valor do Histórico como na janela do Desfazer: dinheiro em reais, datas em dia/mês/ano, sim/não ("(vazio)" sem valor). */
+const textoValor = (k, v) => {
+  if (v === null || v === undefined || v === '') return '(vazio)';
+  if (Array.isArray(v)) return v.length ? `${v.length} ${v.length === 1 ? 'item' : 'itens'}` : '(nenhum)';
+  if (typeof v === 'object') return Object.entries(v).filter(([, x]) => x !== null && x !== undefined && x !== '').map(([kk, x]) => `${rotuloCampo(kk)}: ${textoValor(kk, x)}`).join('; ') || '(vazio)';
+  return valorTexto(k, v);
+};
+
+/** Uma linha por campo que mudou: "Aluguel inicial: R$ 1.800,00 → R$ 1.900,00"; objeto (config) vira os subcampos que mudaram. */
+function linhasDaMudanca(k, m, tabela) {
+  const rot = rotuloCampo(k, tabela);
+  const de = m.de; const para = m.para;
+  const objeto = (x) => x && typeof x === 'object' && !Array.isArray(x);
+  if (objeto(de) || objeto(para)) {
+    const a = objeto(de) ? de : {}; const b = objeto(para) ? para : {};
+    const chaves = [...new Set([...Object.keys(a), ...Object.keys(b)])].filter((kk) => JSON.stringify(a[kk] ?? null) !== JSON.stringify(b[kk] ?? null));
+    if (chaves.length) return chaves.map((kk) => `<div>${esc(rot)} › ${esc(rotuloCampo(kk))}: ${esc(textoValor(kk, a[kk]))} → ${esc(textoValor(kk, b[kk]))}</div>`).join('');
+  }
+  return `<div>${esc(rot)}: ${esc(textoValor(k, de))} → ${esc(textoValor(k, para))}</div>`;
+}
 
 /**
  * Tabela do histórico. ``desfazer`` (só na página Histórico, para o administrador): { pode: Set "índice:campo", indice: Map registro → índice }
@@ -128,13 +152,14 @@ export function tabelaHistorico(lista, desfazer = null) {
       const i = desfazer ? desfazer.indice.get(h) : -1;
       // a gravação inteira volta junta (item 39): um botão por linha; a janela mostra antes o que volta e os boletos recalculados
       const itens = desfazer ? R.gravacaoDesfazivel(d(), i, desfazer.pode) : null;
-      det = Object.entries(h.detalhes).map(([k, m]) => (m && typeof m === 'object'
-        ? `<div><code>${esc(k)}</code>: ${esc(textoValor(m.de))} → ${esc(textoValor(m.para))}</div>`
-        : `<div><code>${esc(k)}</code>: ${esc(m)}</div>`)).join('')
+      det = Object.entries(h.detalhes).map(([k, m]) => (m && typeof m === 'object' && ('de' in m || 'para' in m)
+        ? linhasDaMudanca(k, m, h.tabela)
+        : `<div>${esc(rotuloCampo(k, h.tabela))}: ${esc(textoValor(k, m))}</div>`)).join('')
         + (itens ? `<div class="acoes"><label class="check-mini" title="Marcar para desfazer junto com outras"><input type="checkbox" data-desfazer value="${esc(itens.join(','))}"></label>
           ${botao('desfazerAlteracao', '↶ Desfazer esta alteração', { itens: itens.join(',') }, 'secundario pequeno')}</div>` : '');
     } else if (h.detalhes) {
-      det = `<details><summary>ver</summary>${Object.entries(h.detalhes).map(([k, v]) => `<div><code>${esc(k)}</code>: ${esc(typeof v === 'object' ? JSON.stringify(v) : v)}</div>`).join('')}</details>`;
+      det = `<details><summary>ver</summary>${Object.entries(h.detalhes).map(([k, v]) => (v && typeof v === 'object' && !Array.isArray(v) && ('de' in v || 'para' in v)
+        ? linhasDaMudanca(k, v, h.tabela) : `<div>${esc(rotuloCampo(k, h.tabela))}: ${esc(textoValor(k, v))}</div>`)).join('')}</details>`;
     }
     return `<tr><td class="nw">${C.dataHoraBr(h.quando)}</td><td>${esc(h.usuario)}</td>
       <td>${esc(h.acao)}${h.tabela ? ` · ${esc(R.TABELAS[h.tabela] || h.tabela)}` : ''}${h.descricao ? `<br><span class="suave">${esc(h.descricao)}</span>` : ''}</td>
