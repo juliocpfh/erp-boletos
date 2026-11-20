@@ -1356,6 +1356,9 @@ document.addEventListener('click', async (ev) => {
     menu.setAttribute('aria-expanded', String(aberto));
     return;
   }
+  // botão apagado (ainda não funciona): no toque mostra o motivo, que no computador também fica no title (o celular não tem "passar o mouse")
+  const apagado = ev.target.closest('[data-motivo]');
+  if (apagado) { ev.preventDefault(); aviso(apagado.dataset.motivo); return; }
   const el = ev.target.closest('[data-acao]');
   if (!el) return;
   ev.preventDefault();

@@ -128,7 +128,7 @@ test('tela Gestão: números, lista de cada número (?filtro=), nomes escapados 
   entrarComo(T.E, 'admin');
   const TG = await import('../docs/js/telas/gestao.js');
   const html = TG.telaGestao({ mes: '2026-10' });
-  assert.match(html, /<h1>Gestão<\/h1>/);
+  assert.match(html, /<h1>Financeiro<\/h1>[\s\S]*<h2>Gestão · números de 10\/2026<\/h2>/, 'título do Financeiro, como nas outras abas');
   assert.match(html, /data-acao="relatorioGestao" data-mes="2026-10"/);
   assert.match(html, /25,0%/, 'inadimplência de outubro: R$ 1.500,00 de R$ 6.000,00');
   assert.match(html, /href="#\/gestao\?mes=2026-10&filtro=vagos&ir=lista"/);
@@ -143,7 +143,7 @@ test('tela Gestão: números, lista de cada número (?filtro=), nomes escapados 
   assert.match(TG.telaGestao({ mes: '2026-10', filtro: 'recebido' }), /nº 0001/, 'a NF de cada boleto pago (R.indiceFaturas)');
   assert.ok(!TG.telaGestao({ mes: '2026-10', filtro: 'outra_coisa' }).includes('id="lista"'));
   // mês futuro: fica no mês atual
-  assert.match(TG.telaGestao({ mes: '2099-01' }), new RegExp(`Números de ${T.C.compBr(T.C.competenciaDe(T.C.hojeIso())).replace('/', '\\/')}`));
+  assert.match(TG.telaGestao({ mes: '2099-01' }), new RegExp(`Gestão · números de ${T.C.compBr(T.C.competenciaDe(T.C.hojeIso())).replace('/', '\\/')}`));
   // relatório: uma folha com cada número e o do mês anterior
   const folha = TG._relatorioHtml('2026-11', HOJE);
   assert.match(folha, /RESUMO DE GESTÃO · 11\/2026/);

@@ -87,7 +87,7 @@ export function telaInquilinos(q) {
     const cls = celular ? 'botao secundario mini so-celular' : 'botao secundario pequeno'; const texto = celular ? 'Contrato' : '📄 Contrato';
     return doc && doc.arquivo
       ? `<a href="#" class="${cls}" data-acao="abrirArquivo" data-escopo="assinados" data-id="${doc.contrato.id}" data-nome="${esc(doc.arquivo)}" title="Abrir o contrato assinado de ${esc(doc.contrato.inquilino_nome)}">${texto}</a>`
-      : `<span class="${cls} desligado" title="O contrato assinado de ${esc(c.inquilino_nome)} ainda não foi anexado (página do inquilino, Documentos assinados)">${texto}</span>`; };
+      : `<span class="${cls} desligado" data-motivo="O contrato assinado de ${esc(c.inquilino_nome)} ainda não foi anexado (página do inquilino, Documentos assinados)" title="O contrato assinado de ${esc(c.inquilino_nome)} ainda não foi anexado (página do inquilino, Documentos assinados)">${texto}</span>`; };
   // no computador: Matrícula ao lado do nome do imóvel, encostada à direita da coluna (todas alinhadas) e o Contrato
   // na coluna própria; no celular os dois lado a lado embaixo do imóvel (pedido do dono, 2026-11-17)
   const registrar = (c) => `<td class="centro nw so-pc">${botaoContrato(c)}</td>`;

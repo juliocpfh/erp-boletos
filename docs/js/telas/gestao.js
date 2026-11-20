@@ -102,8 +102,8 @@ export function telaGestao(q) {
   const b = g.boletos; const a = g.boletosAnterior;
   const aqui = (filtro) => `#/gestao?mes=${mes}&filtro=${filtro}&ir=lista`;
   const lista = LISTAS[q.filtro];
-  return `<h1>Gestão</h1>${abasFinanceiro('gestao')}
-    <div class="cabecalho"><h2>Números de ${compBr(mes)}</h2>
+  return `<h1>Financeiro</h1>${abasFinanceiro('gestao')}
+    <div class="cabecalho"><h2>Gestão · números de ${compBr(mes)}</h2>
       <div class="acoes"><a class="botao secundario" href="#/gestao?mes=${g.anterior}">← ${compBr(g.anterior)}</a>
       <form data-form="ir" data-ir="gestao" class="acoes"><input type="month" name="mes" value="${esc(mes)}" max="${atual}" style="width:160px"><button class="secundario">Ir</button></form>
       ${mes < atual ? `<a class="botao secundario" href="#/gestao?mes=${g.proximo}">${compBr(g.proximo)} →</a>` : ''}

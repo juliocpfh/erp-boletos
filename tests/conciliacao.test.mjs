@@ -398,7 +398,7 @@ test('pagamentos pelo banco: preparar (validações), aprovar, lote enviado, sit
   assert.equal(e.content, 'financeiro@exemplo.com.br');
   Z.aprovarPagamento(d2, e.id, 'julio');
   Z.registrarGrupoEnviado(d2, [e.id], 'grupo-2', [{ id: 'it-2', content: e.content, amount: 50, status: 'DECODE_ERROR', error_message: 'Chave Pix inválida' }], 'julio');
-  assert.deepEqual([e.situacao, e.erro], ['erro', 'Chave Pix inválida']);
+  assert.deepEqual([e.situacao, e.erro], ['erro', 'O banco não conseguiu ler este código ou esta chave (Chave Pix inválida)'], 'o motivo em português, com o texto do banco entre parênteses');
   Z.cancelarPagamento(d2, e.id, 'julio', { motivo: 'chave errada' });
   assert.equal(e.situacao, 'cancelado');
   assert.throws(() => Z.atualizarPagamento(d2, e.id, { situacao: 'agendado' }, 'julio'), /não pode passar/);

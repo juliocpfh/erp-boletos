@@ -268,7 +268,7 @@ async function escolherContaC6(cb, lote = '') {
   const sugerida = cb && R.contaSugerida(d(), cb);
   if (sugerida && !lote) return sugerida;
   const contas = R.configBanco(d()).contas;
-  if (!contas.length) throw new C.ErroUsuario('Nenhuma conta bancária cadastrada: configure em Dados e backup (Banco C6).');
+  if (!contas.length) throw new C.ErroUsuario('Nenhuma conta bancária cadastrada: configure em Dados e backup → Banco (C6).');
   if (contas.length === 1) return contas[0];
   const marcada = cb ? R.contaPreMarcada(d(), cb) : R.contaEmissora(d());
   const resp = await janela({ titulo: 'Por qual empresa emitir o boleto?',
@@ -2247,7 +2247,7 @@ export const ACOES = {
     if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador negativa um pagador.');
     const cb = buscar('cobrancas', id);
     const conta = R.contaBanco(d(), cb.banco && cb.banco.conta_id);
-    if (!conta || !conta.negativacao.ativa) throw new C.ErroUsuario('A negativação está desligada nesta conta (Dados e backup → Banco C6).');
+    if (!conta || !conta.negativacao.ativa) throw new C.ErroUsuario('A negativação está desligada nesta conta (Dados e backup → Banco (C6)).');
     const c = buscar('contratos', cb.contrato_id);
     const resp = await janela({ titulo: '2ª confirmação: negativar no birô de crédito', forte: true,
       html: `<p>O banco vai incluir <b>${esc(c.inquilino_nome)}</b>${c.inquilino_cpf ? ` (${esc(c.inquilino_cpf)})` : ''} no birô de crédito se o boleto de <b>${esc(compBr(cb.competencia))}</b> (${esc(reais(cb.banco.valor))}, vencimento ${esc(dataBr(cb.vencimento))}) não for pago em até <b>${conta.negativacao.dias_atraso} dias de atraso</b>.</p>

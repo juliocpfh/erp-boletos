@@ -71,6 +71,18 @@ function mesComContas(imovelId) {
   return atual;
 }
 
+/** Quantos lançamentos as listas mostram de saída (os mais recentes); o resto aparece em "Ver todos". */
+const LIMITE_CONTAS = 60;
+const LIMITE_QUADRO = 12;
+/** Aviso no pé da lista cortada: "Mostrando os 60 mais recentes de 72 · Ver todos". */
+const maisAntigos = (total, mostrados, href) => (total > mostrados ? `<p class="suave" data-mais-antigos>Mostrando os ${mostrados} mais recentes de ${total}. ${link(href, 'Ver todos (também os mais antigos)', '')}</p>` : '');
+/**
+ * "×" de excluir a conta paga por nós: só na lançada à mão. A que veio do extrato mostra "extrato" e a paga pelo sistema via C6,
+ * "pelo banco" (excluir as duas é recusado: o destino se desfaz na tela Banco). Mesma regra no quadro "+ custo" e em "Contas pagas por nós".
+ */
+const excluirDespesa = (x) => (x.movimentacao_id ? '<span class="suave">extrato</span>' : x.pagamento_banco_id ? '<span class="suave">pelo banco</span>'
+  : opera() ? botao('excluir', '×', { tabela: 'despesas', id: x.id }, 'x-excluir', `Excluir ${x.tipo} de ${compBr(x.competencia)} (${reais(x.valor)})?`) : '');
+
 /** Coluna "Banco" dos lançamentos: movimentação do extrato ligada à conta (com o comprovante) ou "sem extrato". */
 function bancoDaDespesa(x) {
   const m = (d().movimentacoes_banco || []).find((y) => y.despesa_id === x.id || (x.movimentacao_id && y.id === x.movimentacao_id));
@@ -84,7 +96,7 @@ export function telaContas(rota) {
   const i = buscar('imoveis', rota.partes[1]);
   // sem o número do imóvel (#/contas): escolher o imóvel numa lista, em vez de "Imóvel não encontrado"
   if (!i && !rota.partes[1]) {
-    return `<h1>Contas do imóvel</h1><div class="cartao"><p>Escolha o imóvel para lançar ou ver as contas:</p>
+    return `<p class="suave"><a href="#/resultados">← Financeiro</a></p><h1>Contas do imóvel</h1><div class="cartao"><p>Escolha o imóvel para lançar ou ver as contas:</p>
       <ul>${ordenar(d().imoveis, 'nome').map((x) => `<li><a href="#/contas/${x.id}">${esc(x.nome)}</a></li>`).join('') || '<li class="suave">Nenhum imóvel cadastrado.</li>'}</ul></div>`;
   }
   if (!i) return naoEncontrado('Imóvel não encontrado', '#/imoveis', 'Ver os imóveis');
@@ -93,7 +105,9 @@ export function telaContas(rota) {
   const permitidas = R.contasPermitidas(d(), i.id, comp);
   const doMes = R.despesasDo(d(), i.id).filter((x) => x.competencia === comp);
   const hoje = C.hojeIso();
-  const lista = R.despesasDo(d(), i.id).slice(0, 60);
+  // os 60 mais recentes; "Ver todos" (todos=1) mostra o resto (conta antiga lançada errada precisa ser achada para excluir)
+  const todas = R.despesasDo(d(), i.id);
+  const lista = rota.q.todos === '1' ? todas : todas.slice(0, LIMITE_CONTAS);
   const linha = (tipo, n) => {
     const u = ultimos[tipo];
     const ja = doMes.filter((x) => x.tipo === tipo).reduce((t, x) => t + x.valor, 0);
@@ -125,8 +139,9 @@ export function telaContas(rota) {
     ${caixaPagarPeloBanco(i, comp)}
     <div class="cartao"><h2>Lançamentos</h2><div class="rolagem"><table class="responsiva"><tr><th>Mês</th><th>Conta</th><th class="n">Valor</th><th>Vencimento</th><th>Pago em</th><th>Observação</th><th>Banco</th><th></th></tr>
       ${lista.map((x) => `<tr><td>${compBr(x.competencia)}</td><td>${esc(x.tipo)}</td><td class="n">${reais(x.valor)}</td><td>${x.vencimento ? dataBr(x.vencimento) : '-'}</td><td>${dataBr(x.data_pagamento)}</td><td>${esc(x.observacoes || '')}</td><td>${bancoDaDespesa(x)}</td>
-        <td class="n">${opera() ? botao('excluir', '×', { tabela: 'despesas', id: x.id }, 'x-excluir', `Excluir ${x.tipo} de ${compBr(x.competencia)} (${reais(x.valor)})?`) : ''}</td></tr>`).join('')
+        <td class="n">${excluirDespesa(x)}</td></tr>`).join('')
       || '<tr><td colspan="8" class="suave">Nenhuma conta lançada.</td></tr>'}</table></div>
+      ${maisAntigos(todas.length, lista.length, `#/contas/${i.id}?comp=${comp}&todos=1`)}
       <p class="suave">Coluna "Banco": a movimentação do extrato ligada a esta conta e o comprovante guardado (tela Banco). "pelo banco" = paga pelo sistema via C6.</p></div>`;
 }
 
@@ -145,8 +160,12 @@ export function telaImpostos(comp) {
   const nTri = Number(tri.slice(-1));
   const meses = R.mesesDoTrimestre(comp);
   const nomeMes = (m) => compBr(m);
+  // total do contador no mês: a guia trimestral só entra no último mês do trimestre (mesma conta da guia esperada)
+  const contadorNoMes = (guias) => guias.filter((g) => g.contador && (g.mensal || meses[2] === comp));
   const guiaLinha = (e, g) => {
-    const dif = g.contador ? g.contador.valor - g.aPagar : null;
+    // IRPJ/CSLL: o valor do contador é do trimestre inteiro; nos dois primeiros meses a guia esperada é parcial, então não se compara
+    const parcial = !g.mensal && meses[2] !== comp;
+    const dif = g.contador && !parcial ? g.contador.valor - g.aPagar : null;
     return `<tr><td><b>${esc(g.imposto)}</b><br><span class="suave">${g.mensal ? `guia mensal de ${compBr(comp)}` : `guia do ${nTri}º trimestre (${nomeMes(meses[0])} a ${nomeMes(meses[2])})`}</span></td>
       <td class="n">${reais(g.base)}${g.mensal ? '' : `<br><span class="suave">${meses.filter((m) => m <= comp).length} de 3 meses</span>`}</td>
       <td class="n">${pct(g.aliquota)}</td>
@@ -160,7 +179,7 @@ export function telaImpostos(comp) {
       <td class="nw">${opera() ? `<form data-form="guiaImposto" class="acoes" data-emitente="${e.id}" data-imposto="${esc(g.imposto)}" data-periodo="${g.periodo}">
         <input name="valor" inputmode="decimal" data-dinheiro placeholder="valor do contador" value="${g.contador ? reais(g.contador.valor, false) : ''}" style="width:150px"><button class="secundario pequeno">Salvar</button></form>`
     : (g.contador ? reais(g.contador.valor) : '-')}</td>
-      <td class="n">${dif === null ? '<span class="suave">-</span>' : dif === 0 ? etiqueta('igual', 'ok') : `<span class="${Math.abs(dif) > 100 ? 'texto-aviso' : 'suave'}">${dif > 0 ? '+' : '-'} ${reais(Math.abs(dif))}</span>`}</td></tr>`;
+      <td class="n">${dif === null ? `<span class="suave">${parcial && g.contador ? `compara em ${compBr(meses[2])}` : '-'}</span>` : dif === 0 ? etiqueta('igual', 'ok') : `<span class="${Math.abs(dif) > 100 ? 'texto-aviso' : 'suave'}">${dif > 0 ? '+' : '-'} ${reais(Math.abs(dif))}</span>`}</td></tr>`;
   };
   return `<h1>Financeiro</h1>${abasFinanceiro('impostos')}
     <div class="cabecalho"><h2>Impostos de ${compBr(comp)}</h2>
@@ -177,7 +196,7 @@ export function telaImpostos(comp) {
       <table><tr><th>Imposto</th><th class="n">Base (faturamento)</th><th class="n">Alíquota</th><th class="n">Guia esperada</th><th>Valor do contador</th><th class="n">Diferença</th></tr>
         ${x.guias.map((g) => guiaLinha(x.empresa, g)).join('')}
         <tr class="total"><td colspan="3">Total a pagar no mês${meses[2] === comp ? '' : ' (IRPJ e CSLL ainda parciais)'}</td><td class="n">${reais(x.guias.reduce((t, g) => t + (g.abaixoDoMinimo ? 0 : g.aPagar), 0))}</td>
-          <td>${x.guias.some((g) => g.contador) ? reais(x.guias.reduce((t, g) => t + (g.contador ? g.contador.valor : 0), 0)) : ''}</td><td></td></tr></table></div>`).join('')
+          <td>${contadorNoMes(x.guias).length ? reais(contadorNoMes(x.guias).reduce((t, g) => t + g.contador.valor, 0)) : ''}</td><td></td></tr></table></div>`).join('')
       || '<div class="cartao"><p class="suave">Nenhuma empresa cadastrada. Cadastre em Dados e backup → Empresas.</p></div>'}`;
 }
 
@@ -185,8 +204,11 @@ export function telaImpostos(comp) {
 function periodo(q, base) {
   const hoje = C.hojeIso();
   // as datas vêm do endereço (#/resultados?de=…&ate=…): só valem no formato AAAA-MM-DD
-  const ate = C.dataValida(q.ate, hoje);
-  const de = C.dataValida(q.de, C.somarDias(C.somarMesesData(ate, -12), 1));
+  let ate = C.dataValida(q.ate, hoje);
+  let de = C.dataValida(q.de, C.somarDias(C.somarMesesData(ate, -12), 1));
+  // "De" depois de "até" (ex.: de 01/12/2026 até 01/01/2026) zerava tudo sem dizer: as duas trocam de lugar, com aviso
+  const trocadas = de > ate;
+  if (trocadas) [de, ate] = [ate, de];
   const ano = Number(hoje.slice(0, 4));
   const atalhos = [
     ['Últimos 12 meses', C.somarDias(C.somarMesesData(hoje, -12), 1), hoje],
@@ -195,7 +217,8 @@ function periodo(q, base) {
     ['Últimos 5 anos', C.somarDias(C.somarAnos(hoje, -5), 1), hoje],
   ].map(([t, a, b]) => link(`#/${base}?de=${a}&ate=${b}`, t, a === de && b === ate ? 'botao pequeno' : 'botao secundario pequeno')).join(' ');
   const form = `<form class="cartao acoes" data-form="ir" data-ir="${base === 'liquido' ? 'liquido' : 'resultados'}"><label style="margin:0">De</label><input type="date" name="de" value="${esc(de)}" style="width:160px"><label style="margin:0">até</label><input type="date" name="ate" value="${esc(ate)}" style="width:160px"><button class="secundario">Ver</button>
-      ${atalhos} ${botao('excelResultados', 'Exportar Excel', { de, ate }, 'pequeno')}</form>`;
+      ${atalhos} ${botao('excelResultados', 'Exportar Excel', { de, ate }, 'pequeno')}</form>
+    ${trocadas ? `<div class="alerta aviso" id="periodo-trocado">A data inicial era depois da final: mostrando de ${dataBr(de)} até ${dataBr(ate)}.</div>` : ''}`;
   return { de, ate, form };
 }
 
@@ -207,28 +230,32 @@ const menos = (v) => (v > 0 ? `- ${reais(v)}` : v < 0 ? `+ ${reais(-v)}` : '<spa
 function painelCusto(i, voltar) {
   const s = R.situacaoCustos(d(), i.id);
   const hoje = C.hojeIso();
-  const lista = R.despesasDo(d(), i.id).slice(0, 12);
-  return `<div class="cartao" id="lancar"><div class="cabecalho"><h2>Custo pago por nós · ${esc(i.nome)}</h2>${link(voltar, 'Fechar')}</div>
+  const todas = R.despesasDo(d(), i.id);
+  const lista = todas.slice(0, LIMITE_QUADRO);
+  // mesmos nomes e a mesma ordem da tela "Contas pagas por nós" (Conta, Mês da conta, Valor pago, Vencimento, Pago em, Observação)
+  return `<div class="cartao" id="lancar"><div class="cabecalho"><h2>Conta paga por nós · ${esc(i.nome)}</h2>${link(voltar, 'Fechar')}</div>
     ${s.rotulo ? `<p>${etiqueta(s.rotulo, s.classe)}</p>` : '<p class="suave">Pelo contrato, o inquilino paga as contas: lance aqui só o que for nosso (ex.: débito antigo, troca de titular).</p>'}
     ${opera() ? `<form data-form="lancarCusto" class="grade-lancar"><input type="hidden" name="imovel" value="${i.id}">
       <label>Conta<select name="tipo">${R.TIPOS_DESPESA.map((t) => `<option>${esc(t)}</option>`).join('')}</select></label>
-      <label>Mês de referência<input type="month" name="competencia" value="${C.competenciaDe(hoje)}"></label>
+      <label>Mês da conta<input type="month" name="competencia" value="${C.competenciaDe(hoje)}"></label>
+      <label>Valor pago<input name="valor" data-dinheiro inputmode="decimal" placeholder="0,00"></label>
       <label>Vencimento<input type="date" name="vencimento"></label>
       <label>Pago em<input type="date" name="data_pagamento" value="${hoje}">${F.atalhosData()}</label>
-      <label>Valor pago<input name="valor" data-dinheiro inputmode="decimal" placeholder="0,00"></label>
       <label>Observação<input name="observacoes" placeholder="opcional"></label>
       <div><button>Lançar</button></div></form>` : ''}
-    <div class="rolagem"><table class="responsiva compacta"><tr><th>Mês</th><th>Conta</th><th>Vencimento</th><th>Pago em</th><th class="n">Valor</th><th>Observação</th><th></th></tr>
-      ${lista.map((x) => `<tr><td>${compBr(x.competencia)}</td><td>${esc(x.tipo)}</td><td>${x.vencimento ? dataBr(x.vencimento) : '<span class="suave">-</span>'}</td><td>${dataBr(x.data_pagamento)}</td><td class="n">${reais(x.valor)}</td><td>${esc(x.observacoes || '')}</td>
-        <td class="n">${opera() && !x.movimentacao_id && !x.pagamento_banco_id ? botao('excluir', '×', { tabela: 'despesas', id: x.id }, 'x-excluir', `Excluir ${x.tipo} de ${compBr(x.competencia)} (${reais(x.valor)})?`) : x.movimentacao_id ? '<span class="suave">extrato</span>' : ''}</td></tr>`).join('')
-      || '<tr><td colspan="7" class="suave">Nenhum custo lançado.</td></tr>'}</table></div>
+    <div class="rolagem"><table class="responsiva compacta"><tr><th>Mês</th><th>Conta</th><th class="n">Valor</th><th>Vencimento</th><th>Pago em</th><th>Observação</th><th></th></tr>
+      ${lista.map((x) => `<tr><td>${compBr(x.competencia)}</td><td>${esc(x.tipo)}</td><td class="n">${reais(x.valor)}</td><td>${x.vencimento ? dataBr(x.vencimento) : '<span class="suave">-</span>'}</td><td>${dataBr(x.data_pagamento)}</td><td>${esc(x.observacoes || '')}</td>
+        <td class="n">${excluirDespesa(x)}</td></tr>`).join('')
+      || '<tr><td colspan="7" class="suave">Nenhuma conta lançada.</td></tr>'}</table></div>
+    ${maisAntigos(todas.length, lista.length, `#/contas/${i.id}?todos=1`)}
     <p class="suave">Entra nos resultados pela data do pagamento. Vindo do extrato do banco, o custo já chega lançado (Financeiro → Visão geral → destino "Conta do imóvel"). <a href="#/contas/${i.id}">Lançar o mês inteiro de uma vez</a>.</p></div>`;
 }
 
 /** Quadro para lançar um ganho do Airbnb num imóvel vago, com os últimos lançamentos. */
-function painelAirbnb(i, voltar) {
+function painelAirbnb(i, voltar, todosAirbnb = false) {
   const hoje = C.hojeIso();
-  const lista = R.ganhosAirbnbDo(d(), i.id).slice(0, 12);
+  const todos = R.ganhosAirbnbDo(d(), i.id);
+  const lista = todosAirbnb ? todos : todos.slice(0, LIMITE_QUADRO);
   return `<div class="cartao" id="lancar"><div class="cabecalho"><h2>Ganho do Airbnb · ${esc(i.nome)}</h2>${link(voltar, 'Fechar')}</div>
     ${opera() ? `<form data-form="lancarAirbnb" class="grade-lancar"><input type="hidden" name="imovel" value="${i.id}">
       <label>Recebido em<input type="date" name="data_recebimento" value="${hoje}">${F.atalhosData()}</label>
@@ -240,6 +267,7 @@ function painelAirbnb(i, voltar) {
       ${lista.map((g) => `<tr><td>${dataBr(g.data_recebimento)}</td><td>${compBr(g.competencia)}</td><td class="n">${reais(g.valor)}</td><td>${esc(g.observacoes || '')}</td>
         <td class="n">${opera() && !g.movimentacao_id ? botao('excluir', '×', { tabela: 'ganhos_airbnb', id: g.id }, 'x-excluir', `Excluir o ganho do Airbnb de ${dataBr(g.data_recebimento)} (${reais(g.valor)})?`) : g.movimentacao_id ? '<span class="suave">extrato</span>' : ''}</td></tr>`).join('')
       || '<tr><td colspan="5" class="suave">Nenhum ganho lançado.</td></tr>'}</table></div>
+    ${maisAntigos(todos.length, lista.length, `${voltar}&airbnb=${i.id}&todos=1&ir=lancar`)}
     <p class="suave">A NF do Airbnb é uma só por mês, sem imóvel, com a soma dos ganhos de todos os imóveis (gerada em Financeiro → Visão geral depois da virada do mês). Estes lançamentos são o nosso controle de quanto entrou em cada imóvel.</p></div>`;
 }
 
@@ -253,7 +281,7 @@ export function telaResultados(q) {
   const aqui = `#/resultados?de=${de}&ate=${ate}`;
   const situacoes = new Map(lista.map((x) => [x.imovel.id, R.situacaoCustos(d(), x.imovel.id)]));
   const painelI = q.custo ? buscar('imoveis', q.custo) : q.airbnb ? buscar('imoveis', q.airbnb) : null;
-  const painel = painelI ? (q.custo ? painelCusto(painelI, aqui) : painelAirbnb(painelI, aqui)) : '';
+  const painel = painelI ? (q.custo ? painelCusto(painelI, aqui) : painelAirbnb(painelI, aqui, q.todos === '1')) : '';
   const totalBase = tot('base');
   return `<h1>Financeiro</h1>${abasFinanceiro('resultados')}${form}
     <div class="numeros">
@@ -321,7 +349,7 @@ export function telaFinanceiro(q) {
   const mesAir = mes < atual ? mes : C.somarMeses(mes, -1);
   const air = R.airbnbDoMes(d(), mesAir);
   const impostos = R.impostosDoMes(d(), mes);
-  const nomeConta = (id) => { const c = ((d().config_banco || {}).contas || []).find((x) => x.id === id); return c ? (c.apelido || c.id) : id; };
+  const nomeConta = (id) => R.apelidoDaConta(d(), id); // as do C6 e as de outros bancos (ex.: "itau" → "Itaú")
   const sugestao = (m) => { try { return Z.sugerirDestino(d(), m, Z.indiceDaTela(d())); } catch { return null; } };
   return `<h1>Financeiro</h1>${abasFinanceiro('financeiro')}
     <div class="cabecalho"><h2>Movimento de ${compBr(mes)}</h2>
@@ -329,8 +357,8 @@ export function telaFinanceiro(q) {
       <form data-form="ir" data-ir="financeiro" class="acoes"><input type="month" name="mes" value="${esc(mes)}" style="width:160px"><button class="secundario">Ir</button></form>
       ${mes < atual ? `<a class="botao secundario" href="#/financeiro?mes=${C.somarMeses(mes, 1)}">${compBr(C.somarMeses(mes, 1))} →</a>` : ''}</div></div>
     <div class="numeros">
-      <div class="cartao"><div class="grande">${reais(entradas)}</div>entradas nos extratos</div>
-      <div class="cartao"><div class="grande">${reais(saidas)}</div>saídas nos extratos</div>
+      <div class="cartao"><div class="grande">${reais(entradas)}</div>entradas nos extratos<br><span class="suave">sem as transferências entre as nossas contas e sem as ignoradas</span></div>
+      <div class="cartao"><div class="grande">${reais(saidas)}</div>saídas nos extratos<br><span class="suave">sem as transferências entre as nossas contas e sem as ignoradas</span></div>
       <div class="cartao"><div class="grande">${reais(tot('liquido'))}</div>líquido do mês ${tot('impostosEstimados') ? etiqueta('estimado', 'aviso') : ''}</div>
       <div class="cartao"><div class="grande">${semDestino.length}</div>movimentação(ões) sem destino</div></div>
     <div class="cartao"><h2>Movimentações do extrato sem destino</h2>
