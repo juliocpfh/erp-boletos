@@ -3,7 +3,8 @@
 27 itens (0 graves, 12 médios, 15 leves). Arquivos: `calculos.js`, `formularios.js`, `telas/cadastros.js`, `telas/campos.js`.
 Como trabalhar: ver `../MUTIRAO_19_11.md`. Marque `[x]` ao corrigir. G = grave, M = médio, L = leve.
 
-- [ ] **mensal-039** [L] A diferença que já tem multa e juros dentro entra de novo na base de multa e juros do boleto seguinte
+- [x] **mensal-039** [L] A diferença que já tem multa e juros dentro entra de novo na base de multa e juros do boleto seguinte
+  - Nota (20/11): decisão de 20/11: a diferença antiga levada ao boleto seguinte (lista diferencas_cobradas) sai da base de multa e juros dele, como a multa da notificação.
   - Vê-se: No Pix pago depois do vencimento pelo valor com desconto, a diferença levada ao boleto seguinte é a bonificação perdida + multa + juros (ex.: R$ 279,35). Ela entra no boleto seguinte como ajuste do mês, e o ajuste faz parte da base de multa e juros. Se o bole…
   - Causa: `docs/js/calculos.js:404-409; docs/js/regras.js:1908-1909 e 2486-2491`
   - Fazer: Perguntar ao dono. Se decidir tirar: guardar a diferença em campo próprio do boleto (como multas_notificacao) e descontar da base_multa.

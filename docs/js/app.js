@@ -791,7 +791,11 @@ export async function criarBanco(nome, loginTexto, senha) {
   // só cria o primeiro administrador onde ainda não há usuários: quem já está dentro não cria outro administrador por aqui
   if (E.d?.usuarios?.length) throw new C.ErroUsuario('Esta pasta já tem usuários: o primeiro acesso já foi feito. Entre com o seu login.');
   const novo = E.d || R.bancoVazio();
-  const u = R.inserir(novo, 'usuarios', { login: loginTexto, nome, papel: 'admin', ativo: true, ...(await camposDeSenha(senha)),
+  // na nuvem, o primeiro administrador nasce ligado ao e-mail com que a pessoa entrou pela internet (a nuvem reconhece quem é
+  // pelo login ou pelo e-mail de acesso igual a ele): com login "dono" e sem e-mail, ninguém entrava depois (mutirão 19/11, nuvem-001)
+  if (E.nuvem && E.saudeNuvem) await E.saudeNuvem;
+  const emailAcesso = E.nuvem && E.emailNuvem && String(loginTexto).trim().toLowerCase() !== String(E.emailNuvem).toLowerCase() ? E.emailNuvem : null;
+  const u = R.inserir(novo, 'usuarios', { login: loginTexto, nome, papel: 'admin', ativo: true, ...(emailAcesso ? { email: emailAcesso } : {}), ...(await camposDeSenha(senha)),
     criado_em: new Date().toISOString() }, loginTexto, 'Primeiro administrador criado');
   novo.revisao = (novo.revisao || 0) + 1;
   if (E.nuvem) { // nuvem vazia: primeira carga

@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import test from 'node:test';
+import * as C from '../docs/js/calculos.js';
 import * as R from '../docs/js/regras.js';
 import * as Z from '../docs/js/conciliacao.js';
 import * as P from '../ponte-c6/servidor.mjs';
@@ -189,24 +190,23 @@ test('22: aluguel recebido na JCK não vira "transferência" só porque a ANK pa
 });
 
 // ---------------------------------------------------------------- item 10 (decisão do dono, 16/11/2026)
-test('10: Pix do valor com desconto pago 20 dias atrasado não é "em dia"; a diferença vai para o boleto do mês seguinte', () => {
+// decisão nova do dono (2026-11-20): não existe pagamento em parte. O Pix do valor com desconto pago depois do vencimento é
+// recusado (antes, de 16/11 a 19/11, ficava pago e a diferença ia ao boleto seguinte); nada é gravado e o dinheiro fica sem destino
+test('10 (20/11): Pix do valor com desconto pago 20 dias atrasado é recusado: o boleto continua em aberto, nada vai ao seguinte', () => {
   const { d, cbA, a } = base();
   R.gerarCobrancas(d, '2026-08', 'j');
   const prox = d.cobrancas.find((x) => x.contrato_id === a.id && x.competencia === '2026-08');
   const pont = R.totais(cbA).a_pagar_pontual;
   const { novas: [mov] } = Z.importarExtrato(d, 'ank', [pix('r7', '2026-08-30', pont, 'PIX ANA')], 'j', { hoje: '2026-09-05' });
-  const r = Z.confirmarPagamentoPeloBanco(d, cbA.id, mov.id, 'j');
   const devido = R.previstoNoPagamento(cbA, '2026-08-30').valor_devido;
-  assert.deepEqual([r.divergente, r.atrasoComDesconto, r.previsto, r.recebido, r.diferenca, r.proximo.id], [true, true, devido, pont, devido - pont, prox.id]);
-  assert.equal(cbA.data_pagamento, null, 'nada gravado sem a confirmação');
-  const fim = Z.confirmarPagamentoPeloBanco(d, cbA.id, mov.id, 'j', { diferencaNoProximo: true });
-  assert.equal(fim.divergente, false);
-  assert.deepEqual([cbA.valor_pago, cbA.situacao, cbA.pagou_em_dia, cbA.diferenca_devida], [pont, 'Paga com atraso', false, devido - pont]);
-  assert.equal(prox.outros, devido - pont);
-  assert.match(prox.outros_descricao, /Diferença do boleto 07\/2026/);
-  // desfazer o pagamento tira a diferença do boleto seguinte
-  R.estornarPagamento(d, cbA.id, 'j');
-  assert.deepEqual([prox.outros, prox.outros_descricao], [0, '']);
+  const recusa = (e) => e instanceof C.ErroUsuario && e.message.includes(`menor que o devido (${C.reais(devido)})`) && /Não existe pagamento em parte/.test(e.message);
+  assert.throws(() => Z.confirmarPagamentoPeloBanco(d, cbA.id, mov.id, 'j'), recusa);
+  assert.throws(() => Z.confirmarPagamentoPeloBanco(d, cbA.id, mov.id, 'j', { diferencaNoProximo: true }), recusa);
+  assert.deepEqual([cbA.data_pagamento, cbA.situacao, cbA.diferenca_devida ?? null], [null, 'Em aberto', null]);
+  assert.equal(prox.outros || 0, 0, 'nada no boleto seguinte');
+  assert.equal(mov.classificacao ?? null, null, 'o dinheiro fica no extrato sem destino');
+  // a proposta automática também não casa esse Pix com o boleto
+  assert.ok(!Z.conciliarMovimentacoes(d, [mov]).some((x) => x.cobranca_id === cbA.id));
 });
 
 test('10: boleto pelo código de barras creditado até 3 dias úteis depois do vencimento, pelo valor do desconto, é em dia', () => {

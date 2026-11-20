@@ -89,7 +89,8 @@ export async function visualizar(blob, nome, tipo, baixar) {
     const lib = await carregarPdfJs();
     const pdf = await lib.getDocument({ data: new Uint8Array(await blob.arrayBuffer()), isEvalSupported: false }).promise;
     corpo.replaceChildren();
-    const largura = Math.max(320, corpo.clientWidth - 16);
+    // a largura que cabe no aparelho (sem mínimo: com 320 px numa tela de 320, o CSS encolhia só a largura e a folha esticava)
+    const largura = Math.max(100, corpo.clientWidth - 16);
     const nitidez = Math.min(window.devicePixelRatio || 1, 2);
     // Primeiro reserva o lugar de TODAS as páginas (tamanho certo, em branco) e só depois desenha uma a uma. Antes cada
     // página entrava na tela só quando ficava pronta: rolando, a próxima "carregava" no fim e a tela pulava.

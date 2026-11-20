@@ -155,6 +155,16 @@ button.botao-ajuda[aria-expanded="true"] { background: var(--primaria); color: #
 .pagamento { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
 .pagamento input[type=date] { width: 140px; padding: 3px 6px; }
 .pagamento input[name=valor] { width: 100px; padding: 3px 6px; }
+.pagamento .campo-pagamento { display: inline-flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+@media (max-width: 760px) {
+  .pagamento .campo-pagamento { display: flex; width: 100%; }
+  /* demonstrativo do boleto no celular: a linha "Aluguel R$ 1.500,00 (Bonif. R$ 1.350,00)" quebra e a margem fica menor */
+  .demonstrativo { padding: 12px; }
+  .demonstrativo td.n { white-space: normal; }
+  /* troca de mês em Boletos: campo do mês e "Ir" numa linha própria */
+  form.mes-boletos { flex-basis: 100%; order: 3; flex-wrap: nowrap; }
+  form.mes-boletos .campo-mes { flex: 1; min-width: 0; }
+}
 .lista-demonstrativos { max-width: 800px; margin: 0 auto; } /* o PDF encolhe a largura da lista: sem limite, a letra saía com 5,6 pt */
 .demonstrativo { background: #fff; max-width: 800px; margin: 0 auto 24px; padding: 24px; border: 1px solid var(--borda); }
 .demonstrativo table td, .demonstrativo table th { padding: 5px 6px; }

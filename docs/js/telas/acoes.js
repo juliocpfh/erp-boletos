@@ -190,10 +190,34 @@ function motivoNaoExcluirImovel(db, r) {
   return ligadas ? 'Este imóvel tem lançamentos ligados ao extrato ou a pagamentos do banco: desfaça o destino das movimentações na tela Banco antes.' : null;
 }
 
+/**
+ * "Baixar PDF" do documento da tela no mesmo tamanho em qualquer aparelho (mutirão 19/11, iphone-002/003/004): no celular a
+ * tela tem uns 400 px e essa largura virava a folha A4 inteira (letra gigante, 24 folhas em vez de 7, coluna do valor cortada).
+ * Tela estreita: fotografa uma cópia desenhada fora da tela com 860 px (como o PDF que vai no e-mail, ``pdfDaCarta``). No
+ * computador continua a do próprio documento (o PDF não muda).
+ */
+async function pdfNaLarguraDaFolha(el, rodape, opcoes) {
+  if (el.offsetWidth >= 700) return pdfDoDocumento(el, rodape, opcoes);
+  const caixa = document.createElement('div');
+  caixa.className = 'impressao';
+  caixa.style.cssText = 'position:absolute;left:-10000px;top:0;width:860px';
+  const copia = el.cloneNode(true);
+  copia.style.maxWidth = 'none';
+  caixa.append(copia);
+  document.body.append(caixa);
+  try {
+    return await pdfDoDocumento(copia, rodape, opcoes);
+  } finally {
+    caixa.remove();
+  }
+}
+
 const TABELAS_EXCLUSAO = {
   imoveis: { admin: true, checar: (db, r) => motivoNaoExcluirImovel(db, r), voltar: () => '#/imoveis' },
   contratos: { admin: true, checar: (db, r) => (db.cobrancas.some((cb) => cb.contrato_id === r.id && R.faturasDe(db, 'cobranca', cb.id, false).length) ? 'Este contrato tem NFs emitidas e não pode ser excluído.' : null), voltar: (r) => (r.imovel_id ? `#/imovel/${r.imovel_id}` : '#/inquilinos') },
-  cobrancas: { checar: (db, r) => (R.emAcordo(r) || R.ehParcelaAcordo(r) ? 'Este boleto faz parte de um acordo: use "Desfazer o acordo" na página do boleto.' : R.faturasDe(db, 'cobranca', r.id, false).length ? 'Este boleto tem NF. Desfaça o pagamento antes.' : r.banco && r.banco.situacao === 'emitido' ? 'Este boleto foi emitido no C6 e está em aberto no banco. Cancele no banco antes de excluir.' : null), voltar: (r) => `#/cobrancas?comp=${r.competencia}` },
+  cobrancas: { checar: (db, r) => (R.emAcordo(r) || R.ehParcelaAcordo(r) ? 'Este boleto faz parte de um acordo: use "Desfazer o acordo" na página do boleto.' : R.faturasDe(db, 'cobranca', r.id, false).length ? 'Este boleto tem NF. Desfaça o pagamento antes.' : r.banco && r.banco.situacao === 'emitido' ? 'Este boleto foi emitido no C6 e está em aberto no banco. Cancele no banco antes de excluir.' : R.motivoNaoExcluirParcelaCaucao(db, r)),
+    // parcela do complemento da caução: as outras (em aberto) saem juntas e o complemento volta a "Caução a completar"
+    depois: (db, r) => R.excluirParcelasIrmas(db, r, login()), voltar: (r) => `#/cobrancas?comp=${r.competencia}` },
   correcoes: { recalcular: (db, r) => (cb) => cb.contrato_id === r.contrato_id },
   iptus: {
     // parcela paga pelo extrato ou pelo C6: a movimentação ficaria apontando para um IPTU apagado (mutirão 3000, item 19)
@@ -210,7 +234,8 @@ const TABELAS_EXCLUSAO = {
   vistorias: { admin: true, voltar: (r) => `#/contrato/${r.contrato_id}?ir=documentos` },
   aditivos: { depois: (db, r) => R.marcarAditivos(db, r.contrato_id, login()), voltar: (r) => `#/contrato/${r.contrato_id}?ir=aditivos` },
   fiadores: { voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },
-  devolucoes_garantia: { voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },
+  // a devolução da troca de titular descontava boletos em aberto: eles voltam a ser cobrados
+  devolucoes_garantia: { depois: (db, r) => R.liberarBoletosDaDevolucao(db, r.id, login()), voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },
   // ficha: só o administrador exclui; os documentos da pasta dela saem juntos (ACOES.excluir)
   fichas: { admin: true, checar: (db, r) => (db.contratos.some((c) => c.ficha_id === r.id) ? 'Esta ficha já virou contrato e não pode ser excluída.' : null), voltar: () => '#/inquilinos?ir=fichas' },
   depositos_garantia: { depois: (db, r) => (r.complementar ? null : R.acertarGarantiaDepositada(db, r.contrato_id, r.qual, login())), voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },
@@ -679,7 +704,7 @@ export const ACOES = {
     const el = document.querySelector(seletor);
     if (!el) throw new Error('Documento não encontrado.');
     aviso('Gerando o PDF…', 'info');
-    baixar(await pdfDoDocumento(el, [], { margemLado: 15 }), `${nome || 'Documento'}.pdf`.replace(/[\\/:*?"<>|]/g, '-'));
+    baixar(await pdfNaLarguraDaFolha(el, [], { margemLado: 15 }), `${nome || 'Documento'}.pdf`.replace(/[\\/:*?"<>|]/g, '-'));
   },
 
   /** PDF do documento que está na tela (contrato, vistoria, recibo das chaves), com o rodapé e "Página X de Y" em todas as folhas. */
@@ -689,7 +714,7 @@ export const ACOES = {
     const el = document.querySelector('.impressao .contrato');
     if (!m || !el) throw new Error('Documento não encontrado.');
     await marcarGeradoNaRotina(tipo, m);
-    const blob = await pdfDoDocumento(el, m.rodape);
+    const blob = await pdfNaLarguraDaFolha(el, m.rodape);
     baixar(blob, `${m.arquivo || `${m.nome} - ${m.c.inquilino_nome}`}.pdf`.replace(/[\\/:*?"<>|]/g, '-'));
   },
 
@@ -1771,7 +1796,10 @@ export const ACOES = {
     const nome = (cb) => { const c = buscar('contratos', cb.contrato_id); return c ? c.inquilino_nome : `boleto ${cb.id}`; };
     const pagos = ids.map((id) => buscar('cobrancas', id)).filter((cb) => cb && cb.data_pagamento);
     if (pagos.length) throw new C.ErroUsuario(`Boleto(s) já pago(s) não podem ser excluídos: ${pagos.map(nome).join(', ')}. Desmarque ou desfaça o pagamento antes.`);
-    if (!(await confirmar(`Eles podem ser gerados de novo depois.`, { titulo: `Excluir ${ids.length} boleto(s) de ${compBr(comp)}?`, sim: 'Excluir boletos', forte: true }))) return;
+    // o título diz os meses dos boletos marcados (nos filtros de todos os meses eles são de vários meses)
+    const meses = [...new Set(ids.map((id) => buscar('cobrancas', id)).filter(Boolean).map((cb) => cb.competencia))].sort();
+    const deMeses = meses.length === 1 ? `de ${compBr(meses[0])}` : meses.length ? `de ${meses.map(compBr).join(', ')}` : `de ${compBr(comp)}`;
+    if (!(await confirmar(`Eles podem ser gerados de novo depois.`, { titulo: `Excluir ${ids.length} boleto(s) ${deMeses}?`, sim: 'Excluir boletos', forte: true }))) return;
     let excluidos = 0;
     await alterar((db) => {
       excluidos = 0;
@@ -1781,7 +1809,7 @@ export const ACOES = {
         const problema = TABELAS_EXCLUSAO.cobrancas.checar(db, cb);
         if (problema) throw new C.ErroUsuario(`${nome(cb)}: ${problema}`);
         R.excluir(db, 'cobrancas', id, login(), `Boleto de ${compBr(cb.competencia)} - ${nome(cb)} (exclusão em lote)`);
-        excluidos += 1;
+        excluidos += 1 + R.excluirParcelasIrmas(db, cb, login());
       }
     });
     aviso(`${excluidos} boleto(s) excluído(s).${excluidos < ids.length ? ` ${ids.length - excluidos} já não existia(m) mais.` : ''}`);

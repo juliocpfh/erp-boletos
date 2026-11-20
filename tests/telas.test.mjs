@@ -181,7 +181,10 @@ test('formulário que só leva a outra tela (data-form="ir"): endereço com os c
   assert.equal(enderecoDoFormulario('cobrancas', [['comp', '2026-11']]), '#/cobrancas?comp=2026-11');
   assert.equal(enderecoDoFormulario('cobrancas', [['comp', '2026-11'], ['ordem', 'vencimento'], ['busca', '  Maria Exemplo ']]), '#/cobrancas?comp=2026-11&ordem=vencimento&busca=Maria+Exemplo');
   assert.equal(enderecoDoFormulario('resultados', [['de', '2026-01-01'], ['ate', '']]), '#/resultados?de=2026-01-01', 'campo vazio fica de fora');
-  assert.equal(enderecoDoFormulario('faturas', [['mes', '2026-13"><img src=x>']]), '#/faturas', 'mês fora do formato: a tela usa o padrão');
+  // mês fora do formato avisa (antes sumia sem aviso, iphone-013); "08/2026" (Safari do Mac, sem campo de mês) vira 2026-08
+  assert.throws(() => enderecoDoFormulario('faturas', [['mes', '2026-13"><img src=x>']]), /Mês inválido/);
+  assert.equal(enderecoDoFormulario('cobrancas', [['comp', '08/2026']]), '#/cobrancas?comp=2026-08');
+  assert.equal(enderecoDoFormulario('cobrancas', [['comp', '8/2026']]), '#/cobrancas?comp=2026-08');
   assert.equal(enderecoDoFormulario('buscar', [['q', 'Pão & Cia']]), '#/buscar?q=P%C3%A3o+%26+Cia');
   assert.equal(enderecoDoFormulario('buscar', [['q', 'x'.repeat(150)]]), `#/buscar?q=${'x'.repeat(100)}`, 'busca de até 100 letras');
   assert.equal(enderecoDoFormulario('buscar', [['q', '   ']]), '#/buscar');

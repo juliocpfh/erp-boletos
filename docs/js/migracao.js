@@ -52,11 +52,18 @@ async function emFila(itens, n, fn) {
  * Leva a pasta para a nuvem. `pasta`: a pasta dos dados (FileSystemDirectoryHandle). `anexos`: AnexosNuvem. `sinc`: Sincronia.
  * `aoAndar({ fase, feitos, total, bytes, totalBytes, nome })` mostra o andamento. Devolve o relatório da conferência.
  */
-export async function levarParaNuvem(pasta, { anexos, sinc, aoAndar = () => {}, substituir = false }) {
+export async function levarParaNuvem(pasta, { anexos, sinc, aoAndar = () => {}, substituir = false, email = null }) {
   // como em "Voltar para este dia": as mudanças deste aparelho ainda na fila se perderiam caladas (mutirão 3000, item 25)
   if (substituir && sinc.pendentesQtd?.()) throw Object.assign(new Error(`Ainda há ${sinc.pendentesQtd()} mudança(s) deste aparelho esperando para ir à nuvem. Espere enviar (ou conecte à internet) antes de substituir os dados.`), { esperado: true });
   const dados = await lerBanco(pasta);
   if (!dados) throw Object.assign(new Error(`A pasta escolhida não tem o arquivo ${ARQUIVO_BANCO}. Escolha a pasta dos dados de sempre.`), { esperado: true });
+  // a lista de usuários vai junto: sem um administrador ativo com o e-mail com que a pessoa entrou pela internet, ninguém
+  // entraria depois (mutirão 19/11, nuvem-003). A nuvem confere de novo; aqui para antes de subir os anexos
+  const quem = String(email || '').trim().toLowerCase();
+  if (quem && !(dados.usuarios || []).some((u) => u && u.ativo !== false && !u.pendente && u.papel === 'admin' && [u.login, u.email].some((v) => String(v || '').trim().toLowerCase() === quem))) {
+    const admins = (dados.usuarios || []).filter((u) => u && u.ativo !== false && u.papel === 'admin').map((u) => `${u.login}${u.email ? ` (${u.email})` : ', sem e-mail'}`);
+    throw Object.assign(new Error(`Na pasta, nenhum administrador ativo tem o login ou o "E-mail de acesso" ${email} (o e-mail com que você entrou pela internet)${admins.length ? `: lá ${admins.length === 1 ? 'o administrador é' : 'os administradores são'} ${admins.join('; ')}` : ''}. Abra a pasta no computador, preencha o e-mail de acesso do seu usuário em Usuários e tente de novo. Nada foi enviado.`), { esperado: true });
+  }
   const arquivos = [];
   for (const raiz of [PASTA_ARQUIVOS, PASTA_MODELOS]) {
     let dir;

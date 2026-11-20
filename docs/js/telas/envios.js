@@ -31,10 +31,21 @@ const REGISTRO_EXCLUIDO = 'Este registro foi excluído por outra pessoa; nada fo
  */
 export function enderecoDoFormulario(rota, campos) {
   if (!/^[a-z-]+$/.test(String(rota || ''))) throw new Error('Formulário sem a tela de destino (data-ir).');
-  const preenchidos = [...campos].map(([k, v]) => [k, String(v).trim().slice(0, 100)]).filter(([, v]) => v);
+  // navegador sem campo de mês (Safari do Mac, Firefox): "08/2026" vira "2026-08"; mês que não dá para entender avisa (antes sumia)
+  const preenchidos = [...campos].map(([k, v]) => [k, String(v).trim().slice(0, 100)]).filter(([, v]) => v).map(([k, v]) => {
+    if (!['comp', 'mes'].includes(k)) return [k, v];
+    const m = /^(\d{1,2})\s*[/.-]\s*(\d{4})$/.exec(v);
+    const mes = m ? `${m[2]}-${m[1].padStart(2, '0')}` : v;
+    if (!C.competenciaValida(mes)) throw new C.ErroUsuario(`Mês inválido: "${v}". Digite como 08/2026 (mês/ano) ou 2026-08.`);
+    return [k, mes];
+  });
   const q = String(new URLSearchParams(Object.entries(C.sanearParametros(Object.fromEntries(preenchidos)))));
   return q ? `#/${rota}?${q}` : `#/${rota}`;
 }
+
+/** Anexos que não entraram no ZIP (aviso NAO-INCLUIDOS.txt de quando ele foi feito): texto para o aviso depois de importar. */
+const foraDoZip = (lidos) => (lidos.naoIncluidos && lidos.naoIncluidos.length
+  ? ` Atenção: ${C.plural(lidos.naoIncluidos.length, 'anexo ficou', 'anexos ficaram')} de fora deste ZIP quando ele foi feito (não deu para ler): ${lidos.naoIncluidos.slice(0, 10).join('; ')}${lidos.naoIncluidos.length > 10 ? '…' : ''}.` : '');
 
 /** Testemunhas do contrato ou do termo aditivo: ficam lembradas neste navegador (o próximo já vem com elas) e vão no formato guardado. */
 function testemunhasDo(f) {
@@ -98,17 +109,20 @@ export const FORMULARIOS = {
     }
     if (f.get('destino') !== 'pasta') {
       baixar(blob, `backup-restaurado-${info.tipo === 'completo' ? 'completo' : 'banco'}-${data}.zip`);
-      aviso(`Backup de ${C.dataHoraBr(info.criado_em)} aberto. Agora use "Importar ZIP" em Dados e backup com o arquivo baixado.`);
+      // na nuvem não existe "Importar ZIP": o caminho é abrir numa pasta do computador e substituir os dados da nuvem (ou Backups da nuvem)
+      aviso(E.nuvem ? `Backup de ${C.dataHoraBr(info.criado_em)} baixado como ZIP (para guardar). Para voltar os dados da nuvem a esse dia: use "Backups da nuvem" em Dados e backup ou, no computador (Chrome ou Edge), abra o backup numa pasta nova e depois "Substituir os dados da nuvem pelos de uma pasta".`
+        : `Backup de ${C.dataHoraBr(info.criado_em)} aberto. Agora use "Importar ZIP" em Dados e backup com o arquivo baixado.`);
       return;
     }
     // abrir numa pasta do computador (versão PC com o site fora do ar): grava o banco e os anexos na pasta escolhida e abre
     let dir;
     try { dir = await window.showDirectoryPicker({ id: 'restaurar-backup', mode: 'readwrite' }); } catch (e) { if (e.name === 'AbortError') return; throw e; }
     if (await S.lerBanco(dir)) throw new C.ErroUsuario(`A pasta escolhida já tem um ${S.ARQUIVO_BANCO}. Escolha uma pasta nova e vazia, para não misturar os dados.`);
-    await S.importarZip(JSZip, dir, blob, null);
+    const lidos = {};
+    await S.importarZip(JSZip, dir, blob, null, lidos);
     await S.lembrarPasta(dir);
     await abrirPasta(dir);
-    aviso(`Backup de ${C.dataHoraBr(info.criado_em)} aberto na pasta ${dir.name}. Entre com seu usuário e senha de sempre. Quando o site voltar, Dados e backup → "Substituir os dados da nuvem pelos de uma pasta" leva o que você fizer aqui para a nuvem.`);
+    aviso(`Backup de ${C.dataHoraBr(info.criado_em)} aberto na pasta ${dir.name}. Entre com seu usuário e senha de sempre. Quando o site voltar, Dados e backup → "Substituir os dados da nuvem pelos de uma pasta" leva o que você fizer aqui para a nuvem.${foraDoZip(lidos)}`, lidos.naoIncluidos.length ? 'aviso' : 'ok');
   },
 
   async modeloVistoria(form) {
@@ -132,7 +146,9 @@ export const FORMULARIOS = {
     const dataPagou = atrasado ? String(fd.get('pagou') || '') || data : null;
     if (atrasado && !/^\d{4}-\d{2}-\d{2}$/.test(dataPagou)) throw new C.ErroUsuario('Informe o dia em que pagaram.');
     if (atrasado && dataPagou > data) throw new C.ErroUsuario('O dia em que pagaram não pode ser depois da data em que o dinheiro entrou.');
-    if (atrasado && dataPagou <= [...vencs][0]) throw new C.ErroUsuario(`Pagaram até o vencimento (${dataBr([...vencs][0])}): use a baixa "pagos em dia".`);
+    // vencimento em dia não útil vale até o próximo dia útil (C.limitePagamento): pagar nesse dia é em dia, sem multa e juros
+    const limiteLote = C.limitePagamento([...vencs][0]);
+    if (atrasado && dataPagou <= limiteLote) throw new C.ErroUsuario(`Pagaram até ${dataBr(limiteLote)}${limiteLote !== [...vencs][0] ? ` (o vencimento ${dataBr([...vencs][0])} não é dia útil e vale até esse dia)` : ' (o vencimento)'}: é pagamento em dia, sem multa e juros. Use a baixa sem "pagaram atrasado".`);
     pagamentoNaoFuturo(data, dataPagou);
     await confirmarAvisos([dataMuitoAntiga(data)].filter(Boolean));
     let r;
@@ -527,18 +543,14 @@ export const FORMULARIOS = {
     const valorNf = texto ? C.centavos(texto) : null;
     const justificativa = String(f.get('justificativa') || '').trim();
     const r = await alterar((db) => {
+      // pagou a menos é recusado na regra (não existe pagamento em parte, 2026-11-20)
       const res = R.registrarPagamento(db, p.id, p.data, p.valor, login(), { pagouEmDia: p.pagouEmDia, dataPagou: p.dataPagou, valorNf, justificativa });
-      // pagou a menos: a diferença fica devendo e vai para o próximo boleto (marcado na tela)
-      if (f.get('diferenca') === '1' && p.valor < res.valor_devido) res.diferenca = R.levarDiferencaAoProximo(db, p.id, res.valor_devido - p.valor, login());
       // veio da tela Banco (entrada do extrato com valor diferente do previsto): a movimentação fica ligada ao boleto
       if (p.movimentacao_id) Z.ligarMovimentacaoAoBoleto(db, p.movimentacao_id, p.id, login());
       return res;
     });
     memoria.pagamentoDivergente = null;
-    const dif = r.diferenca && r.diferenca.diferenca_devida;
-    const proximo = dif && r.diferenca.diferenca_no_boleto && buscar('cobrancas', r.diferenca.diferenca_no_boleto);
-    aviso(`Pagamento confirmado com valor diferente do previsto. Recebido ${reais(p.valor)}; NF de ${reais(valorNf)} (calculada ${reais(r.valor_nf)}). Data da NF: ${dataBr(p.data)}.${dif
-      ? ` Faltam ${reais(dif)}: ${proximo ? `entraram no boleto de ${compBr(proximo.competencia)}` : 'entram no próximo boleto, quando ele for gerado'}.` : ''}`, 'aviso');
+    aviso(`Pagamento confirmado com valor diferente do previsto. Recebido ${reais(p.valor)}; NF de ${reais(valorNf)} (calculada ${reais(r.valor_nf)}). Data da NF: ${dataBr(p.data)}.`, 'aviso');
     await mostrar();
   },
 
@@ -548,7 +560,18 @@ export const FORMULARIOS = {
     if (!valor) throw new C.ErroUsuario('Informe o valor do ajuste.');
     const motivo = String(f.get('motivo') || '').trim();
     if (!motivo) throw new C.ErroUsuario('Informe o motivo do ajuste (fica no histórico).');
-    await alterar((db) => R.ajustarBoleto(db, Number(form.dataset.id), f.get('tipo') === 'ressarcimento' ? -valor : valor, motivo, login()));
+    const cb = buscar('cobrancas', Number(form.dataset.id));
+    const ressarcimento = f.get('tipo') === 'ressarcimento';
+    // "-30,00" em cobrança adicional virava +R$ 30,00 em silêncio: o sinal se escolhe no tipo
+    if (String(f.get('valor') || '').trim().startsWith('-')) throw new C.ErroUsuario('Digite o valor sem o sinal de menos: para descontar, escolha "Ressarcimento (−)".');
+    if (cb) {
+      const semAjuste = R.totais({ ...cb, outros: 0 });
+      // ressarcimento maior que o boleto: a sobra a favor do inquilino não vai para lugar nenhum (o boleto fica R$ 0,00)
+      if (ressarcimento && valor > semAjuste.total_sem_desconto) throw new C.ErroUsuario(`O ressarcimento (${reais(valor)}) é maior que o boleto sem ajuste (${reais(semAjuste.total_sem_desconto)}): a sobra de ${reais(valor - semAjuste.total_sem_desconto)} não iria para lugar nenhum. Lance no máximo o valor do boleto aqui e o resto no boleto seguinte (ou devolva ao inquilino).`);
+      const aluguel = cb.aluguel_mensal || cb.aluguel || 0;
+      if (!ressarcimento && aluguel && valor > 3 * aluguel && !(await confirmar(`A cobrança adicional de ${reais(valor)} é mais de 3 vezes o aluguel (${reais(aluguel)}). Confira o valor.`, { titulo: 'Valor muito acima do aluguel', sim: 'Está certo, salvar', forte: true }))) return;
+    }
+    await alterar((db) => R.ajustarBoleto(db, Number(form.dataset.id), ressarcimento ? -valor : valor, motivo, login()));
     aviso('Ajuste salvo e registrado no histórico.');
     await mostrar();
   },
@@ -575,6 +598,12 @@ export const FORMULARIOS = {
     if (!/^\d{4}-\d{2}$/.test(mesRef)) throw new C.ErroUsuario('Informe o mês até onde vai o acumulado.');
     const percentual = C.numero(f.get('percentual'));
     if (String(f.get('percentual') || '').trim() === '') throw new C.ErroUsuario('Informe o percentual acumulado em 12 meses.');
+    // o acumulado só existe de mês que já terminou; e um zero a mais (45 em vez de 4,5) iria para o reajuste de todos os contratos
+    const mesAtual = C.competenciaDe(C.hojeIso());
+    if (mesRef >= mesAtual) throw new C.ErroUsuario(`O acumulado vai até um mês que já terminou: ${compBr(mesRef)} ainda não fechou (hoje é ${dataBr(C.hojeIso())}).`);
+    if (percentual > 30 || percentual < -10) {
+      if (!(await confirmar(`${indice} acumulado até ${compBr(mesRef)}: ${pct(percentual)}. É bem fora do normal: um aluguel de R$ 2.000,00 iria a ${reais(C.aplicarCorrecao(200000, percentual))} no reajuste. Confira o número antes de salvar.`, { titulo: 'Índice fora do normal', sim: 'Está certo, salvar', forte: true }))) return;
+    }
     await alterar((db) => {
       const existente = db.indices_acumulados.find((x) => x.indice === indice && x.mes_ref === mesRef);
       if (existente) R.atualizar(db, 'indices_acumulados', existente.id, { percentual }, login(), `${indice} até ${compBr(mesRef)}: ${pct(percentual)}`);
@@ -675,12 +704,13 @@ export const FORMULARIOS = {
     if (!arq || !arq.size) throw new C.ErroUsuario('Escolha o arquivo ZIP.');
     if (f.get('confirmo') !== '1') throw new C.ErroUsuario('Marque a confirmação: a importação substitui os dados desta pasta.');
     const JSZip = await jsZip();
-    const novos = await S.importarZip(JSZip, E.pasta, arq, E.d);
+    const lidos = {};
+    const novos = await S.importarZip(JSZip, E.pasta, arq, E.d, lidos);
     E.d = novos;
-    await alterar((db) => R.registrar(db, login(), 'Importação', 'banco', null, `Dados importados de ${arq.name}`, null, {}, false));
+    await alterar((db) => R.registrar(db, login(), 'Importação', 'banco', null, `Dados importados de ${arq.name}${lidos.naoIncluidos.length ? ` (${lidos.naoIncluidos.length} anexo(s) não estavam no ZIP)` : ''}`, null, {}, false));
     E.usuario = E.d.usuarios.find((u) => u.login === E.usuario.login && u.ativo) || null;
     renovarUsuario();
-    aviso('Dados importados. Uma cópia do banco anterior ficou na pasta backups.');
+    aviso(`Dados importados. Uma cópia do banco anterior ficou na pasta backups.${foraDoZip(lidos)}`, lidos.naoIncluidos.length ? 'aviso' : 'ok');
     ir('#/');
   },
 
@@ -768,6 +798,9 @@ export async function confirmarPagamentoBoleto(id, f) {
   ].filter(Boolean));
   // valor recebido diferente do previsto: justificativa e, na página do boleto, o valor da NF digitado à mão
   const previsto = cb && R.previstoNoPagamento(cb, data, { pagouEmDia, dataPagou });
+  // zero, negativo ou menor que o devido (também no boleto de controle) é recusado: não existe pagamento em parte (2026-11-20);
+  // o complemento da caução só pelo valor exato do boleto
+  if (cb) R.conferirValorRecebido(cb, valor, previsto.valor_devido);
   if (cb && valor !== null && valor !== previsto.valor_devido && !R.ehComplementoCaucao(cb) && R.geraNf(buscar('contratos', cb.contrato_id))) {
     if (dataPagou && dataPagou > data) throw new C.ErroUsuario('O dia em que pagou não pode ser depois do dia em que o dinheiro entrou na conta.');
     const dif = valor - previsto.valor_devido;
@@ -786,7 +819,12 @@ export async function confirmarPagamentoBoleto(id, f) {
   }
   const r = await alterar((db) => R.registrarPagamento(db, id, data, valor, login(), { pagouEmDia, dataPagou }));
   const pago = buscar('cobrancas', id);
-  if (pago && R.ehComplementoCaucao(pago)) aviso(`Complemento da caução pago${r.pontual ? '' : ` com ${C.plural(r.dias_atraso, 'dia')} de atraso`}: a caução passou a ${reais(pago.caucao_nova)}. Sem NF.`, 'ok');
+  const contratoPago = pago && buscar('contratos', pago.contrato_id);
+  // a caução de verdade depois do pagamento (parcela paga fora da ordem: só ela entrou), não o "nova" gravado no boleto
+  if (pago && R.ehComplementoCaucao(pago)) aviso(`Complemento da caução pago${r.pontual ? '' : ` com ${C.plural(r.dias_atraso, 'dia')} de atraso`}: a caução passou a ${reais(contratoPago ? R.valorGarantia(d(), contratoPago) : pago.caucao_nova)}. Sem NF.`, 'ok');
+  // boleto de controle (inquilino sem NF): sem "valor da nota" nem "data da NF"
+  else if (contratoPago && !R.geraNf(contratoPago)) aviso(r.pontual ? `Pagamento em dia confirmado${pagouEmDia ? ' (sem multa e juros)' : ''}: recebido ${reais(pago.valor_pago)} em ${dataBr(data)}. Boleto de controle: sem NF.`
+    : `Pagamento com ${C.plural(r.dias_atraso, 'dia')} de atraso: multa ${reais(r.multa)} e juros ${reais(r.juros)}; recebido ${reais(pago.valor_pago)} em ${dataBr(data)}. Boleto de controle: sem NF.`, r.pontual ? 'ok' : 'aviso');
   else aviso(r.pontual ? `Pagamento em dia confirmado${pagouEmDia ? ' (sem multa e juros)' : ''}. Data da NF: ${dataBr(data)}. Valor da nota: ${reais(r.valor_nf)}.`
     : `Pagamento com ${C.plural(r.dias_atraso, 'dia')} de atraso: multa ${reais(r.multa)} e juros ${reais(r.juros)}. Valor da nota: ${reais(r.valor_nf)} (com multa e juros). Data da NF: ${dataBr(data)}.`, r.pontual ? 'ok' : 'aviso');
   avisarImovelSemEmpresa(pago);
