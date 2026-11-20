@@ -64,31 +64,41 @@ test('item 3: na troca de titular, as parcelas do acordo de quem saiu ficam com 
   assert.equal(R.herancaIncompleta(d, novo), null, 'e não ficam "faltando passar"');
 });
 
-test('item 4: pagamento a menos deixa a diferença devendo no próximo boleto; desfeito, ela sai', () => {
+// Pagamento em parte de ANTES de 2026-11-20 (dado antigo): o pagamento entrou a menos e a diferença ficou devendo. Desde
+// 20/11 o pagamento a menos é recusado (não existe pagamento em parte); os dados antigos continuam coerentes.
+function pagoEmParteAntigo(d, cb, data, recebido) {
+  R.registrarPagamento(d, cb.id, data, null, 'julio');
+  const falta = cb.valor_pago - recebido;
+  Object.assign(cb, { valor_pago: recebido, situacao: 'Paga em parte', diferenca_devida: falta, diferenca_no_boleto: null });
+  R.aplicarDiferencasPendentes(d, cb.contrato_id, 'julio');
+  return falta;
+}
+
+test('item 4 (20/11): pagamento a menos é recusado; o pagamento em parte antigo continua levando a diferença ao próximo boleto e desfeito sai', () => {
   const { d, c } = base();
   const jun = R.boletoDoMes(d, c.id, '2026-06');
   const jul = R.boletoDoMes(d, c.id, '2026-07');
-  const r = R.registrarPagamento(d, jun.id, '2026-07-10', 100000, 'julio', { valorNf: 99000, justificativa: 'pagou só uma parte' });
-  const falta = r.valor_devido - 100000;
-  R.levarDiferencaAoProximo(d, jun.id, falta, 'julio');
-  assert.equal(jun.situacao, 'Paga em parte');
-  assert.equal(jun.diferenca_devida, falta);
+  assert.throws(() => R.registrarPagamento(d, jun.id, '2026-07-10', 100000, 'julio', { valorNf: 99000, justificativa: 'pagou só uma parte' }),
+    (e) => e instanceof C.ErroUsuario && /Não existe pagamento em parte/.test(e.message));
+  assert.equal(jun.data_pagamento, null, 'continua em aberto');
+  const falta = pagoEmParteAntigo(d, jun, '2026-07-10', 100000);
   assert.equal(jun.diferenca_no_boleto, jul.id);
   assert.equal(jul.outros, falta);
+  assert.deepEqual(jul.diferencas_cobradas, [{ cobranca_id: jun.id, valor: falta, texto: 'Diferença do boleto 06/2026 (pago em parte)' }]);
   assert.match(jul.outros_descricao, /Diferença do boleto 06\/2026/);
   R.estornarPagamento(d, jun.id, 'julio');
   assert.equal(jul.outros, 0);
   assert.equal(jul.outros_descricao, '');
+  assert.deepEqual(jul.diferencas_cobradas, []);
   assert.equal(jun.diferenca_devida, null);
   // sem próximo boleto em aberto: a diferença espera o boleto ser gerado
   const ago = R.boletoDoMes(d, c.id, '2026-08');
   R.registrarPagamento(d, jul.id, '2026-08-10', null, 'julio');
-  R.registrarPagamento(d, ago.id, '2026-09-10', 50000, 'julio', { valorNf: 49000, justificativa: 'parte' });
-  R.levarDiferencaAoProximo(d, ago.id, 85350, 'julio');
+  const falta2 = pagoEmParteAntigo(d, ago, '2026-09-10', 50000);
   assert.equal(ago.diferenca_no_boleto, null);
   R.gerarCobrancas(d, '2026-09', 'julio');
   const set = R.boletoDoMes(d, c.id, '2026-09');
-  assert.equal(set.outros, 85350);
+  assert.equal(set.outros, falta2);
   assert.equal(ago.diferenca_no_boleto, set.id);
   // pago o boleto que recebeu a diferença, o pagamento em parte não se desfaz sozinho
   R.registrarPagamento(d, set.id, '2026-10-10', null, 'julio');

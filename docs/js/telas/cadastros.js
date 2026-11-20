@@ -606,6 +606,12 @@ export const CADASTROS = {
       if (dados.data_recebida && dados.data_recebida > hoje) erros.data_recebida = 'A data em que a ficha chegou não pode ser no futuro';
       if (dados.reserva_valor > 0 && !dados.reserva_data) erros.reserva_data = 'Informe a data da reserva';
       else if (dados.reserva_data && dados.reserva_data > hoje) erros.reserva_data = 'A reserva não pode ser numa data futura';
+      // reabrir ficha reprovada (ou desistência) com a devolução da reserva registrada: nunca apagar em silêncio um registro de
+      // dinheiro nem levar ao contrato uma reserva já devolvida (o 1º aluguel abateria de novo). Ou zera a reserva (já devolvida;
+      // a devolução fica no Histórico) ou a ficha fica como está
+      if (!R.fichaSemContrato(dados) && r && (r.devolucao_data || r.devolucao_valor > 0) && dados.reserva_valor > 0) {
+        erros.situacao = `A reserva de ${reais(r.reserva_valor || 0)} já foi devolvida${r.devolucao_data ? ` em ${dataBr(r.devolucao_data)}` : ''}${r.devolucao_valor ? ` (${reais(r.devolucao_valor)})` : ''}. Para reabrir a ficha, apague o valor da reserva (ela já foi devolvida; a devolução fica no Histórico). Se a pessoa fizer nova reserva, lance depois, com a data e o comprovante novos.`;
+      }
       if (!R.fichaSemContrato(dados)) { dados.devolucao_data = null; dados.devolucao_valor = null; } else {
         if (dados.devolucao_data && !dados.devolucao_valor) dados.devolucao_valor = dados.reserva_valor || null;
         if (dados.devolucao_valor > 0 && !dados.devolucao_data) erros.devolucao_data = 'Informe a data da devolução';
@@ -1100,6 +1106,10 @@ export const CADASTROS = {
       // na nuvem a pessoa entra pelo e-mail (Cloudflare): sem ele (e sem login em forma de e-mail) ela nunca consegue entrar
       if (E.nuvem && dados.ativo && !emailDeAcesso(dados) && !erros.email) erros.email = 'Na nuvem, informe o e-mail de acesso: é com ele que a pessoa entra pela internet';
       if (r && r.id === E.usuario.id && (dados.papel !== 'admin' || !dados.ativo)) erros.papel = 'Você não pode tirar o seu próprio acesso de administrador';
+      // na nuvem, o próprio usuário sem o e-mail com que entrou ficaria trancado para fora (a nuvem também recusa)
+      if (E.nuvem && E.emailNuvem && r && r.id === E.usuario.id && ![dados.login, dados.email].some((v) => String(v || '').trim().toLowerCase() === String(E.emailNuvem).toLowerCase())) {
+        erros.email = `O seu login ou o e-mail de acesso tem de continuar ${E.emailNuvem} (o e-mail com que você entra pela internet); senão você não entra mais`;
+      }
       if (!r) dados.criado_em = new Date().toISOString();
     },
   },

@@ -354,6 +354,13 @@ export class Cofre {
       if (!substituir) throw new ErroCofre(409, 'A nuvem já tem dados. Para trocar tudo, confirme a substituição.');
       this.exigir(email, 'admin');
     }
+    // a lista de usuários vem da pasta: se nenhum administrador ativo dela tem o e-mail de quem está fazendo a carga, no pedido
+    // seguinte ninguém entra ("Este e-mail não está ligado a nenhum usuário ativo"). "Voltar para este dia" mantém os de hoje.
+    const quemEntra = String(email || '').trim().toLowerCase();
+    if (!manterUsuarios && quemEntra && !d.usuarios.some((u) => u && u.ativo !== false && !u.pendente && u.papel === 'admin'
+      && [u.login, u.email].some((v) => String(v || '').trim().toLowerCase() === quemEntra))) {
+      throw new ErroCofre(400, `Nos dados que vão para a nuvem, nenhum administrador ativo tem o login ou o e-mail de acesso ${email} (o e-mail com que você entrou). Sem isso, ninguém entraria depois. Preencha o "E-mail de acesso" do seu usuário (Usuários, na pasta) com esse e-mail e tente de novo. Nada foi enviado.`);
+    }
     this.conferirRepetidos(d);
     return this.transacao(() => {
       // "Voltar para este dia": os usuários ficam como estão hoje (desativado não volta ativo, senha trocada não volta)
@@ -695,7 +702,13 @@ export class Cofre {
         conflito = true;
       }
       if (mudou && quem.papel !== 'admin') conferirRegrasDoAdmin(tabela, JSON.parse(atual.dados), dados);
-      if (mudou && tabela === 'usuarios' && campos.some(([c]) => c === 'login' || c === 'email')) this.conferirAcessoUnico(id, dados);
+      if (mudou && tabela === 'usuarios' && campos.some(([c]) => c === 'login' || c === 'email')) {
+        this.conferirAcessoUnico(id, dados);
+        // o próprio usuário sem o e-mail com que entrou ficaria trancado para fora (e, se for o único administrador, a empresa toda)
+        if (id === quem.id && email && ![dados.login, dados.email].some((v) => String(v || '').trim().toLowerCase() === String(email).toLowerCase())) {
+          throw new ErroCofre(409, `Seu login ou o e-mail de acesso tem de continuar ${email} (o e-mail com que você entra pela internet); senão você não entra mais. Nada foi salvo.`);
+        }
+      }
       if (mudou) {
         if (this.chaves.has(tabela)) this.anotarChave(this.chaves.get(tabela), tabela, id, dados);
         this.sql.exec('UPDATE registros SET dados = ?, meta = ? WHERE tabela = ? AND id = ?', texto(dados), JSON.stringify(meta), tabela, id);

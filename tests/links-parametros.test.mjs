@@ -31,3 +31,12 @@ test('parâmetros fixos dos links passam por sanearParametros', () => {
   }
   assert.deepEqual(ruins, []);
 });
+
+// fios-011 / impressos-001 (mutirão 19/11): os modelos de contrato padrão têm código negativo (-1 residencial, -2 comercial);
+// sem o sinal de menos no formato, ?modelo=-2 sumia e saía sempre o primeiro modelo (o residencial)
+test('modelo de contrato padrão (código negativo) passa pelo endereço', () => {
+  assert.equal(sanearParametros({ modelo: '-2' }).modelo, '-2');
+  assert.equal(sanearParametros({ modelo: '7' }).modelo, '7');
+  assert.equal(sanearParametros({ modelo: '-' }).modelo, undefined);
+  assert.equal(sanearParametros({ modelo: '2-1' }).modelo, undefined);
+});

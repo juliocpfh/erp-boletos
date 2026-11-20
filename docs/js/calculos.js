@@ -396,9 +396,10 @@ export function aluguelVigente(inicial, correcoes, dataRef) {
 // --------------------------------------------------------------------------
 // ``ctx``: o boleto (com contrato_id) ou o contrato, para valer a regra especial do contrato (`regra(chave, ctx)`, config-regras.js)
 export function totaisCobranca(cobranca, reservaDisponivel = 0, ctx = cobranca) {
-  const { aluguel, desconto, iptu = 0, seguro = 0, taxa_boleto = 0, outros = 0, ressarcimento = 0, fci = 0, multas_notificacao = [] } = cobranca;
-  // multa da notificação ao inquilino (vai em `outros`): sem multa nem juros de atraso sobre ela (decisão do dono, 2026-11-17)
-  const multaNotif = (multas_notificacao || []).reduce((s, e) => s + (Number(e && e.valor) || 0), 0);
+  const { aluguel, desconto, iptu = 0, seguro = 0, taxa_boleto = 0, outros = 0, ressarcimento = 0, fci = 0, multas_notificacao = [], diferencas_cobradas = [] } = cobranca;
+  // multa da notificação ao inquilino (vai em `outros`): sem multa nem juros de atraso sobre ela (decisão do dono, 2026-11-17);
+  // nem sobre a diferença de um pagamento em parte antigo levada a este boleto, que já traz multa e juros dentro (mutirão 19/11)
+  const multaNotif = [...(multas_notificacao || []), ...(diferencas_cobradas || [])].reduce((s, e) => s + (Number(e && e.valor) || 0), 0);
   const encargos = iptu + seguro + taxa_boleto + outros + (fci || 0);
   // ressarcimento ao inquilino (ex.: taxa extraordinária do condomínio que ele pagou e é do proprietário)
   const totalSemDesconto = aluguel + encargos - (ressarcimento || 0);
@@ -412,7 +413,7 @@ export function totaisCobranca(cobranca, reservaDisponivel = 0, ctx = cobranca) 
     // nunca negativo (ex.: ressarcimento maior que o boleto): igual ao "sem desconto", para quem atrasa não pagar mais que quem paga em dia
     a_pagar_pontual: Math.max(totalPontual - reserva, 0),
     a_pagar_sem_desconto: Math.max(totalSemDesconto - reserva, 0),
-    // multa e juros por atraso não incidem sobre o FCI (fundo de conservação do imóvel) nem sobre a multa da notificação
+    // multa e juros por atraso não incidem sobre o FCI (fundo de conservação do imóvel) nem sobre a multa da notificação (nem a diferença antiga)
     // (boleto de R$ 2.000,00 + multa da notificação de R$ 1.500,00 → base R$ 2.000,00); regra `base_multa`: boleto inteiro
     // (padrão) ou só o aluguel cheio (ex.: aluguel R$ 2.000,00 + IPTU R$ 200,00 → base R$ 2.200,00 ou R$ 2.000,00)
     base_multa: regra('base_multa', ctx) === 'aluguel'
@@ -576,7 +577,7 @@ const FORMATOS_PARAMETRO = {
   comp: COMPETENCIA_RE, mes: COMPETENCIA_RE,
   data: DATA_RE,
   de: /^(\d{4}-\d{2}-\d{2}|[a-z]+)$/, ate: DATA_RE, // "de" também é a tela de origem (de=iptu, de=inquilinos)
-  imovel: /^\d+$/, contrato: /^\d+$/, pessoa: /^\d+$/, substitui: /^\d+$/, modelo: /^\d+$/, numero: /^\d+$/, ano: /^\d{4}$/,
+  imovel: /^\d+$/, contrato: /^\d+$/, pessoa: /^\d+$/, substitui: /^\d+$/, modelo: /^-?\d+$/, numero: /^\d+$/, ano: /^\d{4}$/,
   vincular: /^\d+$/, ficha: /^\d+$/, fiador: /^\d$/, custo: /^\d+$/, airbnb: /^\d+$/, id: /^\d+$/, troca: /^\d+$/,
   ids: /^\d+(,\d+)*$/, numeros: /^\d+(,\d+)*$/,
   ordem: /^[a-z_]+$/, filtro: /^[a-z_]+$/, tipo: /^[\wÀ-ÿ -]+$/, todos: /^[01]$/, nf: /^[01]$/,

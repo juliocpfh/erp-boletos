@@ -570,7 +570,7 @@ const rotinaAberta = (c, hoje) => R.contratoAtivo(c, hoje) && !R.resumoRotinaEnt
 /** Marcar um documento de entrada como assinado: data, arquivo assinado e "Marcar" (com "Falta assinatura", se pedido). */
 function formMarcarDocumento(c, k, feito, comParcial = true) {
   return `<form data-form="marcarDocumento" class="acoes" style="justify-content:flex-end"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="campo" value="${k}">
-        <input type="date" name="data" value="${C.hojeIso()}" style="width:auto">${F.atalhosData()}
+        <input type="date" name="data" value="${C.hojeIso()}" max="${C.hojeIso()}" style="width:auto">${F.atalhosData()}
         <label class="botao secundario pequeno enviar" title="Arquivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}" data-arquivo-doc></label>
         <button class="secundario pequeno">Marcar ${feito}</button>
         ${comParcial ? botao('documentoParcial', 'Falta assinatura', { contrato: c.id, campo: k }, 'secundario pequeno') : ''}</form>`;
@@ -628,7 +628,7 @@ function caixaRotinaEntrada(c, hoje = C.hojeIso()) {
     const atalho = e.concessionaria !== null ? conta(e) : (atalhos[e.chave] || (() => ''))();
     return `<div class="acoes" style="justify-content:flex-end">${atalho}
       <form data-form="etapaEntrada" class="acoes"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="chave" value="${e.chave}">
-        <input type="date" name="data" value="${hoje}" style="width:auto" title="Data em que foi feita">${F.atalhosData()}<button class="secundario mini">Marcar feita</button></form>${pular}</div>`;
+        <input type="date" name="data" value="${hoje}" max="${hoje}" style="width:auto" title="Data em que foi feita">${F.atalhosData()}<button class="secundario mini">Marcar feita</button></form>${pular}</div>`;
   };
   // contra-vistoria (2026-11-15): o arquivo que o inquilino mandou (com o "×") ou a data + o arquivo para anexar; "Não houve" fecha
   // a etapa. Passado o prazo, continua pendente até um dos dois. Na troca de titular vale a do anterior.
@@ -640,7 +640,7 @@ function caixaRotinaEntrada(c, hoje = C.hojeIso()) {
     if (!opera() || anterior) return '';
     if (e.manual) return botao('desfazerEtapaEntrada', 'Desfazer', { contrato: c.id, chave: e.chave }, 'link-botao');
     return `<div class="acoes" style="justify-content:flex-end"><form data-form="contraVistoria" class="acoes"><input type="hidden" name="contrato" value="${c.id}">
-        <input type="date" name="data" value="${hoje}" style="width:auto" title="Data em que o inquilino mandou">${F.atalhosData()}
+        <input type="date" name="data" value="${hoje}" max="${hoje}" style="width:auto" title="Data em que o inquilino mandou">${F.atalhosData()}
         <label class="botao secundario mini enviar" title="Arquivo que o inquilino mandou (PDF, foto ou o e-mail salvo em PDF)"><span data-nome-escolhido>Escolher arquivo</span><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}" data-arquivo-doc></label>
         <button class="secundario mini">Anexar</button></form>
       ${e.situacao === 'pulada' ? '' : botao('pularEtapaEntrada', 'Não houve', { contrato: c.id, chave: e.chave }, 'link-botao')}</div>`;

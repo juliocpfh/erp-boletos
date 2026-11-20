@@ -172,10 +172,12 @@ test('conciliação de boletos pela listagem do C6: por external_reference_id e 
   // valor em dia mas pago 5 dias depois do vencimento: não casa (com o dia do pagamento informado pelo banco não há tolerância)
   assert.equal(Z.conciliarBoletos(d, 'ank', [{ amount: '1318.50', payment_date: '2026-08-15', credit_date: '2026-08-15' }]).length, 0);
   assert.equal(Z.conciliarBoletos(d, 'ank', [{ amount: '1318.50', payment_date: '2026-08-15', credit_date: '2026-08-15' }], { dias: 10 }).length, 0);
-  // external_reference_id vence o valor
+  // external_reference_id vence o valor (valor maior que o devido: a mais, vai para a justificativa)
   cb2.banco = { id_externo: 'ANK00000000000000000000002', nosso_numero: '123' };
-  sug = Z.conciliarBoletos(d, 'ank', [{ external_reference_id: 'ANK00000000000000000000002', payments: [{ amount: '1000.00', payment_date: '2026-08-10', credit_date: '2026-08-10' }] }]);
-  assert.deepEqual([sug[0].cobranca_id, sug[0].certeza, sug[0].valor], [cb2.id, 'exata', 100000]);
+  sug = Z.conciliarBoletos(d, 'ank', [{ external_reference_id: 'ANK00000000000000000000002', payments: [{ amount: '1400.00', payment_date: '2026-08-10', credit_date: '2026-08-10' }] }]);
+  assert.deepEqual([sug[0].cobranca_id, sug[0].certeza, sug[0].valor], [cb2.id, 'exata', 140000]);
+  // valor MENOR que o devido, mesmo com o identificador: não existe pagamento em parte (decisão de 2026-11-20), nada é proposto
+  assert.equal(Z.conciliarBoletos(d, 'ank', [{ external_reference_id: 'ANK00000000000000000000002', payments: [{ amount: '1000.00', payment_date: '2026-08-10', credit_date: '2026-08-10' }] }]).length, 0);
   // dois boletos com o mesmo valor em aberto: ambos "provável" (nunca automático)
   const c2 = R.inserir(d, 'contratos', { ...c, id: undefined, inquilino_nome: 'João Teste', inquilino_cpf: '529.982.247-25', imovel_id: d.imoveis[1].id, reserva_valor: 0, cobrar_iptu: false }, 'julio');
   R.gerarCobrancas(d, '2026-07', 'julio');
@@ -200,7 +202,7 @@ test('conciliação pelo extrato: só entradas casam', () => {
 test('confirmar pagamento pelo banco: grava data de crédito, liga os dois lados, não duplica e o estorno limpa tudo', () => {
   const { d, cb2, loja } = base();
   // e1: boleto pago pelo código de barras e creditado no dia seguinte ao vencimento: em dia (o banco leva de 1 a 3 dias úteis)
-  const { novas: [ent, ent2] } = importar(d, 'ank', [entrada('e1', '2026-08-11', '1318.50', LIQUIDACAO), entrada('e2', '2026-08-12', '1300.00')]);
+  const { novas: [ent, ent2] } = importar(d, 'ank', [entrada('e1', '2026-08-11', '1318.50', LIQUIDACAO), entrada('e2', '2026-08-12', '1350.00')]);
   const r = Z.confirmarPagamentoPeloBanco(d, cb2.id, ent.id, 'julio');
   assert.equal(r.divergente, false);
   const cb = R.buscar(d, 'cobrancas', cb2.id);
@@ -219,15 +221,16 @@ test('confirmar pagamento pelo banco: grava data de crédito, liga os dois lados
   R.estornarPagamento(d, cb2.id, 'julio');
   // divergente: devolve sem gravar; com valor da NF e justificativa grava nf_manual
   // creditado em 12/08 (depois do vencimento) com valor estranho: o previsto é com multa e juros até 12/08; se o inquilino pagou em dia, a tela marca
-  let dv = Z.vincularMovimentacao(d, ent2.id, { classificacao: 'boleto', cobranca_id: cb2.id }, 'julio');
-  assert.deepEqual([dv.divergente, dv.previsto, dv.recebido], [true, 159981, 130000]);
-  dv = Z.vincularMovimentacao(d, ent2.id, { classificacao: 'boleto', cobranca_id: cb2.id, pagouEmDia: true }, 'julio');
-  assert.deepEqual([dv.divergente, dv.previsto, dv.recebido], [true, 131850, 130000]);
+  // R$ 1.350,00 creditado em 12/08: sem "pagou em dia" o devido é R$ 1.599,81 (com multa e juros): menor que o devido é
+  // RECUSADO (não existe pagamento em parte, decisão de 2026-11-20) e nada é gravado; pagou em dia, é R$ 31,50 a mais
+  assert.throws(() => Z.vincularMovimentacao(d, ent2.id, { classificacao: 'boleto', cobranca_id: cb2.id }, 'julio'), (e) => e instanceof C.ErroUsuario && /menor que o devido \(R\$ 1\.599,81\)\. Não existe pagamento em parte.*sem destino/.test(e.message));
+  let dv = Z.vincularMovimentacao(d, ent2.id, { classificacao: 'boleto', cobranca_id: cb2.id, pagouEmDia: true }, 'julio');
+  assert.deepEqual([dv.divergente, dv.previsto, dv.recebido], [true, 131850, 135000]);
   assert.equal(R.buscar(d, 'cobrancas', cb2.id).data_pagamento, null);
   assert.equal(R.buscar(d, 'movimentacoes_banco', ent2.id).classificacao, null);
-  Z.confirmarPagamentoPeloBanco(d, cb2.id, ent2.id, 'julio', { pagouEmDia: true, valorNf: 130000, justificativa: 'Inquilino pagou a menos; acerto no mês seguinte' });
+  Z.confirmarPagamentoPeloBanco(d, cb2.id, ent2.id, 'julio', { pagouEmDia: true, valorNf: 135000, justificativa: 'Inquilino pagou a mais' });
   const pago = R.buscar(d, 'cobrancas', cb2.id);
-  assert.deepEqual([pago.valor_pago, pago.nf_manual, pago.valor_nf, pago.movimentacao_id], [130000, true, 130000, ent2.id]);
+  assert.deepEqual([pago.valor_pago, pago.nf_manual, pago.valor_nf, pago.movimentacao_id], [135000, true, 135000, ent2.id]);
   assert.throws(() => Z.desvincularMovimentacao(d, ent2.id, 'julio'), /Desfaça o pagamento do boleto/);
   // uma saída não confirma boleto
   const [sai] = importar(d, 'ank', [saida('s1', '2026-08-10', '1318.50', 'X')]).novas;

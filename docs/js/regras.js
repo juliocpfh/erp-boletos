@@ -152,6 +152,17 @@ export function normalizar(d) {
     cb.juros_mensal_percentual = 0;
     if (cb.data_pagamento) { cb.multa = 0; cb.juros = 0; }
   }
+  // diferença de pagamento em parte (antes de 2026-11-20) já levada a outro boleto: o boleto de destino passa a guardá-la em
+  // ``diferencas_cobradas`` (presa a ele, fora da base de multa e juros), se o texto dela ainda está no ajuste do mês (destino
+  // que não existe mais, boleto excluído: ``diferencaPendente`` já a trata como à espera de um boleto)
+  for (const cb of d.cobrancas) {
+    if (!(cb.diferenca_devida > 0) || !cb.diferenca_no_boleto) continue;
+    const destino = d.cobrancas.find((x) => x.id === cb.diferenca_no_boleto);
+    if (!destino) continue;
+    if ((destino.diferencas_cobradas || []).some((e) => e.cobranca_id === cb.id)) continue;
+    if (!String(destino.outros_descricao || '').split('; ').includes(textoDiferenca(cb))) continue;
+    destino.diferencas_cobradas = [...(destino.diferencas_cobradas || []), { cobranca_id: cb.id, valor: cb.diferenca_devida, texto: textoDiferenca(cb) }];
+  }
   migrarAirbnb(d);
   // versão 1 guardava um único fiador dentro do contrato
   for (const c of d.contratos) {
@@ -692,6 +703,7 @@ export function excluir(d, tabela, id, usuario, descricao) {
   if (i < 0) return;
   const [r] = d[tabela].splice(i, 1);
   registrar(d, usuario, 'Exclusão', tabela, r.id, descricao, visivel(r), vinculos(d, tabela, r));
+  if (tabela === 'cobrancas') soltarDoBoletoExcluido(d, r.id, usuario);
 }
 
 // --------------------------------------------------------------------------
@@ -938,9 +950,10 @@ export const emAcordo = (cb) => cb.situacao === 'Em acordo';
 /** Boleto em acordo fica como estava no dia do acordo: não recebe pagamento, ajuste nem ressarcimento (valem as parcelas do acordo). */
 const MOTIVO_EM_ACORDO = (cb, oQue) => `O boleto de ${C.compBr(cb.competencia)} está em acordo: ${oQue}. Valem os boletos das parcelas do acordo (ou desfaça o acordo antes).`;
 /** Boleto descontado da garantia no cálculo final da saída: não se cobra mais (``encerramentos``, ``quitado_saida``). */
-export const quitadoNaSaida = (cb) => !!cb.quitado_saida && !cb.data_pagamento;
+export const quitadoNaSaida = (cb) => !!(cb.quitado_saida || cb.quitado_devolucao) && !cb.data_pagamento;
 /** Boleto ainda a cobrar: não pago, sem carência, fora de acordo e não descontado no cálculo final da saída. */
-export const aCobrar = (cb) => !cb.data_pagamento && cb.situacao !== 'Carência' && !emAcordo(cb) && !cb.quitado_saida;
+// (também o descontado da garantia devolvida na troca de titular, ``quitado_devolucao``)
+export const aCobrar = (cb) => !cb.data_pagamento && cb.situacao !== 'Carência' && !emAcordo(cb) && !cb.quitado_saida && !cb.quitado_devolucao;
 
 /**
  * Caução depois de um reajuste ou novo valor do aluguel (correção posterior à última caução registrada): a necessária
@@ -1023,6 +1036,30 @@ export function gerarBoletosCaucao(d, contratoId, usuario, comp = null, { vencim
 /** Boletos do complemento da caução gerados para uma correção do aluguel (uma ou mais parcelas). */
 export const boletosCaucaoDa = (d, correcao) => d.cobrancas.filter((x) => x.contrato_id === correcao.contrato_id && ehComplementoCaucao(x) && x.caucao_vigencia === correcao.data_vigencia)
   .sort((a, b) => a.vencimento.localeCompare(b.vencimento) || a.id - b.id);
+
+/** As outras parcelas do mesmo complemento da caução (mesmo contrato e reajuste) que o boleto ``cb``. */
+export const parcelasIrmasDoComplemento = (d, cb) => (ehComplementoCaucao(cb) ? d.cobrancas.filter((x) => x.id !== cb.id && x.contrato_id === cb.contrato_id && ehComplementoCaucao(x) && x.caucao_vigencia === cb.caucao_vigencia) : []);
+
+/**
+ * Excluir uma parcela do complemento da caução (mutirão 19/11): o "a completar" é pelo reajuste, não pelo valor; excluir só uma
+ * deixaria a caução incompleta sem aviso. Com outra parcela paga ou no banco, é barrado (texto); senão, as outras saem juntas e o
+ * complemento volta a "Caução a completar" (ex.: R$ 162,00 em 2 × R$ 81,00, as duas em aberto: excluir a 1ª tira as duas).
+ */
+export function motivoNaoExcluirParcelaCaucao(d, cb) {
+  const irmas = parcelasIrmasDoComplemento(d, cb);
+  const presa = irmas.find((x) => x.data_pagamento || emitidoNoBanco(x));
+  if (!presa) return null;
+  return `Este boleto é uma parcela do complemento da caução e a parcela ${presa.caucao_parcela || ''} ${presa.data_pagamento ? `já foi paga (${C.dataBr(presa.data_pagamento)})` : 'está emitida no banco'}: excluir só esta deixaria a caução incompleta sem aviso. ${presa.data_pagamento ? 'Desfaça antes o pagamento da outra parcela' : 'Cancele antes a outra parcela no banco'} (aí as parcelas saem juntas e o complemento volta a "Caução a completar", na tela Reajustes).`.replace('parcela  ', 'parcela ');
+}
+export function excluirParcelasIrmas(d, cb, usuario) {
+  let n = 0;
+  for (const x of parcelasIrmasDoComplemento(d, cb)) {
+    if (x.data_pagamento || emitidoNoBanco(x) || !buscar(d, 'cobrancas', x.id)) continue;
+    excluir(d, 'cobrancas', x.id, usuario, `Boleto do complemento da caução${x.caucao_parcela ? ` (${x.caucao_parcela})` : ''} excluído junto com a outra parcela (o complemento volta a "Caução a completar")`);
+    n += 1;
+  }
+  return n;
+}
 
 /** Reajuste em que a caução depositada já cobre o necessário: registra a caução como corrigida, sem boleto. */
 export function confirmarCaucaoSemComplemento(d, contratoId, usuario) {
@@ -1804,7 +1841,7 @@ export function alertasBoletosSemOcupacao(d) {
  */
 export function recalcularCobrancas(d, filtro, usuario) {
   const mudaram = new Set();
-  const abertos = (cb) => !cb.data_pagamento && !cb.editado_manual && !emAcordo(cb) && !ehBoletoAvulso(cb) && !cb.quitado_saida;
+  const abertos = (cb) => !cb.data_pagamento && !cb.editado_manual && !emAcordo(cb) && !ehBoletoAvulso(cb) && !cb.quitado_saida && !cb.quitado_devolucao;
   const lista = d.cobrancas.filter((cb) => abertos(cb) && filtro(cb)).sort((a, b) => a.competencia.localeCompare(b.competencia));
   const contratos = new Map();
   for (const cb of lista) {
@@ -1822,6 +1859,9 @@ export function recalcularCobrancas(d, filtro, usuario) {
     const dados = Object.fromEntries(CAMPOS_RECALCULO.map((k) => [k, novo[k]]));
     if (Object.keys(atualizar(d, 'cobrancas', cb.id, dados, usuario, `Boleto ${C.compBr(cb.competencia)} recalculado pelo cadastro`)).length) mudaram.add(cb.id);
   }
+  // boleto excluído (nenhum dia ocupado) que tinha diferença antiga ou multa de notificação: elas voltaram a esperar um boleto
+  // (excluir as solta) e vão para o próximo em aberto; sem próximo (saída), entram nos débitos da saída (debitosDaSaida)
+  if (mudaram.size) for (const c of contratos.values()) { aplicarDiferencasPendentes(d, c.id, usuario); sincronizarMultas(d, c.id, usuario); }
   // com os valores novos, a reserva de cada contrato é redistribuída pelos boletos em aberto dele
   for (const c of contratos.values()) for (const id of realocar(d, c, usuario)) mudaram.add(id);
   return mudaram.size;
@@ -1862,6 +1902,20 @@ export function conferirDivergencia(cb, r, valorPago, valorNf, justificativa) {
   if (valorNf === r.valor_nf) throw new Error(`Altere o valor da NF: ele está igual ao calculado (${C.reais(r.valor_nf)}). Faça o cálculo à mão com o valor recebido de ${C.reais(valorPago)}.`);
 }
 
+/**
+ * Não existe pagamento em parte (decisão do dono, 2026-11-20: "ou paga inteiro ou não paga"): valor recebido menor que o devido
+ * é recusado e o boleto continua em aberto (multa e juros correm; a quitação é por acordo). Ex.: devido R$ 2.700,00, recebido
+ * R$ 2.000,00 → recusado. O complemento da caução só aceita o valor exato do boleto.
+ */
+export const MOTIVO_PAGO_A_MENOS = (recebido, devido, extrato = false) => `O valor recebido (${C.reais(recebido)}) é menor que o devido (${C.reais(devido)}). Não existe pagamento em parte: o boleto continua em aberto${extrato ? ' e o dinheiro fica no extrato sem destino' : ''}. Para quitar, faça um acordo (tela de acordos).`;
+export function conferirValorRecebido(cb, valorPago, devido, { extrato = false } = {}) {
+  if (valorPago === null || valorPago === undefined) return;
+  // (zero só no boleto de R$ 0,00, ex.: mês de carência sem nada a cobrar)
+  if (!Number.isFinite(valorPago) || valorPago < 0 || (valorPago === 0 && devido > 0)) throw new C.ErroUsuario('Informe o valor que entrou na conta (maior que zero).');
+  if (ehComplementoCaucao(cb) && valorPago !== devido) throw new C.ErroUsuario(`O complemento da caução só é pago pelo valor exato do boleto (${C.reais(devido)}); entrou ${C.reais(valorPago)}. Nada foi salvo.`);
+  if (valorPago < devido) throw new C.ErroUsuario(MOTIVO_PAGO_A_MENOS(valorPago, devido, extrato));
+}
+
 export function registrarPagamento(d, cobrancaId, dataContabil, valorPago, usuario, { pagouEmDia = false, dataPagou = null, valorNf = null, justificativa = '' } = {}) {
   const cb = buscar(d, 'cobrancas', cobrancaId);
   if (emAcordo(cb)) throw new C.ErroUsuario(MOTIVO_EM_ACORDO(cb, 'não recebe pagamento'));
@@ -1872,6 +1926,7 @@ export function registrarPagamento(d, cobrancaId, dataContabil, valorPago, usuar
   }
   if (dataPagou && dataPagou > dataContabil) throw new Error('O dia em que pagou não pode ser depois da data contábil.');
   const r = previstoNoPagamento(cb, dataContabil, { pagouEmDia, dataPagou });
+  conferirValorRecebido(cb, valorPago, r.valor_devido);
   const compensadoDepois = pagouEmDia && dataContabil > cb.vencimento;
   const caucao = ehComplementoCaucao(cb);
   const manual = valorNf !== null && !caucao;
@@ -1896,25 +1951,21 @@ export function registrarPagamento(d, cobrancaId, dataContabil, valorPago, usuar
   return r;
 }
 
-/**
- * Pagamento a menos (ex.: pagou R$ 1.000,00 de R$ 1.800,00): a diferença fica devendo e vai para o próximo boleto do
- * aluguel em aberto (ajuste do mês, "Diferença do boleto 02/2026"). Sem boleto gerado ainda, entra quando ele for gerado
- * (``aplicarDiferencasPendentes``). O boleto pago fica "Paga em parte", com ``diferenca_devida`` e ``diferenca_no_boleto``.
+/*
+ * Pagamento a menos de ANTES de 2026-11-20 (dados antigos): o boleto ficou "Paga em parte" (ou "Paga com atraso", no Pix atrasado
+ * pelo valor do desconto) com ``diferenca_devida`` e a diferença foi (ou vai, quando o boleto for gerado) para o próximo boleto
+ * do aluguel (``diferenca_no_boleto``). O boleto de destino guarda em ``diferencas_cobradas`` [{ cobranca_id, valor, texto }] o
+ * que recebeu (como ``multas_notificacao``): ela fica presa a ele (o ajuste do mês não a apaga), sai da base de multa e juros e,
+ * se ele for excluído, a diferença volta a ficar pendente. Pagamento novo a menos é recusado (``conferirValorRecebido``).
  */
-export function levarDiferencaAoProximo(d, cobrancaId, valor, usuario) {
-  const cb = buscar(d, 'cobrancas', cobrancaId);
-  if (!cb || !cb.data_pagamento || !(valor > 0)) return null;
-  atualizar(d, 'cobrancas', cb.id, { diferenca_devida: valor, diferenca_no_boleto: null, situacao: 'Paga em parte' }, usuario,
-    `Boleto ${C.compBr(cb.competencia)} pago em parte: faltam ${C.reais(valor)}, que vão para o próximo boleto`);
-  aplicarDiferencasPendentes(d, cb.contrato_id, usuario);
-  return buscar(d, 'cobrancas', cb.id);
-}
+export const textoDiferenca = (cb) => `Diferença do boleto ${C.compBr(cb.competencia)} (pago em parte)`;
 
-const textoDiferenca = (cb) => `Diferença do boleto ${C.compBr(cb.competencia)} (pago em parte)`;
+/** Diferença antiga ainda sem boleto (nunca foi, ou o boleto de destino foi excluído). */
+export const diferencaPendente = (d, cb) => cb.diferenca_devida > 0 && !!cb.data_pagamento && (!cb.diferenca_no_boleto || !buscar(d, 'cobrancas', cb.diferenca_no_boleto));
 
-/** Põe as diferenças de pagamentos a menos ainda sem boleto no próximo boleto do aluguel em aberto do contrato. */
+/** Põe as diferenças antigas de pagamentos a menos ainda sem boleto no próximo boleto do aluguel em aberto do contrato. */
 export function aplicarDiferencasPendentes(d, contratoId, usuario) {
-  const pendentes = d.cobrancas.filter((x) => x.contrato_id === contratoId && x.diferenca_devida > 0 && !x.diferenca_no_boleto && x.data_pagamento)
+  const pendentes = d.cobrancas.filter((x) => x.contrato_id === contratoId && diferencaPendente(d, x))
     .sort((a, b) => a.competencia.localeCompare(b.competencia));
   let mudou = false;
   for (const cb of pendentes) {
@@ -1922,7 +1973,8 @@ export function aplicarDiferencasPendentes(d, contratoId, usuario) {
       .sort((a, b) => a.competencia.localeCompare(b.competencia))[0];
     if (!destino) continue;
     const descricao = [destino.outros_descricao, textoDiferenca(cb)].filter(Boolean).join('; ');
-    atualizar(d, 'cobrancas', destino.id, { outros: (destino.outros || 0) + cb.diferenca_devida, outros_descricao: descricao }, usuario,
+    const lista = [...(destino.diferencas_cobradas || []), { cobranca_id: cb.id, valor: cb.diferenca_devida, texto: textoDiferenca(cb) }];
+    atualizar(d, 'cobrancas', destino.id, { outros: (destino.outros || 0) + cb.diferenca_devida, outros_descricao: descricao, diferencas_cobradas: lista }, usuario,
       `Boleto ${C.compBr(destino.competencia)}: + ${C.reais(cb.diferenca_devida)} da diferença do boleto ${C.compBr(cb.competencia)} (pago em parte)`);
     atualizar(d, 'cobrancas', cb.id, { diferenca_no_boleto: destino.id }, usuario, `Diferença de ${C.reais(cb.diferenca_devida)} cobrada no boleto ${C.compBr(destino.competencia)}`);
     mudou = true;
@@ -1932,17 +1984,58 @@ export function aplicarDiferencasPendentes(d, contratoId, usuario) {
   return mudou;
 }
 
-/** Pagamento em parte desfeito: a diferença sai do boleto em que foi cobrada (se ele ainda está em aberto). */
+/**
+ * Tira do boleto de destino (em aberto) a diferença antiga que ele recebeu de ``origem``, só se ela ainda está lá (na lista
+ * ``diferencas_cobradas`` ou, em dado antigo sem a lista, com o texto no motivo do ajuste). Devolve true se tirou.
+ */
+function tirarDiferencaDoDestino(d, origem, destino, usuario, motivo) {
+  const texto = textoDiferenca(origem);
+  const naLista = (destino.diferencas_cobradas || []).find((e) => e.cobranca_id === origem.id);
+  const partes = String(destino.outros_descricao || '').split('; ');
+  if (!naLista && !partes.includes(texto)) return false; // o ajuste já foi trocado: não mexe no valor (senão sobraria um desconto)
+  const valor = naLista ? naLista.valor : origem.diferenca_devida;
+  atualizar(d, 'cobrancas', destino.id, { outros: (destino.outros || 0) - valor, outros_descricao: partes.filter((x) => x !== texto).join('; '),
+    diferencas_cobradas: (destino.diferencas_cobradas || []).filter((e) => e.cobranca_id !== origem.id) }, usuario,
+  `Boleto ${C.compBr(destino.competencia)}: sai a diferença de ${C.reais(valor)} do boleto ${C.compBr(origem.competencia)} (${motivo})`);
+  return true;
+}
+
+/** Pagamento em parte (antigo) desfeito: a diferença sai do boleto em que foi cobrada (se ele ainda está em aberto e ela ainda está lá). */
 function retirarDiferenca(d, cb, usuario) {
   if (!(cb.diferenca_devida > 0)) return;
   const destino = cb.diferenca_no_boleto && buscar(d, 'cobrancas', cb.diferenca_no_boleto);
   if (destino && destino.data_pagamento) throw new C.ErroUsuario(`A diferença deste pagamento já foi cobrada no boleto de ${C.compBr(destino.competencia)}, que está pago: desfaça antes aquele pagamento.`);
-  if (destino) {
-    const descricao = String(destino.outros_descricao || '').split('; ').filter((x) => x !== textoDiferenca(cb)).join('; ');
-    atualizar(d, 'cobrancas', destino.id, { outros: (destino.outros || 0) - cb.diferenca_devida, outros_descricao: descricao }, usuario,
-      `Boleto ${C.compBr(destino.competencia)}: sai a diferença do boleto ${C.compBr(cb.competencia)} (pagamento desfeito)`);
-  }
+  if (destino) tirarDiferencaDoDestino(d, cb, destino, usuario, 'pagamento desfeito');
   atualizar(d, 'cobrancas', cb.id, { diferenca_devida: null, diferenca_no_boleto: null }, usuario, 'Diferença do pagamento em parte retirada');
+}
+
+/**
+ * Boleto em aberto que passa a outro contrato (troca de titular): a diferença antiga e a multa de notificação de quem sai
+ * saem dele e voltam a ficar pendentes no contrato anterior (entram nos débitos dele, ``debitosDaSaida``).
+ */
+function limparDoAnterior(d, cb, anteriorId, usuario) {
+  if (cb.data_pagamento || emitidoNoBanco(cb)) return;
+  for (const e of [...(cb.diferencas_cobradas || [])]) {
+    const origem = buscar(d, 'cobrancas', e.cobranca_id);
+    if (!origem || origem.contrato_id !== anteriorId) continue;
+    tirarDiferencaDoDestino(d, origem, buscar(d, 'cobrancas', cb.id), usuario, 'é de quem saiu: fica nos débitos dele');
+    atualizar(d, 'cobrancas', origem.id, { diferenca_no_boleto: null }, usuario, `Diferença de ${C.reais(origem.diferenca_devida)} fica com o contrato anterior (troca de titular)`);
+  }
+  for (const e of [...(cb.multas_notificacao || [])]) {
+    const n = buscar(d, 'notificacoes', e.notificacao_id);
+    if (!n || n.contrato_id !== anteriorId) continue;
+    const atual = buscar(d, 'cobrancas', cb.id);
+    atualizar(d, 'cobrancas', cb.id, { outros: (atual.outros || 0) - e.valor, outros_descricao: String(atual.outros_descricao || '').split('; ').filter((x) => x !== e.texto).join('; '),
+      multas_notificacao: (atual.multas_notificacao || []).filter((x) => x.notificacao_id !== n.id) }, usuario,
+    `Boleto ${C.compBr(cb.competencia)}: sai a multa de ${C.reais(e.valor)} (${e.texto}), que é de quem saiu`);
+    atualizar(d, 'notificacoes', n.id, { multa_cobranca_id: null }, usuario, `Multa da notificação de ${C.dataBr(n.data)} fica com o contrato anterior (troca de titular)`);
+  }
+}
+
+/** Boleto excluído: a diferença antiga e a multa de notificação que estavam nele voltam a ficar pendentes (entram no próximo boleto ou nos débitos da saída). */
+function soltarDoBoletoExcluido(d, cbId, usuario) {
+  for (const x of d.cobrancas.filter((y) => y.diferenca_no_boleto === cbId)) atualizar(d, 'cobrancas', x.id, { diferenca_no_boleto: null }, usuario, `Diferença de ${C.reais(x.diferenca_devida)} do boleto ${C.compBr(x.competencia)} volta a esperar um boleto (o boleto em que estava foi excluído)`);
+  for (const n of (d.notificacoes || []).filter((y) => y.multa_cobranca_id === cbId)) atualizar(d, 'notificacoes', n.id, { multa_cobranca_id: null }, usuario, `Multa da notificação de ${C.dataBr(n.data)} volta a esperar um boleto (o boleto em que estava foi excluído)`);
 }
 
 export function estornarPagamento(d, cobrancaId, usuario) {
@@ -2451,6 +2544,11 @@ export function ajustarBoleto(d, cobrancaId, valor, motivo, usuario) {
   // a multa de notificação vai no mesmo campo: o ajuste que a tirasse deixaria a notificação apontando para cá (sai por "Retirar a multa")
   const multas = (cb.multas_notificacao || []).filter((e) => !String(motivo || '').includes(e.texto));
   if (multas.length) throw new C.ErroUsuario(`Este boleto tem a ${multas.map((e) => e.texto.toLocaleLowerCase('pt-BR')).join(' e a ')}: para tirá-la, use "Retirar a multa" na notificação; para ajustar o resto, mantenha esse texto no motivo e o valor dela no total.`);
+  // a diferença de um pagamento em parte antigo também fica presa ao boleto: sai só desfazendo aquele pagamento
+  const presas = (cb.diferencas_cobradas || []).filter((e) => !String(motivo || '').includes(e.texto));
+  if (presas.length) throw new C.ErroUsuario(`Este boleto cobra a ${presas.map((e) => `${e.texto.toLocaleLowerCase('pt-BR')} (${C.reais(e.valor)})`).join(' e a ')}: ela não sai pelo ajuste (só desfazendo aquele pagamento). Para ajustar o resto, mantenha esse texto no motivo e o valor dela no total.`);
+  const fixo = [...(cb.multas_notificacao || []), ...(cb.diferencas_cobradas || [])].reduce((s, e) => s + (e.valor || 0), 0);
+  if (fixo && valor < fixo) throw new C.ErroUsuario(`O ajuste tem de incluir ${C.reais(fixo)} da multa da notificação e/ou da diferença presas a este boleto: o valor digitado (${C.reais(valor)}) é menor.`);
   const texto = valor ? `${valor < 0 ? 'Ressarcimento' : 'Cobrança adicional'} de ${C.reais(Math.abs(valor))} no boleto ${C.compBr(cb.competencia)}${motivo ? `: ${motivo}` : ''}`
     : `Ajuste do boleto ${C.compBr(cb.competencia)} retirado`;
   atualizar(d, 'cobrancas', cb.id, { outros: valor, outros_descricao: valor ? motivo : '' }, usuario, texto);
@@ -2504,6 +2602,14 @@ export function debitosDaSaida(d, c, data = C.hojeIso()) {
     const conta = venceu && (l.multa || l.juros) ? ` (com multa de ${C.reais(l.multa)} e juros de ${C.reais(l.juros)} até ${C.dataBr(data)})` : !venceu ? ' (ainda não venceu: valor em dia)' : '';
     return { cobranca: cb, valor, texto: `${nome} em aberto: ${C.reais(valor)}${conta}` };
   }).filter((x) => x.valor > 0);
+  // o que esperava "o próximo boleto" e não tem mais boleto (a saída ou a troca de titular encerra a cobrança): a diferença de um
+  // pagamento em parte antigo e a multa de notificação. Ex.: pagou R$ 1.100,00 de R$ 1.500,00 → "Diferença do boleto 10/2026 … R$ 400,00"
+  for (const cb of d.cobrancas.filter((x) => x.contrato_id === c.id && diferencaPendente(d, x)).sort((a, b) => a.competencia.localeCompare(b.competencia))) {
+    itens.push({ cobranca: null, valor: cb.diferenca_devida, texto: `${textoDiferenca(cb)}, ainda não cobrada: ${C.reais(cb.diferenca_devida)}` });
+  }
+  for (const n of (d.notificacoes || []).filter((x) => x.contrato_id === c.id && x.multa_valor > 0 && (!x.multa_cobranca_id || !buscar(d, 'cobrancas', x.multa_cobranca_id)))) {
+    itens.push({ cobranca: null, valor: n.multa_valor, texto: `${textoMultaNotificacao(n)}, ainda não cobrada: ${C.reais(n.multa_valor)}` });
+  }
   return { itens, total: itens.reduce((s, x) => s + x.valor, 0) };
 }
 
@@ -2511,23 +2617,8 @@ export function debitosDaSaida(d, c, data = C.hojeIso()) {
 export const proximoBoletoAberto = (d, cb) => d.cobrancas.filter((x) => x.contrato_id === cb.contrato_id && x.id !== cb.id && x.competencia > cb.competencia && !ehBoletoAvulso(x) && aCobrar(x) && !emitidoNoBanco(x))
   .sort((a, b) => a.competencia.localeCompare(b.competencia) || a.id - b.id)[0] || null;
 
-/**
- * Pix (ou boleto) pago DEPOIS do vencimento com o valor do desconto (decisão do dono, 16/11/2026): o boleto fica pago com o que
- * entrou ("Paga com atraso", NF pelo valor em dia) e a diferença (bonificação perdida + multa + juros até o dia em que pagou) vai
- * para o próximo boleto do aluguel pelo mesmo caminho do pagamento em parte (``diferenca_devida``, ``aplicarDiferencasPendentes``:
- * sem o boleto gerado ainda, entra quando ele for gerado; desfazer o pagamento tira). Ex.: vence 10/08, pagou R$ 1.218,50 em 30/08,
- * devido R$ 1.497,85 → R$ 279,35 no boleto do mês seguinte.
- */
-export function registrarComDiferencaNoProximo(d, cb, { credito, pagou, valor, previsto }, usuario) {
-  const diferenca = previsto.valor_devido - valor;
-  const prox = proximoBoletoAberto(d, cb);
-  const r = registrarPagamento(d, cb.id, credito, valor, usuario, { pagouEmDia: true });
-  atualizar(d, 'cobrancas', cb.id, { situacao: 'Paga com atraso', pagou_em_dia: false, data_pagou: pagou && pagou < credito ? pagou : null, dias_atraso: previsto.dias_atraso,
-    diferenca_devida: diferenca, diferenca_no_boleto: null }, usuario,
-  `Pago com atraso (${C.dataBr(pagou)}) pelo valor do desconto: faltam ${C.reais(diferenca)} (bonificação perdida, multa e juros), que vão para o próximo boleto`);
-  aplicarDiferencasPendentes(d, cb.contrato_id, usuario);
-  return { ...r, diferenca, proximo: prox };
-}
+// Pix (ou boleto) pago depois do vencimento com o valor do desconto: de 16/11 a 19/11/2026 ficava pago e a diferença ia ao próximo
+// boleto (``diferenca_devida``, os dados antigos continuam assim); desde 2026-11-20 é recusado como qualquer pagamento a menos.
 
 /**
  * Cálculo final da saída: garantia corrigida pelo índice informado (ex.: poupança) menos os débitos. O FCI corrigido paga só
@@ -2792,7 +2883,8 @@ export function dadosDaFicha(d, f) {
   const primeiro = !Object.keys(contratosDaFicha(d, f)).length;
   const proposta = Object.fromEntries(CAMPOS_PROPOSTA_FICHA.filter((k) => f[k] !== undefined && f[k] !== null && f[k] !== '').map((k) => [k, f[k]]));
   if (proposta.aluguel_inicial > 0 && f.bonificacao !== false) proposta.aluguel_bonificado = proposta.aluguel_inicial - C.descontoPorPercentual(proposta.aluguel_inicial, f.desconto_pontualidade_percentual || 0);
-  const reserva = primeiro && f.reserva_valor > 0 ? { reserva_valor: f.reserva_valor, reserva_data: f.reserva_data, ...(f.comprovante_reserva && !f.documentos_no_contrato ? { comprovante_reserva: f.comprovante_reserva } : {}) } : {};
+  // reserva já devolvida (ficha reprovada e reaberta): não vai ao contrato, senão o 1º aluguel a abateria de novo
+  const reserva = primeiro && f.reserva_valor > 0 && !(f.devolucao_valor > 0) && !f.devolucao_data ? { reserva_valor: f.reserva_valor, reserva_data: f.reserva_data, ...(f.comprovante_reserva && !f.documentos_no_contrato ? { comprovante_reserva: f.comprovante_reserva } : {}) } : {};
   // fiadores da ficha: os mesmos campos do Novo contrato (fiador1_nome...)
   const fiadores = Object.fromEntries(Object.entries(f).filter(([k, v]) => /^fiador\d+_/.test(k) && v !== undefined && v !== null && v !== ''));
   return { ...dadosDaPessoa(f), ...proposta, ...fiadores, ...reserva };
@@ -3584,6 +3676,8 @@ export function transferirHeranca(d, novoId, usuario, hoje = C.hojeIso()) {
       excluir(d, 'cobrancas', cb.id, usuario, `Boleto ${C.compBr(cb.competencia)} de ${a.inquilino_nome} excluído: o de ${n.inquilino_nome} já existe (troca de titular)`);
       out.boletosApagados += 1;
     } else {
+      // a multa de notificação e a diferença antiga de quem sai ficam com ele (débitos dele): o novo recebe o boleto limpo
+      limparDoAnterior(d, cb, a.id, usuario);
       passa('cobrancas', cb, `Boleto ${C.compBr(cb.competencia)}`);
       out.boletosMovidos += 1;
     }
@@ -3747,6 +3841,7 @@ export function completarHeranca(d, novoId, usuario) {
     let reservaUsada = 0;
     for (const cb of boletosNoAnterior(d, n, a)) {
       reservaUsada += cb.reserva_utilizada || 0;
+      limparDoAnterior(d, cb, a.id, usuario); // multa e diferença de quem saiu ficam com ele
       atualizar(d, 'cobrancas', cb.id, { contrato_id: n.id }, usuario, `Boleto ${C.compBr(cb.competencia)} passa de ${a.inquilino_nome} para ${n.inquilino_nome} (titular desde ${C.dataBr(n.heranca_transferida)})`);
       out.boletos += 1;
     }
@@ -3860,9 +3955,24 @@ export function salvarDevolucaoGarantia(d, contratoId, dados, usuario, id = null
   const { garantia_corrigida, saldo } = calcularEncerramento(dados.garantia_valor, dados.indice_percentual, dados.debitos);
   const reg = { ...dados, contrato_id: a.id, troca_id: trocaId, garantia_corrigida, saldo };
   const texto = `${a.inquilino_nome}: garantia devolvida em ${C.dataBr(dados.data)}, ${C.reais(saldo)} (${troca ? `troca de garantia de ${C.dataBr(troca.data)}` : 'troca de titular com garantia nova'})`;
-  if (!id) return inserir(d, 'devolucoes_garantia', reg, usuario, texto);
-  atualizar(d, 'devolucoes_garantia', id, reg, usuario, texto);
-  return buscar(d, 'devolucoes_garantia', id);
+  let r;
+  if (id) { atualizar(d, 'devolucoes_garantia', id, reg, usuario, texto); r = buscar(d, 'devolucoes_garantia', id); } else r = inserir(d, 'devolucoes_garantia', reg, usuario, texto);
+  // troca de titular: os boletos em aberto descontados nos débitos (linha "Aluguel MM/AAAA em aberto" mantida) não se cobram mais,
+  // como no cálculo final da saída; excluir a devolução os libera. Na troca de garantia o inquilino continua (os boletos seguem).
+  if (!trocaId) {
+    liberarBoletosDaDevolucao(d, r.id, usuario);
+    for (const cb of boletosDescontadosNaSaida(d, a, dados.debitos_descricao)) {
+      atualizar(d, 'cobrancas', cb.id, { quitado_devolucao: r.id, situacao: 'Descontado da garantia' }, usuario, `Boleto ${C.compBr(cb.competencia)} descontado da garantia devolvida na troca de titular`);
+    }
+  }
+  return r;
+}
+
+/** Devolução da garantia da troca de titular excluída (ou refeita): os boletos que ela descontava voltam a ser cobrados. */
+export function liberarBoletosDaDevolucao(d, devolucaoId, usuario) {
+  for (const cb of d.cobrancas.filter((x) => x.quitado_devolucao === Number(devolucaoId))) {
+    atualizar(d, 'cobrancas', cb.id, { quitado_devolucao: null, situacao: cb.data_pagamento ? cb.situacao : 'Em aberto' }, usuario, `Boleto ${C.compBr(cb.competencia)} volta a ser cobrado (devolução da garantia desfeita)`);
+  }
 }
 
 /**
@@ -4136,9 +4246,10 @@ function alertaPerdaAConfirmar(d, c, hoje = C.hojeIso()) {
 }
 
 /** Marca o documento como assinado (exige o nome do arquivo assinado já anexado) ou, sem data, volta a pendente. */
-export function marcarDocumento(d, contratoId, campo, data, usuario, arquivo = null) {
+export function marcarDocumento(d, contratoId, campo, data, usuario, arquivo = null, hoje = C.hojeIso()) {
   const doc = DOCUMENTOS_ENTRADA.find(([k]) => k === campo);
   if (!doc) throw new Error('Documento desconhecido.');
+  dataDaRotinaNaoFutura(data, hoje, `${doc[1]} ${doc[2]}`);
   if (data && !arquivo) throw new Error(`Anexe o arquivo d${doc[2].endsWith('a') ? 'a' : 'o'} ${doc[1].toLocaleLowerCase('pt-BR')} ${doc[2]} antes de marcar.`);
   const c = buscar(d, 'contratos', contratoId);
   // assinado de verdade: saem o registro de perdido e o de assinatura faltante
@@ -4271,11 +4382,14 @@ function situacaoContraVistoria(d, c, hoje) {
 }
 
 /** Anexa a contra-vistoria do inquilino: o arquivo e a data em que ele mandou (troca o arquivo anterior, se houver). */
-export function registrarContraVistoria(d, contratoId, { data, arquivo }, usuario) {
+export function registrarContraVistoria(d, contratoId, { data, arquivo }, usuario, hoje = C.hojeIso()) {
   const c = buscar(d, 'contratos', contratoId);
   if (!c) throw new Error('Inquilino não encontrado.');
   if (!data) throw new C.ErroUsuario('Informe a data em que o inquilino mandou a contra-vistoria.');
   if (!arquivo) throw new C.ErroUsuario('Escolha o arquivo da contra-vistoria.');
+  dataDaRotinaNaoFutura(data, hoje, 'Contra-vistoria');
+  const entrada = c.data_entrada || c.vigencia_inicio;
+  if (entrada && data < entrada) throw new C.ErroUsuario(`A contra-vistoria (${C.dataBr(data)}) não pode ser antes da entrada do inquilino (${C.dataBr(entrada)}).`);
   atualizar(d, 'contratos', c.id, { contra_vistoria: arquivo, contra_vistoria_em: data }, usuario,
     `${c.inquilino_nome}: contra-vistoria do inquilino recebida em ${C.dataBr(data)} (${arquivo})`);
 }
@@ -4454,9 +4568,15 @@ export function resumoRotinaEntrada(d, c, hoje = C.hojeIso()) {
  * Marca à mão uma etapa da rotina de entrada: feita na ``data``, ``pular`` (não se aplica) ou, sem os dois, volta a
  * pendente. Documento assinado não se marca aqui: precisa do arquivo (caixa "Contrato, Vistoria, Termos e Aditivos").
  */
-export function marcarEtapaEntrada(d, contratoId, chave, { data = null, pular = false } = {}, usuario) {
+/** Datas da rotina de entrada (etapa feita, documento assinado, contra-vistoria): nunca depois de hoje (mutirão 19/11, entrada-035). */
+function dataDaRotinaNaoFutura(data, hoje, oque) {
+  if (data && data > hoje) throw new C.ErroUsuario(`${oque}: a data (${C.dataBr(data)}) é depois de hoje (${C.dataBr(hoje)}). Confira o dia.`);
+}
+
+export function marcarEtapaEntrada(d, contratoId, chave, { data = null, pular = false } = {}, usuario, hoje = C.hojeIso()) {
   const etapa = ETAPAS_ENTRADA.find(([k]) => k === chave);
   if (!etapa) throw new Error('Etapa desconhecida.');
+  dataDaRotinaNaoFutura(data, hoje, 'Etapa feita');
   if (etapa[2] && !pular) throw new Error('Documento assinado: anexe o arquivo assinado para marcar.');
   const c = buscar(d, 'contratos', contratoId);
   if (!c) throw new Error('Inquilino não encontrado.');
@@ -4560,6 +4680,8 @@ export function arquivosReferenciados(d) {
   for (const t of TABELAS_COMPROVANTE) for (const x of d[t] || []) usa('contrato', x.contrato_id, x.comprovante);
   for (const a of d.aditivos) usa('aditivos', a.contrato_id, a.arquivo);
   for (const a of d.acordos || []) usa('contrato', a.contrato_id, a.termo_assinado); // termo do acordo assinado (2026-11-15)
+  // termo de quitação assinado da saída (estava fora: a limpeza "arquivos sem lançamento" o apagava, mutirão 19/11 fios-002)
+  for (const x of d.encerramentos || []) usa('contrato', x.contrato_id, x.termo_assinado);
   // notificação ao inquilino (2026-11-17): a assinada e o comprovante da baixa (foto ou arquivo de que foi resolvido)
   for (const n of d.notificacoes || []) { usa('contrato', n.contrato_id, n.arquivo_assinado); usa('contrato', n.contrato_id, n.comprovante_baixa); }
   for (const x of d.cartas_reajuste || []) usa('aditivos', x.contrato_id, x.arquivo);
@@ -5946,7 +6068,8 @@ export function sincronizarMultas(d, contratoId, usuario) {
     const textos = [];
     for (const e of cb.multas_notificacao) {
       const n = buscar(d, 'notificacoes', e.notificacao_id);
-      if (n && n.multa_valor === e.valor && n.multa_cobranca_id === cb.id) ficam.push(e);
+      // (a multa é do contrato da notificação: num boleto de outro contrato, ex.: o que passou na troca de titular, ela sai)
+      if (n && n.contrato_id === contratoId && n.multa_valor === e.valor && n.multa_cobranca_id === cb.id) ficam.push(e);
       else { tira += e.valor; textos.push(e.texto); }
     }
     if (!tira) continue;

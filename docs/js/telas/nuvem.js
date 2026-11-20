@@ -305,7 +305,7 @@ export const ACOES_NUVEM = {
     const el = document.getElementById('progresso-nuvem');
     const migracao = await carregarParte(() => import('../migracao.js')); // só aqui (passagem para a nuvem ou "Substituir…")
     const r = await migracao.levarParaNuvem(pasta, {
-      anexos: E.anexos, sinc: E.nuvem, substituir,
+      anexos: E.anexos, sinc: E.nuvem, substituir, email: E.emailNuvem || null,
       aoAndar: (p) => {
         if (!el) return;
         const fase = { anexos: `Enviando anexos: ${p.feitos} de ${p.total} (${mb(p.bytes)} de ${mb(p.totalBytes)})`, dados: 'Enviando os dados…', conferencia: 'Conferindo tudo…' }[p.fase];
