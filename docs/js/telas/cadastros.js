@@ -11,7 +11,7 @@ import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { confirmarAvisos, conferirAvulsa, conferirBoleto, conferirContrato, conferirIptu, conferirLeitura, conferirPessoa, conferirRessarcimento, conferirSeguro } from './avisos.js';
 import { CAMPOS_GARANTIA_HERDADA, CAMPOS_VALORES_HERDADOS, ENDERECO_DO_IMOVEL, enderecoInquilino } from './campos.js';
-import { ACEITA_DOCUMENTOS, arquivoSumiu, botao, buscar, d, etiqueta, extensao, guardarGuiasSoltas, levarDocumentosDaFicha, memoria, naoEncontrado, nomePastaContrato, nomePastaFicha, opera, PASTA_FICHAS, ordenar, pastaDoEscopo, pastaPaiContrato, renomearNoDisco, salvarAssinado, semAcentoArquivo, trazerHeranca, trazerHerancaAssinada, cienciaDaTroca, registrarCiencia } from './comum.js';
+import { ACEITA_DOCUMENTOS, arquivoSumiu, botao, buscar, d, encerrarLinksDaFicha, etiqueta, extensao, guardarGuiasSoltas, levarDocumentosDaFicha, memoria, naoEncontrado, nomePastaContrato, nomePastaFicha, opera, PASTA_FICHAS, ordenar, pastaDoEscopo, pastaPaiContrato, renomearNoDisco, salvarAssinado, semAcentoArquivo, trazerHeranca, trazerHerancaAssinada, cienciaDaTroca, registrarCiencia } from './comum.js';
 import { confirmarValoresIniciais, inicialBonificado } from './contrato.js';
 
 // --------------------------------------------------------------------------
@@ -475,6 +475,8 @@ export const CADASTROS = {
       if (!antigo && salvo.ficha_id) {
         const n = await levarDocumentosDaFicha(salvo.ficha_id, salvo.id);
         if (n) aviso(`${n} documento(s) da ficha foram para a pasta do inquilino.`);
+        // os documentos já estão no contrato: o link da ficha não manda mais nada para a pasta antiga
+        try { await encerrarLinksDaFicha(salvo.ficha_id); } catch (e) { console.warn('encerrar os links da ficha', e); }
       }
       if (avisoAditivo) aviso(avisoAditivo, 'aviso');
       avisoAditivo = '';
@@ -607,6 +609,12 @@ export const CADASTROS = {
       // análise do Serasa (não é de dinheiro: grava sem valor)
       const serasa = arquivoEscolhido(form, 'analise_serasa');
       if (serasa) dados.analise_serasa = await S.salvarArquivo(await pasta(), new File([serasa], `analise-serasa-${C.hojeIso()}${extensao(serasa.name)}`));
+    },
+    // reprovada (ou desistiu) agora: os links da ficha pela internet deixam de valer
+    async depois(salvo, antigo) {
+      if (antigo && R.fichaSemContrato(salvo) && !R.fichaSemContrato(antigo)) {
+        try { if (await encerrarLinksDaFicha(salvo.id)) aviso('Os links da ficha pela internet foram encerrados.', 'info'); } catch (e) { console.warn('encerrar os links da ficha', e); }
+      }
     },
   },
   correcoes: {

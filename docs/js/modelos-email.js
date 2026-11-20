@@ -78,7 +78,7 @@ Próximos passos: contrato para assinar em até 2 dias úteis[se fiador] (o fiad
 
 Agradecemos o interesse no imóvel da {imovel}. Depois da análise, não foi possível aprovar a ficha neste momento.
 
-[se reserva]A reserva de {reserva} será devolvida em até 24 horas úteis, na conta de onde veio o depósito.
+[se reserva][se devolucao]A reserva de {reserva} já foi devolvida em {devolucao_data}, na conta de onde veio o depósito.[senão]A reserva de {reserva} será devolvida em até 24 horas úteis, na conta de onde veio o depósito.[fim]
 
 [fim]Os documentos enviados serão apagados, conforme a LGPD (Lei 13.709/2018).`,
   },

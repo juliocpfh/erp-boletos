@@ -404,6 +404,21 @@ const semPeso = (tabela, k, v) => (tabela === 'cobrancas' && k === 'banco' && v 
   ? { ...v, pix_qr_base64: IMAGEM_FORA_DO_HISTORICO } : v);
 
 /**
+ * Pessoas de um comunicado no histórico (mutirão 19/11, comunicacoes-001): só as que mudaram naquela gravação, e sem a
+ * assinatura desenhada e o texto aceito (ficam só no comunicado). Ex.: "e-mail enviado para Maria" num comunicado de 40
+ * pessoas → de/para com a linha de Maria, não as 40 duas vezes. Comunicado não se desfaz pelo Histórico (SEM_DESFAZER).
+ */
+const RESPOSTA_PESADA = new Set(['assinatura', 'texto_aceito']);
+export function destinosParaHistorico(de, para) {
+  const mapa = (l) => new Map((Array.isArray(l) ? l : []).map((x, i) => [x && x.chave ? x.chave : `#${i}`, x]));
+  const antes = mapa(de); const depois = mapa(para);
+  const leve = (x) => (x && x.resposta && typeof x.resposta === 'object' ? { ...x, resposta: Object.fromEntries(Object.entries(x.resposta)
+    .map(([k, v]) => [k, RESPOSTA_PESADA.has(k) && v ? '(guardado só no comunicado)' : v])) } : x);
+  const mudou = [...new Set([...antes.keys(), ...depois.keys()])].filter((k) => JSON.stringify(antes.get(k)) !== JSON.stringify(depois.get(k)));
+  return { de: mudou.filter((k) => antes.has(k)).map((k) => leve(antes.get(k))), para: mudou.filter((k) => depois.has(k)).map((k) => leve(depois.get(k))) };
+}
+
+/**
  * Inclui um registro, com a linha no histórico. ``historico: false`` só para carga em lote que registra UMA linha por conta
  * própria (importação do extrato: 1.100 lançamentos davam 1.100 linhas de histórico, cada uma com a cópia do lançamento).
  */
@@ -487,7 +502,8 @@ export function atualizar(d, tabela, id, dados, usuario, descricao) {
   if (Object.keys(mudancas).length) {
     Object.assign(r, dados);
     if (tabela === 'contratos' && 'perfil_regras_id' in mudancas) CR.lembrarContrato(r);
-    const det = Object.fromEntries(Object.entries(mudancas).filter(([k]) => !OCULTOS.has(k)).map(([k, m]) => [k, { de: semPeso(tabela, k, m.de), para: semPeso(tabela, k, m.para) }]));
+    const det = Object.fromEntries(Object.entries(mudancas).filter(([k]) => !OCULTOS.has(k)).map(([k, m]) => [k, tabela === 'comunicados' && k === 'destinos'
+      ? destinosParaHistorico(m.de, m.para) : { de: semPeso(tabela, k, m.de), para: semPeso(tabela, k, m.para) }]));
     if (mudancas.senha_hash) det.senha = 'alterada';
     registrar(d, usuario, 'Alteração', tabela, r.id, descricao, det, vinculos(d, tabela, r));
   }
@@ -498,7 +514,7 @@ export function atualizar(d, tabela, id, dados, usuario, descricao) {
 // Desfazer alterações pelo histórico (só administrador): sempre da mais recente para a mais antiga, campo a campo.
 // Boletos, pagamentos, NFs e usuários ficam de fora (têm botões próprios); a pasta não volta (a pasta no disco não muda).
 // --------------------------------------------------------------------------
-const SEM_DESFAZER = new Set(['taxas_poupanca', 'cobrancas', 'faturas', 'recebimentos', 'avulsas', 'usuarios', 'banco', 'listas', 'fechamentos', 'arquivos', 'movimentacoes_banco', 'pagamentos_banco', 'acordos', 'config_regras', 'versoes_regras', 'perfis_regras']);
+const SEM_DESFAZER = new Set(['taxas_poupanca', 'cobrancas', 'faturas', 'recebimentos', 'avulsas', 'usuarios', 'banco', 'listas', 'fechamentos', 'arquivos', 'movimentacoes_banco', 'pagamentos_banco', 'acordos', 'config_regras', 'versoes_regras', 'perfis_regras', 'comunicados']);
 const CAMPOS_SEM_DESFAZER = new Set(['pasta']);
 /** Campos de pagamento que, ligados ao banco (extrato ou pagamento pelo C6), só se desfazem pela tela Banco. */
 const CAMPOS_PAGAMENTO_BANCO = { despesas: ['data_pagamento', 'movimentacao_id', 'pagamento_banco_id', 'comprovante'], guias_impostos: ['paga_em', 'movimentacao_id', 'pagamento_banco_id'], iptus: ['pagas', 'data_quitacao'] };

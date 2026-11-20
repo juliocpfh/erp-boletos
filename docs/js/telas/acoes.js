@@ -21,7 +21,7 @@ import { ACOES_EMAILS } from './emails.js';
 import { htmlSaude } from './banco-c6.js';
 import { ANEXOS_COM_X, CADASTROS, nomeComprovante } from './cadastros.js';
 import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria, indicesMensaisFci } from './campos.js';
-import { adiados, alterarApagandoAnexos, anexosEmUso, botao, apagarAnexos, apagarPastaDaFicha, nomePastaFicha, arquivoApagadoNoFormulario, buscar, carregarParte, chavePasta, parteAdiada, conferirArquivos, conferirHerancas, d, ehMatricula, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, SO_ADMIN_NUMERACAO, vinculoDoEscopo } from './comum.js';
+import { adiados, alterarApagandoAnexos, anexosEmUso, botao, apagarAnexos, apagarPastaDaFicha, nomePastaFicha, arquivoApagadoNoFormulario, buscar, carregarParte, chavePasta, parteAdiada, conferirArquivos, conferirHerancas, d, ehMatricula, encerrarLinksDaFicha, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, SO_ADMIN_NUMERACAO, vinculoDoEscopo } from './comum.js';
 import { ACOES_ICONE } from './icone.js';
 import { alertasAbertos } from './comum.js';
 import { ACOES_PASTA } from './arquivo-impresso.js';
@@ -1112,6 +1112,8 @@ export const ACOES = {
       if (cfg.recalcular) R.recalcularCobrancas(db, cfg.recalcular(db, reg), login());
       if (cfg.depois) cfg.depois(db, reg);
     });
+    // ficha excluída: os links dela pela internet deixam de valer (senão o que chegasse cairia numa pasta sem ficha)
+    if (tabela === 'fichas') { try { await encerrarLinksDaFicha(r.id); } catch (e) { console.warn('encerrar os links da ficha', e); } }
     if (pastaFicha) await apagarPastaDaFicha(pastaFicha);
     // contrato excluído: a pasta dele sai junto se estiver vazia (pasta com documentos fica guardada)
     if (tabela === 'contratos') {

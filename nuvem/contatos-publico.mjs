@@ -54,6 +54,13 @@ const logoValida = (v) => { const s = String(v || ''); return /^data:image\/(png
 const assinaturaValida = (v) => { const s = String(v || ''); if (!s) return ''; if (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(s) || s.length > MAX_ASSINATURA) throw new ErroContatos(400, 'Assinatura inválida. Limpe e assine de novo.'); return s; };
 /** Telefone só com números (10 a 13 dígitos, com ou sem o 55). */
 export const telefoneValido = (v) => { const t = String(v || '').replace(/\D/g, ''); return t.length >= 10 && t.length <= 13 ? t : ''; };
+/** Telefone para mostrar. Ex.: "41999990000" → "(41) 99999-0000" (o que não tem 10 ou 11 números sai como veio). */
+export const foneBr = (v) => {
+  const n = String(v || '').replace(/\D/g, '').replace(/^55(?=\d{10,11}$)/, '');
+  if (n.length === 11) return `(${n.slice(0, 2)}) ${n.slice(2, 7)}-${n.slice(7)}`;
+  if (n.length === 10) return `(${n.slice(0, 2)}) ${n.slice(2, 6)}-${n.slice(6)}`;
+  return String(v || '');
+};
 
 async function lerJson(request, maximo = MAX_PEDIDO) {
   const tamanho = Number(request.headers.get('Content-Length') || 0);
@@ -241,7 +248,7 @@ export async function lerContatosPublico(request, env) {
   const resp = r.resposta;
   return json(200, {
     contexto: r.contexto, vence_em: r.vence_em, vencido: passou(r.vence_em),
-    resposta: resp ? { em: resp.em, email: resp.email, telefone: resp.telefone, whatsapp: resp.whatsapp, melhor: resp.melhor, assinou: !!resp.assinatura } : null,
+    resposta: resp ? { em: resp.em, email: resp.email, telefone: resp.telefone, whatsapp: resp.whatsapp, melhor: resp.melhor, assinou: !!resp.assinatura, comprovante: !!resp.comprovante_em } : null,
     codigo_para: r.codigo && !passou(r.codigo.vence, 0) ? r.codigo.para : null,
   });
 }
@@ -260,10 +267,13 @@ export async function enviarCodigoContatos(request, env, { buscar = fetch } = {}
   if (!estadoEmail(env, { simular, conta }).ligado) throw new ErroContatos(503, 'O envio de e-mail da administração está desligado agora. Tente mais tarde.');
   const codigo = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, '0');
   const em = new Date().toISOString();
+  let anterior = null; let hashNovo = null;
   await mudarRegistro(env, com, dest, async (r) => {
     const lista = (r.codigo && r.codigo.enviados) || [];
     if (lista.length >= MAX_CODIGOS) throw new ErroContatos(429, 'Já mandamos códigos demais para este link. Fale com a administração.');
-    r.codigo = { para, hash: await sha(`${r.hash}|${codigo}`), vence: new Date(Date.now() + MINUTOS_CODIGO * 60000).toISOString(), tentativas: 0, enviados: [...lista, em] };
+    anterior = r.codigo || null;
+    hashNovo = await sha(`${r.hash}|${codigo}`);
+    r.codigo = { para, hash: hashNovo, vence: new Date(Date.now() + MINUTOS_CODIGO * 60000).toISOString(), tentativas: 0, enviados: [...lista, em] };
     r.eventos.push({ em, texto: `código enviado para ${para}` });
   });
   const c = registro.contexto;
@@ -273,6 +283,15 @@ export async function enviarCodigoContatos(request, env, { buscar = fetch } = {}
     await enviarEmail(env, { para, assunto: `Seu código de confirmação: ${codigo}`, texto: corpo }, { buscar, simular, conta });
   } catch (e) {
     console.warn('código dos contatos', e.message);
+    // o código não saiu: não conta no limite nem na espera de 1 minuto, e o código anterior (se havia) continua valendo
+    try {
+      await mudarRegistro(env, com, dest, (r) => {
+        if (!r.codigo || r.codigo.hash !== hashNovo) return r;
+        r.codigo = anterior ? { ...anterior, enviados: (r.codigo.enviados || []).filter((x) => x !== em) } : null;
+        r.eventos.push({ em: new Date().toISOString(), texto: `código para ${para} não saiu (falha no envio do e-mail)` });
+        return r;
+      });
+    } catch (e2) { console.warn('desfazer o código que não saiu', e2.message); }
     throw new ErroContatos(502, 'Não conseguimos mandar o e-mail agora. Confira o endereço e tente de novo em alguns minutos.');
   }
   return json(200, { ok: true, para });
@@ -322,17 +341,29 @@ export async function confirmarContatos(request, env, { buscar = fetch, avisar =
   const empresa = c.empresas.join(' e ') || 'Administração';
   const quando = new Date(em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' });
   const comprovante = `Olá${c.nome ? `, ${c.nome.split(/\s+/)[0]}` : ''}.\n\nRecebemos a confirmação dos seus contatos em ${quando} (horário de Brasília).\n\n`
-    + `Imóvel: ${c.imovel}\nE-mail: ${email} (confirmado pelo código)\nCelular: ${telefone}${p.whatsapp === true ? ' (WhatsApp)' : ''}\nMelhor forma de falar com você: ${melhor}\n${assinatura ? 'Assinatura: feita na tela\n' : ''}\n`
+    + `Imóvel: ${c.imovel}\nE-mail: ${email} (confirmado pelo código)\nCelular: ${foneBr(telefone)}${p.whatsapp === true ? ' (WhatsApp)' : ''}\nMelhor forma de falar com você: ${melhor}\n${assinatura ? 'Assinatura: feita na tela\n' : ''}\n`
     + `O texto que você leu e aceitou:\n\n${textoDoAceite(c)}\n\nCódigo de conferência do texto: ${novo.resposta.texto_sha256.slice(0, 16)}\n\nGuarde este e-mail. Qualquer dúvida, fale com a administração${c.telefone_empresa ? ` pelo ${c.telefone_empresa}` : ''}.\n\n${empresa}`;
   const simular = env.SIMULAR_GMAIL === '1' && /\/\/(localhost|127\.0\.0\.1)[:/]/.test(String(env.ORIGEM || ''));
+  let comprovanteSaiu = false;
   try {
     const conta = simular ? null : await contaGuardada(env);
-    if (estadoEmail(env, { simular, conta }).ligado) await enviarEmail(env, { para: email, assunto: `Comprovante: contatos confirmados (${c.imovel || empresa})`.slice(0, 190), texto: comprovante }, { buscar, simular, conta });
+    if (estadoEmail(env, { simular, conta }).ligado) {
+      await enviarEmail(env, { para: email, assunto: `Comprovante: contatos confirmados (${c.imovel || empresa})`.slice(0, 190), texto: comprovante }, { buscar, simular, conta });
+      comprovanteSaiu = true;
+    }
   } catch (e) { console.warn('comprovante dos contatos', e.message); }
+  // anotado na resposta: quem reabre o link vê se o comprovante saiu
+  try {
+    await mudarRegistro(env, com, dest, (r) => {
+      if (r.resposta && r.resposta.em === em) r.resposta.comprovante_em = comprovanteSaiu ? new Date().toISOString() : null;
+      return r;
+    });
+  } catch (e) { console.warn('anotar o comprovante dos contatos', e.message); }
   if (avisar) {
-    try { await avisarAparelhos(env, { titulo: 'Contatos confirmados', texto: 'Um inquilino confirmou os contatos. Toque para abrir.', url: './#/comunicacoes', tag: `contatos-${com}` }, { buscar }); } catch (e) { console.warn('aviso no celular (contatos)', e.message); }
+    const quem = dest.startsWith('f') ? 'Um fiador' : 'Um inquilino';
+    try { await avisarAparelhos(env, { titulo: 'Contatos confirmados', texto: `${quem} confirmou os contatos. Toque para abrir.`, url: './#/comunicacoes', tag: `contatos-${com}` }, { buscar }); } catch (e) { console.warn('aviso no celular (contatos)', e.message); }
   }
-  return json(200, { ok: true, em });
+  return json(200, { ok: true, em, comprovante: comprovanteSaiu });
 }
 
 /** Rotas públicas dos contatos (dentro do endereço da ficha). `r`: o caminho depois de /api/publico/. */
@@ -383,7 +414,7 @@ button.sec{background:transparent;color:var(--cor);border:1px solid var(--cor)}b
 .aviso{border-left:4px solid var(--aviso);padding:10px 12px;background:color-mix(in srgb,var(--aviso) 10%,transparent);border-radius:6px}
 .ok{border-left:4px solid var(--ok);padding:10px 12px;background:color-mix(in srgb,var(--ok) 10%,transparent);border-radius:6px}
 .texto{white-space:pre-wrap;background:var(--claro);border-radius:8px;padding:12px}
-.erro{color:var(--perigo);font-weight:600}canvas{width:100%;height:150px;border:1px dashed var(--borda);border-radius:8px;touch-action:none;background:var(--cartao)}
+.erro{color:var(--perigo);font-weight:600}canvas{width:100%;height:150px;border:1px dashed var(--borda);border-radius:8px;touch-action:none;background:#fff}
 .rodape{text-align:center;color:var(--suave);font-size:.82rem;margin-top:18px}[hidden]{display:none!important}
 </style></head><body><main id="app"><p class="suave">Carregando…</p></main>
 <script nonce="{{NONCE}}">
@@ -409,12 +440,12 @@ button.sec{background:transparent;color:var(--cor);border:1px solid var(--cor)}b
     + '<div class="nome">' + esc(c.empresas.join(' e ') || 'Administração de imóveis') + '</div>'
     + (c.cnpjs.length ? '<div class="suave">CNPJ ' + esc(c.cnpjs.join(' · ')) + (c.cidade ? ' · ' + esc(c.cidade) : '') + '</div>' : '')
     + '<div class="seguro">Endereço seguro: <b>' + esc(location.host) + '</b>' + (c.email_empresa ? ' · e-mail oficial: <b>' + esc(c.email_empresa) + '</b>' : '') + '</div></div>';
-  const rodape = (c) => '<p class="rodape">A conta e a chave Pix para pagamento não mudam. Nunca pedimos pagamento em outra conta.' + (c.telefone_empresa ? ' Na dúvida, ligue ' + esc(c.telefone_empresa) + '.' : '') + '</p>';
+  const rodape = (c) => '<p class="rodape">A conta e a chave Pix para pagamento não mudam. Nunca pedimos pagamento em outra conta.' + (c.telefone_empresa ? ' Na dúvida, ligue para ' + esc(c.telefone_empresa) + '.' : '') + '</p>';
 
   function feito(c, resp, novo) {
     app.innerHTML = topo(c) + '<div class="cartao"><div class="ok"><b>' + (novo ? 'Pronto! Contatos confirmados.' : 'Você já confirmou seus contatos.') + '</b><br>Em ' + esc(horaBr(resp.em)) + '.</div>'
       + '<p>E-mail: <b>' + esc(resp.email) + '</b><br>Celular: <b>' + esc(fone(resp.telefone)) + '</b>' + (resp.whatsapp ? ' (WhatsApp)' : '') + '<br>Melhor contato: <b>' + esc(resp.melhor) + '</b></p>'
-      + '<p class="suave">Mandamos o comprovante para o seu e-mail. Guarde o endereço <b>' + esc(c.email_empresa || '') + '</b> nos seus contatos e confira também a caixa de spam.</p>'
+      + '<p class="suave">' + (resp.comprovante ? 'Mandamos o comprovante para o seu e-mail.' : 'Não conseguimos mandar o comprovante para o seu e-mail agora: guarde esta tela (tire uma foto ou um print).') + ' Guarde o endereço <b>' + esc(c.email_empresa || '') + '</b> nos seus contatos e confira também a caixa de spam.</p>'
       + (D && !D.vencido ? '<button class="sec" id="corrigir">Mudar meus contatos</button>' : '') + '</div>' + rodape(c);
     const b = document.getElementById('corrigir');
     if (b) b.addEventListener('click', () => formulario(c, resp));
@@ -446,19 +477,21 @@ button.sec{background:transparent;color:var(--cor);border:1px solid var(--cor)}b
     if (D.codigo_para && D.codigo_para === String(email).toLowerCase()) document.getElementById('msg-codigo').textContent = 'Código já enviado para ' + D.codigo_para + '. Confira a caixa de entrada e o spam.';
     // assinatura
     const cv = document.getElementById('ass'); const ctx = cv.getContext('2d');
-    const ajustar = () => { const r = cv.getBoundingClientRect(); cv.width = r.width * 2; cv.height = r.height * 2; ctx.scale(2, 2); ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.strokeStyle = getComputedStyle(document.body).color; };
+    // tinta sempre escura sobre fundo branco, em qualquer tema do aparelho (o comprovante do aceite é uma folha branca)
+    const fundo = () => { ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, cv.width, cv.height); ctx.restore(); };
+    const ajustar = () => { const r = cv.getBoundingClientRect(); cv.width = r.width * 2; cv.height = r.height * 2; ctx.scale(2, 2); ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.strokeStyle = '#111111'; fundo(); };
     ajustar(); assinou = false;
     let desenhando = false;
     const ponto = (ev) => { const r = cv.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; };
     cv.addEventListener('pointerdown', (ev) => { desenhando = true; cv.setPointerCapture(ev.pointerId); const [x, y] = ponto(ev); ctx.beginPath(); ctx.moveTo(x, y); });
     cv.addEventListener('pointermove', (ev) => { if (!desenhando) return; const [x, y] = ponto(ev); ctx.lineTo(x, y); ctx.stroke(); assinou = true; });
     cv.addEventListener('pointerup', () => { desenhando = false; });
-    document.getElementById('limpar').addEventListener('click', () => { ctx.clearRect(0, 0, cv.width, cv.height); assinou = false; });
+    document.getElementById('limpar').addEventListener('click', () => { fundo(); assinou = false; });
     document.getElementById('pedir').addEventListener('click', async (ev) => {
-      const m = document.getElementById('msg-codigo'); ev.target.disabled = true; m.className = 'suave'; m.textContent = 'Mandando…';
-      try { const r = await api('contatos/codigo', { method: 'POST', body: JSON.stringify({ email: document.getElementById('email').value }) }); m.textContent = 'Código enviado para ' + r.para + '. Confira a caixa de entrada e o spam.'; }
-      catch (e) { m.className = 'erro'; m.textContent = e.message; }
-      setTimeout(() => { ev.target.disabled = false; }, 60000);
+      const b = ev.currentTarget; const m = document.getElementById('msg-codigo'); b.disabled = true; m.className = 'suave'; m.textContent = 'Mandando…';
+      // a espera de 1 minuto só quando o código saiu; no erro (ex.: e-mail digitado errado) o botão volta na hora
+      try { const r = await api('contatos/codigo', { method: 'POST', body: JSON.stringify({ email: document.getElementById('email').value }) }); m.textContent = 'Código enviado para ' + r.para + '. Confira a caixa de entrada e o spam.'; setTimeout(() => { b.disabled = false; }, 60000); }
+      catch (e) { m.className = 'erro'; m.textContent = e.message; b.disabled = false; }
     });
     document.getElementById('confirmar').addEventListener('click', async (ev) => {
       const msg = document.getElementById('msg'); msg.textContent = '';
@@ -471,7 +504,7 @@ button.sec{background:transparent;color:var(--cor);border:1px solid var(--cor)}b
         const corpo = { email: document.getElementById('email').value, codigo: document.getElementById('codigo').value, telefone: document.getElementById('tel').value,
           whatsapp: document.getElementById('zap').checked, melhor: melhorEsc.value, ciente: true, assinatura: assinou ? cv.toDataURL('image/png') : '' };
         const r = await api('contatos/confirmar', { method: 'POST', body: JSON.stringify(corpo) });
-        feito(c, { em: r.em, email: String(corpo.email).trim().toLowerCase(), telefone: so(corpo.telefone), whatsapp: corpo.whatsapp, melhor: corpo.melhor }, true);
+        feito(c, { em: r.em, email: String(corpo.email).trim().toLowerCase(), telefone: so(corpo.telefone), whatsapp: corpo.whatsapp, melhor: corpo.melhor, comprovante: !!r.comprovante }, true);
         window.scrollTo(0, 0);
       } catch (e) { msg.textContent = e.message; ev.target.disabled = false; ev.target.textContent = 'Confirmar'; }
     });

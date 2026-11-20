@@ -145,14 +145,69 @@ export function documentosAceitos(ctx) {
 }
 const mostrarSeValido = (m) => ({ campo: texto(m.campo, 60), valores: (Array.isArray(m.valores) ? m.valores : []).slice(0, 10).map((v) => texto(v, 120)) });
 
-/** Valores digitados, conferidos pelo tipo de cada campo do formulário. Campo desconhecido é ignorado. */
-export function valoresValidos(formulario, valores) {
+// CPF, CNPJ, e-mail e telefone: a mesma conferência dos cadastros do sistema (formularios.js), aqui sem importar o site
+const digitos = (v) => String(v ?? '').replace(/\D/g, '');
+export function cpfValido(v) {
+  const n = digitos(v);
+  if (n.length !== 11 || /^(\d)\1{10}$/.test(n)) return false;
+  const dv = (k) => { let s = 0; for (let i = 0; i < k; i += 1) s += Number(n[i]) * (k + 1 - i); const r = (s * 10) % 11; return r === 10 ? 0 : r; };
+  return dv(9) === Number(n[9]) && dv(10) === Number(n[10]);
+}
+export function cnpjValido(v) {
+  const n = digitos(v);
+  if (n.length !== 14 || /^(\d)\1{13}$/.test(n)) return false;
+  const dv = (k) => { const pesos = k === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]; const s = pesos.reduce((t, p, i) => t + p * Number(n[i]), 0) % 11; return s < 2 ? 0 : 11 - s; };
+  return dv(12) === Number(n[12]) && dv(13) === Number(n[13]);
+}
+const cpfBr = (n) => `${n.slice(0, 3)}.${n.slice(3, 6)}.${n.slice(6, 9)}-${n.slice(9)}`;
+const cnpjBr = (n) => `${n.slice(0, 2)}.${n.slice(2, 5)}.${n.slice(5, 8)}/${n.slice(8, 12)}-${n.slice(12)}`;
+const telBr = (n) => (n.length === 11 ? `(${n.slice(0, 2)}) ${n.slice(2, 7)}-${n.slice(7)}` : `(${n.slice(0, 2)}) ${n.slice(2, 6)}-${n.slice(6)}`);
+export const EMAIL_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@.]{2,}$/;
+const hojeBrasil = () => new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+
+/**
+ * Conferência do que a pessoa digitou no link (mutirão 19/11, entrada-001/002): CPF/CNPJ com os dígitos certos (e com pontos),
+ * e-mail completo, telefone com DDD (10 ou 11 números) e nascimento no passado. Devolve o valor formatado ou lança o erro.
+ * Ex.: ('cpf', '52998224725') → '529.982.247-25'; ('cpf', '11111111111') → erro "CPF inválido".
+ */
+export function valorConferido(c, x) {
+  const rotulo = c.rotulo || c.nome;
+  if (c.tipo === 'cpf' || c.tipo === 'cpfcnpj') {
+    const n = digitos(x);
+    if (n.length === 11 && cpfValido(n)) return cpfBr(n);
+    if (c.tipo === 'cpfcnpj' && n.length === 14 && cnpjValido(n)) return cnpjBr(n);
+    throw new ErroFicha(400, `${c.tipo === 'cpf' || n.length <= 11 ? 'CPF' : 'CNPJ'} inválido em "${rotulo}": confira os números.`);
+  }
+  if (c.tipo === 'email') {
+    const t = texto(x, 254).toLowerCase();
+    if (!EMAIL_VALIDO.test(t)) throw new ErroFicha(400, `E-mail incompleto em "${rotulo}". Ex.: nome@gmail.com`);
+    return t;
+  }
+  if (c.tipo === 'tel') {
+    const n = digitos(x).replace(/^55(?=\d{10,11}$)/, '');
+    if (![10, 11].includes(n.length)) throw new ErroFicha(400, `Telefone com DDD em "${rotulo}": 10 ou 11 números. Ex.: (41) 99999-0000`);
+    return telBr(n);
+  }
+  if (c.tipo === 'data' && /nascimento$/.test(c.nome) && (String(x) >= hojeBrasil() || String(x) < '1900-01-01')) throw new ErroFicha(400, `Confira a data em "${rotulo}": precisa ser uma data do passado.`);
+  return null;
+}
+
+/**
+ * Valores digitados, conferidos pelo tipo de cada campo do formulário. Campo desconhecido é ignorado. ``conferir``: também
+ * CPF/CNPJ, e-mail, telefone e nascimento (o envio da pessoa; os valores que a equipe manda ao criar o link passam como estão,
+ * para um cadastro antigo não travar o link).
+ */
+export function valoresValidos(formulario, valores, { conferir = false } = {}) {
   const out = {};
   const v = valores && typeof valores === 'object' ? valores : {};
   for (const c of formulario) {
     if (!c.nome || !(c.nome in v)) continue;
     const x = v[c.nome];
     if (x === null || x === '' || x === undefined) { out[c.nome] = null; continue; }
+    if (conferir && ['cpf', 'cpfcnpj', 'email', 'tel', 'data'].includes(c.tipo)) {
+      const certo = valorConferido(c, x);
+      if (certo !== null) { out[c.nome] = certo; continue; }
+    }
     if (c.tipo === 'simnao') out[c.nome] = x === true || x === '1' || x === 1;
     else if (c.tipo === 'dinheiro' || c.tipo === 'inteiro') {
       const n = Number(x);
@@ -302,7 +357,7 @@ export async function listarLinks(env, url) {
     }
     return ficha ? paraEquipe(reg) : {
       ficha_id: reg.ficha_id, pessoa: reg.pessoa, situacao: reg.situacao, atualizado_em: reg.atualizado_em, visto_em: reg.visto_em,
-      vence_em: reg.vence_em, criado_em: reg.criado_em, mudou_em: reg.mudou_em || null, ultimo_envio: (reg.respostas.at(-1) || {}).em || null, arquivos: reg.arquivos.length, desistiu_em: reg.desistiu_em,
+      vence_em: reg.vence_em, criado_em: reg.criado_em, mudou_em: reg.mudou_em || null, ultimo_envio: (reg.respostas.at(-1) || {}).em || null, arquivos: reg.arquivos.length, ultimo_arquivo: (reg.arquivos.at(-1) || {}).em || null, desistiu_em: reg.desistiu_em,
       nome: reg.contexto.nome,
     };
   };
@@ -393,7 +448,7 @@ export async function enviarFichaPublica(request, env, avisar) {
   const { fichaId, pessoa, registro } = await registroDaChave(request, env, { gravar: true });
   const p = await lerJson(request);
   if (p.declaracao !== true) throw new ErroFicha(400, 'Marque a declaração antes de enviar.');
-  const valores = valoresValidos(registro.formulario, p.valores);
+  const valores = valoresValidos(registro.formulario, p.valores, { conferir: true });
   const falta = registro.formulario.filter((c) => c.obrig && (valores[c.nome] === null || valores[c.nome] === undefined)).map((c) => c.rotulo);
   if (falta.length) throw new ErroFicha(400, `Preencha: ${falta.join(', ')}.`);
   if (registro.respostas.length >= MAX_ENVIOS) throw new ErroFicha(429, 'Limite de envios deste link. Fale com quem enviou o link.');
@@ -408,7 +463,7 @@ export async function enviarFichaPublica(request, env, avisar) {
     r.eventos = r.eventos.slice(-50);
   });
   if (avisar) await avisar(env, novo, 'enviou');
-  return json(200, { ok: true, enviado_em: em, situacao: novo.situacao });
+  return json(200, { ok: true, enviado_em: em, situacao: novo.situacao, valores });
 }
 
 /**
@@ -445,6 +500,11 @@ export async function receberArquivoPublico(request, env, url, avisar) {
       if (r.arquivos.length >= MAX_ARQUIVOS) throw new ErroFicha(429, `Limite de ${MAX_ARQUIVOS} arquivos por link. Fale com quem enviou o link.`);
       r.arquivos.push({ documento, arquivo: nome.slice(nome.lastIndexOf('/') + 1), nome_original: texto(url.searchParams.get('nome'), 120), em, tamanho: corpo.byteLength, tipo: ext });
       if (qual === 'assinada') { r.situacao = 'Assinada'; r.eventos.push({ em, texto: 'ficha assinada enviada pelo link' }); }
+      // o documento pedido chegou: sai do "Falta mandar"; zerada a lista, volta a "Respondida"
+      if ((r.faltando || []).includes(documento)) {
+        r.faltando = r.faltando.filter((x) => x !== documento);
+        if (!r.faltando.length && r.situacao === 'Falta documento') { r.situacao = 'Respondida'; r.mudou_em = em; }
+      }
       r.visto_em = null;
       r.eventos = r.eventos.slice(-50);
     });
@@ -454,7 +514,7 @@ export async function receberArquivoPublico(request, env, url, avisar) {
     throw e;
   }
   if (avisar) await avisar(env, novo, qual === 'assinada' ? 'assinou' : 'documento', documento);
-  return json(200, { ok: true, documento });
+  return json(200, { ok: true, documento, situacao: novo.situacao, faltando: novo.faltando || [] });
 }
 
 /** "Não vou seguir com a análise": a equipe recebe o aviso e registra a desistência e a devolução da reserva no sistema. */
@@ -571,6 +631,7 @@ h1{font-size:1.5rem;margin-top:0}h2{font-size:1.1rem;margin-top:1.4em}p,li{font-
 <p>Este sistema é usado só pela equipe da administradora de imóveis para cuidar dos contratos de locação: fichas cadastrais, contratos, boletos, notas fiscais e recibos. Não é um serviço aberto ao público.</p>
 <h2>Que dados tratamos</h2>
 <p>Os dados que o interessado ou o inquilino nos informa para a locação: nome, CPF ou CNPJ, contato, endereço, renda e documentos enviados pela ficha cadastral; e os dados do contrato, dos pagamentos e das notas fiscais.</p>
+<p>Quando a pessoa abre ou responde o link de confirmação de contatos, guardamos também a data e a hora, o endereço de internet (IP), o navegador e o aparelho usados e, se ela assinar na tela, a assinatura desenhada, como prova do envio e do aceite.</p>
 <h2>Para que usamos</h2>
 <p>Só para analisar a ficha, fazer e cumprir o contrato de locação, cobrar e dar recibo, emitir nota fiscal e cumprir obrigações legais e fiscais.</p>
 <h2>Uso da conta Google (Gmail)</h2>
@@ -714,7 +775,8 @@ td:first-child{color:var(--suave);width:38%}.doc{padding:10px 0;border-bottom:1p
     const ctx = F.contexto;
     const fiador = F.pessoa !== 'interessado';
     const bloqueado = F.situacao === 'Desistiu' || F.vencido;
-    const situacao = (SITUACAO[F.situacao] || '').replace('{enviado}', horaBr(F.enviado_em)).replace('{desistiu}', dataBr(F.desistiu_em)).replace('{faltando}', F.faltando.map((x) => '<li>' + esc(x) + '</li>').join(''));
+    const modelo = F.situacao === 'Respondida' && !F.enviado_em ? '<div class="ok">Recebemos seus documentos. Obrigado!</div>' : (SITUACAO[F.situacao] || '');
+    const situacao = modelo.replace('{enviado}', horaBr(F.enviado_em)).replace('{desistiu}', dataBr(F.desistiu_em)).replace('{faltando}', F.faltando.map((x) => '<li>' + esc(x) + '</li>').join(''));
     app.innerHTML = '<p class="suave">' + esc(ctx.empresa) + '</p><h1>' + (fiador ? 'Ficha do fiador' : 'Ficha cadastral') + '</h1>'
       + '<p>' + esc(ctx.nome ? 'Olá, ' + ctx.nome.split(' ')[0] + '! ' : '') + (fiador ? 'Você foi indicado como fiador' + (ctx.de ? ' de ' + esc(ctx.de) : '') + ' na locação do imóvel abaixo.' : 'Preencha seus dados e mande os documentos para a análise da locação.') + '</p>'
       + (F.vencido ? '<div class="aviso">O prazo deste link acabou em ' + dataBr(F.vence_em) + '. Peça um novo para quem enviou: o que você já mandou continua guardado.</div>' : '<p class="suave">Este link é só seu e vale até ' + dataBr(F.vence_em) + '.</p>')
@@ -749,8 +811,11 @@ td:first-child{color:var(--suave);width:38%}.doc{padding:10px 0;border-bottom:1p
       if (F.contexto.listas && ['renda_tipo', 'inquilino_estado_civil'].includes(ev.target.name)) {
         F.valores = { ...F.valores, ...valoresDoForm() };
         const marcada = document.getElementById('declaracao').checked;
+        // a tela fica onde está (só a lista de documentos, lá embaixo, muda) e o foco volta ao campo
+        const y = window.scrollY; const foco = ev.target.id;
         desenhar(); document.getElementById('declaracao').checked = marcada;
-        const alvo = document.getElementById('lista-documentos'); if (alvo) alvo.scrollIntoView({ block: 'nearest' });
+        window.scrollTo(0, y);
+        const el = foco && document.getElementById(foco); if (el) el.focus({ preventScroll: true });
       }
     });
     aplicarMostrar();
@@ -764,7 +829,7 @@ td:first-child{color:var(--suave);width:38%}.doc{padding:10px 0;border-bottom:1p
       try {
         const valores = valoresDoForm();
         const r = await api('ficha/enviar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ valores, declaracao: true }) });
-        F.valores = { ...F.valores, ...valores }; F.enviado_em = r.enviado_em; F.situacao = r.situacao;
+        F.valores = { ...F.valores, ...valores, ...(r.valores || {}) }; F.enviado_em = r.enviado_em; F.situacao = r.situacao;
         desenhar('Dados enviados. Obrigado! Se ainda faltar algum documento, mande pelos campos de documentos.');
         scrollTo(0, 0);
       } catch (e) { erro.textContent = e.message; erro.hidden = false; botao.disabled = false; botao.textContent = 'Enviar meus dados'; }
@@ -781,14 +846,20 @@ td:first-child{color:var(--suave);width:38%}.doc{padding:10px 0;border-bottom:1p
           try {
             const r = await api('ficha/arquivo?documento=' + encodeURIComponent(documento) + '&nome=' + encodeURIComponent(arq.name), { method: 'PUT', body: arq });
             F.arquivos.push({ documento: r.documento, nome_original: arq.name, em: new Date().toISOString() });
-            if (qual === 'assinada') F.situacao = 'Assinada';
+            if (r.situacao) F.situacao = r.situacao; else if (qual === 'assinada') F.situacao = 'Assinada';
+            if (Array.isArray(r.faltando)) F.faltando = r.faltando;
             estado.textContent = '';
           } catch (e) { estado.innerHTML = '<span class="erro">' + esc(arq.name) + ': ' + esc(e.message) + '</span>'; return; }
         }
         const valores = valoresDoForm(); F.valores = { ...F.valores, ...valores };
         const marcada = document.getElementById('declaracao').checked;
-        desenhar(qual === 'assinada' ? 'Ficha assinada recebida. Obrigado!' : 'Documento recebido.');
+        const y = window.scrollY;
+        // o "recebido" aparece ao lado do campo do arquivo (a ficha assinada já tem o aviso da situação no topo)
+        desenhar();
         document.getElementById('declaracao') && (document.getElementById('declaracao').checked = marcada);
+        window.scrollTo(0, y);
+        const aqui = document.querySelector('[data-estado="' + qual + '"]');
+        if (aqui) { aqui.className = 'enviados'; aqui.textContent = qual === 'assinada' ? 'Recebido.' : 'Documento recebido.'; }
       });
     }
     const desistir = document.getElementById('desistir');

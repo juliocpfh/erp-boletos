@@ -552,9 +552,10 @@ export function janela({ titulo, html, sim = 'Confirmar', nao = 'Cancelar', fort
     const dlg = document.createElement('dialog');
     dlg.className = `janela-erro janela-pergunta${forte ? ' forte' : ''}`;
     dlg.innerHTML = `<form method="dialog">${titulo ? `<h3>${esc(titulo)}</h3>` : ''}<div class="corpo">${html}</div>
-      <div class="acoes" style="justify-content:flex-end"><button type="button" class="secundario" data-nao>${esc(nao)}</button><button value="sim" class="${forte ? 'perigo' : ''}">${esc(sim)}</button></div></form>`;
+      <div class="acoes" style="justify-content:flex-end">${nao ? `<button type="button" class="secundario" data-nao>${esc(nao)}</button>` : ''}<button value="sim" class="${forte ? 'perigo' : ''}">${esc(sim)}</button></div></form>`;
     let resposta = null;
-    dlg.querySelector('[data-nao]').addEventListener('click', () => dlg.close());
+    // nao: null → janela de um botão só (ex.: "Fechar")
+    if (nao) dlg.querySelector('[data-nao]').addEventListener('click', () => dlg.close());
     dlg.querySelector('form').addEventListener('submit', () => {
       const fd = new FormData(dlg.querySelector('form'));
       resposta = {};
