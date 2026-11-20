@@ -209,7 +209,7 @@ export const DEFINICOES_REGRAS = [
     consequencia: 'Só muda até quando o alerta aparece.', lei: 'Sem lei: rotina.' },
   // mutirão 3000 (2ª rodada, itens 24, 28 e 29 da lista dados): o prazo da lixeira já existia fixo (30 dias na nuvem)
   { chave: 'dias_lixeira_anexos', grupo: 'rotina', rotulo: 'Anexos apagados: guardar na lixeira por (dias)', tipo: 'inteiro', padrao: 30, min: 1, max: 365,
-    explica: 'Anexo apagado (ou trocado por outro com o mesmo nome) não some na hora: a versão de antes fica guardada este número de dias, na lixeira da nuvem e, no computador com o backup seguro, na pasta "Apagados na nuvem" ao lado de "Arquivos dos imoveis". Ex.: contrato assinado apagado por engano em 10/03 → até 09/04 dá para recuperar.',
+    explica: 'Anexo apagado (ou trocado por outro com o mesmo nome) não some na hora: a versão de antes fica guardada este número de dias, na lixeira da nuvem e, no computador com o backup seguro, na pasta "Apagados na nuvem" ao lado de "Arquivos dos imoveis". Ex.: contrato assinado apagado por engano em 10/03 → até 09/04 dá para recuperar. Não há tela de lixeira no sistema: para recuperar, abra no computador do backup seguro a pasta "Apagados na nuvem" e anexe o arquivo de novo pelo sistema (sem esse computador, só o técnico recupera, pelo painel da nuvem).',
     consequencia: 'Prazo maior protege mais contra apagar por engano, mas guarda por mais tempo documentos pessoais que já saíram do sistema; prazo menor libera espaço mais cedo. O que já passou do prazo não volta.',
     lei: 'LGPD (Lei 13.709/2018), art. 6º, III (guardar só o necessário) e art. 46 (segurança: proteger contra perda acidental).' },
   { chave: 'dias_copias_backup', grupo: 'rotina', rotulo: 'Backup seguro: guardar as cópias de cada hora por (dias)', tipo: 'inteiro', padrao: 2, min: 1, max: 30,
@@ -294,6 +294,7 @@ export function limparValorRegra(chave, valor) {
       }
       const n = Number(valor);
       if (!Number.isFinite(n)) throw new ErroRegra(`${def.rotulo}: informe um número.`);
+      if (def.tipo === 'inteiro' && !Number.isInteger(n)) throw new ErroRegra(`${def.rotulo}: informe um número inteiro.`);
       return faixa(def.tipo === 'pct' ? Math.round(n * 10000) / 10000 : Math.round(n));
     }
     case 'feriados': {

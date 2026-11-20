@@ -71,6 +71,24 @@ test('renomear, mover e juntar pastas (inquilino que sai, muda de imóvel, troca
   assert.deepEqual(chaves(R2, 'arquivos/Sala 2/'), []);
 });
 
+test('sem internet: renomear a pasta do inquilino fica guardado e é feito quando a internet volta (mutirão 19/11, nuvem-009)', async () => {
+  const { R2, estado, cliente, raiz } = montar();
+  const arquivos = await raiz.getDirectoryHandle('arquivos', { create: true });
+  const inq = await S.subpasta(arquivos, ['Apto 604', 'Inquilinos']);
+  await S.salvarArquivo(await S.subpasta(inq, ['Maria']), arquivo('a.pdf', 'A'));
+  await S.subpastas(inq); // a lista fica vista (sem internet, é ela que mostra a pasta)
+  estado.internet = false;
+  await S.renomearPasta(inq, 'Maria', 'Maria Souza'); // não dá erro: fica na fila
+  assert.equal((await cliente.movimentosPendentes()).length, 1);
+  assert.deepEqual(chaves(R2), ['arquivos/Apto 604/Inquilinos/Maria/a.pdf'], 'ainda não mudou na nuvem');
+  // anexo feito sem internet na pasta nova sobe depois da troca do nome
+  await S.salvarArquivo(await S.subpasta(inq, ['Maria Souza']), arquivo('b.pdf', 'B'));
+  estado.internet = true;
+  await cliente.enviarFila();
+  assert.deepEqual(chaves(R2), ['arquivos/Apto 604/Inquilinos/Maria Souza/a.pdf', 'arquivos/Apto 604/Inquilinos/Maria Souza/b.pdf']);
+  assert.equal((await cliente.movimentosPendentes()).length, 0);
+});
+
 test('sem internet: anexo novo fica no aparelho, aparece na lista, abre, e sobe quando a internet volta', async () => {
   const { R2, estado, cliente, raiz, guardado } = montar();
   const arquivos = await raiz.getDirectoryHandle('arquivos', { create: true });

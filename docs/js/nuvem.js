@@ -323,7 +323,7 @@ export class Sincronia {
     this.api = api; this.guardar = guardar; this.aoMudar = aoMudar; this.trava = trava; this.normalizar = normalizar;
     this.agrupar = agrupar; this.tabelas = new Set(tabelas);
     this.base = null; this.pendentes = []; this.faixas = {}; this.recusas = []; this.conflitos = [];
-    this.aparelho = null; this.n = 0; this.online = true; this.enviando = null; this.vista = null; this.externo = false;
+    this.aparelho = null; this.n = 0; this.online = true; this.acessoVencido = false; this.enviando = null; this.vista = null; this.externo = false;
     this.envioMarcado = null; this.semFaixas = false; this.ultimoLote = null;
     // fila no aparelho (item 41): as mudanças de cada lote ficam em 'lote:<código>', gravadas uma vez; 'fila' só tem a lista
     this.opsDe = new Map(); this.noAparelho = new Set(); this.legado = false;
@@ -804,9 +804,11 @@ export class Sincronia {
       this.externo = (await this.puxar(meus)) || this.externo;
       if (enviados.size) await this.tirarDaFila(enviados);
       await this.garantirFaixas();
-      this.online = true;
+      this.online = true; this.acessoVencido = false;
     } catch (e) {
       if (passageiro(e)) this.online = false;
+      // 401: o login da internet (Access) venceu; a internet funciona, mas nada sobe até entrar de novo (a faixa avisa)
+      this.acessoVencido = e.status === 401;
       throw e;
     }
   }

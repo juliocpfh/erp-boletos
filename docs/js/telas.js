@@ -467,11 +467,14 @@ export const TELAS = {
         <td class="n nw">${u.id === E.usuario.id ? '<span class="suave">você</span>' : botao('bloquearUsuario', u.ativo ? 'Bloquear' : 'Desbloquear', { id: u.id }, u.ativo ? 'perigo pequeno' : 'pequeno', u.ativo ? `Bloquear o acesso de ${u.nome}?` : '')} ${link(`#/editar/usuarios/${u.id}`, 'Editar')}</td></tr>`).join('')}</table>
       <p class="suave">Quem não tem usuário clica em "Pedir acesso" na tela de login, e o pedido aparece aqui para aprovar. Administrador: tudo, inclusive usuários e importação. Operador: cadastra, altera, confirma pagamentos e numera NFs. Consulta: só vê.</p></div>${aparelhos}`;
   },
-  'minha-senha': () => `<div class="cartao login"><h1>Trocar minha senha</h1><form data-form="minhaSenha">
+  // quem não é administrador vê aqui os computadores que ligou com o próprio login (programa do PC) e pode desligá-los
+  'minha-senha': async () => `${minhaSenhaHtml()}${E.nuvem && !podeUsuario('admin') ? await (await parteAdiada('nuvem')).aparelhosLigadosHtml({ proprios: true }) : ''}`,
+};
+
+const minhaSenhaHtml = () => `<div class="cartao login"><h1>Trocar minha senha</h1><form data-form="minhaSenha">
     <p><label for="ent_atual">Senha atual</label><input id="ent_atual" type="password" name="atual" autocomplete="current-password"></p>
     <p><label for="ent_nova">Nova senha</label><input id="ent_nova" type="password" name="nova" autocomplete="new-password"></p>
-    <p><label for="ent_nova2">Repita a nova senha</label><input id="ent_nova2" type="password" name="nova2" autocomplete="new-password"></p><button>Salvar</button></form></div>`,
-};
+    <p><label for="ent_nova2">Repita a nova senha</label><input id="ent_nova2" type="password" name="nova2" autocomplete="new-password"></p><button>Salvar</button></form></div>`;
 
 export { FORMULARIOS } from './telas/envios.js';
 export { ACOES } from './telas/acoes.js';

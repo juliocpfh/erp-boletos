@@ -240,7 +240,7 @@ export function telaIptu(ano) {
       <tr><td>Em aberto <span class="suave">(guias suas ainda não pagas)</span></td><td class="n nw">${soma.aberto ? `<b class="texto-perigo">${reais(soma.aberto)}</b>` : reais(0)}</td></tr>
       <tr class="total"><td>${soma.sua < 0 ? 'Resultado: sobra para você' : 'Resultado: sai do seu bolso'}</td><td class="n nw">${reais(Math.abs(soma.sua))}</td></tr></table>` : ''}
     <div class="legenda-iptu">${legenda}</div>
-    <p class="suave">Cada quadradinho é o boleto do mês em que a parcela entra; passe o mouse para ver o valor. Clique num vermelho para marcar a guia como paga. O inquilino paga pelo valor parcelado (mesmo quando você paga à vista com desconto); no IPTU pago à vista, os verdes são os boletos dele, os cinzas os meses sem inquilino que você arcou e o risco azul marca o mês em que você pagou; no mês de entrada ou de saída ele paga os dias em que ocupou e você o resto. Se a prefeitura atrasar o carnê, edite o primeiro mês de cobrança.</p></div>`;
+    <p class="suave">Cada quadradinho é o boleto do mês em que a parcela entra; <span class="so-pc">passe o mouse para ver o valor.</span><span class="so-celular">os valores somados estão nas colunas Inquilino e Você paga.</span> Clique num vermelho para marcar a guia como paga. O inquilino paga pelo valor parcelado (mesmo quando você paga à vista com desconto); no IPTU pago à vista, os verdes são os boletos dele, os cinzas os meses sem inquilino que você arcou e o risco azul marca o mês em que você pagou; no mês de entrada ou de saída ele paga os dias em que ocupou e você o resto. Se a prefeitura atrasar o carnê, edite o primeiro mês de cobrança.</p></div>`;
 }
 
 /**

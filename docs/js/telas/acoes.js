@@ -1355,7 +1355,7 @@ export const ACOES = {
       document.body.append(t); t.select();
       const ok = document.execCommand('copy');
       t.remove();
-      if (!ok) throw new C.ErroUsuario(`Não deu para copiar sozinho. Selecione e copie (Ctrl+C): ${texto}`);
+      if (!ok) throw new C.ErroUsuario(`Não deu para copiar sozinho. Selecione e copie: ${texto}`);
     }
     const antes = el.textContent;
     el.textContent = 'Copiado ✓';
@@ -2010,6 +2010,7 @@ export const ACOES = {
   },
 
   async exportar(_dados, el) {
+    if (E.nuvem && !podeUsuario('admin')) throw new C.ErroUsuario('Na nuvem, só o administrador baixa o ZIP com todos os dados (o aparelho dos outros usuários não recebe as senhas de todos, e o ZIP não serviria num desastre).');
     const JSZip = await jsZip();
     const barra = andamentoZip('progresso-exportar');
     let blob;
@@ -2103,6 +2104,9 @@ export const ACOES = {
     }
     return ACOES.abrirArquivo({ escopo: 'matricula', id: i.id, nome });
   },
+
+  /** Faixa do topo (login da internet vencido): recarrega a página para entrar de novo; a fila do aparelho fica. */
+  recarregarPagina() { location.reload(); },
 
   /** Dados e backup: apaga as telas guardadas no aparelho (não os dados nem o que espera envio) e abre a versão nova. */
   async atualizarSistema() {

@@ -894,6 +894,12 @@ function atualizarFaixa() {
   if (E.nuvem) {
     const n = E.nuvem.pendentesQtd() + (E.anexos?.fila?.length || 0); const cf = E.nuvem.conflitos.length; const rc = E.nuvem.recusas.length;
     const avisos = [cf && (podeUsuario('admin') ? `${cf} conflito(s) para escolher` : `${cf} conflito(s) esperando o administrador`), rc && `${rc} mudança(s) recusada(s)`, E.anexos?.naoEnviados?.length && `${E.anexos.naoEnviados.length} anexo(s) não enviado(s)`].filter(Boolean);
+    // login da internet vencido (a internet funciona, mas nada sobe): avisa em vez de "esperando internet"
+    if (E.nuvem.acessoVencido) {
+      el.innerHTML = `Dados na nuvem · <b>⚠ Seu acesso pela internet venceu: recarregue para entrar de novo (código no e-mail).</b>${n ? ` As ${n} mudança(s) estão guardadas neste aparelho e sobem em seguida.` : ''}`
+        + ` <button type="button" class="secundario mini" data-acao="recarregarPagina">Recarregar</button>`;
+      return;
+    }
     el.innerHTML = `Dados na nuvem · ${n ? `<b>⏳ ${n} mudança(s) esperando ${E.nuvem.online ? 'envio' : 'internet'}</b>` : (E.nuvem.online ? '✓ tudo enviado' : 'sem internet')}`
       + `${avisos.length ? ` · <a href="#/conflitos"><b>⚠ ${avisos.join(' e ')}</b></a>` : ''}`
       + ` · Última atualização: <b>${E.d.atualizado_em ? C.dataHoraBr(E.d.atualizado_em) : 'nenhuma ainda'}</b>${E.d.atualizado_por ? ` por <b>${esc(E.d.atualizado_por)}</b>` : ''}`;

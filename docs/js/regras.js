@@ -8022,8 +8022,19 @@ export function padroesNovoContrato(perfil = null) {
   if (r('tarifa_padrao') !== null) out.taxa_boleto = r('tarifa_padrao');
   if (r('fci_percentual_padrao') !== null) { out.fci_percentual = r('fci_percentual_padrao'); if (r('fci_indice_padrao')) out.fci_indice = r('fci_indice_padrao'); }
   if (r('indice_padrao')) out.indice_correcao = r('indice_padrao');
-  if (r('prazo_residencial_padrao') !== null) out.prazo_meses = r('prazo_residencial_padrao');
+  const prazo = prazoPadraoNovoContrato('Residencial', perfil);
+  if (prazo !== null) out.prazo_meses = prazo;
   return out;
+}
+
+/**
+ * Prazo (meses) que vem preenchido no Novo contrato conforme a finalidade: residencial pela regra `prazo_residencial_padrao`,
+ * não residencial pela `prazo_comercial_padrao` (null = em branco, digitar em cada contrato). Ex.: comercial com a regra em 60 → 60.
+ */
+export function prazoPadraoNovoContrato(finalidade, perfil = null) {
+  const ctx = { perfil_regras_id: perfil ? Number(perfil) : null };
+  const v = CR.regra(finalidade === 'Não residencial' ? 'prazo_comercial_padrao' : 'prazo_residencial_padrao', ctx);
+  return v === null || v === undefined || v === '' ? null : v;
 }
 
 /**
