@@ -475,7 +475,7 @@ export const TELAS = {
 const minhaSenhaHtml = () => `<div class="cartao login"><h1>Trocar minha senha</h1><form data-form="minhaSenha">
     <p><label for="ent_atual">Senha atual</label><input id="ent_atual" type="password" name="atual" autocomplete="current-password"></p>
     <p><label for="ent_nova">Nova senha</label><input id="ent_nova" type="password" name="nova" autocomplete="new-password"></p>
-    <p><label for="ent_nova2">Repita a nova senha</label><input id="ent_nova2" type="password" name="nova2" autocomplete="new-password"></p><button>Salvar</button></form></div>`;
+    <p><label for="ent_nova2">Repita a nova senha</label><input id="ent_nova2" type="password" name="nova2" autocomplete="new-password"></p><div class="acoes"><button>Salvar</button> <a href="#/">Cancelar</a></div></form></div>`;
 
 export { FORMULARIOS } from './telas/envios.js';
 export { ACOES } from './telas/acoes.js';

@@ -658,7 +658,7 @@ button[disabled], .botao[disabled] { opacity: .5; cursor: not-allowed; filter: n
 .vis-corpo canvas, .vis-corpo img { flex: none; max-width: 100%; height: auto; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .4); }.vis-aviso { color: #fff; margin-top: 30px; text-align: center; }
 body.com-visualizador { overflow: hidden; }
 /* botão sem destino (ex.: "Contrato" sem o arquivo assinado anexado): apagado, só com a explicação ao passar o mouse */
-.botao.desligado { opacity: .45; cursor: default; pointer-events: auto; filter: grayscale(1); }
+.botao.desligado, button.desligado { opacity: .45; cursor: default; pointer-events: auto; filter: grayscale(1); }
 /* Celular: texto que não quebra (nomes compridos, opções com explicação) esticava a página e o telefone "abria" a tela:
    os cartões ficavam à esquerda e uma linha de texto perdida à direita. Fora das tabelas, tudo quebra em linhas. */
 @media (max-width: 760px) {

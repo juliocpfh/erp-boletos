@@ -2173,7 +2173,7 @@ export function numerarFaturas(d, usuario, { forcar = false, ate = null, apenas 
  */
 export function registrarNfExterna(d, tipo, id, numero, emissao, usuario) {
   const n = Number(numero);
-  if (!Number.isInteger(n) || n < 1) throw new Error('Informe o número da NF.');
+  if (!Number.isInteger(n) || n < 1) throw new C.ErroUsuario('Informe o número da NF.');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(emissao || ''))) throw new Error('Informe a data de emissão da NF.');
   if (d.faturas.some((f) => f.numero === n && f.situacao === 'Emitida')) throw new Error(`Já existe NF nº ${numeroFatura(n)} emitida no sistema.`);
   const registro = buscar(d, tipo === 'cobranca' ? 'cobrancas' : 'avulsas', id);
@@ -2936,7 +2936,7 @@ export function informarSaida(d, contratoId, data, usuario, hoje = C.hojeIso()) 
   const c = buscar(d, 'contratos', contratoId);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data || '')) throw new Error('Informe a data de saída.');
   if (encerramentoDo(d, c.id)) throw new Error('A saída já tem o cálculo final: desfaça o cálculo antes de mudar a data.');
-  if (c.data_entrada && data < c.data_entrada) throw new Error('A saída não pode ser antes da entrada.');
+  if (c.data_entrada && data < c.data_entrada) throw new C.ErroUsuario('A saída não pode ser antes da entrada.');
   const reativar = c.ativo === false && !fimDeVinculo(d, c) && !deveDesativar(d, { ...c, ativo: true, data_saida: data }, hoje);
   atualizar(d, 'contratos', c.id, { data_saida: data, ...(reativar ? { ativo: true } : {}) }, usuario,
     `Saída do inquilino em ${C.dataBr(data)}${reativar ? ' (ativo de novo até a saída)' : ''}`);
@@ -2960,7 +2960,7 @@ export function desfazerSaida(d, contratoId, usuario) {
 export function corrigirImovel(d, contratoId, imovelId, usuario) {
   const c = buscar(d, 'contratos', contratoId);
   const i = buscar(d, 'imoveis', imovelId);
-  if (!i) throw new Error('Escolha o imóvel certo.');
+  if (!i) throw new C.ErroUsuario('Escolha o imóvel certo.');
   if (c.imovel_id === i.id) throw new Error('O contrato já está neste imóvel.');
   if (d.cobrancas.some((cb) => cb.contrato_id === c.id && cb.data_pagamento)) throw new Error('Este contrato já tem boleto pago: o imóvel não pode mais ser trocado.');
   const antes = (buscar(d, 'imoveis', c.imovel_id) || {}).nome || 'sem imóvel';
@@ -2973,7 +2973,7 @@ export function encerrarContrato(d, contratoId, dados, usuario) {
   const c = buscar(d, 'contratos', contratoId);
   const leitura = separarLeitura(dados);
   if (d.encerramentos.some((e) => e.contrato_id === c.id)) throw new Error('A saída deste inquilino já foi registrada.');
-  if (dados.data_saida < c.data_entrada) throw new Error('A saída não pode ser antes da entrada.');
+  if (dados.data_saida < c.data_entrada) throw new C.ErroUsuario('A saída não pode ser antes da entrada.');
   // a leitura da saída é obrigatória (regra leitura_relogios_obrigatoria; desligada, pode ficar em branco) e é a mesma da
   // vistoria de saída (uma só): sem digitar aqui, vale a da vistoria
   if (leitura || !leituraDo(d, c.id, 'Saída do inquilino')) gravarLeitura(d, c, 'Saída do inquilino', dados.data_saida, leitura || {}, usuario);
@@ -5149,8 +5149,8 @@ export function bancoAtivo(d) {
 /** Por que os botões do banco estão desabilitados (texto do ``title``); vazio quando a configuração compartilhada está pronta. */
 export function motivoBancoInativo(d) {
   const cfg = configBanco(d);
-  if (!cfg.contas.length) return 'Aguardando as chaves de acesso do C6: cadastre as contas em Dados e backup (Banco C6)';
-  if (!cfg.ativo) return 'Integração com o C6 desligada: ative em Dados e backup (Banco C6)';
+  if (!cfg.contas.length) return 'Aguardando as chaves de acesso do C6: cadastre as contas em Dados e backup → Banco (C6)';
+  if (!cfg.ativo) return 'Integração com o C6 desligada: ative em Dados e backup → Banco (C6)';
   return '';
 }
 
@@ -5440,7 +5440,7 @@ export function encargosDoBoletoC6(d, cb, conta, b = dadosBoleto(d, cb)) {
     if (b.desconto >= b.valor) throw new C.ErroUsuario(`O desconto do boleto de ${c.inquilino_nome} (${C.reais(b.desconto)}) não pode ser igual ou maior que o valor do boleto (${C.reais(b.valor)}).`);
     // trava combinada com o dono (16/11/2026): o tipo do desconto (VALUE_PER_DAY = "valor por dia de antecipação" na documentação)
     // pode virar um desconto de R$ 135 POR DIA; em produção só depois de um boleto de teste no sandbox mostrar o desconto certo
-    if (!descontoLiberado(conta)) throw new C.ErroUsuario(`O boleto de ${c.inquilino_nome} (${C.compBr(cb.competencia)}) não foi ao banco: a conta ${conta.apelido || conta.id} está em produção e o tipo do desconto de pontualidade ainda não foi conferido num boleto de teste. Emita um boleto no sandbox, confira no PDF que o desconto sai de ${C.reais(b.desconto)} no total (e não por dia) e marque "Conferi o desconto no boleto de teste" na conta (Dados e backup → Banco C6).`);
+    if (!descontoLiberado(conta)) throw new C.ErroUsuario(`O boleto de ${c.inquilino_nome} (${C.compBr(cb.competencia)}) não foi ao banco: a conta ${conta.apelido || conta.id} está em produção e o tipo do desconto de pontualidade ainda não foi conferido num boleto de teste. Emita um boleto no sandbox, confira no PDF que o desconto sai de ${C.reais(b.desconto)} no total (e não por dia) e marque "Conferi o desconto no boleto de teste" na conta (Dados e backup → Banco (C6)).`);
     Object.assign(fees, { [K.desconto_tipo]: conta.tipo_desconto || CONTA_BANCO_PADRAO.tipo_desconto, [K.desconto_valor]: centavosParaReais(b.desconto), [K.desconto_prazo]: Number(conta.desconto_dias_antes) || 0 });
   }
   return fees;
@@ -5616,7 +5616,7 @@ export function registrarNegativacao(d, cbId, resposta, usuario, dias) {
   if (!cb.banco || cb.banco.situacao !== 'emitido') throw new Error('Só um boleto emitido e em aberto no banco pode ser negativado.');
   if (aguardandoCredito(cb) || cb.data_pagamento) throw new C.ErroUsuario('Este boleto já foi pago (o banco ainda confirma o crédito, ou o pagamento já está registrado aqui): não pode ser negativado.');
   const conta = contaBanco(d, cb.banco.conta_id);
-  if (!conta || !conta.negativacao.ativa) throw new Error('A negativação está desligada nesta conta (Dados e backup → Banco C6).');
+  if (!conta || !conta.negativacao.ativa) throw new Error('A negativação está desligada nesta conta (Dados e backup → Banco (C6)).');
   const r = resposta || {};
   const n = normalizarRespostaC6(r).negativacao || { situacao: r[M.RESPOSTA.negativacao_situacao] || null, data: r[M.RESPOSTA.negativacao_data] || null, pode_cancelar: null };
   const banco = { ...cb.banco, negativacao: { situacao: n.situacao || M.STATUS_NEGATIVACAO.agendada, data: n.data || null, dias_atraso: Number(dias) || null, pode_cancelar: n.pode_cancelar ?? true, agendada_em: new Date().toISOString(), cancelada_em: null } };
@@ -6284,7 +6284,7 @@ export function lancarDespesas(d, imovelId, competencia, linhas, usuario) {
   const semValor = linhas.filter((l) => l.valor === null && obs(l)).map((l) => l.tipo);
   if (semValor.length) throw new Error(`${semValor.join(', ')}: informe o valor (0,00 se foi verificado e não há conta).`);
   const novas = linhas.filter((l) => l.valor > 0 || (l.valor === 0 && obs(l)));
-  if (!novas.length) throw new Error('Informe o valor de pelo menos uma conta (0,00 com observação para registrar que não há conta).');
+  if (!novas.length) throw new C.ErroUsuario('Informe o valor de pelo menos uma conta (0,00 com observação para registrar que não há conta).');
   // qualquer imóvel aceita conta nossa (ex.: troca de titular, débito antigo); contasPermitidas só orienta a tela e o fechamento
   const ruim = novas.find((l) => !TIPOS_DESPESA.includes(l.tipo));
   if (ruim) throw new Error(`Conta desconhecida: ${ruim.tipo}.`);
@@ -7149,6 +7149,12 @@ export const INICIO_LC224 = { IRPJ: '2026-01', CSLL: '2026-04' };
 export const trimestreDe = (comp) => `${comp.slice(0, 4)}-T${Math.ceil(Number(comp.slice(5, 7)) / 3)}`;
 /** Meses do trimestre de uma competência (ex.: 2026-05 → 2026-04, 2026-05, 2026-06). */
 export const mesesDoTrimestre = (comp) => { const t = Number(trimestreDe(comp).slice(-1)); return [0, 1, 2].map((k) => `${comp.slice(0, 4)}-${String((t - 1) * 3 + 1 + k).padStart(2, '0')}`); };
+/** Mês da tela Impostos onde está a guia de um período: mensal "2026-10" → 2026-10; trimestral "2026-T3" → 2026-09 (último mês do trimestre). */
+export const mesDoPeriodoGuia = (periodo) => {
+  const p = String(periodo || '');
+  const t = /^(\d{4})-T([1-4])$/.exec(p);
+  return t ? `${t[1]}-${String(Number(t[2]) * 3).padStart(2, '0')}` : p.slice(0, 7);
+};
 
 /**
  * Faturamento das NFs não canceladas por empresa e mês de emissão, numa passada só: Map empresa → Map mês → { valor, numeros }.

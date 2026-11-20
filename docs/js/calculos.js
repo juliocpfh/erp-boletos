@@ -27,7 +27,7 @@ export function centavos(texto) {
   if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
   else if (/^-?\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, ''); // "1.350" = mil trezentos e cinquenta reais
   const n = Number(t);
-  if (!Number.isFinite(n)) throw new Error(`Valor inválido: ${texto}`);
+  if (!Number.isFinite(n)) throw new ErroUsuario(`Valor inválido: ${texto}`);
   return arred(n * 100);
 }
 

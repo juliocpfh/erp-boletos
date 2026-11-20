@@ -94,11 +94,11 @@ export const configuracaoBanco = (d) => ({ ...R.configBanco(d), ...(local.ponte_
 export const pontePronta = (d) => R.bancoAtivo(d) && !!local.ponte_url;
 
 /** Mensagem curta para o ``title`` dos botões desabilitados. */
-export const motivoIndisponivel = (d) => R.motivoBancoInativo(d) || (!local.ponte_url ? 'Informe o endereço e a senha da ponte neste computador (Dados e backup → Banco C6)' : '');
+export const motivoIndisponivel = (d) => R.motivoBancoInativo(d) || (!local.ponte_url ? 'Informe o endereço e a senha da ponte neste computador (Dados e backup → Banco (C6))' : '');
 
 function urlDaPonte(cfg, caminho) {
   const base = String(cfg.ponte_url || '').trim().replace(/\/+$/, '');
-  if (!base) throw new Error('Falta o endereço e a senha da ponte neste computador (Dados e backup → Banco C6).');
+  if (!base) throw new Error('Falta o endereço e a senha da ponte neste computador (Dados e backup → Banco (C6)).');
   return `${base}${caminho.startsWith('/') ? '' : '/'}${caminho}`;
 }
 
@@ -141,7 +141,7 @@ export async function chamarPonteCrua(metodo, caminho, corpo = null, opcoes = {}
   if (!resposta.ok) {
     const msg = (dados && (dados.erro || dados.mensagem || dados.message)) || `A ponte respondeu com erro ${resposta.status}.`;
     // só o 401 é a senha da ponte; o 403 da ponte traz o motivo dele (ex.: rotas de pagamento desligadas)
-    if (resposta.status === 401) throw new ErroPonte('A ponte recusou a senha. Confira a senha da ponte em Dados e backup (Banco C6) e no .env da ponte.', { status: resposta.status, detalhes: dados });
+    if (resposta.status === 401) throw new ErroPonte('A ponte recusou a senha. Confira a senha da ponte em Dados e backup → Banco (C6) e no .env da ponte.', { status: resposta.status, detalhes: dados });
     throw new ErroPonte(msg, { status: resposta.status, detalhes: dados });
   }
   return dados;
@@ -209,7 +209,7 @@ export function alterarBoleto(d, cb, mudancas = R.alteracaoBoletoC6(d, cb), opco
 export function negativarBoleto(d, cb, dias, opcoes = {}) {
   if (!pontePronta(d)) throw new Error(motivoIndisponivel(d));
   const conta = R.contaBanco(d, cb.banco && cb.banco.conta_id);
-  if (!conta || !conta.negativacao.ativa) throw new Error('A negativação está desligada nesta conta (Dados e backup → Banco C6).');
+  if (!conta || !conta.negativacao.ativa) throw new Error('A negativação está desligada nesta conta (Dados e backup → Banco (C6)).');
   return chamarPonte(cb.banco && cb.banco.conta_id, 'POST', `/boletos/${idNoBanco(cb)}/negativar`, R.pedidoNegativacaoC6(dias), opcoes);
 }
 

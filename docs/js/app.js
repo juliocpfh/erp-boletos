@@ -1431,6 +1431,9 @@ document.addEventListener('click', async (ev) => {
   // IPTU's: o quadradinho do mês (sem ação) mostra o mês e o valor ao tocar (no celular não há "passar o mouse")
   const dica = ev.target.closest('.mapa-iptu span.q[title]');
   if (dica) { aviso(dica.title, 'info'); return; }
+  // botão apagado (ainda não funciona): no toque mostra o motivo, que no computador também fica no title (o celular não tem "passar o mouse")
+  const apagado = ev.target.closest('[data-motivo]');
+  if (apagado) { ev.preventDefault(); aviso(apagado.dataset.motivo); return; }
   const el = ev.target.closest('[data-acao]');
   if (!el) return;
   ev.preventDefault();

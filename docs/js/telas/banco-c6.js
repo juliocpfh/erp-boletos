@@ -9,8 +9,11 @@ import * as M from '../mapa-c6.js';
 import * as R from '../regras.js';
 import { botao, buscar, d, etiqueta, item, link, opera, ordenar } from './comum.js';
 
-/** Botão que não funciona ainda, com a explicação no ``title`` (passe o mouse). */
-export const botaoInativo = (texto, titulo, cls = 'secundario pequeno') => `<button type="button" class="${cls}" disabled title="${esc(titulo)}">${texto}</button>`;
+/**
+ * Botão que não funciona ainda: apagado, com a explicação no ``title`` (passe o mouse) e, no toque (o celular não tem mouse),
+ * num aviso (``data-motivo``, app.js). Não é ``disabled``: botão desabilitado não recebe o toque.
+ */
+export const botaoInativo = (texto, titulo, cls = 'secundario pequeno') => `<button type="button" class="${cls} desligado" aria-disabled="true" data-motivo="${esc(titulo)}" title="${esc(titulo)}">${texto}</button>`;
 
 /** "Emitir no C6": ativo quando a integração está pronta; senão desabilitado explicando o que falta. Só para quem opera. */
 export function botaoEmitirC6(cb, cls = 'secundario pequeno') {
@@ -30,10 +33,11 @@ export function botoesMesC6(comp) {
   const notaVencidos = vencidos ? ` <span class="suave">${vencidos} boleto(s) já vencido(s) sem emissão ficam de fora: o banco não aceita vencimento no passado (mude o vencimento do boleto para hoje ou depois antes de emitir).</span>` : '';
   const emitidos = d().cobrancas.some((cb) => cb.competencia === comp && R.emitidoNoBanco(cb));
   // a conferência dos boletos pagos é uma só, na tela Banco (lista com marcação): daqui só o atalho até ela
-  const conferir = link('#/banco?ir=conferir-boletos', 'Conferir pagamentos no banco (tela Banco)', 'botao secundario');
-  if (!B.pontePronta(d())) return `${botaoInativo(texto, B.motivoIndisponivel(d()), 'secundario')} ${conferir}<br><span class="ajuda">Emitir no C6: ${esc(String(B.motivoIndisponivel(d())).replace(/\.$/, ''))}.</span>`;
+  const rotuloConferir = 'Conferir pagamentos no banco (tela Banco)';
+  const conferir = link(`#/banco?mes=${comp}&ir=conferir-boletos`, rotuloConferir, 'botao secundario');
+  if (!B.pontePronta(d())) return `${botaoInativo(texto, B.motivoIndisponivel(d()), 'secundario')} ${botaoInativo(rotuloConferir, B.motivoIndisponivel(d()), 'secundario')}<br><span class="ajuda">Emitir no C6: ${esc(String(B.motivoIndisponivel(d())).replace(/\.$/, ''))}.</span>`;
   return `${n ? botao('emitirBoletosMesC6', texto, { comp }, 'secundario', `Emitir ${n} boleto(s) em aberto no C6?`) : botaoInativo(texto, 'Nenhum boleto em aberto sem emissão neste mês', 'secundario')}
-    ${emitidos ? conferir : botaoInativo('Conferir pagamentos no banco (tela Banco)', 'Nenhum boleto deste mês foi emitido no C6', 'secundario')}${notaVencidos}`;
+    ${emitidos ? conferir : botaoInativo(rotuloConferir, 'Nenhum boleto deste mês foi emitido no C6', 'secundario')}${notaVencidos}`;
 }
 
 const ROTULO = { emitido: ['emitido no C6', 'info'], pago: ['pago no C6', 'ok'], cancelado: ['cancelado no C6', 'neutra'], erro: ['erro na emissão', 'perigo'] };
@@ -107,7 +111,7 @@ export function caixaBancoC6(cb) {
   const qr = B.imagemQrPix(cb);
   const semPix = b.situacao === 'emitido' && !b.pix_copia_cola;
   return `<div class="cartao" id="banco-c6"><div class="cabecalho">${titulo}<div>${etiquetaBanco(cb)}${semPix ? ` ${etiqueta('sem Pix', 'aviso')}` : ''}</div></div>
-    ${semPix ? `<div class="alerta aviso"><b>O boleto saiu sem o Pix</b>${conta && conta.chave_pix ? ': a ponte não tem a chave Pix desta conta. O inquilino paga só pela linha digitável; para ter o QR Code, peça ao técnico para pôr a chave Pix da conta na ponte e emita de novo.' : ': a conta não tem chave Pix cadastrada (Dados e backup → Banco C6).'}</div>` : ''}
+    ${semPix ? `<div class="alerta aviso"><b>O boleto saiu sem o Pix</b>${conta && conta.chave_pix ? ': a ponte não tem a chave Pix desta conta. O inquilino paga só pela linha digitável; para ter o QR Code, peça ao técnico para pôr a chave Pix da conta na ponte e emita de novo.' : ': a conta não tem chave Pix cadastrada (Dados e backup → Banco (C6)).'}</div>` : ''}
     ${cb.data_pagamento && b.situacao === 'emitido' && !cb.pagamento_c6 && !R.aguardandoCredito(cb) ? `<div class="alerta perigo"><b>Pago aqui, mas ainda em aberto no C6.</b> O inquilino ainda consegue pagar este boleto de novo${b.negativacao && b.negativacao.pode_cancelar ? ' e a negativação agendada continua valendo' : ''}. Clique em "Consultar situação no banco" (se o banco já recebeu este pagamento, acerta sozinho); se o pagamento foi por fora (Pix direto, dinheiro), use "Cancelar no banco"${b.negativacao && b.negativacao.pode_cancelar ? ' e "Cancelar negativação"' : ''}.</div>` : ''}
     ${b.pagamentos_no_banco > 1 ? `<div class="alerta perigo"><b>O banco recebeu ${b.pagamentos_no_banco} pagamentos deste boleto</b>${b.valor_pago_total ? ` (${reais(b.valor_pago_total)} no total)` : ''}: o inquilino pagou mais de uma vez (ex.: Pix e código de barras). Registre só um aqui e devolva a diferença ao inquilino.</div>` : ''}
     ${R.aguardandoCredito(cb) ? '<div class="alerta info"><b>O inquilino pagou</b> e o banco ainda está confirmando o crédito. Consulte de novo mais tarde para registrar o pagamento aqui.</div>' : ''}
@@ -145,7 +149,7 @@ export function caixaContaDosBoletos() {
       <div class="largo"><label class="check-mini"><input type="radio" name="modo" value="padrao" ${cfg.modo_conta_boleto !== 'escolher' ? 'checked' : ''}> Sempre pela empresa padrão:</label>
         <select name="conta_padrao_id" style="width:auto;margin-left:8px">${cfg.contas.map((x) => `<option value="${esc(x.id)}" ${(emissora || {}).id === x.id ? 'selected' : ''}>${nomeEmp(x)} (conta ${esc(x.apelido)})</option>`).join('')}</select></div>
       <div class="largo"><label class="check-mini"><input type="radio" name="modo" value="escolher" ${cfg.modo_conta_boleto === 'escolher' ? 'checked' : ''}> Escolher a empresa boleto a boleto</label>
-        <div class="ajuda">Ao emitir, o sistema pergunta sempre a conta, mesmo quando o imóvel tem uma só empresa (ela já vem marcada; senão, a padrão). Em "Emitir todos do mês", pergunta uma vez para o lote.</div></div>
+        <div class="ajuda">Ao emitir, o sistema pergunta sempre a conta, mesmo quando o imóvel tem uma só empresa (ela já vem marcada; senão, a padrão). Em "Emitir no C6 todos em aberto do mês", pergunta uma vez para o lote.</div></div>
       <div class="acoes" style="align-self:end"><button class="secundario">Salvar</button></div></form>
       <p class="suave">Com a empresa padrão, todos os boletos saem pela conta dela, mesmo quando o imóvel é dividido com outra empresa.</p>`
     : '<p class="suave">Nenhuma conta bancária cadastrada ainda: cadastre as contas em <a href="#/dados?ir=banco">Dados e backup → Banco (C6)</a>.</p>'}</div>`;
