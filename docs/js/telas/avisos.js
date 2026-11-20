@@ -31,10 +31,19 @@ export function conferirContrato(dados, r, q) {
     out.push(`Aluguel de ${reais(dados.aluguel_inicial)} está ${Math.abs(p)}% ${p > 0 ? 'acima' : 'abaixo'} ${r ? 'do valor anterior' : `do aluguel atual do inquilino anterior (${anterior.inquilino_nome})`} de ${reais(base)}.`);
   }
   if (imovelId && dados.data_entrada) {
-    const ocupando = d().contratos.find((x) => x.imovel_id === imovelId && (!r || x.id !== r.id) && x.id !== dados.contrato_anterior_id && x.data_entrada && x.data_entrada < dados.data_entrada
-      && (x.data_saida ? x.data_saida >= dados.data_entrada : x.ativo !== false));
-    if (ocupando) out.push(`${ocupando.inquilino_nome} ainda está neste imóvel em ${dataBr(dados.data_entrada)}${ocupando.data_saida ? ` (sai em ${dataBr(ocupando.data_saida)})` : ' (sem data de saída)'}.`);
+    // os dois períodos se cruzam, em qualquer ordem das datas (o outro pode começar no mesmo dia ou depois); a troca de titular
+    // (o anterior e o que continua este) não conta
+    const fimNovo = dados.data_saida || '9999-12-31';
+    const anteriorId = Number(dados.contrato_anterior_id || (r && r.contrato_anterior_id)) || null;
+    const ocupando = d().contratos.find((x) => x.imovel_id === imovelId && (!r || x.id !== r.id) && x.id !== anteriorId && (!r || Number(x.contrato_anterior_id) !== r.id)
+      && x.data_entrada && x.data_entrada <= fimNovo && (x.data_saida ? x.data_saida >= dados.data_entrada : x.ativo !== false));
+    if (ocupando && ocupando.data_entrada < dados.data_entrada) out.push(`${ocupando.inquilino_nome} ainda está neste imóvel em ${dataBr(dados.data_entrada)}${ocupando.data_saida ? ` (sai em ${dataBr(ocupando.data_saida)})` : ' (sem data de saída)'}.`);
+    else if (ocupando) out.push(`${ocupando.inquilino_nome} já tem contrato neste imóvel com entrada em ${dataBr(ocupando.data_entrada)}${ocupando.data_saida ? ` (até ${dataBr(ocupando.data_saida)})` : ''}: os dois ficariam no imóvel ao mesmo tempo, e os dois gerando boleto.`);
   }
+  // ficha em análise (ou aprovada) de outra pessoa para este imóvel: o contrato feito direto passaria por cima dela
+  const fichaDeste = Number(dados.ficha_id || (r && r.ficha_id) || q?.ficha) || null;
+  const ficha = imovelId ? R.fichaAbertaDoImovel(d(), imovelId, fichaDeste) : null;
+  if (ficha && !r) out.push(`Há uma ficha ${ficha.situacao === 'Aprovada' ? 'aprovada' : 'em análise'} de ${ficha.inquilino_nome || 'outro interessado'} para este imóvel${ficha.reserva_valor > 0 ? `, com reserva de ${reais(ficha.reserva_valor)}` : ''}. Se o contrato é de outra pessoa, resolva a ficha antes (reprovar ou desistência devolve a reserva).`);
   if (dados.data_entrada && dados.data_entrada > C.somarDias(C.hojeIso(), diasFuturo())) out.push(`A entrada (${dataBr(dados.data_entrada)}) está a mais de ${diasFuturo()} dias no futuro.`);
   out.push(...R.avisosLegaisDoContrato(dados)); // prazo, bonificação, multa, juros, caução e garantia, com o artigo da lei
   // inquilino novo que emite NF num imóvel ainda sem empresa emitente: lembrar agora (sem isso a NF não é numerada)
@@ -54,13 +63,21 @@ export function conferirContrato(dados, r, q) {
   return out;
 }
 
-/** Avisos ao alterar um boleto: vencimento fora do dia do contrato. */
+/**
+ * Avisos ao alterar um boleto: vencimento fora do dia do contrato ou antes do mês do boleto (ex.: 01/01/2020 no boleto de
+ * 10/2026), multa acima de 10% e juros acima de 1% ao mês (os mesmos limites do contrato, avisosLegaisDoContrato).
+ */
 export function conferirBoleto(dados, r) {
   const out = [];
   const c = buscar('contratos', r.contrato_id);
   if (dados.vencimento && c && c.dia_vencimento && Number(dados.vencimento.slice(8, 10)) !== c.dia_vencimento && dados.vencimento !== r.vencimento) {
     out.push(`O vencimento ${dataBr(dados.vencimento)} não cai no dia ${c.dia_vencimento}, que é o do contrato.`);
   }
+  if (dados.vencimento && r.competencia && dados.vencimento < `${r.competencia}-01` && dados.vencimento !== r.vencimento) {
+    out.push(`O vencimento ${dataBr(dados.vencimento)} é antes do mês do boleto (${compBr(r.competencia)}). Confira o ano.`);
+  }
+  if (Number(dados.multa_percentual) > 10 && dados.multa_percentual !== r.multa_percentual) out.push(`Multa por atraso de ${C.pct(dados.multa_percentual)}: acima de 10% o juiz costuma reduzir (Lei de Usura, art. 9º; Código Civil, art. 413).`);
+  if (Number(dados.juros_mensal_percentual) > 1 && dados.juros_mensal_percentual !== r.juros_mensal_percentual) out.push(`Juros de ${C.pct(dados.juros_mensal_percentual)} ao mês: acima de 1% ao mês pode ser reduzido (Código Civil, art. 406; Lei de Usura, art. 1º).`);
   return out;
 }
 
@@ -114,6 +131,14 @@ export function conferirSeguro(dados, r, q) {
   if (junto) out.push(`Já há seguro deste inquilino de ${dataBr(junto.vigencia_inicio)} a ${dataBr(junto.vigencia_fim)}, no mesmo período.`);
   const ant = outros.filter((x) => x.vigencia_inicio && x.vigencia_inicio < (ini || '')).sort((a, b) => b.vigencia_inicio.localeCompare(a.vigencia_inicio))[0];
   if (ant && diferencaGrande(dados.valor_total, ant.valor_total) && (!r || dados.valor_total !== r.valor_total)) out.push(`Valor de ${reais(dados.valor_total)} está ${pctDif(dados.valor_total, ant.valor_total)} do seguro anterior (${reais(ant.valor_total)}).`);
+  // parcelas cobradas no aluguel fora da vigência (ex.: 1ª cobrança em 01/2020 de uma apólice de 2026, ou 60 parcelas num ano)
+  const mudou = ['primeira_competencia', 'num_parcelas', 'vigencia_inicio', 'vigencia_fim'].some((k) => !r || dados[k] !== r[k]);
+  const pri = dados.primeira_competencia;
+  if (mudou && pri && ini && pri < ini.slice(0, 7)) out.push(`A 1ª parcela no aluguel de ${compBr(pri)} é antes do início da vigência (${dataBr(ini)}).`);
+  if (mudou && pri && fim && dados.num_parcelas >= 1) {
+    const ultima = C.somarMeses(pri, dados.num_parcelas - 1);
+    if (ultima > fim.slice(0, 7)) out.push(`Em ${dados.num_parcelas} parcela(s) a partir de ${compBr(pri)}, a última fica no aluguel de ${compBr(ultima)}, depois do fim da vigência (${dataBr(fim)}).`);
+  }
   return out;
 }
 
@@ -125,8 +150,30 @@ export function conferirIptu(dados, r, q) {
   if (dados.ano && Math.abs(dados.ano - atual) > 1 && (!r || dados.ano !== r.ano)) out.push(`O ano ${dados.ano} está longe do ano atual (${atual}).`);
   const ant = d().iptus.filter((p) => p.imovel_id === iid && p.ano < dados.ano).sort((a, b) => b.ano - a.ano)[0];
   if (ant && diferencaGrande(dados.valor_total, ant.valor_total) && (!r || dados.valor_total !== r.valor_total)) out.push(`Total de ${reais(dados.valor_total)} está ${pctDif(dados.valor_total, ant.valor_total)} do IPTU ${ant.ano} (${reais(ant.valor_total)}).`);
+  const mudou = (k) => !r || dados[k] !== r[k];
+  // a prefeitura parcela em até 12 vezes: 99 parcelas é número digitado errado (R$ 12,12 por mês durante 8 anos)
+  if (dados.num_parcelas > 12 && mudou('num_parcelas')) out.push(`${dados.num_parcelas} parcelas: o IPTU costuma ser em até 12 (o inquilino pagaria por ${dados.num_parcelas} meses).`);
+  // valor fixo por parcela: a soma das parcelas deve dar perto do total (ex.: R$ 5.000,00 × 10 = R$ 50.000,00 de um IPTU de R$ 1.200,00)
+  if (dados.valor_parcela > 0 && dados.num_parcelas >= 1 && dados.valor_total > 0 && (mudou('valor_parcela') || mudou('num_parcelas') || mudou('valor_total'))) {
+    const soma = dados.valor_parcela * dados.num_parcelas;
+    if (Math.abs(soma - dados.valor_total) / dados.valor_total > 0.05) out.push(`Parcela fixa de ${reais(dados.valor_parcela)} × ${dados.num_parcelas} = ${reais(soma)}, ${pctDif(soma, dados.valor_total)} do total do IPTU (${reais(dados.valor_total)}).`);
+  }
+  // 1º boleto com IPTU longe do ano do IPTU (ex.: IPTU 2026 cobrado a partir de 1900)
+  const anoBoleto = Number(String(dados.primeiro_vencimento_boleto || '').slice(0, 4));
+  if (dados.ano && anoBoleto && Math.abs(anoBoleto - dados.ano) > 1 && (mudou('primeiro_vencimento_boleto') || mudou('ano'))) out.push(`O 1º boleto com IPTU (${compBr(dados.primeiro_vencimento_boleto)}) está longe do ano do IPTU (${dados.ano}).`);
   return out;
 }
+
+/** Avisos da renovação: término novo já passado, novo aluguel muito diferente do atual (ex.: R$ 1,00 ou 100 vezes o atual). */
+export function conferirRenovacao(dados, r, q) {
+  const c = buscar('contratos', r ? r.contrato_id : q.contrato);
+  const out = [dataNoPassado(dados.nova_vigencia_fim, 'A nova data de término')];
+  const atual = c ? R.aluguelAtual(d(), c) : 0;
+  if (dados.novo_valor > 0 && diferencaGrande(dados.novo_valor, atual)) out.push(`Novo aluguel de ${reais(dados.novo_valor)} está ${pctDif(dados.novo_valor, atual)} do aluguel atual (${reais(atual)}). Os boletos em aberto são refeitos com ele e sai um termo aditivo.`);
+  return out.filter(Boolean);
+}
+
+const dataNoPassado = (data, rotulo) => (data && data < C.hojeIso() ? `${rotulo} (${dataBr(data)}) já passou: o contrato aparece como vencido.` : '');
 
 /** Leitura do relógio como número (ex.: "1.234,5" → 1234.5); texto que não é número fica de fora. */
 const numeroLeitura = (v) => { const t = String(v ?? '').trim().replace(/\./g, '').replace(',', '.'); return /^\d+(\.\d+)?$/.test(t) ? Number(t) : null; };

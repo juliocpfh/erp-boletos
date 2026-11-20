@@ -2,17 +2,63 @@
 import { alterar, aviso, baixar, E, ir, janela, login, mostrar, podeUsuario, reabrirSessao } from '../app.js';
 import * as S from '../armazenamento.js';
 import * as B from '../backup-seguro.js';
-import { dataBr, dataHoraBr, ErroUsuario, hojeIso } from '../calculos.js';
+import { dataBr, dataHoraBr, ErroUsuario, hojeIso, plural } from '../calculos.js';
 import { esc } from '../formularios.js';
 import * as N from '../nuvem.js';
 import * as R from '../regras.js';
-import { botao, carregarParte, etiqueta, link } from './comum.js';
+import { botao, carregarParte, etiqueta, link, nomePastaContrato, pastaPaiContrato, renomearNoDisco } from './comum.js';
 
-const valorTexto = (v) => {
+/**
+ * Campo derivado: a pasta dos arquivos sai do nome do imóvel (e, no contrato, do nome e das datas do inquilino). Não é um
+ * conflito à parte: acompanha a escolha dos outros campos e a pasta dos anexos é renomeada junto (antes, mudar o nome do
+ * imóvel em dois aparelhos dava dois conflitos e dava para ficar com o nome de um e a pasta do outro).
+ */
+const PASTA_DERIVADA = { imoveis: (r) => S.limparNome(r.nome), contratos: (r) => nomePastaContrato(r) };
+const ehPastaDerivada = (c) => c.tipo === 'campo' && c.campo === 'pasta' && !!PASTA_DERIVADA[c.tabela];
+
+/** Depois de uma escolha: fecha os conflitos da pasta do registro, grava a pasta certa e renomeia a pasta dos anexos. */
+async function acertarPastaDerivada(tabela, id, candidatos = []) {
+  const calcular = PASTA_DERIVADA[tabela];
+  if (!calcular) return;
+  const doRegistro = (E.nuvem.conflitos || []).filter((x) => x.tipo === 'campo' && x.tabela === tabela && x.reg_id === String(id));
+  if (doRegistro.some((x) => x.campo !== 'pasta')) return; // outro campo ainda em disputa: a pasta espera a escolha dele
+  const antes = (E.d[tabela] || []).find((x) => x.id === id);
+  if (!antes) return;
+  const esperada = calcular(antes);
+  const nomes = [antes.pasta, ...candidatos];
+  for (const x of doRegistro) {
+    nomes.push(x.atual, x.proposto);
+    await E.nuvem.resolver(x.id, x.proposto === esperada ? 'proposto' : 'atual');
+  }
+  E.d = E.nuvem.atual();
+  const r = (E.d[tabela] || []).find((x) => x.id === id);
+  if (!r) return;
+  if (r.pasta !== esperada) await alterar((db) => R.atualizar(db, tabela, id, { pasta: esperada }, login(), 'Pasta dos arquivos acertada pela escolha do conflito'));
+  const velhos = [...new Set(nomes.filter((v) => typeof v === 'string' && v && v !== esperada))];
+  if (!velhos.length || !E.pasta) return;
+  const pai = tabela === 'contratos' ? pastaPaiContrato(r) : [];
+  try {
+    const dir = await S.subpasta(await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true }), pai);
+    for (const nome of velhos) {
+      let existe = true;
+      try { await dir.getDirectoryHandle(nome); } catch { existe = false; }
+      if (existe) { await renomearNoDisco(pai, nome, esperada); break; }
+    }
+  } catch (e) {
+    aviso(`Não consegui acertar a pasta dos arquivos ("${esperada}"): ${e.message}`, 'aviso');
+  }
+}
+
+// rótulo do campo e valor formatado (dinheiro em R$, datas dd/mm/aaaa, sim/não): os mesmos do Desfazer e do Excel (exportar.js),
+// carregados por telaConflitos; sem eles (antes de carregar), o nome e o valor como estão gravados
+let X = null;
+const valorTexto = (v, campo = '', tabela = '') => {
   if (v === null || v === undefined || v === '') return '(vazio)';
+  if (X && campo) { const t = X.valorTexto(campo, v, tabela); return t.length > 200 ? `${t.slice(0, 200)}…` : t; }
   if (typeof v === 'object') return JSON.stringify(v).slice(0, 200);
   return String(v);
 };
+const rotulo = (campo, tabela) => (X ? X.rotuloCampo(campo, tabela) : campo);
 const nomeDoRegistro = (c) => {
   if (c.tabela === '_raiz') return 'Configuração geral';
   const r = (E.d[c.tabela] || []).find((x) => String(x.id) === c.reg_id);
@@ -25,18 +71,19 @@ const quando = (t) => (t ? dataHoraBr(t) : '');
 /** Campos que não aparecem com o valor (senha e login lembrado): só o nome. */
 const SEM_VALOR = new Set(['senha_hash', 'senha_sal', 'senha_iteracoes', 'sessoes']);
 const MOSTRAR_MUDANCAS = 8;
-const curto = (v) => { const t = valorTexto(v); return t.length > 60 ? `${t.slice(0, 60)}…` : t; };
+const curto = (v, campo = '', tabela = '') => { const t = valorTexto(v, campo, tabela); return t.length > 60 ? `${t.slice(0, 60)}…` : t; };
 
 /** Uma mudança recusada em palavras (ex.: "Imóvel nº 1 (Apto 604): nome «Apto 604» → «Sala»"). Histórico: null (acompanha as outras). */
 function descreverMudanca(o) {
   if (o.op === 'historico') return null;
-  if (o.op === 'raiz') return `Configuração geral: ${o.campo}`;
+  if (o.op === 'raiz') return `Configuração geral: ${rotulo(o.campo, '')}`;
   const reg = o.op === 'inserir' ? o.dados : (E.d[o.tabela] || []).find((x) => x.id === o.id) || o.base;
   const nome = reg && (reg.nome || reg.descricao || reg.inquilino_nome || reg.competencia || reg.numero);
   const quem = `${R.TABELAS[o.tabela] || o.tabela} nº ${o.id}${nome ? ` (${curto(nome)})` : ''}`;
   if (o.op === 'inserir') return `${quem}: incluído`;
   if (o.op === 'excluir') return `${quem}: excluído`;
-  const campos = Object.entries(o.campos || {}).map(([c, v]) => (SEM_VALOR.has(c) || o.tabela === 'usuarios' ? c : `${c} «${curto(v.antes)}» → «${'depois' in v ? curto(v.depois) : '(apagado)'}»`));
+  const campos = Object.entries(o.campos || {}).map(([c, v]) => (SEM_VALOR.has(c) || o.tabela === 'usuarios' ? rotulo(c, o.tabela)
+    : `${rotulo(c, o.tabela)} «${curto(v.antes, c, o.tabela)}» → «${'depois' in v ? curto(v.depois, c, o.tabela) : '(apagado)'}»`));
   return `${quem}: ${campos.join('; ')}`;
 }
 
@@ -51,15 +98,24 @@ function resumoDaRecusa(ops) {
 
 export async function telaConflitos() {
   if (!E.nuvem) return '<h1>Conflitos</h1><p class="suave">Só existem com os dados na nuvem.</p>';
-  const conflitos = E.nuvem.conflitos;
+  X ||= await carregarParte(() => import('../exportar.js')).catch(() => null);
+  // a pasta dos arquivos acompanha o nome (não aparece como conflito à parte); sozinha (o nome num aparelho e as datas no
+  // outro, por exemplo), vira uma linha só, que a acerta pelo que ficou gravado
+  const todos = E.nuvem.conflitos;
+  const comOutro = (c) => todos.some((x) => x.tipo === 'campo' && !ehPastaDerivada(x) && x.tabela === c.tabela && x.reg_id === c.reg_id);
+  const pastasSoltas = new Map(todos.filter((c) => ehPastaDerivada(c) && !comOutro(c)).map((c) => [`${c.tabela}:${c.reg_id}`, c]));
+  const conflitos = todos.filter((c) => !ehPastaDerivada(c));
+  const linhaPasta = (c) => `<tr><td>${esc(nomeDoRegistro(c))}</td><td><b>pasta dos arquivos</b></td><td colspan="2">${esc(`Os dois aparelhos mudaram o que dá o nome da pasta (${valorTexto(c.atual)} / ${valorTexto(c.proposto)}). Ela acompanha o que ficou gravado no cadastro.`)}</td>
+    <td>${podeUsuario('admin') ? botao('acertarPastaConflito', 'Acertar a pasta', { tabela: c.tabela, id: c.reg_id }, 'secundario pequeno') : ''}</td></tr>`;
   const recusas = await Promise.all(E.nuvem.recusas.map(async (r) => ({ ...r, id: r.id || r.lote, ops: await E.nuvem.lerRecusa(r.id || r.lote).catch(() => null) })));
   const naoEnviados = E.anexos?.naoEnviados || [];
   const pode = podeUsuario('admin'); // só o administrador escolhe (a nuvem também confere)
   const linhas = conflitos.map((c) => {
     if (c.tipo === 'campo') {
-      return `<tr><td>${esc(nomeDoRegistro(c))}</td><td><b>${esc(c.campo)}</b></td>
-        <td>${esc(valorTexto(c.atual))}<br><span class="suave">${esc(c.por_atual || '')}</span></td>
-        <td>${esc(valorTexto(c.proposto))}<br><span class="suave">${esc(c.por_proposto || '')} · ${esc(quando(c.em))}</span></td>
+      const comPasta = PASTA_DERIVADA[c.tabela] && todos.some((x) => ehPastaDerivada(x) && x.tabela === c.tabela && x.reg_id === c.reg_id);
+      return `<tr><td>${esc(nomeDoRegistro(c))}</td><td><b>${esc(rotulo(c.campo, c.tabela))}</b>${comPasta ? '<br><span class="suave">a pasta dos arquivos acompanha</span>' : ''}</td>
+        <td>${esc(valorTexto(c.atual, c.campo, c.tabela))}<br><span class="suave">${esc(c.por_atual || '')}</span></td>
+        <td>${esc(valorTexto(c.proposto, c.campo, c.tabela))}<br><span class="suave">${esc(c.por_proposto || '')} · ${esc(quando(c.em))}</span></td>
         <td>${pode ? `${botao('resolverConflito', 'Fica o 1º', { conflito: c.id, escolha: 'atual' }, 'secundario pequeno')} ${botao('resolverConflito', 'Fica o 2º', { conflito: c.id, escolha: 'proposto' }, 'secundario pequeno')}` : ''}</td></tr>`;
     }
     if (c.tipo === 'lote') {
@@ -74,11 +130,11 @@ export async function telaConflitos() {
       : ['manter_excluido', 'recriar', `${c.por_proposto || 'Alguém'} mudou, mas ${c.por_atual || 'outra pessoa'} tinha excluído antes`];
     return `<tr><td>${esc(nomeDoRegistro(c))}</td><td colspan="3">${esc(txt)} (${esc(quando(c.em))})</td>
       <td>${pode ? `${botao('resolverConflito', a === 'excluir' ? 'Excluir' : 'Deixar excluído', { conflito: c.id, escolha: a }, 'secundario pequeno')} ${botao('resolverConflito', b === 'manter' ? 'Manter' : 'Recriar com a mudança', { conflito: c.id, escolha: b }, 'secundario pequeno')}` : ''}</td></tr>`;
-  }).join('');
-  return `<h1>Conflitos da nuvem</h1>
+  }).join('') + [...pastasSoltas.values()].map(linhaPasta).join('');
+  return `<p class="suave"><a href="#/">← Painel</a></p><h1>Conflitos da nuvem</h1>
     <div class="caixa"><h2>Para escolher</h2>
       <p class="suave">O mesmo campo foi mudado em dois aparelhos sem internet. O sistema não escolhe sozinho: até o <b>administrador</b> escolher, fica o 1º valor (o que chegou primeiro à nuvem) e o 2º espera.${pode ? '' : ' Avise o administrador.'}</p>
-      ${conflitos.length ? `<div class="rolagem"><table class="responsiva"><tr><th>Registro</th><th>Campo</th><th>1º valor</th><th>2º valor</th><th></th></tr>${linhas}</table></div>` : '<p>Nenhum conflito. ✓</p>'}
+      ${conflitos.length || pastasSoltas.size ? `<div class="rolagem"><table class="responsiva"><tr><th>Registro</th><th>Campo</th><th>1º valor</th><th>2º valor</th><th></th></tr>${linhas}</table></div>` : '<p>Nenhum conflito. ✓</p>'}
     </div>
     ${recusas.length ? `<div class="caixa"><h2>Mudanças recusadas pela nuvem</h2>
       <p class="suave">Estas gravações feitas neste aparelho não foram aceitas e não valem (a tela já voltou ao que vale). Veja o que eram e o motivo; refaça o que ainda precisar. "Baixar" guarda o detalhe num arquivo.</p>
@@ -121,9 +177,9 @@ export async function telaBackupsNuvem() {
   // exemplo com o backup do dia mais recente (ou hoje): "o de 09/11 é como os dados estavam às 3h de 09/11"
   const exemplo = dataBr(lista.map((a) => diaDoBackup(a.nome)).find(([, , motivo]) => !motivo)?.[0] || hojeIso()).slice(0, 5);
   return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backups da nuvem</h1>
-    <div class="cartao"><p>O servidor guarda uma cópia do banco de dados por dia (os 30 dias mais recentes), feita às 3h da manhã (horário de Brasília): o backup de ${exemplo} é como os dados estavam às 3h de ${exemplo}. Os anexos não entram: eles ficam guardados uma vez só e não mudam.</p>
-      <p>${lista.some((a) => cifrado(a.nome)) ? '🔒 Os backups marcados como cifrados só abrem com a <b>senha do backup seguro</b> (a mesma da pasta segura): quem tiver acesso ao servidor não consegue ler os dados.' : 'Os backups estão <b>sem cifrar</b>. Ligue o backup seguro neste computador (Dados e backup → Backup seguro): os próximos backups da nuvem passam a sair cifrados com a senha do backup.'}</p>
-      <p><b>Voltar para este dia</b> troca os dados da nuvem pelos daquele backup (antes, o servidor guarda uma cópia de como estava agora). Tudo o que foi lançado depois das 3h daquele dia se perde, em todos os aparelhos. Use só em caso de erro geral.</p>
+    <div class="cartao"><p>A nuvem guarda uma cópia do banco de dados por dia (os 30 dias mais recentes), feita às 3h da manhã (horário de Brasília): o backup de ${exemplo} é como os dados estavam às 3h de ${exemplo}. Os anexos não entram: eles ficam guardados uma vez só e não mudam.</p>
+      <p>${lista.some((a) => cifrado(a.nome)) ? '🔒 Os backups marcados como cifrados só abrem com a <b>senha do backup seguro</b> (a mesma da pasta segura): quem tiver acesso à nuvem não consegue ler os dados.' : 'Os backups estão <b>sem cifrar</b>. Ligue o backup seguro neste computador (Dados e backup → Backup seguro): os próximos backups da nuvem passam a sair cifrados com a senha do backup.'}</p>
+      <p><b>Voltar para este dia</b> troca os dados da nuvem pelos daquele backup (antes, a nuvem guarda uma cópia de como estava agora). Tudo o que foi lançado depois das 3h daquele dia se perde, em todos os aparelhos. Use só em caso de erro geral.</p>
       <div class="rolagem"><table><tr><th>Dia</th><th>O que é</th><th class="n">Tamanho</th><th></th></tr>${linhas || '<tr><td colspan="4" class="suave">Nenhum backup ainda (o primeiro é feito às 3h da manhã).</td></tr>'}</table></div></div>`;
 }
 
@@ -131,14 +187,14 @@ export async function telaBackupsNuvem() {
 export function descreverAcesso(rota) {
   const m = /^(PUT|DELETE|POST) (.*)$/.exec(String(rota || ''));
   const metodo = m ? m[1] : 'GET'; const r = m ? m[2] : String(rota || '');
-  if (r === 'dados/tudo') return 'Baixou o banco de dados inteiro';
+  if (r === 'dados/tudo') return 'Baixou todos os dados';
   if (r.startsWith('dados/importar')) return r.includes('voltar') ? 'Voltou os dados da nuvem para um backup' : r.includes('substituir') ? 'Substituiu os dados da nuvem' : 'Carga inicial dos dados na nuvem';
   if (r.startsWith('aparelho/entrar')) { const pc = (/\((.+)\)$/.exec(r) || [])[1]; return `Programa do PC: entrar${pc ? ` (computador ${pc})` : ''}`; }
   if (r.startsWith('arquivos/')) return `${{ PUT: 'Anexou', DELETE: 'Apagou' }[metodo] || 'Abriu'} ${r.slice(9)}`;
   if (r.startsWith('backups/')) return `Baixou o backup ${r.slice(8)}`;
   if (/^lista(-tudo)?\/backups/.test(r)) return 'Viu a lista dos backups';
   if (r === 'mover') return 'Moveu ou renomeou uma pasta de arquivos';
-  if (r === 'apagar') return 'Apagou uma pasta de arquivos (vai para a lixeira por 30 dias)';
+  if (r === 'apagar') return `Apagou uma pasta de arquivos (fica ${R.regra('dias_lixeira_anexos')} dias na lixeira; para recuperar: pasta "Apagados na nuvem" no computador do backup seguro)`;
   if (r === 'email/enviar') return 'Mandou um e-mail pela conta da empresa';
   if (r.startsWith('ficha-online/')) return `Ficha pela internet: ${metodo === 'GET' ? 'consultou' : 'mexeu em'} ${r.slice(13)}`;
   return r;
@@ -174,7 +230,7 @@ export async function telaAcessos(q = {}) {
   const ultimo = (r.acessos || []).at(-1);
   const mais = r.mais && ultimo ? `<p>${link(`#/acessos?${new URLSearchParams(Object.entries({ de: filtro.de, ate: filtro.ate, quem: filtro.email, antes: String(ultimo.n) }).filter(([, v]) => v))}`, 'Ver os mais antigos')}</p>` : '';
   return `${topo}
-    <div class="cartao"><p>O servidor da nuvem anota quem <b>baixou o banco inteiro</b>, <b>abriu, anexou ou apagou arquivos</b>, baixou <b>backups</b>, mandou <b>e-mail</b> pela conta da empresa, mexeu na <b>ficha pela internet</b> e ligou o <b>programa do PC</b>, com a data, o endereço de internet e o tamanho. Fica guardado por ${Number(r.dias) || 180} dias (<a href="#/regras">Regras do sistema</a>, "Registro de acessos").</p>
+    <div class="cartao"><p>A nuvem anota quem <b>baixou todos os dados</b>, <b>abriu, anexou ou apagou arquivos</b>, baixou <b>backups</b>, mandou <b>e-mail</b> pela conta da empresa, mexeu na <b>ficha pela internet</b> e ligou o <b>programa do PC</b>, com a data, o endereço de internet e o tamanho. Fica guardado por ${Number(r.dias) || 180} dias (<a href="#/regras">Regras do sistema</a>, "Registro de acessos").</p>
       <p class="suave">Use para conferir se alguém baixou dados demais ou tentou entrar sem poder (linhas "Recusado"). Abrir telas e listas de anexos não entra.</p></div>
     ${form}
     <div class="cartao"><h2>Por pessoa${filtro.de || filtro.ate ? ' no período' : ''}</h2>
@@ -186,10 +242,10 @@ export async function telaAcessos(q = {}) {
 /** Relatório da passagem da pasta para a nuvem (etapa 4). */
 function relatorio(r) {
   const itens = [
-    `${r.registros} registros do banco ${r.diferencas.length ? `<b>com diferença em: ${esc(r.diferencas.join(', '))}</b>` : 'conferidos: iguais à pasta ✓'}`,
+    `${r.registros} registros dos dados ${r.diferencas.length ? `<b>com diferença em: ${esc(r.diferencas.join(', '))}</b>` : 'conferidos: iguais à pasta ✓'}`,
     `${r.total} anexos (${mb(r.totalBytes)}) ${r.faltando.length ? `<b>${r.faltando.length} faltando na nuvem</b>: ${esc(r.faltando.slice(0, 10).join('; '))}` : 'conferidos: todos na nuvem com o mesmo tamanho ✓'}${r.pulados ? ` (${r.pulados} já estavam lá)` : ''}`,
     ...(r.recusados.length ? [`<b>${r.recusados.length} recusados</b>: ${esc(r.recusados.map((x) => `${x.caminho} (${x.motivo})`).join('; '))}`] : []),
-    ...(r.trocados?.length ? [`<b>${r.trocados.length} trocados pelo da pasta</b> (a nuvem tinha outro arquivo com o mesmo nome; a versão de lá ficou guardada na lixeira da nuvem por ${esc(String(R.regra('dias_lixeira_anexos')))} dias): ${esc(r.trocados.slice(0, 20).join('; '))}${r.trocados.length > 20 ? '…' : ''}`] : []),
+    ...(r.trocados?.length ? [`<b>${r.trocados.length} trocados pelo da pasta</b> (a nuvem tinha outro arquivo com o mesmo nome; a versão de lá ficou guardada na lixeira da nuvem por ${esc(String(R.regra('dias_lixeira_anexos')))} dias; para recuperar: pasta "Apagados na nuvem" no computador do backup seguro): ${esc(r.trocados.slice(0, 20).join('; '))}${r.trocados.length > 20 ? '…' : ''}`] : []),
   ];
   return `<div class="alerta ${r.ok && !r.recusados.length ? 'ok' : 'perigo'}"><b>${r.ok && !r.recusados.length ? 'Pronto: os dados estão na nuvem.' : 'Terminou, mas confira:'}</b><ul>${itens.map((i) => `<li>${i}</li>`).join('')}</ul></div>`;
 }
@@ -210,18 +266,23 @@ export const versaoDoProgramaHtml = (v) => {
  * "Aparelhos ligados" (em Usuários): computadores com o programa do PC (atualizador-pc/), cada um com o crachá que só lê.
  * Só na nuvem (o crachá é dela). Desligar para o crachá na hora (nos anexos, em até 1 minuto).
  */
-export async function aparelhosLigadosHtml() {
+/**
+ * "Aparelhos ligados" (programa do PC). O administrador vê todos (em Usuários); quem não é administrador vê só os que ligou com
+ * o próprio login (`proprios`, em Trocar minha senha: a nuvem só devolve esses) e pode desligá-los. Sem nenhum: nada aparece.
+ */
+export async function aparelhosLigadosHtml({ proprios = false } = {}) {
   if (!E.nuvem) return '';
   let lista;
   try { lista = (await apiDados()('GET', 'aparelhos')).aparelhos || []; } catch (e) {
-    return `<div class="cartao"><h2>Aparelhos ligados</h2><div class="alerta erro">Não deu para ver os aparelhos agora: ${esc(e.message)}</div></div>`;
+    return proprios ? '' : `<div class="cartao"><h2>Aparelhos ligados</h2><div class="alerta erro">Não deu para ver os aparelhos agora: ${esc(e.message)}</div></div>`;
   }
+  if (proprios && !lista.length) return '';
   const linhas = lista.map((a) => `<tr><td>${esc(a.computador)}</td><td>${esc(a.nome)}${a.usuario_ativo ? '' : ' <span class="suave">(usuário bloqueado: o crachá não vale)</span>'}</td>
     <td>${dataHoraBr(a.ligado_em)}</td><td>${dataHoraBr(a.ultimo_uso)}${a.parado ? ' <span class="suave">(parado há mais de 90 dias: precisa ligar de novo)</span>' : ''}</td>
     <td>${versaoDoProgramaHtml(a.versao_programa)}</td>
     <td class="n">${botao('desligarAparelho', 'Desligar', { id: a.id }, 'perigo pequeno', `Desligar o computador ${a.computador}? Ele para de baixar os dados na hora; para voltar, é preciso entrar de novo nele com e-mail e senha.`)}</td></tr>`).join('');
   return `<div class="cartao"><h2>Aparelhos ligados</h2>
-    <p class="suave">Computadores com o programa do PC (cópia diária dos dados, versão PC e cópia aberta dos arquivos). Cada um só <b>lê</b>, com o acesso de quem o ligou; se essa pessoa for bloqueada, o computador para também. Computador roubado ou de alguém que saiu: <b>Desligar</b>.
+    <p class="suave">${proprios ? 'Computadores que você ligou com o seu login. ' : ''}Computadores com o programa do PC (cópia diária dos dados, versão PC e cópia aberta dos arquivos). Cada um só <b>lê</b>, com o acesso de quem o ligou; se essa pessoa for bloqueada, o computador para também. Computador roubado ou de alguém que saiu: <b>Desligar</b>.
       O programa se atualiza sozinho (todo dia às 20h e ao entrar no Windows); a coluna <b>Programa</b> mostra a versão que cada computador está usando.</p>
     <table><tr><th>Computador</th><th>Ligado por</th><th>Quando</th><th>Última vez</th><th>Programa</th><th></th></tr>${linhas || '<tr><td colspan="6" class="suave">Nenhum computador ligado.</td></tr>'}</table></div>`;
 }
@@ -247,7 +308,7 @@ export const ACOES_NUVEM = {
       anexos: E.anexos, sinc: E.nuvem, substituir,
       aoAndar: (p) => {
         if (!el) return;
-        const fase = { anexos: `Enviando anexos: ${p.feitos} de ${p.total} (${mb(p.bytes)} de ${mb(p.totalBytes)})`, dados: 'Enviando o banco de dados…', conferencia: 'Conferindo tudo…' }[p.fase];
+        const fase = { anexos: `Enviando anexos: ${p.feitos} de ${p.total} (${mb(p.bytes)} de ${mb(p.totalBytes)})`, dados: 'Enviando os dados…', conferencia: 'Conferindo tudo…' }[p.fase];
         el.innerHTML = `<p><progress max="${p.totalBytes || 1}" value="${p.bytes}" style="width:100%"></progress><br>${esc(fase)}<br><span class="suave">${esc(p.nome || '')}</span></p>`;
       },
     });
@@ -258,9 +319,17 @@ export const ACOES_NUVEM = {
   },
 
   async resolverConflito(ds) {
+    const c = E.nuvem.conflitos.find((x) => x.id === Number(ds.conflito));
+    const antes = c && PASTA_DERIVADA[c.tabela] ? ((E.d[c.tabela] || []).find((x) => String(x.id) === c.reg_id) || {}).pasta : null;
     await E.nuvem.resolver(Number(ds.conflito), ds.escolha);
     E.d = E.nuvem.atual();
+    if (c && c.tipo === 'campo' && PASTA_DERIVADA[c.tabela]) await acertarPastaDerivada(c.tabela, Number(c.reg_id), [antes]);
     aviso('Escolha gravada: vale em todos os aparelhos.');
+    await mostrar();
+  },
+  async acertarPastaConflito(ds) {
+    await acertarPastaDerivada(ds.tabela, Number(ds.id));
+    aviso('Pasta dos arquivos acertada pelo cadastro.');
     await mostrar();
   },
   async esquecerRecusas() {

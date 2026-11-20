@@ -404,6 +404,21 @@ const semPeso = (tabela, k, v) => (tabela === 'cobrancas' && k === 'banco' && v 
   ? { ...v, pix_qr_base64: IMAGEM_FORA_DO_HISTORICO } : v);
 
 /**
+ * Pessoas de um comunicado no histórico (mutirão 19/11, comunicacoes-001): só as que mudaram naquela gravação, e sem a
+ * assinatura desenhada e o texto aceito (ficam só no comunicado). Ex.: "e-mail enviado para Maria" num comunicado de 40
+ * pessoas → de/para com a linha de Maria, não as 40 duas vezes. Comunicado não se desfaz pelo Histórico (SEM_DESFAZER).
+ */
+const RESPOSTA_PESADA = new Set(['assinatura', 'texto_aceito']);
+export function destinosParaHistorico(de, para) {
+  const mapa = (l) => new Map((Array.isArray(l) ? l : []).map((x, i) => [x && x.chave ? x.chave : `#${i}`, x]));
+  const antes = mapa(de); const depois = mapa(para);
+  const leve = (x) => (x && x.resposta && typeof x.resposta === 'object' ? { ...x, resposta: Object.fromEntries(Object.entries(x.resposta)
+    .map(([k, v]) => [k, RESPOSTA_PESADA.has(k) && v ? '(guardado só no comunicado)' : v])) } : x);
+  const mudou = [...new Set([...antes.keys(), ...depois.keys()])].filter((k) => JSON.stringify(antes.get(k)) !== JSON.stringify(depois.get(k)));
+  return { de: mudou.filter((k) => antes.has(k)).map((k) => leve(antes.get(k))), para: mudou.filter((k) => depois.has(k)).map((k) => leve(depois.get(k))) };
+}
+
+/**
  * Inclui um registro, com a linha no histórico. ``historico: false`` só para carga em lote que registra UMA linha por conta
  * própria (importação do extrato: 1.100 lançamentos davam 1.100 linhas de histórico, cada uma com a cópia do lançamento).
  */
@@ -487,7 +502,8 @@ export function atualizar(d, tabela, id, dados, usuario, descricao) {
   if (Object.keys(mudancas).length) {
     Object.assign(r, dados);
     if (tabela === 'contratos' && 'perfil_regras_id' in mudancas) CR.lembrarContrato(r);
-    const det = Object.fromEntries(Object.entries(mudancas).filter(([k]) => !OCULTOS.has(k)).map(([k, m]) => [k, { de: semPeso(tabela, k, m.de), para: semPeso(tabela, k, m.para) }]));
+    const det = Object.fromEntries(Object.entries(mudancas).filter(([k]) => !OCULTOS.has(k)).map(([k, m]) => [k, tabela === 'comunicados' && k === 'destinos'
+      ? destinosParaHistorico(m.de, m.para) : { de: semPeso(tabela, k, m.de), para: semPeso(tabela, k, m.para) }]));
     if (mudancas.senha_hash) det.senha = 'alterada';
     registrar(d, usuario, 'Alteração', tabela, r.id, descricao, det, vinculos(d, tabela, r));
   }
@@ -498,7 +514,7 @@ export function atualizar(d, tabela, id, dados, usuario, descricao) {
 // Desfazer alterações pelo histórico (só administrador): sempre da mais recente para a mais antiga, campo a campo.
 // Boletos, pagamentos, NFs e usuários ficam de fora (têm botões próprios); a pasta não volta (a pasta no disco não muda).
 // --------------------------------------------------------------------------
-const SEM_DESFAZER = new Set(['taxas_poupanca', 'cobrancas', 'faturas', 'recebimentos', 'avulsas', 'usuarios', 'banco', 'listas', 'fechamentos', 'arquivos', 'movimentacoes_banco', 'pagamentos_banco', 'acordos', 'config_regras', 'versoes_regras', 'perfis_regras']);
+const SEM_DESFAZER = new Set(['taxas_poupanca', 'cobrancas', 'faturas', 'recebimentos', 'avulsas', 'usuarios', 'banco', 'listas', 'fechamentos', 'arquivos', 'movimentacoes_banco', 'pagamentos_banco', 'acordos', 'config_regras', 'versoes_regras', 'perfis_regras', 'comunicados']);
 const CAMPOS_SEM_DESFAZER = new Set(['pasta']);
 /** Campos de pagamento que, ligados ao banco (extrato ou pagamento pelo C6), só se desfazem pela tela Banco. */
 const CAMPOS_PAGAMENTO_BANCO = { despesas: ['data_pagamento', 'movimentacao_id', 'pagamento_banco_id', 'comprovante'], guias_impostos: ['paga_em', 'movimentacao_id', 'pagamento_banco_id'], iptus: ['pagas', 'data_quitacao'] };
@@ -1864,7 +1880,7 @@ export function registrarPagamento(d, cobrancaId, dataContabil, valorPago, usuar
     data_pagamento: dataContabil, data_pagou: pagouEmDia ? null : (dataPagou || null), valor_pago: valorPago ?? r.valor_devido,
     dias_atraso: r.dias_atraso, multa: r.multa, juros: r.juros, valor_nf: caucao ? 0 : manual ? valorNf : r.valor_nf, pagou_em_dia: compensadoDepois,
     situacao: r.pontual ? 'Paga em dia' : 'Paga com atraso', nf_manual: manual, divergencia: manual ? String(justificativa).trim() : null,
-  }, usuario, `${compensadoDepois ? `Pagamento confirmado (pagou em dia, entrou em ${C.dataBr(dataContabil)})` : 'Pagamento confirmado'}${manual
+  }, usuario, `${compensadoDepois ? `Pagamento confirmado (pagou em dia, entrou em ${C.dataBr(dataContabil)})` : 'Pagamento confirmado'}: boleto ${ehParcelaAcordo(cb) ? `do acordo ${cb.acordo_parcela || ''}`.trim() : C.compBr(cb.competencia)} de ${buscar(d, 'contratos', cb.contrato_id)?.inquilino_nome || 'inquilino'}${manual
     ? `. Recebido ${C.reais(valorPago)}, previsto ${C.reais(r.valor_devido)}; NF digitada ${C.reais(valorNf)} (calculada ${C.reais(r.valor_nf)}). Justificativa: ${String(justificativa).trim()}` : ''}`);
   // complemento da caução pago: soma na caução atual (parcelas, em qualquer ordem); a data nunca fica antes da última correção
   if (caucao) {
@@ -2173,7 +2189,7 @@ export function numerarFaturas(d, usuario, { forcar = false, ate = null, apenas 
  */
 export function registrarNfExterna(d, tipo, id, numero, emissao, usuario) {
   const n = Number(numero);
-  if (!Number.isInteger(n) || n < 1) throw new Error('Informe o número da NF.');
+  if (!Number.isInteger(n) || n < 1) throw new C.ErroUsuario('Informe o número da NF.');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(emissao || ''))) throw new Error('Informe a data de emissão da NF.');
   if (d.faturas.some((f) => f.numero === n && f.situacao === 'Emitida')) throw new Error(`Já existe NF nº ${numeroFatura(n)} emitida no sistema.`);
   const registro = buscar(d, tipo === 'cobranca' ? 'cobrancas' : 'avulsas', id);
@@ -2457,6 +2473,25 @@ export const cobrancasEmAberto = (d, contratoId) => d.cobrancas.filter((cb) => c
  * dois aluguéis em acordo de R$ 4.200,00 → só as parcelas do acordo (R$ 4.200,00), nunca os dois boletos de novo.
  * Devolve { itens: [{ cobranca, valor, texto }], total }.
  */
+/**
+ * Multa da saída antes do fim do contrato (cláusula do modelo: 3 aluguéis, proporcional ao tempo que falta), só como
+ * sugestão para o cálculo final (o operador inclui ou dispensa; a lei dispensa na transferência pelo empregador, art. 4º).
+ * Proporção pelos dias que faltam do prazo; aluguel cheio vigente na saída. Sem prazo determinado, troca de titular ou saída
+ * no fim: null. Ex.: aluguel R$ 2.000,00, contrato de 01/01/2026 a 01/07/2028 (30 meses), saída em 01/09/2027 (faltam 10)
+ * → R$ 6.000,00 × 304/912 dias = R$ 2.000,00. Devolve { valor, aluguel, fim, restam, total }.
+ */
+export function multaSaidaAntecipada(d, c) {
+  if (!c || !c.data_saida || c.prazo_tipo === 'Indeterminado' || fimDeVinculo(d, c)) return null;
+  const inicio = c.data_entrada || c.vigencia_inicio;
+  const fim = fimDoContrato(d, c);
+  if (!inicio || !fim || c.data_saida >= fim || c.data_saida < inicio) return null;
+  const total = C.diasEntre(inicio, fim);
+  const restam = C.diasEntre(c.data_saida, fim);
+  const aluguel = aluguelAtual(d, c, c.data_saida);
+  if (!(total > 0) || !(aluguel > 0)) return null;
+  return { valor: Math.round((3 * aluguel * restam) / total), aluguel, fim, restam, total };
+}
+
 /** Nome do boleto na lista de débitos do cálculo final ("Aluguel 10/2026", "Parcela 2/3 do acordo (vence 10/12/2026)"). */
 const nomeDebitoSaida = (cb) => (ehParcelaAcordo(cb) ? `Parcela ${cb.acordo_parcela || 'única'} do acordo (vence ${C.dataBr(cb.vencimento)})` : `Aluguel ${C.compBr(cb.competencia)}`);
 
@@ -2858,6 +2893,7 @@ export function desistirAntesDeAssinar(d, { fichaId = null, contratoId = null, d
   for (const c of contratos) { const m = motivoSemDesistencia(d, c); if (m) throw new C.ErroUsuario(m); }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(data || ''))) throw new C.ErroUsuario('Informe a data da desistência.');
   if (data > hoje) throw new C.ErroUsuario('A desistência não pode ser numa data futura.');
+  if (f && f.data_recebida && data < f.data_recebida) throw new C.ErroUsuario(`A desistência não pode ser antes de a ficha chegar (${C.dataBr(f.data_recebida)}).`);
   // a reserva e o comprovante dela ficaram no primeiro contrato (dadosDaFicha): voltam para a ficha
   const comReserva = contratos.find((c) => c.reserva_valor > 0) || null;
   const reserva = comReserva ? { reserva_valor: comReserva.reserva_valor, reserva_data: comReserva.reserva_data || null,
@@ -2936,7 +2972,7 @@ export function informarSaida(d, contratoId, data, usuario, hoje = C.hojeIso()) 
   const c = buscar(d, 'contratos', contratoId);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data || '')) throw new Error('Informe a data de saída.');
   if (encerramentoDo(d, c.id)) throw new Error('A saída já tem o cálculo final: desfaça o cálculo antes de mudar a data.');
-  if (c.data_entrada && data < c.data_entrada) throw new Error('A saída não pode ser antes da entrada.');
+  if (c.data_entrada && data < c.data_entrada) throw new C.ErroUsuario('A saída não pode ser antes da entrada.');
   const reativar = c.ativo === false && !fimDeVinculo(d, c) && !deveDesativar(d, { ...c, ativo: true, data_saida: data }, hoje);
   atualizar(d, 'contratos', c.id, { data_saida: data, ...(reativar ? { ativo: true } : {}) }, usuario,
     `Saída do inquilino em ${C.dataBr(data)}${reativar ? ' (ativo de novo até a saída)' : ''}`);
@@ -2960,7 +2996,7 @@ export function desfazerSaida(d, contratoId, usuario) {
 export function corrigirImovel(d, contratoId, imovelId, usuario) {
   const c = buscar(d, 'contratos', contratoId);
   const i = buscar(d, 'imoveis', imovelId);
-  if (!i) throw new Error('Escolha o imóvel certo.');
+  if (!i) throw new C.ErroUsuario('Escolha o imóvel certo.');
   if (c.imovel_id === i.id) throw new Error('O contrato já está neste imóvel.');
   if (d.cobrancas.some((cb) => cb.contrato_id === c.id && cb.data_pagamento)) throw new Error('Este contrato já tem boleto pago: o imóvel não pode mais ser trocado.');
   const antes = (buscar(d, 'imoveis', c.imovel_id) || {}).nome || 'sem imóvel';
@@ -2969,11 +3005,13 @@ export function corrigirImovel(d, contratoId, imovelId, usuario) {
   return c;
 }
 
-export function encerrarContrato(d, contratoId, dados, usuario) {
+/** `hoje` (a tela manda o dia de hoje): o cálculo final só depois da saída (o roteiro diz "depois da saída"). */
+export function encerrarContrato(d, contratoId, dados, usuario, hoje = null) {
   const c = buscar(d, 'contratos', contratoId);
   const leitura = separarLeitura(dados);
   if (d.encerramentos.some((e) => e.contrato_id === c.id)) throw new Error('A saída deste inquilino já foi registrada.');
-  if (dados.data_saida < c.data_entrada) throw new Error('A saída não pode ser antes da entrada.');
+  if (dados.data_saida < c.data_entrada) throw new C.ErroUsuario('A saída não pode ser antes da entrada.');
+  if (hoje && dados.data_saida > hoje) throw new C.ErroUsuario(`O cálculo final é feito depois que o inquilino sai: a saída é em ${C.dataBr(dados.data_saida)}. Volte a partir desse dia.`);
   // a leitura da saída é obrigatória (regra leitura_relogios_obrigatoria; desligada, pode ficar em branco) e é a mesma da
   // vistoria de saída (uma só): sem digitar aqui, vale a da vistoria
   if (leitura || !leituraDo(d, c.id, 'Saída do inquilino')) gravarLeitura(d, c, 'Saída do inquilino', dados.data_saida, leitura || {}, usuario);
@@ -3061,7 +3099,7 @@ function alertaCaucao(d, c) {
   const inicio = `O aluguel foi corrigido em ${C.dataBr(x.correcao.data_vigencia)}.`;
   const texto = x.boleto ? `${inicio} Boleto do complemento da caução (${C.reais(x.boleto.caucao_complemento)}) gerado, vence em ${C.dataBr(x.boleto.vencimento)}: ao confirmar o pagamento, a caução passa a ${C.reais(x.boleto.caucao_nova)}.`
     : x.necessaria === null ? `${inicio} Corrija também a caução (atual ${C.reais(x.atual)}). Informe no contrato a quantos aluguéis ela equivale para o sistema calcular o complemento.`
-      : x.complemento > 0 ? `${inicio} A caução deve passar a ${C.reais(x.necessaria)} (${c.caucao_meses} aluguéis ${CR.regra('caucao_base', c) === 'cheio' || !percentualBonificacao(c) ? 'cheios' : 'com bonificação'}); já depositado ${C.reais(x.atual)}. Gere o boleto do complemento de ${C.reais(x.complemento)} na tela Reajustes.`
+      : x.complemento > 0 ? `${inicio} A caução deve passar a ${C.reais(x.necessaria)} (${C.plural(c.caucao_meses, 'aluguel', 'aluguéis')} ${CR.regra('caucao_base', c) === 'cheio' || !percentualBonificacao(c) ? 'cheios' : 'com bonificação'}); já depositado ${C.reais(x.atual)}. Gere o boleto do complemento de ${C.reais(x.complemento)} na tela Reajustes.`
         : `${inicio} A caução depositada (${C.reais(x.atual)}) já cobre o necessário (${C.reais(x.necessaria)}). Confirme a caução na tela Reajustes para tirar este aviso.`;
   return { nivel: 'aviso', tipo: 'Correção da caução', ancora: 'garantia', texto };
 }
@@ -3133,7 +3171,7 @@ export const GARANTIAS_DEPOSITADAS = {
  * depois (fica o alerta "Comprovante a buscar no banco" até anexar). Quando a soma chega ao necessário, a garantia conta
  * como depositada (data do último depósito).
  */
-export function registrarDepositoGarantia(d, contratoId, qual, { data, valor, arquivo }, usuario) {
+export function registrarDepositoGarantia(d, contratoId, qual, { data, valor, arquivo }, usuario, hoje = C.hojeIso()) {
   const c = buscar(d, 'contratos', contratoId);
   const g = GARANTIAS_DEPOSITADAS[qual];
   if (!c || !g) throw new Error('Contrato ou garantia não encontrados.');
@@ -3141,6 +3179,8 @@ export function registrarDepositoGarantia(d, contratoId, qual, { data, valor, ar
   const complementar = garantiaDepositada(c);
   if (complementar && !(garantiaADepositar(d, c, qual).falta > 0)) throw new Error(`${g.nome.charAt(0).toLocaleUpperCase('pt-BR')}${g.nome.slice(1)} já está completa.`);
   if (!C.dataValida(data)) throw new Error('Informe a data do depósito.');
+  // depósito ainda não feito não entra: a poupança conta da data de cada depósito e o termo de quitação usa essa data
+  if (data > hoje) throw new C.ErroUsuario(`A data do depósito (${C.dataBr(data)}) é depois de hoje (${C.dataBr(hoje)}). Registre o depósito no dia em que ele foi feito.`);
   if (!(valor > 0)) throw new Error('Informe o valor depositado.');
   // completar acima do que falta passaria do combinado (e pode passar do limite de 3 aluguéis da caução, Lei 8.245/91, art. 38, §2º)
   if (complementar) {
@@ -3265,7 +3305,7 @@ function alertaFiador(d, c, hoje) {
   if (atuais.some((f) => !f.data_saida)) return null;
   const fim = atuais.map((f) => f.data_saida).sort().pop();
   const faltam = C.diasEntre(hoje, fim);
-  return faltam <= CR.regra('antecedencia_fiador', c) ? { nivel: 'aviso', tipo: 'Fiador', texto: `O vínculo do fiador termina em ${C.dataBr(fim)} (faltam ${faltam} dias). Providencie a renovação ou outra garantia.` } : null;
+  return faltam <= CR.regra('antecedencia_fiador', c) ? { nivel: 'aviso', tipo: 'Fiador', texto: `O vínculo do fiador termina em ${C.dataBr(fim)} (${C.faltamDias(faltam)}). Providencie a renovação ou outra garantia.` } : null;
 }
 
 /**
@@ -4208,6 +4248,15 @@ export const ETAPAS_ENTRADA = [
  * para o sistema). Troca de titular: a do contrato anterior vale (a vistoria de entrada é a mesma).
  * Ex.: chaves em 02/03/2026 (segunda) → prazo até 09/03/2026; em 05/03 aguardando; em 10/03, sem arquivo, "prazo acabou".
  */
+/**
+ * Dia da entrega das chaves: o do termo das chaves assinado (``doc_chaves_em``) ou, sem ele, a data de entrada. Conta daí o
+ * prazo da contra-vistoria (etapa e e-mail de boas-vindas). Ex.: entrada 01/12/2026 e termo de 04/12/2026 → 04/12/2026.
+ */
+export function dataDasChaves(c) {
+  const t = c && String(c.doc_chaves_em || '').slice(0, 10);
+  return (t && /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : null) || (c && c.data_entrada) || null;
+}
+
 function situacaoContraVistoria(d, c, hoje) {
   if (c.contra_vistoria) return { situacao: 'feita', data: c.contra_vistoria_em || null, texto: 'recebida' };
   const anterior = contratoHerdado(d, c);
@@ -4216,7 +4265,7 @@ function situacaoContraVistoria(d, c, hoje) {
     return { situacao: 'feita', data: a ? a.contra_vistoria_em || null : null, texto: a ? `herdada de ${a.inquilino_nome}` : `herdado de ${anterior.inquilino_nome}` };
   }
   if (!c.data_entrada) return undefined;
-  const limite = C.limiteVistoriaEntrada(c.data_entrada);
+  const limite = C.limiteVistoriaEntrada(dataDasChaves(c));
   if (hoje > limite) return { situacao: 'andamento', texto: `prazo acabou em ${C.dataBr(limite)}: anexe o que o inquilino mandou ou marque "Não houve"` };
   return { situacao: 'andamento', texto: `aguardando o inquilino até ${C.dataBr(limite)} (5 dias úteis da entrega das chaves)` };
 }
@@ -4918,7 +4967,7 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
   for (const x of inadimplencia(d, hoje, { historico: false }).devedores) {
     const i = buscar(d, 'imoveis', x.contrato.imovel_id);
     lista.push({ nivel: x.diasMax >= CR.regra('dias_vermelho', x.contrato) ? 'perigo' : 'aviso', tipo: 'Inadimplência', contrato_id: x.contrato.id, imovel: i ? i.nome : '', inquilino: x.contrato.inquilino_nome,
-      texto: `${x.boletos.length} boleto(s) vencido(s) e não pago(s), ${C.reais(x.totalHoje)} hoje (com multa e juros), o mais antigo há ${x.diasMax} dia(s).${x.passo ? ` Próximo passo: ${x.passo.toLocaleLowerCase('pt-BR')}.` : ''}` });
+      texto: `${C.plural(x.boletos.length, 'boleto vencido e não pago', 'boletos vencidos e não pagos')}, ${C.reais(x.totalHoje)} hoje (com multa e juros), o mais antigo há ${C.plural(x.diasMax, 'dia')}.${x.passo ? ` Próximo passo: ${x.passo.toLocaleLowerCase('pt-BR')}.` : ''}` });
   }
   return lista.sort((a, b) => estiloAlerta(d, a.tipo).prioridade - estiloAlerta(d, b.tipo).prioridade || ordem[a.nivel] - ordem[b.nivel]);
 }
@@ -5149,8 +5198,8 @@ export function bancoAtivo(d) {
 /** Por que os botões do banco estão desabilitados (texto do ``title``); vazio quando a configuração compartilhada está pronta. */
 export function motivoBancoInativo(d) {
   const cfg = configBanco(d);
-  if (!cfg.contas.length) return 'Aguardando as chaves de acesso do C6: cadastre as contas em Dados e backup (Banco C6)';
-  if (!cfg.ativo) return 'Integração com o C6 desligada: ative em Dados e backup (Banco C6)';
+  if (!cfg.contas.length) return 'Aguardando as chaves de acesso do C6: cadastre as contas em Dados e backup → Banco (C6)';
+  if (!cfg.ativo) return 'Integração com o C6 desligada: ative em Dados e backup → Banco (C6)';
   return '';
 }
 
@@ -5165,8 +5214,9 @@ export function salvarConfigBanco(d, dados, usuario) {
   if (novo.ativo && !novo.contas.length) throw new Error('Cadastre pelo menos uma conta antes de ativar a integração.');
   if (novo.conta_padrao_id && !novo.contas.some((x) => x.id === novo.conta_padrao_id)) throw new Error('A conta padrão não está na lista de contas.');
   d.config_banco = novo;
-  const semContas = ({ contas, ...r }) => r;
-  registrar(d, usuario, 'Alteração', 'banco', null, 'Configuração do banco (C6) alterada', { config_banco: { de: semContas(antes), para: semContas(novo) } });
+  // no Histórico, só os campos que mudaram, um por linha (o banco não se desfaz pelo Histórico: SEM_DESFAZER)
+  const mudou = Object.fromEntries(['ativo', 'conta_padrao_id', 'modo_conta_boleto'].filter((k) => antes[k] !== novo[k]).map((k) => [k, { de: antes[k] ?? null, para: novo[k] ?? null }]));
+  if (Object.keys(mudou).length) registrar(d, usuario, 'Alteração', 'banco', null, 'Configuração do banco (C6) alterada', mudou);
   return novo;
 }
 
@@ -5440,7 +5490,7 @@ export function encargosDoBoletoC6(d, cb, conta, b = dadosBoleto(d, cb)) {
     if (b.desconto >= b.valor) throw new C.ErroUsuario(`O desconto do boleto de ${c.inquilino_nome} (${C.reais(b.desconto)}) não pode ser igual ou maior que o valor do boleto (${C.reais(b.valor)}).`);
     // trava combinada com o dono (16/11/2026): o tipo do desconto (VALUE_PER_DAY = "valor por dia de antecipação" na documentação)
     // pode virar um desconto de R$ 135 POR DIA; em produção só depois de um boleto de teste no sandbox mostrar o desconto certo
-    if (!descontoLiberado(conta)) throw new C.ErroUsuario(`O boleto de ${c.inquilino_nome} (${C.compBr(cb.competencia)}) não foi ao banco: a conta ${conta.apelido || conta.id} está em produção e o tipo do desconto de pontualidade ainda não foi conferido num boleto de teste. Emita um boleto no sandbox, confira no PDF que o desconto sai de ${C.reais(b.desconto)} no total (e não por dia) e marque "Conferi o desconto no boleto de teste" na conta (Dados e backup → Banco C6).`);
+    if (!descontoLiberado(conta)) throw new C.ErroUsuario(`O boleto de ${c.inquilino_nome} (${C.compBr(cb.competencia)}) não foi ao banco: a conta ${conta.apelido || conta.id} está em produção e o tipo do desconto de pontualidade ainda não foi conferido num boleto de teste. Emita um boleto no sandbox, confira no PDF que o desconto sai de ${C.reais(b.desconto)} no total (e não por dia) e marque "Conferi o desconto no boleto de teste" na conta (Dados e backup → Banco (C6)).`);
     Object.assign(fees, { [K.desconto_tipo]: conta.tipo_desconto || CONTA_BANCO_PADRAO.tipo_desconto, [K.desconto_valor]: centavosParaReais(b.desconto), [K.desconto_prazo]: Number(conta.desconto_dias_antes) || 0 });
   }
   return fees;
@@ -5616,7 +5666,7 @@ export function registrarNegativacao(d, cbId, resposta, usuario, dias) {
   if (!cb.banco || cb.banco.situacao !== 'emitido') throw new Error('Só um boleto emitido e em aberto no banco pode ser negativado.');
   if (aguardandoCredito(cb) || cb.data_pagamento) throw new C.ErroUsuario('Este boleto já foi pago (o banco ainda confirma o crédito, ou o pagamento já está registrado aqui): não pode ser negativado.');
   const conta = contaBanco(d, cb.banco.conta_id);
-  if (!conta || !conta.negativacao.ativa) throw new Error('A negativação está desligada nesta conta (Dados e backup → Banco C6).');
+  if (!conta || !conta.negativacao.ativa) throw new Error('A negativação está desligada nesta conta (Dados e backup → Banco (C6)).');
   const r = resposta || {};
   const n = normalizarRespostaC6(r).negativacao || { situacao: r[M.RESPOSTA.negativacao_situacao] || null, data: r[M.RESPOSTA.negativacao_data] || null, pode_cancelar: null };
   const banco = { ...cb.banco, negativacao: { situacao: n.situacao || M.STATUS_NEGATIVACAO.agendada, data: n.data || null, dias_atraso: Number(dias) || null, pode_cancelar: n.pode_cancelar ?? true, agendada_em: new Date().toISOString(), cancelada_em: null } };
@@ -5705,6 +5755,11 @@ export const SITUACOES_NOTIFICACAO = ['Rascunho', 'Aguardando resposta', 'Reiter
 /** Como a notificação chegou ao inquilino (o contrato aceita AR e e-mail). */
 export const MEIOS_NOTIFICACAO = ['E-mail', 'Entregue em mãos (com assinatura)', 'Correios com aviso de recebimento (AR)', 'WhatsApp'];
 const NOTIFICACAO_ABERTA = ['Aguardando resposta', 'Reiterada', 'Multa gerada'];
+/**
+ * Notificação "em aberto" nas contagens das telas (aba Notificações, botão "Em aberto", selo da página do inquilino): rascunho,
+ * aguardando resposta ou multa gerada. A reiterada não conta: quem está aberta é a reiteração dela.
+ */
+export const notificacaoEmAberto = (n) => ['Rascunho', 'Aguardando resposta', 'Multa gerada'].includes((n && n.situacao) || 'Rascunho');
 
 /** Data limite: a data da notificação mais o prazo em dias úteis. Ex.: 17/11/2026 + 10 → 02/12/2026 (20/11 é feriado nacional). */
 export const limiteNotificacao = (data, dias) => C.somarDiasUteis(data, Number(dias) || 0);
@@ -5976,7 +6031,7 @@ function alertaNotificacoes(d, c, hoje) {
   const semBoleto = l.filter((n) => n.multa_valor > 0 && !n.multa_cobranca_id);
   const texto = [
     ...vencidas.map(([n]) => `o prazo da notificação de ${C.dataBr(n.data)} (${n.assunto}) terminou em ${C.dataBr(n.data_limite)}: dê baixa se foi resolvido, mande outra notificação ou gere a multa`),
-    ...vencendo.map(([n, e]) => `o prazo da notificação de ${C.dataBr(n.data)} (${n.assunto}) termina ${e.restam === 0 ? 'hoje' : `em ${C.dataBr(n.data_limite)} (faltam ${e.restam} dia(s) útil(eis))`}: mande o lembrete ao inquilino`),
+    ...vencendo.map(([n, e]) => `o prazo da notificação de ${C.dataBr(n.data)} (${n.assunto}) termina ${e.restam === 0 ? 'hoje' : `em ${C.dataBr(n.data_limite)} (${e.restam === 1 ? 'falta' : 'faltam'} ${C.plural(e.restam, 'dia útil', 'dias úteis')})`}: mande o lembrete ao inquilino`),
     ...rascunhos.map(([n]) => `a notificação de ${C.dataBr(n.data)} (${n.assunto}) ainda não foi enviada: imprima, assine, anexe a assinada e envie`),
     ...semBoleto.map((n) => `a multa de ${C.reais(n.multa_valor)} da notificação de ${C.dataBr(n.data)} entra no próximo boleto do aluguel, quando ele for gerado`),
   ];
@@ -6284,7 +6339,7 @@ export function lancarDespesas(d, imovelId, competencia, linhas, usuario) {
   const semValor = linhas.filter((l) => l.valor === null && obs(l)).map((l) => l.tipo);
   if (semValor.length) throw new Error(`${semValor.join(', ')}: informe o valor (0,00 se foi verificado e não há conta).`);
   const novas = linhas.filter((l) => l.valor > 0 || (l.valor === 0 && obs(l)));
-  if (!novas.length) throw new Error('Informe o valor de pelo menos uma conta (0,00 com observação para registrar que não há conta).');
+  if (!novas.length) throw new C.ErroUsuario('Informe o valor de pelo menos uma conta (0,00 com observação para registrar que não há conta).');
   // qualquer imóvel aceita conta nossa (ex.: troca de titular, débito antigo); contasPermitidas só orienta a tela e o fechamento
   const ruim = novas.find((l) => !TIPOS_DESPESA.includes(l.tipo));
   if (ruim) throw new Error(`Conta desconhecida: ${ruim.tipo}.`);
@@ -6604,7 +6659,7 @@ export function eventosDoMes(d, mes, hoje = C.hojeIso()) {
     const nf = etapasFechamento(d, anterior, hoje, { pendentes }).find((e) => e.chave === 'nfs');
     ev.push({ data: `${mes}-01`, tipo: 'Fechamento', texto: `NFs avulsas/Airbnb e numerar as NFs de ${C.compBr(anterior)}`, ...passo(nf, anterior) });
     const faltam = etapas.filter((e) => !e.feito && !e.prevista).length;
-    ev.push({ data: fim, tipo: 'Fechamento', texto: faltam ? `faltam ${faltam} de ${etapas.length} etapas` : 'concluído',
+    ev.push({ data: fim, tipo: 'Fechamento', texto: faltam ? `${faltam === 1 ? 'falta' : 'faltam'} ${faltam} de ${C.plural(etapas.length, 'etapa')}` : 'concluído',
       situacao: faltam ? (fim < hoje ? 'perigo' : 'aviso') : 'ok', estado: faltam ? 'a fazer' : 'feito', fechamento: mes });
   }
   const ordem = { Boleto: 0, Reajuste: 1, IPTU: 2, Seguro: 3, 'Fim do contrato': 4, Fiador: 5, Fechamento: 6 };
@@ -7149,6 +7204,12 @@ export const INICIO_LC224 = { IRPJ: '2026-01', CSLL: '2026-04' };
 export const trimestreDe = (comp) => `${comp.slice(0, 4)}-T${Math.ceil(Number(comp.slice(5, 7)) / 3)}`;
 /** Meses do trimestre de uma competência (ex.: 2026-05 → 2026-04, 2026-05, 2026-06). */
 export const mesesDoTrimestre = (comp) => { const t = Number(trimestreDe(comp).slice(-1)); return [0, 1, 2].map((k) => `${comp.slice(0, 4)}-${String((t - 1) * 3 + 1 + k).padStart(2, '0')}`); };
+/** Mês da tela Impostos onde está a guia de um período: mensal "2026-10" → 2026-10; trimestral "2026-T3" → 2026-09 (último mês do trimestre). */
+export const mesDoPeriodoGuia = (periodo) => {
+  const p = String(periodo || '');
+  const t = /^(\d{4})-T([1-4])$/.exec(p);
+  return t ? `${t[1]}-${String(Number(t[2]) * 3).padStart(2, '0')}` : p.slice(0, 7);
+};
 
 /**
  * Faturamento das NFs não canceladas por empresa e mês de emissão, numa passada só: Map empresa → Map mês → { valor, numeros }.
@@ -7445,7 +7506,7 @@ export function alertaBanco(d, hoje = C.hojeIso()) {
     const c = buscar(d, 'contratos', abertosNoBanco[0].contrato_id);
     partes.push(`${abertosNoBanco.length} boleto(s) pago(s) aqui e ainda em aberto no C6${abertosNoBanco.some((cb) => cb.banco.negativacao && cb.banco.negativacao.pode_cancelar) ? ', com negativação agendada' : ''} (ex.: ${c ? c.inquilino_nome : ''} ${C.compBr(abertosNoBanco[0].competencia)}): o inquilino pode pagar de novo. Na página do boleto, "Consultar situação no banco" (se o banco já recebeu, acerta sozinho) ou "Cancelar no banco"`);
   }
-  if (semDestino.length) partes.push(`${semDestino.length} movimentação(ões) do extrato sem destino há mais de ${CR.regra('dias_alerta_banco')} dias`);
+  if (semDestino.length) partes.push(`${C.plural(semDestino.length, 'movimentação', 'movimentações')} do extrato sem destino há mais de ${CR.regra('dias_alerta_banco')} dias`);
   if (semComprovante.length) partes.push(`${semComprovante.length} comprovante(s) não baixado(s)`);
   if (enviados.length) partes.push(`${enviados.length} pagamento(s) enviado(s) ao banco sem confirmação de que foi pago (confirme pelo extrato ou, se o C6 cancelou, marque "Foi cancelado no C6")`);
   if (semEnvio.length) partes.push(`${semEnvio.length} pagamento(s) aprovado(s) aqui sem a confirmação de que chegou ao banco (em Pagamentos pelo banco, clique em "Atualizar situação")`);
@@ -7511,7 +7572,7 @@ export function buscarGlobal(d, texto, hoje = C.hojeIso()) {
       const c = cb ? buscar(d, 'contratos', cb.contrato_id) : null;
       return { titulo: `NF nº ${numeroFatura(f.numero)}${e ? ` · ${e.nome}` : ''}`, detalhe: `${C.dataBr(f.emissao)} · ${C.reais(f.valor)}${c ? ` · ${c.inquilino_nome}` : ''}`, link: `#/imprimir/faturas?numero=${f.numero}`, extra: f.situacao === 'Emitida' ? '' : f.situacao };
     });
-    if (nfs.length) grupos.push({ tipo: 'Notas fiscais', itens: nfs });
+    if (nfs.length) grupos.push({ tipo: 'NFs', itens: nfs });
   }
   // valor em reais: boletos com esse valor pontual, recebido ou da NF (ex.: "1.350,00" ou "1350")
   let valor = null;
@@ -7570,7 +7631,7 @@ export function textoLembrete(d, cb, hoje = C.hojeIso()) {
     if (!ehComplementoCaucao(cb)) linhas.push(`A partir de amanhã: ${C.reais(t.a_pagar_sem_desconto)} mais multa de ${C.pct(cb.multa_percentual)} e juros de ${C.pct(cb.juros_mensal_percentual)} ao mês.`);
   } else {
     const r = C.liquidar(cb, hoje);
-    linhas.push(`O boleto ${oQue}${onde}, com vencimento em ${C.dataBr(cb.vencimento)}, consta em aberto (${r.dias_atraso} dia(s) de atraso).`);
+    linhas.push(`O boleto ${oQue}${onde}, com vencimento em ${C.dataBr(cb.vencimento)}, consta em aberto (${C.plural(r.dias_atraso, 'dia')} de atraso).`);
     linhas.push(ehComplementoCaucao(cb) ? `Valor: ${C.reais(r.valor_devido)}.` : `Valor para pagamento hoje (${C.dataBr(hoje)}): ${C.reais(r.valor_devido)} (${C.reais(t.a_pagar_sem_desconto)} + multa ${C.reais(r.multa)} + juros ${C.reais(r.juros)}). Em outro dia o valor muda: se precisar, pedimos que nos avise para atualizarmos.`);
     linhas.push('Se o pagamento já foi feito, por favor desconsidere esta mensagem e, se possível, nos envie o comprovante.');
   }
@@ -7595,10 +7656,10 @@ export function segundaVia(d, cb, hoje = C.hojeIso()) {
   const { c, nome, oQue, onde } = boletoNoTexto(d, cb);
   const r = C.liquidar(cb, hoje);
   const original = r.valor_devido - r.multa - r.juros;
-  const linhas = [`Olá, ${nome}!`, '', `Segue a 2ª via do boleto ${oQue}${onde}, que venceu em ${C.dataBr(cb.vencimento)} (${r.dias_atraso} dia(s) de atraso), com o valor atualizado para pagamento hoje, ${C.dataBr(hoje)}:`, ''];
+  const linhas = [`Olá, ${nome}!`, '', `Segue a 2ª via do boleto ${oQue}${onde}, que venceu em ${C.dataBr(cb.vencimento)} (${C.plural(r.dias_atraso, 'dia')} de atraso), com o valor atualizado para pagamento hoje, ${C.dataBr(hoje)}:`, ''];
   linhas.push(`Valor do boleto: ${C.reais(original)}`);
   if (r.multa) linhas.push(`Multa (${C.pct(cb.multa_percentual)}): ${C.reais(r.multa)}`);
-  if (r.juros) linhas.push(`Juros (${C.pct(cb.juros_mensal_percentual)} ao mês, ${r.dias_atraso} dia(s)): ${C.reais(r.juros)}`);
+  if (r.juros) linhas.push(`Juros (${C.pct(cb.juros_mensal_percentual)} ao mês, ${C.plural(r.dias_atraso, 'dia')}): ${C.reais(r.juros)}`);
   linhas.push(`Total para pagar hoje: ${C.reais(r.valor_devido)}`, '', 'Este valor vale para pagamento hoje. Em outro dia ele muda: se for pagar depois, nos avise para atualizarmos.',
     'Se o pagamento já foi feito, por favor desconsidere esta mensagem e, se possível, nos envie o comprovante.');
   const b = cb.banco || null;
@@ -8022,8 +8083,19 @@ export function padroesNovoContrato(perfil = null) {
   if (r('tarifa_padrao') !== null) out.taxa_boleto = r('tarifa_padrao');
   if (r('fci_percentual_padrao') !== null) { out.fci_percentual = r('fci_percentual_padrao'); if (r('fci_indice_padrao')) out.fci_indice = r('fci_indice_padrao'); }
   if (r('indice_padrao')) out.indice_correcao = r('indice_padrao');
-  if (r('prazo_residencial_padrao') !== null) out.prazo_meses = r('prazo_residencial_padrao');
+  const prazo = prazoPadraoNovoContrato('Residencial', perfil);
+  if (prazo !== null) out.prazo_meses = prazo;
   return out;
+}
+
+/**
+ * Prazo (meses) que vem preenchido no Novo contrato conforme a finalidade: residencial pela regra `prazo_residencial_padrao`,
+ * não residencial pela `prazo_comercial_padrao` (null = em branco, digitar em cada contrato). Ex.: comercial com a regra em 60 → 60.
+ */
+export function prazoPadraoNovoContrato(finalidade, perfil = null) {
+  const ctx = { perfil_regras_id: perfil ? Number(perfil) : null };
+  const v = CR.regra(finalidade === 'Não residencial' ? 'prazo_comercial_padrao' : 'prazo_residencial_padrao', ctx);
+  return v === null || v === undefined || v === '' ? null : v;
 }
 
 /**

@@ -36,8 +36,8 @@ function linhasDoResumo(g) {
     ['inadimplencia', 'Inadimplência (boletos que vencem no mês)', `${pctTexto(b.pct)} · ${reais(b.emAtraso)}`, `${pctTexto(a.pct)} · ${reais(a.emAtraso)}`, `em atraso hoje, do valor dos boletos do mês (${reais(b.previsto)})`],
     ['atrasados', 'Inquilinos com boleto do mês em atraso', String(b.inquilinos), String(a.inquilinos), `em atraso hoje, de qualquer mês: ${g.emAtrasoHoje.inquilinos} (${reais(g.emAtrasoHoje.total)})`],
     ['recebido', 'Recebido x previsto (boletos que vencem no mês)', `${reais(b.recebido)} de ${reais(b.previstoEmDia)}`, `${reais(a.recebido)} de ${reais(a.previstoEmDia)}`, `previsto = valor pago em dia; entrou no mês (todos os boletos pagos nele): ${reais(b.entrou)}`],
-    ['nfs', 'NFs emitidas', `${g.nfs.qtd} · ${reais(g.nfs.valor)}`, `${g.nfsAnterior.qtd} · ${reais(g.nfsAnterior.valor)}`, g.nfs.aguardando ? `${g.nfs.aguardando} pagamento(s) do mês aguardando número` : 'nenhum pagamento do mês aguardando número'],
-    ['vagos', 'Imóveis vagos', `${g.vagos.length} de ${g.imoveis}`, String(g.vagosAnterior), g.vagos.length ? `vago há mais tempo: ${esc(g.vagos[0].imovel.nome)}${g.vagos[0].dias !== null ? ` (${g.vagos[0].dias} dias)` : ''}` : 'todos alugados'],
+    ['nfs', 'NFs emitidas', `${g.nfs.qtd} · ${reais(g.nfs.valor)}`, `${g.nfsAnterior.qtd} · ${reais(g.nfsAnterior.valor)}`, g.nfs.aguardando ? `${C.plural(g.nfs.aguardando, 'pagamento do mês aguardando', 'pagamentos do mês aguardando')} número` : 'nenhum pagamento do mês aguardando número'],
+    ['vagos', 'Imóveis vagos', `${g.vagos.length} de ${g.imoveis}`, String(g.vagosAnterior), g.vagos.length ? `vago há mais tempo: ${esc(g.vagos[0].imovel.nome)}${g.vagos[0].dias !== null ? ` (${C.plural(g.vagos[0].dias, 'dia')})` : ''}` : 'todos alugados'],
     ['vencer', `Contratos que vencem em até ${G.JANELA_VENCIMENTO} dias`, String(g.vencer.aVencer), String(g.vencerAnterior), g.vencer.vencidos ? `${g.vencer.vencidos} já venceram sem renovação` : 'nenhum vencido sem renovação'],
     ['reajustes', `Reajustes do aluguel de ${compBr(g.mes)}`, `${g.reajustes.lista.length} (${g.reajustes.feitos} aplicados)`, String(g.reajustesAnterior.lista.length), `${compBr(g.proximo)}: ${g.reajustesProximo.lista.length} reajuste(s)`],
     ['caucao', 'Caução e depósito guardados (hoje)', reais(g.caucao.total), '-', `${g.caucao.inquilinos} inquilino(s); aplicado ${reais(g.caucao.aplicado)}`],
@@ -102,10 +102,10 @@ export function telaGestao(q) {
   const b = g.boletos; const a = g.boletosAnterior;
   const aqui = (filtro) => `#/gestao?mes=${mes}&filtro=${filtro}&ir=lista`;
   const lista = LISTAS[q.filtro];
-  return `<h1>Gestão</h1>${abasFinanceiro('gestao')}
-    <div class="cabecalho"><h2>Números de ${compBr(mes)}</h2>
+  return `<h1>Financeiro</h1>${abasFinanceiro('gestao')}
+    <div class="cabecalho"><h2>Gestão · números de ${compBr(mes)}</h2>
       <div class="acoes"><a class="botao secundario" href="#/gestao?mes=${g.anterior}">← ${compBr(g.anterior)}</a>
-      <form data-form="ir" data-ir="gestao" class="acoes"><input type="month" name="mes" value="${esc(mes)}" max="${atual}" style="width:160px"><button class="secundario">Ir</button></form>
+      <form data-form="ir" data-ir="gestao" class="acoes"><input type="month" name="mes" value="${esc(mes)}" max="${atual}" class="campo-mes"><button class="secundario">Ir</button></form>
       ${mes < atual ? `<a class="botao secundario" href="#/gestao?mes=${g.proximo}">${compBr(g.proximo)} →</a>` : ''}
       ${botao('relatorioGestao', 'Relatório em PDF', { mes }, '')}</div></div>
     <div class="numeros numeros-largos">

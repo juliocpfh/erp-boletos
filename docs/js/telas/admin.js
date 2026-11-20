@@ -25,7 +25,8 @@ const FORM_RESTAURAR = `<form data-form="restaurarSeguro" class="formulario">
     <div><label>Senha do backup</label><input type="password" name="senha" autocomplete="off"></div>
     ${S.suportado() ? '<div><label>O que fazer</label><select name="destino"><option value="pasta">Abrir numa pasta nova do computador (o sistema abre com esses dados)</option><option value="zip">Só baixar o ZIP</option></select></div>' : '<input type="hidden" name="destino" value="zip">'}
     <div class="check"><button>Abrir o backup</button></div></form>
-  <p class="suave"><b>Abrir numa pasta:</b> escolha uma pasta nova e vazia; o sistema grava ali o banco (e os anexos, se o backup for completo) e abre. Só para desastre (dados da nuvem perdidos): com o site só fora do ar, use o aplicativo instalado, que envia sozinho depois. Na pasta, para levar de volta à nuvem, <b>Dados e backup → Substituir os dados da nuvem pelos de uma pasta</b> leva o que fez para a nuvem (para só voltar o banco a um dia, <b>Backups da nuvem</b> é mais simples).
+  <p class="suave">${S.suportado() ? `<b>Abrir numa pasta:</b> escolha uma pasta nova e vazia; o sistema grava ali os dados (e os anexos, se o backup for completo) e abre. Só para desastre (dados da nuvem perdidos): com o site só fora do ar, use o aplicativo instalado, que envia sozinho depois. Na pasta, para levar de volta à nuvem, <b>Dados e backup → Substituir os dados da nuvem pelos de uma pasta</b> leva o que fez para a nuvem (para só voltar o banco a um dia, <b>Backups da nuvem</b> é mais simples).`
+    : 'Neste aparelho só dá para baixar o ZIP: abrir o backup numa pasta (e levar de volta à nuvem) se faz no computador, no Chrome ou no Edge.'}
     <b>ZIP:</b> igual ao do "Exportar tudo", para guardar ou importar depois. Os usuários e senhas voltam junto.</p>`;
 
 export function telaRestaurarBackup() {
@@ -65,10 +66,10 @@ export async function telaBackupSeguro() {
     ${E.seguroErro ? `<div class="alerta erro">A última cópia falhou: ${esc(E.seguroErro)}</div>` : ''}
     <div class="cartao"><div class="grade">
       ${item('Pasta segura (só neste computador)', esc(E.seguro.dir.name))}
-      ${item('Última cópia do banco', quando(ultimo(B.PASTA_DIARIO)))}
+      ${item('Última cópia dos dados', quando(ultimo(B.PASTA_DIARIO)))}
       ${item('Último backup completo', quando(ultimo(B.PASTA_SEMANAL)))}
       ${item('Guarda', `${B.MANTER_DIARIOS} cópias diárias, ${B.MANTER_SEMANAIS} completos semanais e 1 completo por mês durante ${B.MANTER_MENSAIS} meses`)}</div>
-      <p class="suave">${E.nuvem ? 'A cada alteração que chega a <b>este computador</b> (feita aqui ou em outro aparelho), a cópia do dia é atualizada: é a segunda camada do backup, fora do Cloudflare.' : 'A cada alteração no sistema feita <b>neste computador</b>, a cópia do dia é atualizada. As alterações feitas em outros computadores entram na próxima vez que o sistema for aberto aqui.'}
+      <p class="suave">${E.nuvem ? 'A cada alteração que chega a <b>este computador</b> (feita aqui ou em outro aparelho), a cópia do dia é atualizada: é a segunda camada do backup, fora da nuvem.' : 'A cada alteração no sistema feita <b>neste computador</b>, a cópia do dia é atualizada. As alterações feitas em outros computadores entram na próxima vez que o sistema for aberto aqui.'}
         O completo semanal é feito sozinho quando o sistema é aberto e já passou uma semana do último. Os arquivos são cifrados: sem a senha do backup ninguém consegue abrir.</p>
       <div class="acoes">${botao('backupCompletoAgora', 'Fazer backup completo agora', { status: 'Fazendo o backup completo…' }, '')}
         ${botao('desconectarSeguro', 'Desligar neste computador', {}, 'perigo pequeno', 'Desligar o backup seguro neste computador? Os arquivos já gravados continuam na pasta.')}</div>
@@ -150,8 +151,8 @@ export function avisoBackupSeguro() {
     }
   }
   if (!S.suportado() || dispensado(AVISO_SEGURO_DISPENSADO)) return '';
-  return `<div class="alerta aviso"><b>Backup seguro</b> não está ligado ${E.nuvem ? 'em nenhum computador da empresa: sem ele, não há cópia dos dados fora do Cloudflare' : 'neste computador: sem ele, não há uma segunda cópia dos dados, fora da pasta que o sistema usa'} (reserva para um desastre).
-    ${link('#/backup-seguro', 'Ligar o backup seguro', 'botao pequeno')} ${botao('dispensarAvisoSeguro', 'Não avisar neste computador', {}, 'secundario pequeno')}</div>`;
+  return `<div class="alerta aviso"><b>Backup seguro</b> não está ligado ${E.nuvem ? 'em nenhum computador da empresa: sem ele, não há cópia dos dados fora da nuvem' : 'neste computador: sem ele, não há uma segunda cópia dos dados, fora da pasta que o sistema usa'} (reserva para um desastre).
+    ${link('#/backup-seguro', 'Ligar o backup seguro', 'botao pequeno')} ${botao('dispensarAvisoSeguro', 'Não avisar neste aparelho', {}, 'secundario pequeno')}</div>`;
 }
 export const dispensarAvisoSeguro = (chave) => { try { localStorage.setItem(String(chave || '').startsWith(AVISO_SEGURO_DISPENSADO) ? chave : AVISO_SEGURO_DISPENSADO, '1'); } catch { /* sem armazenamento */ } };
 
@@ -292,13 +293,17 @@ async function versaoDoSistema() {
 
 /** Na nuvem: quando o último ZIP com tudo foi baixado (registro "Exportação" do Histórico) e um lembrete se faz tempo. */
 function lembreteZipNuvem() {
-  const ultimo = d().historico.filter((h) => h.acao === 'Exportação' && /ZIP/.test(h.descricao || '')).at(-1);
+  // só conta o ZIP baixado por um administrador: o do operador sai sem as senhas dos outros usuários (não serve num desastre)
+  const admins = new Set(d().usuarios.filter((u) => u.papel === 'admin').map((u) => u.login));
+  const ultimo = d().historico.filter((h) => h.acao === 'Exportação' && /ZIP/.test(h.descricao || '') && admins.has(h.usuario)).at(-1);
   const dias = ultimo ? Math.floor((Date.now() - new Date(ultimo.quando).getTime()) / 86400000) : null;
   const texto = ultimo ? `Último ZIP com todos os dados baixado em ${dataBr(ultimo.quando.slice(0, 10))} (há ${dias} dia${dias === 1 ? '' : 's'}).` : 'Nenhum ZIP com todos os dados foi baixado ainda.';
-  const lembrar = !ultimo || dias > LEMBRETE_ZIP_DIAS;
+  const lembrar = podeUsuario('admin') && (!ultimo || dias > LEMBRETE_ZIP_DIAS);
   return `<p class="suave">${texto} ${lembrar ? etiqueta('vale baixar uma cópia para o seu computador (abaixo, "Exportar tudo em ZIP")', 'aviso') : ''}</p>`;
 }
 const LEMBRETE_ZIP_DIAS = 7;
+/** O ZIP com tudo: na pasta, quem opera; na nuvem, só o administrador (o aparelho dos outros não recebe as senhas de todos). */
+const zipPermitido = () => (E.nuvem ? podeUsuario('admin') : opera());
 
 /** Quantas tabelas aparecem em "Tamanho dos dados" (as com mais registros); as outras ficam em "ver todas". */
 const MAIORES_TABELAS = 8;
@@ -314,7 +319,7 @@ function caixaTamanho() {
   const cabeca = '<tr><th>Tabela</th><th class="n">Registros</th><th class="n">Tamanho</th></tr>';
   const comDados = t.tabelas.filter((x) => x.registros);
   return `<div class="cartao" id="tamanho-dados"><h2>Tamanho dos dados</h2><div class="grade">
-      ${item('Banco de dados (sem os anexos)', tamanho(t.bytes))}${item('Registros', milhar(t.registros))}
+      ${item('Dados (sem os anexos)', tamanho(t.bytes))}${item('Registros', milhar(t.registros))}
       ${item('Histórico de alterações', `${milhar(t.historico.registros)} linha(s) · ${tamanho(t.historico.bytes)}`)}
       ${item('Anexos ligados a lançamentos', milhar(t.anexos))}</div>
     <div class="rolagem"><table class="compacta">${cabeca}${comDados.slice(0, MAIORES_TABELAS).map(linha).join('') || '<tr><td colspan="3" class="suave">Nenhum registro ainda.</td></tr>'}</table></div>
@@ -336,12 +341,12 @@ export async function telaDados(q = {}) {
     ${conflitos.length ? `<div class="alerta perigo">O OneDrive criou cópia(s) em conflito: <b>${conflitos.map(esc).join(', ')}</b>. Isso acontece quando dois computadores gravam ao mesmo tempo. Confira se falta alguma alteração recente e, depois de conferir, apague a cópia na pasta.</div>` : ''}
     ${opera() ? AJ.caixaReabrirPassos(d(), E.usuario?.login || '', { backupLigado: !!(E.seguro && E.seguro.chave) }) : ''}
     <div class="cartao"><div class="grade">
-      ${item('Pasta dos dados', E.nuvem ? 'na nuvem (Cloudflare)' : esc(E.pasta.name))}${item('Banco criado em', dataHoraBr(d().criado_em))}
+      ${item('Pasta dos dados', E.nuvem ? 'na nuvem' : esc(E.pasta.name))}${item('Sistema em uso desde', dataHoraBr(d().criado_em))}
       ${item('Última atualização', d().atualizado_em ? `${dataHoraBr(d().atualizado_em)} por ${esc(d().atualizado_por)}` : '-')}
       ${item('Alterações gravadas', `${d().revisao}`)}
       ${item('Versão do sistema', await versaoDoSistema())}</div>
       ${E.nuvem ? '' : `<p class="suave">Tudo é gravado na hora no arquivo <b>${S.ARQUIVO_BANCO}</b> desta pasta. Uma cópia por dia fica em <b>${S.PASTA_BACKUPS}</b> (30 dias). Os anexos ficam em <b>${S.PASTA_ARQUIVOS}</b>, separados por imóvel e inquilino.</p>`}
-      ${E.nuvem ? `<p class="suave">Na nuvem, tudo é gravado no Cloudflare (com backup diário de 30 dias). Sem internet, as mudanças ficam neste aparelho e sobem quando a conexão voltar.</p>
+      ${E.nuvem ? `<p class="suave">Tudo é gravado na nuvem (servidores da empresa Cloudflare), com backup diário de 30 dias. Sem internet, as mudanças ficam neste aparelho e sobem quando a conexão voltar.</p>
       ${lembreteZipNuvem()}
       ${podeUsuario('admin') ? `<p>${link('#/backups-nuvem', 'Backups da nuvem (baixar ou voltar para um dia)', 'botao secundario pequeno')} ${link('#/acessos', 'Acessos (quem baixou, abriu ou mandou o quê)', 'botao secundario pequeno')}</p>
       <details id="avancado-nuvem"><summary class="suave">Avançado: substituir os dados da nuvem pelos de uma pasta</summary>
@@ -349,35 +354,35 @@ export async function telaDados(q = {}) {
         <p>${botao('levarParaNuvem', 'Substituir os dados da nuvem pelos de uma pasta', { substituir: '1' }, 'perigo pequeno')}</p><div id="progresso-nuvem"></div></details>` : ''}` : `<p>${botao('escolherPasta', 'Trocar de pasta')}</p>`}</div>
     ${caixaTamanho()}
     ${podeUsuario('admin') ? `<div class="cartao"><h2>Backup seguro (só administrador)</h2>
-      <p>Segunda pasta, só no computador do administrador: recebe uma cópia protegida por senha a cada alteração e um backup completo (banco + anexos) por semana, sozinha, sem pedir nada. É a reserva para um desastre (ex.: perder a conta do Cloudflare).${E.nuvem ? ' Na nuvem é a segunda camada, fora do Cloudflare: vale ter.' : ''}</p>
+      <p>Segunda pasta, só no computador do administrador: recebe uma cópia protegida por senha a cada alteração e um backup completo (dados + anexos) por semana, sozinha, sem pedir nada. É a reserva para um desastre (ex.: perder a conta da nuvem).${E.nuvem ? ' É a segunda camada, fora da nuvem: vale ter.' : ''}</p>
       ${E.nuvem ? '<p><b>Sem internet ou com o site fora do ar:</b> abra o sistema pelo ícone do aplicativo instalado (ou pelo endereço de sempre no Chrome). Ele abre com os dados da última vez que este aparelho esteve conectado, você trabalha normalmente e as alterações sobem sozinhas quando a conexão voltar.</p>' : ''}
       ${window.VERSAO_OFFLINE ? `<p>${etiqueta(`Você está na versão PC de ${dataBr(window.VERSAO_OFFLINE)}`, 'info')}</p>` : ''}
-      <p>${E.seguro && E.seguro.chave ? etiqueta(`Ligado neste computador · pasta ${E.seguro.dir.name}`, 'ok') : E.seguro && E.seguro.desconectado ? etiqueta('Desconectado: falta liberar a pasta', 'aviso') : etiqueta('Não configurado neste computador', 'neutra')}
+      <p>${E.seguro && E.seguro.chave ? etiqueta(`Ligado neste computador · pasta ${E.seguro.dir.name}`, 'ok') : E.seguro && E.seguro.desconectado ? etiqueta('Desconectado: falta liberar a pasta', 'aviso') : etiqueta('Não configurado neste aparelho', 'neutra')}
       ${link('#/backup-seguro', 'Abrir o backup seguro')}</p>
       ${E.nuvem && E.backupEmpresa ? `<p>Na empresa: ${E.backupEmpresa.feito_em ? `${etiqueta(`última cópia em ${ultimaCopiaDaEmpresa()}`, B.avisoDaEmpresa(E.backupEmpresa, Date.now(), DIAS_BACKUP_EMPRESA) ? 'aviso' : 'ok')} <span class="suave">(basta um computador com o backup ligado; parado há mais de ${DIAS_BACKUP_EMPRESA} dias, o Painel avisa os administradores)</span>` : etiqueta('nenhum computador com o backup seguro ligado', 'aviso')}</p>` : ''}</div>` : ''}
     ${caixaConfigBanco()}
     ${caixaConfigBanco2()}
-    <div class="cartao"><h2>Exportar tudo em ZIP</h2><p>Banco de dados e todos os anexos num único arquivo, para guardar ou levar para outro computador.</p>${opera() ? botao('exportar', 'Baixar ZIP com todos os dados', { status: 'Montando o ZIP…' }, '') : ''}<div id="progresso-exportar" aria-live="polite"></div>
+    <div class="cartao"><h2>Exportar tudo em ZIP</h2><p>Todos os dados e todos os anexos num único arquivo, ${E.nuvem ? 'para guardar. Para voltar com ele: descompacte numa pasta do computador e use "Avançado: substituir os dados da nuvem pelos de uma pasta" (acima); para voltar o banco a um dia, use os Backups da nuvem.' : 'para guardar ou levar para outro computador.'}${E.nuvem && !podeUsuario('admin') ? ' <span class="suave">Na nuvem, só o administrador baixa o ZIP com tudo (só o aparelho dele recebe as senhas de todos os usuários).</span>' : ''}</p>${zipPermitido() ? botao('exportar', 'Baixar ZIP com todos os dados', { status: 'Montando o ZIP…' }, '') : ''}<div id="progresso-exportar" aria-live="polite"></div>
       <p style="margin-top:14px">Para ler ou imprimir: todos os cadastros numa planilha Excel (uma aba por cadastro, mais o histórico de alterações) e num PDF (uma ficha por registro). Os anexos não entram e estes arquivos não servem para importar.</p>
       ${opera() ? botao('exportarPlanilhaPdf', 'Baixar todos os dados em planilha e PDF', { status: 'Montando a planilha e o PDF…' }, 'secundario') : ''}
-      <p style="margin-top:14px">As regras de negócio do programa (reajuste, caução, NF, IPTU etc.) num arquivo de texto para ler, com a lista das regras em uso hoje no fim. Para mudar as regras (multa, juros, caução, régua de cobrança, prazos), use ${link('#/regras', 'Regras do sistema')}.</p>
+      <p style="margin-top:14px">As regras de negócio do programa (reajuste, caução, NF, IPTU etc.) num arquivo de texto para ler, com a lista das regras em uso hoje no fim. Para mudar as regras (multa, juros, caução, régua de cobrança, prazos), use ${link('#/regras', 'Regras do sistema', '')}.</p>
       ${botao('baixarRegras', 'Baixar as regras para ler (TXT)', {}, 'secundario')}</div>
     ${podeUsuario('admin') && !E.nuvem ? `<div class="cartao"><h2>Importar ZIP</h2>
-      <div class="alerta aviso">A importação <b>substitui o banco de dados desta pasta</b> pelo do ZIP e acrescenta os anexos. Antes, uma cópia do banco atual é guardada em ${S.PASTA_BACKUPS}.</div>
+      <div class="alerta aviso">A importação <b>substitui os dados desta pasta</b> pelos do ZIP e acrescenta os anexos. Antes, uma cópia dos dados atuais é guardada em ${S.PASTA_BACKUPS}.</div>
       <form data-form="importar" class="acoes"><input type="file" name="zip" accept=".zip" style="max-width:380px"><label class="check" style="padding:0"><input type="checkbox" name="confirmo" value="1"> Entendo que os dados atuais serão substituídos</label><button class="perigo">Importar</button></form></div>` : ''}
     ${opera() ? `<div class="cartao"><h2>Conferir arquivos</h2><p>Ao abrir o Painel, o sistema confere se cada arquivo ligado a um lançamento (comprovantes, documentos assinados, aditivos, cartas, apólices, fotos da vistoria) está na pasta.
       O que estiver em outra pasta volta sozinho para o lugar; o que sumiu aparece como alerta no Painel e na página do inquilino, para anexar de novo.</p>
       ${botao('conferirArquivos', 'Conferir arquivos agora', { status: 'Conferindo os arquivos…' })}</div>` : ''}
-    ${podeUsuario('admin') ? `<div class="cartao"><h2>Compactar os anexos</h2><p>Fotos e PDFs escaneados são compactados sozinhos ao anexar (${link('#/regras', 'Regras do sistema')} → "Compactar anexos"${R.regra('compactar_anexos') ? '' : ', hoje desligada'}). Ex.: foto do RG de 4 MB → cerca de 400 KB; PDF escaneado de 10 páginas com 12 MB → cerca de 1,5 MB.
+    ${podeUsuario('admin') ? `<div class="cartao"><h2>Compactar os anexos</h2><p>Fotos e PDFs escaneados são compactados sozinhos ao anexar (${link('#/regras', 'Regras do sistema', '')} → "Compactar anexos"${R.regra('compactar_anexos') ? '' : ', hoje desligada'}). Ex.: foto do RG de 4 MB → cerca de 400 KB; PDF escaneado de 10 páginas com 12 MB → cerca de 1,5 MB.
       Este botão faz o mesmo com os que já estavam no sistema, trocando cada um no lugar, com o mesmo nome. O original não é guardado. PDF com assinatura digital (gov.br, ICP-Brasil, banco) e PDF com texto ficam como estão; documento mandado pelo link da ficha só entra depois de conferido (a conferência fica guardada na ficha).</p>
       ${botao('compactarAnexos', 'Compactar os anexos que já estão no sistema', { status: 'Procurando os anexos…' }, 'secundario', 'Compactar agora as fotos e os PDFs escaneados já anexados? O arquivo original não é guardado (PDF assinado nunca é mexido). Pode levar alguns minutos: deixe esta tela aberta até o fim.')}</div>` : ''}
     ${podeUsuario('admin') ? `<div class="cartao"><h2>Dados de uma pessoa (LGPD)</h2><p>Pelo CPF: onde a pessoa aparece e um arquivo com tudo dela (quando ela pedir). Dez anos depois do fim do último contrato, apagar tudo dela de uma vez.</p>
-      <p>${link('#/pessoa', 'Dados de uma pessoa', 'botao secundario pequeno')} ${link('#/pessoas-antigas', 'Pessoas com mais de 10 anos do fim do contrato', 'botao secundario pequeno')}</p></div>` : ''}
+      <p class="acoes">${link('#/pessoa', 'Dados de uma pessoa', 'botao secundario pequeno')} ${link('#/pessoas-antigas', 'Pessoas com mais de 10 anos do fim do contrato', 'botao secundario pequeno')}</p></div>` : ''}
     ${podeUsuario('admin') ? `<div class="cartao"><h2>Arquivos sem lançamento</h2><p>Ao excluir um lançamento (aditivo, comprovante, depósito, apólice, vistoria, documento assinado), o arquivo anexado é apagado junto.
       Os que sobraram de exclusões antigas podem ser apagados aqui: o sistema mostra a lista antes de apagar. As fichas e documentos anexados à mão em "Arquivos do inquilino" não entram.</p>
       ${botao('limparAnexosSoltos', 'Procurar arquivos sem lançamento', { status: 'Procurando arquivos sem lançamento…' })}</div>` : ''}
     <div class="cartao"><h2>Modelos de contrato</h2><p>Textos usados nos botões <b>Gerar contrato</b> (residencial, não residencial e os que você criar) e <b>Gerar termo aditivo</b> (troca do vencimento e troca de inquilino) do inquilino.</p>${link('#/modelos-contrato', 'Ver e editar os modelos')}</div>
-    <div class="cartao"><h2>Modelos de e-mail</h2><p>Um e-mail para cada etapa da ficha, da entrada e da saída do inquilino, e o informe anual do Imposto de Renda (botão <b>✉ E-mail</b> em cada etapa).</p>${link('#/modelos-email', 'Ver e editar os modelos de e-mail')}</div>
+    <div class="cartao"><h2>Modelos de e-mail</h2><p>Um e-mail para cada etapa da ficha, da entrada e da saída do inquilino, a régua de cobrança (lembretes antes e no dia do vencimento, boleto em atraso), as notificações ao inquilino, o novo valor do aluguel, os termos aditivos e o informe anual do Imposto de Renda (botão <b>✉ E-mail</b> em cada etapa).</p>${link('#/modelos-email', 'Ver e editar os modelos de e-mail')}</div>
     ${await caixaGmailHtml(q.gmail)}
     <div class="cartao"><h2>Modelo Excel da NF</h2>
       <p>${modeloProprio ? `${etiqueta('Modelo próprio', 'ok')} usando o arquivo enviado (${S.PASTA_MODELOS}/${S.MODELO_FATURA}).` : 'Usando o modelo padrão do sistema (uma NF por empresa, com os dados do cadastro de Empresas).'}</p>

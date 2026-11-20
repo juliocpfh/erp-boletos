@@ -23,7 +23,7 @@ const SO_CONSULTA = 'Seu usuário só consulta: não pode alterar. Peça ao admi
 export function etiquetaNotificacao(n, hoje = C.hojeIso()) {
   const e = R.estadoNotificacao(d(), n, hoje);
   const prazo = e.podeMulta ? ` ${etiqueta(`prazo vencido em ${dataBr(n.data_limite)}`, 'perigo')}`
-    : e.aberta && e.situacao !== 'Reiterada' && !n.multa_valor ? ` ${etiqueta(e.restam === 0 ? 'vence hoje' : `faltam ${e.restam} dia(s) útil(eis)`, e.avisar ? 'aviso' : 'neutra')}` : '';
+    : e.aberta && e.situacao !== 'Reiterada' && !n.multa_valor ? ` ${etiqueta(e.restam === 0 ? 'vence hoje' : `${e.restam === 1 ? 'falta' : 'faltam'} ${C.plural(e.restam, 'dia útil', 'dias úteis')}`, e.avisar ? 'aviso' : 'neutra')}` : '';
   return `${etiqueta(e.situacao, COR[e.situacao] || 'neutra')}${prazo}`;
 }
 
@@ -51,10 +51,10 @@ export function telaNotificacoes(q = {}) {
   const hoje = C.hojeIso();
   const todas = d().notificacoes || [];
   const abertas = q.filtro !== 'todas';
-  const lista = ordemNotificacoes(todas.filter((n) => !abertas || ['Rascunho', 'Aguardando resposta', 'Multa gerada'].includes(n.situacao)), hoje);
+  const lista = ordemNotificacoes(todas.filter((n) => !abertas || R.notificacaoEmAberto(n)), hoje);
   const vencidas = todas.filter((n) => { const e = R.estadoNotificacao(d(), n, hoje); return e.podeMulta && e.situacao !== 'Reiterada'; }).length;
-  return `${atalhosComunicacoes('notificacoes')}<div class="cabecalho"><h1>Notificações ao inquilino</h1>${opera() ? link('#/notificacao-nova', 'Nova notificação', 'botao') : ''}</div>
-    <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap">${link('#/notificacoes', `Em aberto (${todas.filter((n) => ['Rascunho', 'Aguardando resposta', 'Multa gerada'].includes(n.situacao)).length})`, `botao ${abertas ? '' : 'secundario '}pequeno`)}
+  return `<div class="cabecalho"><h1>Notificações ao inquilino</h1>${opera() ? link('#/notificacao-nova', 'Nova notificação', 'botao') : ''}</div>${atalhosComunicacoes('notificacoes')}
+    <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap">${link('#/notificacoes', `Em aberto (${todas.filter(R.notificacaoEmAberto).length})`, `botao ${abertas ? '' : 'secundario '}pequeno`)}
       ${link('#/notificacoes?filtro=todas', `Todas (${todas.length})`, `botao ${abertas ? 'secundario ' : ''}pequeno`)}
       ${vencidas ? etiqueta(`${vencidas} com prazo vencido`, 'perigo') : ''}</div>
     <div class="cartao"><div class="rolagem"><table><tr><th>Inquilino</th><th>Data</th><th>Assunto</th><th>Prazo até</th><th>Situação</th><th></th></tr>
@@ -113,7 +113,7 @@ export function telaNovaNotificacao(q = {}) {
         ${edicao || ant ? `<div><label>Inquilino</label><p><b>${esc(c ? c.inquilino_nome : '-')}</b></p></div>`
     : `<div><label for="nt_contrato">Inquilino</label><select id="nt_contrato" name="contrato"><option value="">Escolha…</option>${opcoesInquilino}</select></div>`}
         ${ant ? '' : `<div><label for="nt_tema">Assunto (modelo do texto)</label><select id="nt_tema" name="tema">${NT.MODELOS_NOTIFICACAO.map((m) => `<option value="${m.chave}" ${m.chave === tema ? 'selected' : ''}>${esc(m.nome)}</option>`).join('')}</select></div>`}
-        <div><label for="nt_data">Data da notificação</label><input id="nt_data" type="date" name="data" value="${dados.data}"></div>
+        <div><label for="nt_data">Data da notificação</label><input id="nt_data" type="date" name="data" value="${dados.data}" max="${C.hojeIso()}"></div>
         <div><label for="nt_prazo">Prazo (dias úteis)</label><input id="nt_prazo" type="number" name="prazo" min="1" max="90" value="${dados.prazo_dias}" style="width:100px"></div>
       </div>
       <p class="suave">Data limite: <b>${dataBr(limite)}</b> (${dados.prazo_dias} dias úteis contados de ${dataBr(dados.data)}, sem sábado, domingo${feriados.length ? ` e o(s) feriado(s) ${feriados.join(', ')}` : ' e feriado'}).</p>
@@ -145,7 +145,7 @@ function etapasDaNotificacao(n, c, hoje) {
       <select name="meio" aria-label="Por onde" style="width:auto">${R.MEIOS_NOTIFICACAO.map((m) => `<option>${esc(m)}</option>`).join('')}</select>
       <button class="secundario pequeno">Marcar como enviada</button></form>` : '';
   const prazo = n.situacao === 'Rascunho' ? `até ${dataBr(n.data_limite)} (${n.prazo_dias} dias úteis de ${dataBr(n.data)})`
-    : e.vencida ? `<b>venceu em ${dataBr(n.data_limite)}</b>` : e.aberta ? `até <b>${dataBr(n.data_limite)}</b> · ${e.restam === 0 ? 'vence hoje' : `faltam ${e.restam} dia(s) útil(eis)`}` : `até ${dataBr(n.data_limite)}`;
+    : e.vencida ? `<b>venceu em ${dataBr(n.data_limite)}</b>` : e.aberta ? `até <b>${dataBr(n.data_limite)}</b> · ${e.restam === 0 ? 'vence hoje' : `${e.restam === 1 ? 'falta' : 'faltam'} ${C.plural(e.restam, 'dia útil', 'dias úteis')}`}` : `até ${dataBr(n.data_limite)}`;
   const baixa = n.situacao === 'Resolvida' ? `resolvida em <b>${dataBr(n.resolvida_em)}</b>${n.observacao_baixa ? `: ${esc(n.observacao_baixa)}` : ''} ${n.comprovante_baixa ? linkComprovante(c.id, n.comprovante_baixa, { tabela: 'notificacoes', id: n.id, campo: 'comprovante_baixa', tipo: 'baixa-notificacao', data: n.resolvida_em }) : ''}`
     : e.podeBaixa && opera() ? `<form data-form="baixaNotificacao" data-id="${n.id}" class="acoes" style="margin-top:6px;flex-wrap:wrap">
       <input type="date" name="data" value="${hoje}" aria-label="Resolvido em" style="width:auto">${F.atalhosData()}
@@ -156,7 +156,8 @@ function etapasDaNotificacao(n, c, hoje) {
     { feito: true, titulo: 'Notificação montada', detalhe: `${dataBr(n.data)} · ${esc(n.assunto)} ${pdf}` },
     { feito: !!n.arquivo_assinado, titulo: 'Assinada pelo administrador', detalhe: `${n.arquivo_assinado ? '' : '<span class="suave">assine o PDF no gov.br (assinador.iti.br) e anexe aqui: </span>'}${assinada}` },
     { feito: !!n.enviada_em, titulo: 'Enviada ao inquilino', detalhe: `${enviada}${n.situacao === 'Rascunho' ? `${botaoEmail('notificacao_envio', alvo, '✉ Enviar por e-mail')} <span class="suave">ou entregue à mão (baixe o PDF acima) e marque abaixo. O "Enviar agora" já marca sozinho.</span>${marcar}` : ` ${botaoEmail('notificacao_envio', alvo, '✉ E-mail de novo')}`}` },
-    { feito: !e.aberta && n.situacao !== 'Rascunho', titulo: 'Prazo para resolver', detalhe: `${prazo}${e.aberta && !n.multa_valor && n.situacao !== 'Reiterada' ? ` ${botaoEmail('notificacao_lembrete', alvo, '✉ Lembrete do prazo')}` : ''}` },
+    // a etapa só fecha com a notificação enviada e encerrada (cancelada sem envio não conta); o lembrete, só antes de vencer
+    { feito: !e.aberta && !!n.enviada_em && n.situacao !== 'Cancelada', titulo: 'Prazo para resolver', detalhe: `${prazo}${e.aberta && !e.vencida && e.restam >= 0 && !n.multa_valor && n.situacao !== 'Reiterada' ? ` ${botaoEmail('notificacao_lembrete', alvo, '✉ Lembrete do prazo')}` : ''}` },
     { feito: n.situacao === 'Resolvida', titulo: 'Resolvido (baixa)', detalhe: baixa || (n.situacao === 'Cancelada' ? `cancelada em ${dataBr(n.cancelada_em)}${n.motivo_cancelamento ? `: ${esc(n.motivo_cancelamento)}` : ''}` : '<span class="suave">depois de enviada</span>') },
   ];
 }
@@ -205,6 +206,8 @@ export const FORMULARIOS_NOTIFICACOES = {
     if (!f.get('clausula_conferida')) throw new C.ErroUsuario('Marque "Conferi o número da(s) cláusula(s) no contrato assinado deste inquilino" antes de salvar.');
     const dados = { contrato_id: Number(f.get('contrato')), modelo: String(f.get('tema') || ''), data: String(f.get('data') || ''), prazo_dias: Number(f.get('prazo')),
       assunto: f.get('assunto'), clausula: f.get('clausula'), texto: f.get('texto'), anterior_id: Number(f.get('anterior')) || null };
+    // data no futuro: o "Enviar agora" mandaria o e-mail e depois não conseguiria marcar o envio (que não pode ser antes da data)
+    if (C.dataValida(dados.data) && dados.data > C.hojeIso()) throw new C.ErroUsuario(`A notificação não pode ter data no futuro (${dataBr(dados.data)}): use a data de hoje ou de antes.`);
     const id = Number(f.get('id')) || null;
     const n = id ? (await alterarApagandoAnexos((db) => R.editarNotificacao(db, id, dados, login()))) : await alterar((db) => R.criarNotificacao(db, dados, login()));
     aviso(`Notificação salva. Prazo até ${dataBr(R.limiteNotificacao(dados.data, dados.prazo_dias))}. Agora imprima o PDF, assine e envie.`);

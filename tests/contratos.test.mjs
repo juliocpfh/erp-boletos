@@ -86,7 +86,7 @@ test('vistoria: cabeçalho, chaves, roteiro sem preencher fica de fora, assinatu
   assert.match(t, /Água: 123/);
   assert.match(t, /SALA\n• Piso e rodapé: bom estado\nMobília em bom estado:\n• Sofá 2 lugares/);
   assert.doesNotMatch(t, /Paredes e teto/);
-  assert.match(t, /3 \(três\) dias/);
+  assert.match(t, /5 \(cinco\) dias úteis, contados da entrega das chaves/);
   assert.match(t, /\[LOCADORA, LOCATÁRIO, FIADOR\]/);
 });
 
@@ -220,11 +220,11 @@ test('vistoria: textos de abertura e final podem ser trocados; em branco, vale o
   const v = { tipo: 'Entrada', data: '2026-09-04', condicoes: '', itens: [] };
   let t = texto(K.vistoriaBlocos(d, c, v).blocos);
   assert.match(t, /verifique as fotos em anexo\./, 'sem link: o padrão sem link');
-  assert.match(t, /O LOCATÁRIO tem 3 \(três\) dias[^\n]*\nO imóvel deve ser devolvido/);
+  assert.match(t, /O LOCATÁRIO tem 5 \(cinco\) dias úteis, contados da entrega das chaves[^\n]*\nO imóvel deve ser devolvido/);
   t = texto(K.vistoriaBlocos(d, c, { ...v, texto_abertura: 'Relatório do imóvel.', texto_final: 'Prazo de 5 dias para contestar.\nDevolver igual.' }).blocos);
   assert.match(t, /Relatório do imóvel\./);
   assert.match(t, /Prazo de 5 dias para contestar\.\nDevolver igual\./);
-  assert.doesNotMatch(t, /3 \(três\) dias|presente relatório/);
+  assert.doesNotMatch(t, /5 \(cinco\) dias úteis|presente relatório/);
 });
 
 test('termo aditivo de troca de inquilino: quem sai e quem entra, débitos até a véspera, caução passa a quem entra e assinaturas', () => {

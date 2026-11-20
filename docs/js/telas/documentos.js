@@ -23,10 +23,11 @@ export async function telaImprimir(rota) {
   if (tipo === 'carta') {
     const c = buscar('contratos', rota.q.contrato);
     if (!c) return naoEncontrado('Inquilino não encontrado', '#/inquilinos', 'Ver os inquilinos');
+    if (!C.competenciaValida(rota.q.comp)) return naoEncontrado('Carta não encontrada: falta o mês do reajuste', '#/reajustes', 'Ver os reajustes');
     const r = R.reajusteNaCompetencia(d(), c, rota.q.comp);
     const carta = cartaReajuste(c, rota.q.comp);
     // sem o índice, não há carta (só o aviso): sem botão de PDF
-    return `<div class="impressao">${voltar(carta.includes('class="carta"') ? { seletor: '.impressao .carta', nome: nomeArquivoDoc('Carta reajuste', c, rota.q.comp || '') } : null)}
+    return `<div class="impressao">${voltar(carta.includes('class="carta"') ? { seletor: '.impressao .carta', nome: nomeArquivoDoc('Carta reajuste', c, comp || '') } : null)}
       ${r && opera() ? `<div class="acoes nao-imprimir" style="margin-bottom:12px">${botoesReajuste(c, r, true)}</div>` : ''}
       ${carta}</div>`;
   }
@@ -68,7 +69,8 @@ export async function telaImprimir(rota) {
   if (tipo === 'demonstrativos') {
     const ids = rota.q.ids ? new Set(rota.q.ids.split(',').map(Number)) : null;
     const nomeImovel = (cb) => ((buscar('imoveis', (buscar('contratos', cb.contrato_id) || {}).imovel_id) || {}).nome || '');
-    const lista = d().cobrancas.filter((x) => x.competencia === rota.q.comp && (!ids || ids.has(x.id)))
+    // boletos marcados (ids): todos, de qualquer mês; o mês inteiro: sem os boletos em acordo (viraram as parcelas, não se cobram)
+    const lista = d().cobrancas.filter((x) => (ids ? ids.has(x.id) : x.competencia === rota.q.comp && !R.emAcordo(x)))
       .sort((a, b) => nomeImovel(a).localeCompare(nomeImovel(b), 'pt-BR'));
     const um = lista.length === 1 && buscar('contratos', lista[0].contrato_id);
     const nome = um ? nomeArquivoDoc('Demonstrativo boleto', um, lista[0].competencia) : S.limparNome(`Demonstrativos boletos ${rota.q.comp || ''}`);
@@ -82,7 +84,7 @@ export async function telaImprimir(rota) {
   const cortes = avisosDeCorte(fs);
   const avisoCortes = cortes.length ? `<div class="alerta aviso nao-imprimir aviso-corte-nf"><b>Texto cortado na NF</b> (a NF tem tamanho fixo; sai assim na impressão, no PDF e no Excel):<ul>${cortes.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></div>` : '';
   return `<div class="impressao">${voltar()}${avisoCortes}${rota.q.numero && fs.length ? `<p class="nao-imprimir acoes">${fs.map((f) => botao('pdf', `Baixar PDF${fs.length > 1 ? ` (${esc(buscar('emitentes', f.emitente_id).nome)})` : ''}`, { id: f.id }, 'secundario pequeno')).join('')}${botao('excel', 'Baixar este número em Excel', { numero: rota.q.numero })}</p>` : ''}
-    ${fs.map((f) => faturaHtml(f, buscar('emitentes', f.emitente_id))).join('') || '<p>Nenhuma NF.</p>'}</div>`;
+    ${fs.length ? `<div class="rolagem-nf">${fs.map((f) => faturaHtml(f, buscar('emitentes', f.emitente_id))).join('')}</div>` : '<p>Nenhuma NF.</p>'}</div>`;
 }
 
 // --------------------------------------------------------------------------
@@ -423,7 +425,7 @@ export function telaVistoria(rota) {
   if (id !== 'novo' && !v) return naoEncontrado('Vistoria não encontrada', '#/inquilinos', 'Ver os inquilinos');
   const c = buscar('contratos', v ? v.contrato_id : rota.q.contrato);
   if (!c) return naoEncontrado('Inquilino não encontrado', '#/inquilinos', 'Ver os inquilinos');
-  const tipo = v ? v.tipo : (rota.q.tipo === 'Saída' ? 'Saída' : 'Entrada');
+  const tipo = v ? v.tipo : (['Saída', 'Saida', 'saida'].includes(rota.q.tipo) ? 'Saída' : 'Entrada');
   const i = buscar('imoveis', c.imovel_id) || {};
   // vistoria de entrada do contrato: a deste inquilino ou, se ele continua o contrato de outro, a do titular anterior
   const entrada = K.vistoriaDeEntrada(d(), c);
@@ -433,12 +435,12 @@ export function telaVistoria(rota) {
   const valor = (k, padrao = '') => esc(v ? (v[k] ?? '') : (base[k] ?? padrao));
   const data = v ? v.data : (tipo === 'Saída' ? c.data_saida : c.data_entrada) || C.hojeIso();
   // editar o modelo do imóvel no meio da vistoria: ao salvar, volta para cá (o que já foi marcado fica no rascunho)
-  const aqui = v ? `#/vistoria/${v.id}` : `#/vistoria/novo?contrato=${c.id}&tipo=${tipo === 'Saída' ? 'Sa%C3%ADda' : 'Entrada'}`;
+  const aqui = v ? `#/vistoria/${v.id}` : `#/vistoria/novo?contrato=${c.id}&tipo=${tipo === 'Saída' ? 'Saida' : 'Entrada'}`;
   const linkModelo = (texto) => (opera() && i.id ? link(`#/modelo-vistoria/${i.id}?voltar=${encodeURIComponent(aqui)}`, texto) : '');
   const grade = gradeVistoria(i, v, base, tipo === 'Saída' ? entrada : null, linkModelo);
   // textos padrão que podem ser trocados: vêm desta vistoria, da anterior do imóvel ou do padrão
   const abertura = (v ? v.texto_abertura : base.texto_abertura) || (v && !v.link_fotos ? K.VISTORIA_ABERTURA_SEM_LINK : K.VISTORIA_ABERTURA);
-  const textoFinal = (v ? v.texto_final : base.texto_final) || K.vistoriaFinal((v && v.prazo_dias) || 3);
+  const textoFinal = K.textoFinalVistoria(v || base);
   return `<p class="suave"><a href="#/contrato/${c.id}?ir=documentos">← ${esc(c.inquilino_nome)}</a></p>
     <h1>Vistoria de ${tipo.toLocaleLowerCase('pt-BR')} · ${esc(i.nome || '')}</h1>
     ${!v && base.id ? `<div class="alerta info">Texto inicial copiado da ${tipo === 'Saída' ? (deQuem ? `vistoria de entrada do contrato, feita com ${esc(deQuem.inquilino_nome)} em ${dataBr(entrada.data)} (troca de titular)` : 'vistoria de entrada deste inquilino') : `última vistoria do imóvel (${esc(base.tipo.toLocaleLowerCase('pt-BR'))} de ${dataBr(base.data)})`}. Confira cômodo por cômodo e ajuste o que mudou.</div>` : ''}
@@ -459,7 +461,7 @@ export function telaVistoria(rota) {
       <h2>Leitura dos relógios ${tipo === 'Saída' ? 'na saída' : 'na entrada'}</h2>
       <p class="suave">${R.leituraObrigatoria() ? 'Obrigatória' : 'Não é obrigatória (Regras do sistema), mas guarda a prova do consumo'}: é aqui que se registra a leitura ${tipo === 'Saída' ? 'da saída (o cálculo final usa a mesma)' : 'da entrada'}. ${R.leituraObrigatoria() ? 'Relógio que o contrato diz "Não tem" fica opcional.' : ''}</p>
       <div class="formulario">${(() => { const lt = R.leituraDo(d(), c.id, tipo === 'Saída' ? 'Saída do inquilino' : 'Entrada do inquilino') || {}; const obrig = R.relogiosObrigatorios(c);
-    return F.LEITURAS.map(([k, t]) => `<div><label>${esc(t)}${obrig.includes(k) ? ' *' : ''}</label><input name="leitura_${k}" value="${esc(lt[k] || '')}" ${obrig.includes(k) ? 'required' : ''} placeholder="número do relógio"></div>`).join(''); })()}</div>
+    return F.LEITURAS.map(([k, t]) => `<div><label>${esc(t)}${obrig.includes(k) ? ' *' : ''}</label><input name="leitura_${k}" inputmode="decimal" value="${esc(lt[k] || '')}" ${obrig.includes(k) ? 'required' : ''} placeholder="número do relógio"></div>`).join(''); })()}</div>
       <h2>Fotos que vão no documento</h2>
       <p class="suave">A fachada vai na capa; os relógios e o quadro de disjuntores, na página de registros. As fotos gerais e de detalhe continuam no link da nuvem. Enviar outra foto substitui a anterior.</p>
       <div class="formulario">${K.FOTOS_VISTORIA.map(([k, t]) => `<div><label>${esc(t)}</label><input type="file" name="foto_${k}" accept="image/*">${v && v.fotos && v.fotos[k] && opera() ? F.arquivoGuardado(k, v.fotos[k], 'excluirFotoVistoria', { vistoria: v.id }, { escopo: 'contrato', id: v.contrato_id }) : ''}</div>`).join('')}</div>
@@ -604,13 +606,13 @@ export function telaGerarContrato(rota) {
       <input type="hidden" name="contrato" value="${c.id}">
       <div><label>Modelo</label><select name="modelo">${modelos.map((m) => `<option value="${m.id}" ${m.id === sugerido ? 'selected' : ''}>${esc(m.nome)}</option>`).join('')}</select></div>
       <div><label>Data do contrato</label><input type="date" name="data" value="${esc(rota.q.data || c.vigencia_inicio || C.hojeIso())}"></div>
-      <div><label>Testemunha 1 (opcional)</label><input name="t1" value="${esc(t.t1 || '')}"></div><div><label>CPF da testemunha 1</label><input name="c1" value="${esc(t.c1 || '')}"></div>
-      <div><label>Testemunha 2 (opcional)</label><input name="t2" value="${esc(t.t2 || '')}"></div><div><label>CPF da testemunha 2</label><input name="c2" value="${esc(t.c2 || '')}"></div>
+      <div><label>Testemunha 1 (opcional)</label><input name="t1" value="${esc(t.t1 || '')}"></div><div><label>CPF da testemunha 1</label><input name="c1" inputmode="numeric" value="${esc(t.c1 || '')}"></div>
+      <div><label>Testemunha 2 (opcional)</label><input name="t2" value="${esc(t.t2 || '')}"></div><div><label>CPF da testemunha 2</label><input name="c2" inputmode="numeric" value="${esc(t.c2 || '')}"></div>
       <div class="check"><button>Ver contrato</button></div></form>
     <div class="cartao"><h2>O que entra automaticamente</h2>
       <p>Finalidade: <b>${esc(c.finalidade || 'Residencial')}</b> · Garantia: <b>${esc(garantia)}</b>${c.solidario_nome ? ' · com locatário solidário' : ''} ·
         Locadoras: <b>${esc(K.dadosDoContrato(d(), c).locadoras.map((e) => e.nome).join(' e '))}</b></p>
-      <p class="suave">As partes, valores por extenso, prazo, índice, encargos, garantia e assinaturas vêm do cadastro. Na tela do contrato, use <b>Imprimir / salvar em PDF</b> ou <b>Baixar Word</b> para ajustar algum detalhe antes de assinar.
+      <p class="suave">As partes, valores por extenso, prazo, índice, encargos, garantia e assinaturas vêm do cadastro. Na tela do contrato, use <b>Imprimir</b>, <b>Baixar PDF</b> ou <b>Baixar Word</b> (este para ajustar algum detalhe antes de assinar).
         Os textos ficam em ${link('#/modelos-contrato', 'Modelos de contrato', '')}.</p></div>`;
 }
 
@@ -646,8 +648,8 @@ export function telaAditivo(rota) {
         <div><label>Novo dia do vencimento</label><input type="number" name="dia_novo" min="1" max="31" value="${esc(a ? a.dia_novo : '')}" required></div>
         <div><label>Mês do 1º vencimento no novo dia</label><input type="month" name="mes" value="${esc(a ? a.primeiro_vencimento.slice(0, 7) : C.somarMeses(C.competenciaDe(hoje), 1))}" required></div>
         ${a ? '' : `<div><label>Modelo</label><select name="modelo">${modelos.map((m) => `<option value="${m.id}">${esc(m.nome)}</option>`).join('')}</select></div>`}
-        <div><label>Testemunha 1 (opcional)</label><input name="t1" value="${esc(t.t1 || '')}"></div><div><label>CPF da testemunha 1</label><input name="c1" value="${esc(t.c1 || '')}"></div>
-        <div><label>Testemunha 2 (opcional)</label><input name="t2" value="${esc(t.t2 || '')}"></div><div><label>CPF da testemunha 2</label><input name="c2" value="${esc(t.c2 || '')}"></div>
+        <div><label>Testemunha 1 (opcional)</label><input name="t1" value="${esc(t.t1 || '')}"></div><div><label>CPF da testemunha 1</label><input name="c1" inputmode="numeric" value="${esc(t.c1 || '')}"></div>
+        <div><label>Testemunha 2 (opcional)</label><input name="t2" value="${esc(t.t2 || '')}"></div><div><label>CPF da testemunha 2</label><input name="c2" inputmode="numeric" value="${esc(t.c2 || '')}"></div>
       </div>
       <p class="suave">Ex.: do dia 10 para o dia 20 a partir de novembro/2026: o aluguel de outubro vence em 20/11/2026, com o valor normal.
         Testemunhas: necessárias na assinatura em papel; na assinatura eletrônica, podem ficar em branco.</p>
@@ -667,9 +669,9 @@ function escolherAditivo(c) {
       <p>O inquilino pede para pagar em outro dia do mês. Ex.: do dia 10 para o dia 20 a partir de novembro/2026, sem cobrança proporcional.</p>
       ${link(ir('vencimento'), 'Gerar aditivo de vencimento', 'botao')}</div>
     <div class="cartao"><h2>Troca de inquilino (herança do contrato)</h2>
-      <p>Sai o titular e entra outro, no mesmo contrato: mesmo aluguel, vencimento, reajuste e garantia.</p>
+      <p>Sai o titular e entra outro, no mesmo contrato: mesmo aluguel, vencimento e reajuste. A caução ou o depósito de quem sai é devolvido (com a poupança) e quem entra faz o depósito dele.</p>
       ${ant ? `<p>Sai <b>${esc(ant.inquilino_nome)}</b>, entra <b>${esc(c.inquilino_nome)}</b>, a partir de <b>${dataBr(c.data_entrada || c.vigencia_inicio)}</b>.</p>${link(ir('troca'), 'Gerar aditivo de troca de inquilino', 'botao')}`
-    : `<p class="suave">Este inquilino não continua o contrato de outro. O termo de troca é gerado no inquilino <b>novo</b>: cadastre-o em "Novo inquilino" escolhendo
+    : `<p class="suave">Este inquilino não continua o contrato de outro. O termo de troca é gerado no inquilino <b>novo</b>: cadastre-o em "Novo contrato" escolhendo
       o contrato que ele continua (o do titular que sai) e gere o termo na página dele.</p>`}</div>`;
 }
 
@@ -698,8 +700,8 @@ function telaAditivoTroca(c, a) {
       <div class="formulario">
         <div><label>Data do termo aditivo</label><input type="date" name="data" value="${esc(a ? a.data : (troca || C.hojeIso()))}" required></div>
         ${a ? '' : `<div><label>Modelo</label><select name="modelo">${modelos.map((m) => `<option value="${m.id}">${esc(m.nome)}</option>`).join('')}</select></div>`}
-        <div><label>Testemunha 1 (opcional)</label><input name="t1" value="${esc(t.t1 || '')}"></div><div><label>CPF da testemunha 1</label><input name="c1" value="${esc(t.c1 || '')}"></div>
-        <div><label>Testemunha 2 (opcional)</label><input name="t2" value="${esc(t.t2 || '')}"></div><div><label>CPF da testemunha 2</label><input name="c2" value="${esc(t.c2 || '')}"></div>
+        <div><label>Testemunha 1 (opcional)</label><input name="t1" value="${esc(t.t1 || '')}"></div><div><label>CPF da testemunha 1</label><input name="c1" inputmode="numeric" value="${esc(t.c1 || '')}"></div>
+        <div><label>Testemunha 2 (opcional)</label><input name="t2" value="${esc(t.t2 || '')}"></div><div><label>CPF da testemunha 2</label><input name="c2" inputmode="numeric" value="${esc(t.c2 || '')}"></div>
         ${emDinheiro ? `<div><label>Garantia de quem sai com a poupança até a troca (R$)</label><input name="garantia_corrigida" inputmode="decimal" data-dinheiro value="${a && a.garantia_corrigida ? C.reais(a.garantia_corrigida, false) : ''}">
           <div class="ajuda">${R.garantiaNova(c) ? `Valor devolvido a ${esc(ant.inquilino_nome)}, antes dos débitos` : `Valor que ${esc(c.inquilino_nome)} paga a ${esc(ant.inquilino_nome)}; a caução depositada não muda e o rendimento passa a ser de quem entra`}. Entra no termo. Em branco: o termo sai sem o valor.</div>
           <div class="ajuda-auto" data-auto-msg></div></div>` : ''}
@@ -716,10 +718,12 @@ const AJUDA_MODELO = `<details class="cartao"><summary><b>Como escrever um model
   <ul>
     <li><code>{campo}</code> coloca um dado do cadastro. Campos: <code>{locadoras} {locatarios} {solidario} {fiadores} {fiadores_imoveis} {inquilino_nome} {objeto} {imovel_nome} {endereco_imovel}
       {finalidade} {atividade} {prazo_meses} {data_inicio} {data_fim} {aluguel_cheio} {aluguel_bonificado} {bonificacao_percentual} {dia_vencimento} {indice}
-      {multa} {juros} {tarifa_boleto} {fci_percentual} {fci_indice} {encargos_inquilino} {encargos_inclusos} {caucao_valor} {caucao_meses} {deposito_valor} {deposito_uso} {cidade} {data_assinatura}</code>.</li>
+      {multa} {juros} {tarifa_boleto} {fci_percentual} {fci_indice} {encargos_inquilino} {encargos_inclusos} {representacao} {caucao_valor} {caucao_meses} {caucao_meses_aluguel} {deposito_valor} {deposito_uso} {cidade} {data_assinatura}</code>
+      ({caucao_meses_aluguel}: "1 (um) mês" ou "3 (três) meses"). <code>{Campo}</code> sai com a 1ª letra maiúscula e <code>{CAMPO}</code> todo em maiúsculas.
+      Campo com nome errado sai como "[campo?]": ao salvar, o sistema avisa.</li>
     <li><code>[se condição] texto [senão] outro texto [fim]</code>: o trecho só entra quando a condição vale (o [senão] é opcional; "[se não fiador]" também funciona). Condições:
       <code>fiador caucao deposito seguro_fianca sem_garantia solidario pj residencial nao_residencial bonificacao iptu_inquilino seguro_inquilino tem_incluso tarifa_boleto fci
-      area_comum imovel_fiador varios_fiadores varias_locadoras indeterminado testemunhas</code>.</li>
+      seguro_incluso area_comum imovel_fiador varios_fiadores varias_locadoras indeterminado retomada_livre condominio representacao testemunhas</code>.</li>
     <li>Só nos termos aditivos de vencimento: <code>{numero_aditivo} {data_contrato} {dia_vencimento_anterior} {dia_vencimento_novo} {primeiro_vencimento} {mes_referencia}</code>
       e a condição <code>mes_seguinte</code> (o boleto se refere ao mês anterior ao do vencimento).</li>
     <li>Só nos termos aditivos de troca de inquilino: <code>{numero_aditivo} {data_contrato} {data_troca} {data_vespera} {saintes} {entrantes} {aluguel_atual}</code>,
@@ -730,7 +734,8 @@ const AJUDA_MODELO = `<details class="cartao"><summary><b>Como escrever um model
       e os campos <code>{garantia_depositada}</code> e <code>{garantia_corrigida}</code> (o depositado e o depositado com os rendimentos da poupança até a troca). Nas outras condições de garantia (caucao, fiador...), vale a de quem entra.</li>
     <li>Singular ou plural: <code>{l:a LOCADORA|as LOCADORAS}</code> (locadoras), <code>{f:o FIADOR|os FIADORES}</code> (fiadores), <code>{s:...|...}</code> (locatários).</li>
     <li><code>CLÁUSULA #</code> numera sozinha. <code>CLÁUSULA #multa</code> dá um nome à cláusula, e <code>{cl:multa}</code> escreve o número dela ("18ª (décima oitava)").
-      <code>#i.</code> numera os itens do início.</li>
+      <code>#i.</code> numera os itens do início. <code>**Parágrafo** –</code> (sem número) numera sozinho dentro da cláusula: "Parágrafo único" quando é um só; senão primeiro, segundo...</li>
+    <li>Só nos termos aditivos de novo valor: <code>{numero_aditivo} {data_contrato} {data_novo_valor} {mes_novo_valor} {aluguel_anterior} {aluguel_novo} {bonificacao_novo} {aluguel_bonificado_novo}</code>.</li>
     <li>Linha começando com <code># </code>: título; <code>## </code>: seção; <code>&gt; </code>: alinhado à direita. <code>**texto**</code>: negrito.
       Uma linha em branco separa os parágrafos. A linha <code>[assinaturas]</code> põe o quadro de assinaturas.</li>
   </ul></details>`;

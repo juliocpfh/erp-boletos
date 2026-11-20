@@ -8,7 +8,7 @@ import { regra } from './config-regras.js';
 import {
   buscar, inserir, atualizar, excluir, registrar, registrarPagamento, previstoNoPagamento, totais, marcarIptuPago, parcelasIptu,
   lancarDespesas, lancarGanhoAirbnb, contasPermitidas, participacoesDo, TIPOS_DESPESA, contaBancaria, apelidoDaConta, pastaDoComprovante, pastaContador,
-  CONFIG_BANCO_FASE2, mesDoDinheiro, contaDeOrigem, extratoImportadoAte, proximoBoletoAberto, registrarComDiferencaNoProximo, devidoDoPago, pagoAMaisDo, devolucaoPendente,
+  CONFIG_BANCO_FASE2, mesDoDinheiro, contaDeOrigem, extratoImportadoAte, contasDoExtrato, contaSoArquivo, proximoBoletoAberto, registrarComDiferencaNoProximo, devidoDoPago, pagoAMaisDo, devolucaoPendente,
 } from './regras.js';
 
 export { pastaDoComprovante as escopoDoComprovante, pastaContador as escopoContador, apelidoDaConta, mesDoDinheiro, contaDeOrigem };
@@ -28,6 +28,12 @@ export const CLASSIFICACOES = {
   ignorar: 'Não é nosso / ignorar',
 };
 
+/** Destinos que só servem para saída (dinheiro que saiu) ou só para entrada; os outros servem para as duas (mesmas recusas de vincularMovimentacao). */
+const SO_SAIDA = ['conta_imovel', 'reforma', 'iptu', 'imposto', 'devolucao_inquilino'];
+const SO_ENTRADA = ['airbnb'];
+/** O destino pode ser dado a uma movimentação deste tipo? Ex.: ('iptu', 'entrada') → false; ('airbnb', 'saida') → false. */
+export const destinoServe = (classificacao, tipo) => (tipo === 'entrada' ? !SO_SAIDA.includes(classificacao) : !SO_ENTRADA.includes(classificacao));
+
 export const SITUACOES_PAGAMENTO = {
   rascunho: 'Rascunho',
   aguardando_aprovacao: 'Aprovado no sistema, envio ao banco pendente',
@@ -42,6 +48,17 @@ export const SITUACAO_C6 = {
   READ_DATA: 'agendado', SCHEDULED: 'agendado', PROCESSING: 'agendado', PROCESSED: 'pago',
   DECODE_ERROR: 'erro', ERROR: 'erro', SCHEDULING_CANCELLED: 'cancelado',
 };
+
+/**
+ * Motivo do erro de um item do C6, em português: o banco responde em inglês (ex.: "It was not possible to decode: 1234…"), então
+ * o DECODE_ERROR vira "O banco não conseguiu ler este código ou esta chave" com o texto do banco entre parênteses. Sem erro → null.
+ */
+export function erroDoItemC6(it) {
+  if (!it) return null;
+  const msg = it.error_message ? String(it.error_message) : '';
+  if (it.status === 'DECODE_ERROR') return `O banco não conseguiu ler este código ou esta chave${msg ? ` (${msg})` : ''}`;
+  return msg || null;
+}
 
 /** O que cada situação pode virar (nada sai de pago nem de cancelado). */
 const TRANSICOES = {
@@ -86,7 +103,7 @@ export function contaSugeridaDoImovel(d, imovelId) {
 
 function exigirConta(d, contaId) {
   const c = contaBancaria(d, contaId);
-  if (!c) throw new Error(`Conta bancária "${contaId}" não está configurada em Dados e backup → Banco.`);
+  if (!c) throw new Error(`Conta bancária "${contaId}" não está configurada em Dados e backup → Banco (C6).`);
   return c;
 }
 
@@ -565,10 +582,15 @@ export const DIAS_AGUARDANDO_CREDITO = 2;
  * conferência do saldo. Ex.: pago em 10/11 (terça), aguardando crédito em 13/11 (sexta) → alerta.
  */
 export function saudeDoBanco(d, dia = hoje()) {
-  const contas = contasConfiguradas(d).map((c) => {
+  // as do C6 e as de outros bancos (extrato por arquivo, sem certificado nem entrada no banco); "extrato parado" pela mesma regra
+  // do Fechamento (dias_extrato_recente; ex.: 7 dias, em 20/11 o extrato importado até 12/11 está parado, até 13/11 não)
+  const diasExtrato = regra('dias_extrato_recente');
+  const limite = C.somarDias(dia, -diasExtrato);
+  const contas = contasDoExtrato(d).map((c) => {
     const movs = (d.movimentacoes_banco || []).filter((m) => m.conta_id === c.id && m.importada_em);
     const ultima = movs.reduce((x, m) => (!x || m.importada_em > x ? m.importada_em : x), null);
-    return { id: c.id, apelido: c.apelido || String(c.id).toUpperCase(), importado_ate: extratoImportadoAte(d, c.id), ultima_importacao: ultima, saldo: ((d.saldos_banco || {})[c.id] || {}).ultima || null };
+    const importadoAte = extratoImportadoAte(d, c.id);
+    return { id: c.id, apelido: c.apelido || String(c.id).toUpperCase(), arquivo: !!contaSoArquivo(d, c.id), importado_ate: importadoAte, atrasado: !!importadoAte && importadoAte < limite, ultima_importacao: ultima, saldo: ((d.saldos_banco || {})[c.id] || {}).ultima || null };
   });
   const aguardando = d.cobrancas.filter((cb) => {
     if (!cb.banco || cb.data_pagamento || !/WAIT|PEND/.test(String(cb.banco.situacao_banco || '').toUpperCase())) return false;
@@ -576,7 +598,7 @@ export function saudeDoBanco(d, dia = hoje()) {
     return !!desde && C.somarDiasUteis(desde, DIAS_AGUARDANDO_CREDITO) < dia;
   });
   const comErro = d.cobrancas.filter((cb) => !cb.data_pagamento && ((cb.banco && cb.banco.situacao === 'erro') || (cb.emissao_pendente && cb.emissao_pendente.incerto)));
-  return { contas, aguardando, comErro, pagosSemRegistro: pagosNoBancoSemRegistro(d).filter((cb) => cb.banco.situacao === 'pago') };
+  return { contas, diasExtrato, aguardando, comErro, pagosSemRegistro: pagosNoBancoSemRegistro(d).filter((cb) => cb.banco.situacao === 'pago') };
 }
 
 // --------------------------------------------------------------------------
@@ -1341,7 +1363,7 @@ export function vincularMovimentacao(d, movId, destino, usuario) {
   const obs = String(destino.observacoes || '').trim();
   const base = { observacoes: obs, nome_arquivo: destino.nome_arquivo || null, ...carimbo(usuario) };
   if (cl === 'boleto') {
-    if (!destino.cobranca_id) throw new Error('Escolha o boleto que esta entrada pagou.');
+    if (!destino.cobranca_id) throw new C.ErroUsuario('Escolha o boleto que esta entrada pagou.');
     const cb = buscar(d, 'cobrancas', destino.cobranca_id);
     if (cb && cb.data_pagamento) {
       // o inquilino pagou de novo: a entrada soma no recebido do boleto (a NF não muda) e a diferença é devolvida depois
@@ -1357,14 +1379,14 @@ export function vincularMovimentacao(d, movId, destino, usuario) {
     return r;
   }
   if (cl === 'conta_imovel') {
-    if (mov.tipo !== 'saida') throw new Error('Uma entrada no extrato não pode ser conta do imóvel.');
+    if (mov.tipo !== 'saida') throw new C.ErroUsuario('Uma entrada no extrato não pode ser conta do imóvel.');
     let de = destino.despesa_id ? buscar(d, 'despesas', destino.despesa_id) : null;
     let criada = false;
     if (destino.despesa_id && !de) throw new Error('Conta do imóvel não encontrada.');
     if (de && de.movimentacao_id && de.movimentacao_id !== mov.id) throw new Error('Esta conta já está ligada a outra movimentação do extrato.');
     if (de && de.valor !== mov.valor) throw new C.ErroUsuario(`A conta escolhida (${de.tipo} de ${C.compBr(de.competencia)}) é de ${C.reais(de.valor)} e esta saída é de ${C.reais(mov.valor)}. Escolha a conta do mesmo valor, ou corrija o valor da conta em Contas pagas por nós antes de ligar.`);
     if (!de) {
-      if (!destino.imovel_id) throw new Error('Escolha o imóvel.');
+      if (!destino.imovel_id) throw new C.ErroUsuario('Escolha o imóvel.');
       if (!TIPOS_DESPESA.includes(destino.tipo_despesa)) throw new Error('Escolha a conta (água, luz, gás, condomínio, internet ou outra).');
       const comp = destino.competencia || String(mov.data).slice(0, 7);
       [de] = lancarDespesas(d, Number(destino.imovel_id), comp, [{ tipo: destino.tipo_despesa, valor: mov.valor, data_pagamento: mov.data, observacoes: obs }], usuario);
@@ -1405,7 +1427,7 @@ export function vincularMovimentacao(d, movId, destino, usuario) {
     if (!p) throw new Error('Escolha o IPTU (imóvel e ano).');
     const n = Number(destino.iptu_parcela ?? -1);
     const pc = parcelasIptu(d, p).find((x) => x.n === n);
-    if (!pc) throw new Error('Escolha a parcela do IPTU.');
+    if (!pc) throw new C.ErroUsuario('Escolha a parcela do IPTU.');
     if (!pc.proprietario) throw new Error(`A ${pc.rotulo} parcela do IPTU ${p.ano} é toda do inquilino (vai no boleto).`);
     if (pc.paga) throw new Error(`A ${pc.rotulo} parcela do IPTU ${p.ano} já está marcada como paga em ${C.dataBr(pc.paga)}.`);
     marcarIptuPago(d, p.id, n, mov.data, usuario);
@@ -1618,11 +1640,11 @@ export function itemC6(d, p) {
 
 function validarPagamento(d, dados) {
   const conf = cfg(d);
-  if (!conf.permitir_pagamentos) throw new Error('Os pagamentos pelo banco estão desligados em Dados e backup → Banco.');
+  if (!conf.permitir_pagamentos) throw new Error('Os pagamentos pelo banco estão desligados em Dados e backup → Banco: conciliação e pagamentos.');
   exigirConta(d, dados.conta_id);
   if (!contasConfiguradas(d).some((c) => c.id === dados.conta_id)) throw new C.ErroUsuario('Esta conta é de outro banco (só extrato por arquivo): o pagamento pelo banco sai só por uma conta do C6.');
   if (!(Number(dados.valor) > 0)) throw new Error('Informe o valor a pagar.');
-  if (conf.limite_pagamento > 0 && dados.valor > conf.limite_pagamento) throw new C.ErroUsuario(`O valor (${C.reais(dados.valor)}) passa do limite por pagamento (${C.reais(conf.limite_pagamento)}) definido em Dados e backup → Banco.`);
+  if (conf.limite_pagamento > 0 && dados.valor > conf.limite_pagamento) throw new C.ErroUsuario(`O valor (${C.reais(dados.valor)}) passa do limite por pagamento (${C.reais(conf.limite_pagamento)}) definido em Dados e backup → Banco: conciliação e pagamentos.`);
   if (dados.imovel_id && !buscar(d, 'imoveis', dados.imovel_id)) throw new Error('Imóvel não encontrado.');
   if (!['boleto', 'pix'].includes(dados.forma)) throw new Error('Escolha a forma: boleto (código de barras) ou Pix.');
   const content = conteudoDoPagamento(dados);
@@ -1736,7 +1758,7 @@ function efeitosDoPagamento(d, p, pagoEm, usuario) {
  */
 export function aprovarPagamento(d, pagId, aprovador) {
   const p = exigirPagamento(d, pagId);
-  if (!cfg(d).permitir_pagamentos) throw new Error('Os pagamentos pelo banco estão desligados em Dados e backup → Banco.');
+  if (!cfg(d).permitir_pagamentos) throw new Error('Os pagamentos pelo banco estão desligados em Dados e backup → Banco: conciliação e pagamentos.');
   if (p.situacao !== 'rascunho') throw new Error(`Este pagamento está "${SITUACOES_PAGAMENTO[p.situacao]}" e não pode ser aprovado de novo.`);
   atualizar(d, 'pagamentos_banco', p.id, { situacao: 'aguardando_aprovacao', aprovado_por: aprovador, aprovado_em: new Date().toISOString() }, aprovador,
     `Pagamento de ${C.reais(p.valor)} a ${(p.beneficiario && p.beneficiario.nome) || p.tipo_conta} aprovado por ${aprovador}`);
@@ -1776,7 +1798,7 @@ export function registrarGrupoEnviado(d, ids, grupoId, itensC6, usuario) {
   pags.forEach((p, k) => {
     const item = casados[k];
     const situacao = item ? SITUACAO_C6[item.status] || 'agendado' : 'agendado';
-    atualizarPagamento(d, p.id, { situacao, erro: item && item.error_message ? item.error_message : null, id_externo: item ? item.id : p.id_externo, grupo_id: grupoId,
+    atualizarPagamento(d, p.id, { situacao, erro: erroDoItemC6(item), id_externo: item ? item.id : p.id_externo, grupo_id: grupoId,
       beneficiario: item && item.beneficiary_name ? { nome: item.beneficiary_name } : undefined, vencimento: item ? item.due_date : undefined, pago_em: situacao === 'pago' ? (item.transaction_date || hoje()) : null }, usuario);
     out.push(p);
   });
@@ -1811,7 +1833,7 @@ export function atualizarSituacaoPagamentos(d, itensC6, usuario) {
     if (!p || it.status === 'READ_DATA') continue;
     const situacao = SITUACAO_C6[it.status];
     if (!situacao || situacao === p.situacao || !TRANSICOES[p.situacao].includes(situacao)) continue;
-    atualizarPagamento(d, p.id, { situacao, erro: it.error_message || null, pago_em: situacao === 'pago' ? (it.transaction_date || hoje()) : null, beneficiario: it.beneficiary_name ? { nome: it.beneficiary_name } : undefined }, usuario);
+    atualizarPagamento(d, p.id, { situacao, erro: erroDoItemC6(it), pago_em: situacao === 'pago' ? (it.transaction_date || hoje()) : null, beneficiario: it.beneficiary_name ? { nome: it.beneficiary_name } : undefined }, usuario);
     mudados.push(p);
   }
   return mudados;

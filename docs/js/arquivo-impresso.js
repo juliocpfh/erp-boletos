@@ -112,7 +112,8 @@ export function itensDaPasta(d, c, soltos = null) {
   if (!herdado && c.reserva_valor > 0 && c.reserva_data) {
     poe({ vaga: 'recibo:reserva', grupo: 'recibos', rotulo: `Recibo da reserva (${C.reais(c.reserva_valor)})`, data: c.reserva_data, tipo: 'recibo', recibo: 'reserva', nome: 'recibo-reserva' });
   }
-  if ((R.temCaucao(c) || R.temDeposito(c)) && garantiaPaga(d, c)) {
+  // garantia herdada (trocas antigas): o recibo é de quem pagou, na pasta dele
+  if ((R.temCaucao(c) || R.temDeposito(c)) && garantiaPaga(d, c) && R.pagadorDaGarantia(d, c, R.temCaucao(c) ? 'caucao' : 'deposito').id === c.id) {
     const qual = R.temCaucao(c) ? 'caução' : 'depósito de garantia';
     poe({ vaga: 'recibo:garantia', grupo: 'recibos', rotulo: `Recibo da ${qual}`, data: (R.temCaucao(c) ? c.caucao_pago_em || c.caucao_data : c.deposito_pago_em || c.deposito_data) || null, tipo: 'recibo', recibo: 'garantia', nome: 'recibo-garantia' });
   }

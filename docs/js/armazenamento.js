@@ -153,7 +153,10 @@ export async function copiasEmConflito(pasta) {
 // --------------------------------------------------------------------------
 export function limparNome(nome) {
   const t = String(nome || '').replace(/[<>:"/\\|?*\x00-\x1f]/g, '-').trim().replace(/[. ]+$/, '');
-  return t.slice(0, 120) || 'sem nome';
+  if (t.length <= 120) return t || 'sem nome';
+  // nome comprido: corta a base e mantém a extensão (".pdf"), senão o arquivo deixa de abrir como PDF ou foto
+  const ext = (t.match(/\.[a-z0-9]{1,10}$/i) || [''])[0];
+  return `${t.slice(0, 120 - ext.length).replace(/[. ]+$/, '')}${ext}`;
 }
 
 export async function subpasta(pasta, partes, criar = true) {

@@ -3,144 +3,144 @@
 32 itens (0 graves, 9 médios, 23 leves). Arquivos: `comunicados.js`, `nuvem/contatos-publico.mjs`, `nuvem/ficha-publica.mjs`, `telas/comunicacoes.js`, `telas/fichas.js`.
 Como trabalhar: ver `../MUTIRAO_19_11.md`. Marque `[x]` ao corrigir. G = grave, M = médio, L = leve.
 
-- [ ] **comunicacoes-008** [L] Quem aluga dois imóveis recebe dois e-mails e dois links, e a confirmação de um não atualiza o outro contrato
+- [x] **comunicacoes-008** [L] Quem aluga dois imóveis recebe dois e-mails e dois links, e a confirmação de um não atualiza o outro contrato
   - Vê-se: A lista de pessoas é por contrato. Uma pessoa com 2 contratos ativos (mesmo CPF) aparece duas vezes, recebe dois e-mails iguais e precisa confirmar duas vezes. Se confirmar só um link com o celular novo, só aquele contrato é atualizado; o outro contrato conti…
   - Causa: `docs/js/comunicados.js:87-88 e :178-184`
   - Fazer: Ao aplicar a resposta, atualizar também os outros contratos ativos do mesmo CPF (ou juntar por CPF na lista).
-- [ ] **textos-019** [L] Textos que vão a inquilinos: "24 horas úteis" e "ligue (41) 99999-0000" sem o "para"
+- [x] **textos-019** [L] Textos que vão a inquilinos: "24 horas úteis" e "ligue (41) 99999-0000" sem o "para" (feito: "ligue para {telefone_empresa}"; "24 horas úteis" mantido por decisão, é o prazo da revisão jurídica)
   - Vê-se: No modelo "Ficha reprovada": "A reserva de R$ 500,00 será devolvida em até 24 horas úteis" (não existe "hora útil"; o resto do sistema fala em dia útil). No comunicado "Atualização de contatos" (e-mail, WhatsApp e página): "Na dúvida, ligue {telefone_empresa}…
   - Causa: `docs/js/comunicados.js:32,38,47; docs/js/modelos-email.js:81`
   - Fazer: Pôr "ligue para {telefone_empresa}" nos três textos; perguntar ao dono se "24 horas úteis" vira "1 dia útil".
   - Atenção (conferente): Confirmo a falta do "para": os três textos do comunicado dizem "ligue {telefone_empresa}" (sai "ligue (41) 99999-0000"). Já "24 horas úteis" está mesmo no modelo (linha 81, não 85), mas é o prazo que consta na revisão jurídica (REVISAO_JURIDICA_CONTRATO.md:91): trocar por "1 dia útil" muda o prometido, é escolha do do…
-- [ ] **comunicacoes-004** [M] Assinatura com o dedo feita num celular em modo escuro sai quase invisível no comprovante do aceite
+- [x] **comunicacoes-004** [M] Assinatura com o dedo feita num celular em modo escuro sai quase invisível no comprovante do aceite
   - Vê-se: Na página pública, o traço da assinatura usa a cor do texto da página. No celular em modo escuro o texto é quase branco (#e7eaef), e a imagem é guardada com fundo transparente. No "Comprovante de confirmação de contatos e ciência" (Ver aceite → Imprimir / salvar em PDF), a folha é branca: a assinatura aparece branco sobre branco, ou seja, some justamente na prova do aceite.
   - Causa: `nuvem/contatos-publico.mjs:369 (cores do modo escuro), :449 (strokeStyle = cor do texto), :472 (toDataURL PNG); docs/js/telas/comunicacoes.js:215`
   - Fazer: Traço sempre escuro (#111) e fundo branco pintado no canvas antes de gerar a imagem, em qualquer tema.
   - Certo é: Assinatura sempre em tinta escura sobre fundo branco, em qualquer tema do aparelho.
-- [ ] **comunicacoes-005** [L] Botão "Mandar o código" fica travado 1 minuto mesmo quando deu erro (ex.: e-mail digitado errado)
+- [x] **comunicacoes-005** [L] Botão "Mandar o código" fica travado 1 minuto mesmo quando deu erro (ex.: e-mail digitado errado)
   - Vê-se: Ao clicar em "Mandar o código" o botão é desligado e só volta depois de 60 segundos, tenha o código saído ou não. Se a pessoa digitou o e-mail incompleto, aparece "Confira o e-mail: parece incompleto." e, depois de corrigir, o botão continua apagado por 1 min…
   - Causa: `nuvem/contatos-publico.mjs:457-462`
   - Fazer: No erro, religar o botão na hora; a espera de 1 minuto só quando o código saiu.
-- [ ] **comunicacoes-012** [L] No comprovante que o inquilino recebe por e-mail o celular sai só com números
+- [x] **comunicacoes-012** [L] No comprovante que o inquilino recebe por e-mail o celular sai só com números
   - Vê-se: O e-mail de comprovante mostra "Celular: 41999990000" em vez de "(41) 99999-0000" (na página e no sistema sai formatado).
   - Causa: `nuvem/contatos-publico.mjs:325 (telefone vem de telefoneValido, :295)`
   - Fazer: Formatar o telefone no texto do comprovante: (41) 99999-0000.
-- [ ] **comunicacoes-013** [L] A página diz "Mandamos o comprovante para o seu e-mail" mesmo quando o comprovante não saiu
+- [x] **comunicacoes-013** [L] A página diz "Mandamos o comprovante para o seu e-mail" mesmo quando o comprovante não saiu
   - Vê-se: Depois de confirmar, a página sempre mostra "Mandamos o comprovante para o seu e-mail", mas o envio do comprovante pode falhar (o erro é só anotado no servidor) e a confirmação segue. A frase também aparece para quem reabre o link depois.
   - Causa: `nuvem/contatos-publico.mjs:328-331 e :417`
   - Fazer: Devolver na confirmação se o comprovante saiu e trocar a frase quando não saiu ("guarde esta tela").
-- [ ] **nuvem-014** [L] O aviso no celular diz "Um inquilino confirmou os contatos" também quando quem confirmou foi o fiador
+- [x] **nuvem-014** [L] O aviso no celular diz "Um inquilino confirmou os contatos" também quando quem confirmou foi o fiador
   - Vê-se: O comunicado de contatos vai para inquilinos e fiadores, mas o aviso que chega no celular da equipe é sempre "Um inquilino confirmou os contatos. Toque para abrir."
   - Causa: `nuvem/contatos-publico.mjs:333 (texto) e 51 (destino c/f)`
   - Fazer: Escolher o texto pela primeira letra do destino ("Um fiador confirmou…") ou usar "Alguém confirmou os contatos".
-- [ ] **nuvem-015** [L] Código de confirmação que não saiu (falha no envio do e-mail) conta no limite e ainda obriga a esperar 1 minuto
+- [x] **nuvem-015** [L] Código de confirmação que não saiu (falha no envio do e-mail) conta no limite e ainda obriga a esperar 1 minuto
   - Vê-se: Na página de confirmação de contatos, o pedido do código é anotado (conta para o limite de 5 códigos por link e liga a espera de 1 minuto) antes de o e-mail ser enviado. Se o envio falha ("Não conseguimos mandar o e-mail agora… tente de novo em alguns minutos…
   - Causa: `nuvem/contatos-publico.mjs:256-257 (limites), 263-268 (anota antes), 271-276 (erro não desfaz)`
   - Fazer: No erro do envio, tirar de codigo.enviados a anotação desse pedido antes de responder.
-- [ ] **entrada-001** [M] Ficha pela internet aceita CPF inválido (111.111.111-11) e ele entra na ficha sem aviso
+- [x] **entrada-001** [M] Ficha pela internet aceita CPF inválido (111.111.111-11) e ele entra na ficha sem aviso
   - Vê-se: Na página do link, o interessado digitou o CPF 11111111111 e apertou "Enviar meus dados": a página respondeu "Recebemos seus dados em 19/11/2026, 19:13". Na equipe, a tabela mostra "CPF: - → 11111111111" sem nenhum alerta, e "Trazer para a ficha…" grava assim mesmo. Depois, em "Editar" da ficha, o Salvar também passa ("Salvo.") com o CPF 11111111111, porque o formulário não confere documento que "já estava gravado". O CPF também fica sem os pontos e o traço (o do cônjuge ficou "52998224725").
   - Causa: `nuvem/ficha-publica.mjs:149-174 (valoresValidos, último else); docs/js/telas/fichas.js:563-569 (grava a sugestão direto); docs/js/formularios.js:720-723 (igualAntes)`
   - Fazer: Conferir e formatar CPF/CNPJ no servidor da ficha e na página; em "Trazer para a ficha", passar pelo mesmo conferirDocumento/mascarar dos formulários e avisar o que não passa.
   - Certo é: A página do link devia recusar CPF com dígitos errados (como o sistema faz nos cadastros) e formatar 529.982.247-25; ao trazer, a equipe devia ver o aviso "CPF inválido".
   - Atenção (conferente): Li o servidor da ficha pública: CPF/CNPJ caem no "texto livre" (só corta em 300 letras), sem conferir dígitos nem pôr pontos. "Trazer para a ficha" grava o valor como veio, e o Editar da ficha pula a conferência quando o número não mudou. Nenhuma decisão do dono manda aceitar CPF errado (a decisão de 14/11 só diz que …
-- [ ] **entrada-002** [M] E-mail e telefone errados digitados no link apagam os certos que a equipe tinha (e data de nascimento no futuro passa)
+- [x] **entrada-002** [M] E-mail e telefone errados digitados no link apagam os certos que a equipe tinha (e data de nascimento no futuro passa)
   - Vê-se: A solicitação tinha telefone (41) 99999-0001 e e-mail carlos@exemplo.com.br. No link, o interessado trocou o e-mail para "email-errado", o telefone para "123" e pôs nascimento 01/01/2030: a página aceitou tudo ("Dados enviados. Obrigado!"). Na janela "Trazer para a ficha" as linhas "Telefone: (41) 99999-0001 → 123" e "E-mail: carlos@exemplo.com.br → email-errado" já vêm marcadas; trazendo, a ficha fica com "Telefone 123 (WhatsApp)" e "E-mail email-errado". Daí em diante os botões de e-mail abrem com destinatário i…
   - Causa: `nuvem/ficha-publica.mjs:160-172; docs/js/telas/fichas.js:560 (caixa "campo" sempre marcada)`
   - Fazer: Validar e-mail, telefone (10 ou 11 números) e nascimento no passado no servidor e na página; na janela, deixar desmarcado e avisado o valor que não passa na conferência.
   - Certo é: A página do link devia conferir e-mail (nome@dominio), telefone com DDD (10 ou 11 números) e data de nascimento no passado; ao trazer, valor inválido devia vir desmarcado e avisado, para não apagar o contato bom.
-- [ ] **entrada-003** [M] No celular, escolher o Estado civil ou o Tipo de renda joga a tela lá para baixo (lista de documentos)
+- [x] **entrada-003** [M] No celular, escolher o Estado civil ou o Tipo de renda joga a tela lá para baixo (lista de documentos)
   - Vê-se: O interessado está preenchendo "Seus dados", escolhe "Casado(a)" em Estado civil e a tela pula sozinha para a lista de Documentos (a rolagem foi de 1620 para 3629 pontos; o campo que ele estava preenchendo some da tela). O mesmo ao escolher o Tipo de renda (1974 → 3769). Ele precisa rolar de volta para continuar, e pode achar que já terminou os dados.
   - Causa: `nuvem/ficha-publica.mjs:746-754 (desenhar() + scrollIntoView em lista-documentos)`
   - Fazer: Tirar o scrollIntoView e guardar/repor a rolagem (e o foco) depois de redesenhar; ou redesenhar só a lista de documentos.
   - Certo é: A tela ficar onde está (só a lista de documentos, lá embaixo, muda).
-- [ ] **entrada-004** [L] Ficha devolvida SEM assinatura aparece como "ficha assinada recebida" em verde
+- [x] **entrada-004** [L] Ficha devolvida SEM assinatura aparece como "ficha assinada recebida" em verde
   - Vê-se: O interessado baixou a ficha em PDF pelo link e mandou o mesmo arquivo de volta em "Ficha assinada", sem assinar nada. Para ele apareceu "Recebemos a ficha assinada. Obrigado!"; na equipe a linha ficou com a etiqueta verde "ficha assinada recebida" e a confer…
   - Causa: `nuvem/ficha-publica.mjs:441 (situacao = Assinada); docs/js/telas/fichas.js:453-467 (sinaisHtml não fala da falta de assinatura)`
   - Fazer: Na ficha assinada sem assinatura digital, mostrar etiqueta amarela "sem assinatura digital: confira se foi assinada à mão"; se o arquivo for igual ao PDF guardado no link, avisar que é a ficha sem assinar.
   - Atenção (conferente): O servidor muda o link para "Assinada" só por ter chegado um arquivo no campo da ficha assinada, sem olhar o arquivo; na conferência, PDF sem assinatura digital não ganha aviso nenhum. Baixei a gravidade: assinar à mão é permitido (decisão de 14/11) e a marca "Ficha cadastral assinada" na janela de trazer já vem desma…
-- [ ] **entrada-005** [L] Depois de mandar o documento pedido, a página continua dizendo "Falta mandar"
+- [x] **entrada-005** [L] Depois de mandar o documento pedido, a página continua dizendo "Falta mandar"
   - Vê-se: A equipe pediu "Documento com foto e CPF (RG ou CNH)" e "Extrato do FGTS". O interessado mandou o documento com foto pelo campo certo: aparece "Documento recebido." logo abaixo do aviso amarelo "Falta mandar: Documento com foto e CPF (RG ou CNH); Extrato do F…
   - Causa: `nuvem/ficha-publica.mjs:437-443 (não mexe em r.faltando); docs/js/telas/fichas.js:492 (l.ultimo_envio decide o texto)`
   - Fazer: Tirar da lista o documento recebido (e voltar a "Respondida" quando zerar); no Painel, escolher o texto pela novidade mais recente (arquivo ou dados).
-- [ ] **entrada-006** [L] Dois avisos iguais ao mandar a ficha assinada
+- [x] **entrada-006** [L] Dois avisos iguais ao mandar a ficha assinada
   - Vê-se: Ao mandar a ficha assinada aparecem duas caixas verdes seguidas no topo: "Recebemos a ficha assinada. Obrigado! Avisaremos o resultado da análise." e "Ficha assinada recebida. Obrigado!". Além disso o aviso aparece no topo da página, e o interessado está no f…
   - Causa: `nuvem/ficha-publica.mjs:635 (SITUACAO.Assinada) e :790 (desenhar com a 2ª mensagem)`
   - Fazer: Não passar a mensagem extra quando a situação já diz o mesmo; mostrar o "recebido" ao lado do campo do arquivo.
-- [ ] **nuvem-013** [L] A política de privacidade não cita o que a página de contatos guarda do aparelho (endereço de internet, navegador e assinatura)
+- [x] **nuvem-013** [L] A política de privacidade não cita o que a página de contatos guarda do aparelho (endereço de internet, navegador e assinatura)
   - Vê-se: A página de confirmação de contatos guarda, em cada abertura e na confirmação, o endereço de internet (IP) e o navegador/aparelho da pessoa, além da assinatura feita na tela; a política de privacidade lista só "nome, CPF ou CNPJ, contato, endereço, renda e do…
   - Causa: `nuvem/ficha-publica.mjs:572-573; nuvem/contatos-publico.mjs:225-226, 237 e 312-314`
   - Fazer: Acrescentar uma frase em "Que dados tratamos" sobre o registro da data, do endereço de internet, do aparelho e da assinatura como prova do aceite; manter "ERP Imoveis".
   - Atenção (conferente): A política de privacidade lista nome, CPF/CNPJ, contato, endereço, renda e documentos, e não cita o endereço de internet, o aparelho e a assinatura que a confirmação de contatos guarda. Atenuante: a própria página de contatos avisa a pessoa ("Ao confirmar, guardamos a data, a hora, o endereço de internet e o aparelho"…
-- [ ] **comunicacoes-001** [M] Cada e-mail, WhatsApp ou lembrete do comunicado grava no Histórico a lista inteira de pessoas duas vezes (com assinaturas e textos)
+- [x] **comunicacoes-001** [M] Cada e-mail, WhatsApp ou lembrete do comunicado grava no Histórico a lista inteira de pessoas duas vezes (com assinaturas e textos)
   - Vê-se: O comunicado guarda todas as pessoas num campo só ("destinos"), e dentro dele fica a resposta de cada um: o texto aceito (até 7 mil letras) e a assinatura desenhada (imagem de até 150 KB). Toda vez que o sistema marca "link criado", "e-mail enviado", "WhatsApp enviado" ou "lembrete" de UMA pessoa, o Histórico guarda a lista inteira "antes" e "depois". Ex.: comunicado com 40 pessoas, 20 já confirmaram com assinatura (lista de uns 500 KB): um "Lembrar quem falta" para 20 pessoas por e-mail e WhatsApp grava 40 linhas…
   - Causa: `docs/js/telas/comunicacoes.js:236 e :244; docs/js/comunicados.js:202 e :217; docs/js/regras.js:402 (semPeso só trata cobrancas.banco) e :490`
   - Fazer: No Histórico do comunicado, guardar só a linha descritiva (sem o "de/para" de destinos), ou tirar assinatura e texto aceito da cópia que vai ao Histórico.
   - Certo é: O Histórico guardar só o que mudou daquela pessoa (ex.: "e-mail enviado para Maria"), sem copiar a lista inteira nem as assinaturas.
-- [ ] **comunicacoes-002** [M] Quando o link do inquilino trava ("códigos demais", "prazo acabou", "não vale mais"), a equipe não tem como gerar um link novo
+- [x] **comunicacoes-002** [M] Quando o link do inquilino trava ("códigos demais", "prazo acabou", "não vale mais"), a equipe não tem como gerar um link novo
   - Vê-se: A página pública manda a pessoa "pedir um novo link para a administração" em três casos: pediu o código 5 vezes sem confirmar, o prazo do link acabou, ou o link foi desligado. Só que, no sistema, o link de cada pessoa é criado uma vez e nunca mais é trocado: os botões "E-mail", "WhatsApp" e "Copiar link" sempre reutilizam o mesmo endereço. Não existe botão "Novo link". Também não existe botão para desligar um link mandado à pessoa errada (a nuvem tem a função "encerrar", mas nenhuma tela chama).
   - Causa: `docs/js/telas/comunicacoes.js:230 (if (x.url) return x.url); nuvem/contatos-publico.mjs:256 (códigos demais), :215-219, :110 (renovar existe) e :166 (encerrar existe, sem uso na tela)`
   - Fazer: Botão "Gerar novo link" na linha da pessoa (chama de novo POST contatos/link e grava a url nova) e "Desligar o link".
   - Certo é: Um botão "Gerar novo link" (e "Desligar o link") na linha da pessoa, que troca o endereço e zera a contagem de códigos.
-- [ ] **comunicacoes-006** [M] Comunicado criado com erro não pode ser corrigido nem apagado (e fora da nuvem dá para criar um que nunca poderá ser enviado)
+- [x] **comunicacoes-006** [M] Comunicado criado com erro não pode ser corrigido nem apagado (e fora da nuvem dá para criar um que nunca poderá ser enviado)
   - Vê-se: Depois de "Criar o comunicado" não existe "Editar" nem "Excluir". Se o telefone da empresa (que aparece no aviso contra golpe: "na dúvida, ligue …") ou o prazo foi digitado errado, só resta criar outro; o errado fica para sempre na lista, com os contadores "Não enviados". Além disso, na versão do computador / modo de teste (sem nuvem) o botão "Novo comunicado a todos" aparece e cria o comunicado, mas todos os botões de envio respondem "O comunicado com link só funciona no sistema pela internet (nuvem)".
   - Causa: `docs/js/telas/comunicacoes.js:305-396 (sem excluir/editar), :110 e :399-414 (criar não confere E.nuvem)`
   - Fazer: Ação "Excluir comunicado" enquanto nada foi enviado e edição de prazo/telefone/textos; esconder "Novo comunicado" fora da nuvem.
   - Certo é: Poder excluir (ou corrigir prazo, telefone e textos) enquanto nada foi enviado; fora da nuvem, não oferecer "Novo comunicado".
-- [ ] **links-pc-010** [L] Em Comunicações há dois botões seguidos que abrem a mesma tela ("Comunicações" e "Comunicados a todos"), e em Solicitações dois que voltam para Inquilinos
+- [x] **links-pc-010** [L] Em Comunicações há dois botões seguidos que abrem a mesma tela ("Comunicações" e "Comunicados a todos"), e em Solicitações dois que voltam para Inquilinos
   - Vê-se: No topo de Comunicações, Solicitações e Notificações aparecem as abas "Lista | Comunicações" e logo abaixo os atalhos "Comunicados a todos | Solicitações (2) | Notificações (1) | Modelos". "Comunicações" e "Comunicados a todos" levam ao mesmo endereço (#/comu…
   - Causa: `docs/js/telas/comunicacoes.js:23 e 33-35; docs/js/telas/consultas.js:48`
   - Fazer: Tirar "Comunicados a todos" dos atalhos (a aba já é ele) e o "← Inquilinos" de Solicitações; mesma ordem (título e abas) nas três telas.
-- [ ] **comunicacoes-003** [L] Com o Gmail desligado o sistema deixa mandar o link pelo WhatsApp, mas ninguém consegue confirmar (o código não sai)
+- [x] **comunicacoes-003** [L] Com o Gmail desligado o sistema deixa mandar o link pelo WhatsApp, mas ninguém consegue confirmar (o código não sai)
   - Vê-se: Para confirmar, a pessoa precisa do código de 6 números que vai por e-mail pela conta Gmail da empresa. "Enviar e-mail a todos" confere se o Gmail está ligado, mas "WhatsApp a todos", "WhatsApp" de uma pessoa e "Copiar link" não conferem. Se o Gmail estiver d…
   - Causa: `docs/js/telas/comunicacoes.js:223-226, :334-346 e :365; nuvem/contatos-publico.mjs:260`
   - Fazer: Aviso fixo na tela do comunicado quando o Gmail estiver desligado, e alerta antes de abrir a fila do WhatsApp.
-- [ ] **comunicacoes-009** [L] "Lembrar quem falta" continua mandando para quem já saiu e trava no WhatsApp se o contrato foi excluído
+- [x] **comunicacoes-009** [L] "Lembrar quem falta" continua mandando para quem já saiu e trava no WhatsApp se o contrato foi excluído
   - Vê-se: O lembrete vai para todos que receberam e não confirmaram, sem olhar se o contrato ainda está ativo ou se o fiador já saiu (troca de garantia): o ex-inquilino e o ex-fiador continuam recebendo. E se o contrato (ou o fiador) foi excluído depois do envio, a fil…
   - Causa: `docs/js/telas/comunicacoes.js:350 e :362, :281-284; docs/js/comunicados.js:106 e :233-243`
   - Fazer: Filtrar "falta" por pessoa existente e contrato/fiador ativos (dizendo quantos ficaram de fora) e pular pessoa nula em filaWhatsapp.
-- [ ] **comunicacoes-010** [L] Usuário de consulta vê um aviso de erro toda vez que abre um comunicado
+- [x] **comunicacoes-010** [L] Usuário de consulta vê um aviso de erro toda vez que abre um comunicado
   - Vê-se: A tela busca a situação na nuvem para qualquer usuário, mas a nuvem só responde a quem é operador. Quem só consulta vê sempre a faixa amarela "Situação de agora não veio da nuvem: …", como se houvesse um problema.
   - Causa: `docs/js/telas/comunicacoes.js:172 e :192; nuvem/worker.mjs:683-686`
   - Fazer: Chamar atualizarDaNuvem só se opera() (ou liberar a leitura da lista para consulta).
-- [ ] **comunicacoes-014** [L] E-mail em massa pode sair com "[preencher: imovel]" sem ninguém ver antes
+- [x] **comunicacoes-014** [L] E-mail em massa pode sair com "[preencher: imovel]" sem ninguém ver antes
   - Vê-se: Quando falta um dado (ex.: contrato antigo "Sem imóvel"), o texto fica com "[preencher: imovel]" e o assunto "Confirme seus contatos ([preencher: imovel_curto])". Na janela de e-mail das etapas o "Enviar agora" barra isso; no comunicado a todos não há conferê…
   - Causa: `docs/js/telas/comunicacoes.js:249-274; docs/js/modelos-email.js:362-378; comparar docs/js/telas/emails.js:134 e :166`
   - Fazer: Em enviarEmails, contar como falha a pessoa cujo texto ou assunto ficou com "[preencher: " e listar no fim.
-- [ ] **comunicacoes-015** [L] Janelas com dois botões que fazem a mesma coisa: "Voltar" e "Fechar"
+- [x] **comunicacoes-015** [L] Janelas com dois botões que fazem a mesma coisa: "Voltar" e "Fechar"
   - Vê-se: Em "Ver como o inquilino vê", "Copiar link" e na lista de e-mails com problema, a janela tem os botões "Voltar" e "Fechar", e os dois só fecham a janela.
   - Causa: `docs/js/telas/comunicacoes.js:320, :370 e :385; docs/js/app.js:549-555`
   - Fazer: Permitir janela de um botão só (sem "nao") e usar nessas três.
-- [ ] **comunicacoes-034** [L] Tela do novo comunicado deixa preencher tudo mesmo sem ninguém para receber; telefone da empresa precisa ser digitado toda vez
+- [x] **comunicacoes-034** [L] Tela do novo comunicado deixa preencher tudo mesmo sem ninguém para receber; telefone da empresa precisa ser digitado toda vez
   - Vê-se: Sem contrato ativo, a tela mostra "Vai para 0 pessoa(s)" e só recusa no fim ("Não há inquilino com contrato ativo hoje."). O e-mail da empresa vem preenchido do cadastro, mas o telefone para dúvidas vem sempre vazio, a cada comunicado.
   - Causa: `docs/js/telas/comunicacoes.js:130-143 (sem aviso para lista vazia; input telefone_empresa sem value na linha 143) e :409 (recusa só no fim)`
   - Fazer: Quando pessoas.length for 0, mostrar o aviso no lugar do formulário; preencher o telefone com o do último comunicado gravado (d().comunicados), se houver.
-- [ ] **textos-010** [L] A aba "Modelos" de Comunicações diz "mudar aqui não muda os já enviados", mas ali não dá para mudar nada
+- [x] **textos-010** [L] A aba "Modelos" de Comunicações diz "mudar aqui não muda os já enviados", mas ali não dá para mudar nada
   - Vê-se: No fim da tela está: "Cada comunicado guarda os textos com que foi criado: mudar aqui não muda os já enviados." A tela só mostra o texto fixo do modelo e o botão "Usar este modelo"; não há Editar. A frase faz procurar um botão que não existe.
   - Causa: `docs/js/telas/comunicacoes.js:165`
   - Fazer: Trocar por "Cada comunicado guarda o texto com que foi criado; dá para ajustar o texto ao criar um comunicado novo."
-- [ ] **textos-011** [L] Comunicado ou aceite que não existe mostra só a palavra "Comunicado" ou "Aceite" como título e não oferece voltar para Comunicações
+- [x] **textos-011** [L] Comunicado ou aceite que não existe mostra só a palavra "Comunicado" ou "Aceite" como título e não oferece voltar para Comunicações
   - Vê-se: As outras telas dizem "Notificação não encontrada", "Ficha não encontrada", com um botão para a lista. Aqui o título é só "Comunicado" (ou "Aceite"), seguido de "O endereço pode ser antigo ou o registro foi excluído." e só o botão "Voltar ao painel".
   - Causa: `docs/js/telas/comunicacoes.js:170 e :204`
   - Fazer: naoEncontrado("Comunicado não encontrado", "#/comunicacoes", "Ver as comunicações") e o mesmo para o aceite.
-- [ ] **entrada-022** [M] Link da ficha continua funcionando depois de reprovar, desistir, excluir a ficha ou fazer o contrato, e a caixa para encerrar some
+- [x] **entrada-022** [M] Link da ficha continua funcionando depois de reprovar, desistir, excluir a ficha ou fazer o contrato, e a caixa para encerrar some
   - Vê-se: Reprovar, registrar desistência, excluir a ficha ou fazer o contrato não encerra os links do interessado e do fiador: eles valem até os 7 dias. Ao mesmo tempo, a caixa 'Ficha pela internet' some da página da ficha (reprovada, desistiu ou com contrato feito), então a equipe não vê mais o que chega nem tem o botão 'Encerrar o link'. Ex.: contrato feito em 19/11/2026; em 21/11 o fiador manda a matrícula pelo link dele: o arquivo cai na pasta antiga 'Fichas em analise/…' (os documentos já foram para a pasta do inquili…
   - Causa: `docs/js/telas/fichas.js:216 e :482-486; únicas chamadas com situação em :589, :602 e :625; nuvem/ficha-publica.mjs:363-366`
   - Fazer: Encerrar os links da ficha na decisão, na desistência, na exclusão e depois de levar os documentos ao contrato; manter a caixa visível enquanto houver link válido.
   - Certo é: Ao reprovar, desistir, excluir ou fazer o contrato, encerrar os links na nuvem (ou, com contrato feito, mandar o que chegar para a pasta do inquilino e avisar). A caixa deve continuar à vista enquanto houver link válido.
-- [ ] **entrada-040** [M] Com o link vencido ou encerrado, 'Pedir o que falta' e 'Mandar a ficha para assinar' respondem como se tivessem funcionado
+- [x] **entrada-040** [M] Com o link vencido ou encerrado, 'Pedir o que falta' e 'Mandar a ficha para assinar' respondem como se tivessem funcionado
   - Vê-se: Se o link da pessoa já venceu (7 dias), 'Pedir o que falta' ainda grava o pedido e mostra 'Pedido registrado no link.'; 'Mandar a ficha para assinar' mostra 'A ficha com os dados de agora está no link para assinar.'. Só que a pessoa não consegue mais abrir o link, e a janela com a mensagem para mandar não aparece (ela só abre com link válido). A equipe acha que pediu e o interessado não recebe nada.
   - Causa: `docs/js/telas/fichas.js:589-592, 602-605 (botões em 335-338); nuvem/ficha-publica.mjs:344-346, 375-381`
   - Fazer: Antes de registrar: se o link não está válido, oferecer gerar o link novo (linkParaMandar/novoLinkDaFicha) e só então gravar o pedido; se a pessoa recusar, não mostrar o aviso de sucesso.
   - Certo é: Avisar 'O link venceu: gere um novo para a pessoa ver o pedido' (e oferecer gerar na hora).
-- [ ] **entrada-008** [L] Link encerrado continua mostrando "link até 26/11/2026"; e a janela do lembrete fala do e-mail de envio
+- [x] **entrada-008** [L] Link encerrado continua mostrando "link até 26/11/2026"; e a janela do lembrete fala do e-mail de envio
   - Vê-se: Depois de "Encerrar o link", a linha da pessoa fica "link encerrado · dados enviados em 19/11/2026 · 10 arquivo(s) · link até 26/11/2026" (encerrado e válido ao mesmo tempo). Na janela do lembrete aparece a frase 'O e-mail "Envio de ficha cadastral", mandado …
   - Causa: `docs/js/telas/fichas.js:270 ("· link até" sem olhar a situação) e :530 (frase sem testar lembrete)`
   - Fazer: Não mostrar a validade quando o link está encerrado; pôr a frase do e-mail de envio só quando não for lembrete.
-- [ ] **entrada-009** [L] Ficha aprovada continua com o título "Ficha em análise: Fulano"
+- [x] **entrada-009** [L] Ficha aprovada continua com o título "Ficha em análise: Fulano"
   - Vê-se: Depois de aprovar (e também reprovada ou desistiu), o título da página continua "Ficha em análise: Carlos Entrada Teste", com a etiqueta "Aprovada" logo abaixo.
   - Causa: `docs/js/telas/fichas.js:110`
   - Fazer: Trocar para "Ficha: Fulano" (a etiqueta abaixo já mostra a situação).
-- [ ] **entrada-038** [L] Botões de e-mail da ficha aparecem fora de hora: 'envio da ficha cadastral' em ficha já reprovada, e 'ficha reprovada' promete devolver a reserva depois de ela já ter sido devolvida
+- [x] **entrada-038** [L] Botões de e-mail da ficha aparecem fora de hora: 'envio da ficha cadastral' em ficha já reprovada, e 'ficha reprovada' promete devolver a reserva depois de ela já ter sido devolvida
   - Vê-se: Com reserva, o botão '✉ E-mail: envio da ficha cadastral' continua na ficha reprovada, na que desistiu e na que já virou contrato (o texto pede para preencher a ficha e mandar documentos). O e-mail 'ficha reprovada' sempre diz 'A reserva de R$ 1.000,00 será d…
   - Causa: `docs/js/telas/fichas.js:115; docs/js/modelos-email.js:81`
   - Fazer: Botão do envio só com situação "Em análise"; no modelo, texto condicional: já devolvida em {devolucao_data} ou será devolvida (a condição "devolucao" precisa entrar em condicoes, email-dados.js).

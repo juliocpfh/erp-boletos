@@ -60,3 +60,19 @@ const NIVEL = { consulta: 0, operador: 1, admin: 2 };
 export function pode(usuario, papel) {
   return !!usuario && NIVEL[usuario.papel] >= NIVEL[papel];
 }
+
+/** E-mail com que a pessoa entra pela internet (nuvem): o "E-mail de acesso" ou o login, se ele for um e-mail; sem nenhum, ''. */
+export const emailDeAcesso = (u) => {
+  const e = String((u && u.email) || '').trim().toLowerCase();
+  const l = String((u && u.login) || '').trim().toLowerCase();
+  return e || (/^[^\s@]+@[^\s@]+\.[^\s@.]{2,}$/.test(l) ? l : '');
+};
+
+/**
+ * Outro usuário com o mesmo login ou e-mail de acesso (o login de um igual ao e-mail do outro também conta): a nuvem decide o
+ * papel pelo primeiro usuário ativo com aquele e-mail ou login, e a pessoa podia entrar com o papel do outro. Sem: null.
+ */
+export function usuarioComMesmoAcesso(usuarios, dados, id = null) {
+  const meus = [dados.login, dados.email].map((v) => String(v || '').trim().toLowerCase()).filter(Boolean);
+  return (usuarios || []).find((u) => u.id !== id && [u.login, u.email].some((v) => v && meus.includes(String(v).trim().toLowerCase()))) || null;
+}

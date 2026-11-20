@@ -213,7 +213,12 @@ export function lerFormularioRegras(dados) {
       case 'simnao': out[def.chave] = t === 'sim'; break;
       case 'pct': { const s = String(t ?? '').trim(); out[def.chave] = s === '' ? null : Number(s.replace(',', '.')); break; }
       case 'dinheiro': out[def.chave] = String(t ?? '').trim() === '' ? null : C.centavos(t); break;
-      case 'inteiro': out[def.chave] = numero(t); break;
+      case 'inteiro': {
+        // número inteiro: "2,5" ou "1.5" não viram 3 nem 15 calados
+        const s = String(t ?? '').trim();
+        if (s !== '' && !/^-?\d+$/.test(s)) throw new C.ErroUsuario(`${def.rotulo}: informe um número inteiro (sem vírgula nem ponto). Não entendi: "${s}"`);
+        out[def.chave] = numero(t); break;
+      }
       case 'feriados': out[def.chave] = String(t || '').split(/[\n;,]+/).map((x) => x.trim()).filter(Boolean).map(feriadoDigitado); break;
       case 'regua': out[def.chave] = String(t || '').split('\n').map((x) => x.trim()).filter(Boolean).map((linha) => {
         const m = linha.match(/^(\d+)\s*(?:dias?)?\s*[:\-–]\s*(.+)$/i);

@@ -402,8 +402,8 @@ function aoMudarNuvem(externo) {
   E.anexos?.listas?.forEach((l) => { l.em = 0; }); // outro aparelho pode ter anexado ou apagado arquivos
   if (E.anexos) E.anexos.tudo = null;
   if (!E.usuario) return mostrar();
-  const editando = document.querySelector(SELETOR_FORMULARIO);
-  if (editando) aviso('Chegaram mudanças de outro aparelho. Ao salvar, sua alteração será aplicada sobre a versão nova.', 'info');
+  // só deixa de redesenhar com mudança não salva num formulário (tela com formulário fixo, como Dados e backup, se atualiza)
+  if (formularioAlterado()) aviso('Chegaram mudanças de outro aparelho. Ao salvar, sua alteração será aplicada sobre a versão nova.', 'info');
   else mostrar();
 }
 
@@ -450,8 +450,7 @@ async function conferirMudancasExternas() {
       renovarUsuario();
       atualizarFaixa();
       if (soSessao) return; // alguém só entrou ou saiu: nada mudou nos dados
-      const editando = document.querySelector(SELETOR_FORMULARIO);
-      if (editando) aviso(`${disco.atualizado_por || 'Outra pessoa'} alterou os dados. Ao salvar, sua alteração será aplicada sobre a versão nova.`, 'info');
+      if (formularioAlterado()) aviso(`${disco.atualizado_por || 'Outra pessoa'} alterou os dados. Ao salvar, sua alteração será aplicada sobre a versão nova.`, 'info');
       else await mostrar();
     }
   } catch { /* pasta indisponível no momento */ }
@@ -466,6 +465,7 @@ let mensagens = [];
 let proximaMensagem = 1;
 export function aviso(texto, tipo = 'ok') {
   if (tipo === 'erro') return janelaErro(texto);
+  if (mensagens.some((x) => x.texto === texto && x.tipo === tipo)) return; // o mesmo aviso ainda na tela: não repete
   const m = { id: proximaMensagem++, texto, tipo };
   mensagens.push(m);
   desenharMensagens();
@@ -539,6 +539,7 @@ function janelaErro(texto) {
   dlg.querySelector('button').addEventListener('click', () => dlg.close());
   dlg.addEventListener('close', () => dlg.remove());
   document.body.appendChild(dlg);
+  voltarFecha(dlg);
   dlg.showModal();
 }
 
@@ -552,9 +553,10 @@ export function janela({ titulo, html, sim = 'Confirmar', nao = 'Cancelar', fort
     const dlg = document.createElement('dialog');
     dlg.className = `janela-erro janela-pergunta${forte ? ' forte' : ''}`;
     dlg.innerHTML = `<form method="dialog">${titulo ? `<h3>${esc(titulo)}</h3>` : ''}<div class="corpo">${html}</div>
-      <div class="acoes" style="justify-content:flex-end"><button type="button" class="secundario" data-nao>${esc(nao)}</button><button value="sim" class="${forte ? 'perigo' : ''}">${esc(sim)}</button></div></form>`;
+      <div class="acoes" style="justify-content:flex-end">${nao ? `<button type="button" class="secundario" data-nao>${esc(nao)}</button>` : ''}<button value="sim" class="${forte ? 'perigo' : ''}">${esc(sim)}</button></div></form>`;
     let resposta = null;
-    dlg.querySelector('[data-nao]').addEventListener('click', () => dlg.close());
+    // nao: null → janela de um botão só (ex.: "Fechar")
+    if (nao) dlg.querySelector('[data-nao]').addEventListener('click', () => dlg.close());
     dlg.querySelector('form').addEventListener('submit', () => {
       const fd = new FormData(dlg.querySelector('form'));
       resposta = {};
@@ -587,6 +589,23 @@ export function janela({ titulo, html, sim = 'Confirmar', nao = 'Cancelar', fort
 
 const janelasAbertas = new Set(); // marcas das janelas abertas agora (uma por cima da outra tem entrada própria)
 const ESPERA_VOLTAR = 500; // ms: navegador que não avisa o "voltar" (popstate) não segura a resposta da janela além disto
+
+/**
+ * Voltar do aparelho (ou do navegador) fecha esta janela própria (``<dialog>`` que não sai de ``janela()``, como a do e-mail
+ * e a de erro), em vez de trocar a tela de trás com a janela aberta por cima. Chame antes do ``showModal()``.
+ * Fechada pelos botões ou Esc, a entrada do histórico sai sozinha.
+ */
+export function voltarFecha(dlg) {
+  const marca = entradaDaJanela();
+  if (!marca) return;
+  const aoVoltar = () => { if (history.state && history.state.janela === marca) return; dlg.close(); };
+  window.addEventListener('popstate', aoVoltar);
+  dlg.addEventListener('close', () => {
+    window.removeEventListener('popstate', aoVoltar);
+    janelasAbertas.delete(marca);
+    if (history.state && history.state.janela === marca) history.back();
+  });
+}
 
 /** Põe no histórico a entrada da janela que se abre (mesmo endereço) e devolve a marca dela; null se o navegador não deixa. */
 function entradaDaJanela() {
@@ -769,6 +788,8 @@ export async function reabrirPastaLembrada() {
 }
 
 export async function criarBanco(nome, loginTexto, senha) {
+  // só cria o primeiro administrador onde ainda não há usuários: quem já está dentro não cria outro administrador por aqui
+  if (E.d?.usuarios?.length) throw new C.ErroUsuario('Esta pasta já tem usuários: o primeiro acesso já foi feito. Entre com o seu login.');
   const novo = E.d || R.bancoVazio();
   const u = R.inserir(novo, 'usuarios', { login: loginTexto, nome, papel: 'admin', ativo: true, ...(await camposDeSenha(senha)),
     criado_em: new Date().toISOString() }, loginTexto, 'Primeiro administrador criado');
@@ -893,8 +914,14 @@ function atualizarFaixa() {
   if (!el || !E.d) return;
   if (E.nuvem) {
     const n = E.nuvem.pendentesQtd() + (E.anexos?.fila?.length || 0); const cf = E.nuvem.conflitos.length; const rc = E.nuvem.recusas.length;
-    const avisos = [cf && (podeUsuario('admin') ? `${cf} conflito(s) para escolher` : `${cf} conflito(s) esperando o administrador`), rc && `${rc} mudança(s) recusada(s)`, E.anexos?.naoEnviados?.length && `${E.anexos.naoEnviados.length} anexo(s) não enviado(s)`].filter(Boolean);
-    el.innerHTML = `Dados na nuvem · ${n ? `<b>⏳ ${n} mudança(s) esperando ${E.nuvem.online ? 'envio' : 'internet'}</b>` : (E.nuvem.online ? '✓ tudo enviado' : 'sem internet')}`
+    const avisos = [cf && (podeUsuario('admin') ? `${C.plural(cf, 'conflito')} para escolher` : `${C.plural(cf, 'conflito')} esperando o administrador`), rc && C.plural(rc, 'mudança recusada', 'mudanças recusadas'), E.anexos?.naoEnviados?.length && C.plural(E.anexos.naoEnviados.length, 'anexo não enviado', 'anexos não enviados')].filter(Boolean);
+    // login da internet vencido (a internet funciona, mas nada sobe): avisa em vez de "esperando internet"
+    if (E.nuvem.acessoVencido) {
+      el.innerHTML = `Dados na nuvem · <b>⚠ Seu acesso pela internet venceu: recarregue para entrar de novo (código no e-mail).</b>${n ? ` As ${n} mudança(s) estão guardadas neste aparelho e sobem em seguida.` : ''}`
+        + ` <button type="button" class="secundario mini" data-acao="recarregarPagina">Recarregar</button>`;
+      return;
+    }
+    el.innerHTML = `Dados na nuvem · ${n ? `<b>⏳ ${C.plural(n, 'mudança', 'mudanças')} esperando ${E.nuvem.online ? 'envio' : 'internet'}</b>` : (E.nuvem.online ? '✓ tudo enviado' : 'sem internet')}`
       + `${avisos.length ? ` · <a href="#/conflitos"><b>⚠ ${avisos.join(' e ')}</b></a>` : ''}`
       + ` · Última atualização: <b>${E.d.atualizado_em ? C.dataHoraBr(E.d.atualizado_em) : 'nenhuma ainda'}</b>${E.d.atualizado_por ? ` por <b>${esc(E.d.atualizado_por)}</b>` : ''}`;
     return;
@@ -903,10 +930,10 @@ function atualizarFaixa() {
 }
 
 const MENU = [
-  ['#/', 'Painel', '^$|^fechamento|^pendencias'], ['#/inquilinos', 'Inquilinos', '^inquilino|^contrato|^vistoria|^solicitacoes|^notificac'],
+  ['#/', 'Painel', '^$|^fechamento|^pendencias|^alertas'], ['#/inquilinos', 'Inquilinos', '^inquilino|^contrato|^vistoria|^solicitacoes|^notificac|^ficha|^comunicacoes|^aceite|^aditivo'],
   ['#/reajustes', 'Reajustes', 'reajustes'], ['#/cobrancas', 'Boletos', 'cobranca|^regua'], ['#/faturas', 'NF', 'fatura'], ['#/banco', 'Banco', '^banco'],
   ['#/imoveis', 'Imóveis', '^imove|^novo|^editar|^iptu$|^modelo-vistoria'], ['#/financeiro', 'Financeiro', '^financeiro|^gestao|^resultados|^liquido|^contas|^impostos|^inadimplencia|^garantias'],
-  ['#/dados', 'Dados e backup', '^dados|^historico|^modelos?-contrato|^modelos?-email|^regras|^backup|^empresas'],
+  ['#/dados', 'Dados e backup', '^dados|^historico|^modelos?-contrato|^modelos?-email|^regras|^backup|^empresas|^acessos|^conflitos|^pessoa|^arquivo-impresso|^pasta-'],
 ];
 /** Formulário (#/novo/<tabela>, #/editar/<tabela>/id) → item do menu que acende (antes todos acendiam "Imóveis"). */
 const MENU_DO_FORMULARIO = {
@@ -955,7 +982,7 @@ function layout(conteudo, rota) {
   // formulários (novo/editar) acendem o menu do assunto deles: contrato, fiador, saída... em Inquilinos; boleto em Boletos etc.
   const ehForm = ['novo', 'editar'].includes(rota.partes[0]);
   const deIptu = ehForm && rota.partes[1] === 'iptus' && rota.q.de === 'iptu';
-  const atual = ehForm ? (deIptu ? 'iptu' : MENU_DO_FORMULARIO[rota.partes[1]] || '-') : TELAS[rota.partes[0] || 'painel'] ? rota.partes[0] || '' : '-';
+  const atual = ehForm ? (deIptu ? 'iptu' : MENU_DO_FORMULARIO[rota.partes[1]] || '-') : telaDaRota(rota.partes[0] || 'painel') ? rota.partes[0] || '' : '-';
   const menu = MENU.map(([h, t, m]) => `<a href="${h}" class="${(m && new RegExp(m).test(atual)) || (!m && !atual) ? 'ativo' : ''}">${t}</a>`).join('')
     + (podeUsuario('admin') ? `<a href="#/usuarios" class="${atual === 'usuarios' ? 'ativo' : ''}">Usuários${E.d.usuarios.some((u) => u.pendente) ? ` <span class="contador">${E.d.usuarios.filter((u) => u.pendente).length}</span>` : ''}</a>` : '');
   return `<a class="pular-conteudo nao-imprimir" href="#conteudo" data-pular>Pular para o conteúdo</a><header class="topo nao-imprimir">
@@ -991,8 +1018,55 @@ function guardarClipes() {
     localStorage.setItem(CLIPES_GUARDADOS, JSON.stringify({ quem: E.usuario?.login || '', listas }));
   } catch { /* sem espaço ou bloqueado: só não guarda */ }
 }
+/**
+ * Tela pedida pelo endereço com o usuário já dentro: só as rotas de verdade. As telas de antes do login (escolher a pasta,
+ * primeiro acesso, login, pedir acesso…) e os pedaços internos (começam com _) dão "Página não encontrada".
+ */
+const TELAS_SEM_ENDERECO = new Set(['restaurarBackup', 'arquivoSumiu', 'semSuporte', 'inicio', 'primeiroAcesso', 'login', 'pedirAcesso']);
+function telaDaRota(nome) {
+  if (!nome || nome.startsWith('_') || TELAS_SEM_ENDERECO.has(nome) || !Object.hasOwn(TELAS, nome)) return null;
+  return typeof TELAS[nome] === 'function' ? TELAS[nome] : null;
+}
+/**
+ * Botão "Matrícula" (Inquilinos) de imóvel que, pela última lista vista (Imóveis, clipes guardados), não tem o arquivo:
+ * fica apagado como o "Contrato" sem arquivo, e o toque explica onde anexar. Sem lista vista, continua como estava
+ * (o toque confere a pasta e explica se não houver).
+ */
+function apagarMatriculasSemArquivo(raiz) {
+  for (const el of raiz.querySelectorAll('[data-acao="abrirMatricula"][data-matricula]')) {
+    if (anexosVistos.get(`matricula:${el.dataset.matricula}`) !== '') continue;
+    el.classList.add('desligado');
+    el.dataset.acao = 'explicarBotao';
+    el.dataset.texto = 'Nenhum arquivo da matrícula anexado a este imóvel. Anexe na lista de Imóveis (📎 Anexar, embaixo do nome).';
+    el.title = el.dataset.texto;
+  }
+}
+/** Caixas de abrir (<details>) sem id: chave = título sem os números (a contagem muda depois da ação) + a ordem entre as iguais. */
+function caixasSemId(raiz) {
+  const mapa = new Map();
+  const vistos = new Map();
+  for (const el of raiz.querySelectorAll('details:not([id])')) {
+    const s = el.querySelector(':scope > summary');
+    const base = (s ? s.textContent : '').replace(/\d+/g, '#').replace(/\s+/g, ' ').trim();
+    if (!base) continue;
+    const n = (vistos.get(base) || 0) + 1;
+    vistos.set(base, n);
+    mapa.set(`${base}|${n}`, el);
+  }
+  return mapa;
+}
 let desenhos = 0; // quantas vezes a tela começou a ser desenhada (o envio de formulário sabe se a página vai ser trocada)
 let subirAoTopo = false; // o endereço mudou (hashchange): o próximo desenho que chegar à tela começa do topo
+// Voltar do navegador devolve a página onde estava: cada entrada do histórico ganha uma marca (history.state.idRolagem)
+// e a rolagem de cada marca fica guardada aqui ao sair dela (só nesta aba, enquanto o sistema está aberto)
+const rolagensDoHistorico = new Map();
+let entradaAtual = 0;
+let rolagemDaVolta = null; // rolagem a devolver no próximo desenho (veio do Voltar/Avançar)
+function marcarEntrada() {
+  const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  try { history.replaceState({ ...(history.state || {}), idRolagem: id }, ''); } catch { return 0; }
+  return id;
+}
 export async function mostrar(estadoForm = null) {
   // dois desenhos ao mesmo tempo (dois cliques seguidos, mudança de outro aparelho no meio): só o último chega à tela
   desenhos += 1;
@@ -1010,7 +1084,7 @@ export async function mostrar(estadoForm = null) {
     else {
       gravarSessao(E.usuario.login); // usar o sistema mantém o login lembrado
       const nome = rota.partes[0] || 'painel';
-      const tela = TELAS[nome];
+      const tela = telaDaRota(nome);
       const conteudo = tela ? await tela(rota, estadoForm) : TELAS._naoEncontrado('Página não encontrada');
       if (meu !== desenhos) return;
       html = rota.partes[0] === 'imprimir' ? `<div id="mensagens" class="nao-imprimir" role="status" aria-live="polite"></div>${conteudo}` : layout(conteudo, rota);
@@ -1020,6 +1094,8 @@ export async function mostrar(estadoForm = null) {
     const endereco = location.hash.split('?')[0];
     const abertos = endereco === paginaDesenhada ? [...app.querySelectorAll('details[id][open]')].map((el) => el.id) : [];
     const fechados = endereco === paginaDesenhada ? [...app.querySelectorAll('details[id]:not([open])')].map((el) => el.id) : [];
+    // caixas sem id (Baixa em lote, "Pagamentos (3)", "Mostrar os 5 boletos anteriores"…): pelo título, sem os números
+    const semId = endereco === paginaDesenhada ? caixasSemId(app) : null;
     // redesenho da mesma página (ex.: chegou mudança de outro aparelho): a tela não pode encolher nem voltar ao topo.
     // Mantém a altura e as listas de anexos já mostradas até as novas chegarem, e devolve a posição da rolagem.
     const mesma = endereco === paginaDesenhada;
@@ -1027,24 +1103,30 @@ export async function mostrar(estadoForm = null) {
     // com ?ir= a própria tela rola até a caixa
     const subir = subirAoTopo && !rota.q.ir;
     subirAoTopo = false;
+    const volta = mesma || subir ? null : rolagemDaVolta; // Voltar do navegador: a página volta onde estava
+    rolagemDaVolta = null;
     const rolagem = mesma && !subir ? window.scrollY : 0;
     if (mesma && !subir) app.style.minHeight = `${app.offsetHeight}px`;
+    else if (volta) app.style.minHeight = `${volta + window.innerHeight}px`; // altura até as listas de anexos chegarem
     else app.style.minHeight = '';
     if (!mesma) document.querySelector('.visualizador')?.fecharSemVoltar?.(); // anexo aberto por cima da página antiga
     app.innerHTML = html;
     // título da aba: o nome da tela (com várias abas abertas, ou no histórico do navegador, dá para saber qual é qual)
     const h1 = typeof app.querySelector === 'function' ? app.querySelector('h1') : null;
-    const nomeTela = h1 ? h1.textContent.replace(/\s+/g, ' ').trim() : '';
+    const nomeTela = h1 ? (h1.dataset?.titulo || h1.textContent).replace(/\s+/g, ' ').trim() : ''; // data-titulo: nome próprio da aba (ex.: "Financeiro · Impostos")
     document.title = nomeTela && nomeTela !== 'Administração de Imóveis' ? `${nomeTela.slice(0, 60)} · Imóveis` : 'Administração de Imóveis';
     ligarRotulos(app);
     if (subir) window.scrollTo(0, 0);
     // listas de anexos já vistas (nesta ou noutra visita à tela) aparecem na hora; montarExtras confere e troca se mudou
     if (E.usuario) carregarClipes();
     for (const el of app.querySelectorAll('[data-arquivos]')) if (anexosVistos.has(el.dataset.arquivos)) el.innerHTML = anexosVistos.get(el.dataset.arquivos);
+    apagarMatriculasSemArquivo(app);
     if (mesma && !subir) window.scrollTo(0, rolagem);
+    else if (volta != null) window.scrollTo(0, volta);
     paginaDesenhada = endereco;
     for (const id of abertos) { const el = document.getElementById(id); if (el?.tagName === 'DETAILS') el.open = true; }
     for (const id of fechados) { const el = document.getElementById(id); if (el?.tagName === 'DETAILS') el.open = false; }
+    if (semId) for (const [chave, el] of caixasSemId(app)) if (semId.has(chave)) el.open = semId.get(chave).open;
     if (E.usuario && E.d) {
       // ordem das caixas escolhida pelo administrador (só ele vê o ícone ☰ para arrastar)
       const pagina = rota.partes[0] || 'painel';
@@ -1063,12 +1145,13 @@ export async function mostrar(estadoForm = null) {
     const alvo = rota.q.ir && document.getElementById(rota.q.ir);
     if (alvo?.tagName === 'DETAILS') alvo.open = true;
     if (alvo) alvo.scrollIntoView({ block: 'start' });
-    if (rota.q.ir) history.replaceState(null, '', location.href.replace(/([?&])ir=[^&]*&?/, '$1').replace(/[?&]$/, ''));
+    if (rota.q.ir) history.replaceState(history.state, '', location.href.replace(/([?&])ir=[^&]*&?/, '$1').replace(/[?&]$/, ''));
   } catch (e) {
     logarErro(e);
     if (meu !== desenhos) return; // desenho antigo que falhou: a tela é do mais novo
     app.style.minHeight = '';
     paginaDesenhada = null; // a tela de erro não é a página: o próximo desenho não guarda rolagem nem caixas abertas dela
+    document.title = 'Administração de Imóveis';
     app.innerHTML = `<main><div class="alerta erro">${esc(e.message)}</div><p><a href="#/" class="botao">Voltar ao painel</a></p></main>`;
   }
 }
@@ -1152,6 +1235,12 @@ function arrumarTabelas(raiz) {
   for (const [caixa, tem] of caixas) caixa.classList.toggle('tem-rolagem', tem);
 }
 
+// caixa que estava fechada (escondida, não deu para medir as tabelas no desenho): ao abrir, arruma as tabelas dela
+if (typeof document.addEventListener === 'function') {
+  document.addEventListener('toggle', (ev) => { if (ev.target && ev.target.tagName === 'DETAILS' && ev.target.open) arrumarTabelas(ev.target); }, true);
+  document.addEventListener('caixa-aberta', (ev) => { if (ev.target && ev.target.querySelectorAll) arrumarTabelas(ev.target); });
+}
+
 /** Tabelas com desenho próprio (fatura, contrato, vistoria, boleto, cartas): continuam como estão no celular. */
 const SEM_CARTOES = '.fatura-xls table, .ct-pagina, .ct-tabela, .grade-vistoria, .boleto-banco, .carta-tabela, .mapa-iptu, table.responsiva';
 
@@ -1168,7 +1257,10 @@ function cartoesNoCelular(raiz) {
     const primeira = t.rows[0];
     if (!primeira || !primeira.cells.length) continue;
     const caixa = t.parentElement;
-    const larga = t.scrollWidth > (caixa?.clientWidth || window.innerWidth) + 2 || t.getBoundingClientRect().right > window.innerWidth + 2;
+    // largura útil da caixa: clientWidth inclui o espaço interno (padding) do cartão, onde a tabela não deve entrar
+    const cs = caixa && typeof getComputedStyle === 'function' ? getComputedStyle(caixa) : null;
+    const util = caixa?.clientWidth ? caixa.clientWidth - (cs ? (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) : 0) : window.innerWidth;
+    const larga = t.scrollWidth > util + 2 || t.getBoundingClientRect().right > (document.documentElement?.clientWidth || window.innerWidth) + 1;
     if (larga) largas.push({ t, primeira });
   }
   for (const { t, primeira } of largas) {
@@ -1356,6 +1448,12 @@ document.addEventListener('click', async (ev) => {
     menu.setAttribute('aria-expanded', String(aberto));
     return;
   }
+  // IPTU's: o quadradinho do mês (sem ação) mostra o mês e o valor ao tocar (no celular não há "passar o mouse")
+  const dica = ev.target.closest('.mapa-iptu span.q[title]');
+  if (dica) { aviso(dica.title, 'info'); return; }
+  // botão apagado (ainda não funciona): no toque mostra o motivo, que no computador também fica no title (o celular não tem "passar o mouse")
+  const apagado = ev.target.closest('[data-motivo]');
+  if (apagado) { ev.preventDefault(); aviso(apagado.dataset.motivo); return; }
   const el = ev.target.closest('[data-acao]');
   if (!el) return;
   ev.preventDefault();
@@ -1365,7 +1463,9 @@ document.addEventListener('click', async (ev) => {
     const apaga = el.classList.contains('perigo') || el.classList.contains('x-excluir');
     const rotulo = (el.textContent || '').trim();
     el.dataset.ocupado = '1';
-    const ok = await confirmar(el.dataset.confirmar, { sim: rotulo && rotulo !== '×' && rotulo.length <= 40 ? rotulo : apaga ? 'Excluir' : 'Confirmar', forte: apaga });
+    const sim = rotulo && rotulo !== '×' && rotulo.length <= 40 ? rotulo : apaga ? 'Excluir' : 'Confirmar';
+    // a ação que já se chama "Cancelar…" não pode ter o "Cancelar" de desistir ao lado: o de desistir vira "Voltar"
+    const ok = await confirmar(el.dataset.confirmar, { sim, nao: /^cancelar/i.test(sim) ? 'Voltar' : 'Cancelar', forte: apaga });
     delete el.dataset.ocupado;
     if (!ok) return;
   }
@@ -1480,7 +1580,17 @@ window.addEventListener('hashchange', async (ev) => {
     if (ev && ev.oldURL) history.pushState(null, '', ev.oldURL);
     return;
   }
-  subirAoTopo = true; // mostrar sobe logo depois de trocar a tela (antes subia só depois de esperar as listas de anexos)
+  // Voltar/Avançar do navegador: a entrada do histórico já tem a marca (idRolagem) e a página volta onde estava;
+  // navegação nova: ganha a marca e começa do topo
+  if (entradaAtual) rolagensDoHistorico.set(entradaAtual, window.scrollY);
+  const marca = history.state && history.state.idRolagem;
+  if (marca && rolagensDoHistorico.has(marca)) {
+    rolagemDaVolta = rolagensDoHistorico.get(marca);
+    entradaAtual = marca;
+  } else {
+    entradaAtual = marcarEntrada();
+    subirAoTopo = true; // mostrar sobe logo depois de trocar a tela (antes subia só depois de esperar as listas de anexos)
+  }
   await mostrar();
 });
 
@@ -1496,6 +1606,7 @@ window.addEventListener('online', verificarMudancasExternas);
 setInterval(verificarMudancasExternas, 30000);
 
 (async function iniciar() {
+  entradaAtual = (history.state && history.state.idRolagem) || marcarEntrada(); // a 1ª página também volta onde estava
   // aplicativo instalável: guarda as telas no aparelho para abrir sem internet (sw.js); não na versão de arquivo único
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname))) {
     navigator.serviceWorker.register('sw.js').catch(() => {});

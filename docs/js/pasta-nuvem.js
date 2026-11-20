@@ -11,7 +11,9 @@ const VALIDADE_LISTA = 60000; // ms: a lista de uma pasta é reaproveitada por p
 // a tela se redesenha a cada mudança de outro aparelho). O que este aparelho grava, apaga ou move já atualiza a lista na hora.
 
 const naoAchou = (nome) => new DOMException(`"${nome}" não encontrado.`, 'NotFoundError');
-const semInternet = (oQue) => Object.assign(new Error(`Sem internet: ${oQue} precisa de conexão. Tente de novo quando a internet voltar.`), { esperado: true });
+const semInternet = (oQue, e) => Object.assign(new Error(e?.status === 401
+  ? 'Seu acesso pela internet venceu: recarregue a página para entrar de novo (código no e-mail).'
+  : `Sem internet: ${oQue} precisa de conexão. Tente de novo quando a internet voltar.`), { esperado: true });
 /** Partes do caminho → caminho na API, cada parte codificada (ex.: ['arquivos', 'Loja 1', 'a b.pdf'] → 'arquivos/Loja%201/a%20b.pdf'). */
 export const codificar = (partes) => partes.map(encodeURIComponent).join('/');
 
@@ -237,7 +239,7 @@ export class AnexosNuvem {
       if (passageiro(e)) {
         const local = this.daCopiaLocal ? await Promise.resolve().then(() => this.daCopiaLocal(partes)).catch(() => null) : null;
         if (local) return local; // sem internet, no computador com a cópia aberta: abre a cópia
-        throw semInternet('abrir o arquivo');
+        throw semInternet('abrir o arquivo', e);
       }
       throw e;
     }
@@ -277,22 +279,42 @@ export class AnexosNuvem {
         }
       } else await this.pedir('DELETE', codificar(partes));
     } catch (e) {
-      if (passageiro(e)) throw semInternet('apagar');
+      if (passageiro(e)) throw semInternet('apagar', e);
       if (e.status !== 404) throw e;
     }
     this.esquecerLista(pasta ? partes : partes.slice(0, -1));
     this.aoMudar?.();
   }
 
+  /** Pede à nuvem para mover a pasta (em partes, o site repete com `mais`). */
+  async moverNaNuvem(de, para) {
+    for (let n = 0; n < 1000; n += 1) {
+      const r = await (await this.pedir('POST', 'mover', { corpo: JSON.stringify({ de: de.join('/'), para: para.join('/') }), cabecalhos: { 'Content-Type': 'application/json' } })).json();
+      if (!r.mais) break;
+    }
+  }
+
+  /** Pastas movidas (ou renomeadas) sem internet, em ordem: [{ de, para, em }]; vão para a nuvem no `enviarFila`, antes dos anexos. */
+  async movimentosPendentes() { return (await this.guardar?.ler('fila-mover')) || []; }
+
+  async mudarMovimentos(fn) {
+    return this.trava(async () => {
+      const atual = (await this.guardar.ler('fila-mover')) || [];
+      const nova = fn(atual);
+      if (nova) await this.guardar.gravar('fila-mover', nova);
+      return nova || atual;
+    });
+  }
+
   async mover(de, para) {
     try {
-      for (let n = 0; n < 1000; n += 1) {
-        const r = await (await this.pedir('POST', 'mover', { corpo: JSON.stringify({ de: de.join('/'), para: para.join('/') }), cabecalhos: { 'Content-Type': 'application/json' } })).json();
-        if (!r.mais) break;
-      }
+      await this.moverNaNuvem(de, para);
     } catch (e) {
-      if (passageiro(e)) throw semInternet('mover a pasta');
-      if (e.status !== 404) throw e; // pasta só criada (vazia) ou só na fila deste aparelho: nada na nuvem para mover
+      // sem internet: a troca do nome fica guardada no aparelho e é feita quando a internet voltar (antes, a pasta ficava com o
+      // nome antigo para sempre e o cadastro apontava para a nova)
+      if (passageiro(e) && this.guardar) await this.mudarMovimentos((lista) => [...lista, { de: [...de], para: [...para], em: new Date().toISOString() }]);
+      else if (passageiro(e)) throw semInternet('mover a pasta', e);
+      else if (e.status !== 404) throw e; // pasta só criada (vazia) ou só na fila deste aparelho: nada na nuvem para mover
     }
     // a fila deste aparelho acompanha a pasta movida
     const k = de.join('/');
@@ -314,6 +336,19 @@ export class AnexosNuvem {
   async enviarFila() {
     if (this.enviando) return this.enviando;
     this.enviando = (async () => {
+      // primeiro as pastas movidas sem internet (os anexos da fila já apontam para o lugar novo)
+      for (const m of this.guardar ? await this.movimentosPendentes() : []) {
+        try {
+          await this.moverNaNuvem(m.de, m.para);
+        } catch (e) {
+          if (passageiro(e)) return; // a internet caiu de novo: tudo fica para a próxima
+          if (e.status !== 404) this.avisos.push(`Não consegui mudar a pasta "${m.de.join('/')}" para "${m.para.join('/')}" na nuvem (${e.message}). Confira os arquivos dela.`);
+        }
+        const chave = (x) => `${x.em}|${x.de.join('/')}|${x.para.join('/')}`;
+        await this.mudarMovimentos((lista) => lista.filter((x) => chave(x) !== chave(m)));
+        this.esquecerLista(m.de); this.esquecerLista(m.para);
+        this.aoMudar?.();
+      }
       const fila = await this.mudarFila(() => null);
       for (const f of [...fila]) {
         const blob = await this.guardar.ler(`anexo:${f.id}`);

@@ -2,16 +2,16 @@
 // a conferência (avisos.js), como salvar e para onde voltar. telaFormulario desenha o formulário; o envio é FORMULARIOS.cadastro (envios.js).
 import { alterar, aviso, E, login, podeUsuario, tokenDaSessao } from '../app.js';
 import * as S from '../armazenamento.js';
-import { camposDeSenha, ERRO_SENHA_CURTA, senhaCurta } from '../auth.js';
+import { camposDeSenha, emailDeAcesso, ERRO_SENHA_CURTA, senhaCurta, usuarioComMesmoAcesso } from '../auth.js';
 import * as C from '../calculos.js';
 import { compBr, dataBr, reais } from '../calculos.js';
 import { resultadoVistoriaSaida, textoReparo, TIPO_ADITIVO_TROCA } from '../contratos.js';
 import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
-import { confirmarAvisos, conferirAvulsa, conferirBoleto, conferirContrato, conferirIptu, conferirLeitura, conferirPessoa, conferirRessarcimento, conferirSeguro } from './avisos.js';
+import { confirmarAvisos, conferirAvulsa, conferirBoleto, conferirContrato, conferirIptu, conferirLeitura, conferirPessoa, conferirRenovacao, conferirRessarcimento, conferirSeguro, dataNoFuturo } from './avisos.js';
 import { CAMPOS_GARANTIA_HERDADA, CAMPOS_VALORES_HERDADOS, ENDERECO_DO_IMOVEL, enderecoInquilino } from './campos.js';
-import { ACEITA_DOCUMENTOS, arquivoSumiu, botao, buscar, d, etiqueta, extensao, guardarGuiasSoltas, levarDocumentosDaFicha, memoria, naoEncontrado, nomePastaContrato, nomePastaFicha, opera, PASTA_FICHAS, ordenar, pastaDoEscopo, pastaPaiContrato, renomearNoDisco, salvarAssinado, semAcentoArquivo, trazerHeranca, trazerHerancaAssinada, cienciaDaTroca, registrarCiencia } from './comum.js';
+import { ACEITA_DOCUMENTOS, arquivoSumiu, botao, buscar, d, encerrarLinksDaFicha, etiqueta, extensao, guardarGuiasSoltas, levarDocumentosDaFicha, memoria, naoEncontrado, nomePastaContrato, nomePastaFicha, opera, PASTA_FICHAS, ordenar, pastaDoEscopo, pastaPaiContrato, renomearNoDisco, salvarAssinado, semAcentoArquivo, trazerHeranca, trazerHerancaAssinada, cienciaDaTroca, registrarCiencia } from './comum.js';
 import { confirmarValoresIniciais, inicialBonificado } from './contrato.js';
 
 // --------------------------------------------------------------------------
@@ -39,7 +39,7 @@ export function caixaReservaAbatida(c) {
   return `${usos.length || ant ? `<p class="suave">${nosBoletos}</p>` : `<div class="alerta aviso"><b>Reserva ainda não abatida em nenhum boleto do sistema.</b> Se ela já foi abatida num aluguel antigo, marque abaixo o mês e o valor.</div>`}
     ${opera() ? `${max > 0 ? `<form data-form="reservaAbatida" class="acoes" style="margin-top:6px"><input type="hidden" name="contrato" value="${c.id}">
         <label class="suave" style="margin:0">Abatida em</label><input type="month" name="competencia" value="${esc(R.competenciaReserva(c) || '')}" style="width:auto" required>
-        <label class="suave" style="margin:0">valor R$</label><input name="valor" value="${esc(C.reais(max, false))}" style="width:120px" required>
+        <label class="suave" style="margin:0">valor R$</label><input name="valor" value="${esc(C.reais(max, false))}" style="width:120px" inputmode="decimal" data-dinheiro required>
         <button class="secundario pequeno">Marcar como já abatida</button></form>` : ''}` : ''}`;
 }
 
@@ -97,7 +97,7 @@ export const ANEXOS_COM_X = { contratos: ['comprovante_reserva', 'termo_chaves_s
 // sem comprovante: um só botão pequeno "⚠ anexar" (antes: etiqueta "sem comprovante: buscar no banco" + botão grande)
 export const linkComprovante = (contratoId, nome, anexo = null) => (nome && !(anexo && arquivoSumiu('contrato', contratoId, nome)) ? `<span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="contrato" data-id="${contratoId}" data-nome="${esc(nome)}" title="${esc(nome)}">📎 comprovante</a>${anexo && (ANEXOS_COM_X[anexo.tabela] || []).includes(anexo.campo)
   ? xAnexo('removerAnexo', { tabela: anexo.tabela, id: anexo.id, campo: anexo.campo }, `Apagar o comprovante "${nome}"? O lançamento continua e volta o aviso para anexar.`) : ''}</span>`
-  : anexo && opera() ? `<label class="anexar-falta" title="${nome ? `O arquivo ${esc(nome)} sumiu da pasta: anexe de novo (PDF ou foto)` : 'Sem comprovante: buscar no banco e anexar (PDF ou foto)'}">⚠ ${nome ? 'arquivo sumiu: anexar de novo' : 'anexar comprovante'}<input type="file" accept="application/pdf,image/*"
+  : anexo && opera() ? `<label class="anexar-falta" title="${nome ? `O arquivo ${esc(nome)} sumiu da pasta: anexe de novo (PDF ou foto)` : 'Sem comprovante: buscar no banco e anexar (PDF ou foto)'}">⚠ ${nome ? 'arquivo sumiu: anexar de novo' : 'anexar comprovante'}<input type="file" accept="${ACEITA_DOCUMENTOS}"
     data-acao-arquivo="anexarComprovante" data-contrato="${contratoId}" data-tabela="${anexo.tabela}" data-id="${anexo.id}" data-campo="${anexo.campo}" data-tipo="${anexo.tipo}" data-data="${esc(anexo.data || '')}"></label>`
     : etiqueta('sem comprovante', 'aviso'));
 
@@ -277,7 +277,7 @@ export const CADASTROS = {
     },
     valores: (r) => ({ ...r, ...escolhaDoContrato(r.contrato_id, r) }),
     padrao: (q) => ({ data: C.hojeIso(), ...(q.contrato ? escolhaDoContrato(Number(q.contrato)) : {}) }),
-    voltar: (r, q) => ({ inquilinos: '#/inquilinos', solicitacoes: '#/solicitacoes' }[q && q.de]
+    voltar: (r, q) => ({ inquilinos: '#/inquilinos', solicitacoes: `#/solicitacoes${q && q.filtro ? `?filtro=${q.filtro}` : ''}` }[q && q.de]
       || (r || (q && q.contrato) ? `#/contrato/${r ? r.contrato_id : q.contrato}?ir=solicitacoes` : '#/solicitacoes')),
     descricao: (dados) => `Solicitação: ${String(dados.descricao || '').slice(0, 80)}`,
     ajustar(dados, erros, r, form) {
@@ -289,16 +289,24 @@ export const CADASTROS = {
       const contrato = p.contratos.length > 1 ? p.contratos.find((c) => String(c.id) === fd.get(`imovel_${k}`)) : p.contratos[0];
       if (!contrato) { erros[`imovel_${k}`] = 'Escolha o imóvel do pedido'; return; }
       dados.contrato_id = contrato.id;
+      // reaberta (era "Concluída" e voltou para "Aberta"/"Em andamento"): a data de conclusão sai (antes a data que ficou
+      // preenchida a fazia voltar sozinha para "Concluída")
+      if (r && r.situacao === 'Concluída' && ['Aberta', 'Em andamento'].includes(dados.situacao)) dados.data_conclusao = null;
       // data de conclusão preenchida em pedido aberto ou em andamento: fica "Concluída" (pedido do dono, 2026-11-19)
       if (dados.data_conclusao && ['Aberta', 'Em andamento'].includes(dados.situacao)) dados.situacao = 'Concluída';
       if (dados.situacao === 'Concluída' && !dados.data_conclusao) dados.data_conclusao = C.hojeIso();
+      if (dados.data_conclusao && dados.data && dados.data_conclusao < dados.data) erros.data_conclusao = `A conclusão não pode ser antes do pedido (${dataBr(dados.data)})`;
     },
+    conferir: (dados, r) => [dataNoFuturo(dados.data_conclusao, 'A data de conclusão'),
+      dados.valor > 0 && dados.pago_por === 'Sem custo' && (!r || r.valor !== dados.valor || r.pago_por !== dados.pago_por) ? `Custo de ${reais(dados.valor)} com "Custo por conta de: Sem custo". Confira quem paga.` : ''].filter(Boolean),
   },
   reformas: {
     titulo: (r, q) => `Reforma / investimento - ${buscar('imoveis', r ? r.imovel_id : q.imovel).nome}`,
     campos: () => F.REFORMA,
     fixos: (r, q) => (r ? {} : { imovel_id: Number(q.imovel) }),
     padrao: () => ({ data: C.hojeIso() }),
+    // o valor investido entra no retorno do imóvel (Gestão): data no futuro costuma ser ano digitado errado
+    conferir: (dados) => [dataNoFuturo(dados.data, 'A data da reforma')].filter(Boolean),
     voltar: (r, q) => `#/imovel/${r ? r.imovel_id : q.imovel}?ir=reformas`,
     descricao: (dados) => `Reforma: ${dados.descricao} ${reais(dados.valor)}`,
   },
@@ -424,6 +432,13 @@ export const CADASTROS = {
       // contrato a partir da ficha: fica ligado a ela; o comprovante da reserva da ficha vale (vai para a pasta do inquilino em "depois")
       const ficha = r ? null : fichaDoNovoContrato(q);
       if (ficha) {
+        // o endereço do botão "Fazer o contrato" continua valendo (seta "voltar" do navegador): ficha não aprovada ou imóvel
+        // que já virou contrato dela não fazem um segundo contrato
+        const imovelDaFicha = dados.imovel_id || Number(q.imovel) || null;
+        if (!R.imoveisParaContrato(d(), ficha).includes(Number(imovelDaFicha))) {
+          throw new C.ErroUsuario(ficha.situacao !== 'Aprovada' ? `A ficha de ${ficha.inquilino_nome} não está aprovada (${ficha.situacao}): aprove a ficha antes de fazer o contrato.`
+            : `O contrato desta ficha${imovelDaFicha && buscar('imoveis', imovelDaFicha) ? ` para ${buscar('imoveis', imovelDaFicha).nome}` : ''} já foi feito (ou o imóvel não está na ficha). Abra o contrato pela página da ficha.`);
+        }
         dados.ficha_id = ficha.id;
         if (!dados.comprovante_reserva && ficha.comprovante_reserva && !ficha.documentos_no_contrato && dados.reserva_valor === ficha.reserva_valor) dados.comprovante_reserva = ficha.comprovante_reserva;
       }
@@ -475,6 +490,8 @@ export const CADASTROS = {
       if (!antigo && salvo.ficha_id) {
         const n = await levarDocumentosDaFicha(salvo.ficha_id, salvo.id);
         if (n) aviso(`${n} documento(s) da ficha foram para a pasta do inquilino.`);
+        // os documentos já estão no contrato: o link da ficha não manda mais nada para a pasta antiga
+        try { await encerrarLinksDaFicha(salvo.ficha_id); } catch (e) { console.warn('encerrar os links da ficha', e); }
       }
       if (avisoAditivo) aviso(avisoAditivo, 'aviso');
       avisoAditivo = '';
@@ -547,6 +564,10 @@ export const CADASTROS = {
     voltar: (r) => (r ? `#/ficha/${r.id}` : '#/inquilinos'),
     destino: (salvo) => `#/ficha/${salvo.id}`,
     descricao: (dados) => `Ficha de ${dados.inquilino_nome}`,
+    // o recibo da reserva promete devolução por inteiro: devolver só uma parte pede confirmação
+    conferir: (dados, r) => (R.fichaSemContrato(dados) && dados.devolucao_valor > 0 && dados.devolucao_valor < dados.reserva_valor
+      && (!r || r.devolucao_valor !== dados.devolucao_valor || r.reserva_valor !== dados.reserva_valor)
+      ? [`Devolução de ${reais(dados.devolucao_valor)} de uma reserva de ${reais(dados.reserva_valor)}: ficam ${reais(dados.reserva_valor - dados.devolucao_valor)} sem devolver. O recibo da reserva promete a devolução por inteiro; o alerta "devolver a reserva" some e o termo sai como devolução de parte.`] : []),
     ajustar(dados, erros, r, form) {
       const hoje = C.hojeIso();
       // solicitação de reserva: começa em análise; o link da ficha vai pelo e-mail ou pelo WhatsApp
@@ -577,12 +598,28 @@ export const CADASTROS = {
         dados.decisao_data = dados.decisao_data || hoje;
         dados.decisao_por = r && r.situacao === dados.situacao && r.decisao_por ? r.decisao_por : login();
         if (dados.decisao_data > hoje) erros.decisao_data = 'A decisão não pode ser numa data futura';
+        else if (dados.data_recebida && dados.decisao_data < dados.data_recebida) erros.decisao_data = `A decisão não pode ser antes de a ficha chegar (${dataBr(dados.data_recebida)})`;
+        // "Reprovar (com o motivo)": sem o motivo a ficha ficava "Reprovada" sem explicação
+        if (dados.situacao === 'Reprovada' && !String(dados.decisao_motivo || '').trim()) erros.decisao_motivo = 'Escreva o motivo da reprovação';
       }
+      // datas da ficha: nada no futuro; a reserva com valor precisa da data (sem ela o recibo e o e-mail saem sem data)
+      if (dados.data_recebida && dados.data_recebida > hoje) erros.data_recebida = 'A data em que a ficha chegou não pode ser no futuro';
+      if (dados.reserva_valor > 0 && !dados.reserva_data) erros.reserva_data = 'Informe a data da reserva';
+      else if (dados.reserva_data && dados.reserva_data > hoje) erros.reserva_data = 'A reserva não pode ser numa data futura';
       if (!R.fichaSemContrato(dados)) { dados.devolucao_data = null; dados.devolucao_valor = null; } else {
         if (dados.devolucao_data && !dados.devolucao_valor) dados.devolucao_valor = dados.reserva_valor || null;
         if (dados.devolucao_valor > 0 && !dados.devolucao_data) erros.devolucao_data = 'Informe a data da devolução';
+        else if (dados.devolucao_data && dados.devolucao_data > hoje) erros.devolucao_data = 'A devolução não pode ser numa data futura (registre depois de devolver)';
+        else if (dados.devolucao_data && dados.reserva_data && dados.devolucao_data < dados.reserva_data) erros.devolucao_data = `A devolução não pode ser antes da reserva (${dataBr(dados.reserva_data)})`;
         if (dados.devolucao_valor > (dados.reserva_valor || 0)) erros.devolucao_valor = `A devolução não pode passar da reserva (${reais(dados.reserva_valor || 0)})`;
+        // devolução de só uma parte: o termo diz que a diferença "fica explicada nas observações da ficha"
+        else if (dados.devolucao_valor > 0 && dados.devolucao_valor < dados.reserva_valor && !String(dados.observacoes || '').trim()) {
+          erros.observacoes = `Devolução de ${reais(dados.devolucao_valor)} de uma reserva de ${reais(dados.reserva_valor)}: explique a diferença nas observações (ela sai no termo de devolução)`;
+        }
       }
+      // comprovante escolhido sem o valor: o arquivo era descartado em silêncio
+      if (arquivoEscolhido(form, 'comprovante_reserva') && !(dados.reserva_valor > 0)) erros.reserva_valor = 'Informe o valor da reserva: há um comprovante escolhido';
+      if (arquivoEscolhido(form, 'comprovante_devolucao') && R.fichaSemContrato(dados) && !(dados.devolucao_valor > 0)) erros.devolucao_valor = 'Informe o valor devolvido (ou a data da devolução): há um comprovante escolhido';
       if (!dados.solidario_nome) for (const k of Object.keys(dados)) if (k.startsWith('solidario_')) dados[k] = null;
       limparFicha(dados);
       // "Usar o endereço do imóvel de interesse": precisa de um só imóvel marcado
@@ -607,6 +644,12 @@ export const CADASTROS = {
       // análise do Serasa (não é de dinheiro: grava sem valor)
       const serasa = arquivoEscolhido(form, 'analise_serasa');
       if (serasa) dados.analise_serasa = await S.salvarArquivo(await pasta(), new File([serasa], `analise-serasa-${C.hojeIso()}${extensao(serasa.name)}`));
+    },
+    // reprovada (ou desistiu) agora: os links da ficha pela internet deixam de valer
+    async depois(salvo, antigo) {
+      if (antigo && R.fichaSemContrato(salvo) && !R.fichaSemContrato(antigo)) {
+        try { if (await encerrarLinksDaFicha(salvo.id)) aviso('Os links da ficha pela internet foram encerrados.', 'info'); } catch (e) { console.warn('encerrar os links da ficha', e); }
+      }
     },
   },
   correcoes: {
@@ -641,12 +684,14 @@ export const CADASTROS = {
     conferir: conferirSeguro,
     // arquivo da apólice: pode salvar sem (confirma e fica o alerta para anexar depois); outros arquivos opcionais
     extraHtml: (r) => `<h3>Arquivos do seguro</h3><div class="formulario">
-      <div><label>Arquivo da apólice</label><input type="file" name="arquivo_apolice" accept="application/pdf,image/*">
+      <div><label>Arquivo da apólice</label><input type="file" name="arquivo_apolice" accept="${ACEITA_DOCUMENTOS}">
         ${r && r.arquivo_apolice ? F.arquivoGuardado('arquivo_apolice', r.arquivo_apolice) : '<small class="suave">PDF ou foto da apólice. Sem ele, o seguro é salvo e fica o alerta para anexar depois.</small>'}</div>
       <div><label>Outros arquivos (opcional)</label><input type="file" name="outros_arquivos" multiple accept="${ACEITA_DOCUMENTOS}">
         <small class="suave">Ex.: boleto do seguro, proposta, comprovante de pagamento.</small></div></div>`,
     ajustar(dados, erros) {
       if (dados.vigencia_inicio && dados.vigencia_fim && dados.vigencia_fim <= dados.vigencia_inicio) erros.vigencia_fim = 'O fim da vigência precisa ser depois do início';
+      // 0 parcelas: o seguro nunca entrava em boleto nenhum (no IPTU já era recusado)
+      if (!(dados.num_parcelas >= 1)) erros.num_parcelas = 'Informe pelo menos 1 parcela';
     },
     async ajustarAsync(dados, erros, r, form, q) {
       // só corre sem erro nos campos: a pergunta (janela do sistema) vem antes de gravar qualquer arquivo
@@ -782,7 +827,7 @@ export const CADASTROS = {
       const ult = R.correcoesDo(d(), c.id).pop();
       return { data: ult ? ult.data_vigencia : C.hojeIso(), valor_novo: R.caucaoSugerida(d(), c, ult ? ult.data_vigencia : C.hojeIso()) };
     },
-    aviso: (r, q) => { const c = buscar('contratos', q.contrato); return R.garantiaDepositada(c) ? `Caução atual: ${reais(R.valorGarantia(d(), c))}${c.caucao_meses ? ` (${c.caucao_meses} aluguéis com bonificação)` : ''}.`
+    aviso: (r, q) => { const c = buscar('contratos', q.contrato); return R.garantiaDepositada(c) ? `Caução atual: ${reais(R.valorGarantia(d(), c))}${c.caucao_meses ? ` (${c.caucao_meses} aluguéis ${R.regra('caucao_base', c) === 'cheio' || !R.percentualBonificacao(c) ? 'cheios' : 'com bonificação'})` : ''}.`
       : `Caução ainda não registrada (depositado ${reais(R.somaDepositos(d(), c, 'caucao'))} de ${reais(c.caucao_valor)}): a correção vale depois que o valor inicial for depositado; o complemento é o que passa do valor inicial.`; },
     voltar: (r, q) => `#/contrato/${q.contrato}`,
     descricao: (dados) => `Caução corrigida para ${reais(dados.valor_novo)}`,
@@ -905,8 +950,17 @@ export const CADASTROS = {
     aviso: (r, q) => { const c = buscar('contratos', q.contrato); return `Aluguel atual ${reais(R.aluguelAtual(d(), c))}. Contrato ${c.prazo_tipo === 'Indeterminado' ? 'por prazo indeterminado' : `até ${dataBr(c.vigencia_fim)}`}.`; },
     voltar: (r, q) => `#/contrato/${q.contrato}`,
     ajustar(dados, erros, r, form, q) {
+      const c = buscar('contratos', q.contrato);
       if (dados.tipo === 'Renovado com nova data de término' && !dados.nova_vigencia_fim) erros.nova_vigencia_fim = 'Informe a nova data de término';
-      if (dados.tipo === 'Passou a prazo indeterminado') dados.nova_vigencia_fim = null;
+      else if (dados.tipo === 'Renovado com nova data de término') {
+        // término novo antes da entrada, da própria renovação ou do término atual: o contrato passava a constar como vencido
+        const fimAtual = R.fimDoContrato(d(), c);
+        if (c.data_entrada && dados.nova_vigencia_fim <= c.data_entrada) erros.nova_vigencia_fim = `A nova data de término precisa ser depois da entrada (${dataBr(c.data_entrada)})`;
+        else if (dados.data && dados.nova_vigencia_fim <= dados.data) erros.nova_vigencia_fim = `A nova data de término precisa ser depois da data da renovação (${dataBr(dados.data)})`;
+        else if (fimAtual && dados.nova_vigencia_fim <= fimAtual) erros.nova_vigencia_fim = `A nova data de término precisa ser depois do término atual (${dataBr(fimAtual)})`;
+      }
+      // só a renovação com nova data muda o término (antes a data digitada valia também no "Novo valor negociado")
+      if (dados.tipo !== 'Renovado com nova data de término') dados.nova_vigencia_fim = null;
       if (dados.tipo === 'Novo valor negociado' && !(dados.novo_valor > 0)) erros.novo_valor = 'Informe o novo valor';
       // aluguel bonificado digitado (sem o %): o % sai dele, como no contrato. Ex.: cheio R$ 2.200,00 e bonificado R$ 1.980,00 → 10%
       const bonificadoTexto = String(new FormData(form).get('novo_bonificado') || '').trim();
@@ -922,6 +976,7 @@ export const CADASTROS = {
       else dados.vale_desde = R.valeDesdeDaRenovacao(dados);
       if (dados.novo_percentual !== null && dados.novo_percentual !== undefined && (dados.novo_percentual < 0 || dados.novo_percentual > 100)) erros.novo_percentual = 'Informe um percentual entre 0 e 100';
     },
+    conferir: conferirRenovacao,
     salvar: (db, dados, q) => R.registrarRenovacao(db, Number(q.contrato), dados, login()),
     async depois(salvo) {
       if (salvo.novo_valor > 0) aviso('Termo aditivo do novo valor gerado: mande para assinar pelo "✉ E-mail: termo para assinar" (em Termos aditivos) e anexe o termo assinado (o aceite) quando voltar.', 'info');
@@ -954,7 +1009,19 @@ export const CADASTROS = {
       const vistoria = v.vistoria ? `Vistoria de saída de ${dataBr(v.vistoria.data)}: ${v.texto.toLocaleLowerCase('pt-BR')}${v.pendencias.length ? ` (${v.pendencias.slice(0, 5).join('; ')}${v.pendencias.length > 5 ? '…' : ''}): ${v.semValor ? `falta o valor de ${v.semValor} reparo(s) (roteiro da saída, "Valores dos reparos")` : `os reparos (${reais(v.totalReparos)}) já entram nos débitos`}` : ''}.` : 'Vistoria de saída ainda não registrada: o cálculo fica como "não feita" (registre a vistoria antes, se houver).';
       const semDeposito = (R.temCaucao(c) || R.temDeposito(c)) && R.valorGarantia(d(), c) > 0 && !R.garantiaRecebida(d(), c)
         ? ` Atenção: a ${R.temCaucao(c) ? 'caução' : 'garantia'} de ${reais(R.valorGarantia(d(), c))} foi combinada, mas nada foi depositado: não há garantia a devolver (se foi depositada, registre o depósito antes).` : '';
-      return `Saída em ${dataBr(c.data_saida)} (mude em "Saída do inquilino").${semDeposito} ${vistoria} A leitura dos relógios é a da vistoria de saída: vem preenchida e, se mudar aqui, muda lá também. Confira o boleto do último mês (proporcional aos dias). A garantia é corrigida pela poupança: o índice vem do Banco Central, pelo aniversário de cada depósito (confira e corrija se precisar).`;
+      // saída antes do fim do prazo: a multa do contrato não entra sozinha; o valor sugerido aparece para incluir ou dispensar
+      const m = R.multaSaidaAntecipada(d(), c);
+      const multa = m ? ` Saída antes do fim do contrato (${dataBr(m.fim)}): multa sugerida de ${reais(m.valor)} (3 aluguéis de ${reais(m.aluguel)}, proporcional aos ${m.restam} de ${m.total} dias que faltavam; confira a cláusula no contrato assinado). Ela não entra sozinha: para cobrar, some aos débitos e escreva "Multa pela saída antecipada" na descrição; para dispensar (ex.: transferência pelo empregador, Lei 8.245/91, art. 4º), deixe de fora e anote o motivo na descrição.` : '';
+      const compSaida = c.data_saida ? C.competenciaDe(c.data_saida) : null;
+      const semBoleto = compSaida && !R.boletoDoMes(d(), c.id, compSaida) ? ` Atenção: o boleto de ${compBr(compSaida)} (último mês, proporcional) ainda não foi gerado: gere antes, senão o aluguel desse mês fica fora dos débitos.` : '';
+      return `Saída em ${dataBr(c.data_saida)} (mude em "Saída do inquilino").${multa}${semBoleto}${semDeposito} ${vistoria} A leitura dos relógios é a da vistoria de saída: vem preenchida e, se mudar aqui, muda lá também. Confira o boleto do último mês (proporcional aos dias). A garantia é corrigida pela poupança: o índice vem do Banco Central, pelo aniversário de cada depósito (confira e corrija se precisar).`;
+    },
+    // os débitos vêm dos boletos que já existem: sem o boleto do mês da saída, o último aluguel ficava fora do cálculo
+    // (ex.: saída em 20/10/2026 e o boleto de 10/2026 ainda não gerado → débitos R$ 0,00 e a caução devolvida inteira)
+    conferir: (dados, r, q) => {
+      const c = buscar('contratos', q.contrato);
+      const comp = c.data_saida ? C.competenciaDe(c.data_saida) : null;
+      return comp && !R.boletoDoMes(d(), c.id, comp) ? [`O boleto do último mês (aluguel de ${compBr(comp)}, proporcional) ainda não foi gerado: o aluguel desse mês fica fora dos débitos. Gere antes o boleto de ${compBr(comp)} (tela Boletos) e refaça o cálculo.`] : [];
     },
     // a data de saída é a do contrato (1ª etapa, "Informar data de saída")
     fixos: (r, q) => ({ data_saida: buscar('contratos', q.contrato).data_saida }),
@@ -966,7 +1033,7 @@ export const CADASTROS = {
       for (const k of R.relogiosObrigatorios(c)) if (!dados[`leitura_${k}`]) erros[`leitura_${k}`] = 'Informe a leitura na saída';
       dados.vistoria_saida = resultadoVistoriaSaida(d(), c).texto;
     },
-    salvar: (db, dados, q) => R.encerrarContrato(db, Number(q.contrato), dados, login()),
+    salvar: (db, dados, q) => R.encerrarContrato(db, Number(q.contrato), dados, login(), C.hojeIso()),
   },
   avulsas: {
     titulo: (r) => (r ? (r.airbnb_competencia ? `Editar a NF do Airbnb de ${compBr(r.airbnb_competencia)}` : 'Editar NF avulsa') : 'Nova NF avulsa'),
@@ -1025,6 +1092,13 @@ export const CADASTROS = {
         if (r) { const token = r.id === E.usuario.id ? tokenDaSessao() : null; dados.sessoes = token ? [token] : []; }
       } else if (!r) erros.login = 'Informe uma senha inicial';
       if (d().usuarios.some((u) => u.login === dados.login && u.id !== (r && r.id))) erros.login = 'Já existe um usuário com este login';
+      else {
+        // e-mail de acesso igual ao de outro (ou ao login de outro): a nuvem podia dar à pessoa o papel do outro usuário
+        const outro = usuarioComMesmoAcesso(d().usuarios, dados, r && r.id);
+        if (outro) erros[dados.email && [outro.login, outro.email].some((v) => String(v || '').toLowerCase() === String(dados.email).toLowerCase()) ? 'email' : 'login'] = `Já usado pelo usuário ${outro.nome || outro.login}: cada pessoa entra com um e-mail próprio`;
+      }
+      // na nuvem a pessoa entra pelo e-mail (Cloudflare): sem ele (e sem login em forma de e-mail) ela nunca consegue entrar
+      if (E.nuvem && dados.ativo && !emailDeAcesso(dados) && !erros.email) erros.email = 'Na nuvem, informe o e-mail de acesso: é com ele que a pessoa entra pela internet';
       if (r && r.id === E.usuario.id && (dados.papel !== 'admin' || !dados.ativo)) erros.papel = 'Você não pode tirar o seu próprio acesso de administrador';
       if (!r) dados.criado_em = new Date().toISOString();
     },
@@ -1046,6 +1120,8 @@ export const CADASTROS = {
       }
       for (const k of ['desconto', 'iptu', 'seguro', 'taxa_boleto', 'fci', 'outros', 'reserva_utilizada', 'multa_percentual', 'juros_mensal_percentual']) if (dados[k] === null) dados[k] = 0;
       dados.editado_manual = true; // o recálculo automático não mexe mais nestes valores
+      // bonificação maior que o aluguel deixava o boleto "a pagar R$ 0,00" (ex.: aluguel R$ 2.400,00 e desconto R$ 5.000,00)
+      if (dados.aluguel > 0 && dados.desconto > dados.aluguel) erros.desconto = `O desconto não pode passar do aluguel (${reais(dados.aluguel)})`;
       const disp = R.saldoReserva(d(), buscar('contratos', r.contrato_id), r.id);
       if (dados.reserva_utilizada > disp) {
         const outros = d().cobrancas.filter((x) => x.contrato_id === r.contrato_id && x.id !== r.id && x.reserva_utilizada > 0);
@@ -1056,16 +1132,16 @@ export const CADASTROS = {
 };
 
 export function telaFormulario(tabela, registro, q, estado) {
-  const cfg = CADASTROS[tabela];
+  const cfg = Object.hasOwn(CADASTROS, String(tabela)) ? CADASTROS[tabela] : null;
   if (!cfg) return naoEncontrado('Página não encontrada');
   if (!opera() || (cfg.admin && !podeUsuario('admin'))) return '<h1>Seu usuário não pode alterar este cadastro</h1>';
-  if (!registro && cfg.semNovo) return naoEncontrado('Boletos novos saem na tela Boletos ("Gerar boletos" do mês)', '#/cobrancas', 'Ir para Boletos');
+  if (!registro && cfg.semNovo) return naoEncontrado('Boletos novos saem na tela Boletos ("Gerar boletos" do mês)', '#/cobrancas', 'Ir para Boletos', '');
   // cadastro que depende de outro (ex.: depósito da garantia de um contrato) aberto sem ele: endereço incompleto
   try {
     return montarFormulario(cfg, tabela, registro, q, estado);
   } catch (e) {
     if (!(e instanceof TypeError)) throw e;
-    return naoEncontrado('Abra este cadastro pela página do inquilino ou do imóvel');
+    return naoEncontrado('Abra este cadastro pela página do inquilino ou do imóvel', '#/', 'Voltar ao painel', '');
   }
 }
 

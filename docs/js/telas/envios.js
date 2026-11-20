@@ -38,6 +38,13 @@ export function enderecoDoFormulario(rota, campos) {
 
 /** Testemunhas do contrato ou do termo aditivo: ficam lembradas neste navegador (o próximo já vem com elas) e vão no formato guardado. */
 function testemunhasDo(f) {
+  // CPF da testemunha: conferido e formatado como nos cadastros (ex.: 52998224725 → 529.982.247-25)
+  for (const [t, k, n] of [['t1', 'c1', 1], ['t2', 'c2', 2]]) {
+    const cpf = String(f[k] || '').trim();
+    if (!cpf) continue;
+    if (!F.cpfValido(cpf)) throw new C.ErroUsuario(`CPF da testemunha ${n}${f[t] ? ` (${String(f[t]).trim()})` : ''} inválido: confira os números.`);
+    f[k] = F.mascarar('cpf', cpf);
+  }
   try { localStorage.setItem('testemunhas_contrato', JSON.stringify({ t1: f.t1, c1: f.c1, t2: f.t2, c2: f.c2 })); } catch { /* sem lembrar */ }
   return [[f.t1, f.c1], [f.t2, f.c2]].map(([nome, cpf]) => ({ nome: String(nome || '').trim(), cpf: String(cpf || '').trim() }));
 }
@@ -244,6 +251,9 @@ export const FORMULARIOS = {
     // leitura dos relógios: obrigatória (regra leitura_relogios_obrigatoria, padrão) e registrada aqui (entrada ou saída do inquilino)
     const momento = f.tipo === 'Saída' ? 'Saída do inquilino' : 'Entrada do inquilino';
     const leitura = Object.fromEntries(F.LEITURAS.map(([k]) => [k, String(f[`leitura_${k}`] || '').trim()]));
+    // leitura é o número do relógio: zero ou mais, com vírgula se tiver (ex.: 01234 ou 1234,5); letras e negativo não
+    const leituraRuim = F.LEITURAS.filter(([k]) => leitura[k] && !/^\d[\d.]*(,\d+)?$/.test(leitura[k]));
+    if (leituraRuim.length) throw new C.ErroUsuario(`Leitura do relógio só com números (ex.: 01234 ou 1234,5): confira ${leituraRuim.map(([k, t]) => `${t.replace('Relógio de ', '')} ("${leitura[k]}")`).join(' e ')}.`);
     const faltaLeitura = R.relogiosObrigatorios(c).filter((k) => !leitura[k]);
     if (faltaLeitura.length) throw new C.ErroUsuario(`Informe a leitura do relógio de ${faltaLeitura.map((k) => F.LEITURAS.find(([x]) => x === k)[1].replace('Relógio de ', '')).join(' e ')}.`);
     const dados = { contrato_id: c.id, imovel_id: c.imovel_id || null, tipo: f.tipo, data: f.data, link_fotos: (f.link_fotos || '').trim(),
@@ -257,7 +267,7 @@ export const FORMULARIOS = {
     // texto igual ao padrão fica em branco: vale o padrão (a abertura muda sozinha com ou sem o link das fotos)
     const semEspacos = (x) => String(x).replace(/\s+/g, ' ').trim();
     if ([K.VISTORIA_ABERTURA, K.VISTORIA_ABERTURA_SEM_LINK].map(semEspacos).includes(semEspacos(dados.texto_abertura))) dados.texto_abertura = '';
-    if (semEspacos(dados.texto_final) === semEspacos(K.vistoriaFinal(3))) dados.texto_final = '';
+    if ([K.vistoriaFinal(), K.VISTORIA_FINAL_ANTIGA].map(semEspacos).includes(semEspacos(dados.texto_final))) dados.texto_final = '';
     dados.itens = [];
     for (let n = 0; f[`ic_${n}`] !== undefined; n += 1) dados.itens.push({ comodo: f[`ic_${n}`], item: f[`ii_${n}`], situacao: f[`is_${n}`] || '', obs: String(f[`io_${n}`] || '').trim() });
     // todo item do modelo precisa de situação (o navegador já aponta o primeiro; aqui a lista completa)
@@ -362,7 +372,11 @@ export const FORMULARIOS = {
     const texto = String(f.get('texto') || '');
     if (!nome || !texto.trim()) throw new C.ErroUsuario('Preencha o nome e o texto do modelo.');
     const id = Number(f.get('id') || 0);
-    const tipo = ['aditivo', 'aditivo_troca'].includes(f.get('tipo')) ? f.get('tipo') : 'contrato';
+    const tipo = ['aditivo', 'aditivo_troca', 'aditivo_valor'].includes(f.get('tipo')) ? f.get('tipo') : 'contrato';
+    // campo com nome errado sairia escrito "[campo?]" no contrato: avisa antes de gravar
+    const fora = K.camposDesconhecidosDoModelo(texto);
+    if (fora.length && !(await confirmar(`Estes campos não existem e vão sair no contrato como "[nome?]":\n\n${fora.map((x) => `• ${x}`).join('\n')}\n\nConfira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assim mesmo?`,
+      { titulo: 'Campo desconhecido no modelo', sim: 'Salvar assim mesmo', nao: 'Voltar e corrigir' }))) return;
     await alterar((db) => {
       // o modelo novo não esconde os padrões do mesmo tipo: eles vão para o banco antes
       const real = modelosNoBanco(db, id, tipo);
@@ -401,6 +415,7 @@ export const FORMULARIOS = {
   },
 
   async pedirAcesso(form) {
+    if (E.nuvem) throw new C.ErroUsuario('Na nuvem, o acesso é dado pelo administrador: peça para ele cadastrar você em Usuários → Novo usuário, com o seu e-mail.');
     const f = new FormData(form);
     const nome = String(f.get('nome') || '').trim();
     const lg = String(f.get('login') || '').trim().toLowerCase();
@@ -771,9 +786,9 @@ export async function confirmarPagamentoBoleto(id, f) {
   }
   const r = await alterar((db) => R.registrarPagamento(db, id, data, valor, login(), { pagouEmDia, dataPagou }));
   const pago = buscar('cobrancas', id);
-  if (pago && R.ehComplementoCaucao(pago)) aviso(`Complemento da caução pago${r.pontual ? '' : ` com ${r.dias_atraso} dia(s) de atraso`}: a caução passou a ${reais(pago.caucao_nova)}. Sem NF.`, 'ok');
+  if (pago && R.ehComplementoCaucao(pago)) aviso(`Complemento da caução pago${r.pontual ? '' : ` com ${C.plural(r.dias_atraso, 'dia')} de atraso`}: a caução passou a ${reais(pago.caucao_nova)}. Sem NF.`, 'ok');
   else aviso(r.pontual ? `Pagamento em dia confirmado${pagouEmDia ? ' (sem multa e juros)' : ''}. Data da NF: ${dataBr(data)}. Valor da nota: ${reais(r.valor_nf)}.`
-    : `Pagamento com ${r.dias_atraso} dia(s) de atraso: multa ${reais(r.multa)} e juros ${reais(r.juros)}. Valor da nota: ${reais(r.valor_nf)} (com multa e juros). Data da NF: ${dataBr(data)}.`, r.pontual ? 'ok' : 'aviso');
+    : `Pagamento com ${C.plural(r.dias_atraso, 'dia')} de atraso: multa ${reais(r.multa)} e juros ${reais(r.juros)}. Valor da nota: ${reais(r.valor_nf)} (com multa e juros). Data da NF: ${dataBr(data)}.`, r.pontual ? 'ok' : 'aviso');
   avisarImovelSemEmpresa(pago);
   // pago à mão com o boleto ainda aberto no C6: o inquilino pode pagar de novo (ou ser negativado já tendo pago)
   if (pago && pago.banco && pago.banco.situacao === 'emitido' && !pago.pagamento_c6) aviso('Atenção: este boleto continua em aberto no C6. Se o pagamento foi por fora do boleto (Pix direto, dinheiro), cancele no banco na página do boleto ("Cancelar no banco"); se foi pelo boleto, use "Consultar situação no banco".', 'aviso');

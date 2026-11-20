@@ -29,13 +29,13 @@ Precisamos que você confirme seus contatos até {prazo}. Leva 2 minutos:
 
 Pelo contrato, as mensagens enviadas para o e-mail e o telefone cadastrados valem como recebidas. Se você não atualizar, continuaremos usando os contatos que temos hoje.
 
-Atenção: a conta e a chave Pix para pagamento não mudam. Nunca pedimos pagamento em outra conta. Na dúvida, ligue {telefone_empresa}.
+Atenção: a conta e a chave Pix para pagamento não mudam. Nunca pedimos pagamento em outra conta. Na dúvida, ligue para {telefone_empresa}.
 
 Atenciosamente,
 {empresas}`,
     whatsapp: `Olá, {nome}! Aqui é a {empresas}, administração [se fiador]da locação de {locatario} ({imovel_curto})[senão]do seu imóvel ({imovel_curto})[fim].
 Nosso novo e-mail é {email_empresa}. Confirme seus contatos até {prazo}: {link}
-A conta e o Pix de pagamento não mudam. Na dúvida, ligue {telefone_empresa}.`,
+A conta e o Pix de pagamento não mudam. Na dúvida, ligue para {telefone_empresa}.`,
     lembrete: `Olá, {nome}! Ainda não recebemos a confirmação dos seus contatos ([se fiador]locação de {locatario}, [fim]{imovel_curto}). O prazo vai até {prazo}: {link}
 Nosso e-mail é {email_empresa}. A conta e o Pix de pagamento não mudam.`,
     aviso: `A partir de agora, os e-mails da administração (boletos, avisos, notificações, recibos e documentos) saem do endereço {email_empresa}. Confira com a administração qualquer mensagem de outro endereço que diga falar em nosso nome.
@@ -44,7 +44,7 @@ Pelo contrato de locação, as comunicações e notificações enviadas ao e-mai
 
 Até você nos informar outro contato, continuaremos usando os contatos do seu cadastro, e as mensagens enviadas a eles serão consideradas recebidas. Manter esses contatos atualizados e acompanhar as mensagens que chegam por eles, inclusive na caixa de spam, fica sob a sua responsabilidade.
 
-A conta e a chave Pix para pagamento não mudam. Nunca pedimos pagamento em outra conta. Em caso de dúvida, ligue {telefone_empresa} antes de pagar.`,
+A conta e a chave Pix para pagamento não mudam. Nunca pedimos pagamento em outra conta. Em caso de dúvida, ligue para {telefone_empresa} antes de pagar.`,
     ciencia: 'Li e concordo: os e-mails da administração saem de {email_empresa}; o e-mail e o celular acima são os meus contatos atuais; as mensagens enviadas a eles valem como recebidas; e vou avisar a administração se eles mudarem.',
   },
 };
@@ -184,6 +184,37 @@ export function mudancaNoCadastro(d, x) {
   return Object.keys(dados).length ? { tabela: 'contratos', id: c.id, dados } : null;
 }
 
+const soNumeros = (v) => String(v || '').replace(/\D/g, '');
+
+/**
+ * Outros cadastros ativos da mesma pessoa (mesmo CPF/CNPJ): os outros contratos ativos do inquilino, ou os outros contratos
+ * ativos em que o fiador é fiador. Ex.: Ana (CPF 529.982.247-25) aluga os contratos 12 e 15; a resposta do link do 12 →
+ * [{ tipo: 'inquilino', contrato_id: 15 }]. Sem CPF no cadastro, nada (não dá para saber se é a mesma pessoa).
+ */
+export function mesmaPessoaEmOutrosContratos(d, x, hoje = C.hojeIso()) {
+  if (x.tipo === 'fiador') {
+    const f = R.buscar(d, 'fiadores', x.fiador_id);
+    const doc = f ? soNumeros(f.cpf) : '';
+    if (!doc) return [];
+    return (d.fiadores || []).filter((g) => g.id !== f.id && soNumeros(g.cpf) === doc && g.contrato_id)
+      .filter((g) => { const c = R.buscar(d, 'contratos', g.contrato_id); return c && R.contratoAtivo(c, hoje) && R.fiadoresDo(d, c.id, hoje).some((h) => h.id === g.id); })
+      .map((g) => ({ tipo: 'fiador', contrato_id: g.contrato_id, fiador_id: g.id }));
+  }
+  const c = R.buscar(d, 'contratos', x.contrato_id);
+  const doc = c ? soNumeros(c.inquilino_cpf) : '';
+  if (!doc) return [];
+  return d.contratos.filter((o) => o.id !== c.id && soNumeros(o.inquilino_cpf) === doc && R.contratoAtivo(o, hoje))
+    .map((o) => ({ tipo: 'inquilino', contrato_id: o.id, fiador_id: null }));
+}
+
+/** A pessoa do comunicado ainda está no cadastro e ativa hoje (contrato ativo; o fiador, ainda fiador dele). */
+export function destinoAtivo(d, x, hoje = C.hojeIso()) {
+  const c = x && R.buscar(d, 'contratos', x.contrato_id);
+  if (!c || !R.contratoAtivo(c, hoje)) return false;
+  if (x.tipo !== 'fiador') return true;
+  return R.fiadoresDo(d, c.id, hoje).some((f) => f.id === x.fiador_id);
+}
+
 /**
  * Junta a lista da nuvem ao comunicado (dentro de alterar): abertura, confirmação e resposta; quem confirmou tem o cadastro
  * atualizado (uma vez; o antigo fica no histórico). Devolve quantos cadastros mudaram.
@@ -206,9 +237,10 @@ export function juntarRespostas(db, comId, links, usuario) {
   });
   for (const x of destinos) {
     if (!x.resposta || x.aplicado_em) continue;
-    const m = mudancaNoCadastro(db, x);
-    x.resposta = { ...x.resposta, mudou: !!m };
-    if (m) {
+    // o mesmo CPF em outro contrato ativo (quem aluga dois imóveis, o fiador de dois contratos) recebe os mesmos contatos
+    const ms = [x, ...mesmaPessoaEmOutrosContratos(db, x)].map((y) => mudancaNoCadastro(db, { ...y, resposta: x.resposta })).filter(Boolean);
+    x.resposta = { ...x.resposta, mudou: ms.length > 0 };
+    for (const m of ms) {
       R.atualizar(db, m.tabela, m.id, m.dados, usuario, `${x.nome}: contatos confirmados pelo link do comunicado "${com.titulo}"`);
       mudaram += 1;
     }

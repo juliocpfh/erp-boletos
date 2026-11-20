@@ -71,15 +71,30 @@ export function itensDaProposta(f) {
   return out;
 }
 
+/**
+ * Caução ou depósito que saiu numa troca de garantia e ainda não foi devolvido (os depósitos ficam guardados na troca):
+ * o recibo continua podendo sair. Ex.: caução de R$ 3.600,00 trocada por fiador em 01/12/2026, ainda a devolver.
+ */
+function garantiaDaTroca(d, c) {
+  const pend = R.devolucoesDeTrocaPendentes(d, c).at(-1);
+  if (!pend) return null;
+  const t = pend.troca;
+  const qual = t.tipo_anterior === 'Caução' ? 'caucao' : 'deposito';
+  const deps = (t.devolucao_movimentos || []).filter((x) => x.valor > 0);
+  const valor = deps.reduce((s, x) => s + x.valor, 0) || t.valor_anterior;
+  return { qual, nome: qual === 'caucao' ? 'caução' : 'depósito de garantia', valor, data: deps.length ? deps[deps.length - 1].data : t.data,
+    depositos: deps.map((x) => ({ data: x.data, valor: x.valor })), uso: (t.anterior || {}).deposito_uso || '', troca: t };
+}
+
 /** Garantia em dinheiro já paga: { qual, nome, valor, data, depositos: [{ data, valor }] } ou null. */
-function garantiaPaga(d, c) {
+export function garantiaPaga(d, c) {
   const qual = R.temCaucao(c) ? 'caucao' : R.temDeposito(c) ? 'deposito' : null;
-  if (!qual) return null;
+  if (!qual) return garantiaDaTroca(d, c);
   const deps = R.depositosGarantiaDo(d, c, qual).filter((x) => !x.complementar);
   if (!R.garantiaDepositada(c) && !deps.length) return null;
   const valor = deps.length ? deps.reduce((s, x) => s + x.valor, 0) : (qual === 'caucao' ? c.caucao_valor : c.deposito_valor) || 0;
   const data = (qual === 'caucao' ? c.caucao_pago_em : c.deposito_pago_em) || (deps.length ? deps[deps.length - 1].data : (qual === 'caucao' ? c.caucao_data : c.deposito_data));
-  return valor > 0 ? { qual, nome: qual === 'caucao' ? 'caução' : 'depósito de garantia', valor, data, depositos: deps.map((x) => ({ data: x.data, valor: x.valor })) } : null;
+  return valor > 0 ? { qual, nome: qual === 'caucao' ? 'caução' : 'depósito de garantia', valor, data, depositos: deps.map((x) => ({ data: x.data, valor: x.valor })), uso: c.deposito_uso || '' } : null;
 }
 
 /**
@@ -96,7 +111,12 @@ export function reciboDisponivel(d, tipo, alvo) {
     if (tipo === 'ficha_fiador' && !R.temFiador(f) && !R.fiadoresDaFicha(f).length) return { ok: false, motivo: 'A garantia da proposta não é fiador.' };
     return { ok: true };
   }
-  if (tipo === 'reserva') return p.reserva_valor > 0 && p.reserva_data ? { ok: true } : { ok: false, motivo: 'Informe o valor e a data da reserva.' };
+  if (tipo === 'reserva') {
+    // troca de titular: a reserva copiada do contrato anterior foi paga pelo titular anterior (o recibo é o dele)
+    const ant = c ? R.contratoHerdado(d, c) : null;
+    if (ant) return { ok: false, motivo: `A reserva foi paga pelo titular anterior (${ant.inquilino_nome}): o recibo é o do contrato dele.` };
+    return p.reserva_valor > 0 && p.reserva_data ? { ok: true } : { ok: false, motivo: 'Informe o valor e a data da reserva.' };
+  }
   if (tipo === 'devolucao_reserva') {
     if (!f) return { ok: false, motivo: 'O termo de devolução da reserva é da ficha em análise.' };
     if (!(f.reserva_valor > 0)) return { ok: false, motivo: 'A ficha não tem reserva.' };
@@ -104,7 +124,11 @@ export function reciboDisponivel(d, tipo, alvo) {
   }
   if (tipo === 'garantia') {
     if (!c) return { ok: false, motivo: 'O recibo da garantia é do contrato.' };
-    if (!R.temCaucao(c) && !R.temDeposito(c)) return { ok: false, motivo: 'O contrato não tem caução nem depósito em dinheiro.' };
+    if (!R.temCaucao(c) && !R.temDeposito(c) && !garantiaDaTroca(d, c)) return { ok: false, motivo: 'O contrato não tem caução nem depósito em dinheiro.' };
+    // garantia herdada (trocas antigas): quem pagou foi o titular anterior
+    const qual = R.temCaucao(c) ? 'caucao' : R.temDeposito(c) ? 'deposito' : null;
+    const pagador = qual ? R.pagadorDaGarantia(d, c, qual) : c;
+    if (pagador.id !== c.id) return { ok: false, motivo: `O recibo é de quem pagou a garantia (${pagador.inquilino_nome}): tire-o no contrato dele.` };
     return garantiaPaga(d, c) ? { ok: true } : { ok: false, motivo: 'Registre antes o depósito da garantia (data e comprovante).' };
   }
   if (tipo === 'devolucao_chaves') {
@@ -169,7 +193,7 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
         '3. Não aprovada a ficha, ou se o interessado desistir antes de assinar o contrato, o valor é devolvido por inteiro, sem desconto, na conta de onde veio o depósito.',
       ],
       tabela: proposta.length ? [['CONDIÇÕES PROPOSTAS (dependem da aprovação da ficha)', null], ...proposta] : [],
-      depois: ['Dou quitação do valor acima, nos termos dos artigos 319 e 320 do Código Civil.'],
+      depois: ['Damos quitação do valor acima, nos termos dos artigos 319 e 320 do Código Civil.'],
       assinaturas: [assinaEmpresa],
       arquivo: nomeArq('Recibo reserva', p.reserva_data),
     };
@@ -204,11 +228,11 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
         `Recebemos de ${quem}, a importância de ${K.valorComExtenso(g.valor)}, ${g.depositos.length > 1 ? `em ${g.depositos.length} depósitos (abaixo)` : `em ${C.dataBr(g.data)}`}, creditada na conta da empresa, a título de ${g.nome} do contrato de locação do imóvel situado na ${endereco}${inicio ? `, com início em ${C.dataBr(inicio)}` : ''}.`,
         caucao
           ? 'O valor fica depositado em caderneta de poupança, com os rendimentos a favor do locatário, e é devolvido no fim da locação, depois da entrega das chaves e da vistoria de saída, descontados apenas os débitos comprovados, conforme o contrato (Lei 8.245/91, artigo 38, § 2º).'
-          : `O valor é devolvido no fim da locação, depois da entrega das chaves e da vistoria de saída, descontados apenas os débitos comprovados, conforme o contrato${c.deposito_uso ? ` (uso combinado: ${c.deposito_uso})` : ''}.`,
+          : `O valor é devolvido no fim da locação, depois da entrega das chaves e da vistoria de saída, descontados apenas os débitos comprovados, conforme o contrato${g.uso ? ` (uso combinado: ${g.uso})` : ''}.`,
         'A garantia não é aluguel nem receita da empresa: não há nota fiscal.',
       ],
       tabela: g.depositos.length > 1 ? [['DEPÓSITOS', null], ...g.depositos.map((x) => [C.dataBr(x.data), C.reais(x.valor)])] : [],
-      depois: ['Dou quitação do valor acima, nos termos dos artigos 319 e 320 do Código Civil.'],
+      depois: ['Damos quitação do valor acima, nos termos dos artigos 319 e 320 do Código Civil.'],
       assinaturas: [assinaEmpresa],
       arquivo: nomeArq(caucao ? 'Recibo caucao' : 'Recibo deposito garantia', g.data),
     };
@@ -221,20 +245,8 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
   // quitacao: entrega do imóvel, acerto final e quitação recíproca, com os valores discriminados
   const enc = R.encerramentoDo(d, c.id);
   const vist = K.resultadoVistoriaSaida(d, c);
-  const solidario = c.solidario_nome ? pessoa(c.solidario_nome, c.solidario_cpf ? `CPF/CNPJ ${c.solidario_cpf}` : '') : '';
-  const tabela = [];
-  if (enc.garantia_valor > 0) {
-    tabela.push(['Garantia depositada', C.reais(enc.garantia_valor)]);
-    tabela.push([`Garantia corrigida até ${C.dataBr(enc.data_saida)}`, C.reais(enc.garantia_corrigida || enc.garantia_valor)]);
-  }
-  if (enc.fci_credito) tabela.push(['FCI corrigido (crédito do locatário)', C.reais(enc.fci_credito)]);
-  // os reparos pagos pelo FCI e o que passou dele também saem do saldo: sem essas linhas a tabela não fecha com o saldo
-  if (enc.fci_usado > 0) tabela.push(['(-) Reparos pagos pelo FCI', C.reais(enc.fci_usado)]);
-  const danosAlem = Math.max((enc.fci_danos || 0) - (enc.fci_usado || 0), 0);
-  if (danosAlem > 0) tabela.push(['(-) Reparos além do FCI', C.reais(danosAlem)]);
-  tabela.push(['(-) Débitos descontados', C.reais(enc.debitos || 0)]);
-  for (const l of String(enc.debitos_descricao || '').split(/\n+/).map((x) => x.trim()).filter(Boolean)) tabela.push([`   ${l}`, '']);
-  tabela.push([enc.saldo >= 0 ? '= Saldo devolvido ao locatário' : '= Saldo pago pelo locatário', C.reais(Math.abs(enc.saldo || 0))]);
+  const solidario = c.solidario_nome ? pessoa(c.solidario_nome, c.solidario_cpf ? `${K.rotuloDocumento(c.solidario_cpf)} ${c.solidario_cpf}` : '') : '';
+  const tabela = linhasDoAcerto(enc, { quitacao: true });
   const pagamento = enc.saldo > 0 ? `Em ${C.dataBr(enc.garantia_devolvida_em)}, a LOCADORA devolveu ao LOCATÁRIO o saldo de ${K.valorComExtenso(enc.saldo)}, conforme o comprovante bancário anexo.`
     : enc.saldo < 0 ? `Em ${C.dataBr(enc.garantia_devolvida_em)}, o LOCATÁRIO pagou à LOCADORA o saldo de ${K.valorComExtenso(-enc.saldo)}.`
       : 'Não há saldo a devolver nem a pagar.';
@@ -256,6 +268,30 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
   };
 }
 
+/**
+ * Linhas do acerto final (cálculo da saída), as mesmas no termo de quitação e no e-mail do acerto: [[rótulo, valor]].
+ * Os reparos pagos pelo FCI e o que passou dele também saem do saldo, senão a conta não fecha. Ex.: garantia corrigida
+ * R$ 5.940,00, FCI R$ 1.200,00, reparos R$ 800,00, débitos R$ 1.000,00 → 5.940 + 1.200 − 800 − 1.000 = saldo R$ 5.340,00.
+ * ``quitacao``: rótulos do termo (saldo já devolvido ou pago); sem ela, os do e-mail (a devolver / a pagar).
+ */
+export function linhasDoAcerto(enc, { quitacao = false } = {}) {
+  if (!enc) return [];
+  const tabela = [];
+  if (enc.garantia_valor > 0) {
+    tabela.push(['Garantia depositada', C.reais(enc.garantia_valor)]);
+    tabela.push([`Garantia corrigida até ${C.dataBr(enc.data_saida)}`, C.reais(enc.garantia_corrigida || enc.garantia_valor)]);
+  }
+  if (enc.fci_credito) tabela.push(['FCI corrigido (crédito do locatário)', C.reais(enc.fci_credito)]);
+  if (enc.fci_usado > 0) tabela.push(['(-) Reparos pagos pelo FCI', C.reais(enc.fci_usado)]);
+  const danosAlem = Math.max((enc.fci_danos || 0) - (enc.fci_usado || 0), 0);
+  if (danosAlem > 0) tabela.push(['(-) Reparos além do FCI', C.reais(danosAlem)]);
+  tabela.push([quitacao ? '(-) Débitos descontados' : '(-) Débitos', C.reais(enc.debitos || 0)]);
+  for (const l of String(enc.debitos_descricao || '').split(/\n+/).map((x) => x.trim()).filter(Boolean)) tabela.push([`   ${l}`, '']);
+  const saldo = quitacao ? (enc.saldo >= 0 ? '= Saldo devolvido ao locatário' : '= Saldo pago pelo locatário') : `= Saldo ${enc.saldo >= 0 ? 'a devolver' : 'a pagar'}`;
+  tabela.push([saldo, C.reais(Math.abs(enc.saldo || 0))]);
+  return tabela;
+}
+
 /** Notificação do documento (``alvo.notificacao``: o registro, ou ``alvo.id``), só se for deste contrato. */
 const notificacaoDe = (d, c, alvo) => {
   const n = alvo.notificacao || R.buscar(d, 'notificacoes', Number(alvo.id));
@@ -271,7 +307,7 @@ const notificacaoDe = (d, c, alvo) => {
 function cartaDaNotificacao(d, c, n, base, x) {
   const numero = R.numeroDaNotificacao(d, n);
   const ant = n.anterior_id ? R.buscar(d, 'notificacoes', n.anterior_id) : null;
-  const solidario = c.solidario_nome ? pessoa(c.solidario_nome, c.solidario_cpf ? `CPF/CNPJ ${c.solidario_cpf}` : '') : '';
+  const solidario = c.solidario_nome ? pessoa(c.solidario_nome, c.solidario_cpf ? `${K.rotuloDocumento(c.solidario_cpf)} ${c.solidario_cpf}` : '') : '';
   return {
     ...base, data: n.data, titulo: numero > 1 ? `${numero}ª NOTIFICAÇÃO EXTRAJUDICIAL` : 'NOTIFICAÇÃO EXTRAJUDICIAL',
     paragrafos: [
@@ -301,7 +337,7 @@ const acordoDe = (d, c, alvo) => { const a = R.buscar(d, 'acordos', Number(alvo.
  * consentimento dele (Código Civil, artigo 838, I): por isso os fiadores assinam concordando.
  */
 function termoDoAcordo(d, c, a, base, x) {
-  const solidario = c.solidario_nome ? pessoa(c.solidario_nome, c.solidario_cpf ? `CPF/CNPJ ${c.solidario_cpf}` : '') : '';
+  const solidario = c.solidario_nome ? pessoa(c.solidario_nome, c.solidario_cpf ? `${K.rotuloDocumento(c.solidario_cpf)} ${c.solidario_cpf}` : '') : '';
   const fiadores = R.fiadoresDoContrato(d, c.id).filter((f) => !f.data_saida || f.data_saida >= a.data);
   const origens = R.origensDoAcordo(d, a);
   const parcelas = R.parcelasDoAcordo(d, a);
@@ -349,7 +385,7 @@ function chavesDaSaida(d, c) {
  * ressalva de que receber as chaves não dá quitação. Ex.: saída em 10/03/2027, vistoria marcada para 12/03/2027 às 14:00.
  */
 function termoDevolucaoChaves(d, c, base, x) {
-  const solidario = c.solidario_nome ? pessoa(c.solidario_nome, c.solidario_cpf ? `CPF/CNPJ ${c.solidario_cpf}` : '') : '';
+  const solidario = c.solidario_nome ? pessoa(c.solidario_nome, c.solidario_cpf ? `${K.rotuloDocumento(c.solidario_cpf)} ${c.solidario_cpf}` : '') : '';
   const chaves = chavesDaSaida(d, c);
   const horas = c.finalidade === 'Não residencial' ? '48 (quarenta e oito)' : '72 (setenta e duas)';
   const vistoria = c.vistoria_saida_data

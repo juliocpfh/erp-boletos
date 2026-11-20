@@ -30,6 +30,7 @@ function listaDoQueSai(x) {
   const saem = [...p.proprios, ...p.ligados];
   if (saem.length) itens.push(`<b>${saem.length} registro(s)</b> saem inteiros: ${esc(porTabela(saem))}`);
   if (p.outros.length) itens.push(`<b>${p.outros.length} registro(s) de outras pessoas</b> ficam, mas sem os dados dela (${esc([...new Set(p.outros.map((o) => `${rotulo(o.tabela)} nº ${o.id}: ${campoEmPalavras(o.campo)}`))].join('; '))})`);
+  if (p.destinos.length) itens.push(`<b>a resposta dela em ${p.destinos.length} comunicado(s)</b> (contatos, IP, aparelho e assinatura do aceite; o comunicado fica para os outros)`);
   if (p.contratos.length || p.fichas.length) itens.push(`<b>as pastas de arquivos</b> ${p.contratos.length ? `do(s) ${p.contratos.length} contrato(s)` : ''}${p.contratos.length && p.fichas.length ? ' e ' : ''}${p.fichas.length ? `da(s) ${p.fichas.length} ficha(s)` : ''}, com tudo dentro (${x.anexos.length} arquivo(s) ligados a lançamentos e o que mais estiver lá)`);
   itens.push(`<b>${x.historico.length} linha(s) do Histórico</b> desses registros${E.nuvem ? ', também no servidor da nuvem (os outros aparelhos baixam os dados de novo sozinhos)' : ''}`);
   return `<ul>${itens.map((i) => `<li>${i}</li>`).join('')}</ul>`;
@@ -121,7 +122,7 @@ export const ACOES_PESSOA = {
     const s = P.situacaoParaApagar(d(), cpfEscolhido);
     if (!s.pode) throw new C.ErroUsuario(s.motivo || 'Esta pessoa ainda não pode ser apagada.');
     if (E.nuvem && E.nuvem.pendentesQtd()) throw new C.ErroUsuario('Ainda há mudanças deste aparelho esperando para ir à nuvem. Espere enviar (ou conecte à internet) e tente de novo.');
-    const resp = await janela({ titulo: '2ª confirmação: apagar tudo desta pessoa', forte: true, sim: 'Apagar tudo', nao: 'Cancelar',
+    const resp = await janela({ titulo: 'Apagar tudo desta pessoa?', forte: true, sim: 'Apagar tudo', nao: 'Cancelar',
       html: `<p>Apagar de vez tudo de <b>${esc(x.nome || 'esta pessoa')}</b> (${esc(doc(cpfEscolhido))})? Não tem como desfazer.</p>${listaDoQueSai(x)}
         <p>Digite <b>APAGAR</b> para confirmar: <input name="confirmo" autocomplete="off" required></p>` });
     if (!resp) return;

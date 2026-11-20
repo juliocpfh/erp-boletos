@@ -140,6 +140,8 @@ const pessoaDe = (r, prefixo) => ({ nome: r[`${prefixo}nome`], genero: r[`${pref
   estado_civil: r[`${prefixo}estado_civil`], profissao: r[`${prefixo}profissao`], rg: r[`${prefixo}rg`], cpf: r[`${prefixo}cpf`],
   nascimento: r[`${prefixo}nascimento`], endereco: r[`${prefixo}endereco`] });
 
+/** "CPF" ou "CNPJ" pelo número de dígitos do documento (14 = CNPJ). */
+export const rotuloDocumento = (doc) => (String(doc || '').replace(/\D/g, '').length === 14 ? 'CNPJ' : 'CPF');
 /** Qualificação de uma empresa locadora ou locatária, com o representante. */
 function qualificarEmpresa(nome, cnpj, sede, rep, cargo) {
   const partes = [`${String(nome || '').toLocaleUpperCase('pt-BR')}, pessoa jurídica de direito privado`];
@@ -300,7 +302,9 @@ export function dadosDoContrato(d, c, extra = {}) {
   const campos = {
     locadoras: locadoras.map((e) => qualificarEmpresa(e.razao_social || e.nome, e.cnpj, e.endereco_sede || e.endereco, pessoaDe(e, 'representante_'), e.representante_cargo)).join('; e '),
     locatarios: locatarios.join('; e '),
-    solidario: c.solidario_nome ? qualificarPessoa(pessoaDe(c, 'solidario_')) : '',
+    // solidário empresa (CNPJ no campo "CPF / CNPJ do solidário"): qualificação de pessoa jurídica
+    solidario: !c.solidario_nome ? '' : rotuloDocumento(c.solidario_cpf) === 'CNPJ'
+      ? qualificarEmpresa(c.solidario_nome, c.solidario_cpf, c.solidario_endereco) : qualificarPessoa(pessoaDe(c, 'solidario_')),
     fiadores: fiadores.map((f) => qualificarFiador(f)).join('; e '),
     fiadores_imoveis: fiadores.filter((f) => f.imovel_garantia).map((f) => (fiadores.length > 1 ? `${f.nome.toLocaleUpperCase('pt-BR')}: ${f.imovel_garantia}` : f.imovel_garantia)).join('; '),
     inquilino_nome: String(c.inquilino_nome || '').toLocaleUpperCase('pt-BR'),
@@ -328,6 +332,7 @@ export function dadosDoContrato(d, c, extra = {}) {
     representacao: lista(representacaoDoContrato(d, c, imovel)),
     caucao_valor: valorComExtenso(caucaoValor),
     caucao_meses: numeroComExtenso(caucaoMeses || 0),
+    caucao_meses_aluguel: `${numeroComExtenso(caucaoMeses || 0)} ${caucaoMeses === 1 ? 'mês' : 'meses'}`,
     deposito_valor: valorComExtenso(c.deposito_valor || 0),
     deposito_uso: c.deposito_uso || '',
     cidade: imovel.cidade || dadoDaEmpresa(d, c, 'cidade_documentos'),
@@ -338,6 +343,7 @@ export function dadosDoContrato(d, c, extra = {}) {
     seguro_fianca: c.garantia_tipo === 'Seguro fiança', sem_garantia: !c.garantia_tipo || c.garantia_tipo === 'Sem garantia',
     solidario: !!c.solidario_nome, pj, residencial: c.finalidade !== 'Não residencial', nao_residencial: c.finalidade === 'Não residencial',
     bonificacao: pctBonif > 0, iptu_inquilino: inquilinoPaga.includes('IPTU'), seguro_inquilino: inquilinoPaga.includes('seguro incêndio'),
+    seguro_incluso: inclusos.includes('seguro incêndio'),
     tem_incluso: inclusos.length > 0, tarifa_boleto: false, fci: c.fci_percentual > 0, area_comum: !!imovel.area_comum, imovel_fiador: !!campos.fiadores_imoveis,
     varios_fiadores: fiadores.length > 1, varias_locadoras: locadoras.length > 1,
     indeterminado: c.prazo_tipo === 'Indeterminado',
@@ -350,8 +356,8 @@ export function dadosDoContrato(d, c, extra = {}) {
     ...locadoras.map((e) => ({ nome: (e.razao_social || e.nome).toLocaleUpperCase('pt-BR'), doc: e.cnpj ? `CNPJ ${e.cnpj}` : '', papel: 'LOCADORA',
       extra: e.representante_nome ? `${e.representante_nome.toLocaleUpperCase('pt-BR')} – ${(e.representante_cargo || 'representante').toLocaleUpperCase('pt-BR')}` : '' })),
     { nome: campos.inquilino_nome, doc: c.inquilino_cpf ? `${pj ? 'CNPJ' : 'CPF'} ${c.inquilino_cpf}` : '', papel: 'LOCATÁRIO',
-      extra: pj && c.representante_nome ? `${c.representante_nome.toLocaleUpperCase('pt-BR')} – REPRESENTANTE` : '' },
-    ...(c.solidario_nome ? [{ nome: c.solidario_nome.toLocaleUpperCase('pt-BR'), doc: c.solidario_cpf ? `CPF ${c.solidario_cpf}` : '', papel: 'LOCATÁRIO SOLIDÁRIO' }] : []),
+      extra: pj && c.representante_nome ? `${c.representante_nome.toLocaleUpperCase('pt-BR')} – ${(c.representante_cargo || 'representante').toLocaleUpperCase('pt-BR')}` : '' },
+    ...(c.solidario_nome ? [{ nome: c.solidario_nome.toLocaleUpperCase('pt-BR'), doc: c.solidario_cpf ? `${rotuloDocumento(c.solidario_cpf)} ${c.solidario_cpf}` : '', papel: 'LOCATÁRIO SOLIDÁRIO' }] : []),
     ...(temFiador ? fiadores.flatMap((f, i) => {
       const papel = fiadores.length > 1 ? `FIADOR ${i + 1}` : 'FIADOR';
       const cj = conjugeDoFiador(f);
@@ -424,6 +430,12 @@ export function montarContrato(texto, dados) {
     const [sim, nao = ''] = m[2].split('[senão]');
     t = t.slice(0, m.index) + (cond(m[1]) ? sim : nao) + t.slice(m.index + m[0].length);
   }
+  // "**Parágrafo** –" sem número: numera sozinho dentro de cada cláusula (um só = "único"; vários = primeiro, segundo...)
+  t = t.split(/(?=CL[ÁA]USULA #)/).map((seg) => {
+    const total = (seg.match(/\*\*Parágrafo\*\* –/g) || []).length;
+    let k = 0;
+    return total ? seg.replace(/\*\*Parágrafo\*\* –/g, () => { k += 1; return `**Parágrafo ${total === 1 ? 'único' : ordinalPorExtenso(k).replace(/a\b/g, 'o')}** –`; }) : seg;
+  }).join('');
   // numeração de cláusulas e itens
   let n = 0;
   let item = 0;
@@ -435,7 +447,15 @@ export function montarContrato(texto, dados) {
   const qtd = { s: q.locatarios, l: q.locadoras, f: q.fiadores, a: q.saintes || 1 };
   t = t.replace(/\{([slfa]):([^|}]*)\|([^}]*)\}/g, (x, k, um, varios) => (qtd[k] > 1 ? varios : um));
   t = t.replace(/\{cl:([a-z_]+)\}/gi, (x, nome) => (rotulos[nome] ? `${rotulos[nome]}ª (${ordinalPorExtenso(rotulos[nome])})` : `[cláusula ${nome}?]`));
-  t = t.replace(/\{([a-z_]+)\}/g, (x, nome) => (nome in dados.campos ? dados.campos[nome] : `[${nome}?]`));
+  // {campo} como nos e-mails: {Campo} sai com a 1ª letra maiúscula e {CAMPO} todo em maiúsculas
+  t = t.replace(/\{([A-Za-z_]+)\}/g, (x, nome) => {
+    const chave = nome.toLowerCase();
+    if (!(chave in dados.campos)) return `[${chave}?]`;
+    const s = String(dados.campos[chave] ?? '');
+    if (nome === chave || !s) return s;
+    if (nome === nome.toUpperCase()) return s.toLocaleUpperCase('pt-BR');
+    return s[0].toLocaleUpperCase('pt-BR') + s.slice(1);
+  });
   // blocos
   const blocos = [];
   for (const parte of t.split(/\n\s*\n/)) {
@@ -448,6 +468,28 @@ export function montarContrato(texto, dados) {
     else blocos.push({ tipo: 'paragrafo', runs: negritos(linha) });
   }
   return blocos;
+}
+
+/** Campos que os modelos conhecem: os dos modelos padrão e os da ajuda "Como escrever um modelo". */
+const CAMPOS_EXTRAS = ['locadoras', 'locatarios', 'solidario', 'fiadores', 'fiadores_imoveis', 'inquilino_nome', 'objeto', 'imovel_nome', 'endereco_imovel',
+  'finalidade', 'atividade', 'prazo_meses', 'data_inicio', 'data_fim', 'aluguel_cheio', 'aluguel_bonificado', 'bonificacao_percentual', 'dia_vencimento',
+  'indice', 'multa', 'juros', 'tarifa_boleto', 'fci_percentual', 'fci_indice', 'encargos_inquilino', 'encargos_inclusos', 'representacao', 'caucao_valor',
+  'caucao_meses', 'caucao_meses_aluguel', 'deposito_valor', 'deposito_uso', 'cidade', 'data_assinatura', 'numero_aditivo', 'data_contrato',
+  'dia_vencimento_anterior', 'dia_vencimento_novo', 'primeiro_vencimento', 'mes_referencia', 'data_troca', 'data_vespera', 'saintes', 'entrantes',
+  'aluguel_atual', 'garantia_anterior', 'garantia_depositada', 'garantia_corrigida'];
+let camposConhecidos = null;
+/**
+ * Avisos ao salvar um modelo: {campo} que não existe (sai "[campo?]" no contrato). Ex.: ["{locatario}"].
+ * Maiúscula vale ({Cidade}, {CIDADE}), como nos e-mails.
+ */
+export function camposDesconhecidosDoModelo(texto) {
+  if (!camposConhecidos) {
+    camposConhecidos = new Set(CAMPOS_EXTRAS);
+    for (const m of MODELOS_PADRAO) for (const [, nome] of String(m.texto || '').matchAll(/\{([a-z_]+)\}/g)) camposConhecidos.add(nome);
+  }
+  const fora = new Set();
+  for (const [x, nome] of String(texto || '').matchAll(/\{([A-Za-z_]+)\}/g)) if (!camposConhecidos.has(nome.toLowerCase())) fora.add(x);
+  return [...fora];
 }
 
 /** "texto **negrito** texto" → [{t, b}] */
@@ -824,8 +866,18 @@ export const VISTORIA_INTRO = 'O presente relatório acusará as condições do 
 /** Textos padrão da vistoria; cada vistoria pode trocar (abertura e, na entrada, o texto final). */
 export const VISTORIA_ABERTURA = `${VISTORIA_INTRO} Para mais detalhes, verifique a íntegra das fotos no link compartilhado por e-mail:`;
 export const VISTORIA_ABERTURA_SEM_LINK = `${VISTORIA_INTRO} Para mais detalhes, verifique as fotos em anexo.`;
-export const vistoriaFinal = (dias = 3) => `O LOCATÁRIO tem ${numeroComExtenso(dias)} dias, a contar desta data, para apontar por escrito qualquer ponto não registrado nesta vistoria; depois disso, ela vale como aceita.
+// mesmo prazo do contrato (parágrafo da cláusula da vistoria, decisão de 13/11/2026): dias úteis contados da entrega das chaves
+export const vistoriaFinal = (dias = C.PRAZO_VISTORIA_ENTRADA) => `O LOCATÁRIO tem ${numeroComExtenso(dias)} dias úteis, contados da entrega das chaves, para apontar por escrito qualquer ponto não registrado nesta vistoria; depois disso, ela vale como aceita.
 O imóvel deve ser devolvido nas mesmas condições descritas neste documento.`;
+/** Texto padrão antigo (3 dias corridos): vistoria gravada com ele passa a usar o padrão de hoje. */
+export const VISTORIA_FINAL_ANTIGA = `O LOCATÁRIO tem 3 (três) dias, a contar desta data, para apontar por escrito qualquer ponto não registrado nesta vistoria; depois disso, ela vale como aceita.
+O imóvel deve ser devolvido nas mesmas condições descritas neste documento.`;
+const semEspacosVistoria = (x) => String(x || '').replace(/\s+/g, ' ').trim();
+/** Texto final da vistoria de entrada: o gravado, ou o padrão (em branco ou igual a um padrão antigo). */
+export const textoFinalVistoria = (v) => {
+  const t = String((v && v.texto_final) || '').trim();
+  return !t || semEspacosVistoria(t) === semEspacosVistoria(VISTORIA_FINAL_ANTIGA) ? vistoriaFinal() : t;
+};
 export const VISTORIA_CONDICOES = `Imóvel entregue limpo.
 Parte elétrica e hidráulica em perfeito funcionamento, exceto os pontos descritos acima.
 Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os pontos descritos acima e/ou registrados nas fotos da vistoria.`;
@@ -844,14 +896,16 @@ function cabecalhoDoc(d, c, dados) {
     it(`**IMÓVEL:** ${descr}${dados.campos.endereco_imovel || imovel.nome || ''}`),
     ...dados.locadoras.map((e) => it(`**LOCADORA:** ${(e.razao_social || e.nome).toLocaleUpperCase('pt-BR')}${e.cnpj ? `, CNPJ ${e.cnpj}` : ''}`)),
     it(`**LOCATÁRIO:** ${dados.campos.inquilino_nome}${c.inquilino_cpf ? `, ${pj ? 'CNPJ' : 'CPF'} ${c.inquilino_cpf}` : ''}`),
-    ...(c.solidario_nome ? [it(`**LOCATÁRIO SOLIDÁRIO:** ${c.solidario_nome.toLocaleUpperCase('pt-BR')}${c.solidario_cpf ? `, CPF ${c.solidario_cpf}` : ''}`)] : []),
+    ...(c.solidario_nome ? [it(`**LOCATÁRIO SOLIDÁRIO:** ${c.solidario_nome.toLocaleUpperCase('pt-BR')}${c.solidario_cpf ? `, ${rotuloDocumento(c.solidario_cpf)} ${c.solidario_cpf}` : ''}`)] : []),
   ];
 }
 
 /** Texto do descritivo: "## CÔMODO" vira subtítulo, "- item" vira marcador, as demais linhas ficam como estão. */
 export function descritivoBlocos(texto) {
   // item do roteiro que ficou sem preencher ("- Piso e rodapé:") não sai no documento
-  return linhasDe(texto).filter((l) => !/^[-•*]\s+[^:]*:$/.test(l)).map((l) => {
+  const linhas = linhasDe(texto).filter((l) => !/^[-•*]\s+[^:]*:$/.test(l));
+  // cômodo que ficou sem nenhum item nem texto abaixo dele também não sai (título solto)
+  return linhas.filter((l, n) => !l.startsWith('## ') || (linhas[n + 1] !== undefined && !linhas[n + 1].startsWith('## '))).map((l) => {
     if (l.startsWith('## ')) return { tipo: 'subsecao', runs: negritos(l.slice(3).toLocaleUpperCase('pt-BR')) };
     if (/^[-•*]\s+/.test(l)) return it(`• ${l.replace(/^[-•*]\s+/, '')}`);
     return it(l);
@@ -1002,7 +1056,7 @@ export function vistoriaBlocos(d, c, v, leitura = null, fotos = {}, entradaItens
     blocos.push(it('Os itens destacados pioraram em relação à vistoria de entrada.'));
   }
   blocos.push({ tipo: 'secao', runs: negritos('CONDIÇÕES GERAIS') }, ...linhasDe(v.condicoes).map(it));
-  if (!saida) blocos.push(...linhasDe(String(v.texto_final || '').trim() || vistoriaFinal(v.prazo_dias || 3)).map(it));
+  if (!saida) blocos.push(...linhasDe(textoFinalVistoria(v)).map(it));
   // B3: quem acompanhou a vistoria de saída; sem o locatário, o prazo para contestar o relatório enviado por e-mail
   if (saida && v.inquilino_presente) blocos.push(it(v.inquilino_presente === 'Não veio' ? 'O LOCATÁRIO, convidado por escrito, não compareceu. Este relatório lhe é enviado por e-mail, com 5 (cinco) dias úteis para contestar.' : `Vistoria acompanhada pelo LOCATÁRIO${v.inquilino_presente === 'Mandou representante' ? ', por pessoa autorizada por escrito' : ''}.`));
   blocos.push({ tipo: 'direita', runs: negritos(`${dados.campos.cidade}, ${dados.campos.data_assinatura}.`) });

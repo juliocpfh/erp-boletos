@@ -5,7 +5,7 @@
 //   envios (FORMULARIOS: envio de cada formulário) · acoes (ACOES: botões data-acao)
 import { aviso, E, podeUsuario } from './app.js';
 import * as S from './armazenamento.js';
-import { PAPEIS, SENHA_MINIMA } from './auth.js';
+import { emailDeAcesso, PAPEIS, SENHA_MINIMA } from './auth.js';
 import * as C from './calculos.js';
 import { compBr, dataBr, reais } from './calculos.js';
 import * as F from './formularios.js';
@@ -46,7 +46,7 @@ function alertaRegua() {
   if (!podeUsuario('operador')) return '';
   const fila = G.filaRegua(d());
   if (!fila.length) return '';
-  return `<div class="alerta info"><b>Régua de cobrança:</b> ${fila.length} e-mail(s) ${admin() ? 'aguardando a sua autorização' : 'aguardando a autorização do administrador'} (nada é enviado sozinho).
+  return `<div class="alerta info"><b>Régua de cobrança:</b> ${C.plural(fila.length, 'e-mail', 'e-mails')} ${admin() ? 'aguardando a sua autorização' : 'aguardando a autorização do administrador'} (nada é enviado sozinho).
     ${link('#/regua', admin() ? 'Ver e autorizar' : 'Ver a lista', 'botao pequeno')}</div>`;
 }
 
@@ -237,9 +237,11 @@ export const TELAS = {
       <p><label for="ent_login">Login</label><input id="ent_login" name="login" autofocus autocomplete="username"></p>
       <p><label for="ent_senha">Senha</label><input id="ent_senha" type="password" name="senha" autocomplete="current-password"></p>
       <button>Entrar</button> ${E.nuvem ? '' : botao('escolherPasta', 'Trocar de pasta')}
-    </form><p class="suave" style="margin-top:14px">Primeiro acesso? <a href="#/pedir-acesso">Pedir acesso ao administrador</a></p>${LINK_RESTAURAR}</div></main>`,
+    </form><p class="suave" style="margin-top:14px">${E.nuvem ? 'Primeiro acesso? Peça ao administrador para cadastrar você em Usuários → Novo usuário, com o seu e-mail de acesso.' : 'Primeiro acesso? <a href="#/pedir-acesso">Pedir acesso ao administrador</a>'}</p>${LINK_RESTAURAR}</div></main>`,
 
-  pedirAcesso: () => `<main><div id="mensagens"></div><div class="cartao login">
+  // na nuvem só o administrador cria usuários (o cofre recusa o pedido): lá a tela só explica o caminho
+  pedirAcesso: () => (E.nuvem ? `<main><div id="mensagens"></div><div class="cartao login"><h1>Pedir acesso</h1>
+    <p>Primeiro acesso? Peça ao administrador para cadastrar você em Usuários → Novo usuário, com o seu e-mail de acesso.</p><p><a class="botao secundario" href="#/">Voltar</a></p></div></main>` : `<main><div id="mensagens"></div><div class="cartao login">
     <h1>Pedir acesso</h1><p class="suave">${E.nuvem ? 'Dados na nuvem' : `Pasta: <b>${esc(E.pasta.name)}</b>`}. O administrador recebe o pedido em Usuários e libera o acesso.</p>
     <form data-form="pedirAcesso">
       <p><label for="ent_nome">Seu nome</label><input id="ent_nome" name="nome" autofocus></p>
@@ -247,7 +249,7 @@ export const TELAS = {
       <p><label for="ent_senha">Senha (mínimo ${SENHA_MINIMA} caracteres)</label><input id="ent_senha" type="password" name="senha" autocomplete="new-password"></p>
       <p><label for="ent_senha2">Repita a senha</label><input id="ent_senha2" type="password" name="senha2" autocomplete="new-password"></p>
       <button>Enviar pedido</button> <a class="botao secundario" href="#/">Voltar</a>
-    </form></div></main>`,
+    </form></div></main>`),
 
   // ------------------------------------------------------------------------
   painel(rota) {
@@ -289,7 +291,7 @@ export const TELAS = {
     const porTipo = {};
     for (const a of alertas) porTipo[a.tipo] = (porTipo[a.tipo] || 0) + 1;
     const [tipoMais, qtdMais] = Object.entries(porTipo).sort((a, b) => b[1] - a[1])[0] || ['', 0];
-    return `${avisoPrimeiraLogo()}<div class="cabecalho"><h1>Painel</h1>${opera() ? `<div class="acoes">${link('#/cobrancas?filtro=abertos', 'Registrar pagamento', 'botao')} ${link('#/cobrancas', 'Acompanhar boletos', 'botao secundario')}</div>` : ''}</div>
+    return `${avisoPrimeiraLogo()}<div class="cabecalho"><h1>Painel</h1>${opera() ? `<div class="acoes">${link('#/cobrancas?filtro=abertos', 'Confirmar pagamento', 'botao')} ${link('#/cobrancas', 'Acompanhar boletos', 'botao secundario')}</div>` : ''}</div>
       ${primeirosPassos()}
       <div class="numeros">
         ${n(d().imoveis.length, 'imóveis', '#/imoveis')}
@@ -297,14 +299,14 @@ export const TELAS = {
         ${n(pend.length, 'pagamentos aguardando NF', '#/faturas')}
         <a class="cartao" href="#/?ir=alertas" title="Ver os alertas">${qtdMais ? `<div class="grande">${alertas.length}</div>${alertas.length === 1 ? 'alerta ativo' : 'alertas ativos'}<br><span class="suave">${Object.keys(porTipo).length > 1 ? `o maior grupo: ${esc(tipoMais)} (${qtdMais})` : esc(tipoMais)}${adiados.length ? `, ${adiados.length} adiado(s)` : ''}${desligados.length ? `, ${desligados.length} desligado(s)` : ''}</span>` : `<div class="grande">0</div>alertas ativos${adiados.length || desligados.length ? `<br><span class="suave">${[adiados.length && `${adiados.length} adiado(s)`, desligados.length && `${desligados.length} desligado(s)`].filter(Boolean).join(', ')}</span>` : ''}`}</a>
         ${(() => { const r = R.resumoSolicitacoes(d()); return `<a class="cartao resumo-painel" href="#/solicitacoes" title="Ver as solicitações dos inquilinos">
-          <div class="simbolos">${SITUACOES_SOLICITACAO.map((s) => `<span title="${s.texto}">${s.simbolo} ${r[s.nome]}</span>`).join('')}</div>Solicitações de inquilinos
+          <div class="simbolos">${SITUACOES_SOLICITACAO.map((s) => `<span title="${s.texto}">${s.simbolo} ${r[s.nome]}</span>`).join('')}</div>Solicitações dos inquilinos
           <div class="suave legenda-simbolos">${SITUACOES_SOLICITACAO.map((s) => `${s.simbolo} ${s.texto}`).join(' · ')}</div></a>`; })()}
       </div>
-      ${incompletos.length ? `<div class="alerta aviso"><b>${incompletos.length} cadastro(s) incompleto(s).</b> ${link('#/pendencias?ir=cadastros', 'Ver os cadastros incompletos', 'botao pequeno')}</div>` : ''}
+      ${incompletos.length ? `<div class="alerta aviso"><b>${C.plural(incompletos.length, 'cadastro incompleto', 'cadastros incompletos')}.</b> ${link('#/pendencias?ir=cadastros', 'Ver os cadastros incompletos', 'botao pequeno')}</div>` : ''}
       ${d().contratos.filter((c) => R.dataApagarSemImovel(c)).map((c) => `<div class="alerta aviso"><b>Contrato sem imóvel:</b> <a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a> será apagado em <b>${dataBr(R.dataApagarSemImovel(c))}</b> se não for vinculado a um imóvel (use "Editar" no contrato).</div>`).join('')}
       ${alertaArquivosFaltando()}
       ${pastasComArquivos.length ? `<div class="alerta aviso"><b>Pasta "${PASTA_SEM_IMOVEL}"</b> tem pasta(s) com arquivos e sem contrato: ${esc(pastasComArquivos.join(', '))}. Confira e apague à mão se não precisar mais.</div>` : ''}
-      ${!d().contratos.length ? '' : `<div class="alerta ${faltamEtapas.length ? 'aviso' : 'ok'}"><b>Fechamento de ${compBr(mesAtual)}:</b> ${faltamEtapas.length ? `faltam ${faltamEtapas.length} etapa(s): ${esc(faltamEtapas.map((e) => `${e.titulo.split(/ \(|, a partir/)[0]}${e.mes !== mesAtual ? ` (de ${compBr(e.mes)})` : ''}`).join('; '))}.` : 'as etapas liberadas estão feitas.'}
+      ${!d().contratos.length ? '' : `<div class="alerta ${faltamEtapas.length ? 'aviso' : 'ok'}"><b>Fechamento de ${compBr(mesAtual)}:</b> ${faltamEtapas.length ? `${faltamEtapas.length === 1 ? 'falta' : 'faltam'} ${C.plural(faltamEtapas.length, 'etapa')}: ${esc(faltamEtapas.map((e) => `${e.titulo.split(/ \(|, a partir/)[0]}${e.mes !== mesAtual ? ` (de ${compBr(e.mes)})` : ''}`).join('; '))}.` : 'as etapas liberadas estão feitas.'}
         ${previstas.length ? `<span class="suave">Próximas: ${esc(previstas.map((e) => `${e.titulo.split(/ \(|, a partir/)[0]} a partir de ${dataBr(e.aPartirDe)}`).join('; '))}.</span>` : ''}
         ${link(`#/fechamento?mes=${faltamEtapas.length && faltamEtapas[0].mes !== mesAtual ? faltamEtapas[0].mes : mesAtual}`, 'Abrir o fechamento do mês', 'botao pequeno')}</div>`}
       ${podeUsuario('admin') && E.seguro && E.seguro.desconectado ? `<div class="alerta aviso"><b>Backup seguro</b> desconectado neste computador: o navegador pede para liberar a pasta de novo. ${botao('reconectarSeguro', 'Reconectar o backup seguro', {}, 'secundario pequeno')}</div>` : ''}
@@ -320,14 +322,14 @@ export const TELAS = {
         ${gruposDeAlertas(alertas).map(([tipo, lista]) => { const todos = alertasAbertos.has(tipo); return `<div class="grupo-alerta"><h3>${esc(tipo)} <span class="suave">(${lista.length})</span></h3>
           ${(todos ? lista : lista.slice(0, MOSTRAR_ALERTAS)).map((a) => `<div class="${classeAlerta(a)} com-adiar">${nomeAlerta(a)} ${adiar(a)}</div>`).join('')}
           ${lista.length > MOSTRAR_ALERTAS ? `<p class="mais-alertas">${botao('verTodosAlertas', todos ? `Mostrar só os ${MOSTRAR_ALERTAS} primeiros` : `Ver todos os ${lista.length} alertas de "${esc(tipo)}" (mais ${lista.length - MOSTRAR_ALERTAS})`, { tipo }, 'secundario mini')}</p>` : ''}</div>`; }).join('') || '<p class="suave">Nenhum alerta no momento.</p>'}
-        ${adiados.length ? `<details id="alertas-adiados"><summary class="suave">${adiados.length} alerta(s) adiado(s) ou em cuidado (clique para ver)</summary>
+        ${adiados.length ? `<details id="alertas-adiados"><summary class="suave">${C.plural(adiados.length, 'alerta adiado', 'alertas adiados')} ou em cuidado (clique para ver)</summary>
           ${adiados.map((a) => alertaAdiado(a, hoje)).join('')}</details>` : ''}
-        ${desligados.length ? `<details id="alertas-desligados"><summary class="suave">${desligados.length} alerta(s) desligado(s) (clique para ver ou religar)</summary>
+        ${desligados.length ? `<details id="alertas-desligados"><summary class="suave">${C.plural(desligados.length, 'alerta desligado', 'alertas desligados')} (clique para ver ou religar)</summary>
           ${desligados.map((x) => alertaDesligado(x)).join('')}</details>` : ''}
         <p class="suave" style="margin:10px 0 0">${link('#/pendencias', 'Ver tudo o que está pendente (alertas, fechamento e cadastros) numa lista só', '')}</p>
       </div>
       ${caixaHistorico('Últimas alterações', `${tabelaHistorico(ultimos(() => true, 12))}
-        <p class="suave">Banco criado em ${C.dataHoraBr(d().criado_em)}. <a href="#/historico">Ver histórico completo</a></p>`)}`;
+        <p class="suave">Sistema em uso desde ${C.dataHoraBr(d().criado_em)}. <a href="#/historico">Ver histórico completo</a></p>`)}`;
   },
 
   // ------------------------------------------------------------------------
@@ -335,7 +337,8 @@ export const TELAS = {
     // contas embaixo do endereço, cada uma numa coluna sem título (alinhadas de cima a baixo; a coluna cresce com o número maior)
     // o endereço ocupa as colunas das contas e mais uma de sobra, sem quebrar; sem número, "vazio"
     const CONTAS = [['💧', 'sanepar_matricula'], ['⚡', 'copel_uc'], ['🔥', 'gas_relogio'], ['📶', 'internet'], ['🏢', 'administradora_nome']];
-    const celulasContas = (i) => CONTAS.map(([t, k]) => `<td class="conta">${t} ${i[k] ? `<b>${esc(i[k])}</b>` : '<span class="vazio">vazio</span>'}</td>`).join('');
+    const NOMES_CONTAS = { sanepar_matricula: 'Água', copel_uc: 'Luz', gas_relogio: 'Gás', internet: 'Internet', administradora_nome: 'Condomínio' };
+    const celulasContas = (i) => CONTAS.map(([t, k]) => `<td class="conta" title="${NOMES_CONTAS[k]}">${t}<span class="so-celular"> ${NOMES_CONTAS[k]}</span> ${i[k] ? `<b>${esc(i[k])}</b>` : '<span class="vazio">vazio</span>'}</td>`).join('');
     // matrícula ao lado do nome (número ou vazio); embaixo do nome, os clipes dela (📎1, 📎2…, apagar em "✎ Editar") e o botão "Anexar"
     const numeroMatricula = (i) => `<span class="contas">📄 Matrícula ${i.matricula ? `nº <b>${esc(i.matricula)}</b>` : '<span class="vazio">vazio</span>'}</span>`;
     const anexosMatricula = (i) => `<span class="contas matricula"><span data-arquivos="matricula:${i.id}"></span>
@@ -345,8 +348,8 @@ export const TELAS = {
       const atuais = d().contratos.filter((c) => c.imovel_id === i.id && R.contratoAtivo(c, hoje) && !R.herancaAgendada(d(), c, hoje)).sort((a, b) => b.data_entrada.localeCompare(a.data_entrada));
       const aluguel = atuais.length ? atuais.map((c) => `${R.geraNf(c) ? '' : `${etiqueta('boleto de controle', 'controle')}<br>`}<span class="nw">${reais(R.aluguelAtual(d(), c))}</span>${c.bonificacao === false ? '' : ` <span class="suave nw">(${reais(valorBonificado(c))})</span>`}`).join('<br>') : etiqueta('Vago', 'aviso');
       return `<tr class="imovel-l1"><td class="nome"><a href="#/imovel/${i.id}"><b>${esc(i.nome)}</b></a> ${numeroMatricula(i)}</td>
-        <td colspan="${CONTAS.length + 1}" class="end-imovel">${esc(R.enderecoCompleto(i))}${i.sublote ? ` <span class="sublote">${esc(/^sublote/i.test(i.sublote) ? i.sublote : `Sublote ${i.sublote}`)}</span>` : ''}</td><td class="n">${aluguel}</td></tr>
-        <tr class="imovel-l2"><td class="anexos">${anexosMatricula(i)}</td>${celulasContas(i)}<td class="sobra"></td><td class="n nw valor-imovel" title="Valor do imóvel">${i.valor_imovel ? reais(i.valor_imovel) : '-'}</td></tr>`;
+        <td colspan="${CONTAS.length + 1}" class="end-imovel">${esc(R.enderecoCompleto(i))}${i.sublote ? ` <span class="sublote">${esc(/^sublote/i.test(i.sublote) ? i.sublote : `Sublote ${i.sublote}`)}</span>` : ''}</td><td class="n aluguel-imovel">${aluguel}</td></tr>
+        <tr class="imovel-l2"><td class="anexos">${anexosMatricula(i)}</td>${celulasContas(i)}<td class="sobra"></td><td class="n nw valor-imovel${i.valor_imovel ? '' : ' sem-valor'}" title="Valor do imóvel">${i.valor_imovel ? reais(i.valor_imovel) : '-'}</td></tr>`;
     }).join('');
     return `<div class="cabecalho"><h1>Imóveis</h1><div class="acoes">${link('#/iptu', "IPTU's", 'botao secundario')}${opera() ? link('#/novo/imoveis', 'Novo imóvel', 'botao') : ''}</div></div>
       <div class="cartao"><div class="rolagem"><table class="lista-imoveis"><tr><th>Imóvel</th><th colspan="6">Endereço</th><th class="n">Aluguel (bonif.)<br><span class="suave">Valor do imóvel</span></th></tr>
@@ -375,6 +378,8 @@ export const TELAS = {
 
   novo: (rota, estado) => telaFormulario(rota.partes[1], null, rota.q, estado),
   editar(rota, estado) {
+    // endereço cortado ou com tabela que não existe: "não encontrado" em vez de erro de programa
+    if (!rota.partes[1] || !Object.hasOwn(d(), rota.partes[1]) || !Array.isArray(d()[rota.partes[1]])) return naoEncontrado('Página não encontrada');
     const r = buscar(rota.partes[1], rota.partes[2]);
     if (!r) return naoEncontrado('Registro não encontrado');
     return telaFormulario(rota.partes[1], r, rota.q, estado);
@@ -463,15 +468,18 @@ export const TELAS = {
           <td><select data-papel-de="${u.id}" style="width:auto">${papeis}</select></td>
           <td class="n nw">${botao('aprovarUsuario', 'Aprovar', { id: u.id }, 'pequeno')} ${botao('recusarUsuario', 'Recusar', { id: u.id }, 'perigo pequeno', `Recusar o pedido de ${u.nome}?`)}</td></tr>`).join('')}</table></div>` : ''}
       <div class="cartao"><table><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>Situação</th><th></th></tr>
-      ${ordenar(d().usuarios.filter((u) => !u.pendente), 'nome').map((u) => `<tr><td>${esc(u.nome)}</td><td>${esc(u.login)}</td><td>${PAPEIS[u.papel]}</td><td>${u.ativo ? etiqueta('Ativo', 'ok') : etiqueta('Bloqueado', 'perigo')}</td>
+      ${ordenar(d().usuarios.filter((u) => !u.pendente), 'nome').map((u) => `<tr><td>${esc(u.nome)}</td><td>${esc(u.login)}</td><td>${PAPEIS[u.papel]}</td><td>${u.ativo ? etiqueta('Ativo', 'ok') : etiqueta('Bloqueado', 'perigo')}${E.nuvem && u.ativo && !emailDeAcesso(u) ? ` ${etiqueta('sem e-mail: não entra pela internet', 'aviso')}` : ''}</td>
         <td class="n nw">${u.id === E.usuario.id ? '<span class="suave">você</span>' : botao('bloquearUsuario', u.ativo ? 'Bloquear' : 'Desbloquear', { id: u.id }, u.ativo ? 'perigo pequeno' : 'pequeno', u.ativo ? `Bloquear o acesso de ${u.nome}?` : '')} ${link(`#/editar/usuarios/${u.id}`, 'Editar')}</td></tr>`).join('')}</table>
-      <p class="suave">Quem não tem usuário clica em "Pedir acesso" na tela de login, e o pedido aparece aqui para aprovar. Administrador: tudo, inclusive usuários e importação. Operador: cadastra, altera, confirma pagamentos e numera NFs. Consulta: só vê.</p></div>${aparelhos}`;
+      <p class="suave">${E.nuvem ? 'Para dar acesso a alguém, cadastre a pessoa em "Novo usuário" com o e-mail de acesso dela (na nuvem não há pedido de acesso pela tela de login).' : 'Quem não tem usuário clica em "Pedir acesso" na tela de login, e o pedido aparece aqui para aprovar.'} Administrador: tudo, inclusive usuários e importação. Operador: cadastra, altera, confirma pagamentos e numera NFs. Consulta: só vê.</p></div>${aparelhos}`;
   },
-  'minha-senha': () => `<div class="cartao login"><h1>Trocar minha senha</h1><form data-form="minhaSenha">
+  // quem não é administrador vê aqui os computadores que ligou com o próprio login (programa do PC) e pode desligá-los
+  'minha-senha': async () => `${minhaSenhaHtml()}${E.nuvem && !podeUsuario('admin') ? await (await parteAdiada('nuvem')).aparelhosLigadosHtml({ proprios: true }) : ''}`,
+};
+
+const minhaSenhaHtml = () => `<div class="cartao login"><h1>Trocar minha senha</h1><form data-form="minhaSenha">
     <p><label for="ent_atual">Senha atual</label><input id="ent_atual" type="password" name="atual" autocomplete="current-password"></p>
     <p><label for="ent_nova">Nova senha</label><input id="ent_nova" type="password" name="nova" autocomplete="new-password"></p>
-    <p><label for="ent_nova2">Repita a nova senha</label><input id="ent_nova2" type="password" name="nova2" autocomplete="new-password"></p><button>Salvar</button></form></div>`,
-};
+    <p><label for="ent_nova2">Repita a nova senha</label><input id="ent_nova2" type="password" name="nova2" autocomplete="new-password"></p><div class="acoes"><button>Salvar</button> <a href="#/">Cancelar</a></div></form></div>`;
 
 export { FORMULARIOS } from './telas/envios.js';
 export { ACOES } from './telas/acoes.js';
