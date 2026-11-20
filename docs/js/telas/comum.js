@@ -305,7 +305,7 @@ export async function trazerHeranca(id) {
   const c = buscar('contratos', id);
   const partes = [r.correcoes && `${r.correcoes} correção(ões) do aluguel`, c.reserva_usada_anterior !== undefined && 'a reserva', r.garantia && `a garantia (${c.garantia_tipo})`, r.arquivosSeguro && r.arquivosSeguro.length && 'o seguro (apólice e documentos)',
     r.boletosMovidos && `${r.boletosMovidos} boleto(s) (a NF sai no nome do novo titular)`].filter(Boolean);
-  aviso(`${c.inquilino_nome}: contrato continuado de ${r.anterior.inquilino_nome} desde ${dataBr(r.data)}. Fim do vínculo do anterior em ${dataBr(C.somarDias(r.data, -1))}; reajuste no aniversário do contrato original${partes.length ? `; vieram ${partes.join(', ')}` : ''}.${r.comNf ? ` ${r.comNf} boleto(s) depois da troca já com NF emitida ficaram com ${r.anterior.inquilino_nome}: confira.` : ''}`, 'info');
+  aviso(`${c.inquilino_nome}: contrato continuado de ${r.anterior.inquilino_nome} desde ${dataBr(r.data)}. Fim do vínculo do anterior em ${dataBr(C.somarDias(r.data, -1))}; reajuste no aniversário do contrato original${partes.length ? `; vieram ${partes.join(', ')}` : ''}.${r.comNf ? ` ${r.comNf} boleto(s) depois da troca já com NF emitida ficaram com ${r.anterior.inquilino_nome}: confira.` : ''}${r.noBanco ? ` ${r.noBanco} boleto(s) de ${r.anterior.inquilino_nome} já emitido(s) no banco ficaram com ele (o novo titular já tem o do mesmo mês): cancele no banco e exclua.` : ''}`, r.noBanco ? 'aviso' : 'info');
   return r;
 }
 

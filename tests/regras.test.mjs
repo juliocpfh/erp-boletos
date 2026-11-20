@@ -627,7 +627,10 @@ test('contas pagas por nós abatem do resultado do imóvel', () => {
   const c = d.contratos[0];
   c.conta_agua = 'Incluso no aluguel';
   assert.throws(() => R.lancarDespesas(d, loja.id, '2026-07', [{ tipo: 'Água', valor: 0 }], 'julio'), /pelo menos uma/);
-  R.lancarDespesas(d, loja.id, '2026-07', [{ tipo: 'Água', valor: 8540, data_pagamento: '2026-07-10' }, { tipo: 'Condomínio', valor: 45000, data_pagamento: '2026-07-10' }, { tipo: 'Luz', valor: 0 }], 'julio');
+  // R$ 0,00 sem observação junto de contas válidas não some calado: pede a observação (lote J1, mensal-038)
+  assert.throws(() => R.lancarDespesas(d, loja.id, '2026-07', [{ tipo: 'Água', valor: 8540, data_pagamento: '2026-07-10' }, { tipo: 'Luz', valor: 0 }], 'julio'), /Luz: R\$ 0,00 precisa de observação/);
+  assert.throws(() => R.lancarDespesas(d, loja.id, '2026-07', [{ tipo: 'Água', valor: 8540, data_pagamento: '2026-07-10' }, { tipo: 'Luz', valor: -5000 }], 'julio'), /Luz: o valor .* não pode ser negativo/);
+  R.lancarDespesas(d, loja.id, '2026-07', [{ tipo: 'Água', valor: 8540, data_pagamento: '2026-07-10' }, { tipo: 'Condomínio', valor: 45000, data_pagamento: '2026-07-10' }, { tipo: 'Luz', valor: null }], 'julio');
   assert.equal(d.despesas.length, 2);
   assert.equal(R.ultimosValores(d, loja.id)['Condomínio'].valor, 45000);
   const r = R.resultadosFinanceiros(d, '2026-07-01', '2026-07-31').find((x) => x.imovel.id === loja.id);

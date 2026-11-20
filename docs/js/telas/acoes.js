@@ -441,9 +441,20 @@ async function baixarPdfs(numeros, nomeZip, emitenteId = null) {
  * Muda o contrato (saída, imóvel corrigido): o nome da pasta acompanha (datas e imóvel), os boletos em aberto são
  * recalculados e a pasta do inquilino é renomeada ou movida no disco.
  */
-async function mudarContrato(id, fn) {
+/**
+ * Aviso dos boletos já pagos proporcionais que ficaram com menos dias que os ocupados (saída desfeita ou adiada):
+ * a diferença não é cobrada sozinha. Ex.: " O boleto de 10/2026, já pago, cobrou 15 de 30 dias: faltam R$ 750,00 …".
+ */
+function textoPagosComMenosDias(id) {
+  const c = buscar('contratos', id);
+  const l = c ? R.pagosComMenosDias(d(), c) : [];
+  if (!l.length) return '';
+  return ` Atenção: ${l.map((x) => `o boleto de ${compBr(x.cobranca.competencia)}, já pago, cobrou ${x.dias_pagos} de ${x.dias_mes} dias e agora são ${x.dias_agora} (faltam ${reais(x.diferenca)})`).join('; ')}. O sistema não cobra essa diferença sozinho: lance-a no próximo boleto (cobrança adicional) ou combine com o inquilino.`;
+}
+
+async function mudarContrato(id, fn, { apagandoAnexos = false } = {}) {
   const antigo = { ...buscar('contratos', id) };
-  await alterar((db) => {
+  await (apagandoAnexos ? alterarApagandoAnexos : alterar)((db) => {
     fn(db);
     const c = R.buscar(db, 'contratos', id);
     const pasta = nomePastaContrato(c);
@@ -1255,8 +1266,10 @@ export const ACOES = {
         <label>Data de saída</label><input type="date" name="data" value="${esc(c.data_saida || C.hojeIso())}" required>` });
     if (!r) return;
     const data = String((r.data || [])[0] || '');
+    // data muito longe de hoje costuma ser erro de digitação do ano (2026-11-20)
+    if (C.dataValida(data) && Math.abs(C.diasEntre(C.hojeIso(), data)) > 365 && !(await confirmar(`A data de saída (${dataBr(data)}) está a mais de um ano de hoje. Confira o ano antes de salvar.`, { titulo: 'Confira a data de saída', sim: 'Salvar assim mesmo', nao: 'Voltar' }))) return;
     await mudarContrato(c.id, (db) => R.informarSaida(db, c.id, data, login()));
-    aviso(`Saída em ${dataBr(data)}. Depois que ele sair: vistoria de saída e cálculo final.`);
+    aviso(`Saída em ${dataBr(data)}. Depois que ele sair: vistoria de saída e cálculo final.${textoPagosComMenosDias(c.id)}`, R.pagosComMenosDias(d(), buscar('contratos', c.id)).length ? 'aviso' : 'ok');
     await mostrar();
   },
 
@@ -1330,14 +1343,19 @@ export const ACOES = {
       html: `<p>${e.saldo >= 0 ? `Devolução de <b>${reais(e.saldo)}</b> ao inquilino.` : `Cobrança de <b>${reais(-e.saldo)}</b> do inquilino.`} Informe o dia em que aconteceu (fica no histórico).</p>
         <label>Data</label><input type="date" name="data" value="${esc(e.garantia_devolvida_em || C.hojeIso())}" required>` });
     if (!r) return;
-    await alterar((db) => R.marcarGarantiaDevolvida(db, e.id, String((r.data || [])[0] || ''), login()));
+    const dataDev = String((r.data || [])[0] || '');
+    // vai para o termo de quitação: não antes da saída nem depois de hoje (2026-11-20)
+    if (dataDev && dataDev > C.hojeIso()) throw new C.ErroUsuario(`A data (${dataBr(dataDev)}) é depois de hoje: marque no dia em que aconteceu.`);
+    await alterar((db) => R.marcarGarantiaDevolvida(db, e.id, dataDev, login()));
     aviso('Etapa marcada no roteiro da saída.');
     await mostrar();
   },
 
   async desfazerSaida({ id }) {
-    await mudarContrato(Number(id), (db) => R.desfazerSaida(db, Number(id), login()));
-    aviso('Inquilino ativo de novo (sem data de saída).');
+    // o termo de devolução das chaves era desta saída: sai do lançamento e o arquivo da pasta (2026-11-20)
+    await mudarContrato(Number(id), (db) => R.desfazerSaida(db, Number(id), login()), { apagandoAnexos: true });
+    const falta = textoPagosComMenosDias(Number(id));
+    aviso(`Inquilino ativo de novo (sem data de saída).${falta}`, falta ? 'aviso' : 'ok');
     await mostrar();
   },
 

@@ -157,7 +157,8 @@ export function telaRegras(q = {}) {
     ${admin ? '' : '<div class="alerta aviso">Só o administrador muda as regras.</div>'}
     ${cartaoRegrasEspeciais(admin)}
     <div class="cartao"><h2>Guardar e recuperar as regras</h2>
-      <p>Salve uma versão antes de mudar: se algo der errado, volte a ela. O arquivo das regras guarda todas as regras em uso, para levar a outro sistema ou guardar fora.</p>
+      <p>Salve uma versão antes de mudar: se algo der errado, volte a ela. O arquivo das regras guarda as regras do sistema em uso, para levar a outro sistema ou guardar fora.</p>
+      <p class="suave">Valem só para as <b>regras do sistema</b>: as regras especiais (caixa acima) não entram na versão nem no arquivo, e "Voltar tudo ao padrão" não mexe nelas nem nos contratos que as seguem.</p>
       ${admin ? `<form data-form="salvarVersaoRegras" class="acoes"><input name="nome" placeholder="Ex.: Regras de novembro de 2026" style="max-width:320px"><button class="secundario">Salvar versão das regras</button></form>` : ''}
       ${versoes.length ? `<table><tr><th>Versão</th><th>Salva em</th><th>Por</th><th></th></tr>${versoes.map((v) => `<tr><td><b>${esc(v.nome)}</b></td><td>${dataHoraBr(v.salvo_em)}</td><td>${esc(v.salvo_por || '-')}</td>
         <td class="n">${admin ? `${botao('restaurarVersaoRegras', 'Voltar a esta versão', { id: v.id }, 'secundario pequeno', `Voltar às regras da versão "${v.nome}"? As regras de agora são trocadas (salve uma versão antes, se quiser guardá-las).`)}

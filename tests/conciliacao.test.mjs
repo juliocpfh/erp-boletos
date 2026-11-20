@@ -518,7 +518,7 @@ test('código de barras: 44, 47 e 48 dígitos passam (com pontos e espaços), 46
   assert.equal(Z.codigoDeBarras(arr), '12345678901234567890123456789012345678901234');
 });
 
-test('fechamento tem a etapa "banco" (sem destino + extrato não buscado) e o Painel só avisa com o banco ligado', () => {
+test('fechamento tem a etapa "banco" (sem destino + extrato não buscado) e o Painel avisa com qualquer conta que recebe extrato', () => {
   const { d } = base();
   const hoje = '2026-12-05';
   let e = R.etapasFechamento(d, '2026-11', hoje).find((x) => x.chave === 'banco');
@@ -541,8 +541,12 @@ test('fechamento tem a etapa "banco" (sem destino + extrato não buscado) e o Pa
   assert.ok(a);
   assert.match(a.texto, /1 movimentação do extrato sem destino há mais de 7 dias/);
   assert.equal(R.todosAlertas(d2, '2026-11-08').find((x) => x.tipo === 'Banco'), undefined, 'ainda dentro do prazo');
+  // C6 desligado, extrato por arquivo (lote J1, financeiro-banco-003): o aviso das movimentações e a etapa continuam
   d2.config_banco.ativo = false;
-  assert.equal(R.todosAlertas(d2, '2026-11-20').find((x) => x.tipo === 'Banco'), undefined);
+  assert.match(R.todosAlertas(d2, '2026-11-20').find((x) => x.tipo === 'Banco').texto, /1 movimentação do extrato sem destino/);
+  assert.ok(R.etapasFechamento(d2, '2026-11', '2026-12-05').find((x) => x.chave === 'banco'));
+  d2.config_banco.contas = [];
+  assert.equal(R.todosAlertas(d2, '2026-11-20').find((x) => x.tipo === 'Banco'), undefined, 'sem conta que recebe extrato');
   assert.equal(R.etapasFechamento(d2, '2026-11', '2026-12-05').find((x) => x.chave === 'banco'), undefined);
   // pagamento enviado sem confirmação depois da data
   const { d: d3 } = base();

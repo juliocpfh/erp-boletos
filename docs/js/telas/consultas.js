@@ -10,7 +10,7 @@ import { abasInquilinos, atalhosComunicacoes } from './comunicacoes.js';
 import { caixaFichas } from './fichas.js';
 
 /** Filtros da busca global (parâmetro ``tipo`` do endereço → grupo devolvido por ``R.buscarGlobal``). */
-const TIPOS_BUSCA = [['inquilinos', 'Inquilinos'], ['imoveis', 'Imóveis'], ['boletos', 'Boletos com esse valor'], ['nfs', 'NFs']];
+const TIPOS_BUSCA = [['inquilinos', 'Inquilinos'], ['fichas', 'Fichas em análise'], ['imoveis', 'Imóveis'], ['boletos', 'Boletos com esse valor'], ['nfs', 'NFs']];
 
 /** Busca global (campo do cabeçalho): resultados em grupos, com filtro por tipo. */
 export function telaBusca(q) {

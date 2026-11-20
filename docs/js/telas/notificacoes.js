@@ -218,6 +218,8 @@ export const FORMULARIOS_NOTIFICACOES = {
     if (!opera()) throw new C.ErroUsuario(SO_CONSULTA);
     const f = new FormData(form);
     const n = buscar('notificacoes', form.dataset.id);
+    const dataEnvio = String(f.get('data') || '');
+    if (dataEnvio > C.hojeIso()) throw new C.ErroUsuario(`A data do envio (${dataBr(dataEnvio)}) é depois de hoje: marque no dia em que foi enviada.`);
     if (n && !n.arquivo_assinado && !(await confirmar('A notificação assinada ainda não foi anexada. Marcar como enviada mesmo assim? (ex.: entregue em papel assinado à mão)', { titulo: 'Marcar como enviada?', sim: 'Marcar como enviada' }))) return;
     await alterar((db) => R.marcarNotificacaoEnviada(db, Number(form.dataset.id), { data: String(f.get('data') || ''), meio: String(f.get('meio') || '') }, login()));
     aviso('Envio marcado: o prazo está correndo.');
@@ -231,6 +233,7 @@ export const FORMULARIOS_NOTIFICACOES = {
     if (!n) throw new C.ErroUsuario('Esta notificação não existe mais. Atualize a página.');
     const data = String(f.get('data') || '');
     if (!C.dataValida(data)) throw new C.ErroUsuario('Informe a data em que foi resolvido.');
+    if (data > C.hojeIso()) throw new C.ErroUsuario(`A data (${dataBr(data)}) é depois de hoje: dê a baixa no dia em que foi resolvido.`);
     const arq = f.get('comprovante');
     const comprovante = arq && arq.size ? await S.salvarArquivo(await pastaDoEscopo('contrato', n.contrato_id), new File([arq], nomeComprovante('baixa-notificacao', data, arq))) : null;
     await alterar((db) => R.darBaixaNotificacao(db, n.id, { data, comprovante, observacao: f.get('observacao') }, login()));

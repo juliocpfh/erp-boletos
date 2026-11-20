@@ -27,7 +27,7 @@ const ANTES = {
   'email:ficha_devolucao': 'dede29cb5e188ee0',
   'email:contrato_assinar': 'c82dc0dcc10b4fe2',
   'email:contrato_assinado': '65654954ba3d9470', // mutirão 19/11 (lote E): "falta o depósito" sem a caução registrada
-  'email:vistoria_assinada': 'bdf80e518c6aff6b',
+  'email:vistoria_assinada': 'f20a62fda5dbf4b4',
   'email:novo_valor': 'eab9c789f37c7c93',
   'email:aditivo_assinado': '548ec68b37e2cd44',
   'email:saida_aviso': 'c026d37a6466c076',

@@ -145,7 +145,8 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
   const g = condicoesDaGarantia(tipo);
   // na ficha não há valor da caução nem do depósito: o texto sai sem o valor ([se valor_deposito] nos modelos)
   const valorDeposito = c ? (g.caucao ? (c.caucao_valor || (c.caucao_meses || 0) * (aluguel - desconto)) : c.deposito_valor || 0) : 0;
-  const chaves = c ? R.dataDasChaves(c) : null;
+  // só afirma a entrega das chaves (e o prazo da contra-vistoria) com o termo das chaves assinado (2026-11-20)
+  const chaves = c ? R.termoDasChavesEm(c) : null;
   // um link por fiador da ficha que tenha link válido nesta aba
   const fiadoresLink = f ? (R.fiadoresDaFicha(f).length ? R.fiadoresDaFicha(f) : [{ n: 1 }]).map((x) => ({ ...x, ...linkDaFicha(f, `fiador${x.n}`, hoje) })).filter((x) => x.url) : [];
   const variosLinks = fiadoresLink.length > 1;

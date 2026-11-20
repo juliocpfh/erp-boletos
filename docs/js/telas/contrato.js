@@ -220,7 +220,7 @@ function caixaGarantia(c) {
     }
     const inicial = R.depositosGarantiaDo(d(), c, 'caucao').filter((x) => !x.complementar).reduce((t, x) => t + x.valor, 0) || c.caucao_valor;
     html += `<p class="linha-garantia">Caução <b>${reais(inicial)}</b>${herdadaDe}, ${pagaEm('caucao')}${comprovanteDa('caucao', 'comprovante_caucao')}${remover('caucao')}
-      · ${atual || `atual <b class="maior">${reais(R.valorGarantia(d(), c))}</b>${c.caucao_meses ? ` <span class="suave">(${C.plural(c.caucao_meses, 'aluguel', 'aluguéis')}; sugerido hoje ${reais(sug)})</span>` : ''}`}</p>
+      · ${atual || `atual <b class="maior">${reais(R.valorGarantia(d(), c))}</b>${c.caucao_meses ? ` <span class="suave">(combinada em ${C.plural(c.caucao_meses, 'aluguel', 'aluguéis')}; sugerido hoje ${reais(sug)})</span>` : ''}`}</p>
       ${parcelas('caucao')}${correcoesHtml()}`;
   }
   if (R.temDeposito(c) && !R.garantiaDepositada(c) && !anteriorDaGarantia) {
@@ -270,7 +270,7 @@ function caixaGarantia(c) {
   } else if (R.temCaucao(c) || R.temDeposito(c) || aplic.length) {
     const situacaoTotal = sit.ok ? etiqueta('100% aplicado', 'ok') : sit.total ? etiqueta(`falta aplicar ${reais(sit.falta)}`, 'aviso') : '';
     html += `${subtitulo('Onde o valor foi aplicado', opera() ? link(`#/novo/aplicacoes?contrato=${c.id}`, 'Registrar aplicação') : '', 'Na saída, o valor é devolvido corrigido pela poupança (informado no cálculo final), pela conta em que foi depositado.')}
-      <table class="compacta">${aplic.map((a) => { const rec = R.recebedorDaAplicacao(d(), a); return `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(rec.nome)}${rec.pessoa ? ` ${etiqueta('outra pessoa', 'info')}` : ''}</td><td class="n">${reais(a.valor)}</td>
+      <table class="compacta">${aplic.map((a) => { const rec = R.recebedorDaAplicacao(d(), a); return `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(rec.nome)}${rec.pessoa ? ` ${etiqueta('outra pessoa', 'info')}` : ''}${R.aplicacaoBaixada(d(), a) ? ` ${etiqueta('garantia anterior, devolvida na troca', 'info')}` : ''}</td><td class="n">${reais(a.valor)}</td>
         <td>${linkComprovante(c.id, a.comprovante, { tabela: 'aplicacoes', id: a.id, campo: 'comprovante', tipo: 'aplicacao-garantia', data: a.data })} ${esc(a.observacoes || '')}</td>
         <td class="n nw">${editar(`#/editar/aplicacoes/${a.id}?contrato=${c.id}`)} ${excluir('aplicacoes', a.id, 'Excluir esta aplicação? O comprovante também é apagado.')}</td></tr>`; }).join('')}
       <tr class="total"><td colspan="7">Aplicado de ${reais(sit.total)}${R.garantiaDepositada(c) ? '' : ' <span class="suave">(já depositado)</span>'}</td><td class="n">${reais(sit.soma)}</td><td colspan="2">${situacaoTotal}</td></tr></table>`;
@@ -345,7 +345,7 @@ function caixaSaida(c) {
     }
     const temVistoria = R.vistoriasDo(d(), c.id).some((v) => v.tipo === 'Saída');
     return `<div class="cartao" id="saida"><div class="cabecalho"><h2>Saída em ${dataBr(c.data_saida)}</h2>
-        <div class="acoes">${botao('informarSaida', 'Mudar a data', { id: c.id }, 'secundario pequeno')} ${botao('desfazerSaida', 'Desfazer a saída', { id: c.id }, 'perigo pequeno', 'Tirar a data de saída? O inquilino volta a ativo.')}</div></div>
+        <div class="acoes">${botao('informarSaida', 'Mudar a data', { id: c.id }, 'secundario pequeno')} ${botao('desfazerSaida', 'Desfazer a saída', { id: c.id }, 'perigo pequeno', 'Tirar a data de saída? O inquilino volta a ativo; a data marcada da vistoria de saída e o termo de devolução das chaves (se anexado) saem junto.')}</div></div>
       ${roteiroSaidaHtml(c, null)}
       ${(() => { const s = R.saldoFci(d(), c); return s.depositos.length ? `<div class="alerta info">💰 Crédito do inquilino no FCI: <b>${reais(s.corrigido)}</b>${s.ate ? ` (corrigido até ${compBr(s.ate)})` : ' (sem correção: use "Calcular atualização" na caixa do FCI)'}. Paga só os reparos de danos da vistoria de saída; o que sobrar volta ao inquilino.</div>` : ''; })()}
       ${c.data_saida > C.hojeIso() ? `<div class="alerta info">O cálculo final é feito depois da saída, a partir de ${dataBr(c.data_saida)}.</div></div>` : `<div class="alerta aviso">Falta o cálculo final. ${temVistoria ? '' : `Faça antes a ${link(`#/vistoria/novo?contrato=${c.id}&tipo=Sa%C3%ADda`, 'vistoria de saída', '')} (com a leitura dos relógios). `}${link(`#/novo/encerramentos?contrato=${c.id}`, 'Fazer cálculo final', 'botao pequeno')}</div></div>`}`;
@@ -777,7 +777,7 @@ export function telaContrato(c) {
   // documentos de entrada e contas a transferir aparecem na rotina de entrada (recolhida: também na faixa dos documentos)
   // alertas adiados no Painel ("adiar 7 dias" / "já estou cuidando") ficam de fora aqui também
   // os desligados para este inquilino também (lista e "Religar" na caixa "Alertas deste inquilino", logo abaixo dos alertas)
-  const alertasDoContrato = R.contratoAtivo(c, hoje) ? R.alertasContrato(d(), c, hoje).map((a) => ({ ...a, contrato_id: c.id })) : [];
+  const alertasDoContrato = R.alertasDoInquilino(d(), c, hoje).map((a) => ({ ...a, contrato_id: c.id }));
   const alertas = alertasDoContrato.filter((a) => !['A verificar', 'Rotina de entrada'].includes(a.tipo) && !R.adiamentoDe(d(), R.chaveAlerta(a), hoje) && !R.desligamentoDe(d(), a));
   const rotina = caixaRotinaEntrada(c, hoje);
   const agendada = R.herancaAgendada(d(), c, hoje);
