@@ -222,19 +222,7 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
   const enc = R.encerramentoDo(d, c.id);
   const vist = K.resultadoVistoriaSaida(d, c);
   const solidario = c.solidario_nome ? pessoa(c.solidario_nome, c.solidario_cpf ? `CPF/CNPJ ${c.solidario_cpf}` : '') : '';
-  const tabela = [];
-  if (enc.garantia_valor > 0) {
-    tabela.push(['Garantia depositada', C.reais(enc.garantia_valor)]);
-    tabela.push([`Garantia corrigida até ${C.dataBr(enc.data_saida)}`, C.reais(enc.garantia_corrigida || enc.garantia_valor)]);
-  }
-  if (enc.fci_credito) tabela.push(['FCI corrigido (crédito do locatário)', C.reais(enc.fci_credito)]);
-  // os reparos pagos pelo FCI e o que passou dele também saem do saldo: sem essas linhas a tabela não fecha com o saldo
-  if (enc.fci_usado > 0) tabela.push(['(-) Reparos pagos pelo FCI', C.reais(enc.fci_usado)]);
-  const danosAlem = Math.max((enc.fci_danos || 0) - (enc.fci_usado || 0), 0);
-  if (danosAlem > 0) tabela.push(['(-) Reparos além do FCI', C.reais(danosAlem)]);
-  tabela.push(['(-) Débitos descontados', C.reais(enc.debitos || 0)]);
-  for (const l of String(enc.debitos_descricao || '').split(/\n+/).map((x) => x.trim()).filter(Boolean)) tabela.push([`   ${l}`, '']);
-  tabela.push([enc.saldo >= 0 ? '= Saldo devolvido ao locatário' : '= Saldo pago pelo locatário', C.reais(Math.abs(enc.saldo || 0))]);
+  const tabela = linhasDoAcerto(enc, { quitacao: true });
   const pagamento = enc.saldo > 0 ? `Em ${C.dataBr(enc.garantia_devolvida_em)}, a LOCADORA devolveu ao LOCATÁRIO o saldo de ${K.valorComExtenso(enc.saldo)}, conforme o comprovante bancário anexo.`
     : enc.saldo < 0 ? `Em ${C.dataBr(enc.garantia_devolvida_em)}, o LOCATÁRIO pagou à LOCADORA o saldo de ${K.valorComExtenso(-enc.saldo)}.`
       : 'Não há saldo a devolver nem a pagar.';
@@ -254,6 +242,30 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
     assinaturas: [assinaEmpresa, assinaPessoa('LOCATÁRIO'), ...(c.solidario_nome ? [{ nome: c.solidario_nome, linha: 'LOCATÁRIO SOLIDÁRIO' }] : [])],
     arquivo: nomeArq('Termo quitacao', enc.garantia_devolvida_em || enc.data_saida),
   };
+}
+
+/**
+ * Linhas do acerto final (cálculo da saída), as mesmas no termo de quitação e no e-mail do acerto: [[rótulo, valor]].
+ * Os reparos pagos pelo FCI e o que passou dele também saem do saldo, senão a conta não fecha. Ex.: garantia corrigida
+ * R$ 5.940,00, FCI R$ 1.200,00, reparos R$ 800,00, débitos R$ 1.000,00 → 5.940 + 1.200 − 800 − 1.000 = saldo R$ 5.340,00.
+ * ``quitacao``: rótulos do termo (saldo já devolvido ou pago); sem ela, os do e-mail (a devolver / a pagar).
+ */
+export function linhasDoAcerto(enc, { quitacao = false } = {}) {
+  if (!enc) return [];
+  const tabela = [];
+  if (enc.garantia_valor > 0) {
+    tabela.push(['Garantia depositada', C.reais(enc.garantia_valor)]);
+    tabela.push([`Garantia corrigida até ${C.dataBr(enc.data_saida)}`, C.reais(enc.garantia_corrigida || enc.garantia_valor)]);
+  }
+  if (enc.fci_credito) tabela.push(['FCI corrigido (crédito do locatário)', C.reais(enc.fci_credito)]);
+  if (enc.fci_usado > 0) tabela.push(['(-) Reparos pagos pelo FCI', C.reais(enc.fci_usado)]);
+  const danosAlem = Math.max((enc.fci_danos || 0) - (enc.fci_usado || 0), 0);
+  if (danosAlem > 0) tabela.push(['(-) Reparos além do FCI', C.reais(danosAlem)]);
+  tabela.push([quitacao ? '(-) Débitos descontados' : '(-) Débitos', C.reais(enc.debitos || 0)]);
+  for (const l of String(enc.debitos_descricao || '').split(/\n+/).map((x) => x.trim()).filter(Boolean)) tabela.push([`   ${l}`, '']);
+  const saldo = quitacao ? (enc.saldo >= 0 ? '= Saldo devolvido ao locatário' : '= Saldo pago pelo locatário') : `= Saldo ${enc.saldo >= 0 ? 'a devolver' : 'a pagar'}`;
+  tabela.push([saldo, C.reais(Math.abs(enc.saldo || 0))]);
+  return tabela;
 }
 
 /** Notificação do documento (``alvo.notificacao``: o registro, ou ``alvo.id``), só se for deste contrato. */

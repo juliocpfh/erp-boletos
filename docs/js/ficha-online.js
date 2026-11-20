@@ -246,7 +246,7 @@ export async function ligarAviso() {
   // a permissão logo no toque do botão (o Safari do iPhone recusa sem perguntar se vier depois de uma ida à internet)
   const permissao = await Notification.requestPermission();
   const e = await estadoDoAviso();
-  if (!e.ligadoNaNuvem) throw new C.ErroUsuario('O aviso no celular ainda não foi ligado na nuvem (chaves VAPID: passo a passo em nuvem/README.md).');
+  if (!e.ligadoNaNuvem) throw new C.ErroUsuario('O aviso no celular ainda não foi ligado: falta uma configuração na nuvem. Peça ao técnico.');
   if (permissao !== 'granted') throw new C.ErroUsuario('Sem permissão para avisos. Libere as notificações deste site nas configurações do navegador.');
   const reg = await navigator.serviceWorker.ready;
   let inscricao = await reg.pushManager.getSubscription();

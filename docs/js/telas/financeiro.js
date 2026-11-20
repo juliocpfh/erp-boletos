@@ -38,7 +38,7 @@ export function telaInadimplencia() {
   const hoje = C.hojeIso();
   const r = R.inadimplencia(d(), hoje);
   const imovelDe = (c) => (buscar('imoveis', c.imovel_id) || {}).nome || '';
-  return `<h1>Financeiro</h1>${abasFinanceiro('inadimplencia')}<div class="cabecalho"><h2>Inadimplência</h2><div>${link('#/cobrancas', 'Ver boletos')}</div></div>
+  return `${topoFinanceiro('inadimplencia')}<div class="cabecalho"><h2>Inadimplência</h2><div>${link('#/cobrancas', 'Ver boletos')}</div></div>
     <div class="numeros">
       <div class="cartao"><div class="grande">${r.devedores.length}</div>inquilino(s) em atraso</div>
       <div class="cartao"><div class="grande">${r.devedores.reduce((s, x) => s + x.boletos.length, 0)}</div>boleto(s) vencido(s)</div>
@@ -131,8 +131,14 @@ export function telaContas(rota) {
 }
 
 /** Abas da página Financeiro. */
-export const abasFinanceiro = (atual) => `<div class="abas">${[['financeiro', '#/financeiro', 'Visão geral'], ['gestao', '#/gestao', 'Gestão'], ['resultados', '#/resultados', 'Resultado bruto'], ['liquido', '#/liquido', 'Resultado líquido'],
-  ['impostos', '#/impostos', 'Impostos'], ['inadimplencia', '#/inadimplencia', 'Inadimplência'], ['garantias', '#/garantias', 'Caução']]
+const ABAS_FINANCEIRO = [['financeiro', '#/financeiro', 'Visão geral'], ['gestao', '#/gestao', 'Gestão'], ['resultados', '#/resultados', 'Resultado bruto'], ['liquido', '#/liquido', 'Resultado líquido'],
+  ['impostos', '#/impostos', 'Impostos'], ['inadimplencia', '#/inadimplencia', 'Inadimplência'], ['garantias', '#/garantias', 'Caução']];
+/** Título "Financeiro" e as abas; a aba do navegador leva o nome da aba aberta (ex.: "Financeiro · Impostos · Imóveis"). */
+const topoFinanceiro = (atual) => {
+  const aba = ABAS_FINANCEIRO.find(([k]) => k === atual);
+  return `<h1${aba ? ` data-titulo="Financeiro · ${aba[2]}"` : ''}>Financeiro</h1>${abasFinanceiro(atual)}`;
+};
+export const abasFinanceiro = (atual) => `<div class="abas">${ABAS_FINANCEIRO
   .map(([k, h, t]) => `<a href="${h}" class="${k === atual ? 'ativo' : ''}">${t}</a>`).join('')}</div>`;
 
 /**
@@ -162,7 +168,7 @@ export function telaImpostos(comp) {
     : (g.contador ? reais(g.contador.valor) : '-')}</td>
       <td class="n">${dif === null ? '<span class="suave">-</span>' : dif === 0 ? etiqueta('igual', 'ok') : `<span class="${Math.abs(dif) > 100 ? 'texto-aviso' : 'suave'}">${dif > 0 ? '+' : '-'} ${reais(Math.abs(dif))}</span>`}</td></tr>`;
   };
-  return `<h1>Financeiro</h1>${abasFinanceiro('impostos')}
+  return `${topoFinanceiro('impostos')}
     <div class="cabecalho"><h2>Impostos de ${compBr(comp)}</h2>
       <div class="acoes"><a class="botao secundario" href="#/impostos?mes=${C.somarMeses(comp, -1)}">← ${compBr(C.somarMeses(comp, -1))}</a>
       <form data-form="ir" data-ir="impostos" class="acoes"><input type="month" name="mes" value="${esc(comp)}" style="width:160px"><button class="secundario">Ir</button></form>
@@ -255,7 +261,7 @@ export function telaResultados(q) {
   const painelI = q.custo ? buscar('imoveis', q.custo) : q.airbnb ? buscar('imoveis', q.airbnb) : null;
   const painel = painelI ? (q.custo ? painelCusto(painelI, aqui) : painelAirbnb(painelI, aqui)) : '';
   const totalBase = tot('base');
-  return `<h1>Financeiro</h1>${abasFinanceiro('resultados')}${form}
+  return `${topoFinanceiro('resultados')}${form}
     <div class="numeros">
       <div class="cartao"><div class="grande">${reais(tot('receita'))}</div>receita (aluguel ${reais(tot('aluguel') + tot('avulsas'))} + Airbnb ${reais(tot('airbnb'))})</div>
       <div class="cartao"><div class="grande">- ${reais(tot('iptu') + tot('contas'))}</div>IPTU ${reais(tot('iptu'))} + custos ${reais(tot('contas'))}</div>
@@ -285,7 +291,7 @@ export function telaLiquido(q) {
   const tot = (k) => lista.reduce((s, x) => s + x[k], 0);
   const meses = lista[0] ? lista[0].meses : 12;
   const est = tot('impostosEstimados');
-  return `<h1>Financeiro</h1>${abasFinanceiro('liquido')}${form}
+  return `${topoFinanceiro('liquido')}${form}
     <div class="numeros">
       <div class="cartao"><div class="grande">${reais(tot('resultado'))}</div>resultado bruto (receita − IPTU − custos)</div>
       <div class="cartao"><div class="grande">- ${reais(tot('impostos'))}</div>impostos ${est ? etiqueta(est === tot('impostos') ? 'estimados' : `${reais(est)} estimados`, 'aviso') : etiqueta('confirmados pelo contador', 'ok')}</div>
@@ -323,7 +329,7 @@ export function telaFinanceiro(q) {
   const impostos = R.impostosDoMes(d(), mes);
   const nomeConta = (id) => { const c = ((d().config_banco || {}).contas || []).find((x) => x.id === id); return c ? (c.apelido || c.id) : id; };
   const sugestao = (m) => { try { return Z.sugerirDestino(d(), m, Z.indiceDaTela(d())); } catch { return null; } };
-  return `<h1>Financeiro</h1>${abasFinanceiro('financeiro')}
+  return `${topoFinanceiro('financeiro')}
     <div class="cabecalho"><h2>Movimento de ${compBr(mes)}</h2>
       <div class="acoes"><a class="botao secundario" href="#/financeiro?mes=${C.somarMeses(mes, -1)}">← ${compBr(C.somarMeses(mes, -1))}</a>
       <form data-form="ir" data-ir="financeiro" class="acoes"><input type="month" name="mes" value="${esc(mes)}" style="width:160px"><button class="secundario">Ir</button></form>
@@ -413,4 +419,4 @@ export async function ligarGarantiasCorrigidas(raiz) {
   }
 }
 
-export const telaGarantias = () => `<h1>Financeiro</h1>${abasFinanceiro('garantias')}${caixaGarantiasPorEmpresa()}`;
+export const telaGarantias = () => `${topoFinanceiro('garantias')}${caixaGarantiasPorEmpresa()}`;

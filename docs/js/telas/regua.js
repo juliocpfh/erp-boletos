@@ -60,7 +60,7 @@ export async function telaRegua() {
     : !gmail ? 'O envio direto está ligado, mas o Gmail da empresa não está ligado nesta nuvem (ou você está sem internet): por enquanto, abra no Gmail ou copie o texto.'
       : 'Marque os e-mails que quer mandar e clique em "Enviar os selecionados": o sistema mostra a lista final e pede a sua confirmação.';
   const recentes = G.decididosRecentes(db, hoje);
-  return `<h1>Boletos</h1><div class="abas"><a href="#/cobrancas">← Boletos</a></div>
+  return `<h1>E-mails da régua</h1><div class="abas"><a href="#/cobrancas">← Boletos</a></div>
     <div class="cabecalho"><h2>E-mails da régua de cobrança: aguardando sua autorização</h2>${link('#/modelos-email', 'Textos dos e-mails')}</div>
     <p class="suave">O sistema prepara os e-mails ${dias.length ? `de cada boleto em aberto: ${esc(dias.map(G.nomeDaEtapa).join('; '))}` : '(nenhum dia escolhido nas Regras do sistema: nada é preparado)'}. <b>Nada é enviado sozinho.</b>
       Boleto pago, em acordo ou de contrato encerrado sai da lista. A cobrança de atraso só aparece passados 3 dias úteis do último dia para pagar (o banco leva até 3 dias úteis para creditar o boleto). E-mail enviado ou marcado "Não enviar" não volta.${admin() ? '' : ' Só o administrador autoriza.'}</p>
