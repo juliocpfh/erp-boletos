@@ -77,6 +77,11 @@ test('contrato para assinar: conta da caução só com caução; saída antecipa
   assert.match(s, /= Saldo a devolver: R\$ 5\.033,12/);
   assert.match(s, /Pintura da sala/);
   assert.match(s, /Informe a chave Pix/);
+  // sem o termo das chaves assinado, o e-mail não afirma a entrega nem a data limite (lote J1, entrada-036)
+  const semTermo = texto(d, 'vistoria_assinada', { contrato: c }).texto;
+  assert.doesNotMatch(semTermo, /chaves foram entregues/);
+  assert.match(semTermo, /em até 5 dias úteis da entrega das chaves/);
+  c.doc_chaves_em = c.data_entrada;
   const v = texto(d, 'vistoria_assinada', { contrato: c }).texto;
   assert.match(v, /até 08\/12\/2026 \(5 dias úteis\)/);
 });

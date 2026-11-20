@@ -164,6 +164,8 @@ export const FORMULARIOS = {
       return { tipo: f[`tipo_${n}`], valor: texto ? C.centavos(texto) : null, data_pagamento: f[`data_${n}`], vencimento: f[`venc_${n}`] || null, observacoes: String(f[`obs_${n}`] || '').trim() };
     });
     if (!f.competencia) throw new C.ErroUsuario('Informe o mês da conta.');
+    // data do pagamento no futuro tira a conta dos Resultados do mês (entra pela data do pagamento): pergunta antes
+    await confirmarAvisos(linhas.filter((l) => l.valor !== null).map((l) => dataNoFuturo(l.data_pagamento, `${l.tipo}: a data do pagamento`)).filter(Boolean));
     let n = 0;
     await alterar((db) => { n = R.lancarDespesas(db, Number(f.imovel), f.competencia, linhas, login()).length; });
     aviso(`${n} conta(s) lançada(s).`);
@@ -177,6 +179,7 @@ export const FORMULARIOS = {
     if (!texto) throw new C.ErroUsuario('Informe o valor pago.');
     if (!/^\d{4}-\d{2}$/.test(f.competencia || '')) throw new C.ErroUsuario('Informe o mês de referência.');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(f.data_pagamento || '')) throw new C.ErroUsuario('Informe a data do pagamento.');
+    await confirmarAvisos([dataNoFuturo(f.data_pagamento, 'A data do pagamento')].filter(Boolean));
     await alterar((db) => R.lancarDespesas(db, Number(f.imovel), f.competencia, [{ tipo: f.tipo, valor: C.centavos(texto), data_pagamento: f.data_pagamento,
       vencimento: f.vencimento || null, observacoes: String(f.observacoes || '').trim() }], login()));
     aviso(`${f.tipo} de ${compBr(f.competencia)} lançada.`);
@@ -346,6 +349,8 @@ export const FORMULARIOS = {
     const testemunhas = testemunhasDo(f);
     const modelo = f.id ? null : K.modelosDe(d(), 'aditivo').find((m) => String(m.id) === f.modelo);
     if (!f.id && !modelo) throw new C.ErroUsuario('Escolha o modelo do termo aditivo.');
+    // o termo muda o dia dos boletos a partir do mês dele: mês já passado não tem como valer (2026-11-20)
+    if (/^\d{4}-\d{2}$/.test(f.mes || '') && f.mes < C.competenciaDe(C.hojeIso())) throw new C.ErroUsuario(`O 1º vencimento no dia novo (${compBr(f.mes)}) é antes deste mês: escolha ${compBr(C.competenciaDe(C.hojeIso()))} ou depois.`);
     const dados = { data: f.data, dia_novo: f.dia_novo, mes: f.mes, testemunhas,
       ...(modelo ? { modelo_id: modelo.id > 0 ? modelo.id : null, texto: modelo.texto } : { texto: f.texto }) };
     let a;
@@ -586,6 +591,11 @@ export const FORMULARIOS = {
   },
   async nfExterna(form) {
     const f = new FormData(form);
+    // número que passa do próximo da sequência faz a numeração pular: pergunta antes (2026-11-20)
+    const num = Number(f.get('numero'));
+    const prox = d().proxima_fatura;
+    if (Number.isInteger(num) && prox && num > prox && !(await confirmar(`O próximo número da sequência é ${R.numeroFatura(prox)}. Registrando a NF nº ${R.numeroFatura(num)}, a numeração vai pular de ${R.numeroFatura(prox)} para ${R.numeroFatura(num + 1)}. Confira se o número foi digitado certo.`,
+      { titulo: 'A numeração das NFs vai pular', sim: 'Registrar assim mesmo', nao: 'Voltar e corrigir' }))) return;
     const n = await alterar((db) => R.registrarNfExterna(db, form.dataset.tipo, Number(form.dataset.id), f.get('numero'), String(f.get('emissao') || ''), login()));
     aviso(`NF nº ${R.numeroFatura(n)} registrada (emitida fora do sistema).`);
     await mostrar();

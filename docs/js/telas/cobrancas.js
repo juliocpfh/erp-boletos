@@ -285,7 +285,10 @@ export function demonstrativo(cb) {
     <p><b>Inquilino:</b> ${esc(c.inquilino_nome)}${c.inquilino_cpf ? ` · ${rotuloDocumento(c.inquilino_cpf)} ${esc(c.inquilino_cpf)}` : ''}${c.inquilino_telefone ? ` · ${esc(c.inquilino_telefone)}` : ''}</p>
     <table><tr><th>Descrição</th><th class="n">Valor</th></tr>
       ${linha('Caução já depositada', reais(caucaoAntes))}
-      ${linha(`Nova caução${c.caucao_meses ? ` (${c.caucao_meses} ${c.caucao_meses === 1 ? 'aluguel' : 'aluguéis'})` : ''}${cb.caucao_parcela ? ` depois desta parcela (${esc(cb.caucao_parcela)})` : ''}`, reais(caucaoAntes + (cb.caucao_complemento || 0)))}
+      ${cb.caucao_parcela ? `${linha(`Parcela ${esc(cb.caucao_parcela)} do complemento`, reais(cb.caucao_complemento))}
+      ${linha('Caução depois desta parcela', reais(caucaoAntes + (cb.caucao_complemento || 0)))}
+      ${cb.caucao_necessaria > 0 ? linha(`Caução necessária${c.caucao_meses ? ` (${c.caucao_meses} ${c.caucao_meses === 1 ? 'aluguel' : 'aluguéis'})` : ''}`, reais(cb.caucao_necessaria)) : ''}`
+        : linha(`Nova caução${c.caucao_meses ? ` (${c.caucao_meses} ${c.caucao_meses === 1 ? 'aluguel' : 'aluguéis'})` : ''}`, reais(caucaoAntes + (cb.caucao_complemento || 0)))}
       <tr class="total"><td>Depósito adicional a pagar até ${dataBr(cb.vencimento)}</td><td class="n maior">${reais(t.a_pagar_pontual)}</td></tr>
       <tr><td colspan="2" class="suave">Após o vencimento: sem multa e juros.</td></tr></table>
     ${cb.data_pagamento ? `<p><b>Pago em ${dataBr(cb.data_pagamento)}</b>${cb.dias_atraso ? ` com ${C.plural(cb.dias_atraso, 'dia')} de atraso` : ''} · recebido ${reais(cb.valor_pago)}</p>` : ''}
