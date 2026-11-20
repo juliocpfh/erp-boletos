@@ -256,7 +256,8 @@ test('item 1/9: listagem do banco — um pagamento que casa com dois boletos nã
   assert.deepEqual(sug.map((s) => [s.cobranca_id, s.alternativas]), [[cb2.id, 2], [cb3.id, 2]]);
   assert.ok(sug.every((s) => !Z.prontoParaRegistrar(d, s)), 'nenhuma caixa marcada: quem escolhe é o usuário');
   // pago à mão com a data do crédito: a listagem só confirma (já estava pago) e não propõe o de 08/2026
-  R.registrarPagamento(d, cb2.id, '2026-08-11', 131850, 'julio');
+  // (pagou em 10/08, no vencimento, e entrou em 11/08: em dia; sem isso o valor seria menor que o devido e recusado desde 20/11)
+  R.registrarPagamento(d, cb2.id, '2026-08-11', 131850, 'julio', { pagouEmDia: true });
   const sug2 = Z.conciliarBoletos(d, 'ank', listagem);
   assert.deepEqual(sug2.map((s) => [s.cobranca_id, s.jaPago]), [[cb2.id, true]]);
   assert.equal(Z.prontoParaRegistrar(d, sug2[0]), false);

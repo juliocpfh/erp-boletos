@@ -862,36 +862,11 @@ function abrirDivergencia(r, m) {
 }
 
 /**
- * Pago depois do vencimento com o valor do desconto (decisão do dono, 16/11/2026): não é "em dia". Pergunta se registra o que entrou
- * e passa a diferença (desconto perdido, multa e juros) para o próximo boleto. Devolve true (passar), false (outro caminho) ou null (cancelou).
+ * Grava o destino; boleto com valor diferente do previsto não grava e abre o fluxo da divergência. Valor menor que o devido
+ * (também o Pix pago depois do vencimento com o valor do desconto) é recusado pela regra: não existe pagamento em parte (2026-11-20).
  */
-async function perguntarDiferencaNoProximo(r, m) {
-  const cb = r.cobranca;
-  const c = buscar('contratos', cb.contrato_id);
-  const resp = await janela({ titulo: 'Pago com atraso pelo valor do desconto', sim: 'Registrar e passar a diferença', nao: 'Cancelar', forte: true,
-    html: `<p>Boleto de <b>${compBr(cb.competencia)}</b> de <b>${esc(c ? c.inquilino_nome : '')}</b>: vencimento ${dataBr(cb.vencimento)}, pago em <b>${dataBr(r.dataPagou || m.data)}</b>${Z.ehPix(m) ? ' por Pix' : ''}.</p>
-      <p>Entrou <b>${reais(r.recebido)}</b> (o valor com a bonificação de pontualidade). Pago depois do vencimento, o devido é <b>${reais(r.previsto)}</b>: faltam <b>${reais(r.diferenca)}</b> (bonificação perdida, multa e juros).</p>
-      ${r.proximo ? `<p>Ao confirmar, este boleto fica "Pago com atraso" com o valor que entrou e os <b>${reais(r.diferenca)}</b> vão como cobrança adicional no boleto de <b>${compBr(r.proximo.competencia)}</b> (vence ${dataBr(r.proximo.vencimento)}).${r.proximo.banco && r.proximo.banco.situacao === 'emitido' ? ' Esse boleto já está no banco: depois, atualize-o lá ("Atualizar o boleto no banco").' : ''}</p>`
-    : `<p>Ao confirmar, este boleto fica "Pago com atraso" com o valor que entrou e os <b>${reais(r.diferenca)}</b> vão para o próximo boleto do aluguel assim que ele for gerado.</p>`}` });
-  if (!resp) return null;
-  return true;
-}
-
-/** Para onde foi a diferença (texto do aviso). */
-const ondeFoiDiferenca = (res) => (res && res.resultado && res.resultado.proximo ? `o boleto de ${compBr(res.resultado.proximo.competencia)}` : 'o próximo boleto, quando ele for gerado');
-
-/** Grava o destino; boleto com valor diferente do previsto não grava e abre o fluxo da divergência. */
 async function salvarDestino(m, destino) {
   let r = await alterar((db) => Z.vincularMovimentacao(db, m.id, destino, login()));
-  if (r && r.divergente && r.atrasoComDesconto) {
-    const passar = await perguntarDiferencaNoProximo(r, m);
-    if (passar === null) return mostrar();
-    if (passar) {
-      r = await alterar((db) => Z.vincularMovimentacao(db, m.id, { ...destino, diferencaNoProximo: true }, login()));
-      aviso(`Boleto de ${compBr(r.cobranca.competencia)} registrado como pago com atraso; a diferença vai para ${ondeFoiDiferenca(r)}.`, 'ok');
-      return mostrar();
-    }
-  }
   if (r && r.divergente) return abrirDivergencia(r, m);
   // devolução que deixaria o recebido do boleto abaixo do devido: só com a confirmação (nada foi gravado ainda)
   if (r && r.abaixoDoDevido) {
@@ -1186,19 +1161,11 @@ export const ACOES_BANCO = {
     const r = await janela({ titulo: 'Confirmar o pagamento do boleto', sim: 'Confirmar pagamento', forte: previsto !== m.valor,
       html: `<p>Boleto de <b>${compBr(cb.competencia)}</b> de <b>${esc(c ? c.inquilino_nome : '')}</b>, vencimento ${dataBr(cb.vencimento)}.</p>
         <p>Recebido <b>${reais(m.valor)}</b> em <b>${dataBr(m.data)}</b> · previsto para esta data: <b>${reais(previsto)}</b>
-        ${previsto === m.valor ? etiqueta('bate certinho', 'ok') : `${etiqueta('valor diferente', 'aviso')}<br><span class="suave">Ao confirmar, o sistema pede a justificativa e o valor da NF na página do boleto.</span>`}</p>
+        ${previsto === m.valor ? etiqueta('bate certinho', 'ok') : m.valor < previsto ? `${etiqueta('valor menor que o devido', 'perigo')}<br><span class="suave">Não existe pagamento em parte: se o valor menor se confirmar, o pagamento é recusado, o boleto continua em aberto e o dinheiro fica sem destino (para quitar, faça um acordo).</span>` : `${etiqueta('valor diferente', 'aviso')}<br><span class="suave">Ao confirmar, o sistema pede a justificativa e o valor da NF na página do boleto.</span>`}</p>
         <p class="suave">O boleto fica "Pago" com a data em que o dinheiro entrou e esta movimentação fica ligada a ele.</p>` });
     if (!r) return;
+    // valor menor que o devido: a regra recusa (não existe pagamento em parte, 2026-11-20) e nada é gravado
     const res = await alterar((db) => Z.confirmarPagamentoPeloBanco(db, cb.id, m.id, login()));
-    if (res.divergente && res.atrasoComDesconto) {
-      const passar = await perguntarDiferencaNoProximo(res, m);
-      if (passar === null) return mostrar();
-      if (passar) {
-        const fim = await alterar((db) => Z.confirmarPagamentoPeloBanco(db, cb.id, m.id, login(), { diferencaNoProximo: true }));
-        aviso(`Boleto de ${compBr(cb.competencia)} registrado como pago com atraso; a diferença vai para ${ondeFoiDiferenca(fim)}.`, 'ok');
-        return mostrar();
-      }
-    }
     if (res.divergente) return abrirDivergencia(res, m);
     aviso(`Pagamento do boleto de ${compBr(cb.competencia)} confirmado.`);
     await mostrar();
@@ -1371,7 +1338,9 @@ export const FORMULARIOS_BANCO = {
     const divergentes = [];
     const repetidos = [];
     const paraJustificar = [];
+    let recusados = [];
     await alterar((db) => {
+      recusados = [];
       const usados = new Set();
       for (const s of marcados) {
         const cb = R.buscar(db, 'cobrancas', s.cobranca_id);
@@ -1379,22 +1348,29 @@ export const FORMULARIOS_BANCO = {
         // o mesmo pagamento do banco nunca paga dois boletos (ex.: dois boletos de mesmo valor marcados)
         if (s.pagamento !== undefined && usados.has(s.pagamento)) { const c = R.buscar(db, 'contratos', cb.contrato_id); repetidos.push(`${compBr(cb.competencia)}${c ? ` de ${c.inquilino_nome}` : ''}`); continue; }
         // a entrada desse dinheiro no extrato, se já importada, fica ligada ao boleto (Z.registrarPagamentoDoBanco, o mesmo da tela Boletos)
-        const r = Z.registrarPagamentoDoBanco(db, conf.conta, s, login());
+        let r;
+        // pago a menos: recusado antes de gravar (não existe pagamento em parte, 2026-11-20); os outros marcados seguem
+        try { r = Z.registrarPagamentoDoBanco(db, conf.conta, s, login()); } catch (e) {
+          if (!(e instanceof C.ErroUsuario)) throw e;
+          recusados.push(`${compBr(cb.competencia)}: ${e.message}`);
+          continue;
+        }
         if (r.divergente) { divergentes.push(`${compBr(cb.competencia)} (recebido ${reais(r.recebido)}, previsto ${reais(r.previsto)})`); paraJustificar.push({ s, r }); }
         else { n += 1; usados.add(s.pagamento); }
       }
     });
     estado.conferencia = null;
+    const txtRecusados = recusados.length ? ` Não registrado(s), pago(s) a menos: ${recusados.join(' · ')}` : '';
     // valor diferente do previsto, mesmo sem o extrato importado: abre direto a janela da justificativa (um de cada vez)
     if (paraJustificar.length) {
       const { s, r } = paraJustificar[0];
       const entrada = Z.entradaDoRecebimento(d(), { conta_id: conf.conta, valor: s.valor, ids: [s.external_payment_id, ...Z.identificadoresDoBoleto(buscar('cobrancas', s.cobranca_id))] });
       memoria.pagamentoDivergente = { id: s.cobranca_id, data: s.data_credito, valor: s.valor, pagouEmDia: !!r.pagouEmDia, dataPagou: !r.pagouEmDia && s.data_pagamento && s.data_pagamento < s.data_credito ? s.data_pagamento : null,
         justificativa: `Valor informado pelo banco (C6): ${reais(s.valor)}`, movimentacao_id: entrada ? entrada.id : null };
-      aviso(`${n} pagamento(s) registrado(s).${repetidos.length ? ` Não registrei ${repetidos.join(', ')}: é o mesmo pagamento do banco de outro boleto marcado.` : ''} ${divergentes.length} com valor diferente do previsto: ${divergentes.join('; ')}. Informe a justificativa e o valor da NF do primeiro${divergentes.length > 1 ? '; depois, busque os boletos pagos de novo para os outros' : ''}.`, 'aviso');
+      aviso(`${n} pagamento(s) registrado(s).${repetidos.length ? ` Não registrei ${repetidos.join(', ')}: é o mesmo pagamento do banco de outro boleto marcado.` : ''}${txtRecusados} ${divergentes.length} com valor diferente do previsto: ${divergentes.join('; ')}. Informe a justificativa e o valor da NF do primeiro${divergentes.length > 1 ? '; depois, busque os boletos pagos de novo para os outros' : ''}.`, 'aviso');
       return ir(`#/cobranca/${s.cobranca_id}?ir=pagamento`);
     }
-    aviso(`${n} pagamento(s) registrado(s).${repetidos.length ? ` Não registrei ${repetidos.join(', ')}: é o mesmo pagamento do banco de outro boleto marcado.` : ''}${divergentes.length ? ` ${divergentes.length} com valor diferente do previsto não foi(ram) registrado(s): ${divergentes.join('; ')}. Confirme pela linha do extrato ("É o pagamento do boleto…"), que pede a justificativa e o valor da NF.` : ''}`, divergentes.length || repetidos.length ? 'aviso' : 'ok');
+    aviso(`${n} pagamento(s) registrado(s).${repetidos.length ? ` Não registrei ${repetidos.join(', ')}: é o mesmo pagamento do banco de outro boleto marcado.` : ''}${divergentes.length ? ` ${divergentes.length} com valor diferente do previsto não foi(ram) registrado(s): ${divergentes.join('; ')}. Confirme pela linha do extrato ("É o pagamento do boleto…"), que pede a justificativa e o valor da NF.` : ''}${txtRecusados}`, divergentes.length || repetidos.length || recusados.length ? 'aviso' : 'ok');
     await mostrar();
   },
 

@@ -22,6 +22,7 @@ export function telaFechamento(mes) {
     <div class="cartao"><ol class="fechamento">${etapas.map((e) => `<li class="${e.feito ? 'feito' : ''}">
       <div class="cabecalho"><div><b>${esc(e.titulo)}</b> ${e.feito ? etiqueta(e.marcado ? `marcado em ${dataBr(e.marcado.feito_em)}` : 'feito', 'ok') : e.prevista ? etiqueta(String(e.titulo).includes(dataBr(e.aPartirDe)) ? 'previsto' : `previsto a partir de ${dataBr(e.aPartirDe)}`, 'neutra') : etiqueta(C.plural(e.pendentes, 'pendente', 'pendentes'), 'aviso')}
         <div class="suave">${esc(e.detalhe)}</div>
+        ${e.chave === 'condominio' && e.contratos && e.contratos.length ? `<div class="acoes" style="margin-top:4px">${e.contratos.map((id) => { const c = buscar('contratos', id); return c ? link(`#/contrato/${id}?ir=ressarcimentos`, `Conferir: ${esc(c.inquilino_nome)}`, 'botao secundario pequeno') : ''; }).join(' ')}</div>` : ''}
         ${e.chave === 'contas' && e.imoveis && e.imoveis.length ? `<div class="acoes" style="margin-top:4px">${e.imoveis.map((id) => link(`#/contas/${id}?comp=${esc(mes)}`, `Lançar: ${esc(buscar('imoveis', id).nome)}`, 'botao secundario pequeno')).join(' ')}</div>` : ''}</div>
         <div class="acoes">${link(e.link, 'Abrir', 'botao pequeno')}
           ${opera() ? (e.marcado ? botao('etapaFechamento', 'Desmarcar', { mes, etapa: e.chave, feito: '' }, 'link-botao') : !e.feito ? botao('etapaFechamento', 'Marcar como feito', { mes, etapa: e.chave, feito: '1' }, 'secundario pequeno') : '') : ''}</div></div></li>`).join('')}</ol>

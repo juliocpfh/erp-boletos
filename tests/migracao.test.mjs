@@ -155,6 +155,16 @@ test('internet cai num envio com outros em andamento: espera os outros, não com
   fs.rmSync(raiz, { recursive: true, force: true });
 });
 
+test('mutirão 19/11 (nuvem-003): pasta sem administrador com o e-mail de quem leva: para antes de enviar qualquer coisa', async () => {
+  const raiz = pastaFicticia();
+  const { sinc, anexos } = nuvemDeTeste();
+  let enviou = false;
+  await assert.rejects(levarParaNuvem(new PastaDisco(raiz), { anexos, sinc, email: 'outra@exemplo.com.br', aoAndar: () => { enviou = true; } }),
+    (e) => e.esperado && /nenhum administrador ativo tem o login ou o "E-mail de acesso" outra@exemplo\.com\.br.*o administrador é dono@exemplo\.com\.br, sem e-mail.*Nada foi enviado/.test(e.message));
+  assert.equal(enviou, false);
+  fs.rmSync(raiz, { recursive: true, force: true });
+});
+
 test('pasta sem o arquivo de dados: avisa para escolher a pasta certa', async () => {
   const raiz = fs.mkdtempSync(path.join(os.tmpdir(), 'pasta-errada-'));
   const { sinc, anexos } = nuvemDeTeste();

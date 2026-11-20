@@ -425,16 +425,23 @@ export async function exportarZip(JSZip, pasta, dados, aoAndar = () => {}) {
     zip.file(x.caminho, arquivo);
     bytes += x.tamanho || arquivo.size || 0;
   }
-  if (naoIncluidos.length) zip.file('NAO-INCLUIDOS.txt', `Arquivos que não entraram neste ZIP (não deu para ler):\r\n${naoIncluidos.join('\r\n')}\r\n`);
+  if (naoIncluidos.length) zip.file(AVISO_NAO_INCLUIDOS, `Arquivos que não entraram neste ZIP (não deu para ler):\r\n${naoIncluidos.join('\r\n')}\r\n`);
   aoAndar({ fase: 'compactando', pct: 0 });
   return zip.generateAsync({ type: 'blob', compression: 'DEFLATE' }, (m) => aoAndar({ fase: 'compactando', pct: m.percent }));
 }
 
-export async function importarZip(JSZip, pasta, arquivoZip, dadosAtuais) {
+/** Aviso que o "Exportar tudo" põe no ZIP quando um anexo não deu para ler: a importação aceita e só lê a lista. */
+export const AVISO_NAO_INCLUIDOS = 'NAO-INCLUIDOS.txt';
+
+/** ``info``: recebe ``naoIncluidos`` (os anexos que ficaram fora do ZIP, do aviso NAO-INCLUIDOS.txt), para a tela dizer quais. */
+export async function importarZip(JSZip, pasta, arquivoZip, dadosAtuais, info = {}) {
   const zip = await JSZip.loadAsync(arquivoZip);
   const banco = zip.file(ARQUIVO_BANCO);
   if (!banco) throw new Error(`O ZIP não contém o arquivo ${ARQUIVO_BANCO}.`);
-  const nomes = Object.keys(zip.files);
+  // o aviso dos anexos que ficaram de fora não vai para a pasta (antes, o ZIP inteiro era recusado por causa dele)
+  const aviso = zip.files[AVISO_NAO_INCLUIDOS];
+  info.naoIncluidos = aviso && !aviso.dir ? String(await aviso.async('string')).split(/\r?\n/).slice(1).map((x) => x.trim()).filter(Boolean) : [];
+  const nomes = Object.keys(zip.files).filter((n) => n !== AVISO_NAO_INCLUIDOS);
   // Confere todos os caminhos antes de gravar qualquer coisa: um nome inválido no meio deixaria a pasta
   // com metade dos anexos novos e o banco antigo. Cada parte do caminho passa por limparNome (igual ao anexar).
   const entradas = [];

@@ -27,7 +27,7 @@ const FORM_RESTAURAR = `<form data-form="restaurarSeguro" class="formulario">
     <div class="check"><button>Abrir o backup</button></div></form>
   <p class="suave">${S.suportado() ? `<b>Abrir numa pasta:</b> escolha uma pasta nova e vazia; o sistema grava ali os dados (e os anexos, se o backup for completo) e abre. Só para desastre (dados da nuvem perdidos): com o site só fora do ar, use o aplicativo instalado, que envia sozinho depois. Na pasta, para levar de volta à nuvem, <b>Dados e backup → Substituir os dados da nuvem pelos de uma pasta</b> leva o que fez para a nuvem (para só voltar o banco a um dia, <b>Backups da nuvem</b> é mais simples).`
     : 'Neste aparelho só dá para baixar o ZIP: abrir o backup numa pasta (e levar de volta à nuvem) se faz no computador, no Chrome ou no Edge.'}
-    <b>ZIP:</b> igual ao do "Exportar tudo", para guardar ou importar depois. Os usuários e senhas voltam junto.</p>`;
+    <b>ZIP:</b> igual ao do "Exportar tudo", para guardar. Para voltar os dados com ele: com os dados numa pasta do computador, "Importar ZIP" em Dados e backup; na nuvem (onde não há "Importar ZIP"), use "Backups da nuvem" ou abra o backup numa pasta nova do computador e depois "Substituir os dados da nuvem pelos de uma pasta". Os usuários e senhas voltam junto.</p>`;
 
 export function telaRestaurarBackup() {
   return `<main><div id="mensagens"></div><div class="cartao login" style="max-width:640px">

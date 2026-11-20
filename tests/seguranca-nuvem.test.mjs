@@ -136,6 +136,29 @@ test('cofre vazio: com DONO_EMAIL só o dono faz a primeira carga; banco sem adm
   assert.throws(() => c.importar(semAdmin, DONO, { substituir: true }), /nenhum administrador ativo/);
 });
 
+test('mutirão 19/11 (nuvem-001/003): a carga só entra se um administrador ativo dela tem o e-mail de quem a faz (senão ninguém entraria)', () => {
+  const sql = sqlFalso(); const c = new Cofre(sql, tx(sql), () => hora);
+  // pasta antiga com login curto e sem e-mail de acesso: recusada com a explicação, nada gravado
+  const curto = { ...banco(), usuarios: [{ id: 1, login: 'julio', papel: 'admin', ativo: true, senha_hash: 'h1' }] };
+  assert.throws(() => c.importar(curto, DONO), (e) => e.status === 400 && /nenhum administrador ativo tem o login ou o e-mail de acesso dono@exemplo\.com\.br/.test(e.message));
+  assert.equal(c.vazio(), true);
+  // o mesmo usuário com o e-mail de acesso preenchido entra (e depois o dono é reconhecido)
+  const comEmail = { ...banco(), usuarios: [{ id: 1, login: 'julio', email: DONO, papel: 'admin', ativo: true, senha_hash: 'h1' }] };
+  assert.equal(c.importar(comEmail, DONO).ok, true);
+  assert.equal(c.exigir(DONO, 'admin').papel, 'admin');
+  // substituir pela pasta errada também é recusado
+  assert.throws(() => c.importar(curto, DONO, { substituir: true }), /nenhum administrador ativo tem/);
+});
+
+test('mutirão 19/11 (nuvem-002): o administrador não troca o próprio login e e-mail para algo que não seja o e-mail com que entra', () => {
+  const c = novo();
+  assert.throws(() => c.aplicar(lote([{ op: 'alterar', tabela: 'usuarios', id: 1, campos: { login: { antes: DONO, depois: 'julio' } } }]), DONO), (e) => e.status === 409 && /tem de continuar dono@exemplo\.com\.br/.test(e.message));
+  assert.equal(c.exigir(DONO, 'admin').papel, 'admin', 'continua entrando');
+  // trocar o login mantendo o e-mail de acesso igual passa
+  assert.equal(c.aplicar(lote([{ op: 'alterar', tabela: 'usuarios', id: 1, campos: { login: { antes: DONO, depois: 'julio' }, email: { antes: undefined, depois: DONO } } }]), DONO).ok, true);
+  assert.equal(c.exigir(DONO, 'admin').papel, 'admin');
+});
+
 test('e-mail pela conta da empresa: só operador, registrado (destino, assunto, anexos), com limite por dia', () => {
   const c = novo();
   assert.throws(() => c.registrarEmail({ para: ['qualquer@exemplo.org'], assunto: 'Oi' }, CONSULTA), /não pode/);

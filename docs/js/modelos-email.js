@@ -141,9 +141,9 @@ O primeiro boleto ({primeiro_boleto}) chega por este e-mail[se reserva], já com
     anexos: 'Vistoria de entrada e termo de entrega das chaves (PDF)', prontos: ['assinado:doc_vistoria', 'assinado:doc_chaves'],
     texto: `Olá, {nome}! Seja bem-vindo(a).
 
-As chaves foram entregues em {data_chaves}. Segue a vistoria de entrada: é com ela que o imóvel será comparado na saída.
+[se data_chaves]As chaves foram entregues em {data_chaves}. [fim]Segue a vistoria de entrada: é com ela que o imóvel será comparado na saída.
 
-Achou algum defeito que não está nela? Avise por este e-mail, com fotos, até {data_limite_vistoria} (5 dias úteis). Depois disso a vistoria vale como aceita, salvo defeito oculto.
+Achou algum defeito que não está nela? Avise por este e-mail, com fotos, [se data_limite_vistoria]até {data_limite_vistoria} (5 dias úteis)[senão]em até 5 dias úteis da entrega das chaves[fim]. Depois disso a vistoria vale como aceita, salvo defeito oculto.
 
 LEMBRETES
 - Boletos e avisos chegam por este e-mail, o canal oficial; o primeiro: {primeiro_boleto}

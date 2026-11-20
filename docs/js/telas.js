@@ -215,7 +215,7 @@ export const TELAS = {
 
   primeiroAcesso: () => `<main><div id="mensagens"></div><div class="cartao login">
     <h1>Primeiro acesso</h1>
-    <p class="suave">${E.nuvem ? '<b>Dados na nuvem</b>. A nuvem ainda não tem dados:' : `Pasta: <b>${esc(E.pasta.name)}</b>. Esta pasta ainda não tem dados:`} crie o usuário administrador. O nome, o login e a senha são você que escolhe agora (senha com pelo menos ${SENHA_MINIMA} caracteres: uma frase curta serve). Depois o administrador libera os demais em Usuários.</p>
+    <p class="suave">${E.nuvem ? '<b>Dados na nuvem</b>. A nuvem ainda não tem dados:' : `Pasta: <b>${esc(E.pasta.name)}</b>. Esta pasta ainda não tem dados:`} crie o usuário administrador. O nome, o login e a senha são você que escolhe agora (senha com pelo menos ${SENHA_MINIMA} caracteres: uma frase curta serve). Depois o administrador libera os demais em Usuários.${E.nuvem && E.emailNuvem ? ` Na nuvem, o seu usuário fica ligado ao e-mail com que você entrou pela internet (<b>${esc(E.emailNuvem)}</b>): é por ele que a nuvem sabe que é você.` : ""}</p>
     ${E.nuvem ? `<div class="alerta info"><b>Já usa o sistema?</b> Leve os dados e os anexos da pasta de sempre (OneDrive) para a nuvem. A pasta não é alterada; no fim, tudo é conferido.
       Depois cada um entra com o login e a senha de sempre.
       <p class="acoes" style="margin-top:8px">${botao('levarParaNuvem', 'Levar os dados da pasta para a nuvem', {}, '')}</p><div id="progresso-nuvem"></div></div>

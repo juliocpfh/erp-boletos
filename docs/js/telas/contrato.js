@@ -43,6 +43,17 @@ function selosContrato(c) {
 export const inicialBonificado = (c, inicial = c.aluguel_inicial, pctB = R.percentualBonificacao(c)) => inicial - C.descontoPorPercentual(inicial, pctB);
 
 /** Aluguel atual com a bonificação de pontualidade (o que o inquilino paga em dia, sem IPTU e seguro). */
+/**
+ * Termo aditivo assinado excluído: o que ele já mudou continua valendo (mutirão 19/11, saida-031 e saida-043). Texto para a pergunta.
+ * Ex.: vencimento do dia 10 para o 15 → "O dia do vencimento continua 15 no cadastro e nos boletos em aberto…".
+ */
+function oQueContinuaDoAditivo(a, c) {
+  if (a.tipo === 'Vencimento' && a.dia_novo) return ` Atenção: o dia do vencimento continua ${a.dia_novo} no cadastro e nos boletos em aberto. Se o termo foi anexado por engano, corrija o dia em "Editar" (o anterior era ${a.dia_anterior || '—'}).`;
+  if (a.tipo === K.TIPO_ADITIVO_VALOR) return ' Atenção: o novo valor do aluguel continua valendo nos boletos; o termo assinado terá de ser anexado de novo.';
+  if ((!a.tipo || a.tipo === K.TIPO_ADITIVO_TROCA) && c && c.contrato_anterior_id) return c.heranca_transferida ? ' Atenção: a troca de titular já feita continua valendo; o termo assinado terá de ser anexado de novo (o Painel volta a pedir).' : ' Atenção: sem o termo assinado, a troca de titular volta a esperar por ele.';
+  return '';
+}
+
 export function valorBonificado(c) {
   const aluguel = R.aluguelAtual(d(), c);
   return aluguel - C.descontoPorPercentual(aluguel, R.percentualBonificacao(c));
@@ -220,7 +231,7 @@ function caixaGarantia(c) {
     }
     const inicial = R.depositosGarantiaDo(d(), c, 'caucao').filter((x) => !x.complementar).reduce((t, x) => t + x.valor, 0) || c.caucao_valor;
     html += `<p class="linha-garantia">Caução <b>${reais(inicial)}</b>${herdadaDe}, ${pagaEm('caucao')}${comprovanteDa('caucao', 'comprovante_caucao')}${remover('caucao')}
-      · ${atual || `atual <b class="maior">${reais(R.valorGarantia(d(), c))}</b>${c.caucao_meses ? ` <span class="suave">(${C.plural(c.caucao_meses, 'aluguel', 'aluguéis')}; sugerido hoje ${reais(sug)})</span>` : ''}`}</p>
+      · ${atual || `atual <b class="maior">${reais(R.valorGarantia(d(), c))}</b>${c.caucao_meses ? ` <span class="suave">(combinada em ${C.plural(c.caucao_meses, 'aluguel', 'aluguéis')}; sugerido hoje ${reais(sug)})</span>` : ''}`}</p>
       ${parcelas('caucao')}${correcoesHtml()}`;
   }
   if (R.temDeposito(c) && !R.garantiaDepositada(c) && !anteriorDaGarantia) {
@@ -270,7 +281,7 @@ function caixaGarantia(c) {
   } else if (R.temCaucao(c) || R.temDeposito(c) || aplic.length) {
     const situacaoTotal = sit.ok ? etiqueta('100% aplicado', 'ok') : sit.total ? etiqueta(`falta aplicar ${reais(sit.falta)}`, 'aviso') : '';
     html += `${subtitulo('Onde o valor foi aplicado', opera() ? link(`#/novo/aplicacoes?contrato=${c.id}`, 'Registrar aplicação') : '', 'Na saída, o valor é devolvido corrigido pela poupança (informado no cálculo final), pela conta em que foi depositado.')}
-      <table class="compacta">${aplic.map((a) => { const rec = R.recebedorDaAplicacao(d(), a); return `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(rec.nome)}${rec.pessoa ? ` ${etiqueta('outra pessoa', 'info')}` : ''}</td><td class="n">${reais(a.valor)}</td>
+      <table class="compacta">${aplic.map((a) => { const rec = R.recebedorDaAplicacao(d(), a); return `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(rec.nome)}${rec.pessoa ? ` ${etiqueta('outra pessoa', 'info')}` : ''}${R.aplicacaoBaixada(d(), a) ? ` ${etiqueta('garantia anterior, devolvida na troca', 'info')}` : ''}</td><td class="n">${reais(a.valor)}</td>
         <td>${linkComprovante(c.id, a.comprovante, { tabela: 'aplicacoes', id: a.id, campo: 'comprovante', tipo: 'aplicacao-garantia', data: a.data })} ${esc(a.observacoes || '')}</td>
         <td class="n nw">${editar(`#/editar/aplicacoes/${a.id}?contrato=${c.id}`)} ${excluir('aplicacoes', a.id, 'Excluir esta aplicação? O comprovante também é apagado.')}</td></tr>`; }).join('')}
       <tr class="total"><td colspan="7">Aplicado de ${reais(sit.total)}${R.garantiaDepositada(c) ? '' : ' <span class="suave">(já depositado)</span>'}</td><td class="n">${reais(sit.soma)}</td><td colspan="2">${situacaoTotal}</td></tr></table>`;
@@ -345,7 +356,7 @@ function caixaSaida(c) {
     }
     const temVistoria = R.vistoriasDo(d(), c.id).some((v) => v.tipo === 'Saída');
     return `<div class="cartao" id="saida"><div class="cabecalho"><h2>Saída em ${dataBr(c.data_saida)}</h2>
-        <div class="acoes">${botao('informarSaida', 'Mudar a data', { id: c.id }, 'secundario pequeno')} ${botao('desfazerSaida', 'Desfazer a saída', { id: c.id }, 'perigo pequeno', 'Tirar a data de saída? O inquilino volta a ativo.')}</div></div>
+        <div class="acoes">${botao('informarSaida', 'Mudar a data', { id: c.id }, 'secundario pequeno')} ${botao('desfazerSaida', 'Desfazer a saída', { id: c.id }, 'perigo pequeno', 'Tirar a data de saída? O inquilino volta a ativo; a data marcada da vistoria de saída e o termo de devolução das chaves (se anexado) saem junto.')}</div></div>
       ${roteiroSaidaHtml(c, null)}
       ${(() => { const s = R.saldoFci(d(), c); return s.depositos.length ? `<div class="alerta info">💰 Crédito do inquilino no FCI: <b>${reais(s.corrigido)}</b>${s.ate ? ` (corrigido até ${compBr(s.ate)})` : ' (sem correção: use "Calcular atualização" na caixa do FCI)'}. Paga só os reparos de danos da vistoria de saída; o que sobrar volta ao inquilino.</div>` : ''; })()}
       ${c.data_saida > C.hojeIso() ? `<div class="alerta info">O cálculo final é feito depois da saída, a partir de ${dataBr(c.data_saida)}.</div></div>` : `<div class="alerta aviso">Falta o cálculo final. ${temVistoria ? '' : `Faça antes a ${link(`#/vistoria/novo?contrato=${c.id}&tipo=Sa%C3%ADda`, 'vistoria de saída', '')} (com a leitura dos relógios). `}${link(`#/novo/encerramentos?contrato=${c.id}`, 'Fazer cálculo final', 'botao pequeno')}</div></div>`}`;
@@ -570,7 +581,7 @@ const rotinaAberta = (c, hoje) => R.contratoAtivo(c, hoje) && !R.resumoRotinaEnt
 /** Marcar um documento de entrada como assinado: data, arquivo assinado e "Marcar" (com "Falta assinatura", se pedido). */
 function formMarcarDocumento(c, k, feito, comParcial = true) {
   return `<form data-form="marcarDocumento" class="acoes" style="justify-content:flex-end"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="campo" value="${k}">
-        <input type="date" name="data" value="${C.hojeIso()}" style="width:auto">${F.atalhosData()}
+        <input type="date" name="data" value="${C.hojeIso()}" max="${C.hojeIso()}" style="width:auto">${F.atalhosData()}
         <label class="botao secundario pequeno enviar" title="Arquivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}" data-arquivo-doc></label>
         <button class="secundario pequeno">Marcar ${feito}</button>
         ${comParcial ? botao('documentoParcial', 'Falta assinatura', { contrato: c.id, campo: k }, 'secundario pequeno') : ''}</form>`;
@@ -628,7 +639,7 @@ function caixaRotinaEntrada(c, hoje = C.hojeIso()) {
     const atalho = e.concessionaria !== null ? conta(e) : (atalhos[e.chave] || (() => ''))();
     return `<div class="acoes" style="justify-content:flex-end">${atalho}
       <form data-form="etapaEntrada" class="acoes"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="chave" value="${e.chave}">
-        <input type="date" name="data" value="${hoje}" style="width:auto" title="Data em que foi feita">${F.atalhosData()}<button class="secundario mini">Marcar feita</button></form>${pular}</div>`;
+        <input type="date" name="data" value="${hoje}" max="${hoje}" style="width:auto" title="Data em que foi feita">${F.atalhosData()}<button class="secundario mini">Marcar feita</button></form>${pular}</div>`;
   };
   // contra-vistoria (2026-11-15): o arquivo que o inquilino mandou (com o "×") ou a data + o arquivo para anexar; "Não houve" fecha
   // a etapa. Passado o prazo, continua pendente até um dos dois. Na troca de titular vale a do anterior.
@@ -640,7 +651,7 @@ function caixaRotinaEntrada(c, hoje = C.hojeIso()) {
     if (!opera() || anterior) return '';
     if (e.manual) return botao('desfazerEtapaEntrada', 'Desfazer', { contrato: c.id, chave: e.chave }, 'link-botao');
     return `<div class="acoes" style="justify-content:flex-end"><form data-form="contraVistoria" class="acoes"><input type="hidden" name="contrato" value="${c.id}">
-        <input type="date" name="data" value="${hoje}" style="width:auto" title="Data em que o inquilino mandou">${F.atalhosData()}
+        <input type="date" name="data" value="${hoje}" max="${hoje}" style="width:auto" title="Data em que o inquilino mandou">${F.atalhosData()}
         <label class="botao secundario mini enviar" title="Arquivo que o inquilino mandou (PDF, foto ou o e-mail salvo em PDF)"><span data-nome-escolhido>Escolher arquivo</span><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}" data-arquivo-doc></label>
         <button class="secundario mini">Anexar</button></form>
       ${e.situacao === 'pulada' ? '' : botao('pularEtapaEntrada', 'Não houve', { contrato: c.id, chave: e.chave }, 'link-botao')}</div>`;
@@ -738,7 +749,7 @@ function caixaAditivos(c) {
         <label class="botao secundario pequeno enviar" title="Termo aditivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}" data-arquivo-doc></label>
         <button class="pequeno">Marcar assinado</button></form>` : ''}</td></tr>`).join('')}</table></div></div>` : ''}
     ${lista.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Assunto</th><th>Arquivo</th><th></th></tr>${lista.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}${a.ciencia_por ? `<br><span class="suave mini">ciência da herança: ${esc(a.ciencia_por)} em ${dataBr(String(a.ciencia_em).slice(0, 10))}</span>` : ""}</td><td class="nw">${R.aditivoPerdido(a) ? `${abrir(a)} ${acoesPerdido(a)}` : `${abrir(a)}${xAnexo('removerArquivoAditivo', { id: a.id }, `Apagar o arquivo "${a.arquivo}"? O termo aditivo continua e volta a "aguardando assinatura".`)}`}</td>
-      <td class="n nw">${a.arquivo ? `${botaoEmail('aditivo_assinado', { contrato: c.id, aditivo: a.id })} ` : ''}${ver(a)} ${opera() ? botao('excluir', '×', { tabela: 'aditivos', id: a.id }, 'x-excluir', `Excluir o termo aditivo de ${dataBr(a.data)}?${a.arquivo ? ' O arquivo assinado também é apagado.' : ''}`) : ''}</td></tr>`).join('')}</table></div>`
+      <td class="n nw">${a.arquivo ? `${botaoEmail('aditivo_assinado', { contrato: c.id, aditivo: a.id })} ` : ''}${ver(a)} ${opera() ? botao('excluir', '×', { tabela: 'aditivos', id: a.id }, 'x-excluir', `Excluir o termo aditivo de ${dataBr(a.data)}?${a.arquivo ? ' O arquivo assinado também é apagado.' : ''}${oQueContinuaDoAditivo(a, c)}`) : ''}</td></tr>`).join('')}</table></div>`
     : '<p class="suave">Nenhum termo aditivo registrado.</p>'}
     ${anteriores.map(([x, l]) => `<details open><summary>Histórico: aditivos do contrato anterior de <a href="#/contrato/${x.id}?ir=aditivos">${esc(x.inquilino_nome)}</a> (${l.length})</summary>
       <div class="rolagem"><table>${l.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td><td>${abrir(a)}</td></tr>`).join('')}</table></div></details>`).join('')}
@@ -777,7 +788,7 @@ export function telaContrato(c) {
   // documentos de entrada e contas a transferir aparecem na rotina de entrada (recolhida: também na faixa dos documentos)
   // alertas adiados no Painel ("adiar 7 dias" / "já estou cuidando") ficam de fora aqui também
   // os desligados para este inquilino também (lista e "Religar" na caixa "Alertas deste inquilino", logo abaixo dos alertas)
-  const alertasDoContrato = R.contratoAtivo(c, hoje) ? R.alertasContrato(d(), c, hoje).map((a) => ({ ...a, contrato_id: c.id })) : [];
+  const alertasDoContrato = R.alertasDoInquilino(d(), c, hoje).map((a) => ({ ...a, contrato_id: c.id }));
   const alertas = alertasDoContrato.filter((a) => !['A verificar', 'Rotina de entrada'].includes(a.tipo) && !R.adiamentoDe(d(), R.chaveAlerta(a), hoje) && !R.desligamentoDe(d(), a));
   const rotina = caixaRotinaEntrada(c, hoje);
   const agendada = R.herancaAgendada(d(), c, hoje);

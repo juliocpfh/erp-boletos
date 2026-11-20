@@ -8,7 +8,7 @@ import { regra } from './config-regras.js';
 import {
   buscar, inserir, atualizar, excluir, registrar, registrarPagamento, previstoNoPagamento, totais, marcarIptuPago, parcelasIptu,
   lancarDespesas, lancarGanhoAirbnb, contasPermitidas, participacoesDo, TIPOS_DESPESA, contaBancaria, apelidoDaConta, pastaDoComprovante, pastaContador,
-  CONFIG_BANCO_FASE2, mesDoDinheiro, contaDeOrigem, extratoImportadoAte, contasDoExtrato, contaSoArquivo, proximoBoletoAberto, registrarComDiferencaNoProximo, devidoDoPago, pagoAMaisDo, devolucaoPendente,
+  CONFIG_BANCO_FASE2, mesDoDinheiro, contaDeOrigem, extratoImportadoAte, contasDoExtrato, contaSoArquivo, conferirValorRecebido, ehComplementoCaucao, devidoDoPago, pagoAMaisDo, devolucaoPendente,
 } from './regras.js';
 
 export { pastaDoComprovante as escopoDoComprovante, pastaContador as escopoContador, apelidoDaConta, mesDoDinheiro, contaDeOrigem };
@@ -739,6 +739,10 @@ function casarBoletos(d, valor, data, dias, { idExterno = null, nossoNumero = nu
       if (emAberto(cb)) {
         const pontual = ib ? ib.pontual.get(cb) : totais(cb).a_pagar_pontual;
         const noPrazo = valor === pontual && data <= (pix ? C.limitePagamento(cb.vencimento) : ultimoCreditoEmDia(cb, false, dias));
+        // valor menor que o devido (mesmo no dia de pagamento mais favorável): não existe pagamento em parte (decisão de 2026-11-20),
+        // nada é proposto e o dinheiro fica sem destino
+        const minimo = Math.min(...(pix ? [data] : datasPossiveisDoPagamento(data)).map((x) => previstoNoPagamento(cb, data, { dataPagou: x }).valor_devido));
+        if (!noPrazo && valor < minimo) return [];
         return [{ cobranca: cb, certeza: 'exata', previsto: noPrazo ? pontual : previstoNoPagamento(cb, data).valor_devido, pagouEmDia: noPrazo && data > cb.vencimento, peloId: true }];
       }
       if (cb.data_pagamento && ligavel(cb, movId) && cb.valor_pago === valor) return [{ cobranca: cb, certeza: 'exata', previsto: cb.valor_pago, pagouEmDia: !!cb.pagou_em_dia, jaPago: true, peloId: true }];
@@ -750,7 +754,9 @@ function casarBoletos(d, valor, data, dias, { idExterno = null, nossoNumero = nu
     const cb = abertos.find((x) => x.banco && ((idExterno && x.banco.id_externo === idExterno) || (nossoNumero && x.banco.nosso_numero && String(x.banco.nosso_numero) === String(nossoNumero))));
     if (cb) {
       const emDia = data > cb.vencimento && valor === totais(cb).a_pagar_pontual;
-      return [{ cobranca: cb, certeza: 'exata', previsto: previstoNoPagamento(cb, data, { pagouEmDia: emDia }).valor_devido, pagouEmDia: emDia }];
+      const previsto = previstoNoPagamento(cb, data, { pagouEmDia: emDia }).valor_devido;
+      if (valor < previsto) return []; // pagamento a menos: nunca casa (decisão de 2026-11-20)
+      return [{ cobranca: cb, certeza: 'exata', previsto, pagouEmDia: emDia }];
     }
   }
   const credito = dataCredito || data;
@@ -937,15 +943,15 @@ export function confirmarPagamentoPeloBanco(d, cobrancaId, origem, usuario, { pa
     if (dia) dataPagou = dia;
   }
   const previsto = previstoNoPagamento(cb, credito, { pagouEmDia: emDia, dataPagou });
-  // pago depois do vencimento com o valor do desconto: a diferença (desconto perdido, multa e juros) pode ir ao boleto do mês seguinte
-  const atrasoComDesconto = !emDia && valor === pontual && previsto.valor_devido > valor;
-  if (diferencaNoProximo && !atrasoComDesconto) throw new C.ErroUsuario('Este pagamento não foi com atraso pelo valor do desconto: nada a passar para o próximo boleto.');
-  if (!diferencaNoProximo && valor !== previsto.valor_devido && valorNf === null) {
-    const prox = atrasoComDesconto ? proximoBoletoAberto(d, cb) : null;
-    return { divergente: true, previsto: previsto.valor_devido, recebido: valor, cobranca: cb, pagouEmDia: emDia, atrasoComDesconto, diferenca: atrasoComDesconto ? previsto.valor_devido - valor : null, proximo: prox, dataPagou: dataPagou || pagou || credito };
+  // não existe pagamento em parte (decisão do dono, 2026-11-20): valor menor que o devido (também o Pix pago depois do vencimento
+  // com o valor do desconto) é recusado; o boleto continua em aberto e o dinheiro fica no extrato sem destino
+  // (boleto só com a data do crédito: vale o devido no dia de pagamento mais favorável, até 3 dias úteis antes do crédito)
+  const minimo = !emDia && !pagou && !pix ? Math.min(previsto.valor_devido, ...datasPossiveisDoPagamento(credito).map((x) => previstoNoPagamento(cb, credito, { dataPagou: x }).valor_devido)) : previsto.valor_devido;
+  if (diferencaNoProximo || valor < minimo || ehComplementoCaucao(cb)) conferirValorRecebido(cb, valor, ehComplementoCaucao(cb) ? previsto.valor_devido : minimo, { extrato: !!mov });
+  if (valor !== previsto.valor_devido && valorNf === null) {
+    return { divergente: true, previsto: previsto.valor_devido, recebido: valor, cobranca: cb, pagouEmDia: emDia, dataPagou: dataPagou || pagou || credito };
   }
-  const r = diferencaNoProximo ? registrarComDiferencaNoProximo(d, cb, { credito, pagou: dataPagou || pagou || credito, valor, previsto }, usuario)
-    : registrarPagamento(d, cb.id, credito, valor, usuario, { pagouEmDia: emDia, dataPagou, valorNf, justificativa });
+  const r = registrarPagamento(d, cb.id, credito, valor, usuario, { pagouEmDia: emDia, dataPagou, valorNf, justificativa });
   const c = buscar(d, 'contratos', cb.contrato_id);
   if (mov) {
     atualizar(d, 'cobrancas', cb.id, { movimentacao_id: mov.id }, usuario, 'Pagamento confirmado pelo extrato do banco');
