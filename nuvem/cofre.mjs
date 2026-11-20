@@ -318,6 +318,20 @@ export class Cofre {
     const u = usuarios.find((x) => x.ativo !== false && [x.login, x.email].some((v) => String(v || '').toLowerCase() === e));
     return u ? { papel: u.papel, id: u.id } : null;
   }
+  /**
+   * Login e e-mail de acesso de um usuário não podem ser os de outro (nem o login de um o e-mail do outro): o papel sai do
+   * primeiro usuário ativo com aquele e-mail (papelDe) e a pessoa entraria com o papel do outro.
+   */
+  conferirAcessoUnico(id, dados) {
+    const meus = [dados?.login, dados?.email].map((v) => String(v || '').trim().toLowerCase()).filter(Boolean);
+    if (!meus.length) return;
+    for (const r of this.q("SELECT id, dados FROM registros WHERE tabela = 'usuarios' AND id <> ?", id)) {
+      const u = JSON.parse(r.dados);
+      if ([u.login, u.email].some((v) => v && meus.includes(String(v).trim().toLowerCase()))) {
+        throw new ErroCofre(409, `O login ou e-mail de acesso já é usado pelo usuário ${u.nome || u.login}: cada pessoa entra com um e-mail próprio.`);
+      }
+    }
+  }
   exigir(email, nivel) {
     const p = this.papelDe(email);
     const papel = typeof p === 'string' ? p : p?.papel;
@@ -602,6 +616,7 @@ export class Cofre {
         if (igual(JSON.parse(atual.dados), dados)) return { ok: true, repetido: true };
         throw new ErroCofre(409, `Código ${id} já usado em ${tabela} (aparelho sem faixa de códigos?).`);
       }
+      if (tabela === 'usuarios') this.conferirAcessoUnico(id, dados);
       const chaves = this.chavesDe(tabela);
       if (chaves) {
         const k = chaveUnica(tabela, dados); const outro = k === null ? undefined : chaves.porChave.get(k);
@@ -680,6 +695,7 @@ export class Cofre {
         conflito = true;
       }
       if (mudou && quem.papel !== 'admin') conferirRegrasDoAdmin(tabela, JSON.parse(atual.dados), dados);
+      if (mudou && tabela === 'usuarios' && campos.some(([c]) => c === 'login' || c === 'email')) this.conferirAcessoUnico(id, dados);
       if (mudou) {
         if (this.chaves.has(tabela)) this.anotarChave(this.chaves.get(tabela), tabela, id, dados);
         this.sql.exec('UPDATE registros SET dados = ?, meta = ? WHERE tabela = ? AND id = ?', texto(dados), JSON.stringify(meta), tabela, id);

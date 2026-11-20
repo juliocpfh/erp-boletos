@@ -427,3 +427,15 @@ test('entrar, sair ou trocar a própria senha não muda "Última atualização �
   assert.equal(c.tudo().revisao, antes.revisao + 1, 'mudança nos dados conta');
   assert.equal(c.tudo().atualizado_por, OPERADOR);
 });
+
+test('usuários: o e-mail de acesso (ou o login) de um não pode ser o de outro (a nuvem daria o papel do outro)', () => {
+  const c = carregado();
+  // o operador novo com o e-mail do sócio (admin): recusado
+  assert.throws(() => c.aplicar(lote([{ op: 'inserir', tabela: 'usuarios', id: 9, dados: { id: 9, login: 'novo', email: SOCIO, papel: 'operador', ativo: true } }]), DONO), (e) => e.status === 409);
+  // o login igual ao e-mail de outro também
+  assert.throws(() => c.aplicar(lote([{ op: 'inserir', tabela: 'usuarios', id: 9, dados: { id: 9, login: SOCIO, papel: 'consulta', ativo: true } }]), DONO), (e) => e.status === 409);
+  // mudar o e-mail do consulta para o do operador: recusado; para um e-mail livre: vale
+  assert.throws(() => c.aplicar(lote([{ op: 'alterar', tabela: 'usuarios', id: 4, campos: { email: { antes: undefined, depois: OPERADOR } } }]), DONO), (e) => e.status === 409);
+  assert.equal(c.aplicar(lote([{ op: 'alterar', tabela: 'usuarios', id: 4, campos: { email: { antes: undefined, depois: 'livre@exemplo.com.br' } } }]), DONO).ok, true);
+  assert.equal(c.aplicar(lote([{ op: 'inserir', tabela: 'usuarios', id: 9, dados: { id: 9, login: 'maria', email: 'maria@exemplo.com.br', papel: 'operador', ativo: true } }]), DONO).ok, true);
+});

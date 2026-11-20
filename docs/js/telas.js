@@ -5,7 +5,7 @@
 //   envios (FORMULARIOS: envio de cada formulário) · acoes (ACOES: botões data-acao)
 import { aviso, E, podeUsuario } from './app.js';
 import * as S from './armazenamento.js';
-import { PAPEIS, SENHA_MINIMA } from './auth.js';
+import { emailDeAcesso, PAPEIS, SENHA_MINIMA } from './auth.js';
 import * as C from './calculos.js';
 import { compBr, dataBr, reais } from './calculos.js';
 import * as F from './formularios.js';
@@ -464,7 +464,7 @@ export const TELAS = {
           <td><select data-papel-de="${u.id}" style="width:auto">${papeis}</select></td>
           <td class="n nw">${botao('aprovarUsuario', 'Aprovar', { id: u.id }, 'pequeno')} ${botao('recusarUsuario', 'Recusar', { id: u.id }, 'perigo pequeno', `Recusar o pedido de ${u.nome}?`)}</td></tr>`).join('')}</table></div>` : ''}
       <div class="cartao"><table><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>Situação</th><th></th></tr>
-      ${ordenar(d().usuarios.filter((u) => !u.pendente), 'nome').map((u) => `<tr><td>${esc(u.nome)}</td><td>${esc(u.login)}</td><td>${PAPEIS[u.papel]}</td><td>${u.ativo ? etiqueta('Ativo', 'ok') : etiqueta('Bloqueado', 'perigo')}</td>
+      ${ordenar(d().usuarios.filter((u) => !u.pendente), 'nome').map((u) => `<tr><td>${esc(u.nome)}</td><td>${esc(u.login)}</td><td>${PAPEIS[u.papel]}</td><td>${u.ativo ? etiqueta('Ativo', 'ok') : etiqueta('Bloqueado', 'perigo')}${E.nuvem && u.ativo && !emailDeAcesso(u) ? ` ${etiqueta('sem e-mail: não entra pela internet', 'aviso')}` : ''}</td>
         <td class="n nw">${u.id === E.usuario.id ? '<span class="suave">você</span>' : botao('bloquearUsuario', u.ativo ? 'Bloquear' : 'Desbloquear', { id: u.id }, u.ativo ? 'perigo pequeno' : 'pequeno', u.ativo ? `Bloquear o acesso de ${u.nome}?` : '')} ${link(`#/editar/usuarios/${u.id}`, 'Editar')}</td></tr>`).join('')}</table>
       <p class="suave">Quem não tem usuário clica em "Pedir acesso" na tela de login, e o pedido aparece aqui para aprovar. Administrador: tudo, inclusive usuários e importação. Operador: cadastra, altera, confirma pagamentos e numera NFs. Consulta: só vê.</p></div>${aparelhos}`;
   },

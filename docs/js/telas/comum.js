@@ -4,7 +4,7 @@ import { alterar, aviso, E, janela, login, mostrar, podeUsuario } from '../app.j
 import * as S from '../armazenamento.js';
 import * as C from '../calculos.js';
 import { dataBr, pct, reais } from '../calculos.js';
-import { esc } from '../formularios.js';
+import { ACEITA_DOCUMENTOS, esc } from '../formularios.js';
 import * as P from '../poupanca.js';
 import * as R from '../regras.js';
 import * as AI from '../arquivo-impresso.js';
@@ -61,7 +61,7 @@ export const PARTES_ADIADAS = {
   regras: { importar: () => import('./regras-sistema.js'), acoes: ['ACOES_REGRAS', ['restaurarVersaoRegras', 'excluirVersaoRegras', 'voltarRegrasPadrao', 'baixarArquivoRegras', 'carregarArquivoRegras', 'excluirPerfilRegras']],
     formularios: ['FORMULARIOS_REGRAS', ['regrasSistema', 'salvarVersaoRegras', 'perfilRegras']] },
   regua: { importar: () => import('./regua.js'), acoes: ['ACOES_REGUA', ['recusarRegua', 'copiarRegua', 'abrirReguaGmail', 'enviarReguaSelecionados']] },
-  nuvem: { importar: () => import('./nuvem.js'), acoes: ['ACOES_NUVEM', ['desligarAparelho', 'levarParaNuvem', 'resolverConflito', 'esquecerRecusas', 'baixarRecusa', 'esquecerRecusa',
+  nuvem: { importar: () => import('./nuvem.js'), acoes: ['ACOES_NUVEM', ['desligarAparelho', 'levarParaNuvem', 'resolverConflito', 'acertarPastaConflito', 'esquecerRecusas', 'baixarRecusa', 'esquecerRecusa',
     'baixarNaoEnviado', 'baixarBackupNuvem', 'restaurarBackupNuvem', 'esquecerNaoEnviado']] },
 };
 
@@ -1021,7 +1021,7 @@ export const alertasAbertos = new Set();
 export const caixaHistorico = (titulo, conteudo) => `<details class="cartao caixa-historico"><summary><b>${titulo}</b> <span class="suave">· clique para expandir</span></summary>${conteudo}</details>`;
 
 /** Tipos aceitos ao anexar: documentos (PDF e fotos) e, nas pastas gerais, também planilha, Word e ZIP. Página e script nunca (ver S.nomeAnexavel). */
-export const ACEITA_DOCUMENTOS = '.pdf,.jpg,.jpeg,.png,.webp,.gif';
+export { ACEITA_DOCUMENTOS };
 export const ACEITA_ANEXOS = `${ACEITA_DOCUMENTOS},.xlsx,.docx,.zip`;
 
 export function caixaArquivos(escopo, id, titulo, ancora, ajuda = '', dentro = false, enviar = true) {

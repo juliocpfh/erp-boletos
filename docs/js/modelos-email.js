@@ -90,7 +90,7 @@ Agradecemos o interesse no imóvel da {imovel}. Depois da análise, não foi pos
 
 Devolvemos {devolucao} em {devolucao_data}, na conta de onde veio a reserva do imóvel da {imovel}. Anexos: o comprovante e o termo de devolução e quitação.
 
-A ficha está encerrada, sem valores pendentes. Se puder, responda com o termo assinado (pode ser pelo gov.br); o comprovante do banco já prova a devolução.
+A ficha está encerrada[se devolucao_parcial]. Da reserva, {devolucao_parcial} não foi devolvido: qualquer dúvida, responda este e-mail[senão], sem valores pendentes[fim]. Se puder, responda com o termo assinado (pode ser pelo gov.br); o comprovante do banco já prova a devolução.
 
 Os documentos da análise serão apagados, conforme a LGPD (Lei 13.709/2018).`,
   },

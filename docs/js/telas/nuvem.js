@@ -6,7 +6,48 @@ import { dataBr, dataHoraBr, ErroUsuario, hojeIso } from '../calculos.js';
 import { esc } from '../formularios.js';
 import * as N from '../nuvem.js';
 import * as R from '../regras.js';
-import { botao, carregarParte, etiqueta, link } from './comum.js';
+import { botao, carregarParte, etiqueta, link, nomePastaContrato, pastaPaiContrato, renomearNoDisco } from './comum.js';
+
+/**
+ * Campo derivado: a pasta dos arquivos sai do nome do imóvel (e, no contrato, do nome e das datas do inquilino). Não é um
+ * conflito à parte: acompanha a escolha dos outros campos e a pasta dos anexos é renomeada junto (antes, mudar o nome do
+ * imóvel em dois aparelhos dava dois conflitos e dava para ficar com o nome de um e a pasta do outro).
+ */
+const PASTA_DERIVADA = { imoveis: (r) => S.limparNome(r.nome), contratos: (r) => nomePastaContrato(r) };
+const ehPastaDerivada = (c) => c.tipo === 'campo' && c.campo === 'pasta' && !!PASTA_DERIVADA[c.tabela];
+
+/** Depois de uma escolha: fecha os conflitos da pasta do registro, grava a pasta certa e renomeia a pasta dos anexos. */
+async function acertarPastaDerivada(tabela, id, candidatos = []) {
+  const calcular = PASTA_DERIVADA[tabela];
+  if (!calcular) return;
+  const doRegistro = (E.nuvem.conflitos || []).filter((x) => x.tipo === 'campo' && x.tabela === tabela && x.reg_id === String(id));
+  if (doRegistro.some((x) => x.campo !== 'pasta')) return; // outro campo ainda em disputa: a pasta espera a escolha dele
+  const antes = (E.d[tabela] || []).find((x) => x.id === id);
+  if (!antes) return;
+  const esperada = calcular(antes);
+  const nomes = [antes.pasta, ...candidatos];
+  for (const x of doRegistro) {
+    nomes.push(x.atual, x.proposto);
+    await E.nuvem.resolver(x.id, x.proposto === esperada ? 'proposto' : 'atual');
+  }
+  E.d = E.nuvem.atual();
+  const r = (E.d[tabela] || []).find((x) => x.id === id);
+  if (!r) return;
+  if (r.pasta !== esperada) await alterar((db) => R.atualizar(db, tabela, id, { pasta: esperada }, login(), 'Pasta dos arquivos acertada pela escolha do conflito'));
+  const velhos = [...new Set(nomes.filter((v) => typeof v === 'string' && v && v !== esperada))];
+  if (!velhos.length || !E.pasta) return;
+  const pai = tabela === 'contratos' ? pastaPaiContrato(r) : [];
+  try {
+    const dir = await S.subpasta(await E.pasta.getDirectoryHandle(S.PASTA_ARQUIVOS, { create: true }), pai);
+    for (const nome of velhos) {
+      let existe = true;
+      try { await dir.getDirectoryHandle(nome); } catch { existe = false; }
+      if (existe) { await renomearNoDisco(pai, nome, esperada); break; }
+    }
+  } catch (e) {
+    aviso(`Não consegui acertar a pasta dos arquivos ("${esperada}"): ${e.message}`, 'aviso');
+  }
+}
 
 // rótulo do campo e valor formatado (dinheiro em R$, datas dd/mm/aaaa, sim/não): os mesmos do Desfazer e do Excel (exportar.js),
 // carregados por telaConflitos; sem eles (antes de carregar), o nome e o valor como estão gravados
@@ -58,13 +99,21 @@ function resumoDaRecusa(ops) {
 export async function telaConflitos() {
   if (!E.nuvem) return '<h1>Conflitos</h1><p class="suave">Só existem com os dados na nuvem.</p>';
   X ||= await carregarParte(() => import('../exportar.js')).catch(() => null);
-  const conflitos = E.nuvem.conflitos;
+  // a pasta dos arquivos acompanha o nome (não aparece como conflito à parte); sozinha (o nome num aparelho e as datas no
+  // outro, por exemplo), vira uma linha só, que a acerta pelo que ficou gravado
+  const todos = E.nuvem.conflitos;
+  const comOutro = (c) => todos.some((x) => x.tipo === 'campo' && !ehPastaDerivada(x) && x.tabela === c.tabela && x.reg_id === c.reg_id);
+  const pastasSoltas = new Map(todos.filter((c) => ehPastaDerivada(c) && !comOutro(c)).map((c) => [`${c.tabela}:${c.reg_id}`, c]));
+  const conflitos = todos.filter((c) => !ehPastaDerivada(c));
+  const linhaPasta = (c) => `<tr><td>${esc(nomeDoRegistro(c))}</td><td><b>pasta dos arquivos</b></td><td colspan="2">${esc(`Os dois aparelhos mudaram o que dá o nome da pasta (${valorTexto(c.atual)} / ${valorTexto(c.proposto)}). Ela acompanha o que ficou gravado no cadastro.`)}</td>
+    <td>${podeUsuario('admin') ? botao('acertarPastaConflito', 'Acertar a pasta', { tabela: c.tabela, id: c.reg_id }, 'secundario pequeno') : ''}</td></tr>`;
   const recusas = await Promise.all(E.nuvem.recusas.map(async (r) => ({ ...r, id: r.id || r.lote, ops: await E.nuvem.lerRecusa(r.id || r.lote).catch(() => null) })));
   const naoEnviados = E.anexos?.naoEnviados || [];
   const pode = podeUsuario('admin'); // só o administrador escolhe (a nuvem também confere)
   const linhas = conflitos.map((c) => {
     if (c.tipo === 'campo') {
-      return `<tr><td>${esc(nomeDoRegistro(c))}</td><td><b>${esc(rotulo(c.campo, c.tabela))}</b></td>
+      const comPasta = PASTA_DERIVADA[c.tabela] && todos.some((x) => ehPastaDerivada(x) && x.tabela === c.tabela && x.reg_id === c.reg_id);
+      return `<tr><td>${esc(nomeDoRegistro(c))}</td><td><b>${esc(rotulo(c.campo, c.tabela))}</b>${comPasta ? '<br><span class="suave">a pasta dos arquivos acompanha</span>' : ''}</td>
         <td>${esc(valorTexto(c.atual, c.campo, c.tabela))}<br><span class="suave">${esc(c.por_atual || '')}</span></td>
         <td>${esc(valorTexto(c.proposto, c.campo, c.tabela))}<br><span class="suave">${esc(c.por_proposto || '')} · ${esc(quando(c.em))}</span></td>
         <td>${pode ? `${botao('resolverConflito', 'Fica o 1º', { conflito: c.id, escolha: 'atual' }, 'secundario pequeno')} ${botao('resolverConflito', 'Fica o 2º', { conflito: c.id, escolha: 'proposto' }, 'secundario pequeno')}` : ''}</td></tr>`;
@@ -81,11 +130,11 @@ export async function telaConflitos() {
       : ['manter_excluido', 'recriar', `${c.por_proposto || 'Alguém'} mudou, mas ${c.por_atual || 'outra pessoa'} tinha excluído antes`];
     return `<tr><td>${esc(nomeDoRegistro(c))}</td><td colspan="3">${esc(txt)} (${esc(quando(c.em))})</td>
       <td>${pode ? `${botao('resolverConflito', a === 'excluir' ? 'Excluir' : 'Deixar excluído', { conflito: c.id, escolha: a }, 'secundario pequeno')} ${botao('resolverConflito', b === 'manter' ? 'Manter' : 'Recriar com a mudança', { conflito: c.id, escolha: b }, 'secundario pequeno')}` : ''}</td></tr>`;
-  }).join('');
+  }).join('') + [...pastasSoltas.values()].map(linhaPasta).join('');
   return `<p class="suave"><a href="#/">← Painel</a></p><h1>Conflitos da nuvem</h1>
     <div class="caixa"><h2>Para escolher</h2>
       <p class="suave">O mesmo campo foi mudado em dois aparelhos sem internet. O sistema não escolhe sozinho: até o <b>administrador</b> escolher, fica o 1º valor (o que chegou primeiro à nuvem) e o 2º espera.${pode ? '' : ' Avise o administrador.'}</p>
-      ${conflitos.length ? `<div class="rolagem"><table class="responsiva"><tr><th>Registro</th><th>Campo</th><th>1º valor</th><th>2º valor</th><th></th></tr>${linhas}</table></div>` : '<p>Nenhum conflito. ✓</p>'}
+      ${conflitos.length || pastasSoltas.size ? `<div class="rolagem"><table class="responsiva"><tr><th>Registro</th><th>Campo</th><th>1º valor</th><th>2º valor</th><th></th></tr>${linhas}</table></div>` : '<p>Nenhum conflito. ✓</p>'}
     </div>
     ${recusas.length ? `<div class="caixa"><h2>Mudanças recusadas pela nuvem</h2>
       <p class="suave">Estas gravações feitas neste aparelho não foram aceitas e não valem (a tela já voltou ao que vale). Veja o que eram e o motivo; refaça o que ainda precisar. "Baixar" guarda o detalhe num arquivo.</p>
@@ -270,9 +319,17 @@ export const ACOES_NUVEM = {
   },
 
   async resolverConflito(ds) {
+    const c = E.nuvem.conflitos.find((x) => x.id === Number(ds.conflito));
+    const antes = c && PASTA_DERIVADA[c.tabela] ? ((E.d[c.tabela] || []).find((x) => String(x.id) === c.reg_id) || {}).pasta : null;
     await E.nuvem.resolver(Number(ds.conflito), ds.escolha);
     E.d = E.nuvem.atual();
+    if (c && c.tipo === 'campo' && PASTA_DERIVADA[c.tabela]) await acertarPastaDerivada(c.tabela, Number(c.reg_id), [antes]);
     aviso('Escolha gravada: vale em todos os aparelhos.');
+    await mostrar();
+  },
+  async acertarPastaConflito(ds) {
+    await acertarPastaDerivada(ds.tabela, Number(ds.id));
+    aviso('Pasta dos arquivos acertada pelo cadastro.');
     await mostrar();
   },
   async esquecerRecusas() {

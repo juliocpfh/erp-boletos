@@ -182,6 +182,8 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
     pendencias: r.pendencias, ano: String(ano),
     inclusos: juntar(inclusos), iptu_valor: f && f.iptu_estimado > 0 ? C.reais(f.iptu_estimado) : '', seguro_valor: f && f.seguro_estimado > 0 ? C.reais(f.seguro_estimado) : '',
     devolucao: f && f.devolucao_data ? C.reais(f.devolucao_valor || f.reserva_valor) : '', devolucao_data: f && f.devolucao_data ? C.dataBr(f.devolucao_data) : '',
+    // devolução de só uma parte da reserva: a diferença (o e-mail não diz "sem valores pendentes")
+    devolucao_parcial: f && f.devolucao_data && f.devolucao_valor > 0 && f.devolucao_valor < f.reserva_valor ? C.reais(f.reserva_valor - f.devolucao_valor) : '',
     documentos_ficha: f ? documentosDoEmail(f) : '',
     link: linkDaFicha(f, 'interessado', hoje).url, link_validade: linkDaFicha(f, 'interessado', hoje).validade,
     link_fiador: fiadoresLink.length ? fiadoresLink[0].url : '', links_fiadores: linksFiadores,

@@ -6,7 +6,7 @@ import * as C from '../calculos.js';
 import { compBr, dataBr, pct, reais } from '../calculos.js';
 import * as K from '../contratos.js';
 import * as F from '../formularios.js';
-import { esc } from '../formularios.js';
+import { ACEITA_DOCUMENTOS, esc } from '../formularios.js';
 import { poupancaDaGarantia } from '../poupanca.js';
 import * as R from '../regras.js';
 import { buscar, buscarComLimite, d, endereco, memoria, taxasDaPoupanca } from './comum.js';
@@ -160,7 +160,7 @@ function ligarContinuacaoDeContrato(raiz) {
         <p><label class="check" style="padding-top:0"><input type="radio" name="garantia" value="nova"> Garantia nova: ${dinheiro ? `a de ${nomeAnt} é devolvida a ${nomeAnt} (corrigida, descontados os débitos)` : `a de ${nomeAnt} vale só até a véspera`}
           e o novo inquilino presta a sua, com depósito e comprovante próprios (pode ser de outro tipo)</label></p>
         <p class="suave">A escolha entra no termo aditivo da troca, para quem sai e quem entra darem ciência.</p>` : ''}
-        <p><label>Termo aditivo assinado da troca de titular <span class="suave">(opcional)</span></label><input type="file" name="arquivo" accept="application/pdf,image/*"></p>
+        <p><label>Termo aditivo assinado da troca de titular <span class="suave">(opcional)</span></label><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}"></p>
         <p class="suave">Sem o termo agora: o contrato é registrado e fica o alerta "Aditivo da troca de titular" até anexar (em "Termos aditivos" na página do inquilino).</p>
         <p class="suave">Ao salvar, ${esc(anterior.inquilino_nome)} fica com <b>fim do vínculo</b> na véspera dessa data (não é saída: o contrato continua, com as mesmas regras e documentos).
         Os boletos continuam no nome de ${esc(anterior.inquilino_nome)} até a véspera (o último sai proporcional aos dias); a partir da data, saem no nome do novo inquilino.
@@ -275,8 +275,11 @@ function ligarGarantiaHerdada(raiz) {
   const c = form && id && buscar('contratos', id);
   const ant = c && R.contratoHerdado(d(), c);
   if (!ant) return;
+  // os "change" disparados aqui ao montar a tela não são mudança da pessoa: sem isso, só de abrir e sair vinha "Sair sem salvar?"
+  const jaAlterado = form.dataset.alterado;
   travarValoresHerdados(form);
   if (!R.garantiaNova(c)) travarGarantiaHerdada(form, c, ant.inquilino_nome);
+  if (!jaAlterado) delete form.dataset.alterado;
 }
 
 /** Caixas "Usar o endereço do imóvel" do contrato: [caixa, campo de endereço que recebe] (inquilino, representante e solidário). */
@@ -564,30 +567,41 @@ function ligarPoupancaDoAditivo(raiz) {
   }).catch((e) => { if (el.isConnected) mensagemAuto(el, `${esc(e.message)} Digite o valor (saldo do extrato da poupança) ou deixe em branco.`); });
 }
 
-/** Devolução da garantia (troca com garantia nova) e cálculo final da saída: traz o % da poupança até a data. */
+/**
+ * Devolução da garantia (troca com garantia nova) e cálculo final da saída: traz o % da poupança até a data. Também na edição
+ * da devolução (lápis): contrato e troca vêm do registro; o % gravado só é trocado se era o do Banco Central (não digitado).
+ */
 function ligarPoupancaDaGarantia(raiz) {
   const form = raiz.querySelector('form[data-form=cadastro]');
   const [, tabela, consulta] = location.hash.match(/^#\/novo\/(devolucoes_garantia|encerramentos)\?(.*)$/) || [];
-  const el = form && tabela && form.querySelector('[name=indice_percentual]');
-  const c = el && buscar('contratos', new URLSearchParams(consulta).get('contrato'));
+  const [, idEditado] = location.hash.match(/^#\/editar\/devolucoes_garantia\/(\d+)/) || [];
+  const editado = idEditado && buscar('devolucoes_garantia', idEditado);
+  const qual = tabela || (editado ? 'devolucoes_garantia' : null);
+  const el = form && qual && form.querySelector('[name=indice_percentual]');
+  const c = el && buscar('contratos', editado ? editado.contrato_id : new URLSearchParams(consulta).get('contrato'));
   // troca de garantia do mesmo inquilino: os depósitos da garantia que saiu ficaram guardados na troca
-  const troca = c && tabela === 'devolucoes_garantia' && buscar('trocas_garantia', new URLSearchParams(consulta).get('troca'));
+  const troca = c && qual === 'devolucoes_garantia' && buscar('trocas_garantia', editado ? editado.troca_id : new URLSearchParams(consulta).get('troca'));
   if (!c || !(troca ? troca.devolucao_movimentos : R.temCaucao(c) || R.temDeposito(c))) return;
   // garantia combinada e nunca depositada: nada rende (o valor a devolver vem zerado)
   const movimentos = troca ? troca.devolucao_movimentos : R.garantiaRecebida(d(), c) > 0 ? R.movimentosGarantia(d(), c) : [];
   const dataEl = form.querySelector('[name=data]');
   let pedido = 0;
   let trazido = null; // % que veio do Banco Central: troca quando a data muda, salvo se o usuário digitou outro
+  let primeira = true;
   const trazer = async () => {
-    const ate = tabela === 'encerramentos' ? c.data_saida : dataEl && dataEl.value;
+    const ate = qual === 'encerramentos' ? c.data_saida : dataEl && dataEl.value;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(ate || '')) return;
     const n = (pedido += 1);
+    const inicio = primeira;
+    primeira = false;
     mensagemAuto(el, 'Buscando a poupança no Banco Central…');
     try {
       const r = await poupancaDaGarantia(movimentos, ate, fetch, taxasDaPoupanca());
       if (n !== pedido || !el.isConnected) return;
       if (r.falta.length) return mensagemAuto(el, faltaPoupanca(r));
       if (!r.total) return mensagemAuto(el, '');
+      // edição: o % gravado igual ao do Banco Central na data gravada passa a acompanhar a data (mudou a data → muda o %)
+      if (inicio && editado && el.value === F.pctTexto(r.percentual)) trazido = el.value;
       if (!el.value.trim() || el.value === trazido) { el.value = F.pctTexto(r.percentual); trazido = el.value; }
       mensagemAuto(el, resumoPoupanca(r, ate));
     } catch (e) {

@@ -2877,6 +2877,7 @@ export function desistirAntesDeAssinar(d, { fichaId = null, contratoId = null, d
   for (const c of contratos) { const m = motivoSemDesistencia(d, c); if (m) throw new C.ErroUsuario(m); }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(data || ''))) throw new C.ErroUsuario('Informe a data da desistência.');
   if (data > hoje) throw new C.ErroUsuario('A desistência não pode ser numa data futura.');
+  if (f && f.data_recebida && data < f.data_recebida) throw new C.ErroUsuario(`A desistência não pode ser antes de a ficha chegar (${C.dataBr(f.data_recebida)}).`);
   // a reserva e o comprovante dela ficaram no primeiro contrato (dadosDaFicha): voltam para a ficha
   const comReserva = contratos.find((c) => c.reserva_valor > 0) || null;
   const reserva = comReserva ? { reserva_valor: comReserva.reserva_valor, reserva_data: comReserva.reserva_data || null,

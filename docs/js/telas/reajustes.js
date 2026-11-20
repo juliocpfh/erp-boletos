@@ -114,7 +114,7 @@ export function telaReajustes(q) {
     <div class="cartao"><h2>Índices acumulados em 12 meses</h2>
       <p class="suave">Informe o acumulado de 12 meses de cada índice, com o mês até onde ele vai. O reajuste de um aluguel usa o mais recente até o mês anterior ao corrigido.</p>
       ${opera() ? `<form data-form="indiceAcumulado" class="acoes"><select name="indice" style="width:auto">${nomesIndices.map((n) => `<option>${esc(n)}</option>`).join('')}</select>
-        <input type="month" name="mes_ref" value="${C.somarMeses(atual, -1)}" style="width:170px" title="Mês até onde vai o acumulado"><input name="percentual" placeholder="% acumulado" inputmode="decimal" style="width:130px"><button class="pequeno">Incluir</button></form>
+        <input type="month" name="mes_ref" value="${C.somarMeses(atual, -1)}" style="width:170px" title="Mês até onde vai o acumulado"><input name="percentual" placeholder="% acumulado" style="width:130px"><button class="pequeno">Incluir</button></form>
         <div data-indice-msg class="suave">Escolha o índice e o mês: IGP-M, IPCA, INPC e IGP-DI vêm do Banco Central para você conferir. Os outros (ex.: IVAR) são digitados.</div>` : ''}
       ${meses.length ? `<table class="indices-compacta"><tr><th>Acumulado até</th>${colunas.map((n) => `<th class="n">${esc(n)}</th>`).join('')}</tr>
       ${meses.map((m) => `<tr><td>${compBr(m)}</td>${colunas.map((n) => `<td class="n nw">${celula(m, n)}</td>`).join('')}</tr>`).join('')}</table>` : '<p class="suave">Nenhum índice informado.</p>'}</div>

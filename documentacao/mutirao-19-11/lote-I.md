@@ -8,62 +8,62 @@ Como trabalhar: ver `../MUTIRAO_19_11.md`. Marque `[x]` ao corrigir. G = grave, 
   - Causa: `docs/js/calculos.js:404-409; docs/js/regras.js:1908-1909 e 2486-2491`
   - Fazer: Perguntar ao dono. Se decidir tirar: guardar a diferença em campo próprio do boleto (como multas_notificacao) e descontar da base_multa.
   - Atenção (conferente): Confere no código: a diferença do Pix atrasado (bonificação perdida + multa + juros) é somada em "outros" do boleto seguinte, e "outros" faz parte da base de multa e juros; só o FCI e a multa da notificação saem da base. Se o boleto seguinte atrasar, há multa e juros sobre multa e juros (poucos reais: 2% de R$ 279,35 …
-- [ ] **mensal-013** [M] "Alterar valores" aceita desconto maior que o aluguel, multa de 500%, juros negativos e vencimento de 2020
+- [x] **mensal-013** [M] "Alterar valores" aceita desconto maior que o aluguel, multa de 500%, juros negativos e vencimento de 2020
   - Vê-se: No boleto de 10/2026 do Daniel (aluguel R$ 2.400,00) gravei sem nenhuma pergunta: desconto de R$ 5.000,00 (o demonstrativo ficou "Aluguel R$ 2.400,00 (Bonif. R$ -2.600,00)" e "Valor a pagar R$ 0,00"), multa de 500% e juros de -3% ao mês (a página passou a dizer "Se for pago hoje: R$ 14.378,40 (multa 500% = R$ 12.000,00; juros -3% a.m. = R$ -21,60)"). O vencimento 01/01/2020 também foi aceito: o único aviso foi "não cai no dia 10, que é o do contrato", sem estranhar o ano.
   - Causa: `docs/js/formularios.js:635, 643-644 (campos sem limite) e docs/js/telas/avisos.js:58-65 (conferirBoleto só olha o dia)`
   - Fazer: Barrar multa/juros negativos e desconto maior que o aluguel; pedir confirmação para multa acima do normal e vencimento antes do mês do boleto.
   - Certo é: Barrar desconto maior que o aluguel, multa e juros negativos ou fora do razoável (ex.: multa acima de 10% pede confirmação) e avisar quando o vencimento fica antes do mês do boleto.
-- [ ] **nuvem-005** [M] Na nuvem dá para criar usuário sem "E-mail de acesso": ele nunca consegue entrar e nada avisa
+- [x] **nuvem-005** [M] Na nuvem dá para criar usuário sem "E-mail de acesso": ele nunca consegue entrar e nada avisa
   - Vê-se: O campo "E-mail de acesso" do usuário é opcional mesmo na nuvem. Criando a Maria com login "maria" e sem e-mail, o cadastro salva normal e ela aparece ativa em Usuários; quando ela tenta abrir o sistema com o e-mail dela, vê "Este e-mail não está ligado a nenhum usuário ativo do sistema". A lista de Usuários não marca quem está sem e-mail.
   - Causa: `docs/js/formularios.js:627; docs/js/telas/cadastros.js:1018-1029; nuvem/cofre.mjs:318`
   - Fazer: Na nuvem, exigir o e-mail quando o login não for um e-mail (erros.email) e marcar na lista de Usuários quem não consegue entrar pela internet.
   - Certo é: Na nuvem, exigir o e-mail (ou login em forma de e-mail) e marcar na lista os usuários que não conseguem entrar pela internet.
-- [ ] **iphone-011** [L] No iPhone não dá para digitar valor negativo: o teclado de números não tem o sinal de menos
+- [x] **iphone-011** [L] No iPhone não dá para digitar valor negativo: o teclado de números não tem o sinal de menos
   - Vê-se: O campo "Ajuste do mês: cobrança adicional (+) ou ressarcimento (−)" do boleto pede valor negativo para descontar (a própria ajuda diz "Ex.: -150,00"). No iPhone, campo de dinheiro abre o teclado só de números e vírgula, que não tem a tecla "−". Resultado: pe…
   - Causa: `docs/js/formularios.js:640 e 855 (dinheiro com negativo: true sai com inputmode="decimal"); docs/js/telas/reajustes.js:108; o caminho que funciona: docs/js/telas/cobrancas.js:289-299`
   - Fazer: Nos campos que aceitam negativo (c.negativo e o percentual do índice), não pôr inputmode="decimal" (deixar o teclado completo).
   - Atenção (conferente): Em parte. É verdade que os campos pedem o teclado 'decimal', que no iPhone não tem o sinal de menos. Mas para o boleto existe outro caminho que funciona no iPhone: na página do boleto, a caixa "Ajuste deste mês" tem a escolha "Ressarcimento (−)" e o valor se digita sem sinal. Sobra de verdade só o "% acumulado" de um …
-- [ ] **iphone-018** [L] Dois tipos de campo de arquivo: uns aceitam "qualquer imagem", outros só PDF/JPG/PNG/WEBP/GIF
+- [x] **iphone-018** [L] Dois tipos de campo de arquivo: uns aceitam "qualquer imagem", outros só PDF/JPG/PNG/WEBP/GIF
   - Vê-se: Dez campos de anexo (comprovante de pagamento, arquivos dos formulários, etc.) aceitam "application/pdf,image/*"; os outros usam a lista do sistema (.pdf, .jpg, .jpeg, .png, .webp, .gif). Nos primeiros, pelo iPhone ("Escolher arquivo") ou pelo computador dá p…
   - Causa: `docs/js/formularios.js:845, telas/contrato.js:128, 570, 662, 734, 744, telas/cadastros.js:100 e 644, telas/campos.js:163, telas/acoes.js:1672; lista em telas/comum.js:1024; docs/js/armazenamento.js:192`
   - Fazer: Trocar o accept desses campos por ${ACEITA_DOCUMENTOS}.
-- [ ] **entrada-030** [M] Datas da ficha não são conferidas: recebida no futuro, reserva sem data ou no futuro, devolução no futuro ou antes da reserva, desistência antes de a ficha existir
+- [x] **entrada-030** [M] Datas da ficha não são conferidas: recebida no futuro, reserva sem data ou no futuro, devolução no futuro ou antes da reserva, desistência antes de a ficha existir
   - Vê-se: A ficha aceita: 'Solicitação recebida em' 01/01/2030; reserva de R$ 1.000,00 sem data ou com data futura; devolução da reserva em data futura ou anterior à reserva (reserva 18/11/2026, devolução 10/11/2026); decisão ou 'Desistiu antes de assinar' em 01/11/2026 numa ficha recebida em 19/11/2026. Consequências: reserva sem data deixa o Recibo da reserva indisponível, o e-mail de envio sai com '[preencher: reserva_data]' e o Termo de devolução sai com 'recebida em' sem data; devolução futura some com o alerta 'devolv…
   - Causa: `docs/js/telas/cadastros.js:576-585; docs/js/regras.js:2859-2860; docs/js/formularios.js:372 e :432-435`
   - Fazer: Conferir no salvar: reserva com valor exige data; nenhuma dessas datas no futuro; devolução não antes da reserva; decisão/desistência não antes da data em que a ficha foi recebida.
   - Certo é: Reserva com valor exige data; nenhuma dessas datas no futuro; devolução não antes da reserva; decisão e desistência não antes da data em que a ficha foi recebida.
   - Atenção (conferente): Na ficha só se confere: decisão no futuro, devolução sem data e devolução maior que a reserva. Não há conferência para "recebida em" no futuro, reserva com valor e sem data (ou futura), devolução no futuro ou antes da reserva; a desistência só recusa data futura (aceita data antes de a ficha existir). Reserva sem data…
-- [ ] **mensal-032** [M] IPTU aceita 99 parcelas e parcela fixa maior que o total (IPTU de R$ 1.200,00 virou R$ 5.000,00 por mês no boleto)
+- [x] **mensal-032** [M] IPTU aceita 99 parcelas e parcela fixa maior que o total (IPTU de R$ 1.200,00 virou R$ 5.000,00 por mês no boleto)
   - Vê-se: O cadastro do IPTU só confere se há pelo menos 1 parcela. Gravou sem perguntar: IPTU de R$ 1.200,00 em 99 parcelas (R$ 12,12 por mês durante 8 anos) e IPTU de R$ 1.200,00 com "Valor fixo cobrado por parcela" de R$ 5.000,00 em 10 vezes (R$ 50.000,00 cobrados do inquilino). Os boletos em aberto do Carlos Em Dia foram recalculados na hora: o de 10/2026 passou a ter IPTU de R$ 5.012,12. O mês do 1º boleto também pode ser de outro ano (IPTU "1900" cobrado nos boletos de 2026) com apenas o aviso do ano.
   - Causa: `docs/js/telas/cadastros.js:694-699 (ajustar); docs/js/telas/avisos.js:121-129 (conferirIptu); docs/js/formularios.js:468-469`
   - Fazer: Em conferirIptu, avisar (com "Salvar assim mesmo") quando parcelas > 12, quando valor fixo × parcelas foge do total (ex.: mais de 5%) e quando o mês do 1º boleto está longe do ano do IPTU.
   - Certo é: Perguntar antes de salvar quando: parcelas > 12; parcela fixa × nº de parcelas muito diferente do total; mês do 1º boleto longe do ano do IPTU.
-- [ ] **mensal-034** [M] Seguro aceita 0 parcelas (nunca é cobrado do inquilino), 60 parcelas e 1ª cobrança em 01/2020 sem avisar
+- [x] **mensal-034** [M] Seguro aceita 0 parcelas (nunca é cobrado do inquilino), 60 parcelas e 1ª cobrança em 01/2020 sem avisar
   - Vê-se: No cadastro da apólice o "Número de parcelas" 0 é aceito: o seguro de R$ 600,00 foi salvo e nunca entra em boleto nenhum, sem aviso. Também passou sem pergunta um seguro em 60 parcelas com "Cobrar 1ª parcela no aluguel de" 01/2020 (a janela só reclamou da vigência de 5 anos e da sobreposição). No IPTU, 0 parcelas é recusado ("Informe pelo menos 1 parcela"); no seguro não.
   - Causa: `docs/js/telas/cadastros.js:648-650; docs/js/formularios.js:460 e 705-708; docs/js/telas/avisos.js:102-118; docs/js/calculos.js:349-350`
   - Fazer: No ajustar do seguro: erros.num_parcelas quando < 1 (como no IPTU); em conferirSeguro, avisar quando a 1ª cobrança é de antes do início da vigência ou as parcelas passam do fim.
   - Certo é: Recusar 0 parcelas e perguntar quando a 1ª cobrança é de antes do início da vigência ou as parcelas passam da vigência.
-- [ ] **mensal-044** [M] Renovação aceita nova data de término no passado (01/01/2020) e novo aluguel de R$ 1,00 sem perguntar
+- [x] **mensal-044** [M] Renovação aceita nova data de término no passado (01/01/2020) e novo aluguel de R$ 1,00 sem perguntar
   - Vê-se: No formulário "Renovação / novo valor" não há conferência: "Renovado com nova data de término" com 01/01/2020 é gravado e o contrato passa a terminar em 2020 (viram alertas de contrato vencido); "Novo valor" de R$ 1,00 (ou 100 vezes o atual) é gravado e os boletos em aberto do mês em diante são recalculados na hora, e ainda sai um termo aditivo do novo valor. Nos outros cadastros (IPTU, seguro, contrato) valor muito diferente do anterior pede confirmação.
   - Causa: `docs/js/telas/cadastros.js:907-922 (sem conferir); docs/js/regras.js:2275-2291`
   - Fazer: Erro quando a nova data de término é anterior à entrada; pergunta (conferir) quando é anterior a hoje e quando o novo valor difere muito do atual (diferencaGrande, já usada em IPTU e seguro).
   - Certo é: Recusar data de término anterior à entrada ou a hoje; perguntar quando o novo valor é muito diferente do atual (ex.: mais de 30%).
-- [ ] **saida-017** [M] Cálculo final é aceito sem o boleto do último mês ter sido gerado: o último aluguel fica fora dos débitos
+- [x] **saida-017** [M] Cálculo final é aceito sem o boleto do último mês ter sido gerado: o último aluguel fica fora dos débitos
   - Vê-se: Os débitos do cálculo final vêm só dos boletos que já existem. Se o boleto do mês da saída ainda não foi gerado (ex.: saída em 20/10/2026 e o boleto de outubro só é gerado em novembro), o cálculo final sai com débitos R$ 0,00 e devolve a caução inteira; o aviso da tela diz só "Confira o boleto do último mês". Depois o boleto é gerado e fica em aberto, mas o contrato já consta como encerrado e não aparece mais na inadimplência.
   - Causa: `docs/js/telas/cadastros.js:935-956 e 962-968; docs/js/regras.js:2972-2991`
   - Fazer: No formulário, se não houver boleto do mês da saída (boletoDoMes), avisar em destaque ou barrar: "gere antes o boleto de 10/2026".
   - Certo é: Avisar em destaque "o boleto de 10/2026 ainda não foi gerado: gere antes" (ou barrar), como o roteiro já mostra na etapa "Último boleto".
-- [ ] **comunicacoes-016** [M] Não dá para reabrir uma solicitação concluída: ao salvar como "Aberta" ela volta sozinha para "Concluída"
+- [x] **comunicacoes-016** [M] Não dá para reabrir uma solicitação concluída: ao salvar como "Aberta" ela volta sozinha para "Concluída"
   - Vê-se: Solicitação concluída em 10/11/2026 que o inquilino reclama de novo: ao editar, trocar a Situação para "Aberta" (ou "Em andamento") e salvar, o sistema vê a data "Concluído em" ainda preenchida e muda a situação de volta para "Concluída", sem avisar. A solicitação continua concluída. Só funciona se a pessoa lembrar de apagar a data.
   - Causa: `docs/js/telas/cadastros.js:295-296`
   - Fazer: Se a situação gravada era "Concluída" e a pessoa escolheu "Aberta"/"Em andamento", limpar a data de conclusão em vez de forçar "Concluída".
   - Certo é: Ao voltar para "Aberta"/"Em andamento", o sistema limpar a data de conclusão (ou perguntar).
-- [ ] **admin-005** [M] Dois usuários podem ficar com o mesmo e-mail de acesso (ou o e-mail de um igual ao login de outro): na nuvem a pessoa pode entrar com o papel errado
+- [x] **admin-005** [M] Dois usuários podem ficar com o mesmo e-mail de acesso (ou o e-mail de um igual ao login de outro): na nuvem a pessoa pode entrar com o papel errado
   - Vê-se: O cadastro de usuário só confere se o login se repete. O "E-mail de acesso" pode ser igual ao de outro usuário (ou igual ao login de outro). Na nuvem, o que a pessoa pode fazer é decidido pelo primeiro usuário ativo que a nuvem achar com aquele e-mail (ou login), não pelo usuário com que ela entrou na tela. Ex.: já existe um usuário "Consulta" com o e-mail fulano@exemplo.com.br e o administrador cria um "Operador" com o mesmo e-mail: a tela mostra os botões de operador, mas a nuvem pode recusar tudo o que ele grav…
   - Causa: `docs/js/telas/cadastros.js:1027 (só login) x nuvem/cofre.mjs:318-322 (papelDe)`
   - Fazer: Ao salvar usuário, recusar e-mail igual ao e-mail ou ao login de outro usuário (e login igual ao e-mail de outro); conferir o mesmo no cofre.
   - Certo é: Recusar e-mail de acesso já usado por outro usuário (como já faz com o login).
-- [ ] **nuvem-007** [M] Uma mudança só (o nome do imóvel) vira dois conflitos, e dá para escolher um de cada aparelho
+- [x] **nuvem-007** [M] Uma mudança só (o nome do imóvel) vira dois conflitos, e dá para escolher um de cada aparelho
   - Vê-se: Mudando o nome do imóvel 1 em dois navegadores sem internet ("Casa 1 - mudada no A" e "Casa 1 - mudada no B"), a volta da internet mostra "⚠ 2 conflito(s) para escolher": um do campo "nome" e outro do campo "pasta" (campo interno, que o usuário nunca digitou). O administrador pode escolher "Fica o 1º" num e "Fica o 2º" no outro: o imóvel fica com um nome e a pasta dos arquivos com outro. Escolhendo o 2º nos dois, o campo muda mas a pasta dos anexos na nuvem não é renomeada (a tela de Conflitos só grava o campo).
   - Causa: `docs/js/telas/cadastros.js:217 (e 435 nos contratos); docs/js/telas/nuvem.js:261-266 (resolverConflito); nuvem/cofre.mjs (conflito campo a campo, resolver em 776)`
   - Fazer: Tratar "pasta" como campo derivado: sem conflito próprio (acompanha a escolha do nome/datas) e, ao resolver, recalcular a pasta e renomear a pasta dos anexos.
@@ -71,61 +71,62 @@ Como trabalhar: ver `../MUTIRAO_19_11.md`. Marque `[x]` ao corrigir. G = grave, 
 - [ ] **fios-019** [L] Quatro caminhos existem no sistema mas nenhum botão leva a eles (entre eles "novo contrato da mesma pessoa em outro imóvel")
   - Vê-se: Há telas prontas que nenhum link ou botão abre: (1) "Novo contrato" já preenchido com os dados de uma pessoa que já é inquilina (endereço com pessoa=<contrato>; é a decisão de 15/10/2026 "mesma pessoa alugando outro imóvel", com aviso próprio "os dados da pes…
   - Causa: `docs/js/telas/cadastros.js:331-353 (q.pessoa), :726-735 (q.substitui); docs/js/telas/campos.js:295 e docs/js/telas/avisos.js:25 (q.vincular)`
+  - Feito em parte (20/11): o botão "Novo contrato desta pessoa em outro imóvel" já está na página do inquilino; os caminhos antigos sem entrada (substitui, vincular, fiador e correção avulsos) esperam o dono confirmar que podem sair.
   - Fazer: Pôr na página do inquilino o botão "Novo contrato desta pessoa em outro imóvel" (#/novo/contratos?pessoa=<id>) e remover os caminhos antigos sem entrada (substitui, vincular, cadastros avulsos de fiador e correção), depois de o dono confirmar.
   - Atenção (conferente): Procurei em todo o docs/js: nenhum link ou botão monta pessoa=, substitui=, vincular=, #/novo/fiadores nem #/novo/correcoes; as telas que leem esses parâmetros existem (cadastros.js). O caminho "mesma pessoa em outro imóvel" é decisão do dono de 15/10/2026 (DECISOES.md:35) e está sem entrada na tela. Não quebra nada: …
-- [ ] **entrada-029** [L] Novo contrato aceita ficha que não está aprovada, e a mesma ficha/imóvel duas vezes (voltar do navegador)
+- [x] **entrada-029** [L] Novo contrato aceita ficha que não está aprovada, e a mesma ficha/imóvel duas vezes (voltar do navegador)
   - Vê-se: O endereço do botão 'Fazer o contrato' (#/novo/contratos?ficha=5&imovel=5) continua valendo depois: voltando com a seta do navegador depois de salvar, o formulário abre de novo preenchido e salva um segundo contrato para a mesma ficha e o mesmo imóvel. O mesm…
   - Causa: `docs/js/telas/cadastros.js:151 e :425-428 (R.imoveisParaContrato existe em regras.js:2666 e não é consultada)`
   - Fazer: Ao salvar, recusar se o imóvel não está em R.imoveisParaContrato da ficha ("ficha não aprovada" / "contrato já feito").
-- [ ] **entrada-031** [L] 'Reprovar (com o motivo)' salva sem motivo nenhum
+- [x] **entrada-031** [L] 'Reprovar (com o motivo)' salva sem motivo nenhum
   - Vê-se: O botão chama 'Reprovar (com o motivo)' e o texto abaixo manda 'escreva o motivo', mas o campo 'Motivo / observação da decisão' pode ficar em branco: a ficha fica 'Reprovada em 19/11/2026 por qa' sem explicação.
   - Causa: `docs/js/telas/cadastros.js:576-580; docs/js/formularios.js:375; docs/js/telas/fichas.js:117-118`
   - Fazer: No ajustar da ficha: situação "Reprovada" sem decisao_motivo → erro "Escreva o motivo da reprovação" (ou tirar "com o motivo" do botão).
   - Atenção (conferente): Li o salvar da ficha: ele confere a data da decisão, a devolução e os imóveis, mas em nenhum lugar olha o campo do motivo, que também não é obrigatório no formulário. A ficha fica "Reprovada em 19/11/2026 por qa" sem explicação, embora o botão diga "Reprovar (com o motivo)".
-- [ ] **entrada-032** [L] Devolução de só uma parte da reserva é aceita sem pergunta e a pendência some
+- [x] **entrada-032** [L] Devolução de só uma parte da reserva é aceita sem pergunta e a pendência some
   - Vê-se: O recibo da reserva promete devolução 'por inteiro, sem desconto'. Mesmo assim, registrar 'Valor devolvido R$ 300,00' numa reserva de R$ 1.000,00 salva direto: o alerta 'devolver a reserva' some, a ficha mostra 'Reserva devolvida: R$ 300,00' e o termo sai diz…
   - Causa: `docs/js/telas/cadastros.js:582-584; docs/js/regras.js:2687; docs/js/recibos.js:189; docs/js/modelos-email.js:93`
   - Fazer: Devolução menor que a reserva: janela "Confira antes de salvar" e motivo/observação obrigatório; no e-mail, trocar "sem valores pendentes" por texto condicional.
   - Atenção (conferente): A devolução parcial é aceita de propósito (o termo tem texto próprio para ela), mas o salvar só barra valor maior que a reserva: R$ 300,00 de R$ 1.000,00 passa sem pergunta, o alerta "devolver a reserva" some (olha só a data), o termo diz que a diferença "fica explicada nas observações" sem exigir observação, e o e-ma…
-- [ ] **entrada-033** [L] Comprovante escolhido sem o valor é descartado em silêncio (mostra 'Salvo.')
+- [x] **entrada-033** [L] Comprovante escolhido sem o valor é descartado em silêncio (mostra 'Salvo.')
   - Vê-se: Na solicitação de reserva, se a pessoa escolhe o arquivo em 'Comprovante da reserva' mas esquece de digitar o 'Valor da reserva', o sistema salva, mostra 'Salvo.' e não guarda o arquivo nem avisa. O mesmo no comprovante da devolução sem valor. Quem anexou ach…
   - Causa: `docs/js/telas/cadastros.js:79-85 (chamado em 601-606)`
   - Fazer: No ajustar: arquivo escolhido e valor em branco → erro no campo do valor ("Informe o valor da reserva: há um comprovante escolhido").
-- [ ] **mensal-036** [L] Reforma aceita data no futuro (01/01/2030) sem perguntar
+- [x] **mensal-036** [L] Reforma aceita data no futuro (01/01/2030) sem perguntar
   - Vê-se: "Reformas e valores investidos": a reforma "Futura" de R$ 10,00 com data 01/01/2030 foi salva direto. Como o valor investido entra na conta do retorno do imóvel (Gestão), uma data digitada errada passa despercebida. A leitura dos relógios, ao lado, pergunta q…
   - Causa: `docs/js/telas/cadastros.js:297-304`
   - Fazer: Acrescentar no cadastro reformas: conferir: (dados) => [dataNoFuturo(dados.data, 'A data da reforma')].filter(Boolean).
-- [ ] **saida-037** [L] Renovação aceita "nova data de término" no passado, e a data digitada vale mesmo quando o tipo é "Novo valor negociado"
+- [x] **saida-037** [L] Renovação aceita "nova data de término" no passado, e a data digitada vale mesmo quando o tipo é "Novo valor negociado"
   - Vê-se: O formulário não confere a "Nova data de término": aceita uma data anterior ao término atual, anterior à própria data da renovação ou até anterior à entrada (ex.: contrato até 05/03/2027, renovado "até 05/03/2020"). O contrato passa a aparecer como vencido. A…
   - Causa: `docs/js/telas/cadastros.js:908-910 (não confere a data nem limpa o campo no tipo "Novo valor negociado"); docs/js/regras.js:2281-2285 (grava vigencia_fim sempre que o campo vem preenchido); campo sem limite em docs/js/formularios.js:556`
   - Fazer: Em ajustar: erro se a nova data não for depois do término atual e da data da renovação; limpar nova_vigencia_fim quando o tipo for "Novo valor negociado".
-- [ ] **saida-038** [L] Aviso da correção da caução diz sempre "aluguéis com bonificação", mesmo quando a regra escolhida é o aluguel cheio
+- [x] **saida-038** [L] Aviso da correção da caução diz sempre "aluguéis com bonificação", mesmo quando a regra escolhida é o aluguel cheio
   - Vê-se: Em Regras do sistema o administrador escolhe se a caução é calculada sobre o aluguel com bonificação ou sobre o cheio. O alerta do Painel respeita a escolha ("2 aluguéis cheios"), mas o aviso no topo do formulário de correção da caução escreve sempre "Caução …
   - Causa: `docs/js/telas/cadastros.js:785 (texto fixo); compare com docs/js/regras.js:3064 (alerta pela regra caucao_base) e 904 (aluguelDaCaucao)`
   - Fazer: Montar o texto com a mesma condição do alerta: regra caucao_base do contrato e percentual de bonificação.
-- [ ] **comunicacoes-017** [L] Solicitação aceita "Concluído em" antes da data do pedido e custo "Sem custo" com valor
+- [x] **comunicacoes-017** [L] Solicitação aceita "Concluído em" antes da data do pedido e custo "Sem custo" com valor
   - Vê-se: O formulário não confere as datas nem o custo: aceita pedido de 19/11/2026 concluído em 01/01/2020, data de conclusão no futuro, e Custo R$ 200,00 com "Custo por conta de: Sem custo".
   - Causa: `docs/js/telas/cadastros.js:283-297; docs/js/formularios.js:126-134`
   - Fazer: Duas conferências: conclusão não antes do pedido; valor com "Sem custo" pede confirmação ou é recusado.
-- [ ] **android-026** [L] Mais campos de número que abrem o teclado de letras
+- [x] **android-026** [L] Mais campos de número que abrem o teclado de letras
   - Vê-se: Além dos quatro do achado android-016: (1) "valor R$" de "Marcar como já abatida" (reserva, página do inquilino); (2) as leituras de água, energia e gás na vistoria ("número do relógio"); (3) Água, Energia e Gás no formulário "Leitura dos relógios". Todos são…
   - Causa: `docs/js/telas/cadastros.js:42 (name=valor sem inputmode); docs/js/telas/documentos.js:462 (leitura_<k>); docs/js/formularios.js:570 (leituras sem tipo) e :855-856 (só dinheiro, pct, inteiro, documentos e tel ganham inputmode)`
   - Fazer: inputmode="decimal" data-dinheiro no valor e inputmode="numeric" (ou tipo próprio) nas leituras.
-- [ ] **fios-001** [M] Editar contrato do novo titular: só de abrir e sair, sem digitar nada, aparece "Sair sem salvar?"
+- [x] **fios-001** [M] Editar contrato do novo titular: só de abrir e sair, sem digitar nada, aparece "Sair sem salvar?"
   - Vê-se: No contrato de quem entrou por troca de titular com a garantia herdada (na base de teste: Pedro Novo Titular, Casa 1 - Rua Teste), basta abrir "Editar" e clicar em qualquer item do menu (ex.: Painel) que o sistema pergunta "SAIR SEM SALVAR? Você mudou este formulário e ainda não salvou. Se sair agora, o que foi digitado se perde." Ninguém digitou nada. Nos outros contratos (Maria Teste da Silva, contrato 3) isso não acontece. O dono fica sem saber se mexeu em alguma coisa sem querer.
   - Causa: `docs/js/telas/campos.js:239 (dispatchEvent('change') em travarGarantiaHerdada, chamada por ligarGarantiaHerdada em campos.js:279 e :609); docs/js/app.js:1261-1268 (marcarAlterado marca em qualquer change)`
   - Fazer: Em marcarAlterado, ignorar evento que não veio da pessoa (ev.isTrusted === false), ou tirar a marca data-alterado do formulário no fim da montagem da tela.
   - Certo é: Sair direto, sem pergunta, quando nada foi digitado.
-- [ ] **android-001** [M] Editar contrato do novo titular: sair sem mexer em nada pergunta "Sair sem salvar?"
+- [x] **android-001** [M] Editar contrato do novo titular: sair sem mexer em nada pergunta "Sair sem salvar?"
   - Vê-se: Abri "Editar contrato" do Pedro Novo Titular (o contrato que continua o da Maria a partir de 01/12/2026), não toquei em nenhum campo e toquei no menu para ir a Imóveis. O sistema abriu a janela vermelha "SAIR SEM SALVAR? Você mudou este formulário e ainda não salvou.". Nos contratos comuns (Maria, Ana) isso não acontece. Quem só entrou para olhar fica na dúvida se mexeu em alguma coisa.
   - Causa: `docs/js/telas/campos.js:241 (travarGarantiaHerdada: dispatchEvent('change') em cada campo) + docs/js/app.js:1261-1268 (marcarAlterado aceita qualquer 'change')`
   - Fazer: Em marcarAlterado, ignorar evento que não veio da pessoa (ev.isTrusted falso); ou apagar data-alterado do formulário no fim de ligarCamposAutomaticos.
   - Certo é: Sair direto, sem pergunta, porque nada foi mudado.
-- [ ] **saida-032** [L] Ao editar a devolução da garantia e mudar a data, a poupança não é recalculada
+- [x] **saida-032** [L] Ao editar a devolução da garantia e mudar a data, a poupança não é recalculada
   - Vê-se: No registro novo, o % da poupança vem do Banco Central e muda quando se troca a data. Na edição (lápis ao lado da devolução) isso não acontece: mudando a data de 12/11 para 12/12/2026, o índice fica o antigo e o valor devolvido não ganha o mês a mais.
   - Causa: `docs/js/telas/campos.js:570 (expressão só aceita #/novo/(devolucoes_garantia|encerramentos)); lápis em docs/js/telas/contrato.js:190 e 258`
   - Fazer: Aceitar também #/editar/devolucoes_garantia/ID (contrato e troca vêm do registro) e, na edição, mostrar ao menos a mensagem com o índice do Banco Central até a nova data.
-- [ ] **iphone-001** [L] Abrir o "Editar contrato" do Pedro Novo Titular e sair sem mexer em nada pergunta "Sair sem salvar?"
+- [x] **iphone-001** [L] Abrir o "Editar contrato" do Pedro Novo Titular e sair sem mexer em nada pergunta "Sair sem salvar?"
   - Vê-se: No contrato que veio de troca de titular (Pedro Novo Titular, a partir de 01/12/2026), basta abrir Editar contrato e tocar em qualquer outro lugar (Menu, Voltar, um link): aparece a janela "SAIR SEM SALVAR? Você mudou este formulário e ainda não salvou", sem …
   - Causa: `docs/js/telas/campos.js:243 (travarGarantiaHerdada dispara 'change' em todo campo, chamado por ligarGarantiaHerdada, campos.js:279) + docs/js/app.js:1261-1268 (marcarAlterado conta qualquer 'change')`
   - Fazer: No fim de ligarGarantiaHerdada (ou de ligarCamposAutomaticos), apagar form.dataset.alterado; ou disparar o evento com uma marca que marcarAlterado ignore.
