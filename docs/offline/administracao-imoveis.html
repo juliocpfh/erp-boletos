@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-xS4AlhmuhierzYPZoj1LdVaLM+2HxNJL6lTvfskPbk8=' 'sha256-OBykDI1KRZEXHA5Kz+Ls3x3foNPz7isl+aoMa6Rengg='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-xS4AlhmuhierzYPZoj1LdVaLM+2HxNJL6lTvfskPbk8=' 'sha256-NE8SxLqf2HjjMnJWhLceVrPPOrwf6j43n0dLQSu3eJw='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="f31f3b3a983e07d2">
+<meta name="fontes" content="4aabb1b6d54bc355">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -7423,7 +7423,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     conferirValorRecebido(cb, valorPago, r.valor_devido);
     const compensadoDepois = pagouEmDia && dataContabil > cb.vencimento;
     const caucao = ehComplementoCaucao(cb);
-    const manual = valorNf !== null && !caucao;
+    const saldoSaida = ehSaldoSaida(cb);
+    const manual = valorNf !== null && !caucao && !saldoSaida;
     if (manual) conferirDivergencia(cb, r, valorPago, valorNf, justificativa);
     atualizar(d2, "cobrancas", cb.id, {
       data_pagamento: dataContabil,
@@ -7432,7 +7433,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       dias_atraso: r.dias_atraso,
       multa: r.multa,
       juros: r.juros,
-      valor_nf: caucao ? 0 : manual ? valorNf : r.valor_nf,
+      valor_nf: caucao || saldoSaida ? 0 : manual ? valorNf : r.valor_nf,
       pagou_em_dia: compensadoDepois,
       situacao: r.pontual ? "Paga em dia" : "Paga com atraso",
       nf_manual: manual,
@@ -7458,6 +7459,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         `Caução corrigida para ${reais(atual + cb.caucao_complemento)} (complemento pago)`
       );
       atualizar(d2, "cobrancas", cb.id, { caucao_correcao_id: x.id }, usuario, "Correção da caução registrada");
+    }
+    if (saldoSaida) {
+      const e = buscar(d2, "encerramentos", cb.saldo_saida_de);
+      if (e && !e.garantia_devolvida_em) marcarGarantiaDevolvida(d2, e.id, dataPagou && !pagouEmDia ? dataPagou : dataContabil, usuario);
     }
     return r;
   }
@@ -7545,6 +7550,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   function estornarPagamento(d2, cobrancaId, usuario) {
     const cb = buscar(d2, "cobrancas", cobrancaId);
     if (cb) retirarDiferenca(d2, cb, usuario);
+    if (cb && ehSaldoSaida(cb)) {
+      const e = buscar(d2, "encerramentos", cb.saldo_saida_de);
+      if (e && e.garantia_devolvida_em && [cb.data_pagamento, cb.data_pagou].includes(e.garantia_devolvida_em)) marcarGarantiaDevolvida(d2, e.id, "", usuario);
+    }
     if (cb && cb.caucao_correcao_id) {
       const depois = d2.correcoes_garantia.find((x) => x.contrato_id === cb.contrato_id && x.id > cb.caucao_correcao_id);
       if (depois) throw new Error(`A caução foi corrigida de novo depois deste pagamento (${dataBr(depois.data)}): desfaça antes o pagamento da parcela mais recente.`);
@@ -8399,8 +8408,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       ressarcimento: 0,
       ressarcimento_descricao: "",
       ressarcimento_na_nf: false,
-      multa_percentual: 0,
-      juros_mensal_percentual: 0,
+      multa_percentual: c.multa_percentual || 0,
+      juros_mensal_percentual: c.juros_mensal_percentual || 0,
       saldo_saida_de: e.id,
       situacao: "Em aberto",
       data_pagamento: null,
@@ -12731,7 +12740,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       ehParcelaAcordo = (cb) => !!cb.acordo_parcela_de;
       ehSaldoSaida = (cb) => !!cb.saldo_saida_de;
       ehBoletoAvulso = (cb) => ehComplementoCaucao(cb) || ehParcelaAcordo(cb) || ehSaldoSaida(cb);
-      semMultaJuros = (cb) => ehComplementoCaucao(cb) || ehSaldoSaida(cb);
+      semMultaJuros = (cb) => ehComplementoCaucao(cb);
       emAcordo = (cb) => cb.situacao === "Em acordo";
       MOTIVO_EM_ACORDO = (cb, oQue) => `O boleto de ${compBr(cb.competencia)} está em acordo: ${oQue}. Valem os boletos das parcelas do acordo (ou desfaça o acordo antes).`;
       quitadoNaSaida = (cb) => !!(cb.quitado_saida || cb.quitado_devolucao) && !cb.data_pagamento;
@@ -36743,7 +36752,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
           const r = await janela({
             titulo: "Boleto do saldo da saída",
             sim: "Gerar o boleto",
-            html: `<p>O inquilino deve <b>${reais(-e.saldo)}</b> no cálculo final. O boleto sai sem NF e sem multa e juros (os débitos já os trazem) e pode ser emitido no C6 como os outros.</p>
+            html: `<p>O inquilino deve <b>${reais(-e.saldo)}</b> no cálculo final. O boleto sai sem NF; pago depois do vencimento, tem a multa e os juros do contrato. Quando for pago, o saldo fica marcado como cobrado sozinho. Pode ser emitido no C6 como os outros.</p>
         <label>Vencimento</label><input type="date" name="vencimento" value="${somarDias(hojeIso(), 5)}" min="${hojeIso()}" required>`
           });
           if (!r) return;
