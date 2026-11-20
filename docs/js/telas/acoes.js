@@ -2090,6 +2090,11 @@ export const ACOES = {
    * Página Inquilinos: botão "Matrícula" ao lado do imóvel. Abre o arquivo da matrícula (pasta "Matrículas" do imóvel);
    * com mais de um, pergunta qual. Sem arquivo, explica onde anexar (lista de Imóveis, coluna Matrícula).
    */
+  /** Botão apagado (ex.: "Contrato" sem o arquivo assinado): o toque explica o motivo (no celular não há "passar o mouse"). */
+  explicarBotao({ texto }) {
+    if (texto) aviso(String(texto), 'aviso');
+  },
+
   async abrirMatricula({ imovel }) {
     const i = buscar('imoveis', Number(imovel));
     let lista = [];

@@ -87,7 +87,8 @@ export function telaInquilinos(q) {
     const cls = celular ? 'botao secundario mini so-celular' : 'botao secundario pequeno'; const texto = celular ? 'Contrato' : '📄 Contrato';
     return doc && doc.arquivo
       ? `<a href="#" class="${cls}" data-acao="abrirArquivo" data-escopo="assinados" data-id="${doc.contrato.id}" data-nome="${esc(doc.arquivo)}" title="Abrir o contrato assinado de ${esc(doc.contrato.inquilino_nome)}">${texto}</a>`
-      : `<span class="${cls} desligado" title="O contrato assinado de ${esc(c.inquilino_nome)} ainda não foi anexado (página do inquilino, Documentos assinados)">${texto}</span>`; };
+      : ((motivo) => `<a href="#" class="${cls} desligado" data-acao="explicarBotao" data-texto="${motivo}" title="${motivo}">${texto}</a>`)(
+        `O contrato assinado de ${esc(c.inquilino_nome)} ainda não foi anexado (página do inquilino, Documentos assinados).`); };
   // no computador: Matrícula ao lado do nome do imóvel, encostada à direita da coluna (todas alinhadas) e o Contrato
   // na coluna própria; no celular os dois lado a lado embaixo do imóvel (pedido do dono, 2026-11-17)
   const registrar = (c) => `<td class="centro nw so-pc">${botaoContrato(c)}</td>`;
@@ -98,7 +99,7 @@ export function telaInquilinos(q) {
     const fone = tel ? `<span class="so-celular"> · <a class="tel-inq" href="tel:+${comPais(tel)}" title="Ligar para ${esc(x.c.inquilino_nome)}">${esc(x.c.inquilino_telefone)}</a></span>` : '';
     return nome(x, fone); };
   // o botão que abre o arquivo da matrícula do imóvel
-  const matricula = (x, celular = false) => (x.i ? `<a href="#" class="botao secundario ${celular ? 'mini' : 'pequeno'}" data-acao="abrirMatricula" data-imovel="${x.i.id}" title="Abrir o arquivo da matrícula de ${esc(x.i.nome)}">${celular ? 'Matrícula' : '📑 Matrícula'}</a>` : '');
+  const matricula = (x, celular = false) => (x.i ? `<a href="#" class="botao secundario ${celular ? 'mini' : 'pequeno'}" data-acao="abrirMatricula" data-imovel="${x.i.id}" data-matricula="${x.i.id}" title="Abrir o arquivo da matrícula de ${esc(x.i.nome)}">${celular ? 'Matrícula' : '📑 Matrícula'}</a>` : '');
   const documentosCelular = (x) => (x.i ? `<div class="botoes-doc so-celular">${matricula(x, true)}${botaoContrato(x.c, true)}</div>` : '');
   // nenhum ativo: sem contrato nenhum, o próximo passo (imóvel primeiro, depois a ficha ou o contrato)
   const semAtivos = () => (d().contratos.length ? `<span class="suave">${busca ? 'Nenhum inquilino ativo encontrado nesta busca.' : 'Nenhum inquilino ativo hoje.'}</span>`
@@ -240,7 +241,7 @@ export function telaIptu(ano) {
       <tr><td>Em aberto <span class="suave">(guias suas ainda não pagas)</span></td><td class="n nw">${soma.aberto ? `<b class="texto-perigo">${reais(soma.aberto)}</b>` : reais(0)}</td></tr>
       <tr class="total"><td>${soma.sua < 0 ? 'Resultado: sobra para você' : 'Resultado: sai do seu bolso'}</td><td class="n nw">${reais(Math.abs(soma.sua))}</td></tr></table>` : ''}
     <div class="legenda-iptu">${legenda}</div>
-    <p class="suave">Cada quadradinho é o boleto do mês em que a parcela entra; passe o mouse para ver o valor. Clique num vermelho para marcar a guia como paga. O inquilino paga pelo valor parcelado (mesmo quando você paga à vista com desconto); no IPTU pago à vista, os verdes são os boletos dele, os cinzas os meses sem inquilino que você arcou e o risco azul marca o mês em que você pagou; no mês de entrada ou de saída ele paga os dias em que ocupou e você o resto. Se a prefeitura atrasar o carnê, edite o primeiro mês de cobrança.</p></div>`;
+    <p class="suave">Cada quadradinho é o boleto do mês em que a parcela entra; <span class="so-pc">passe o mouse para ver o valor. Clique num vermelho para marcar a guia como paga.</span><span class="so-celular">toque nele para ver o mês e o valor. Toque num vermelho para marcar a guia como paga.</span> O inquilino paga pelo valor parcelado (mesmo quando você paga à vista com desconto); no IPTU pago à vista, os verdes são os boletos dele, os cinzas os meses sem inquilino que você arcou e o risco azul marca o mês em que você pagou; no mês de entrada ou de saída ele paga os dias em que ocupou e você o resto. Se a prefeitura atrasar o carnê, edite o primeiro mês de cobrança.</p></div>`;
 }
 
 /**

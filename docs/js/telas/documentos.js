@@ -82,7 +82,7 @@ export async function telaImprimir(rota) {
   const cortes = avisosDeCorte(fs);
   const avisoCortes = cortes.length ? `<div class="alerta aviso nao-imprimir aviso-corte-nf"><b>Texto cortado na NF</b> (a NF tem tamanho fixo; sai assim na impressão, no PDF e no Excel):<ul>${cortes.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></div>` : '';
   return `<div class="impressao">${voltar()}${avisoCortes}${rota.q.numero && fs.length ? `<p class="nao-imprimir acoes">${fs.map((f) => botao('pdf', `Baixar PDF${fs.length > 1 ? ` (${esc(buscar('emitentes', f.emitente_id).nome)})` : ''}`, { id: f.id }, 'secundario pequeno')).join('')}${botao('excel', 'Baixar este número em Excel', { numero: rota.q.numero })}</p>` : ''}
-    ${fs.map((f) => faturaHtml(f, buscar('emitentes', f.emitente_id))).join('') || '<p>Nenhuma NF.</p>'}</div>`;
+    ${fs.length ? `<div class="rolagem-nf">${fs.map((f) => faturaHtml(f, buscar('emitentes', f.emitente_id))).join('')}</div>` : '<p>Nenhuma NF.</p>'}</div>`;
 }
 
 // --------------------------------------------------------------------------

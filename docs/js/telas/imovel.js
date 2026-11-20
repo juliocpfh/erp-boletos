@@ -59,8 +59,9 @@ function resumoIptu(p) {
 
 function caixaIptu(i) {
   const iptus = d().iptus.filter((p) => p.imovel_id === i.id).sort((a, b) => b.ano - a.ano);
-  const ano = (p, atual) => `<h3>${p.ano} · total ${reais(p.valor_total)} em ${p.num_parcelas} parcela(s)${p.pago_avista ? ` · ${etiqueta(`quitado à vista${p.valor_avista ? ` ${reais(p.valor_avista)}` : ''}${p.data_quitacao ? ` em ${dataBr(p.data_quitacao)}` : ' (falta data)'}`, 'info')}` : ''}
-      ${opera() ? `${link(`#/editar/iptus/${p.id}`, 'Editar')} ${botao('excluir', '×', { tabela: 'iptus', id: p.id }, 'x-excluir', 'Excluir o IPTU deste ano?')}` : ''}</h3>
+  // título do ano de um lado e Editar / × do outro (dentro do h3, em maiúsculas, o botão virava "EDITAR")
+  const ano = (p, atual) => `<div class="titulo-iptu"><h3>${p.ano} · total ${reais(p.valor_total)} em ${p.num_parcelas} parcela(s)${p.pago_avista ? ` · ${etiqueta(`quitado à vista${p.valor_avista ? ` ${reais(p.valor_avista)}` : ''}${p.data_quitacao ? ` em ${dataBr(p.data_quitacao)}` : ' (falta data)'}`, 'info')}` : ''}</h3>
+      ${opera() ? `<div class="acoes">${link(`#/editar/iptus/${p.id}`, 'Editar')} ${botao('excluir', '×', { tabela: 'iptus', id: p.id }, 'x-excluir', 'Excluir o IPTU deste ano?')}</div>` : ''}</div>
       ${resumoIptu(p)}${p.pago_avista ? `<p class="suave">Inquilino que entrar: ${esc(p.cobranca_inquilino || R.COBRANCA_IPTU_QUITADO[0])}.</p>` : ''}${tabelaIptu(p)}
       ${caixaArquivos('iptuano', idGuiasDoAno(i.id, p.ano), `Guias do IPTU ${p.ano}`, `guias-iptu-${p.ano}`, atual ? 'Para anexar a guia, use o clipe ao lado do imóvel na página IPTU (botão "IPTU\'s" em Imóveis).' : '', true, false)}`;
   const [atual, ...anteriores] = iptus;
