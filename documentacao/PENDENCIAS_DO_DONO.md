@@ -4,6 +4,8 @@ Situação em 17/11/2026 (fim do dia). Tudo o que foi feito até hoje está no a
 
 **18–19/11, na main e ainda não conferido pelo dono:** #319 (backup seguro da empresa: aviso em Dados e backup se nenhum computador fizer o backup em 3 dias), #320 (comunicado de contatos), #321 (e-mails de cada etapa mais curtos; rodapé de confidencialidade **não** será usado, decisão de 18/11), #322 (regras especiais por contrato), #323 (Solicitações e Notificações só em Inquilinos → Comunicações), #324 ("Nova solicitação de reserva": formulário curto, o resto a pessoa preenche pelo link), #325 (data de conclusão → "Concluída"; **conferido pelo dono em 19/11**) e #326 (filtro das solicitações pela situação, que estava quebrado). **Próximo (19/11):** o dono vai rodar uma busca geral de erros (links e ligações quebradas); pistas em `ROTINA_DE_MELHORIA.md`, "19/11".
 
+**20/11: busca geral de erros feita** (pedido do dono em 19/11): 345 erros confirmados (15 graves, 107 médios, 223 leves), cada um conferido por um segundo agente. **Nada foi corrigido ainda.** Estão em 17 lotes em `MUTIRAO_19_11.md` (índice) e `mutirao-19-11/`. **Próximo:** corrigir lote por lote, começando pelo A (diferença de pagamento que some) e pelo B (outros graves); antes de mexer em regra de dinheiro, confirmar com o dono um exemplo em reais.
+
 Marque com `[x]` o que for concluindo.
 
 ## Para confirmar na sequência (dono)

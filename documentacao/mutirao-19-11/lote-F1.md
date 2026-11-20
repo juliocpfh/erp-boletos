@@ -1,0 +1,152 @@
+# Lote F1: Contrato, vistoria, recibos e impressos (1/2)
+
+32 itens (0 graves, 12 médios, 20 leves). Arquivos: `contratos.js`, `modelos-contrato.js`, `recibos.js`, `telas/documentos.js`.
+Como trabalhar: ver `../MUTIRAO_19_11.md`. Marque `[x]` ao corrigir. G = grave, M = médio, L = leve.
+
+- [ ] **entrada-018** [M] Vistoria de entrada dá 3 dias para contestar; o contrato, o e-mail e a rotina dizem 5 dias úteis
+  - Vê-se: O texto final que já vem na vistoria de entrada é "O LOCATÁRIO tem 3 (três) dias, a contar desta data, para apontar por escrito qualquer ponto não registrado nesta vistoria". O contrato gerado pelo mesmo sistema diz, na cláusula 10ª, "5 (cinco) dias úteis, contados da entrega das chaves"; o e-mail de boas-vindas diz "5 dias úteis" e a rotina de entrada mostra "aguardando o inquilino até 27/11/2026 (5 dias úteis da entrega das chaves)". O inquilino assina dois documentos com prazos diferentes.
+  - Causa: `docs/js/contratos.js:827 (vistoriaFinal(dias = 3)); docs/js/telas/documentos.js:441; docs/js/telas/envios.js:260`
+  - Fazer: Trocar o padrão para "5 (cinco) dias úteis, contados da entrega das chaves" num lugar só (e ajustar a comparação com o padrão em envios.js:260).
+  - Certo é: O texto padrão da vistoria usar o mesmo prazo do contrato: 5 (cinco) dias úteis contados da entrega das chaves.
+  - Atenção (conferente): O texto final padrão da vistoria de entrada usa 3 dias "a contar desta data". A decisão do dono de 13/11 (DECISOES.md:299), a cláusula do contrato, o e-mail e a rotina de entrada usam 5 dias úteis da entrega das chaves. O inquilino assina dois prazos diferentes.
+- [ ] **impressos-006** [M] Vistoria de entrada dá 3 dias para o inquilino reclamar; o contrato dá 5 dias úteis
+  - Vê-se: O contrato (cláusula da vistoria, parágrafo único) diz: "O LOCATÁRIO terá 5 (cinco) dias úteis, contados da entrega das chaves, para comunicar por escrito … defeitos ou divergências não descritos na vistoria de entrada" (decisão do dono de 13/11/2026). Mas o texto final padrão da vistoria de entrada, que o inquilino assina, diz: "O LOCATÁRIO tem 3 (três) dias, a contar desta data, para apontar por escrito qualquer ponto não registrado nesta vistoria; depois disso, ela vale como aceita." Dois documentos assinados c…
+  - Causa: `docs/js/contratos.js:827 (vistoriaFinal(dias = 3)) e :1005; docs/js/telas/documentos.js:441; contrato em docs/js/modelos-contrato.js:14`
+  - Fazer: Trocar o texto padrão de vistoriaFinal para "5 (cinco) dias úteis, contados da entrega das chaves" (vistorias já salvas com texto próprio continuam como estão).
+  - Certo é: O texto padrão da vistoria com o mesmo prazo do contrato: 5 (cinco) dias úteis, contados da entrega das chaves.
+  - Atenção (conferente): O texto final padrão da vistoria de entrada diz "3 (três) dias, a contar desta data"; o contrato diz "5 (cinco) dias úteis, contados da entrega das chaves" (decisão de 13/11/2026, DECISOES.md linha 299). O campo prazo_dias da vistoria não é gravado por nenhuma tela, então é sempre 3. Não achei decisão que mantenha os …
+- [ ] **textos-001** [M] A vistoria de entrada diz "3 (três) dias" para reclamar; o contrato, a rotina e os e-mails dizem "5 dias úteis"
+  - Vê-se: O texto final que sai impresso na vistoria de entrada é: "O LOCATÁRIO tem 3 (três) dias, a contar desta data, para apontar por escrito qualquer ponto não registrado nesta vistoria". Já o contrato (parágrafo único da cláusula da vistoria) diz "5 (cinco) dias úteis, contados da entrega das chaves", a Rotina de entrada mostra "aguardando o inquilino até 08/12/2026 (5 dias úteis da entrega das chaves)" e os e-mails "Contrato assinado" e "Vistoria assinada" também dizem 5 dias úteis. O número 3 vem de "prazo_dias || 3"…
+  - Causa: `docs/js/contratos.js:827 e :1005; docs/js/telas/documentos.js:441`
+  - Fazer: vistoriaFinal passa a dizer "5 (cinco) dias úteis, contados da entrega das chaves" usando C.PRAZO_VISTORIA_ENTRADA; em telas/envios.js:260 comparar também com o texto antigo de 3 dias para as vistorias já gravadas.
+  - Certo é: Um prazo só em todos os documentos: 5 dias úteis da entrega das chaves.
+  - Atenção (conferente): Li o texto padrão da vistoria de entrada: sai sempre "3 (três) dias, a contar desta data". Não existe campo "prazo_dias" no formulário da vistoria (só nas notificações), então é sempre 3. O contrato (modelos-contrato.js), a rotina (calculos.js:225, PRAZO_VISTORIA_ENTRADA = 5) e a decisão de 13/11/2026 (DECISOES.md:299…
+- [ ] **entrada-020** [L] Cômodo inserido pelo roteiro e deixado em branco sai como título solto no documento
+  - Vê-se: Cliquei em "Inserir roteiro: Cozinha" e não preenchi os itens. A ajuda diz que item sem preencher não sai no documento; de fato os itens somem, mas o título "COZINHA" fica sozinho, seguido de "CONDIÇÕES GERAIS".
+  - Causa: `docs/js/contratos.js:852-858 (descritivoBlocos)`
+  - Fazer: Pular o título do cômodo quando não sobra nenhum item ou texto abaixo dele.
+- [ ] **entrada-026** [L] Inquilino solidário que é empresa sai como 'portadora do CPF nº 11.222.333/0001-81' e assina com 'CPF'
+  - Vê-se: O campo do solidário é 'CPF / CNPJ do solidário' (aceita CNPJ e até busca os dados da empresa). No contrato, porém, o solidário é sempre qualificado como pessoa física ('solteira, professora, portadora do CPF nº …') e no quadro de assinaturas sai 'CPF 11.222.…
+  - Causa: `docs/js/contratos.js:303 (qualificarPessoa, :118) e :354; docs/js/formularios.js:288`
+  - Fazer: Com 14 dígitos, usar a qualificação de empresa e "CNPJ" na assinatura.
+- [ ] **impressos-020** [L] Contrato de empresa: "pessoa jurídica … inscrita … representada … doravante denominado" e assinatura sem o cargo
+  - Vê-se: Na qualificação do inquilino empresa a frase muda de gênero no meio: "PADARIA TESTE LTDA, pessoa jurídica de direito privado, inscrita no CNPJ…, neste ato representada por sua sócia administradora…, doravante denominado simplesmente LOCATÁRIO". E no quadro de…
+  - Causa: `docs/js/contratos.js:353 (texto fixo "REPRESENTANTE"); compare :351 (locadora usa o cargo)`
+  - Fazer: Na assinatura do inquilino empresa, usar c.representante_cargo quando preenchido (como na linha da locadora).
+- [ ] **admin-016** [L] Modelo de contrato: {Campo} com maiúscula sai escrito no contrato; campo que não existe não é avisado ao salvar; não há pré-visualização
+  - Vê-se: Nos modelos de e-mail a ajuda ensina que {Nome} sai com maiúscula e {NOME} em maiúsculas. No modelo de contrato isso não vale: {Locatarios} ou {ALUGUEL_CHEIO} não são trocados e saem escritos assim mesmo no contrato, sem nenhuma marca. Campo com nome errado (…
+  - Causa: `docs/js/contratos.js:438 x docs/js/modelos-email.js:377-382; docs/js/telas/envios.js:359-372 (salva sem conferir); docs/js/telas/documentos.js:755-770`
+  - Fazer: Ao salvar o modelo (contrato e e-mail), avisar os {campos} que não existem ou estão com maiúscula; opcional: aceitar maiúscula no contrato como no e-mail.
+- [ ] **entrada-024** [M] Contrato com seguro incêndio 'Incluso no aluguel' diz, duas cláusulas depois, que o seguro é por conta do inquilino e cobrado com o aluguel
+  - Vê-se: Contrato residencial com 'Seguro contra incêndio: Incluso no aluguel'. A Cláusula 3ª sai: 'O valor do aluguel contempla água e esgoto, IPTU e seguro incêndio, que ficam a cargo da LOCADORA'. Mais abaixo, o Parágrafo primeiro da cláusula do incêndio sai: 'o LOCATÁRIO autoriza desde já que seja feito o seguro de incêndio do imóvel locado, sendo seus prêmios e despesas por sua exclusiva conta, cobrados juntamente com o aluguel, já a partir do primeiro a vencer'. As duas frases se contradizem no mesmo contrato (e o bo…
+  - Causa: `docs/js/modelos-contrato.js:154 (só [se residencial]); a condição seguro_inquilino existe em docs/js/contratos.js:340`
+  - Fazer: Envolver o parágrafo em [se seguro_inquilino] e dar texto próprio para o seguro incluso; incluir em ATUALIZACOES_MODELO.
+  - Certo é: O parágrafo do seguro cobrado com o aluguel só entra quando o seguro é por conta do inquilino; incluso: dizer que a locadora contrata e o custo está no aluguel.
+- [ ] **impressos-010** [M] Contrato sem fiador sai com erro de português: "O LOCATÁRIO aceitam como válidas…"
+  - Vê-se: Na cláusula das comunicações (Disposições finais), quando o contrato não tem fiador (caução, depósito, seguro fiança ou sem garantia) o texto sai: "CLÁUSULA 27ª – O LOCATÁRIO aceitam como válidas todas as comunicações ou notificações enviadas por via postal…". O verbo ficou no plural porque o trecho "e o FIADOR" é tirado, mas o "aceitam" não muda. Sai assim no contrato que o inquilino assina, no PDF e no Word.
+  - Causa: `docs/js/modelos-contrato.js:232 (e o mesmo texto em :504)`
+  - Fazer: Escrever "[se fiador] e {f:o FIADOR|os FIADORES} aceitam[senão] aceita[fim] como válidas" e pôr a troca em ATUALIZACOES_MODELO para os modelos já gravados.
+  - Certo é: "O LOCATÁRIO aceita como válidas…" sem fiador; "O LOCATÁRIO e o FIADOR aceitam…" com fiador.
+- [ ] **impressos-011** [M] Contrato com seguro incluso no aluguel diz, em outra cláusula, que o inquilino paga o seguro junto com o aluguel
+  - Vê-se: Com o seguro marcado como "Incluso no aluguel", a cláusula 3ª diz: "O valor do aluguel contempla água e esgoto, IPTU e seguro incêndio, que ficam a cargo da LOCADORA". Mas a cláusula do incêndio, parágrafo primeiro, continua dizendo: "o LOCATÁRIO autoriza desde já que seja feito o seguro de incêndio do imóvel locado, sendo seus prêmios e despesas por sua exclusiva conta, cobrados juntamente com o aluguel, já a partir do primeiro a vencer" (no modelo comercial: "deve apresentar apólice … sendo os prêmios e despesas…
+  - Causa: `docs/js/modelos-contrato.js:154; a condição seguro_inquilino existe em docs/js/contratos.js:340 e já é usada em docs/js/modelos-contrato.js:90`
+  - Fazer: Envolver o parágrafo em [se seguro_inquilino] ... [senão] texto para o seguro por conta da locadora [fim], com a redação aprovada pelo dono, e levar a ATUALIZACOES_MODELO.
+  - Certo é: Com o seguro incluso (ou "não tem"), o parágrafo não deve dizer que o prêmio é cobrado do inquilino com o aluguel.
+  - Atenção (conferente): O parágrafo primeiro da cláusula do incêndio só olha se o contrato é residencial; não olha se o seguro é do inquilino. Com o seguro "incluso no aluguel", a cláusula 3ª diz que é da locadora e esse parágrafo diz que o prêmio é cobrado do inquilino. Não achei decisão do dono nem nota na revisão jurídica sobre isso. A re…
+- [ ] **entrada-011** [L] Contrato sem fiador sai com erro de concordância: "O LOCATÁRIO aceitam como válidas..."
+  - Vê-se: No contrato de locação gerado para Carlos Entrada Teste (garantia caução, sem fiador), a cláusula 27ª sai "O LOCATÁRIO aceitam como válidas todas as comunicações ou notificações...". O verbo só está certo quando há fiador ("O LOCATÁRIO e o FIADOR aceitam"). T…
+  - Causa: `docs/js/modelos-contrato.js:232 (e a cópia em :504) e :39`
+  - Fazer: Usar "[se fiador] e o FIADOR aceitam[senão] aceita[fim]", acertar o título e numerar os parágrafos; incluir em ATUALIZACOES_MODELO para os modelos já gravados.
+- [ ] **entrada-025** [L] Contrato com dois fiadores: 'constitui os FIADORES seu procurador' (erro de concordância)
+  - Vê-se: Com dois fiadores a cláusula sai 'O LOCATÁRIO nomeia e constitui os FIADORES seu procurador, para fim especial, conjunta ou separadamente...'. O certo é 'seus procuradores'.
+  - Causa: `docs/js/modelos-contrato.js:194`
+  - Fazer: Usar {f:o FIADOR seu procurador|os FIADORES seus procuradores} e incluir em ATUALIZACOES_MODELO.
+- [ ] **impressos-012** [L] Caução de 1 aluguel sai "1 (um) meses de aluguel" e "1 aluguéis"
+  - Vê-se: Quando a caução equivale a 1 aluguel, os textos não passam para o singular. No contrato: "o valor de R$ 1.800,00 (mil e oitocentos reais), equivalente a 1 (um) meses de aluguel". Na carta de reajuste: "a caução dada em garantia equivale a 1 aluguéis" e "Cauçã…
+  - Causa: `docs/js/modelos-contrato.js:198; docs/js/telas/reajustes.js:197 e :199; docs/js/telas/cobrancas.js:249`
+  - Fazer: Singular quando for 1 ("1 (um) mês de aluguel", "1 aluguel").
+- [ ] **impressos-013** [L] Termos aditivos saem com "do imóvel o imóvel, no endereço…"
+  - Vê-se: A abertura dos três termos aditivos (troca do vencimento, novo valor e troca de titular) junta a palavra "imóvel" do modelo com a descrição do cadastro, que já começa por "o imóvel": "As partes acima, já qualificadas no Contrato de Locação residencial do imóv…
+  - Causa: `docs/js/modelos-contrato.js:257, :286 e :370; docs/js/contratos.js:307`
+  - Fazer: Nos aditivos, trocar "do imóvel {objeto}" por "que tem por objeto {objeto}" e levar a ATUALIZACOES_MODELO.
+- [ ] **impressos-018** [L] Cláusula 3ª do contrato tem dois ou três parágrafos seguidos só com "Parágrafo –", sem número
+  - Vê-se: As outras cláusulas trazem "Parágrafo único", "Parágrafo primeiro", "Parágrafo segundo". A cláusula 3ª (despesas) sai com "Parágrafo – As despesas extraordinárias de condomínio…", "Parágrafo – Fica estabelecido entre as partes que o IPTU…", "Parágrafo – As de…
+  - Causa: `docs/js/modelos-contrato.js:72, :88, :90, :92, :352 e :354`
+  - Fazer: Numerar os parágrafos sozinho dentro de cada cláusula ("Parágrafo #": único, primeiro, segundo...), como já se faz com "CLÁUSULA #".
+- [ ] **impressos-019** [L] Contrato com dois fiadores: "constitui os FIADORES seu procurador" e "falência do fiador"
+  - Vê-se: Com dois fiadores o texto passa para o plural em quase tudo, mas sobram dois trechos no singular: "O LOCATÁRIO nomeia e constitui os FIADORES seu procurador, para fim especial…" (devia ser "seus procuradores") e, na rescisão, "falecimento, insolvência, recupe…
+  - Causa: `docs/js/modelos-contrato.js:194 e :186`
+  - Fazer: Usar {f:seu procurador|seus procuradores} e {f:do fiador|de qualquer dos fiadores} e levar a ATUALIZACOES_MODELO.
+- [ ] **impressos-003** [M] Recibo da reserva do novo titular sai em nome de quem não pagou a reserva
+  - Vê-se: Na troca de titular o sistema copia a reserva do contrato anterior para o novo (valor e data). Com isso a página do novo titular mostra "Reserva dada na visita: R$ 500,00 em 10/11/2026 … 🧾 recibo", e o recibo sai assim: "Recebemos de Pedro Novo Titular, CPF 529.982.247-25, a importância de R$ 500,00 (quinhentos reais), em 10/11/2026 … a título de reserva do imóvel". Quem pagou a reserva foi a Maria (titular anterior), que também tem o recibo dela: ficam dois recibos de quitação do mesmo depósito, um deles em nome…
+  - Causa: `docs/js/recibos.js:99 (reciboDisponivel) e :165; docs/js/regras.js:3568 (herdarReserva); docs/js/telas/contrato.js:846 (link do recibo); compare docs/js/arquivo-impresso.js:111-112`
+  - Fazer: Em reciboDisponivel, recusar o tipo "reserva" quando o contrato continua o de outro titular (R.contratoHerdado), com o motivo "a reserva foi paga pelo titular anterior".
+  - Certo é: No contrato que continua o de outro titular, não oferecer o recibo da reserva (ou emitir em nome de quem pagou).
+- [ ] **saida-040** [L] Recibo da caução no novo titular (caução herdada, trocas antigas) diz que foi ele quem pagou
+  - Vê-se: Nas trocas de titular antigas em que a caução passou ao novo titular, a página dele mostra "caução herdada de Maria, paga em 08/06/2026", mas o link "Recibo da caução (para o inquilino)" também aparece ali e gera: "Recebemos de PEDRO NOVO TITULAR, CPF ..., a …
+  - Causa: `docs/js/recibos.js:75-83 (garantiaPaga aceita o comprovante herdado), 105-108 (reciboDisponivel) e 196-204 (texto sempre com o inquilino do contrato); docs/js/telas/contrato.js:278; docs/js/arquivo-impresso.js:116-119; docs/js/regras.js:3869-3892 (o herdeiro …`
+  - Fazer: Em reciboDisponivel("garantia") e na pasta física: recusar quando R.pagadorDaGarantia(d, c, qual) não for o próprio contrato, com o motivo "o recibo é de quem pagou (Fulano)".
+- [ ] **saida-041** [L] Depois de trocar a caução por fiador, não dá mais para tirar o recibo da caução; e a devolução da garantia não tem recibo nem termo
+  - Vê-se: O recibo da caução só sai enquanto a garantia atual do contrato é caução. Trocou para fiador (a caução antiga fica "a devolver"): o link some, a tela de impressão responde "O contrato não tem caução nem depósito em dinheiro" e o recibo sai também da lista da …
+  - Causa: `docs/js/recibos.js:105-108 (exige temCaucao/temDeposito no contrato de hoje) e 21-31 (TIPOS_RECIBO sem devolução da garantia); docs/js/arquivo-impresso.js:116; docs/js/telas/contrato.js:278`
+  - Fazer: Deixar o recibo da caução antiga sair pela troca de garantia (depósitos guardados em trocas_garantia.devolucao_movimentos) enquanto não devolvida; se o dono quiser, criar o termo de devolução da garantia a partir de devolucoes_garantia.
+  - Atenção (conferente): Confirmei as duas partes: o recibo da caução só sai se a garantia de hoje do contrato for caução ou depósito (trocou para fiador, o link some e a tela responde "O contrato não tem caução nem depósito em dinheiro"); e a lista de documentos que o sistema emite não tem recibo nem termo para a devolução da garantia nas tr…
+- [ ] **impressos-016** [L] Documentos saem com "CPF/CNPJ" escrito, em vez de só CPF ou só CNPJ
+  - Vê-se: Nos termos (quitação, devolução das chaves, acordo e notificação), o locatário solidário sai como "LOCATÁRIO SOLIDÁRIO: João Solidário, CPF/CNPJ 529.982.247-25". No demonstrativo do boleto, o inquilino sai como "Inquilino: Ana Caucao Teste · CPF/CNPJ 529.982.…
+  - Causa: `docs/js/recibos.js:224, :274, :304 e :352; docs/js/telas/cobrancas.js:246`
+  - Fazer: Escolher "CPF" ou "CNPJ" pelo número de dígitos, como rotuloDocumento de docs/js/fatura.js:13.
+- [ ] **impressos-017** [L] Recibos começam com "Recebemos" e terminam com "Dou quitação"
+  - Vê-se: O recibo da reserva e o recibo da caução/depósito são da empresa, mas misturam plural e singular: "Recebemos de Maria Teste da Silva … a importância de R$ 500,00 (quinhentos reais)…" e, no fim, "Dou quitação do valor acima, nos termos dos artigos 319 e 320 do…
+  - Causa: `docs/js/recibos.js:165 e :172; :204 e :211`
+  - Fazer: Trocar "Dou quitação" por "Damos quitação" nos dois recibos.
+- [ ] **fios-012** [M] "Imprimir demonstrativos selecionados" em "Em aberto" só imprime os boletos de um mês: os outros marcados somem sem aviso
+  - Vê-se: Em Boletos → "Em aberto (5)" a lista mostra boletos de todos os meses (na base de teste: 10/2026, 11/2026, 12/2026 e 01/2027). Marquei os 5 e cliquei em "Imprimir demonstrativos selecionados": a página de impressão trouxe só 1 demonstrativo (o de 10/2026, R$ do Apto 2 - Rua Dois). Os outros 4 marcados ficaram de fora, sem nenhum aviso. Vale o mesmo para "Vencidos e não pagos" e "Pagos ainda sem NF", que também juntam vários meses. Quem imprime os demonstrativos dos atrasados para cobrar recebe só os do mês que est…
+  - Causa: `docs/js/telas/documentos.js:71 (filtra competencia === comp mesmo com ids); docs/js/telas/cobrancas.js:193 e :197; docs/js/telas/acoes.js:1752-1756`
+  - Fazer: Quando o endereço traz ids, usar só os ids (sem filtrar pelo mês).
+  - Certo é: Um demonstrativo para cada boleto marcado, de qualquer mês.
+- [ ] **links-pc-003** [M] Na vistoria de SAÍDA, abrir o modelo do imóvel e salvar/cancelar não volta para a vistoria (vai para o imóvel)
+  - Vê-se: Na vistoria de entrada, o link para editar o modelo do imóvel leva ao modelo com "← Voltar para a vistoria" e "Cancelar" voltando para a vistoria. Na vistoria de saída o mesmo link abre o modelo sem o "← Voltar para a vistoria", e o "Cancelar" (e o salvar) leva para a página do imóvel (#/imovel/2). Quem estava no meio da vistoria de saída perde o caminho de volta. Motivo: o endereço de volta leva a palavra "Saída" (com acento) codificada duas vezes, e o sistema joga fora parâmetro com "%".
+  - Causa: `docs/js/telas/documentos.js:436-437 e 537; docs/js/calculos.js:572`
+  - Fazer: Levar o tipo sem acento no endereço de volta (tipo=Saida, aceito em telaVistoria), para o voltar passar no formato.
+  - Certo é: Cancelar e salvar voltarem para a vistoria de saída, como na de entrada.
+- [ ] **impressos-005** [M] PDF dos demonstrativos de boleto sai com letra minúscula no computador (5,6 pt)
+  - Vê-se: Na tela de impressão dos demonstrativos, a lista ocupa a largura inteira da janela (1.366 pontos no notebook) e o "Baixar PDF" encolhe essa largura para caber na folha. O demonstrativo sai no PDF com letra de 5,6 pt (num monitor de 1.920 fica menor ainda), difícil de ler; o mesmo demonstrativo baixado pela página do boleto sai em tamanho normal. O tamanho da letra muda conforme o tamanho da janela.
+  - Causa: `docs/js/telas/documentos.js:75 (seletor .lista-demonstrativos) e :178-179; docs/css/estilo.css:158 e :182 (só o .demonstrativo tem max-width; a lista não tem regra)`
+  - Fazer: Dar largura máxima de 800 px e margem automática à .lista-demonstrativos (ou a mesma caixa fora da tela do item 004).
+  - Certo é: PDF com a letra do mesmo tamanho dos outros documentos (cerca de 10 pt), qualquer que seja a janela.
+- [ ] **impressos-008** [M] Sair da vistoria de SAÍDA para editar o modelo do imóvel não volta para a vistoria
+  - Vê-se: A tela da vistoria promete: "O que você marcar fica guardado mesmo se sair para editar o modelo", e a tela do modelo devia mostrar "← Voltar para a vistoria" e voltar para ela ao salvar ou cancelar. Isso funciona na vistoria de entrada, mas na vistoria de saída nova o endereço de volta leva a palavra "Saída" (com acento, escrita como Sa%C3%ADda), que o sistema descarta em silêncio. A tela do modelo abre com "← Apto 2 - Rua Dois" e os botões Salvar/Cancelar levam para a página do imóvel (#/imovel/2): a pessoa perde…
+  - Causa: `docs/js/telas/documentos.js:436-437 (monta o voltar) e :537; docs/js/calculos.js:572 (voltar: /^#\/[\w/?&=.,-]*$/)`
+  - Fazer: Mandar o tipo sem acento no endereço (tipo=saida) e aceitar as duas formas em telaVistoria; incluir em tests/links-parametros.test.mjs.
+  - Certo é: Topo "← Voltar para a vistoria" e Salvar/Cancelar voltando para #/vistoria/novo?contrato=3&tipo=Saída.
+- [ ] **textos-002** [M] A tela do termo aditivo manda cadastrar em "Novo inquilino" (botão que não existe) e diz que a garantia passa ao novo titular
+  - Vê-se: Na caixa "Troca de inquilino (herança do contrato)" está escrito: "Sai o titular e entra outro, no mesmo contrato: mesmo aluguel, vencimento, reajuste e garantia." e, quando o inquilino não continua outro: "O termo de troca é gerado no inquilino novo: cadastre-o em "Novo inquilino" escolhendo o contrato que ele continua". Não existe botão nem tela "Novo inquilino" (o botão é "Novo contrato", em Inquilinos e na página do imóvel). E a garantia em dinheiro não passa mais adiante desde a decisão de 13/11/2026 (na troc…
+  - Causa: `docs/js/telas/documentos.js:670-673`
+  - Fazer: Trocar "Novo inquilino" por "Novo contrato" e tirar "e garantia" da frase (dizer que a caução do titular que sai é devolvida e o novo deposita a dele).
+  - Certo é: Texto com o nome certo do botão ("Novo contrato") e sem dizer que a garantia é a mesma.
+  - Atenção (conferente): Li a caixa "Troca de inquilino": o texto manda cadastrar em "Novo inquilino", nome que só existe nessa linha (o botão do sistema é "Novo contrato"), e diz "mesmo aluguel, vencimento, reajuste e garantia", o contrário da decisão de 13/11/2026 (caução nunca passa adiante: a do que sai é devolvida).
+- [ ] **fios-005** [L] Vistoria de saída: "Montar o modelo do imóvel" não volta para a vistoria (vai parar na página do imóvel)
+  - Vê-se: Na vistoria de ENTRADA, o link "Montar o modelo do imóvel" abre o modelo com "← Voltar para a vistoria", e Salvar/Cancelar voltam para a vistoria. Na vistoria de SAÍDA o mesmo link abre o modelo com "← Casa 1 - Rua Teste": Salvar e Cancelar levam para a págin…
+  - Causa: `docs/js/telas/documentos.js:436-437 (monta o voltar com %C3%AD); docs/js/calculos.js:572 (formato de voltar sem %); docs/js/telas/documentos.js:537 e docs/js/telas/envios.js:112`
+  - Fazer: Aceitar % no formato de voltar em FORMATOS_PARAMETRO (ou mandar o tipo sem acento) e pôr o caso em tests/links-parametros.test.mjs.
+- [ ] **fios-009** [L] "Gerar termo aditivo" manda cadastrar em "Novo inquilino", botão que não existe (o nome é "Novo contrato")
+  - Vê-se: Na escolha do termo aditivo, para quem não continua o contrato de outro, o texto diz: "O termo de troca é gerado no inquilino novo: cadastre-o em \"Novo inquilino\" escolhendo…". Não há botão "Novo inquilino" no sistema: em Inquilinos e na página do imóvel o …
+  - Causa: `docs/js/telas/documentos.js:672 (botões reais em docs/js/telas/consultas.js:114 e docs/js/telas/imovel.js:95)`
+  - Fazer: Trocar "Novo inquilino" por "Novo contrato" no texto.
+  - Atenção (conferente): Conferi: o texto cita o botão "Novo inquilino", que não existe (a única ocorrência no código é este texto). Em DECISOES.md (16/10/2026) o dono decidiu que o cadastro se chama "Novo contrato"; os botões reais têm esse nome.
+- [ ] **entrada-012** [L] CPF da testemunha não é conferido nem formatado
+  - Vê-se: Em "Gerar contrato", o CPF da testemunha 1 foi digitado 11111111111 e o contrato saiu com "TESTEMUNHA UM · CPF 11111111111" (inválido e sem pontos). Nenhum aviso.
+  - Causa: `docs/js/telas/documentos.js:607-608 (também 649-650 nos aditivos); docs/js/telas/envios.js:304-309`
+  - Fazer: Conferir e formatar o CPF da testemunha (mesma conferência dos cadastros) antes de abrir o contrato.
+- [ ] **entrada-019** [L] Leitura dos relógios aceita letras e número negativo (Água: abc · Energia: -5)
+  - Vê-se: Na vistoria de entrada digitei Água = "abc", Energia = "-5", Gás = "0" e o sistema salvou ("Vistoria salva."). O documento saiu com "Água: abc · Energia: -5 · Gás: 0" e a leitura de entrada do inquilino ficou gravada assim (é a que se compara com a da saída).
+  - Causa: `docs/js/telas/documentos.js:462; docs/js/telas/envios.js:246-248`
+  - Fazer: Aceitar só número (zero ou mais, com vírgula) e avisar o resto antes de gravar.
+- [ ] **mensal-015** [L] Demonstrativo de boleto "Em acordo" sai na impressão do mês como se fosse para cobrar
+  - Vê-se: "Imprimir todos os demonstrativos do mês" de 10/2026 inclui o boleto da Maria Teste da Silva, que está "Em acordo" (não se cobra mais; virou as parcelas do acordo). O demonstrativo dela sai igual aos outros: "Valor a pagar até 10/11/2026 R$ 1.800,00", sem nen…
+  - Causa: `docs/js/telas/documentos.js:71 (filtro só pela competência) e docs/js/telas/cobrancas.js:237 em diante (demonstrativo)`
+  - Fazer: Pular R.emAcordo(cb) na impressão do mês (ou pôr a faixa "Em acordo" no demonstrativo).
+- [ ] **impressos-015** [L] Carta de reajuste aberta sem o mês mostra erro em inglês
+  - Vê-se: Se o endereço da carta chega sem o mês (ou com o mês fora do formato, que o sistema descarta em silêncio), a tela mostra "Cannot read properties of undefined (reading 'split')" e o botão "Voltar ao painel", em vez de um aviso em português. Pelo código, com um…
+  - Causa: `docs/js/telas/documentos.js:26-27 (usa rota.q.comp sem C.competenciaValida)`
+  - Fazer: Conferir o mês com competenciaValida e mostrar "Carta não encontrada: falta o mês do reajuste" com link para Reajustes.

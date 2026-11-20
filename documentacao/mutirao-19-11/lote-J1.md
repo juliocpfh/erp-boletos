@@ -1,0 +1,155 @@
+# Lote J1: Regras de negócio (regras.js) (1/2)
+
+32 itens (0 graves, 18 médios, 14 leves). Arquivos: `regras.js`.
+Como trabalhar: ver `../MUTIRAO_19_11.md`. Marque `[x]` ao corrigir. G = grave, M = médio, L = leve.
+
+- [ ] **fios-003** [M] O × do termo de quitação assinado tira o termo do lançamento, mas deixa o arquivo na pasta
+  - Vê-se: Nos outros comprovantes, o × apaga o arquivo da pasta. No termo de quitação assinado, a mensagem diz "Comprovante apagado: fica o aviso para anexar o certo.", mas o PDF continua na pasta do inquilino. Anexando de novo, fica um segundo arquivo "comprovante-termo-quitacao-assinado-2026-10-20 (2).pdf" ao lado do antigo. O arquivo errado (o que se quis apagar) fica guardado sem ninguém saber. Mesma causa do achado anterior. Pela mesma causa, o termo também fica de fora do ZIP "baixar os dados de uma pessoa" e da confe…
+  - Causa: `docs/js/regras.js:4511 (termo_assinado dos encerramentos fora de arquivosReferenciados); docs/js/telas/comum.js:486-494; docs/js/telas/acoes.js:971-972`
+  - Fazer: A mesma linha da correção do fios-002 resolve (o × passa a apagar o arquivo, e o termo entra na conferência de arquivos e no ZIP da pessoa).
+  - Certo é: O × apaga o arquivo da pasta, como diz a mensagem.
+- [ ] **fios-007** [M] Botão "Desligar" do alerta "Incluir caução e anexar comprovante" dá erro "Tipo de alerta desconhecido."
+  - Vê-se: Todo contrato com caução (ou depósito de garantia), depois de assinado e antes de anexar o comprovante, gera o alerta "Anexe o comprovante: caução de R$ 3.600,00 (25/11/2026)…". O tipo desse alerta é "Incluir caução e anexar comprovante" (ou "Incluir depósito e anexar comprovante"), que não está na lista de tipos de alerta do sistema. Por isso: (1) clicar em "Desligar" no Painel e confirmar abre a janela "Tipo de alerta desconhecido." e nada é desligado; (2) o tipo não aparece em "Aparência e prazos dos alertas" (…
+  - Causa: `docs/js/regras.js:3253 (tipos criados); docs/js/regras.js:4929-4931 (TIPOS_ALERTA sem eles); docs/js/regras.js:7695; docs/js/telas/comum.js:988; docs/js/telas/acoes.js:1384-1385`
+  - Fazer: Incluir os dois tipos em TIPOS_ALERTA (ou usar o tipo "Comprovante a buscar no banco" mudando só o texto) e um teste: todo tipo criado pelos alertas tem de estar em TIPOS_ALERTA.
+  - Certo é: O alerta é desligado para o inquilino (como os outros) e o tipo aparece nas telas de configuração.
+- [ ] **entrada-016** [M] Depósito maior que a caução combinada entra sem pergunta e a caução vira outro valor (R$ 13.000,00 = "3 aluguéis")
+  - Vê-se: Caução combinada de R$ 4.860,00, já com R$ 4.000,00 depositados (faltavam R$ 860,00). Digitei 9.000,00 (erro de digitação de 900 ou 860): "Depósito de R$ 9.000,00 registrado: caução registrada". A caixa passou a mostrar "Caução R$ 13.000,00 ... atual R$ 13.000,00 (3 aluguéis; sugerido hoje R$ 4.860,00)": 13 mil são 8 aluguéis, a lei permite 3, e o texto continua dizendo "3 aluguéis". Depois de desfazer um depósito ficou "depositado R$ 11.000,00 · falta R$ 0,00" com o botão de registrar outro depósito ainda aberto.
+  - Causa: `docs/js/regras.js:3146-3149 (conferência só dentro de "if (complementar)") e :893-897`
+  - Fazer: Aplicar a mesma conferência aos depósitos iniciais (avisar e pedir confirmação quando passa do que falta ou do limite legal) e acertar o texto "(N aluguéis)".
+  - Certo é: Perguntar antes: "O depósito de R$ 9.000,00 passa do que falta (R$ 860,00) e a caução ficaria em R$ 13.000,00, mais que 3 aluguéis (Lei 8.245/91, art. 38). Confirma?"
+- [ ] **entrada-036** [M] O sistema trata a 'Data de vigência inicial' como o dia da entrega das chaves: e-mail diz 'chaves entregues' em dia errado (até no futuro) e o prazo da contra-vistoria corre antes de o inquilino ter as chaves
+  - Vê-se: Contrato de Eva com vigência inicial em 01/12/2026, visto em 19/11/2026: a etapa 'Contra-vistoria do inquilino' já mostra 'aguardando o inquilino até 08/12/2026 (5 dias úteis da entrega das chaves)', com o termo das chaves ainda pendente. O e-mail de boas-vindas sai 'As chaves foram entregues em 01/12/2026 … avise até 08/12/2026', mesmo que o termo das chaves tenha sido assinado em outro dia (ex.: 05/12/2026, quando o prazo certo seria 14/12/2026). O sistema guarda a data em que o termo das chaves foi assinado, ma…
+  - Causa: `docs/js/regras.js:4218-4221; docs/js/email-dados.js:162, 177-178; docs/js/modelos-email.js:144-146`
+  - Fazer: Usar c.doc_chaves_em quando existir (na regra e no e-mail); sem ele, etapa "aguarda a entrega das chaves" e e-mail sem afirmar a data.
+  - Certo é: Contar os 5 dias úteis da data do termo de entrega das chaves assinado; antes disso, a etapa fica 'aguarda a entrega das chaves' e o e-mail não afirma que as chaves foram entregues.
+  - Atenção (conferente): O prazo da contra-vistoria e o e-mail de boas-vindas usam o campo data_entrada, que na tela se chama "Data de vigência inicial"; a data do termo das chaves assinado (doc_chaves_em) existe mas não é lida em nenhum dos dois. A decisão de 15/11 fala em "5 dias úteis da entrega das chaves": com vigência em 01/12/2026 e ch…
+- [ ] **mensal-031** [M] "Já emitida": um número digitado errado pula a numeração das NFs sem perguntar, e aceita data de emissão no futuro
+  - Vê-se: No "Já emitida" (NF feita fora do sistema), se o operador digita 1570 em vez de 157, o sistema registra e passa o "próximo número" para 1571, sem nenhuma pergunta: as próximas NFs saem a partir de 1571. A data de emissão também não é conferida (aceita 31/12/2027). Para consertar é preciso o administrador desfazer a numeração. As recusas ("Informe o número da NF", "Já existe NF nº…") saem como falha do programa no console.
+  - Causa: `docs/js/regras.js:2174-2203 (linha 2198: n >= proxima_fatura vira n+1, sem pergunta; 2177: só o formato da data); docs/js/telas/envios.js:549-554 (sem confirmar)`
+  - Fazer: Em nfExterna (envios.js), perguntar com confirmar() quando o número passa do próximo da sequência e recusar emissão depois de hoje; trocar os throw new Error por C.ErroUsuario.
+  - Certo é: Perguntar antes quando o número é maior que o próximo da sequência ("a numeração vai pular de 0157 para 1571") e recusar data de emissão futura.
+- [ ] **mensal-038** [M] Lançar contas: valor negativo ou 0,00 sem observação é ignorado calado, e a data de pagamento pode ser no futuro
+  - Vê-se: Na tabela de contas do mês, se uma linha tem valor negativo (−50,00) ou 0,00 sem observação e outra linha tem valor válido, o sistema lança só a válida e diz "1 conta(s) lançada(s)": a outra é descartada sem aviso. A data "Pago em" não é conferida: uma conta com pagamento em 2030 é gravada e, como entra nos Resultados pela data do pagamento, some dos resultados do mês. As recusas ("Informe o valor de pelo menos uma conta…") saem como falha do programa no console.
+  - Causa: `docs/js/regras.js:6286-6293; docs/js/telas/envios.js:137-148; docs/js/telas/financeiro.js:104`
+  - Fazer: Em lancarDespesas, recusar valor negativo dizendo a conta; na tela, perguntar/recusar data de pagamento futura (dataNoFuturo); usar C.ErroUsuario nas recusas.
+  - Certo é: Recusar valor negativo dizendo qual linha; perguntar quando a data do pagamento é futura.
+  - Atenção (conferente): lancarDespesas fica só com as linhas de valor > 0 (ou 0 com observação); linha com valor negativo é descartada calada se outra linha for válida, e o aviso diz só "1 conta(s) lançada(s)". A data "Pago em" não é conferida nem na tela (campo sem máximo) nem na regra: aceita 2030. As recusas usam erro comum (console). Res…
+- [ ] **saida-006** [M] "Desfazer a saída" deixa para trás a vistoria de saída, a data marcada e o termo das chaves: a próxima saída já nasce com etapas feitas
+  - Vê-se: O inquilino avisa que sai, marca-se a vistoria, anexa-se o termo das chaves e ele desiste ("Desfazer a saída"). Meses depois ele sai de verdade em 30/06/2027: o roteiro novo já mostra ✅ Vistoria de saída "feita em 21/10/2026", ✅ Devolução das chaves "chaves devolvidas em 30/06/2027; termo de devolução assinado ✓" (com uma data que ainda nem chegou) e ✅ leitura da saída, tudo da saída antiga. O cálculo final usa os reparos e a leitura velhos.
+  - Causa: `docs/js/regras.js:2948-2954 (desfazerSaida) e 7742-7743, 7777, 7779-7781 (roteiroSaida)`
+  - Fazer: Em desfazerSaida, limpar vistoria_saida_data/hora/marcada_em e avisar (ou perguntar) sobre a vistoria de saída, a leitura e o termo das chaves que ficaram.
+  - Certo é: Ao desfazer a saída, perguntar o que fazer com a vistoria de saída, a data marcada, a leitura e o termo das chaves (apagar ou guardar como histórico), e a nova saída começar do zero.
+- [ ] **saida-007** [M] Desfazer a saída (ou adiar a data) depois de pago o último boleto proporcional: os dias que faltam nunca são cobrados
+  - Vê-se: Ex.: aluguel de R$ 1.500,00; saída informada para 15/10/2026, o boleto de outubro sai proporcional (15 dias = R$ 750,00) e é pago. O inquilino resolve ficar e a saída é desfeita (ou a data muda para 15/12). O boleto de outubro, já pago, continua com 15 dias e nada cobra os outros 15 (R$ 750,00); o sistema não avisa.
+  - Causa: `docs/js/regras.js:1791 (recálculo só de boleto não pago), 2935-2954; docs/js/telas/acoes.js:444-452`
+  - Fazer: Ao desfazer ou adiar a saída, conferir boleto pago com menos dias do que os ocupados e lançar a diferença no próximo boleto (ou ao menos avisar).
+  - Certo é: Avisar que o boleto do mês já foi pago proporcional e lançar a diferença dos dias no próximo boleto (como no pagamento a menos), ou pedir confirmação.
+- [ ] **saida-009** [M] Termo aditivo do vencimento muda a data de boleto já emitido no banco
+  - Vê-se: Ao anexar o termo assinado (dia 5 → dia 15), o sistema muda o vencimento de todos os boletos em aberto a partir do 1º vencimento novo, inclusive o que já foi emitido no C6. Na tela o boleto passa a vencer em 15/12/2026, mas no banco (e no PDF que o inquilino recebeu) continua 05/12/2026. A regra da casa é que boleto emitido no banco não se mexe.
+  - Causa: `docs/js/regras.js:4712 (aplicarAditivoVencimento, sem emitidoNoBanco)`
+  - Fazer: Pular os boletos emitidos no banco e dizer quantos ficaram para cancelar e emitir de novo.
+  - Certo é: Boleto emitido no banco fica como está (com o aviso para cancelar e emitir de novo), como faz o recálculo.
+- [ ] **saida-010** [M] Cancelar a troca de garantia deixa o depósito da garantia nova gravado e invisível
+  - Vê-se: Ex.: troca Fiador → Caução em 01/11/2026 e depósito da caução de R$ 3.000,00 registrado em 03/11 com o comprovante. Ao clicar em "Cancelar troca", o contrato volta para Fiador, mas o depósito de R$ 3.000,00 e o comprovante continuam gravados, ligados a uma troca que não existe mais: não aparecem em tela nenhuma, não dá para excluir nem devolver por ali, e se a troca for refeita eles não são contados.
+  - Causa: `docs/js/regras.js:2402-2416 (cancelarTrocaGarantia) e 811-815 (depositosGarantiaDo)`
+  - Fazer: Recusar o cancelamento enquanto houver depósito com o troca_id dela ("exclua o depósito antes"), como já faz com a devolução.
+  - Certo é: Barrar o cancelamento enquanto houver depósito (ou aplicação) da garantia nova, pedindo para excluir antes, como já faz com a devolução.
+- [ ] **saida-011** [M] Aplicação da caução antiga continua contando depois que ela foi trocada e devolvida
+  - Vê-se: Ex.: caução de R$ 2.700,00 aplicada na empresa. Troca de garantia para uma caução nova de R$ 3.000,00; a antiga é devolvida ao inquilino (R$ 2.727,00 com a poupança). A aplicação antiga de R$ 2.700,00 continua na lista e conta para a caução nova: a tela diz "falta aplicar R$ 300,00" quando na verdade nenhum centavo da caução nova foi aplicado, e a aba Caução do Financeiro mostra R$ 2.700,00 aplicados que já saíram da conta.
+  - Causa: `docs/js/regras.js:763 (aplicacoesDo) e 1063-1076 (situacaoAplicacao)`
+  - Fazer: Guardar o troca_id nas aplicações (como nos depósitos) e contar só as da garantia em vigor; ou baixar as antigas ao registrar a devolução.
+  - Certo é: As aplicações da garantia que saiu ficam no histórico da troca (ou são baixadas na devolução) e não contam para a garantia nova.
+- [ ] **saida-012** [M] Alerta "Devolver garantia" aparece antes de a troca de titular acontecer (termo ainda não assinado)
+  - Vê-se: Troca de titular com garantia nova marcada para 01/11/2026, mas o termo aditivo ainda não foi assinado: pelo sistema o contrato continua com a Maria (ela segue ativa e recebendo boleto). Mesmo assim, passado o dia 01/11, o Painel e a página dela mostram "Pedro Novo Titular assumiu o contrato com garantia nova: devolva a caução de R$ 4.000,00 a Maria Teste da Silva" com o botão "Registrar devolução". Quem seguir o aviso devolve a caução de um contrato que ainda está sem outra garantia.
+  - Causa: `docs/js/regras.js:3795-3801 e 3832-3837; docs/js/telas/contrato.js:181 e 192-194`
+  - Fazer: Em devolucaoGarantiaPendente, exigir que a troca já tenha acontecido (heranca_transferida do novo, ou não estar em herancaAgendada).
+  - Certo é: O aviso de devolver a garantia só aparece depois que a troca de fato passou (termo assinado e data chegada).
+- [ ] **saida-023** [M] Depois que o inquilino sai, nenhum alerta dele aparece: comprovante do saldo da saída, notificação vencida, multa esperando boleto
+  - Vê-se: Os alertas só são calculados para contrato ativo. No dia seguinte à saída, somem do Painel e da página do inquilino: o aviso "Comprovante a buscar no banco" da devolução do saldo da saída (o sistema tem a regra pronta para saídas desde 13/11/2026, mas ela nunca chega à tela, porque a devolução acontece depois da saída), a notificação com prazo vencido, a multa "entra no próximo boleto" e o termo do acordo sem assinatura. Ex.: saldo de R$ 1.418,56 devolvido em 25/10 sem comprovante: nada lembra de anexar.
+  - Causa: `docs/js/regras.js:4893 (todosAlertas), 722-724 (contratoAtivo) e 3106-3109; docs/js/telas/contrato.js:776`
+  - Fazer: Para contrato com saída e roteiro incompleto, manter os alertas de comprovantes e de notificação/multa pendentes.
+  - Certo é: Os avisos da saída (comprovante do saldo, termo de quitação, multa e diferença pendentes) continuam até serem resolvidos.
+- [ ] **saida-033** [M] Caução toda descontada no cálculo final (saldo zero) continua aparecendo como dinheiro guardado do inquilino
+  - Vê-se: Quando o cálculo final dá saldo R$ 0,00 (ex.: caução de R$ 2.700,00 e débitos de R$ 2.700,00), o roteiro da saída já mostra a etapa "Devolução da garantia" como feita ("nada a devolver nem a cobrar") e não oferece o botão "Marcar garantia devolvida". Só que a aba Caução do Financeiro só tira a garantia da lista quando existe a data dessa marcação. Resultado: a caução de R$ 2.700,00 de quem já saiu fica para sempre na lista das cauções guardadas (e no total corrigido pela poupança), sem ter como tirar. O mesmo vale…
+  - Causa: `docs/js/regras.js:1083-1088 (garantiaJaSaiu só olha garantia_devolvida_em) e 1105; regras.js:7757 (saldo 0 = feito, sem data); docs/js/telas/contrato.js:312 e 316 (etapa feita não mostra o botão); única gravação da data em regras.js:7859`
+  - Fazer: Em garantiaJaSaiu, contar também o cálculo final com saldo zero (nada ficou guardado); ou gravar garantia_devolvida_em com a data da saída quando o cálculo final fecha em zero.
+  - Certo é: Garantia consumida no cálculo final sai da lista das cauções guardadas (ou o roteiro pede a data mesmo com saldo zero).
+- [ ] **financeiro-banco-001** [M] O "Retorno ao ano" do período padrão (Últimos 12 meses) é calculado como se fossem 13 meses e sai menor do que é
+  - Vê-se: A tela abre em "Últimos 12 meses" (hoje, 19/11/2026: de 20/11/2025 a 19/11/2026). O sistema conta os meses do calendário tocados pelo período (nov/2025 até nov/2026 = 13) e divide o resultado por 13 antes de multiplicar por 12. Exemplo: imóvel de R$ 1.000.000,00 com resultado de R$ 120.000,00 no período: o certo é 12,00% ao ano, a tela mostra 11,08%. Vale para cada imóvel, para o total, para o "Retorno líquido ao ano" e para o Excel ("Exportar Excel"). Só dá certo quando hoje é o último dia do mês (30/11/2026 → de…
+  - Causa: `docs/js/regras.js:6130 (meses = mesesEntre + 1) e :6203 (retorno = resultado × 12 ÷ meses); docs/js/telas/financeiro.js:189 e :191-194 (período padrão e atalhos)`
+  - Fazer: Contar o período pelos dias (dias ÷ 365 × 12) ou por meses cheios entre as duas datas, em vez dos meses do calendário tocados.
+  - Certo é: Período de 12 meses exatos (20/11/2025 a 19/11/2026) deve contar 12 meses; o retorno do exemplo deve ser 12,00%.
+- [ ] **financeiro-banco-003** [M] Extrato importado por arquivo (OFX/CSV) com o C6 ainda desligado não entra no Fechamento do mês nem no alerta do Painel
+  - Vê-se: Hoje o C6 espera as chaves, mas a tela Banco já deixa importar o extrato por arquivo (conta do C6 cadastrada ou conta de outro banco, ex.: Itaú). Só que a etapa "Conferir o extrato de nov/2026 das contas e dar destino às movimentações" só aparece no Fechamento se a caixinha "Integração ativa" do C6 estiver marcada, e o alerta "Banco" do Painel (movimentação sem destino há mais de 7 dias, comprovante não baixado) também. Resultado: 30 movimentações importadas em 05/11/2026 sem destino não cobram ninguém, e o Fecham…
+  - Causa: `docs/js/regras.js:6431 (etapa só com config_banco.ativo) e :7434 (alertaBanco: if (!cfg.ativo) return null)`
+  - Fazer: Trocar a condição por 'existe conta que recebe extrato' (contasDoExtrato(d).length) ou 'há movimentação importada'; os avisos de pagamento pelo banco continuam só com o C6 ligado.
+  - Certo é: Com qualquer conta que recebe extrato (do C6 ou de outro banco), a etapa do banco aparece no Fechamento e o alerta de movimentação sem destino vale.
+- [ ] **financeiro-banco-008** [M] A etapa conta os boletos pelo mês do vencimento, mas o botão "Abrir" leva à lista pelo mês de uso anterior: os números não batem
+  - Vê-se: No Fechamento de nov/2026 a etapa conta todos os boletos que vencem em novembro (aluguel de out/2026, parcelas de acordo e os de contrato que cobra no próprio mês). O "Abrir" vai para Boletos de out/2026 (mês de uso). Uma parcela de acordo com vencimento em 10/11/2026, ou um boleto de nov/2026 que vence no próprio novembro, conta nos "3 em aberto" mas pode não estar na lista aberta (que mostra 2). Quem confere pela lista acha que acabou e a etapa continua pendente.
+  - Causa: `docs/js/regras.js:6410 (conta pelo vencimento) e :6429-6430 (link #/cobrancas?comp=<mês anterior>); docs/js/telas/cobrancas.js:126`
+  - Fazer: Dar à tela Boletos um filtro 'vencem no mês' e apontar a etapa para ele, ou dizer na etapa quais boletos estão fora da lista aberta.
+  - Certo é: O botão abre a lista dos mesmos boletos contados (pelo vencimento no mês), ou a etapa diz quais ficaram de fora da lista.
+- [ ] **admin-003** [M] Adiar um alerta que já teve adiamento dá erro na tela ("iso.slice is not a function") e a tela não atualiza
+  - Vê-se: Se o alerta já tem um adiamento guardado (ex.: ontem alguém clicou "Já estou cuidando", o prazo venceu e o alerta voltou para a lista antes de a limpeza da abertura rodar), clicar de novo em "Adiar 7 dias" grava o adiamento, mas em vez do aviso "Alerta adiado: volta em 26/11/2026" aparece a janela de erro em inglês "iso.slice is not a function" (ou "Cannot read properties of undefined (reading slice)") e o Painel continua mostrando o alerta até recarregar.
+  - Causa: `docs/js/regras.js:7647 (devolve atualizar) e docs/js/regras.js:494 (atualizar devolve mudancas) x docs/js/telas/acoes.js:1373-1375`
+  - Fazer: Em adiarAlerta, devolver sempre o registro (ex.: atualizar(...) e depois return { ...atual, ...dados }), ou a tela calcular a data sem depender do retorno.
+  - Certo é: O aviso normal ("Alerta adiado: volta em 26/11/2026 se ainda estiver pendente") e o alerta indo para a lista de adiados.
+- [ ] **links-pc-004** [L] No Fechamento de um mês passado, o "Abrir" das NFs e dos reajustes abre o mês de hoje, não o mês do fechamento
+  - Vê-se: No Fechamento de 10/2026, a etapa "Lançar as NFs avulsas e do Airbnb de 10/2026 e numerar as NFs de 10/2026" tem o botão "Abrir" que leva a #/faturas sem o mês: abre "NFs emitidas em 11/2026". A etapa "Corrigir os aluguéis de 10/2026 e enviar a carta de reaju…
+  - Causa: `docs/js/regras.js:6428, 6445 e 6452`
+  - Fazer: Usar `#/faturas?mes=${mes}` e `#/reajustes?mes=${mes}` (as duas telas já leem o mês).
+- [ ] **mensal-004** [L] Erro esperado do usuário vai para o console como falha do programa (NF igual ao calculado)
+  - Vê-se: Ao confirmar o pagamento com valor diferente sem mudar o "Valor da NF", a janela "Altere o valor da NF: ele está igual ao calculado (R$ 2.700,00)..." aparece certo, mas o erro também é registrado no console como exceção (console.error com a pilha). As mensage…
+  - Causa: `docs/js/regras.js:1844-1846, 1855 e 1857 (throw new Error); docs/js/app.js:533 (logarErro)`
+  - Fazer: Trocar por C.ErroUsuario nessas cinco mensagens.
+- [ ] **mensal-018** [L] Demonstrativo da 1ª parcela do complemento chama de "Nova caução (2 aluguéis)" um valor que não é 2 aluguéis
+  - Vê-se: No boleto 1/2 do complemento (R$ 81,00) o demonstrativo diz "Caução já depositada R$ 3.600,00 · Nova caução (2 aluguéis) R$ 3.681,00". Dois aluguéis são R$ 3.762,00; R$ 3.681,00 é só a caução depois desta parcela. O texto para o banco repete: "NOVA CAUÇÃO RS3…
+  - Causa: `docs/js/regras.js:998 e 5033; docs/js/telas/cobrancas.js:249`
+  - Fazer: Com parcela, mostrar "Parcela 1/2", a caução depois desta parcela e a caução necessária.
+- [ ] **mensal-033** [L] IPTU com parcela arredondada: a tela diz que você paga à prefeitura a soma das parcelas arredondadas, não o valor real
+  - Vê-se: Quando o IPTU tem "Valor fixo cobrado por parcela" (a ajuda do campo dá o exemplo de arredondar para R$ 213,00), o sistema usa esse valor arredondado também como o valor da guia da prefeitura. Ex.: IPTU de R$ 2.125,37 em 10 parcelas com valor fixo de R$ 213,0…
+  - Causa: `docs/js/regras.js:1377 (valoresIptu), 1536-1542 (valor da guia e valorProprietario), 1599-1605 (custo); docs/js/telas/consultas.js:237`
+  - Fazer: Em parcelasIptu, usar dividirIptu(p) para o valor da guia e o valor fixo só para o que é cobrado do inquilino; mostrar a diferença como sobra do proprietário.
+- [ ] **saida-021** [L] Dar baixa na 2ª notificação não fecha a 1ª quando ela tem multa: fica "Multa gerada" em aberto para sempre
+  - Vê-se: A baixa na notificação mais nova resolve as anteriores do mesmo assunto que estão "Reiterada". Mas se a 1ª teve multa gerada, ela está como "Multa gerada" e não é fechada: o assunto está resolvido (2ª "Resolvida"), e a 1ª segue na lista "Em aberto" em vermelh…
+  - Causa: `docs/js/regras.js:5829 e 5811`
+  - Fazer: Na baixa, resolver também as anteriores da cadeia que estão "Multa gerada" ou "Aguardando resposta".
+- [ ] **saida-022** [L] Duas notificações da mesma data com multa no mesmo boleto: retirar uma apaga o texto das duas
+  - Vê-se: O texto da multa no boleto é igual para notificações da mesma data ("Multa por descumprimento da notificação de 01/10/2026"). Com duas multas no boleto (R$ 1.000,00 e R$ 500,00), ao retirar a primeira o valor cai certo para R$ 500,00, mas a descrição some int…
+  - Causa: `docs/js/regras.js:5898 e 5864`
+  - Fazer: Tirar uma ocorrência por multa retirada, ou pôr o assunto no texto da multa.
+- [ ] **saida-024** [L] Boleto do complemento da caução do mesmo mês é marcado "Descontado da garantia" sem ter entrado nos débitos
+  - Vê-se: O cálculo final marca como descontados os boletos cujo nome aparece no texto dos débitos ("Aluguel 10/2026 em aberto"). O boleto do complemento da caução do mesmo mês tem o mesmo nome para essa busca: fica "Descontado da garantia" embora o valor dele (ex.: R$…
+  - Causa: `docs/js/regras.js:2994-2998 (boletosDescontadosNaSaida) e 2461`
+  - Fazer: Filtrar por cobrancasEmAberto (a mesma lista dos débitos, sem o complemento da caução).
+- [ ] **saida-025** [L] Etapa "Último boleto" nunca fecha quando o boleto do mês está em acordo (ou há complemento da caução em aberto) e diz "em aberto"
+  - Vê-se: Se o aluguel do mês da saída entrou num acordo, a etapa mostra "em aberto, vence 10/11/2026" (o boleto está "Em acordo", não em aberto) e continua ⬜. Um boleto de complemento da caução em aberto também conta como "outro boleto em aberto" e segura a etapa, emb…
+  - Causa: `docs/js/regras.js:7751 e 7786-7787`
+  - Fazer: Tratar o boleto em acordo no texto da etapa e tirar o complemento da caução da conta dos abertos.
+- [ ] **saida-026** [L] Etapa diz "chaves devolvidas em 20/10/2026" sem ninguém ter registrado a devolução (e até com data futura)
+  - Vê-se: Passada a data de saída, a etapa ⬜ mostra "chaves devolvidas em 20/10/2026; falta anexar o termo de devolução assinado", como se as chaves já estivessem na empresa: o sistema só sabe a data combinada. E com o termo anexado e a data de saída futura, mostra ✅ "…
+  - Causa: `docs/js/regras.js:7780-7781`
+  - Fazer: Sem o termo: "devolução prevista para ..."; com o termo: não afirmar data futura.
+- [ ] **saida-028** [L] Várias datas da saída e das notificações são aceitas sem conferência (futuras ou antes do fato)
+  - Vê-se: Aceitos sem aviso: "Marcar garantia devolvida" com data antes da saída ou no futuro (ex.: 12/11/2025; vai para o termo de quitação); "Marcar data e hora" da vistoria de saída antes da data de saída; "Marcar como enviada" e "Dar baixa" da notificação com data …
+  - Causa: `docs/js/regras.js:7854-7862, 5802-5808, 5821-5825, 2935-2939, 4726-4737`
+  - Fazer: Acrescentar as conferências: devolução não antes da saída nem no futuro; envio e baixa não no futuro; mês do termo a partir do mês atual; saída muito distante pede confirmação.
+  - Atenção (conferente): Conferi as regras citadas: garantia devolvida, envio e baixa da notificação, data de saída e mês do termo do vencimento só conferem o formato (ou "não antes de"), sem barrar data futura ou muito antiga. Ressalvas: marcar a vistoria de saída antes da data de saída pode ser normal (esse ponto eu não trataria como erro),…
+- [ ] **saida-036** [L] Na troca no meio do mês, a janela de ciência diz que o boleto do mês da troca passa ao novo titular, mas ele fica com o anterior
+  - Vê-se: A janela que explica o que passa ao novo titular conta os boletos "a partir do mês da troca". Mas a regra que faz a troca só passa os boletos dos meses DEPOIS do fim do vínculo do anterior. Ex.: troca em 15/12/2026, o anterior tem os boletos de 12/2026 e 01/2…
+  - Causa: `docs/js/regras.js:3594 (resumoDaHeranca: competencia >= mês da troca) contra regras.js:3542 (transferirHeranca: competencia > mês do fim do vínculo)`
+  - Fazer: Usar em resumoDaHeranca o mesmo corte de transferirHeranca (mês depois da véspera da troca) e acrescentar uma linha dizendo que o mês da troca é dividido entre os dois.
+- [ ] **saida-039** [L] Inquilino que já avisou a saída continua recebendo o alerta e o boleto de complemento da caução
+  - Vê-se: O complemento da caução depois do reajuste não olha se o inquilino já tem data de saída. Ex.: saída informada para 30/11/2026 e reajuste em 01/11/2026: o Painel pede "Gere o boleto do complemento de R$ 135,00" e a tela Boletos lista o complemento como pendent…
+  - Causa: `docs/js/regras.js:934-950 (complementoCaucao sem teste de data_saida), 953-956 (complementosCaucaoPendentes: só contratoAtivo no dia 1º), 1047-1052 (caucoesACompletar) e 3292 (o alerta não é desligado pela saída)`
+  - Fazer: Perguntar ao dono. Se ele não quiser cobrar: devolver null em complementoCaucao quando o contrato tem data de saída (que não seja fim de vínculo por troca de titular).
+  - Atenção (conferente): Confirmei que o complemento da caução não olha a data de saída: inquilino com saída informada para o fim do mês continua com o alerta no Painel e na lista de complementos a gerar (só sai depois da data de saída). Não achei decisão do dono sobre isso: o comportamento existe, mas se é erro ou não é escolha dele (cobrar …
+- [ ] **saida-042** [L] Na troca de titular, o boleto do anterior é apagado mesmo se já foi emitido no banco
+  - Vê-se: Quando o novo titular já tem o boleto do mês, a troca apaga o boleto em aberto do anterior daquele mês. A regra não confere se esse boleto já foi emitido no C6: o boleto some do sistema e continua valendo no banco (o inquilino pode pagar um boleto que o siste…
+  - Causa: `docs/js/regras.js:3547-3549 (transferirHeranca exclui sem testar cb.banco) contra docs/js/telas/acoes.js:195 (trava da exclusão manual)`
+  - Fazer: No laço, não excluir boleto com banco.situacao "emitido": deixar com o anterior e contar no resumo com o aviso de cancelar no banco (como já se faz com os que têm NF).
+- [ ] **financeiro-banco-019** [L] Apagar o valor do contador de uma guia já marcada como paga pelo extrato apaga a guia inteira, com a data do pagamento
+  - Vê-se: Guia PIS/COFINS de out/2026 com valor do contador R$ 365,00 e ligada a uma saída do extrato de 25/11/2026 (destino "Imposto"). Se alguém limpa o campo e salva ("Valor do contador apagado."), o registro da guia some: a data "paga em" se perde e a movimentação …
+  - Causa: `docs/js/regras.js:7291 (salvarGuiaImposto exclui sem olhar paga_em/movimentacao_id/pagamento_banco_id); docs/js/telas/envios.js:594-601`
+  - Fazer: Recusar apagar o valor quando a guia tem paga_em, movimentacao_id ou pagamento_banco_id ('desfaça o destino na tela Banco antes'), ou só limpar o valor mantendo a guia.

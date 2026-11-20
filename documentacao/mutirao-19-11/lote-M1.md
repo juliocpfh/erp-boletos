@@ -1,0 +1,143 @@
+# Lote M1: Inquilino, imóvel, busca, ajuda e textos soltos (1/2)
+
+32 itens (0 graves, 9 médios, 23 leves). Arquivos: `ajuda.js`, `alertas.js`, `armazenamento.js`, `pessoa.js`, `telas.js`, `telas/avisos.js`, `telas/comum.js`, `telas/consultas.js`, `telas/contrato.js`.
+Como trabalhar: ver `../MUTIRAO_19_11.md`. Marque `[x]` ao corrigir. G = grave, M = médio, L = leve.
+
+- [ ] **mensal-045** [L] No celular, as caixas de marcar têm 13 a 16 px e os botões "Hoje"/"Ontem" 22 px de altura: difíceis de acertar com o dedo
+  - Vê-se: Medido no Android (412 px de largura): em Boletos as caixas de marcar boleto (para imprimir, excluir ou baixar em lote) têm 16×16 px e as de "marcar todos" 13×13 px; na tela NF, 13×13 px. Na janela "Confirmar pagamento", os atalhos "Hoje" e "Ontem" têm 41×22 …
+  - Causa: `docs/css (folha de estilo): linha 739 (min-height só em "main button") e 754-756 (.atalhos-data sem altura); nenhuma regra para input[type=checkbox]`
+  - Fazer: No bloco do celular: estender a altura mínima aos botões de dialog/.atalhos-data e aumentar a caixa de marcar (ex.: 22 px, com área de toque na célula).
+- [ ] **admin-014** [L] Textos de ajuda com prazo fixo que hoje é regra que o administrador muda (dia 20, 3 meses, 30 dias)
+  - Vê-se: A ajuda do Painel e dos Boletos diz "No dia 20/11/2026 o calendário avisa boletos" e "A partir do dia 20, clique em Gerar boletos": o dia é a regra "Dia de gerar os boletos do mês" (se o administrador puser 25, a ajuda ensina errado). A ajuda da Ficha diz "os…
+  - Causa: `docs/js/ajuda.js:21, :76 e :82; docs/js/telas/nuvem.js:141`
+  - Fazer: Montar esses textos com R.regra(...) na hora de mostrar (como já faz nuvem.js:192).
+- [ ] **textos-021** [L] Ajuda e legenda falam em "clique num dia" e "passe o mouse", que não existem no celular
+  - Vê-se: A ajuda do Painel diz: "No calendário, clique (no celular, toque) num dia para ver o que vence nele." No celular o calendário não tem dias: vira a lista "Semana de 15/11 a 21/11" e o toque é na semana. Em IPTU's a legenda diz "passe o mouse para ver o valor" …
+  - Causa: `docs/js/ajuda.js:20; docs/js/telas/consultas.js:243`
+  - Fazer: Na ajuda: "no celular, toque na semana"; em IPTU's, separar a frase em versão de computador e de celular, como já é feito no calendário.
+- [ ] **textos-004** [L] Plural errado quando o número é 1: "faltam 1 dias", "(1 dias de atraso)", "1 aluguéis", "Faltam 1 de 6 etapas"
+  - Vê-se: Vários textos montam o número seguido da palavra sempre no plural. Como fica na tela: alerta "Seguro vence em 21/11/2026 (faltam 1 dias)" e, no próprio dia, "(faltam 0 dias)"; o mesmo em "Vigência termina em ... (faltam 1 dias)" e "O vínculo do fiador termina…
+  - Causa: `docs/js/alertas.js:29,69; docs/js/regras.js:3268,3064; docs/js/telas/cobrancas.js:223; docs/js/telas/comum.js:114; docs/js/telas/contrato.js:217; docs/js/telas/reajustes.js:197; docs/js/email-dados.js:33; docs/js/telas/gestao.js:40; docs/js/telas/fechamento.j…`
+  - Fazer: Uma função de plural em calculos.js (plural(n, "dia", "dias")) usada nesses textos; no dia zero, "vence hoje".
+- [ ] **comunicacoes-026** [L] Arquivo com nome muito comprido (mais de 120 letras) é gravado sem o ".pdf" e depois não abre na tela
+  - Vê-se: O nome é cortado em 120 letras, do começo para o fim, sem preservar a extensão. Um PDF com nome de 130 letras fica sem ".pdf": o sistema deixa de reconhecer como PDF (não abre na tela nem no celular, só baixa, e o arquivo baixado vem sem extensão).
+  - Causa: `docs/js/armazenamento.js:154-157, :209-211 e :195-197`
+  - Fazer: Em limparNome, cortar a base e recolocar a extensão.
+- [ ] **comunicacoes-011** [M] "Dados de uma pessoa" (LGPD) não traz o que ela respondeu nos comunicados, e "Apagar tudo" deixa esses dados
+  - Vê-se: A resposta do comunicado guarda nome, e-mail, celular, endereço de internet (IP), aparelho e a assinatura da pessoa, dentro do comunicado (não no contrato). A tela "Dados de uma pessoa" procura registros pelo CPF ou ligados ao contrato; o comunicado não tem CPF nem "contrato_id" no registro, então fica de fora do ZIP "Baixar os dados desta pessoa" e também não é limpo em "Apagar tudo desta pessoa". O mesmo vale para as linhas do Histórico do comunicado.
+  - Causa: `docs/js/pessoa.js:25-37 (busca por campo de documento) e :72-76 (só r.contrato_id); docs/js/comunicados.js:5-7`
+  - Fazer: Em partesDaPessoa/apagarPessoa, tratar comunicados.destinos pelo contrato_id/fiador_id da pessoa (entra no ZIP; no apagar, sai o item da lista).
+  - Certo é: O ZIP trazer o aceite (e-mail, celular, IP, assinatura) e o "Apagar tudo" tirar a pessoa dos comunicados.
+- [ ] **admin-007** [M] Apagar tudo de um titular antigo apaga também o que o inquilino atual herdou dele (vistoria de entrada, depósitos), sem aviso
+  - Vê-se: Na troca de titular, o contrato novo continua o anterior: a vistoria de entrada e o que ficou lançado no anterior continuam no contrato de quem saiu. Dez anos depois da saída do titular antigo, ele aparece em "Pessoas com mais de 10 anos" e o sistema deixa apagar tudo dele, mesmo que o sucessor ainda esteja no imóvel. Some o contrato anterior com tudo o que é ligado a ele (vistoria de entrada, depósitos da garantia, boletos, pasta de arquivos) e o contrato atual fica apontando para um contrato que não existe mais.
+  - Causa: `docs/js/pessoa.js:105-123 (vinculos) e :129-141 (situacaoParaApagar); docs/js/pessoa.js:70-82 (ligados pelo contrato_id)`
+  - Fazer: Em vinculos(), contar também o fim da cadeia: se algum contrato que continua o dela (contrato_anterior_id) ainda vale ou terminou há menos de 10 anos, não liberar (e dizer o motivo na tela).
+  - Certo é: Não deixar apagar (ou avisar com destaque) enquanto houver contrato que continua o dela ainda valendo; os 10 anos deviam contar do fim do último contrato da cadeia.
+- [ ] **admin-018** [L] "Pessoas com mais de 10 anos" diz que lista também quem foi solidário, mas quem só foi solidário nunca aparece
+  - Vê-se: O texto da tela diz: pessoas cujo último contrato "(como inquilino, solidário ou fiador)" terminou há mais de 10 anos. A lista, porém, só é montada a partir do CPF do inquilino, da ficha e do fiador: quem aparece só como locatário solidário (ou representante,…
+  - Causa: `docs/js/pessoa.js:15 (DONO) e :146-148 (pessoasParaApagar) x docs/js/telas/pessoa.js:76`
+  - Fazer: Incluir na lista os CPFs dos outros papéis (solidário, cônjuge, representante) ou acertar o texto da tela.
+  - Atenção (conferente): A lista parte só do CPF do inquilino, do interessado da ficha e do fiador (DONO). Quem só foi locatário solidário, cônjuge ou representante nunca entra, embora o texto diga "(como inquilino, solidário ou fiador)". Na prática os dados do solidário saem junto quando o inquilino daquele contrato é apagado; o que está err…
+- [ ] **admin-002** [M] Na nuvem, "Pedir acesso" não funciona: a nuvem recusa o pedido, e a tela Usuários manda usar esse caminho
+  - Vê-se: Na nuvem (erp.ankjck.com.br) a tela de login mostra "Primeiro acesso? Pedir acesso ao administrador". O pedido cria um usuário "pendente", mas a nuvem só deixa o administrador criar usuários: a gravação é recusada ("Só o administrador muda usuários") e o pedido nunca aparece em Usuários → Pedidos de acesso. Além disso, quem ainda não tem o e-mail ligado a um usuário ativo nem chega a abrir o sistema na nuvem. Mesmo assim a tela Usuários diz: "Quem não tem usuário clica em Pedir acesso na tela de login, e o pedido …
+  - Causa: `docs/js/telas.js:240 (link sem olhar a nuvem) e :468 (texto); docs/js/telas/envios.js:403-416; nuvem/cofre.mjs:586-589 e :320-325`
+  - Fazer: Na nuvem, esconder o link e trocar o texto de Usuários por "o administrador cadastra o usuário com o e-mail de acesso" (ou aceitar o pedido pendente no cofre, com e-mail no formulário).
+  - Certo é: Na nuvem, esconder o "Pedir acesso" (e o texto da tela Usuários) e explicar que o administrador cadastra a pessoa em Usuários → Novo usuário com o e-mail; ou a nuvem aceitar o pedido pendente (sem papel nem acesso).
+- [ ] **nuvem-004** [M] Na nuvem, "Pedir acesso ao administrador" diz "Pedido enviado" mas o pedido nunca chega
+  - Vê-se: Na tela de login da nuvem há o link "Primeiro acesso? Pedir acesso ao administrador". Quem ainda não é usuário nem chega a essa tela (a nuvem responde "Este e-mail não está ligado a nenhum usuário"). Quem chega (aparelho de um operador ou consulta) preenche, vê "Pedido enviado. Assim que o administrador aprovar…", mas a nuvem recusa a gravação ("Só o administrador muda usuários") e o pedido vira "1 mudança recusada" naquele aparelho; o administrador nunca vê. E mesmo um pedido aprovado nasce sem "E-mail de acesso"…
+  - Causa: `docs/js/telas.js:240 e 242-250; docs/js/telas/envios.js:403-417; nuvem/cofre.mjs:491 e 586-589; docs/js/telas/acoes.js:1820-1830`
+  - Fazer: Na nuvem, tirar o link e a tela de pedir acesso (texto: "peça ao administrador para cadastrar o seu e-mail em Usuários").
+  - Certo é: Na nuvem o link não deveria existir (o acesso é dado em Usuários + lista do Cloudflare), ou o pedido deveria pedir o e-mail e chegar ao administrador.
+- [ ] **fios-016** [L] Endereço incompleto mostra erro de programador em inglês ("Cannot read properties of undefined (reading 'find')")
+  - Vê-se: Quando o endereço chega sem uma parte (link antigo guardado nos favoritos, endereço cortado ao copiar do WhatsApp/e-mail, mês inválido), a tela mostra uma faixa vermelha com o erro cru: "Cannot read properties of undefined (reading 'find')" (em #/editar ou #/…
+  - Causa: `docs/js/telas.js:378 (buscar sem conferir a tabela); docs/js/telas/documentos.js:26 (rota.q.comp sem competenciaValida); docs/js/telas.js:194 (arquivoSumiu alcançável pelo endereço, app.js:1012-1013)`
+  - Fazer: Em novo/editar, tabela desconhecida vira "Página não encontrada"; na carta, usar competenciaValida(q.comp, mês atual); barrar as telas internas no roteador.
+- [ ] **links-pc-006** [L] Endereço de edição com nome errado mostra mensagem técnica em inglês em vez de "não encontrado"
+  - Vê-se: #/editar/xyz/1 e #/editar (sem nada) mostram uma faixa vermelha "Cannot read properties of undefined (reading 'find')" e só o botão "Voltar ao painel"; #/editar/config_banco/1 mostra "d[tabela].find is not a function"; #/cobrancas?filtro=constructor mostra "F…
+  - Causa: `docs/js/telas.js:377-378; docs/js/regras.js:366; docs/js/telas/cobrancas.js:109-111; docs/js/app.js:1069-1075`
+  - Fazer: Em TELAS.editar, conferir CADASTROS[tabela] antes de buscar; usar Object.hasOwn em FILTROS_BOLETO/ORDENS_BOLETO; no catch de mostrar(), pôr o título padrão na aba.
+- [ ] **textos-005** [L] Avisos com "(s)" e "(ões)" em vez da palavra certa: "1 cadastro(s) incompleto(s)", "movimentação(ões) sem destino"
+  - Vê-se: Muitos avisos escrevem o plural entre parênteses mesmo quando o número é conhecido. Exemplos: Painel "Régua de cobrança: 1 e-mail(s) aguardando a sua autorização", "1 cadastro(s) incompleto(s).", "faltam 1 etapa(s)", "2 alerta(s) adiado(s) ou em cuidado"; Bol…
+  - Causa: `docs/js/telas.js:49,303,307,323,325; docs/js/telas/cobrancas.js:141,162,167; docs/js/telas/financeiro.js:335; docs/js/app.js:896-897`
+  - Fazer: Usar a mesma função de plural do textos-004.
+- [ ] **textos-007** [L] "Banco" quer dizer duas coisas: o banco C6 (menu Banco) e o banco de dados
+  - Vê-se: O menu tem "Banco" (extrato do C6). Mas o Painel termina com "Banco criado em 01/01/2026 08:00", Dados e backup mostra "Banco criado em", "Banco de dados (sem os anexos)", "o sistema grava ali o banco (e os anexos...)", "backup completo (banco + anexos)", o B…
+  - Causa: `docs/js/telas.js:330; docs/js/telas/admin.js:28,345,352; docs/js/backup-seguro.js:321; docs/js/telas/nuvem.js:177`
+  - Fazer: Trocar "banco" sozinho por "os dados" ("Sistema em uso desde", "só os dados", "baixou todos os dados").
+- [ ] **textos-013** [L] A mesma ação tem três nomes: "Registrar pagamento" (Painel), "Confirmar pagamento" (Boletos) e "Registrar o pagamento" (Banco)
+  - Vê-se: No Painel o botão é "Registrar pagamento" (abre Boletos em aberto); na linha do boleto é "Confirmar pagamento"; a ajuda "?" do Painel manda usar "Registrar pagamento" e a de Boletos, "Confirmar pagamento"; a janela depois de anexar o comprovante tem o botão "…
+  - Causa: `docs/js/telas.js:292; docs/js/telas/cobrancas.js:159,219; docs/js/telas/acoes.js:347; docs/js/ajuda.js:19,83; docs/js/telas/banco.js:224,233`
+  - Fazer: Padronizar em "Confirmar pagamento" (botões e ajuda).
+- [ ] **entrada-027** [M] Aviso de 'imóvel ainda ocupado' não aparece quando o outro contrato começa no mesmo dia ou depois
+  - Vê-se: O aviso 'Fulano ainda está neste imóvel em …' só olha contratos que começaram ANTES da entrada do novo. Ex.: Loja 5 já tem o contrato de Eva com entrada em 01/12/2026. Criar outro contrato para a mesma loja com entrada em 01/12/2026 (ou em 25/11/2026) salva sem nenhum aviso: ficam dois inquilinos ativos no mesmo imóvel, os dois gerando boleto.
+  - Causa: `docs/js/telas/avisos.js:34`
+  - Fazer: Avisar sempre que os períodos dos dois contratos se cruzam, em qualquer ordem das datas.
+  - Certo é: Avisar sempre que os períodos dos dois contratos se cruzam (qualquer ordem das datas).
+- [ ] **entrada-028** [L] Contrato feito direto no imóvel não avisa que há ficha em análise (com reserva) de outra pessoa para ele
+  - Vê-se: A ficha protege o imóvel ('cada imóvel fica com uma ficha por vez'), mas só contra outra ficha. Ex.: Apto 2 tem a ficha de João em análise com reserva de R$ 1.000,00. Abrindo Novo contrato pelo Apto 2 e cadastrando Maria, o sistema salva sem falar da ficha de…
+  - Causa: `docs/js/telas/avisos.js:23-52; docs/js/telas/cadastros.js:150-153`
+  - Fazer: Em conferirContrato, usar R.fichaAbertaDoImovel e avisar quando a ficha aberta do imóvel não é a do contrato (com o valor da reserva).
+- [ ] **admin-010** [M] Histórico mostra o nome técnico do campo e o dinheiro em centavos ("aluguel_inicial: 180000 → 190000")
+  - Vê-se: Cada alteração aparece com o nome interno do campo e o valor cru: um aluguel que passou de R$ 1.800,00 para R$ 1.900,00 aparece como "aluguel_inicial: 180000 → 190000"; a regra especial aparece como "perfil_regras_id: 1 → (vazio)"; datas como 2026-11-19. Na mesma tela, a janela "Desfazer esta alteração?" já mostra certo ("Aluguel inicial: R$ 1.900,00 → R$ 1.800,00"). Para quem não é programador, a lista é difícil de ler e parece que o aluguel é de cento e oitenta mil.
+  - Causa: `docs/js/telas/comum.js:117 (textoValor) e :130-132 (tabelaHistorico) x docs/js/exportar.js:29-58`
+  - Fazer: Usar na lista o mesmo rotuloCampo(campo, tabela) e valorTexto(campo, valor) da janela do Desfazer.
+  - Certo é: O mesmo texto da janela do Desfazer: nome do campo como no formulário, dinheiro em reais e datas em dia/mês/ano.
+- [ ] **links-pc-008** [L] Histórico mostra texto de programador (chaves, aspas e nomes internos) nas alterações do banco e das contas
+  - Vê-se: Em Histórico de alterações, a linha "Configuração do banco (C6) alterada" traz, ao clicar em "ver": config_banco: {"ativo":false,"provedor":"c6","conta_padrao_id":"ank","modo_conta_boleto":"padrao","pasta_contador":"_Contador",...} → {"ativo":true,...}. O mes…
+  - Causa: `docs/js/telas/comum.js:117 e 132-136; docs/js/regras.js:5169`
+  - Fazer: Gravar só os campos que mudaram, um por linha e com nome em português; na tela, listar campo a campo em vez de JSON.stringify.
+- [ ] **links-pc-013** [L] Avisos de orientação saem com a frase "O endereço pode ser antigo ou o registro foi excluído", que não tem a ver
+  - Vê-se: Abrindo #/pasta-impressao/1 direto (ou dando F5 nessa tela, que perde a escolha dos documentos), aparece o título "Escolha os documentos na pasta do inquilino" e embaixo "O endereço pode ser antigo ou o registro foi excluído." O mesmo em "Boletos novos saem n…
+  - Causa: `docs/js/telas/comum.js:13-14; docs/js/telas/arquivo-impresso.js:258; docs/js/telas/cadastros.js:1062 e 1068; docs/js/telas/comunicacoes.js:170 e 204`
+  - Fazer: naoEncontrado aceitar a frase de baixo (vazia nas orientações) e trocar os títulos para "Comunicado não encontrado" e "Aceite não encontrado".
+- [ ] **mensal-011** [L] Histórico dos boletos não diz de quem é o boleto e mostra os campos em linguagem de programa
+  - Vê-se: Cada pagamento confirmado aparece no Histórico como "Alteração · Boleto — Pagamento confirmado" sem o nome do inquilino nem o mês do boleto: com vários pagamentos no mesmo minuto não dá para saber qual é qual. Na coluna Detalhes os campos saem crus: "data_pag…
+  - Causa: `docs/js/telas/comum.js:128-131 (campo e valor crus) e docs/js/regras.js:1864-1865 (descrição sem o boleto)`
+  - Fazer: Pôr mês e inquilino na descrição e mostrar rótulo e formato (dinheiro, data, sim/não) nos detalhes.
+- [ ] **textos-012** [L] Três telas de orientação terminam com "O endereço pode ser antigo ou o registro foi excluído", que não é o caso
+  - Vê-se: A função de "não encontrado" é usada para dar uma instrução: "Boletos novos saem na tela Boletos ("Gerar boletos" do mês)", "Abra este cadastro pela página do inquilino ou do imóvel" e "Escolha os documentos na pasta do inquilino". Embaixo sai sempre a frase …
+  - Causa: `docs/js/telas/comum.js:13-14; docs/js/telas/cadastros.js:1062,1068; docs/js/telas/arquivo-impresso.js:258`
+  - Fazer: Dar à função um parâmetro para tirar ou trocar a 2ª frase nessas três chamadas.
+- [ ] **fios-017** [M] Busca da lista de Inquilinos não acha o CPF digitado sem pontos nem o nome digitado sem acento
+  - Vê-se: O campo diz "Buscar por nome, CPF ou imóvel", mas compara o texto ao pé da letra. O CPF fica gravado com pontos e traço (529.982.247-25): quem digita 52998224725 recebe a lista vazia. O mesmo com acento: digitar "jose" não acha "José", e "sao joao" não acha o imóvel "Loja São João". A busca do topo (lupa) e a busca da tela Boletos acham nos dois casos, então a mesma pessoa aparece numa busca e some na outra.
+  - Causa: `docs/js/telas/consultas.js:69-71 (comparar com docs/js/telas/cobrancas.js:128, que usa R.textoDeBusca)`
+  - Fazer: Usar R.textoDeBusca dos dois lados e, quando o digitado for só números, comparar com os dígitos do CPF/CNPJ.
+  - Certo é: Achar o inquilino pelo CPF/CNPJ com ou sem pontuação e pelo nome com ou sem acento, como a busca do topo e a de Boletos.
+- [ ] **comunicacoes-018** [L] Editar uma solicitação a partir da lista filtrada volta para "Todas" (perde o filtro)
+  - Vê-se: Na lista filtrada por "🟢 abertas", clicar em "Editar" e salvar (ou cancelar) volta para a lista sem filtro.
+  - Causa: `docs/js/telas/consultas.js:61; docs/js/telas/cadastros.js:280-281`
+  - Fazer: Levar o filtro no endereço do Editar e usá-lo na volta.
+- [ ] **comunicacoes-019** [L] A busca da lista de Inquilinos não acha nome sem acento nem CPF digitado sem pontos
+  - Vê-se: Digitar "joao" não acha "João"; digitar o CPF só com números (52998224725) não acha o cadastro gravado como 529.982.247-25. A Busca do topo do sistema acha nos dois casos; a da lista de Inquilinos compara o texto exato.
+  - Causa: `docs/js/telas/consultas.js:69-71; comparar docs/js/regras.js:7469-7483`
+  - Fazer: Usar R.textoDeBusca e a comparação por dígitos também na lista.
+- [ ] **comunicacoes-031** [L] A tela Solicitações tem o link "← Inquilinos" e, logo abaixo, a aba "Lista" que leva ao mesmo lugar; a de Notificações não tem o link
+  - Vê-se: Solicitações mostra "← Inquilinos" em cima das abas "Lista | Comunicações" (dois caminhos para a mesma tela). Notificações e Comunicações, que são irmãs, não têm esse link: as três telas da mesma aba começam de jeitos diferentes.
+  - Causa: `docs/js/telas/consultas.js:47 (link sobrando); as abas vêm de atalhosComunicacoes, docs/js/telas/comunicacoes.js:31; docs/js/telas/notificacoes.js:56 não tem o link`
+  - Fazer: Tirar a linha do "← Inquilinos" de telaSolicitacoes (consultas.js:47), ficando igual às outras duas.
+- [ ] **textos-014** [L] O mesmo formulário abre por "Abrir nova solicitação" numa tela e "Registrar solicitação" na outra; e a lista tem três títulos
+  - Vê-se: Em Solicitações o botão é "Abrir nova solicitação"; na página do inquilino, "Registrar solicitação" (os dois abrem #/novo/solicitacoes). O assunto aparece como "Solicitações de inquilinos" (cartão do Painel), "Solicitações dos inquilinos" (título da tela) e "…
+  - Causa: `docs/js/telas/consultas.js:48; docs/js/telas/contrato.js:452; docs/js/telas.js:300`
+  - Fazer: Usar "Nova solicitação" nos dois botões e "Solicitações dos inquilinos" no cartão do Painel.
+- [ ] **textos-015** [L] A Busca chama de "Notas fiscais" o que o resto do sistema chama de "NF"
+  - Vê-se: As abas do resultado são "Inquilinos", "Imóveis", "Boletos" e "Notas fiscais (2)", e o grupo sai com o título "Notas fiscais". No menu, nas telas e nos avisos o nome é sempre "NF"/"NFs".
+  - Causa: `docs/js/telas/consultas.js:13; docs/js/regras.js:7514`
+  - Fazer: Trocar os dois rótulos por "NFs" (o tipo do grupo em regras.js e a aba em consultas.js têm de continuar iguais).
+- [ ] **entrada-015** [M] Depósito da caução aceita data no futuro (01/01/2027) sem avisar
+  - Vê-se: Em 19/11/2026 registrei um depósito de R$ 2.000,00 com a data 01/01/2027: "Depósito de R$ 2.000,00 registrado". A caução ficou "paga em 01/01/2027" (data que ainda não chegou). A correção pela poupança conta a partir da data de cada depósito.
+  - Causa: `docs/js/telas/contrato.js:126 (campo de data sem max); docs/js/regras.js:3143 (só C.dataValida)`
+  - Fazer: Pôr max = hoje no campo e recusar data futura em registrarDepositoGarantia.
+  - Certo é: Recusar (ou pelo menos perguntar) data de depósito depois de hoje, como já faz a data da decisão da ficha.
+- [ ] **saida-005** [M] Não existe botão para desfazer "Garantia devolvida" (ou "Saldo cobrado"), e o sistema manda desfazer
+  - Vê-se: Depois de clicar em "Marcar garantia devolvida" e informar a data, o botão some e não aparece nenhum "Desfazer" nem jeito de corrigir a data (ex.: digitou 12/11 em vez de 21/11/2026; a data vai para o termo de quitação). E ao clicar em "Desfazer cálculo final" o sistema responde "A devolução já foi registrada em 12/11/2026. Desfaça a devolução antes de desfazer o cálculo final", sem dizer onde. O único caminho é o administrador achar a linha no Histórico e desfazer por lá.
+  - Causa: `docs/js/telas/contrato.js:312, 316 e 322; docs/js/telas/acoes.js:207 (mensagem) e 1317-1327; docs/js/regras.js:7854`
+  - Fazer: Mostrar "Desfazer" (e "Mudar a data") na etapa da garantia feita, chamando marcarGarantiaDevolvida com data vazia; citar o botão na mensagem.
+  - Certo é: Na etapa "Devolução da garantia" feita, um "Desfazer" (como existe no "Arquivo físico") ou "Mudar a data".
+- [ ] **fios-018** [L] Editar leitura ou "Atualizar protocolo" a partir da página do inquilino: ao salvar, cai na página do imóvel
+  - Vê-se: Na página do inquilino, o "Registrar leitura" e o "Registrar protocolo" levam o contrato no endereço e, ao salvar, voltam para o inquilino. Já o "Editar" de uma leitura e o "Atualizar protocolo" de uma troca de titularidade não levam o contrato: depois de sal…
+  - Causa: `docs/js/telas/contrato.js:404 e :600 (links sem ?contrato=); docs/js/telas/cadastros.js:722 e :894 (voltar); docs/js/telas/envios.js:484 (destino depois de salvar)`
+  - Fazer: Na página do inquilino, montar os dois links com ?contrato=<id> (caixaLeituras recebe o contrato).
+- [ ] **saida-018** [L] "Falta o cálculo final" com o botão aparece antes de o inquilino sair, e o sistema aceita o cálculo antes da data
+  - Vê-se: Assim que se informa a data (ex.: hoje 20/11, saída 15/12/2026), a caixa mostra em amarelo "Falta o cálculo final. Fazer cálculo final". O roteiro logo acima diz que o cálculo é "depois da saída" e não mostra o botão. Clicando no de baixo, o cálculo é salvo a…
+  - Causa: `docs/js/telas/contrato.js:347 comparado com 315; docs/js/regras.js:2972-2976`
+  - Fazer: Usar no aviso a mesma condição do roteiro (data de saída já chegou) e recusar em encerrarContrato antes da data.

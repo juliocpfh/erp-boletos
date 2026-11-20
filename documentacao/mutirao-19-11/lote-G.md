@@ -1,0 +1,129 @@
+# Lote G: Banco e Financeiro
+
+29 itens (0 graves, 5 médios, 24 leves). Arquivos: `conciliacao.js`, `telas/banco-c6.js`, `telas/banco.js`, `telas/fechamento.js`, `telas/financeiro.js`, `telas/gestao.js`.
+Como trabalhar: ver `../MUTIRAO_19_11.md`. Marque `[x]` ao corrigir. G = grave, M = médio, L = leve.
+
+- [ ] **links-pc-014** [L] Avisos normais de preenchimento são tratados como erro de programa (vão para o registro de erros)
+  - Vê-se: Mensagens esperadas como "Escolha o boleto que esta entrada pagou", "Escolha a parcela do IPTU", "Escolha o imóvel", "Informe o número da NF", "Informe o valor de pelo menos uma conta", "A saída não pode ser antes da entrada" e "Valor inválido: teste" aparece…
+  - Causa: `docs/js/conciliacao.js:1344, 1367, 1408; docs/js/regras.js:2176, 2939, 6287; docs/js/calculos.js:30; docs/js/app.js:533`
+  - Fazer: Trocar `throw new Error` por `throw new C.ErroUsuario` nessas validações.
+  - Atenção (conferente): Li o código: as sete mensagens são lançadas como erro comum e por isso vão ao console (logarErro só poupa C.ErroUsuario). O dono não vê diferença na tela; é limpeza do registro de erros. O mesmo tipo de defeito já foi anotado no mutirão anterior (MUTIRAO_3000.md linha 359), mas com outras mensagens: estas ficaram de f…
+- [ ] **financeiro-banco-005** [L] A "Saúde do banco" não mostra as contas de outros bancos e diz "tudo em ordem" mesmo com saldo que não bate ou extrato parado nelas
+  - Vê-se: A caixa aparece também na aba da conta de outro banco (Itaú), mas a lista só tem as contas do C6. Se a conta do Itaú está com "Faltam lançamentos" na conferência do saldo ou há mais de uma semana sem importar, a Saúde continua com a etiqueta "tudo em ordem". …
+  - Causa: `docs/js/conciliacao.js:568 (contasConfiguradas); docs/js/telas/banco.js:133 (caixa mostrada em toda aba) e :261-275`
+  - Fazer: Montar a lista com as contas que recebem extrato (contasDoExtrato), sem a linha do certificado nas de arquivo.
+- [ ] **fios-010** [L] Ajuda cita "Emitir todos do mês", mas o botão em Boletos é "Emitir no C6 todos em aberto do mês"
+  - Vê-se: Na caixa que escolhe a conta dos boletos, a ajuda diz: "Em \"Emitir todos do mês\", pergunta uma vez para o lote." O botão da tela Boletos tem outro nome: "Emitir no C6 todos em aberto do mês (N)". É só o nome citado que não bate (a função em si depende das c…
+  - Causa: `docs/js/telas/banco-c6.js:148 (botão em docs/js/telas/banco-c6.js:29)`
+  - Fazer: Usar na ajuda o nome do botão: "Emitir no C6 todos em aberto do mês".
+- [ ] **fios-014** [L] Botão "Conferir pagamentos no banco (tela Banco)" fica aceso com o banco desligado e leva a uma tela que não tem a conferência; e não leva o mês
+  - Vê-se: Em Boletos, com o banco ainda não ligado (como hoje), o botão "Emitir no C6…" aparece apagado com o motivo, mas ao lado dele "Conferir pagamentos no banco (tela Banco)" fica aceso. Clicando, abre a tela Banco só com o aviso "O banco ainda não está ligado" e "…
+  - Causa: `docs/js/telas/banco-c6.js:33-34 (link fixo #/banco?ir=conferir-boletos, mostrado também sem a ponte); docs/js/telas/banco.js:88 e :128`
+  - Fazer: Sem a ponte pronta, mostrar o botão apagado com o motivo; no link, mandar o mês da tela Boletos.
+- [ ] **android-025** [L] Botão "Emitir no C6" apagado: no celular não dá para saber por quê (a explicação só aparece com o mouse em cima)
+  - Vê-se: Enquanto o banco não está ligado, "Emitir no C6" (página do boleto) e "Emitir no C6 todos em aberto de..." (Boletos) ficam apagados e a explicação ("Aguardando as chaves de acesso do C6: cadastre as contas em Dados e backup (Banco C6)") está só na dica do mou…
+  - Causa: `docs/js/telas/banco-c6.js:12-13 e :21 (botaoInativo: motivo só no title); docs/js/telas/banco.js:63-64 (botaoPonte, idem)`
+  - Fazer: Pôr ao lado do botão desabilitado uma frase curta (.ajuda) com o motivo, ou trocar o disabled por um toque que mostra o motivo com aviso().
+- [ ] **iphone-015** [L] Botão apagado que só explica o motivo "ao passar o mouse": no celular o toque não faz nem diz nada
+  - Vê-se: Quando a ponte do banco não está pronta, o botão "Emitir no C6" de cada boleto fica apagado e o motivo está só na dica que aparece com o mouse parado em cima. No celular não existe mouse: toca-se e nada acontece. O mesmo com "Conferir pagamentos no banco (tel…
+  - Causa: `docs/js/telas/banco-c6.js:13 (botaoInativo: disabled + title), usado em 21 e 36; docs/js/telas/consultas.js:90; docs/css/estilo.css:653-654`
+  - Fazer: No lugar do disabled, botão apagado que no toque mostra o motivo com aviso().
+- [ ] **financeiro-banco-002** [M] Pagamentos preparados em contas diferentes (ANK e JCK) e ainda sem leitura do banco viram um lote só e saem todos pela conta do primeiro
+  - Vê-se: Quando o banco não responde na hora de preparar, o pagamento fica como rascunho "sem leitura do banco". Se no mesmo imóvel ficarem dois assim, um pela conta ANK (ex.: Água R$ 150,00) e outro pela JCK (ex.: Luz R$ 200,00), a caixa junta os dois num único "Pagamento preparado · ANK" (o título usa só a conta do primeiro). O botão "Mandar o banco ler os códigos" manda os dois códigos para a conta do primeiro; os dois ganham o mesmo lote, e "Aprovar e enviar" manda o lote inteiro pela ANK. A Luz, que era para sair da J…
+  - Causa: `docs/js/telas/banco.js:610 (lotes só por grupo_id), :619 (título com a conta do primeiro), :1225 (lerNoBanco(pags[0].conta_id, pags)), :945 (pagamentosDoLote não confere a conta)`
+  - Fazer: Agrupar os pendentes por conta + lote e, em lerNoBanco e no envio, separar (ou recusar) pagamento de conta diferente.
+  - Certo é: Um bloco por conta bancária; cada pagamento só é lido e enviado pela conta em que foi preparado.
+- [ ] **financeiro-banco-006** [M] O link da guia trimestral (IRPJ ou CSLL) na coluna Destino abre os Impostos do mês de hoje, não do trimestre da guia
+  - Vê-se: Uma saída com destino "Imposto" ligada à guia "IRPJ 2026-T3" (3º trimestre, paga em 30/10/2026) mostra o link "IRPJ 2026-T3". O endereço vai como #/impostos?mes=2026-T3; como "2026-T3" não é um mês, o sistema joga o parâmetro fora em silêncio e abre "Impostos de novembro/2026" (4º trimestre), onde essa guia não está. Na guia mensal (PIS/COFINS 2026-10) funciona.
+  - Causa: `docs/js/telas/banco.js:332; docs/js/calculos.js:565 (mes só aceita AAAA-MM)`
+  - Fazer: Para período trimestral, apontar para o último mês do trimestre (2026-T3 → 2026-09).
+  - Certo é: Abrir os Impostos de setembro/2026 (último mês do 3º trimestre), onde está a guia completa.
+- [ ] **financeiro-banco-007** [M] Se o banco não responde ao "Preparar pagamento", o rascunho é gravado mas a tela não mostra: a mensagem manda usar um botão que não está na tela
+  - Vê-se: Ao preparar, por exemplo, Condomínio de R$ 480,00, o sistema grava o rascunho e depois pede a leitura ao banco. Se a ponte não responde, aparece: "Os pagamentos ficaram como rascunho, mas o banco não respondeu… Use "Mandar o banco ler os códigos" quando a ponte voltar". Só que a tela não é redesenhada: o formulário continua preenchido e o bloco "Pagamento preparado", com esse botão, não aparece até sair e voltar (ou F5). Quem clica de novo em "Preparar pagamento" recebe "Já existe um pagamento igual … preparado" e…
+  - Causa: `docs/js/telas/banco.js:1405-1407 (grava, lê no banco, só depois mostrar()); :927-931 (lerNoBanco lança); docs/js/app.js:1216-1219`
+  - Fazer: Em pagarPeloBanco, cercar o lerNoBanco com try/finally que chama mostrar() (o aviso do erro continua aparecendo).
+  - Certo é: Depois do erro, a tela mostra o bloco "Pagamento preparado (sem leitura do banco)" com o botão "Mandar o banco ler os códigos".
+- [ ] **financeiro-banco-009** [M] O Banco filtrado por imóvel mostra só as movimentações da conta aberta: o total é diferente do que a página do imóvel mostra
+  - Vê-se: Na página do imóvel a caixa "Banco: movimentações e comprovantes" soma as movimentações de todas as contas (ex.: + R$ 3.600,00 em 2 entradas na ANK e − R$ 480,00 numa saída da JCK). O link "Ver no Banco" abre "Movimentações de <imóvel>" já na conta padrão (ANK) e mostra só as 2 entradas; a saída da JCK some, sem aviso de que há mais na outra aba. Os cartões "entradas/saídas" e "Todas (2)" também ficam só com a conta aberta.
+  - Causa: `docs/js/telas/banco.js:92 (m.conta_id === conta mesmo com imovelFiltro) × :641 (caixaBancoImovel sem filtro de conta)`
+  - Fazer: Com o filtro por imóvel, mostrar as movimentações de todas as contas (com a coluna Conta) ou avisar quantas há em cada aba.
+  - Certo é: Com o filtro por imóvel, mostrar as movimentações de todas as contas (com a coluna Conta) ou avisar quantas há em cada aba.
+- [ ] **fios-015** [L] Banco: trocar o mês pelo campo de data (botão "Ir") perde o filtro "Só sem destino" / "Só sem comprovante"
+  - Vê-se: Mesmo defeito do achado da ordem em Boletos: no extrato, com "Só sem destino" escolhido, as setas "← 10/2026" e "12/2026 →" mantêm o filtro, mas o campo do mês com o botão "Ir" volta para "Todas". O formulário do mês só leva a conta e o mês.
+  - Causa: `docs/js/telas/banco.js:109 (formulário só com conta e mes) e :91; docs/js/telas/envios.js:32-37`
+  - Fazer: Pôr um campo escondido filtro no formulário do mês quando o filtro não for "todas".
+- [ ] **financeiro-banco-010** [L] Banco filtrado por imóvel sem movimentação diz "Nenhuma movimentação importada em nov/2026. Clique em Buscar extrato"
+  - Vê-se: O filtro por imóvel não é por mês (mostra todas as datas), mas a mensagem de lista vazia fala do mês e manda buscar o extrato, o que não resolve: o que falta é dar destino com esse imóvel. O link "sem extrato" da tela Contas pagas por nós cai exatamente aqui.
+  - Causa: `docs/js/telas/banco.js:126-127; link em docs/js/telas/financeiro.js:78`
+  - Fazer: Texto próprio quando o filtro por imóvel está ligado ('Nenhuma movimentação do extrato ligada a este imóvel nesta conta').
+- [ ] **financeiro-banco-013** [L] O texto manda ir pela "página do imóvel → Contas pagas por nós", caminho que não existe na página do imóvel
+  - Vê-se: A tela diz: "Para preparar um pagamento, abra as contas do imóvel (página do imóvel → "Contas pagas por nós") e use a caixa "Pagar pelo banco"". A página do imóvel não tem link nem caixa com esse nome; a tela das contas só se alcança por Financeiro → Resultad…
+  - Causa: `docs/js/telas/banco.js:560; docs/js/telas/imovel.js (nenhum link para #/contas)`
+  - Fazer: Pôr no texto o link direto (#/contas, que já lista os imóveis) e/ou um botão 'Contas pagas por nós' na página do imóvel.
+- [ ] **financeiro-banco-014** [L] A mensagem final sempre diz "0 sem destino (dê o destino antes)", mesmo quando não há nenhuma sem destino
+  - Vê-se: Depois de gerar, aparece por exemplo: "5 comprovante(s) gerado(s), 0 sem destino (dê o destino antes)." A parte do "sem destino" só faz sentido quando há alguma.
+  - Causa: `docs/js/telas/banco.js:1163`
+  - Fazer: Escrever a parte do 'sem destino' só quando o número for maior que zero.
+- [ ] **financeiro-banco-015** [L] A mesma caixa de Dados e backup é chamada de vários jeitos, e o link do aviso "O banco ainda não está ligado" abre o topo da página
+  - Vê-se: A caixa se chama "Banco (C6) — boleto com Pix". Os textos citam: caixa "Banco (C6)", "Dados e backup → Banco", "Dados e backup → Banco C6", "Dados e backup (Banco C6)" e "Dados e backup → Banco: conciliação e pagamentos" (esta é outra caixa). O link do aviso …
+  - Causa: `docs/js/telas/banco.js:22, :69 e :84; docs/js/banco.js:97, :101, :144; docs/js/regras.js:5152-5153; docs/js/conciliacao.js:89; título em docs/js/telas/banco-c6.js:163`
+  - Fazer: Um nome só nos textos e os links com #/dados?ir=banco.
+- [ ] **financeiro-banco-021** [L] Sem a ponte informada neste computador (e no modo de teste), a Saúde fica para sempre em "a ponte ainda não respondeu", sem dizer o motivo
+  - Vê-se: Cada computador precisa do endereço e da senha da ponte. Onde não foram informados, a Saúde nem tenta consultar e mostra "certificado e entrada no banco: a ponte ainda não respondeu", como se ela estivesse lenta; "Conferir a ponte agora" responde "A ponte do …
+  - Causa: `docs/js/telas/banco.js:204 (só consulta com pontePronta), :264 (texto único) e :1083 (mensagem do botão); docs/js/banco.js:94 e :101`
+  - Fazer: Texto próprio quando falta informar a ponte neste computador ('Informe o endereço e a senha da ponte em Dados e backup'), em vez de 'não respondeu'.
+- [ ] **financeiro-banco-022** [L] A Saúde do banco usa 8 dias fixos para "mais de uma semana sem importar", e o Fechamento usa a regra configurável dos dias do extrato recente
+  - Vê-se: Se o administrador mudar a regra para 15 dias, o Fechamento aceita o extrato buscado há 10 dias como feito, mas a Saúde do banco continua marcando "mais de uma semana sem importar" como ponto a conferir (e o contrário com a regra em 3 dias).
+  - Causa: `docs/js/telas/banco.js:269 (-8 fixo) × docs/js/regras.js:7416 (regra dias_extrato_recente, config-regras.js:182)`
+  - Fazer: Usar R.regra('dias_extrato_recente') na Saúde e escrever o número de dias na etiqueta.
+- [ ] **financeiro-banco-025** [L] A janela oferece todos os destinos para entrada e para saída; escolher um que não serve só dá erro depois de fechar, e perde o que foi preenchido
+  - Vê-se: Numa entrada (+ R$ 1.800,00) a lista traz "Conta do imóvel", "Reforma", "IPTU", "Imposto" e "Devolução ao inquilino"; numa saída traz "Airbnb". Escolhendo um desses e clicando em "Salvar destino", a janela fecha e aparece, por exemplo, "Uma entrada no extrato…
+  - Causa: `docs/js/telas/banco.js:721 e :730 (lista inteira de Z.CLASSIFICACOES); docs/js/conciliacao.js:1360, :1380, :1392, :1402, :1465 (recusas por tipo); docs/js/telas/banco.js:1088-1089`
+  - Fazer: Filtrar as opções pelo tipo da movimentação (entrada: sem conta do imóvel, reforma, IPTU, imposto e devolução ao inquilino; saída: sem Airbnb).
+- [ ] **textos-023** [L] O motivo do erro devolvido pelo banco aparece em inglês
+  - Vê-se: Quando o banco não reconhece o código de barras ou a chave Pix de um pagamento preparado, o motivo é gravado e mostrado como veio. No modo de teste aparece "It was not possible to decode: 1234..." ou "It was not possible to find key: erro@..." na lista de pag…
+  - Causa: `docs/js/telas/banco.js:938 (grava), :548 e :618 (mostra); docs/js/c6-comum.js:154-155`
+  - Fazer: Para a situação DECODE_ERROR, mostrar "O banco não conseguiu ler este código ou esta chave" e deixar o texto do banco entre parênteses.
+- [ ] **admin-009** [L] Operador vê o botão "Completar" na empresa incompleta, mas ao clicar cai em "Seu usuário não pode alterar este cadastro"
+  - Vê-se: Em Pendências, a linha da empresa com dado faltando (ex.: sem CPF do representante) mostra o botão "Completar" para o operador. O cadastro de empresas é só do administrador: o operador clica e vê só "Seu usuário não pode alterar este cadastro".
+  - Causa: `docs/js/telas/fechamento.js:98 (opera() || Empresa e admin) x docs/js/telas/cadastros.js:1061`
+  - Fazer: Mostrar o botão da Empresa só para o administrador: (t === "Empresa" ? podeUsuario("admin") : opera()).
+- [ ] **financeiro-banco-011** [M] A lista "Lançamentos" corta nos 60 mais recentes (12 no quadro "+ custo") sem avisar: conta antiga não aparece nem pode ser excluída
+  - Vê-se: Um imóvel com 6 contas por mês passa de 60 lançamentos em 10 meses. A partir daí os mais antigos somem da tela, sem "mostrando 60 de 72" nem "ver mais". Não há outra tela com as contas do imóvel: um lançamento errado de jan/2026 (ex.: Luz R$ 1.500,00 em vez de R$ 150,00) continua abatendo o Resultado e não tem como ser achado nem excluído pela tela. No quadro "+ custo" o corte é em 12 e no de "+ Airbnb" também.
+  - Causa: `docs/js/telas/financeiro.js:96 (slice(0, 60)), :209 (12) e :231 (12)`
+  - Fazer: Mostrar por ano/mês ou pôr 'Ver os mais antigos', com o aviso 'mostrando 60 de N'.
+  - Certo é: Mostrar tudo (por ano ou com "ver os mais antigos") ou avisar que há mais e como chegar neles.
+- [ ] **financeiro-banco-012** [L] A coluna "Conta" mostra o código interno da conta de outro banco (ex.: "itau") em vez do apelido ("Itaú")
+  - Vê-se: A Visão geral procura o nome da conta só entre as contas do C6. Movimentação importada de conta de outro banco aparece com o código em minúsculas, diferente da tela Banco, que mostra o apelido.
+  - Causa: `docs/js/telas/financeiro.js:324`
+  - Fazer: Usar R.apelidoDaConta(d(), id).
+- [ ] **financeiro-banco-016** [L] Período com a data "De" depois da data "até" mostra tudo zerado, sem avisar
+  - Vê-se: Digitando De 01/12/2026 até 01/01/2026 a tela mostra receita R$ 0,00, custos R$ 0,00 e retorno 0,00% para todos os imóveis, como se nada tivesse acontecido, e o "Exportar Excel" sai igual.
+  - Causa: `docs/js/telas/financeiro.js:186-189; docs/js/telas/envios.js:608; docs/js/regras.js:6130-6131`
+  - Fazer: Avisar ('a data inicial é depois da final') ou trocar as duas de lugar.
+- [ ] **financeiro-banco-017** [L] "Entradas nos extratos" e "saídas nos extratos" da Visão geral não batem com a soma das abas do Banco, e a tela não diz por quê
+  - Vê-se: A Visão geral tira as transferências entre as nossas contas e as movimentações ignoradas; os cartões "entradas" e "saídas" de cada aba do Banco somam tudo. Num mês com uma transferência de R$ 10.000,00 da ANK para a JCK, o Banco mostra R$ 10.000,00 a mais nas…
+  - Causa: `docs/js/telas/financeiro.js:314-316 e :332-333 (sem legenda); docs/js/telas/banco.js:95`
+  - Fazer: Legenda nos cartões da Visão geral: 'sem transferências entre as nossas contas e sem as ignoradas'.
+  - Atenção (conferente): A Visão geral tira as transferências entre contas e as ignoradas dos cartões 'entradas/saídas nos extratos'; os cartões de cada aba do Banco somam tudo. Tirar a transferência faz sentido (senão conta em dobro); o que falta é só a legenda dizendo isso. Não achei decisão do dono sobre o assunto.
+- [ ] **financeiro-banco-018** [L] O "×" de excluir aparece nas contas que vieram do extrato ou foram pagas pelo banco, e só dá erro; a paga pelo banco não tem como sair
+  - Vê-se: No quadro "+ custo" essas contas mostram "extrato" no lugar do ×. Na tela Contas pagas por nós o × aparece em todas; clicando numa conta ligada ao extrato vem "Esta conta veio do banco: desfaça o destino da movimentação na tela Banco." Para a conta paga pelo …
+  - Causa: `docs/js/telas/financeiro.js:128 (× sempre) × :223 (× só sem extrato/banco); docs/js/telas/acoes.js:217; docs/js/conciliacao.js:1517`
+  - Fazer: Usar na tela Contas a mesma condição do quadro '+ custo' (com o texto 'extrato'/'pelo banco'); decidir com o dono o caminho para corrigir conta paga pelo banco lançada errada.
+- [ ] **financeiro-banco-020** [L] Nos dois primeiros meses do trimestre, a "Diferença" compara o valor do contador do trimestre inteiro com a guia parcial e acusa diferença grande
+  - Vê-se: O valor do contador do IRPJ/CSLL é um só para o trimestre e aparece igual nos três meses. Em out/2026 a guia esperada é parcial (1 de 3 meses, ex.: R$ 480,00) e o contador informou R$ 1.440,00 pelo trimestre: a coluna Diferença mostra "+ R$ 960,00" em laranja…
+  - Causa: `docs/js/telas/financeiro.js:149 e :163 (diferença sem olhar se a guia é parcial); total em :180`
+  - Fazer: Na guia trimestral, mostrar a diferença (e somar o valor do contador no total) só no último mês do trimestre (meses[2] === comp).
+- [ ] **textos-018** [L] Dois formulários diferentes lançam a mesma conta paga por nós, com nomes de campo diferentes
+  - Vê-se: O "+ custo" de Resultado bruto abre o quadro "Custo pago por nós" (Conta, "Mês de referência", Vencimento, Pago em, Valor pago, Observação). A tela "Contas pagas por nós" do imóvel lança a mesma coisa em tabela, com "Mês da conta". As duas listas embaixo most…
+  - Causa: `docs/js/telas/financeiro.js:109,119,129 e :211,215,222`
+  - Fazer: Usar os mesmos nomes e a mesma ordem de colunas nos dois e esconder o X da conta ligada ao extrato também em "Contas pagas por nós".
+  - Atenção (conferente): Os dois formulários existem por decisão (DECISOES.md 05/11/2026: "+ custo" no Resultado bruto; o quadro tem o link "Lançar o mês inteiro de uma vez" para a outra tela), então a duplicidade em si não é defeito. O que confirmo é a diferença de nomes: "Custo pago por nós" × "Contas pagas por nós", "Mês de referência" × "…
+- [ ] **textos-025** [L] Telas sem o caminho de volta
+  - Vê-se: (1) A página de uma notificação tem só "← nome do inquilino": quem veio da lista Inquilinos → Comunicações → Notificações não tem link de volta à lista. (2) "Contas do imóvel" sem imóvel escolhido (#/contas) não tem link de voltar. (3) "Trocar minha senha" nã…
+  - Causa: `docs/js/telas/financeiro.js:87-88; docs/js/telas.js:470-473`
+  - Fazer: Pôr "← Financeiro" em #/contas e um link "Cancelar" (para o Painel) na troca de senha.
+- [ ] **textos-016** [L] A aba Gestão troca o título da página para "Gestão"; nas outras abas do Financeiro o título é "Financeiro"
+  - Vê-se: Visão geral, Resultado bruto, Resultado líquido, Impostos e Inadimplência têm o título "Financeiro" e as abas embaixo. Em Gestão o título grande vira "Gestão", com as mesmas abas: parece que saiu do Financeiro.
+  - Causa: `docs/js/telas/gestao.js:105`
+  - Fazer: Título "Financeiro" e "Gestão" como subtítulo, como nas outras abas.

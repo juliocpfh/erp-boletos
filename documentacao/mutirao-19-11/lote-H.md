@@ -1,0 +1,106 @@
+# Lote H: Boletos e pagamentos (telas)
+
+23 itens (0 graves, 7 médios, 16 leves). Arquivos: `telas/cobrancas.js`, `telas/envios.js`.
+Como trabalhar: ver `../MUTIRAO_19_11.md`. Marque `[x]` ao corrigir. G = grave, M = médio, L = leve.
+
+- [ ] **mensal-012** [M] Ao buscar um inquilino em Boletos, aparece o aviso falso "7 contratos ainda sem boleto neste mês"
+  - Vê-se: Em Boletos de 10/2026 (9 boletos gerados, nenhum faltando) digitei "daniel" na busca. A lista mostrou só o boleto do Daniel, mas em cima apareceu o aviso amarelo "7 contrato(s) ainda sem boleto neste mês: Maria Teste da Silva, Carlos Em Dia, Beatriz Atrasada, Elisa Feriado, Fabio Caucao, Gisele Controle, Empresa PJ Teste Ltda." com o botão "Gerar boletos de 10/2026". Todos esses têm boleto no mês; o aviso conta como "sem boleto" quem a busca escondeu. A "Baixa em lote" também passa a dizer "1 em aberto".
+  - Causa: `docs/js/telas/cobrancas.js:145 (usa lista, filtrada na linha 126, em vez de doMes)`
+  - Fazer: Trocar lista.some por doMes.some no cálculo de "faltando".
+  - Certo é: O aviso de contratos sem boleto olhar todos os boletos do mês, não só os que a busca deixou na tela.
+- [ ] **mensal-028** [M] Boleto pago com NF de R$ 0,00 fica para sempre em "Pagos ainda sem NF" e "aguardando nº"
+  - Vê-se: Boleto pago em que não há aluguel na nota (mês de carência que só cobrou IPTU e seguro; parcela de acordo só de encargos) fica com valor da NF R$ 0,00. A tela NF não o põe na fila (certo: não existe NF de R$ 0,00), mas a tela Boletos conta esse boleto no botão "Pagos ainda sem NF (1)", mostra o aviso "1 pagamento(s) aguardando número de NF. Numerar na tela NF" e na linha fica "aguardando nº"; na página do boleto aparece "Aguardando numeração (tela NF)" e o "Já emitida", que ao tentar registrar responde "Valor da N…
+  - Causa: `docs/js/telas/cobrancas.js:97, 221 e 367-368 contra docs/js/regras.js:2006; docs/js/regras.js:1704`
+  - Fazer: Usar a mesma condição da fila (valor da NF maior que zero) no filtro, na linha e na página; mostrar "sem NF".
+  - Certo é: Boleto pago com valor de NF zero aparece como "sem NF" (como o complemento da caução) e não entra na contagem de pendentes.
+- [ ] **mensal-043** [M] Troca de titular esperando o termo assinado: Boletos avisa "1 contrato ainda sem boleto" e o botão "Gerar boletos" gera 0, para sempre
+  - Vê-se: Quando o novo titular ainda não tem o termo da troca assinado, o sistema (de propósito) não gera boleto para ele. Mas a tela Boletos continua avisando "1 contrato(s) ainda sem boleto neste mês: Pedro Novo Titular" com o botão "Gerar boletos de 12/2026"; ao clicar, a resposta é "0 boleto(s) gerado(s) para 12/2026" e o aviso continua. Não diz que o motivo é o termo da troca que falta anexar.
+  - Causa: `docs/js/telas/cobrancas.js:145 e 163 (e 174-186, mês vazio); docs/js/regras.js:1663; docs/js/telas/acoes.js:1365-1369`
+  - Fazer: Tirar de "faltando" os contratos em R.trocaAguardaAditivo e mostrar linha própria: "falta anexar o termo da troca assinado", com link para o contrato.
+  - Certo é: O aviso separar esse caso: "Pedro Novo Titular: falta anexar o termo da troca de titular assinado para gerar o boleto" com o link para o contrato, sem o botão que não funciona.
+  - Atenção (conferente): Na tela Boletos, "faltando" conta todo contrato ativo com dias no mês e sem boleto; montarCobranca devolve nada para quem aguarda o termo da troca (isso é de propósito). O botão "Gerar boletos" então responde "0 boleto(s) gerado(s)" e o aviso continua, sem dizer que falta o termo assinado. A regra de não gerar é decis…
+- [ ] **fios-006** [L] Boletos: trocar o mês pelo campo de data (botão "Ir") perde a ordem escolhida
+  - Vê-se: Com "Ordenar por: Nome do inquilino" em 10/2026, trocar o mês no campo do meio e clicar em "Ir" abre 09/2026 de volta em "Data de vencimento". Pelas setas "← 09/2026" a ordem é mantida. São dois caminhos para a mesma coisa com resultado diferente.
+  - Causa: `docs/js/telas/cobrancas.js:157 (formulário só com comp; o da busca, na linha 133, leva ordem e filtro); docs/js/telas/envios.js:32-37`
+  - Fazer: Pôr um campo escondido ordem no formulário do mês.
+- [ ] **links-pc-012** [L] O "← Boletos de 11/2026" da página do boleto sempre volta para a lista do mês inteiro, perdendo o filtro de onde a pessoa veio
+  - Vê-se: Vindo de "Boletos em aberto · todos os meses" (ou "Vencidos e não pagos", ou de uma busca), abre-se um boleto; o link de volta no topo é "← Boletos de 10/2026" e leva para #/cobrancas?comp=2026-10, a lista do mês sem filtro. Para continuar cobrando os vencido…
+  - Causa: `docs/js/telas/cobrancas.js:346`
+  - Fazer: Guardar o endereço da última lista de boletos aberta (memoria) e usar no "← Boletos"; sem ela, o mês como hoje.
+- [ ] **mensal-003** [L] Título do boleto diz "Em aberto" quando ele já está vencido (a lista diz "Vencida")
+  - Vê-se: O boleto de 10/2026 da Ana Caucao Teste venceu em 05/11/2026 (14 dias de atraso em 19/11/2026). Na lista de Boletos e na página do inquilino a situação aparece "Vencida"; na página do próprio boleto a etiqueta ao lado do título é "Em aberto". O mesmo com o bo…
+  - Causa: `docs/js/telas/cobrancas.js:347 (situacao(cb.situacao)) contra docs/js/telas/contrato.js:504-507 (situacaoBoleto)`
+  - Fazer: Usar situacaoBoleto(cb, hoje) no título.
+- [ ] **mensal-005** [L] Total do mês soma o boleto "Em acordo", que não se cobra mais
+  - Vê-se: Em Boletos de 10/2026 a linha Total mostra R$ 14.430,00 na coluna Pontual. Essa soma inclui o boleto da Maria Teste da Silva (R$ 1.800,00), que está "Em acordo" (não recebe mais pagamento; a dívida virou as parcelas do acordo de 11/2026 a 01/2027, que também …
+  - Causa: `docs/js/telas/cobrancas.js:150 e 170`
+  - Fazer: Tirar R.emAcordo(cb) da soma e dizer quantos ficaram de fora, como já se faz com os de controle.
+- [ ] **mensal-019** [L] Explicação do pagamento fala em NF, multa e juros num boleto que não tem nenhum dos três
+  - Vê-se: No boleto do complemento da caução ("sem NF", "Após o vencimento: sem multa e juros") a caixa Pagamento traz a explicação padrão: "O dia em que o dinheiro entrou na conta é a data de emissão da NF... Se atrasou de verdade, o banco já cobra multa e juros no bo…
+  - Causa: `docs/js/telas/cobrancas.js:36-42 (formPagamento)`
+  - Fazer: Texto curto próprio quando R.ehComplementoCaucao(cb).
+- [ ] **mensal-029** [L] Janela de excluir boletos nos filtros de todos os meses diz o mês errado
+  - Vê-se: Nos filtros "Em aberto" e "Vencidos" a lista traz boletos de vários meses. Ao marcar, por exemplo, 5 boletos de 06 a 10/2026 e clicar em "Excluir boletos selecionados", a janela pergunta "Excluir 5 boleto(s) de 11/2025?": cita só o mês do primeiro boleto da l…
+  - Causa: `docs/js/telas/cobrancas.js:193 e 198; docs/js/telas/acoes.js:1766`
+  - Fazer: Montar o título pelos boletos marcados (sem mês, ou com os meses de cada um).
+- [ ] **mensal-046** [L] No celular, cada boleto da lista ocupa uns 600 px de altura: 43 boletos em aberto dão 26.000 px de rolagem
+  - Vê-se: Medido no Android: a lista "Em aberto" com 43 boletos tem 25.929 px de altura (a tela tem 839 px): cada boleto vira um cartão de quase uma tela inteira, com as 9 colunas empilhadas (pontual, após vencimento, multa e juros, valor NF, NF…), mesmo as vazias. Com…
+  - Causa: `docs/js/telas/cobrancas.js:207-225 (tabela "cobrancas responsiva"); CSS linhas 596-605`
+  - Fazer: No cartão do celular, não desenhar as células sem valor (vazias em vez de "-") e juntar pontual/após vencimento numa linha; ou cartão resumido com o resto ao tocar.
+- [ ] **android-006** [L] Página do boleto: na caixa "Pagamento" os botões Hoje/Ontem da segunda data caem ao lado de "Valor recebido"
+  - Vê-se: Na página do boleto 11/2026 da Maria (R$ 2.184,00), a caixa "Pagamento" fica embaralhada no celular: "Pagou em (se atrasou)" e o campo da data ficam numa linha, e os botões "Hoje" e "Ontem" dessa data descem para a linha de baixo, ao lado do rótulo "Valor rec…
+  - Causa: `docs/js/telas/cobrancas.js:36-40 (formPagamento sem agrupar cada campo) + docs/css/estilo.css:155-157 (.pagamento flex-wrap)`
+  - Fazer: Envolver cada rótulo + campo + Hoje/Ontem num <div> (um bloco por linha no celular), como na janela de confirmar pagamento.
+- [ ] **android-017** [L] Boletos no celular: troca de mês desarrumada e caixinha de marcar sem dizer para que serve
+  - Vê-se: No alto de Boletos, os botões "← 09/2026", o campo "outubro de 2026", "Ir", "11/2026 →" e "E-mails da régua" ficam espalhados em três linhas desalinhadas (o "Ir" sozinho embaixo do campo; "← 09/2026" no meio da altura). Mais abaixo, "Ordenar por:" fica ao lad…
+  - Causa: `docs/js/telas/cobrancas.js:155-158 (navegação do mês) e :203-205 (th e td só com checkbox e title)`
+  - Fazer: No celular, campo do mês + Ir numa linha própria; pôr um texto curto ao lado da caixinha no cartão (ex.: 'marcar').
+- [ ] **iphone-006** [L] Página do boleto não cabe no celular de 320: a tabela do demonstrativo e os botões "Copiar" passam da borda
+  - Vê-se: Em todo boleto, a linha "Aluguel R$ 1.500,00 (Bonif. R$ 1.350,00)" não quebra e empurra a tabela do demonstrativo 22 px para fora do cartão (a página fica com 342 de largura numa tela de 320). O celular encolhe a página inteira ou deixa a tela escorregando pa…
+  - Causa: `docs/js/telas/cobrancas.js:271 + docs/css/estilo.css:42 (td.n nowrap) e estilo.css:158 (.demonstrativo padding 24px)`
+  - Fazer: No celular, '.demonstrativo td.n { white-space: normal }' (ou pôr o '(Bonif. …)' em linha própria) e padding menor no .demonstrativo.
+- [ ] **textos-022** [L] O mês do aluguel tem quatro nomes: "Competência", "Mês de referência", "Mês da conta" e "mês de uso"
+  - Vê-se: Em Boletos: "Competência é o mês de uso do imóvel." Fora dali o sistema usa "Mês de referência" (custos, Airbnb), "Mês da conta" (contas do imóvel), "mês de uso" (ajuda) e "aluguel de novembro". "Competência" é palavra de contador e só é explicada nessa linha.
+  - Causa: `docs/js/telas/cobrancas.js:159; docs/js/telas/financeiro.js:119,215,235; docs/js/telas/banco.js:629,735,736`
+  - Fazer: Escolher um nome com o dono (ex.: "mês de referência") e usar em todos os rótulos.
+- [ ] **mensal-008** [M] Aceita valor recebido negativo e zero: boleto fica "pago" com R$ -100,00 ou R$ 0,00
+  - Vê-se: No boleto de 09/2026 da Beatriz Atrasada digitei "Valor recebido" -100. O sistema mostrou "Recebido: R$ -100,00", pediu a justificativa e gravou: "Paga em parte", valor recebido R$ -100,00, e jogou R$ 1.720,00 para o boleto seguinte. Com valor 0 no boleto de 10/2026: "Paga em parte", recebido R$ 0,00, NF de R$ 1,00 e os R$ 3.340,00 inteiros "entram no próximo boleto". O boleto sai dos vencidos e da Inadimplência sem ter entrado um centavo.
+  - Causa: `docs/js/telas/envios.js:745 e docs/js/regras.js:1849-1862 (sem conferência valor > 0); docs/js/calculos.js:21-32`
+  - Fazer: Recusar valor recebido menor ou igual a zero em confirmarPagamentoBoleto e em registrarPagamento.
+  - Certo é: Recusar valor recebido menor ou igual a zero ("Informe o valor que entrou na conta").
+- [ ] **mensal-014** [M] Ajuste do mês aceita ressarcimento maior que o boleto (total negativo) e valores absurdos
+  - Vê-se: No boleto de 10/2026 do Daniel (R$ 2.400,00) lancei "Ressarcimento (−)" de R$ 5.000,00. Foi salvo sem pergunta: o demonstrativo mostra "Total sem desconto R$ -2.600,00" e "Valor a pagar R$ 0,00"; os R$ 2.600,00 que sobram a favor do inquilino não vão para lugar nenhum (nem para o boleto seguinte), e a página ainda diz "nota fiscal R$ 2.400,00" para um boleto de R$ 0,00. Também aceitou "Cobrança adicional" de R$ 1.000.000.000,00 sem confirmar, e "-30,00" em cobrança adicional virou +R$ 30,00 em silêncio.
+  - Causa: `docs/js/telas/envios.js:530-539 e docs/js/regras.js:2431-2445`
+  - Fazer: Avisar quando o ressarcimento passa do total do boleto e pedir confirmação para valor muito acima do aluguel.
+  - Certo é: Avisar que o ressarcimento é maior que o boleto (e perguntar o que fazer com a sobra) e confirmar valores muito acima do aluguel.
+- [ ] **mensal-023** [M] Índice acumulado aceita 500% e mês que ainda não aconteceu (06/2027) sem perguntar
+  - Vê-se: Incluí INPC de 10/2026 com 500% e IVAR "acumulado até 06/2027" (hoje é 19/11/2026): os dois foram gravados com "Índice salvo.", sem nenhuma pergunta. Um zero a mais no índice (45 em vez de 4,5) já vem preenchido como o reajuste de todos os contratos daquele índice, e o aluguel de R$ 2.000,00 iria a R$ 2.900,00.
+  - Causa: `docs/js/telas/envios.js:555-565`
+  - Fazer: Perguntar antes de gravar percentual muito alto ou muito negativo e recusar mês igual ou depois do atual.
+  - Certo é: Perguntar antes de gravar índice acima de uns 30% (ou abaixo de -10%) e recusar mês que ainda não fechou.
+- [ ] **admin-008** [M] Depois de abrir o backup como ZIP, o aviso manda usar "Importar ZIP em Dados e backup", que não existe na nuvem
+  - Vê-se: Na nuvem (e no celular só existe esta opção), restaurar o backup seguro como ZIP termina com: Backup de 18/11/2026 aberto. Agora use "Importar ZIP" em Dados e backup com o arquivo baixado. Mas a caixa "Importar ZIP" só aparece quando os dados estão numa pasta do computador: na nuvem ela não existe. A explicação do formulário repete: "ZIP: igual ao do Exportar tudo, para guardar ou importar depois". A pessoa fica com o ZIP na mão e sem botão para usar.
+  - Causa: `docs/js/telas/envios.js:94 e docs/js/telas/admin.js:28 x docs/js/telas/admin.js:365`
+  - Fazer: Na nuvem, trocar o texto: dizer que o ZIP é para guardar e que, para voltar os dados, se usa "Backups da nuvem" ou abrir numa pasta do computador e "Substituir os dados da nuvem pelos de uma pasta".
+  - Certo é: Na nuvem, o aviso dizer o caminho que existe (abrir numa pasta nova no computador e depois "Substituir os dados da nuvem pelos de uma pasta", ou "Backups da nuvem").
+- [ ] **entrada-035** [L] Datas da rotina de entrada aceitam qualquer coisa (etapa 'feita' em 2030, contrato 'assinado' no futuro, contra-vistoria antes da entrada)
+  - Vê-se: Nos campos de data da rotina não há limite: 'Marcar feita' com 31/12/2030 grava 'feita em 31/12/2030'; 'Marcar assinado' do contrato, da vistoria e do termo das chaves aceita data futura ou de anos atrás; a contra-vistoria aceita a data 10/11/2026 para um inq…
+  - Causa: `docs/js/telas/envios.js:173-204; docs/js/regras.js:4099-4107, 4225-4232, 4408-4420; docs/js/telas/contrato.js:568, 624, 637`
+  - Fazer: Nas três regras: recusar data depois de hoje; contra-vistoria não antes de data_entrada; pôr max=hoje nos campos de data.
+- [ ] **mensal-007** [L] Boleto de controle (sem NF) fala em "Valor da nota" e "Data da NF"
+  - Vê-se: Ao confirmar o pagamento da Gisele Controle (inquilino sem NF) o aviso diz "Pagamento com 10 dia(s) de atraso: multa R$ 24,07 e juros R$ 4,00. Valor da nota: R$ 1.228,07 (com multa e juros). Data da NF: 20/09/2026." e a caixa Pagamento mostra "Valor da nota f…
+  - Causa: `docs/js/telas/envios.js:775-776 e docs/js/telas/cobrancas.js:357-359`
+  - Fazer: Texto próprio quando o inquilino não emite NF (!R.geraNf(contrato)).
+- [ ] **mensal-010** [L] Baixa em lote "pagaram atrasado" diz "com multa e juros" mas grava em dia quando o vencimento caiu no fim de semana
+  - Vê-se: Boletos de 04/2026 vencem em 10/05/2026 (domingo; valem até segunda 11/05). Na Baixa em lote marquei "pagaram atrasado, em 11/05/2026" com entrada em 21/05/2026. O aviso disse "2 pagamento(s) confirmado(s) com atraso (pagaram em 11/05/2026, com multa e juros)…
+  - Causa: `docs/js/telas/envios.js:128 e 133`
+  - Fazer: Comparar com C.limitePagamento(vencimento) e montar o aviso pelo resultado gravado.
+- [ ] **mensal-042** [L] Pagar a 2ª parcela do complemento antes da 1ª: o aviso diz que a caução passou ao valor cheio
+  - Vê-se: Complemento de R$ 162,00 em 2 boletos de R$ 81,00 (caução de R$ 3.600,00). Confirmando primeiro o pagamento da parcela 2/2, o aviso diz "Complemento da caução pago: a caução passou a R$ 3.762,00", mas a caução de verdade ficou em R$ 3.681,00 (só uma parcela e…
+  - Causa: `docs/js/telas/envios.js:774; docs/js/regras.js:993-1004; docs/js/telas/cobrancas.js:248-249`
+  - Fazer: No aviso, usar R.valorGarantia do contrato depois do pagamento; no demonstrativo do boleto em aberto, calcular "já depositada" na hora e "nova" = já depositada + parcela.
+- [ ] **iphone-013** [L] No Safari do computador o campo do mês vira texto, e mês digitado como 08/2026 é ignorado sem aviso
+  - Vê-se: O iPhone tem a roleta de mês, mas o Safari do Mac (e iPad antigo) não tem campo de mês: aparece uma caixa de texto com "2026-11", sem dizer o formato. Quem digita "08/2026" e aperta "Ir" cai em Boletos sem mês (a tela mostrou "Boletos de 10/2026"), sem nenhum…
+  - Causa: `docs/js/telas/envios.js:32-37 (enderecoDoFormulario + C.sanearParametros) e docs/js/calculos.js:565 (comp/mes só AAAA-MM)`
+  - Fazer: Em enderecoDoFormulario, converter 'MM/AAAA' em 'AAAA-MM' para comp/mes e avisar quando o mês for inválido; pôr placeholder="AAAA-MM" nos campos.
+  - Atenção (conferente): Conferi no código: o formulário do mês manda o que foi digitado para o endereço e o que não está no formato 2026-08 é jogado fora sem aviso; a tela abre no mês padrão. Só acontece em navegador de computador sem o campo de mês (Safari do Mac e Firefox); no Chrome, Edge, iPhone e Android o campo é de escolher e sempre m…

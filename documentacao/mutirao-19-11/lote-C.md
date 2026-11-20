@@ -1,0 +1,107 @@
+# Lote C: Nuvem, usuários, backup e administração
+
+22 itens (0 graves, 9 médios, 13 leves). Arquivos: `backup-seguro.js`, `config-regras.js`, `exportar.js`, `nuvem.js`, `nuvem/aparelhos.mjs`, `nuvem/cofre.mjs`, `pasta-nuvem.js`, `telas/admin.js`, `telas/nuvem.js`, `telas/regras-sistema.js`.
+Como trabalhar: ver `../MUTIRAO_19_11.md`. Marque `[x]` ao corrigir. G = grave, M = médio, L = leve.
+
+- [ ] **textos-020** [L] O arquivo de instruções gravado na pasta do backup seguro está todo sem acentos e fala em "Cloudflare"
+  - Vê-se: O texto que o sistema grava na pasta segura sai assim: "Nao mova nem renomeie os arquivos desta pasta.", "uma copia do banco de dados por dia", "SO EM CASO DE DESASTRE", "o que voce fizer sobe sozinho", "SE O SITE OU O CLOUDFLARE CAIREM". É justamente o papel…
+  - Causa: `docs/js/backup-seguro.js:283-306 (TEXTO_LEIAME) e :309-315 (gravarLeiaMe)`
+  - Fazer: Acentuar o texto e gravar com a marca de início do arquivo (como o "Regras do sistema.txt"); como gravarLeiaMe regrava quando o texto muda, a pasta se atualiza sozinha.
+  - Atenção (conferente): Li o texto de instruções gravado na pasta do backup seguro: está inteiro sem acentos ("Nao mova", "copia", "voce", "SO EM CASO DE DESASTRE") e cita "CLOUDFLARE". Não achei decisão que mande ficar assim (a regra de não usar acento é só para nomes de arquivo). O arquivo "Regras do sistema.txt" já sai acentuado com a mar…
+- [ ] **fios-004** [M] Regra "Prazo do contrato não residencial (meses)" não faz nada: o novo contrato comercial vem sempre com 30 meses
+  - Vê-se: Em Regras do sistema há o campo "Prazo do contrato não residencial (meses)" ("Em branco: digitar em cada contrato"). Gravei 60 (a tela confirma "Regras salvas (1 mudança(s))"), abri Novo contrato e escolhi Finalidade "Não residencial": o prazo continua 30, que é o da regra do contrato residencial. Nenhuma parte do programa lê essa regra. Além disso, o prazo residencial (30) vem preenchido também no contrato não residencial, embora a regra diga que em branco é para digitar em cada contrato.
+  - Causa: `docs/js/config-regras.js:96 (definição sem uso); docs/js/regras.js:8025 (padroesNovoContrato só lê prazo_residencial_padrao)`
+  - Fazer: Ao escolher Finalidade "Não residencial" no Novo contrato, trocar o prazo pelo da regra comercial (ou deixar em branco se a regra estiver em branco), só enquanto o campo estiver com o valor padrão.
+  - Certo é: Com a finalidade "Não residencial", o prazo vem com o da regra (60) ou em branco quando a regra está em branco.
+  - Atenção (conferente): Procurei a regra prazo_comercial_padrao em todo o docs/js: só existe a definição (aparece na tela Regras do sistema); nenhuma parte do programa a lê. O novo contrato usa sempre a regra do residencial (30 meses), qualquer que seja a finalidade. Não achei decisão do dono dizendo que é para ser assim.
+- [ ] **admin-004** [M] A regra "Prazo do contrato não residencial (meses)" não faz nada: o Novo contrato comercial continua vindo com o prazo do residencial
+  - Vê-se: Em Regras do sistema dá para escolher o prazo que "vem preenchido" no contrato não residencial (ex.: 60 meses). O valor é gravado e aparece como "mudada", mas nenhuma tela lê essa regra: o Novo contrato vem sempre com o prazo da regra do residencial (30 meses), também quando a finalidade é "Não residencial". A regra também aparece nas regras especiais, sem efeito.
+  - Causa: `docs/js/config-regras.js:96 (definição sem uso) e docs/js/regras.js:8025 (só prazo_residencial_padrao)`
+  - Fazer: Nos padrões do Novo contrato, usar prazo_comercial_padrao quando a finalidade for não residencial (em branco = sem prazo preenchido), também ao trocar a finalidade no formulário.
+  - Certo é: O prazo trocar para 60 quando a finalidade for não residencial (ou a regra sair da tela).
+- [ ] **admin-020** [M] A lixeira dos anexos não tem tela: o sistema diz que "dá para recuperar", mas não há onde ver nem recuperar o arquivo apagado
+  - Vê-se: A regra explica: "contrato assinado apagado por engano em 10/03 → até 09/04 dá para recuperar", e vários textos falam da "lixeira da nuvem" (Acessos, relatório da substituição, apagar pessoa). Só que em nenhuma tela do sistema existe a lixeira: não há lista dos anexos apagados nem botão para trazer de volta. Hoje o único jeito é o computador que tem o backup seguro (pasta "Apagados na nuvem", ao lado de "Arquivos dos imoveis") ou pedir ao técnico. Quem apagou um anexo por engano no celular não tem o que fazer na t…
+  - Causa: `docs/js/config-regras.js:211-212 (texto da regra); docs/js/telas/nuvem.js:141 e :192; docs/js/telas.js (nenhuma rota de lixeira); nuvem/lixeira.mjs`
+  - Fazer: Fazer a tela "Anexos apagados" em Dados e backup (lista da lixeira da nuvem com "Recuperar"), ou, até lá, dizer no texto da regra onde se recupera (pasta "Apagados na nuvem" no computador do backup seguro).
+  - Certo é: Uma lista "Anexos apagados (últimos 30 dias)" em Dados e backup, com "Recuperar"; ou, no mínimo, a regra e os avisos dizerem onde o arquivo fica (pasta "Apagados na nuvem" do computador do backup seguro).
+- [ ] **impressos-007** [M] Excel de todos os dados: dívida do acordo e valores do FCI saem em centavos (R$ 12.567,36 vira 1256736)
+  - Vê-se: Na planilha de todos os dados, os valores em dinheiro são convertidos de centavos para reais, mas alguns campos ficam de fora da conversão e saem com o número cru. Exemplo da base de teste: na aba dos acordos, a coluna "Divida na data" mostra 1256736 (o certo é R$ 12.567,36), ao lado de "Valor original" 12.000,00 e "Valor total" 10.000,00. O mesmo acontece com "Fci usado" e "Fci devolver" (saídas) e com "diferenca_devida" (pagamento a menos que vai para o boleto seguinte). No PDF de todos os dados esses campos tam…
+  - Causa: `docs/js/exportar.js:17-18 (DINHEIRO e NAO_DINHEIRO) e :41 (valorCelula)`
+  - Fazer: Acrescentar divida, fci e diferenca à lista DINHEIRO e tirar "divida_na_data" da exceção "_data"; teste que percorre os campos em centavos da base.
+  - Certo é: Todos os valores em dinheiro em reais, com o mesmo formato.
+- [ ] **impressos-025** [L] Colunas do Excel com nome sem acento e com jeito de programa: "Divida na data", "Numero", "Dias mes", "Fci devolver", "Valor nf"
+  - Vê-se: Os campos que não estão num formulário de cadastro ganham o nome da coluna a partir do nome interno do campo, sem acento: "Divida na data", "Numero", "Dias mes", "Dias atraso", "Fci devolver", "Fci usado", "Valor nf", "Acordo parcela de", "Desconto pontualida…
+  - Causa: `docs/js/exportar.js:29-36 (rotuloCampo)`
+  - Fazer: Uma tabela pequena de títulos para os campos calculados mais comuns (Dívida na data, Número, Dias do mês, FCI a devolver, Valor da NF...).
+- [ ] **admin-012** [L] Na planilha e no PDF de todos os dados, as regras mudadas saem como dinheiro: dia 25 vira "R$ 0,25", multa de 5% vira "R$ 0,05"
+  - Vê-se: A aba "Regra do sistema" da planilha (e a ficha no PDF) mostra o valor de cada regra mudada como se fosse dinheiro em centavos. Com "Dia de gerar os boletos = 25" sai 0,25 (R$ 0,25 no PDF); com multa de 5% sai R$ 0,05; 60 dias de antecedência saem R$ 0,60.
+  - Causa: `docs/js/exportar.js:17 e :21 (ehDinheiro) e :41-56 (valorCelula/valorTexto); docs/js/regras.js:7917 (formato da linha)`
+  - Fazer: ehDinheiro receber a tabela e devolver falso para config_regras (ou formatar o valor pela definição da regra: dias, %, R$).
+- [ ] **nuvem-008** [M] Login da internet vencido aparece como "esperando internet": as mudanças param de subir e ninguém é avisado para entrar de novo
+  - Vê-se: O login do Cloudflare vale 1 mês. Quando vence com o sistema aberto (aplicativo instalado), cada gravação continua dando "Salvo.", mas fica só no aparelho, e a faixa do topo mostra "⏳ N mudança(s) esperando internet", mesmo com a internet funcionando. A mensagem certa ("Seu acesso pela internet venceu. Recarregue a página para entrar de novo (código no e-mail)") existe no código, mas só aparece ao numerar NF; no dia a dia ela é engolida. Abrir um anexo nessa situação diz "Sem internet: abrir o arquivo precisa de c…
+  - Causa: `docs/js/nuvem.js:267 (passageiro), 766-776 (sincronizar), 807-809 (online = false), 1040-1043; docs/js/app.js:895-897; docs/js/pasta-nuvem.js:47 e 236-243`
+  - Fazer: Guardar o motivo da última falha (acesso vencido) e mostrar na faixa "login da internet vencido: recarregue para entrar de novo", com botão Recarregar.
+  - Certo é: Faixa do topo e um aviso dizendo "Seu acesso pela internet venceu: recarregue para entrar de novo; as N mudanças estão guardadas e sobem em seguida".
+- [ ] **admin-021** [L] O operador que ligou o programa do PC com o seu login não consegue ver nem desligar o próprio computador
+  - Vê-se: A nuvem deixa cada usuário ver e desligar o computador que ele mesmo ligou (programa do PC). Mas a lista "Aparelhos ligados" só existe dentro da tela Usuários, que para quem não é administrador mostra só "Acesso só para administradores". O operador que instal…
+  - Causa: `nuvem/aparelhos.mjs:240 e :254 x docs/js/telas.js:455-457`
+  - Fazer: Mostrar ao operador a lista dos próprios aparelhos (ex.: em Trocar minha senha ou em Dados e backup), com o botão Desligar.
+- [ ] **admin-006** [M] ZIP baixado pelo operador na nuvem sai sem as senhas dos outros usuários, mas conta como "ZIP com todos os dados"
+  - Vê-se: Na nuvem, o aparelho de quem não é administrador recebe os outros usuários sem a senha. O botão "Baixar ZIP com todos os dados" aparece também para o operador e grava no ZIP o que o aparelho tem: o administrador vai sem senha. A tela diz "Os usuários e senhas voltam junto" e o lembrete "Último ZIP com todos os dados baixado em 19/11/2026" passa a contar esse ZIP. Se for esse o ZIP usado num desastre (importar numa pasta), só o operador consegue entrar: o administrador recebe "Login ou senha incorretos" e ninguém c…
+  - Causa: `nuvem/cofre.mjs:398-402 e :412; docs/js/telas/admin.js:360 (botão para quem opera) e :294-300 (lembrete); docs/js/telas/acoes.js:2012-2019`
+  - Fazer: Na nuvem, deixar o ZIP com tudo só para o administrador (ou avisar no ZIP do operador que as senhas dos outros não vão e não contar esse ZIP no lembrete).
+  - Certo é: O ZIP "com todos os dados" ser só do administrador (ou avisar no ZIP e na tela que as senhas dos outros não foram junto, e não contar no lembrete).
+- [ ] **nuvem-016** [L] Na nuvem, "Última atualização … por fulano" muda só porque alguém entrou no sistema (até o usuário de consulta)
+  - Vê-se: Logo depois de o usuário de consulta "co" entrar (sem mudar nada, ele nem pode), a faixa do topo passou a dizer "Última atualização: 20/11/2026, 09:24:41 por co"; com o operador, "por op". Na nuvem, entrar ou sair grava a sessão do login e o servidor conta is…
+  - Causa: `nuvem/cofre.mjs:515-520 (fecharLote); docs/js/app.js:153-160 (soSessao ignorado na nuvem), 86-92 e 864`
+  - Fazer: No cofre, não mexer em revisao/atualizado_em/atualizado_por quando o lote só muda sessões ou senha do próprio usuário (mesmo teste de soProprioAcesso).
+- [ ] **nuvem-009** [M] Mudar o nome do inquilino ou do imóvel sem internet deixa a pasta dos anexos com o nome antigo para sempre
+  - Vê-se: Sem internet, editar o inquilino (ex.: corrigir o nome, ou registrar a saída, que põe a data no nome da pasta) grava o cadastro com a pasta nova e mostra o aviso "Não consegui renomear a pasta … Sem internet: … precisa de conexão". Quando a internet volta, o cadastro sobe apontando para a pasta nova, mas ninguém refaz a troca do nome na nuvem: os arquivos continuam na pasta antiga. Os comprovantes ligados a lançamentos são copiados de volta pela conferência do Painel (ficando em dobro, na pasta velha e na nova), e…
+  - Causa: `docs/js/pasta-nuvem.js:287-296 (mover) e 456-461; docs/js/armazenamento.js:273-299; docs/js/telas/comum.js:1098-1107 (renomearNoDisco) e 922-924; docs/js/telas/cadastros.js:498-511`
+  - Fazer: Guardar o "mover pasta" pendente no aparelho e refazer quando a internet voltar (junto de enviarFila); ou não deixar mudar nome/datas que trocam a pasta estando sem internet.
+  - Certo é: A troca do nome da pasta fica guardada na fila e é feita quando a internet voltar (como os anexos), ou a tela não deixa mudar o nome sem internet.
+- [ ] **nuvem-011** [L] Na nuvem dá para "Exportar tudo em ZIP … para levar para outro computador", mas não existe como importar esse ZIP
+  - Vê-se: Em Dados e backup, na nuvem, a caixa "Exportar tudo em ZIP" diz "para guardar ou levar para outro computador", mas a caixa "Importar ZIP" só existe no modo pasta. Na nuvem, o único caminho para voltar um ZIP é descompactar numa pasta do computador e usar "Ava…
+  - Causa: `docs/js/telas/admin.js:360 (texto), 365 (Importar ZIP só sem nuvem), 347-349 (Avançado)`
+  - Fazer: Na nuvem, trocar o texto da caixa do ZIP (serve para guardar; para voltar: descompactar e usar "Substituir…" ou os Backups da nuvem).
+  - Atenção (conferente): Na nuvem a caixa do ZIP diz "para guardar ou levar para outro computador", mas "Importar ZIP" só é desenhada fora da nuvem, e o texto do "Avançado" não fala em ZIP descompactado. Não ter Importar ZIP na nuvem foi escolha (DECISOES 2026-11-06: a passagem é pela pasta, alternativa "Importar ZIP" descartada); o que sobra…
+- [ ] **android-015** [L] Textos que falam de computador, mouse e Ctrl+C aparecem no celular
+  - Vê-se: No celular o Painel diz "Backup seguro não está ligado neste computador" e oferece o botão "Não avisar neste computador"; em Dados e backup, "Não configurado neste computador"; no IPTU, "passe o mouse para ver o valor"; e, quando a cópia do texto do e-mail fa…
+  - Causa: `docs/js/telas/admin.js:153-154 e :355; docs/js/telas/consultas.js:243; docs/js/telas/emails.js:151 e :255; docs/js/telas/acoes.js:1358`
+  - Fazer: Trocar 'computador' por 'aparelho' nesses avisos, 'passe o mouse' por 'toque' no celular e 'Ctrl+C' por 'selecione e copie'.
+  - Atenção (conferente): Li o código e os textos existem: 'Não avisar neste computador' e 'Não configurado neste computador' (backup seguro), 'passe o mouse para ver o valor' (IPTU) e 'use Ctrl+C' quando a cópia falha (janela do e-mail e cópia de texto). Aparecem iguais no celular. Ressalva: na nuvem (uso real) o aviso do Painel diz 'em nenhu…
+- [ ] **android-018** [L] Dados e backup no celular: botões empilhados sem espaço e botão no meio da frase
+  - Vê-se: Na caixa "Dados de uma pessoa (LGPD)", os botões "Dados de uma pessoa" e "Pessoas com mais de 10 anos do fim do contrato" ficam um em cima do outro, encostados (0 de distância). Nas caixas "Exportar tudo em ZIP" e "Compactar os anexos" o botão "Regras do sist…
+  - Causa: `docs/js/telas/admin.js:375 (dois botões num <p>) e :371 (link('#/regras', 'Regras do sistema') sem classe; o padrão de link() em comum.js:24 é 'botao secundario pequeno')`
+  - Fazer: Trocar o <p> por <p class="acoes"> na caixa LGPD e passar classe vazia ao link dentro das frases (link de texto).
+- [ ] **iphone-020** [L] Backup seguro no celular explica "Abrir numa pasta" e "Substituir os dados da nuvem", que ali não existem
+  - Vê-se: No iPhone a tela avisa "Faça isto no computador (Chrome ou Edge)" e, em Restaurar, só sobra baixar o ZIP (a escolha "Abrir numa pasta nova do computador" é escondida). Mas o parágrafo de baixo continua: "Abrir numa pasta: escolha uma pasta nova e vazia… Dados…
+  - Causa: `docs/js/telas/admin.js:26 (esconde a opção) e admin.js:28 (parágrafo fixo)`
+  - Fazer: Mostrar a parte "Abrir numa pasta" do parágrafo só quando S.suportado(); senão, dizer que abrir numa pasta se faz no computador.
+  - Atenção (conferente): Conferi: no aparelho que não grava em pasta (iPhone, Safari, Firefox) a escolha "Abrir numa pasta nova" é escondida, mas o parágrafo logo abaixo, que explica "Abrir numa pasta" e "Substituir os dados da nuvem pelos de uma pasta", sai sempre. Texto que não se aplica ao aparelho.
+- [ ] **textos-009** [L] A descrição dos Modelos de e-mail está desatualizada: não cita a régua de cobrança, a notificação, o novo valor nem o termo aditivo
+  - Vê-se: Em Dados e backup e no alto de Modelos de e-mail está: "Um e-mail para cada etapa da ficha, da entrada e da saída do inquilino, e o informe anual do Imposto de Renda". A lista logo abaixo tem também "Lembrete antes do vencimento", "Lembrete no dia do vencimen…
+  - Causa: `docs/js/telas/admin.js:380; docs/js/telas/emails.js:311`
+  - Fazer: Atualizar as duas frases citando também a régua de cobrança, as notificações e os termos aditivos.
+- [ ] **textos-024** [L] O lugar dos dados tem três nomes: "a nuvem", "o servidor da nuvem" e "o Cloudflare"
+  - Vê-se: Dados e backup: "Pasta dos dados: na nuvem (Cloudflare)", "Na nuvem, tudo é gravado no Cloudflare", "perder a conta do Cloudflare", "É a segunda camada, fora do Cloudflare". Em outras telas o mesmo lugar é "a nuvem" ou "o servidor da nuvem" (Backups da nuvem,…
+  - Causa: `docs/js/telas/admin.js:345,352; docs/js/telas/nuvem.js:124,177`
+  - Fazer: Usar "a nuvem" em todo lugar e explicar uma vez que a nuvem fica na empresa Cloudflare.
+- [ ] **admin-011** [M] Conflitos para o administrador escolher aparecem com nome técnico do campo e valores crus (centavos, datas AAAA-MM-DD)
+  - Vê-se: Na tela em que o administrador tem de escolher "Fica o 1º" ou "Fica o 2º", a coluna Campo mostra o nome interno (ex.: aluguel_inicial, dia_vencimento, perfil_regras_id) e os valores vêm crus: 180000 e 190000 para R$ 1.800,00 e R$ 1.900,00, 2026-12-10 para 10/12/2026, listas em formato de programa. As "mudanças recusadas" seguem igual ("aluguel_inicial «180000» → «190000»"). É uma decisão que vale para todos os aparelhos, tomada lendo código.
+  - Causa: `docs/js/telas/nuvem.js:11-15, :39 e :61-63`
+  - Fazer: Usar rotuloCampo e valorTexto de exportar.js (já usados no Desfazer) nas duas listas.
+  - Certo é: Nome do campo como no formulário, dinheiro em reais, datas em dia/mês/ano.
+- [ ] **textos-003** [M] Conflitos da nuvem mostram o nome interno do campo e o valor cru (centavos, data ao contrário, texto de programa)
+  - Vê-se: Na tabela "Para escolher" a coluna Campo mostra o nome interno (ex.: "valor_pago", "data_pagamento", "inquilino_telefone") e os valores saem como estão guardados: R$ 1.800,00 aparece "180000", 10/12/2026 aparece "2026-12-10" e um campo com lista aparece como texto de programa ({"a":1,...} cortado em 200 letras). É com isso que o administrador tem de escolher "Fica o 1º" ou "Fica o 2º". O mesmo vale para a lista das "Mudanças recusadas pela nuvem" (ex.: "Boleto nº 12: valor_pago «180000» → «185000»"). A tela também…
+  - Causa: `docs/js/telas/nuvem.js:11-15, :44, :60-62`
+  - Fazer: Mostrar o rótulo do campo (o do formulário) e formatar dinheiro em R$ e data em dd/mm/aaaa; pôr "← Painel" no alto.
+  - Certo é: Nome do campo como no formulário ("Valor pago", "Data do pagamento"), dinheiro em R$ e data em dd/mm/aaaa.
+- [ ] **nuvem-006** [L] A tela de Conflitos mostra o nome interno do campo e o valor cru, difíceis de entender
+  - Vê-se: Na coluna "Campo" aparece o nome de programador ("nome", "pasta", "valor_aluguel", "doc_contrato_em") e nas colunas "1º valor" e "2º valor" o dado como está gravado: dinheiro em centavos (180000 em vez de R$ 1.800,00), data como 2026-02-15 (em vez de 15/02/20…
+  - Causa: `docs/js/telas/nuvem.js:11-15 (valorTexto), 39-41, 60-64 e 83`
+  - Fazer: Mostrar o rótulo do formulário e formatar pelo tipo do campo (reais, dataBr, sim/não); ajustar o texto de cima.
+- [ ] **admin-015** [L] Nas regras de número inteiro, "2,5" é gravado como 3 e "1.5" como 15, sem aviso
+  - Vê-se: Nos campos de número inteiro (ex.: "Avisar quando a caução passar de quantos aluguéis", prazos em dias), o que for digitado com vírgula é arredondado calado (2,5 → 3) e o ponto é tratado como separador de milhar (1.5 → 15). A mensagem é só "Regras salvas (1 m…
+  - Causa: `docs/js/telas/regras-sistema.js:207 (numero) e docs/js/config-regras.js:296-297 (Math.round)`
+  - Fazer: Em regra de número inteiro, recusar valor com vírgula ou ponto com a mensagem "informe um número inteiro".

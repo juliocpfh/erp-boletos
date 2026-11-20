@@ -1,0 +1,103 @@
+# Lote E: E-mails e notificações
+
+22 itens (0 graves, 5 médios, 17 leves). Arquivos: `email-dados.js`, `modelos-email.js`, `telas/emails.js`, `telas/notificacoes.js`, `telas/regua.js`.
+Como trabalhar: ver `../MUTIRAO_19_11.md`. Marque `[x]` ao corrigir. G = grave, M = médio, L = leve.
+
+- [ ] **saida-013** [M] E-mail do acerto final não fecha a conta quando o inquilino tem FCI
+  - Vê-se: O termo de quitação mostra as linhas "(-) Reparos pagos pelo FCI" e "(-) Reparos além do FCI" para a soma bater com o saldo. O e-mail do acerto final não tem essas linhas. Ex.: garantia corrigida R$ 5.940,00, FCI corrigido R$ 1.200,00, reparos R$ 800,00 pagos com o FCI, débitos R$ 1.000,00: o e-mail lista 5.940,00 + 1.200,00 − 1.000,00 e termina com "= Saldo a devolver: R$ 5.340,00" (pela lista seriam R$ 6.140,00). O inquilino recebe uma conta que não fecha.
+  - Causa: `docs/js/email-dados.js:48-57 (textoAcerto) comparado com docs/js/recibos.js:231-235 e docs/js/regras.js:2502-2507`
+  - Fazer: Fazer o e-mail usar as mesmas linhas do termo de quitação (uma função só para os dois).
+  - Certo é: O e-mail traz as mesmas linhas do termo de quitação.
+- [ ] **entrada-010** [L] E-mail de ficha aprovada sai com "[preencher: valor_deposito]" no meio do texto
+  - Vê-se: Com garantia Caução, o texto do e-mail "Ficha aprovada" vem: "Próximos passos: contrato para assinar em até 2 dias úteis, depósito de [preencher: valor_deposito] da caução...". Na ficha não existe campo para o valor da caução, então isso acontece em toda fich…
+  - Causa: `docs/js/email-dados.js:157 (valorDeposito = 0 sem contrato) e :172; docs/js/modelos-email.js:70`
+  - Fazer: Na ficha com caução, calcular o valor pela regra (meses × aluguel com bonificação) ou escrever a frase sem o valor quando ele não existe.
+- [ ] **entrada-037** [L] Com dois fiadores, o e-mail de envio da ficha só leva o link do primeiro
+  - Vê-se: A ficha comporta dois fiadores e cada um tem o seu link. O e-mail 'Envio de ficha cadastral' escreve 'Link do fiador (encaminhe para ele): …' só com o link do fiador 1; o do segundo fiador nunca entra, embora o mesmo e-mail anexe a ficha em PDF dos dois e dig…
+  - Causa: `docs/js/email-dados.js:188, 198; docs/js/modelos-email.js:46-47`
+  - Fazer: Campo com uma linha por fiador que tenha link válido na aba ("Link de <nome>: …").
+- [ ] **comunicacoes-032** [L] O e-mail de boas-vindas diz que as chaves foram entregues na data de entrada do contrato, mesmo que a entrega tenha sido em outro dia
+  - Vê-se: "As chaves foram entregues em {data_chaves}" e o prazo "até {data_limite_vistoria} (5 dias úteis)" usam sempre a data de entrada do contrato. Se a entrada é 01/12/2026 e as chaves foram entregues em 04/12/2026, o e-mail sai com 01/12 e o prazo para reclamar d…
+  - Causa: `docs/js/email-dados.js:162 e :177-178 (data_chaves e data_limite_vistoria = c.data_entrada); mesmo critério em docs/js/regras.js:4219`
+  - Fazer: Usar a data do termo das chaves assinado (doc_chaves_em) quando existir, senão a data de entrada, no e-mail e na etapa Contra-vistoria ao mesmo tempo (para não darem prazos diferentes).
+  - Atenção (conferente): O e-mail de boas-vindas tira "chaves entregues em" e o prazo de 5 dias úteis da data de entrada do contrato, não do dia em que o termo das chaves foi assinado (que o sistema guarda em doc_chaves_em). Entrada 01/12/2026 e chaves em 04/12/2026: o e-mail diz 01/12 e o prazo sai mais curto. A decisão de 13/11 e 15/11 fala…
+- [ ] **entrada-014** [M] E-mail do contrato assinado diz "Recebemos também a caução de R$ 4.860,00 (recibo e comprovante anexos)" sem ter recebido nada
+  - Vê-se: Com o contrato assinado anexado mas a caução ainda sem nenhum depósito (etapa 4 "pendente", "depositado R$ 0,00 · falta R$ 4.860,00"), o e-mail da etapa 3 sai com a frase "Recebemos também a caução de R$ 4.860,00 (recibo e comprovante anexos)". A janela até mostra "Recibo da garantia: Registre antes o depósito", mas o texto vai assim e foi enviado com 1 anexo só (o contrato).
+  - Causa: `docs/js/modelos-email.js:126 ([se dinheiro]); docs/js/email-dados.js:41-45 (não existe condição de garantia depositada)`
+  - Fazer: Criar a condição "garantia depositada" nos dados do e-mail e usar: depositada = frase atual; senão = "falta o depósito da caução de R$ ...".
+  - Certo é: A frase da caução só aparecer quando o depósito está registrado (e o recibo existe); antes disso, dizer "falta o depósito da caução de R$ 4.860,00".
+- [ ] **saida-015** [M] Multa por saída antes do fim do contrato é prometida "no acerto final", mas o cálculo final não calcula nem lembra
+  - Vê-se: O e-mail do aviso de saída diz, quando a saída é antes do fim do prazo: "multa de 3 aluguéis, proporcional ao tempo que falta, no acerto final". Na tela do cálculo final os débitos vêm só com boletos em aberto e reparos; não há linha, valor sugerido nem aviso da multa. O operador precisa lembrar e fazer a conta à mão (ex.: aluguel de R$ 2.000,00, faltam 10 de 30 meses → R$ 2.000,00).
+  - Causa: `docs/js/modelos-email.js:182-184; docs/js/email-dados.js:196; docs/js/telas/cadastros.js:935-950`
+  - Fazer: No cálculo final, quando data_saida for antes do fim do contrato, mostrar o aviso com o valor proporcional sugerido da multa (para incluir ou dispensar).
+  - Certo é: O cálculo final mostrar, na saída antecipada, o valor proporcional sugerido da multa (para incluir ou dispensar com o motivo).
+- [ ] **entrada-013** [L] E-mail "Segue o contrato de locação" é enviado sem o contrato anexado
+  - Vê-se: O e-mail "Contrato para assinar" diz "Segue o contrato de locação do imóvel...", mas o "Enviar agora" manda sem nenhum anexo: a janela só tem a frase "Anexar: Contrato (PDF)" no alto e a confirmação diz "O e-mail vai agora para carlos@exemplo.com.br, sem anex…
+  - Causa: `docs/js/modelos-email.js:101-103 (sem "prontos"); docs/js/telas/emails.js:115 e :172`
+  - Fazer: Gerar o PDF do contrato como anexo pronto deste e-mail, ou destacar em vermelho na confirmação quando o texto diz "Segue o contrato" e não há anexo.
+- [ ] **saida-014** [L] E-mail diz "Segue o boleto do saldo", mas o sistema não gera boleto do saldo da saída
+  - Vê-se: Quando a garantia não cobre os débitos (ex.: saldo a cobrar de R$ 300,00), o e-mail do acerto final diz "Segue o boleto do saldo, com o vencimento nele". Não existe no sistema nenhum botão que gere esse boleto: a etapa só tem "Marcar saldo cobrado".
+  - Causa: `docs/js/modelos-email.js:237`
+  - Fazer: Trocar a frase pelos dados de pagamento (Pix/conta da empresa) ou criar o boleto avulso do saldo.
+  - Atenção (conferente): O modelo do e-mail diz "Segue o boleto do saldo, com o vencimento nele" quando o saldo é a cobrar; o sistema não tem como gerar boleto do saldo da saída (boleto avulso só existe para complemento da caução e parcela de acordo). Se o dono costuma emitir esse boleto direto no banco, o texto pode ficar; é escolha dele.
+- [ ] **saida-019** [M] Notificação com data futura: o e-mail sai, mas o envio não fica registrado
+  - Vê-se: A tela aceita criar a notificação com data futura (ex.: datada de 25/11/2026, feita em 20/11). Ao mandar pelo "Enviar agora", o e-mail vai ao inquilino e, na hora de gravar, o sistema recusa com "O envio não pode ser antes da data da notificação (25/11/2026)": nem o envio do e-mail nem o "enviada" ficam registrados, a notificação continua Rascunho e o prazo não corre, embora o inquilino já tenha recebido.
+  - Causa: `docs/js/telas/emails.js:175-176 e 41-42; docs/js/regras.js:5807 e 5753-5770`
+  - Fazer: Recusar data futura em conferirNotificacao e conferir a notificação antes de mandar o e-mail.
+  - Certo é: Não deixar datar a notificação no futuro, ou conferir a data antes de mandar o e-mail.
+- [ ] **android-020** [M] Na janela do e-mail, os avisos dos botões aparecem atrás da janela: parece que o botão não fez nada
+  - Vê-se: No celular a janela do e-mail ocupa a tela inteira (412 x 803 numa tela de 839). Os avisos que os botões dela dão ("Assunto e texto copiados: cole no e-mail", "Digite o e-mail do destinatário", "Ainda há [preencher: ...] no texto", "Marque pelo menos um anexo", "Gmail aberto. O texto é comprido... ele foi copiado") são escritos no topo da página que está atrás da janela. No teste, tocando em "Copiar texto" o aviso ficou 4.178 px acima da tela, escondido. Quem toca em "Enviar agora" sem destinatário, ou com um [pre…
+  - Causa: `docs/js/telas/emails.js:143, 151, 161, 166-167 (aviso(..., 'aviso'/'ok') com o dialog aberto) + docs/js/app.js:467-473 e :968 (#mensagens dentro do <main>)`
+  - Fazer: Dentro da janela do e-mail, mostrar o aviso num parágrafo da própria janela, perto dos botões (ou usar janela de aviso por cima).
+  - Certo é: O aviso aparecer dentro da própria janela, perto do botão tocado.
+- [ ] **comunicacoes-021** [L] "Abrir no Gmail" não avisa do "[preencher: …]" e marca "aberto em" mesmo se o Gmail não abriu
+  - Vê-se: Na janela do e-mail, "Enviar agora" barra texto com "[preencher: …]" e "Copiar texto" avisa; "Abrir no Gmail" abre o rascunho com o buraco no texto sem dizer nada. Além disso o sistema não confere se a aba do Gmail abriu (bloqueador de janelas): mostra "Gmail…
+  - Causa: `docs/js/telas/emails.js:147-156; comparar :134, :144 e :166`
+  - Fazer: Avisar do "[preencher: …]" antes de abrir o Gmail.
+- [ ] **comunicacoes-022** [L] Assunto corrigido à mão é trocado de volta quando se mexe numa resposta da janela
+  - Vê-se: O texto alterado à mão é preservado (aparece "Texto alterado à mão…"), mas o Assunto não: se a pessoa corrige o assunto e depois muda, por exemplo, "Devolver assinado até", o assunto volta ao do modelo sem aviso.
+  - Causa: `docs/js/telas/emails.js:124-128`
+  - Fazer: Marcar o assunto como editado ao digitar e não sobrescrever.
+- [ ] **comunicacoes-023** [L] No celular, o botão Voltar com a janela do e-mail aberta troca a tela por trás e a janela continua aberta
+  - Vê-se: As outras janelas do sistema fecham com o Voltar do aparelho. A janela do e-mail não tem esse cuidado: o Voltar muda a página que está por trás (ex.: sai da página do inquilino para a lista) e a janela do e-mail continua por cima, com os botões "Enviar agora"…
+  - Causa: `docs/js/telas/emails.js:104 e :185-186 (sem popstate); comparar docs/js/app.js:564-581 e :1477`
+  - Fazer: Usar na janela do e-mail o mesmo cuidado de app.js (entradaDaJanela/popstate): o Voltar fecha a janela.
+- [ ] **comunicacoes-024** [L] A ajuda "Como escrever" dos modelos de e-mail não lista vários campos que os modelos usam
+  - Vê-se: Faltam na lista: {link}, {link_validade}, {link_fiador}, {documentos_ficha}, {inclusos}, {iptu_valor}, {seguro_valor}, {devolucao}, {devolucao_data}, {ano_saida}, {valor_anterior}, {valor_novo}, {novo_inicio}, {novo_bonificado}, {aditivo_data}, {aditivo_assun…
+  - Causa: `docs/js/telas/emails.js:295-303 e :309; docs/js/modelos-email.js`
+  - Fazer: Completar a lista da ajuda (ou montá-la a partir dos campos de dadosDoEmail).
+- [ ] **admin-022** [L] Mensagens ao dono citam arquivos e nomes do programador (documentacao/LIGAR_GMAIL.md, nuvem/README.md, GMAIL_CLIENT_ID, chaves VAPID)
+  - Vê-se: Na caixa do Gmail: "Falta um passo antes de conectar: no Cloudflare, os segredos GMAIL_CLIENT_ID e GMAIL_CLIENT_SECRET... (passo a passo em documentacao/LIGAR_GMAIL.md)" e, no erro, "veja o passo a passo (documentacao/LIGAR_GMAIL.md)". No aviso do celular: "a…
+  - Causa: `docs/js/telas/emails.js:195, :198 e :227; docs/js/ficha-online.js:249`
+  - Fazer: Trocar por texto simples ("falta uma configuração na nuvem: peça ao técnico") sem nome de arquivo nem de segredo.
+  - Atenção (conferente): Li os três textos: a caixa do Gmail cita os segredos GMAIL_CLIENT_ID/GMAIL_CLIENT_SECRET e "documentacao/LIGAR_GMAIL.md"; o aviso do celular cita "chaves VAPID" e "nuvem/README.md". São arquivos do repositório, que o dono não abre pela tela. Só aparecem enquanto a ligação não foi feita (o Gmail já está ligado desde 18…
+- [ ] **android-003** [L] Voltar do aparelho com a janela do e-mail (ou de erro) aberta troca a tela de trás e a janela continua aberta
+  - Vê-se: Na ficha da Maria toquei em "✉ E-mail: envio da ficha cadastral". Com a janela aberta, apertei o Voltar do celular para fechá-la: a janela continuou aberta e a tela de trás mudou para a página anterior (saiu da ficha e foi para a página do inquilino). O mesmo…
+  - Causa: `docs/js/telas/emails.js:104-186 (dialog próprio, sem entradaDaJanela/popstate) e docs/js/app.js:535-543 (janelaErro, idem); comparar com janela() em app.js:549-585`
+  - Fazer: Abrir as duas pela mesma mecânica de janela() (entradaDaJanela + popstate) e pôr um ✕ Fechar no alto da janela do e-mail.
+  - Atenção (conferente): Li o código: a janela do e-mail e a janela de erro ('Entendi') não usam o esquema das outras janelas (entrada própria no histórico). Então 'voltar' no histórico (gesto de voltar do iPhone, botão Voltar do navegador no PC) troca a tela de trás e a janela fica aberta. Ressalva: no Chrome atual do Android o botão Voltar …
+- [ ] **android-021** [L] Janela do e-mail no celular: Fechar, Copiar texto, Abrir no Gmail e Enviar só aparecem depois de rolar tudo
+  - Vê-se: A janela tem 980 px de conteúdo numa tela de 839: os botões ficam no fim (a 946 px), abaixo do texto de 16 linhas. Para fechar a janela é preciso rolar até o fim dela (o Voltar do aparelho não fecha, achado android-003).
+  - Causa: `docs/js/telas/emails.js:106-121 (botões no fim; textarea rows=16); docs/css/estilo.css:290-297 (janela sem rodapé fixo; não há regra para .janela-email)`
+  - Fazer: No celular: .janela-email .acoes { position: sticky; bottom: 0; background: #fff } e textarea com menos linhas; ✕ no alto.
+- [ ] **textos-008** [L] A caixa do Gmail fala em "segredos GMAIL_CLIENT_ID", "Client Secret", "GMAIL_REFRESH_TOKEN" e manda ler um arquivo que o dono não abre pela tela
+  - Vê-se: Textos como estão: "Falta um passo antes de conectar: no Cloudflare, os segredos GMAIL_CLIENT_ID e GMAIL_CLIENT_SECRET da credencial "Aplicativo da Web" do Google Cloud (passo a passo em documentacao/LIGAR_GMAIL.md)."; "A autorização guardada não abre mais (o…
+  - Causa: `docs/js/telas/emails.js:195,198,220,226,227,246`
+  - Fazer: Reescrever em português simples ("falta terminar a configuração no Cloudflare; peça ao técnico") e deixar os nomes técnicos entre parênteses.
+  - Atenção (conferente): Conferi a caixa do Gmail: os avisos citam "segredos GMAIL_CLIENT_ID e GMAIL_CLIENT_SECRET", "Client Secret", "GMAIL_REFRESH_TOKEN" e "documentacao/LIGAR_GMAIL.md" (arquivo que não abre pela tela). Só aparecem em situação de configuração ou erro; com o Gmail já ligado (18/11) o dono quase não vê. As linhas certas são 1…
+- [ ] **saida-020** [L] Botão "✉ Lembrete do prazo" continua depois que o prazo venceu, com texto de "termina em"
+  - Vê-se: Numa notificação com "Prazo para resolver: venceu em 08/10/2026", a mesma linha ainda oferece "✉ Lembrete do prazo". O e-mail desse botão diz "O prazo da notificação ... termina em 08/10/2026", uma data que já passou.
+  - Causa: `docs/js/telas/notificacoes.js:159; docs/js/modelos-email.js:337-342`
+  - Fazer: Mostrar o lembrete só enquanto o prazo não venceu (e.restam >= 0).
+- [ ] **saida-029** [L] "Enviar agora" marca a notificação como enviada sem a assinada e sem perguntar; marcar à mão pergunta
+  - Vê-se: Ao marcar o envio pelo formulário ("Marcar como enviada") sem a notificação assinada anexada, o sistema pergunta "A notificação assinada ainda não foi anexada. Marcar como enviada mesmo assim?". Pelo e-mail ("Enviar agora"), vai o PDF sem assinatura (o anexo …
+  - Causa: `docs/js/telas/notificacoes.js:218 comparado com docs/js/telas/emails.js:172 e 41-42; docs/js/email-dados.js:261-264`
+  - Fazer: Na pergunta do "Enviar agora" da notificação, dizer em destaque que vai o PDF sem assinatura e pedir confirmação.
+- [ ] **saida-030** [L] Notificação cancelada sem nunca ter sido enviada mostra ✅ em "Prazo para resolver"
+  - Vê-se: Cancelando um rascunho, as etapas ficam: ⬜ Enviada ao inquilino, ✅ Prazo para resolver, ⬜ Resolvido (cancelada em ...). O ✅ no prazo não faz sentido para uma notificação que não chegou a ser enviada.
+  - Causa: `docs/js/telas/notificacoes.js:159`
+  - Fazer: Marcar a etapa só quando a notificação foi enviada e resolvida (não na cancelada).
+- [ ] **links-pc-011** [L] Título da tela (e da aba do navegador) não diz qual é: "E-mails da régua" abre com título "Boletos"; seis telas diferentes se chamam "Financeiro"
+  - Vê-se: O botão "E-mails da régua" (em Boletos) abre uma tela cujo título é "Boletos" e a aba do navegador fica "Boletos · Imóveis". Resultado bruto, Resultado líquido, Impostos, Inadimplência, Caução e Visão geral têm todas o título "Financeiro" (aba "Financeiro · I…
+  - Causa: `docs/js/telas/regua.js:63; docs/js/telas/financeiro.js:41, 165, 258, 288, 326, 416; docs/js/app.js:1037-1039`
+  - Fazer: Título próprio em cada tela ("E-mails da régua"; "Financeiro · Impostos" etc.).
