@@ -18,9 +18,9 @@ export function telaFechamento(mes) {
   return `<div class="cabecalho"><h1>Fechamento de ${compBr(mes)}</h1>
       <div class="acoes">${link(`#/fechamento?mes=${C.somarMeses(mes, -1)}`, `← ${compBr(C.somarMeses(mes, -1))}`, 'botao secundario')}
       ${link(`#/fechamento?mes=${C.somarMeses(mes, 1)}`, `${compBr(C.somarMeses(mes, 1))} →`, 'botao secundario')}</div></div>
-    <div class="alerta ${faltam ? 'aviso' : 'ok'}">${faltam ? `Faltam <b>${faltam}</b> de ${etapas.length} etapas.` : etapas.some((e) => e.prevista) ? 'O que já está liberado foi feito; falta o que é previsto para depois.' : 'Fechamento concluído.'} As etapas ficam feitas sozinhas quando não há pendência; dá para marcar à mão quando já resolveu de outro jeito.</div>
+    <div class="alerta ${faltam ? 'aviso' : 'ok'}">${faltam ? `${faltam === 1 ? 'Falta' : 'Faltam'} <b>${faltam}</b> de ${C.plural(etapas.length, 'etapa')}.` : etapas.some((e) => e.prevista) ? 'O que já está liberado foi feito; falta o que é previsto para depois.' : 'Fechamento concluído.'} As etapas ficam feitas sozinhas quando não há pendência; dá para marcar à mão quando já resolveu de outro jeito.</div>
     <div class="cartao"><ol class="fechamento">${etapas.map((e) => `<li class="${e.feito ? 'feito' : ''}">
-      <div class="cabecalho"><div><b>${esc(e.titulo)}</b> ${e.feito ? etiqueta(e.marcado ? `marcado em ${dataBr(e.marcado.feito_em)}` : 'feito', 'ok') : e.prevista ? etiqueta(String(e.titulo).includes(dataBr(e.aPartirDe)) ? 'previsto' : `previsto a partir de ${dataBr(e.aPartirDe)}`, 'neutra') : etiqueta(`${e.pendentes} pendente(s)`, 'aviso')}
+      <div class="cabecalho"><div><b>${esc(e.titulo)}</b> ${e.feito ? etiqueta(e.marcado ? `marcado em ${dataBr(e.marcado.feito_em)}` : 'feito', 'ok') : e.prevista ? etiqueta(String(e.titulo).includes(dataBr(e.aPartirDe)) ? 'previsto' : `previsto a partir de ${dataBr(e.aPartirDe)}`, 'neutra') : etiqueta(C.plural(e.pendentes, 'pendente', 'pendentes'), 'aviso')}
         <div class="suave">${esc(e.detalhe)}</div>
         ${e.chave === 'contas' && e.imoveis && e.imoveis.length ? `<div class="acoes" style="margin-top:4px">${e.imoveis.map((id) => link(`#/contas/${id}?comp=${esc(mes)}`, `Lançar: ${esc(buscar('imoveis', id).nome)}`, 'botao secundario pequeno')).join(' ')}</div>` : ''}</div>
         <div class="acoes">${link(e.link, 'Abrir', 'botao pequeno')}

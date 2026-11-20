@@ -194,7 +194,7 @@ export function cartaReajuste(c, comp) {
       <tr><td>Aluguel</td><td class="n">${reais(k.atual)}</td><td class="n"><b>${reais(k.novo)}</b></td></tr>
       ${k.bonificacao ? `<tr><td>Aluguel com bonificação (pagamento em dia)</td><td class="n">${reais(k.atualBonificado)}</td><td class="n"><b>${reais(k.novoBonificado)}</b></td></tr>` : ''}</table>
     <p>O novo valor será cobrado a partir do boleto do aluguel de <b>${compBr(comp)}</b>, com vencimento em <b>${dataBr(vencNovo)}</b>.${caucao ? '' : ' As demais condições do contrato permanecem as mesmas.'}</p>
-    ${caucao ? `<p>Conforme o contrato, a caução dada em garantia equivale a <b>${caucao.meses} aluguéis</b> e acompanha o valor do aluguel corrigido. Por isso é necessário um depósito adicional:</p>
+    ${caucao ? `<p>Conforme o contrato, a caução dada em garantia equivale a <b>${C.plural(caucao.meses, 'aluguel', 'aluguéis')}</b> e acompanha o valor do aluguel corrigido. Por isso é necessário um depósito adicional:</p>
     <table class="carta-tabela"><tr><td>Caução já depositada</td><td class="n">${reais(caucao.atual)}</td></tr>
       <tr><td>Caução necessária (${caucao.meses} × aluguel atualizado)</td><td class="n">${reais(caucao.nova)}</td></tr>
       <tr><td><b>Depósito adicional</b></td><td class="n"><b>${reais(caucao.nova - caucao.atual)}</b></td></tr></table>

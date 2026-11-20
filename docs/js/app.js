@@ -893,8 +893,8 @@ function atualizarFaixa() {
   if (!el || !E.d) return;
   if (E.nuvem) {
     const n = E.nuvem.pendentesQtd() + (E.anexos?.fila?.length || 0); const cf = E.nuvem.conflitos.length; const rc = E.nuvem.recusas.length;
-    const avisos = [cf && (podeUsuario('admin') ? `${cf} conflito(s) para escolher` : `${cf} conflito(s) esperando o administrador`), rc && `${rc} mudança(s) recusada(s)`, E.anexos?.naoEnviados?.length && `${E.anexos.naoEnviados.length} anexo(s) não enviado(s)`].filter(Boolean);
-    el.innerHTML = `Dados na nuvem · ${n ? `<b>⏳ ${n} mudança(s) esperando ${E.nuvem.online ? 'envio' : 'internet'}</b>` : (E.nuvem.online ? '✓ tudo enviado' : 'sem internet')}`
+    const avisos = [cf && (podeUsuario('admin') ? `${C.plural(cf, 'conflito')} para escolher` : `${C.plural(cf, 'conflito')} esperando o administrador`), rc && C.plural(rc, 'mudança recusada', 'mudanças recusadas'), E.anexos?.naoEnviados?.length && C.plural(E.anexos.naoEnviados.length, 'anexo não enviado', 'anexos não enviados')].filter(Boolean);
+    el.innerHTML = `Dados na nuvem · ${n ? `<b>⏳ ${C.plural(n, 'mudança', 'mudanças')} esperando ${E.nuvem.online ? 'envio' : 'internet'}</b>` : (E.nuvem.online ? '✓ tudo enviado' : 'sem internet')}`
       + `${avisos.length ? ` · <a href="#/conflitos"><b>⚠ ${avisos.join(' e ')}</b></a>` : ''}`
       + ` · Última atualização: <b>${E.d.atualizado_em ? C.dataHoraBr(E.d.atualizado_em) : 'nenhuma ainda'}</b>${E.d.atualizado_por ? ` por <b>${esc(E.d.atualizado_por)}</b>` : ''}`;
     return;
@@ -991,6 +991,8 @@ function guardarClipes() {
     localStorage.setItem(CLIPES_GUARDADOS, JSON.stringify({ quem: E.usuario?.login || '', listas }));
   } catch { /* sem espaço ou bloqueado: só não guarda */ }
 }
+/** Telas que só o próprio programa abre (antes do login ou em situação especial): pelo endereço, "Página não encontrada". */
+const TELAS_INTERNAS = new Set(['arquivoSumiu', 'semSuporte', 'inicio', 'primeiroAcesso', 'login', 'pedirAcesso', 'restaurarBackup']);
 let desenhos = 0; // quantas vezes a tela começou a ser desenhada (o envio de formulário sabe se a página vai ser trocada)
 let subirAoTopo = false; // o endereço mudou (hashchange): o próximo desenho que chegar à tela começa do topo
 export async function mostrar(estadoForm = null) {
@@ -1010,7 +1012,8 @@ export async function mostrar(estadoForm = null) {
     else {
       gravarSessao(E.usuario.login); // usar o sistema mantém o login lembrado
       const nome = rota.partes[0] || 'painel';
-      const tela = TELAS[nome];
+      // telas internas (login, primeiro acesso, arquivo sumido...) e ajudantes (_xxx) não abrem pelo endereço
+      const tela = Object.hasOwn(TELAS, nome) && !nome.startsWith('_') && !TELAS_INTERNAS.has(nome) ? TELAS[nome] : null;
       const conteudo = tela ? await tela(rota, estadoForm) : TELAS._naoEncontrado('Página não encontrada');
       if (meu !== desenhos) return;
       html = rota.partes[0] === 'imprimir' ? `<div id="mensagens" class="nao-imprimir" role="status" aria-live="polite"></div>${conteudo}` : layout(conteudo, rota);
@@ -1069,6 +1072,7 @@ export async function mostrar(estadoForm = null) {
     if (meu !== desenhos) return; // desenho antigo que falhou: a tela é do mais novo
     app.style.minHeight = '';
     paginaDesenhada = null; // a tela de erro não é a página: o próximo desenho não guarda rolagem nem caixas abertas dela
+    document.title = 'Administração de Imóveis';
     app.innerHTML = `<main><div class="alerta erro">${esc(e.message)}</div><p><a href="#/" class="botao">Voltar ao painel</a></p></main>`;
   }
 }

@@ -332,7 +332,7 @@ export function telaFinanceiro(q) {
       <div class="cartao"><div class="grande">${reais(entradas)}</div>entradas nos extratos</div>
       <div class="cartao"><div class="grande">${reais(saidas)}</div>saídas nos extratos</div>
       <div class="cartao"><div class="grande">${reais(tot('liquido'))}</div>líquido do mês ${tot('impostosEstimados') ? etiqueta('estimado', 'aviso') : ''}</div>
-      <div class="cartao"><div class="grande">${semDestino.length}</div>movimentação(ões) sem destino</div></div>
+      <div class="cartao"><div class="grande">${semDestino.length}</div>${semDestino.length === 1 ? 'movimentação' : 'movimentações'} sem destino</div></div>
     <div class="cartao"><h2>Movimentações do extrato sem destino</h2>
       ${semDestino.length ? `<div class="rolagem"><table class="responsiva compacta"><tr><th>Data</th><th>Conta</th><th>Descrição no extrato</th><th class="n">Valor</th><th>Destino</th></tr>
         ${semDestino.map((m) => { const s = sugestao(m); return `<tr><td class="nw">${dataBr(m.data)}<br><span class="suave">${m.tipo === 'entrada' ? 'entrada' : 'saída'}</span></td><td>${esc(nomeConta(m.conta_id))}</td><td>${esc(m.titulo || '')} ${esc(m.descricao || '')}</td>

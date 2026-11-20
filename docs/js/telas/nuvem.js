@@ -2,7 +2,7 @@
 import { alterar, aviso, baixar, E, ir, janela, login, mostrar, podeUsuario, reabrirSessao } from '../app.js';
 import * as S from '../armazenamento.js';
 import * as B from '../backup-seguro.js';
-import { dataBr, dataHoraBr, ErroUsuario, hojeIso } from '../calculos.js';
+import { dataBr, dataHoraBr, ErroUsuario, hojeIso, plural } from '../calculos.js';
 import { esc } from '../formularios.js';
 import * as N from '../nuvem.js';
 import * as R from '../regras.js';
@@ -121,7 +121,7 @@ export async function telaBackupsNuvem() {
   // exemplo com o backup do dia mais recente (ou hoje): "o de 09/11 é como os dados estavam às 3h de 09/11"
   const exemplo = dataBr(lista.map((a) => diaDoBackup(a.nome)).find(([, , motivo]) => !motivo)?.[0] || hojeIso()).slice(0, 5);
   return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backups da nuvem</h1>
-    <div class="cartao"><p>O servidor guarda uma cópia do banco de dados por dia (os 30 dias mais recentes), feita às 3h da manhã (horário de Brasília): o backup de ${exemplo} é como os dados estavam às 3h de ${exemplo}. Os anexos não entram: eles ficam guardados uma vez só e não mudam.</p>
+    <div class="cartao"><p>O servidor guarda uma cópia dos dados por dia (os 30 dias mais recentes), feita às 3h da manhã (horário de Brasília): o backup de ${exemplo} é como os dados estavam às 3h de ${exemplo}. Os anexos não entram: eles ficam guardados uma vez só e não mudam.</p>
       <p>${lista.some((a) => cifrado(a.nome)) ? '🔒 Os backups marcados como cifrados só abrem com a <b>senha do backup seguro</b> (a mesma da pasta segura): quem tiver acesso ao servidor não consegue ler os dados.' : 'Os backups estão <b>sem cifrar</b>. Ligue o backup seguro neste computador (Dados e backup → Backup seguro): os próximos backups da nuvem passam a sair cifrados com a senha do backup.'}</p>
       <p><b>Voltar para este dia</b> troca os dados da nuvem pelos daquele backup (antes, o servidor guarda uma cópia de como estava agora). Tudo o que foi lançado depois das 3h daquele dia se perde, em todos os aparelhos. Use só em caso de erro geral.</p>
       <div class="rolagem"><table><tr><th>Dia</th><th>O que é</th><th class="n">Tamanho</th><th></th></tr>${linhas || '<tr><td colspan="4" class="suave">Nenhum backup ainda (o primeiro é feito às 3h da manhã).</td></tr>'}</table></div></div>`;
@@ -131,14 +131,14 @@ export async function telaBackupsNuvem() {
 export function descreverAcesso(rota) {
   const m = /^(PUT|DELETE|POST) (.*)$/.exec(String(rota || ''));
   const metodo = m ? m[1] : 'GET'; const r = m ? m[2] : String(rota || '');
-  if (r === 'dados/tudo') return 'Baixou o banco de dados inteiro';
+  if (r === 'dados/tudo') return 'Baixou todos os dados';
   if (r.startsWith('dados/importar')) return r.includes('voltar') ? 'Voltou os dados da nuvem para um backup' : r.includes('substituir') ? 'Substituiu os dados da nuvem' : 'Carga inicial dos dados na nuvem';
   if (r.startsWith('aparelho/entrar')) { const pc = (/\((.+)\)$/.exec(r) || [])[1]; return `Programa do PC: entrar${pc ? ` (computador ${pc})` : ''}`; }
   if (r.startsWith('arquivos/')) return `${{ PUT: 'Anexou', DELETE: 'Apagou' }[metodo] || 'Abriu'} ${r.slice(9)}`;
   if (r.startsWith('backups/')) return `Baixou o backup ${r.slice(8)}`;
   if (/^lista(-tudo)?\/backups/.test(r)) return 'Viu a lista dos backups';
   if (r === 'mover') return 'Moveu ou renomeou uma pasta de arquivos';
-  if (r === 'apagar') return 'Apagou uma pasta de arquivos (vai para a lixeira por 30 dias)';
+  if (r === 'apagar') return `Apagou uma pasta de arquivos (vai para a lixeira por ${plural(R.regra('dias_lixeira_anexos'), 'dia')})`;
   if (r === 'email/enviar') return 'Mandou um e-mail pela conta da empresa';
   if (r.startsWith('ficha-online/')) return `Ficha pela internet: ${metodo === 'GET' ? 'consultou' : 'mexeu em'} ${r.slice(13)}`;
   return r;
@@ -174,7 +174,7 @@ export async function telaAcessos(q = {}) {
   const ultimo = (r.acessos || []).at(-1);
   const mais = r.mais && ultimo ? `<p>${link(`#/acessos?${new URLSearchParams(Object.entries({ de: filtro.de, ate: filtro.ate, quem: filtro.email, antes: String(ultimo.n) }).filter(([, v]) => v))}`, 'Ver os mais antigos')}</p>` : '';
   return `${topo}
-    <div class="cartao"><p>O servidor da nuvem anota quem <b>baixou o banco inteiro</b>, <b>abriu, anexou ou apagou arquivos</b>, baixou <b>backups</b>, mandou <b>e-mail</b> pela conta da empresa, mexeu na <b>ficha pela internet</b> e ligou o <b>programa do PC</b>, com a data, o endereço de internet e o tamanho. Fica guardado por ${Number(r.dias) || 180} dias (<a href="#/regras">Regras do sistema</a>, "Registro de acessos").</p>
+    <div class="cartao"><p>O servidor da nuvem anota quem <b>baixou todos os dados</b>, <b>abriu, anexou ou apagou arquivos</b>, baixou <b>backups</b>, mandou <b>e-mail</b> pela conta da empresa, mexeu na <b>ficha pela internet</b> e ligou o <b>programa do PC</b>, com a data, o endereço de internet e o tamanho. Fica guardado por ${Number(r.dias) || 180} dias (<a href="#/regras">Regras do sistema</a>, "Registro de acessos").</p>
       <p class="suave">Use para conferir se alguém baixou dados demais ou tentou entrar sem poder (linhas "Recusado"). Abrir telas e listas de anexos não entra.</p></div>
     ${form}
     <div class="cartao"><h2>Por pessoa${filtro.de || filtro.ate ? ' no período' : ''}</h2>
@@ -186,7 +186,7 @@ export async function telaAcessos(q = {}) {
 /** Relatório da passagem da pasta para a nuvem (etapa 4). */
 function relatorio(r) {
   const itens = [
-    `${r.registros} registros do banco ${r.diferencas.length ? `<b>com diferença em: ${esc(r.diferencas.join(', '))}</b>` : 'conferidos: iguais à pasta ✓'}`,
+    `${r.registros} registros dos dados ${r.diferencas.length ? `<b>com diferença em: ${esc(r.diferencas.join(', '))}</b>` : 'conferidos: iguais à pasta ✓'}`,
     `${r.total} anexos (${mb(r.totalBytes)}) ${r.faltando.length ? `<b>${r.faltando.length} faltando na nuvem</b>: ${esc(r.faltando.slice(0, 10).join('; '))}` : 'conferidos: todos na nuvem com o mesmo tamanho ✓'}${r.pulados ? ` (${r.pulados} já estavam lá)` : ''}`,
     ...(r.recusados.length ? [`<b>${r.recusados.length} recusados</b>: ${esc(r.recusados.map((x) => `${x.caminho} (${x.motivo})`).join('; '))}`] : []),
     ...(r.trocados?.length ? [`<b>${r.trocados.length} trocados pelo da pasta</b> (a nuvem tinha outro arquivo com o mesmo nome; a versão de lá ficou guardada na lixeira da nuvem por ${esc(String(R.regra('dias_lixeira_anexos')))} dias): ${esc(r.trocados.slice(0, 20).join('; '))}${r.trocados.length > 20 ? '…' : ''}`] : []),
@@ -247,7 +247,7 @@ export const ACOES_NUVEM = {
       anexos: E.anexos, sinc: E.nuvem, substituir,
       aoAndar: (p) => {
         if (!el) return;
-        const fase = { anexos: `Enviando anexos: ${p.feitos} de ${p.total} (${mb(p.bytes)} de ${mb(p.totalBytes)})`, dados: 'Enviando o banco de dados…', conferencia: 'Conferindo tudo…' }[p.fase];
+        const fase = { anexos: `Enviando anexos: ${p.feitos} de ${p.total} (${mb(p.bytes)} de ${mb(p.totalBytes)})`, dados: 'Enviando os dados…', conferencia: 'Conferindo tudo…' }[p.fase];
         el.innerHTML = `<p><progress max="${p.totalBytes || 1}" value="${p.bytes}" style="width:100%"></progress><br>${esc(fase)}<br><span class="suave">${esc(p.nome || '')}</span></p>`;
       },
     });

@@ -11,6 +11,17 @@ export class ErroUsuario extends Error {
   constructor(mensagem) { super(mensagem); this.name = 'ErroUsuario'; this.esperado = true; }
 }
 
+/**
+ * Número com a palavra no singular ou no plural: plural(1, 'dia') → "1 dia"; plural(3, 'dia') → "3 dias";
+ * plural(2, 'cadastro incompleto', 'cadastros incompletos') → "2 cadastros incompletos". Sem o plural, junta "s".
+ */
+export function plural(n, singular, varios = `${singular}s`) {
+  return `${n} ${Math.abs(Number(n)) === 1 ? singular : varios}`;
+}
+
+/** "é hoje", "falta 1 dia", "faltam 5 dias" (n = dias que faltam; 0 = hoje). */
+export const faltamDias = (n) => (Number(n) === 0 ? 'é hoje' : `${Number(n) === 1 ? 'falta' : 'faltam'} ${plural(n, 'dia')}`);
+
 /** Arredonda para o inteiro mais próximo, meio para cima (também para negativos). */
 export function arred(x) {
   const s = x < 0 ? -1 : 1;

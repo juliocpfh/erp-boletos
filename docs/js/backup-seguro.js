@@ -318,7 +318,7 @@ export async function gravarLeiaMe(dir) {
 /** Arquivos da pasta segura, do mais novo para o mais antigo. */
 export async function listarBackups(dir) {
   const lista = [];
-  for (const [pasta, tipo] of [[PASTA_DIARIO, 'Cópia diária (só o banco)'], [PASTA_SEMANAL, 'Completo (banco + anexos)']]) {
+  for (const [pasta, tipo] of [[PASTA_DIARIO, 'Cópia diária (só os dados)'], [PASTA_SEMANAL, 'Completo (dados + anexos)']]) {
     let sub;
     try { sub = await dir.getDirectoryHandle(pasta); } catch { continue; }
     for await (const [n, h] of sub.entries()) {

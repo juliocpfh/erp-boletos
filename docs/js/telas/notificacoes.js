@@ -23,7 +23,7 @@ const SO_CONSULTA = 'Seu usuário só consulta: não pode alterar. Peça ao admi
 export function etiquetaNotificacao(n, hoje = C.hojeIso()) {
   const e = R.estadoNotificacao(d(), n, hoje);
   const prazo = e.podeMulta ? ` ${etiqueta(`prazo vencido em ${dataBr(n.data_limite)}`, 'perigo')}`
-    : e.aberta && e.situacao !== 'Reiterada' && !n.multa_valor ? ` ${etiqueta(e.restam === 0 ? 'vence hoje' : `faltam ${e.restam} dia(s) útil(eis)`, e.avisar ? 'aviso' : 'neutra')}` : '';
+    : e.aberta && e.situacao !== 'Reiterada' && !n.multa_valor ? ` ${etiqueta(e.restam === 0 ? 'vence hoje' : `${e.restam === 1 ? 'falta' : 'faltam'} ${C.plural(e.restam, 'dia útil', 'dias úteis')}`, e.avisar ? 'aviso' : 'neutra')}` : '';
   return `${etiqueta(e.situacao, COR[e.situacao] || 'neutra')}${prazo}`;
 }
 
@@ -51,10 +51,10 @@ export function telaNotificacoes(q = {}) {
   const hoje = C.hojeIso();
   const todas = d().notificacoes || [];
   const abertas = q.filtro !== 'todas';
-  const lista = ordemNotificacoes(todas.filter((n) => !abertas || ['Rascunho', 'Aguardando resposta', 'Multa gerada'].includes(n.situacao)), hoje);
+  const lista = ordemNotificacoes(todas.filter((n) => !abertas || R.notificacaoEmAberto(n)), hoje);
   const vencidas = todas.filter((n) => { const e = R.estadoNotificacao(d(), n, hoje); return e.podeMulta && e.situacao !== 'Reiterada'; }).length;
   return `${atalhosComunicacoes('notificacoes')}<div class="cabecalho"><h1>Notificações ao inquilino</h1>${opera() ? link('#/notificacao-nova', 'Nova notificação', 'botao') : ''}</div>
-    <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap">${link('#/notificacoes', `Em aberto (${todas.filter((n) => ['Rascunho', 'Aguardando resposta', 'Multa gerada'].includes(n.situacao)).length})`, `botao ${abertas ? '' : 'secundario '}pequeno`)}
+    <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap">${link('#/notificacoes', `Em aberto (${todas.filter(R.notificacaoEmAberto).length})`, `botao ${abertas ? '' : 'secundario '}pequeno`)}
       ${link('#/notificacoes?filtro=todas', `Todas (${todas.length})`, `botao ${abertas ? 'secundario ' : ''}pequeno`)}
       ${vencidas ? etiqueta(`${vencidas} com prazo vencido`, 'perigo') : ''}</div>
     <div class="cartao"><div class="rolagem"><table><tr><th>Inquilino</th><th>Data</th><th>Assunto</th><th>Prazo até</th><th>Situação</th><th></th></tr>
@@ -145,7 +145,7 @@ function etapasDaNotificacao(n, c, hoje) {
       <select name="meio" aria-label="Por onde" style="width:auto">${R.MEIOS_NOTIFICACAO.map((m) => `<option>${esc(m)}</option>`).join('')}</select>
       <button class="secundario pequeno">Marcar como enviada</button></form>` : '';
   const prazo = n.situacao === 'Rascunho' ? `até ${dataBr(n.data_limite)} (${n.prazo_dias} dias úteis de ${dataBr(n.data)})`
-    : e.vencida ? `<b>venceu em ${dataBr(n.data_limite)}</b>` : e.aberta ? `até <b>${dataBr(n.data_limite)}</b> · ${e.restam === 0 ? 'vence hoje' : `faltam ${e.restam} dia(s) útil(eis)`}` : `até ${dataBr(n.data_limite)}`;
+    : e.vencida ? `<b>venceu em ${dataBr(n.data_limite)}</b>` : e.aberta ? `até <b>${dataBr(n.data_limite)}</b> · ${e.restam === 0 ? 'vence hoje' : `${e.restam === 1 ? 'falta' : 'faltam'} ${C.plural(e.restam, 'dia útil', 'dias úteis')}`}` : `até ${dataBr(n.data_limite)}`;
   const baixa = n.situacao === 'Resolvida' ? `resolvida em <b>${dataBr(n.resolvida_em)}</b>${n.observacao_baixa ? `: ${esc(n.observacao_baixa)}` : ''} ${n.comprovante_baixa ? linkComprovante(c.id, n.comprovante_baixa, { tabela: 'notificacoes', id: n.id, campo: 'comprovante_baixa', tipo: 'baixa-notificacao', data: n.resolvida_em }) : ''}`
     : e.podeBaixa && opera() ? `<form data-form="baixaNotificacao" data-id="${n.id}" class="acoes" style="margin-top:6px;flex-wrap:wrap">
       <input type="date" name="data" value="${hoje}" aria-label="Resolvido em" style="width:auto">${F.atalhosData()}

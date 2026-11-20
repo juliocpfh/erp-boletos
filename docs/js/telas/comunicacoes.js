@@ -25,7 +25,7 @@ export const abasInquilinos = (atual) => `<nav class="abas">${link('#/inquilinos
 export function atalhosComunicacoes(atual) {
   const sol = R.resumoSolicitacoes(d());
   const abertasSol = (sol.Aberta || 0) + (sol['Em andamento'] || 0);
-  const notAbertas = (d().notificacoes || []).filter((n) => ['Rascunho', 'Aguardando resposta', 'Multa gerada'].includes(n.situacao));
+  const notAbertas = (d().notificacoes || []).filter(R.notificacaoEmAberto);
   const abertasNot = notAbertas.length;
   const vencidasNot = notAbertas.filter((n) => R.estadoNotificacao(d(), n).podeMulta).length;
   const b = (hash, texto, chave) => link(hash, texto, `botao ${atual === chave ? '' : 'secundario '}pequeno`);
@@ -167,7 +167,7 @@ function telaModelosComunicado() {
 
 async function telaComunicado(id) {
   const com0 = buscar('comunicados', id);
-  if (!com0) return naoEncontrado('Comunicado');
+  if (!com0) return naoEncontrado('Comunicado não encontrado', '#/comunicacoes', 'Ver os comunicados');
   let erroNuvem = '';
   try { await atualizarDaNuvem(id); } catch (e) { erroNuvem = e.message; }
   const com = buscar('comunicados', id);
@@ -201,7 +201,7 @@ async function telaComunicado(id) {
 export function telaAceiteContatos(q = {}) {
   const com = buscar('comunicados', Number(q.id));
   const x = com && com.destinos.find((y) => y.chave === q.chave);
-  if (!x || !x.resposta) return naoEncontrado('Aceite');
+  if (!x || !x.resposta) return naoEncontrado('Aceite não encontrado', '#/comunicacoes', 'Ver os comunicados');
   const r = x.resposta;
   const e = CM.empresasDoTopo(d());
   const linhas = [['Pessoa', `${x.nome}${x.tipo === 'fiador' ? ' (fiador)' : ''}`], ['Confirmado em', C.dataHoraBr(r.em)], ['E-mail', `${r.email} (confirmado por código enviado a ele)`],

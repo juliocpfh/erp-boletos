@@ -23,10 +23,11 @@ export async function telaImprimir(rota) {
   if (tipo === 'carta') {
     const c = buscar('contratos', rota.q.contrato);
     if (!c) return naoEncontrado('Inquilino não encontrado', '#/inquilinos', 'Ver os inquilinos');
-    const r = R.reajusteNaCompetencia(d(), c, rota.q.comp);
-    const carta = cartaReajuste(c, rota.q.comp);
+    const comp = C.competenciaValida(rota.q.comp, C.competenciaDe(C.hojeIso())); // mês cortado ou inválido no endereço: o mês atual
+    const r = R.reajusteNaCompetencia(d(), c, comp);
+    const carta = cartaReajuste(c, comp);
     // sem o índice, não há carta (só o aviso): sem botão de PDF
-    return `<div class="impressao">${voltar(carta.includes('class="carta"') ? { seletor: '.impressao .carta', nome: nomeArquivoDoc('Carta reajuste', c, rota.q.comp || '') } : null)}
+    return `<div class="impressao">${voltar(carta.includes('class="carta"') ? { seletor: '.impressao .carta', nome: nomeArquivoDoc('Carta reajuste', c, comp || '') } : null)}
       ${r && opera() ? `<div class="acoes nao-imprimir" style="margin-bottom:12px">${botoesReajuste(c, r, true)}</div>` : ''}
       ${carta}</div>`;
   }

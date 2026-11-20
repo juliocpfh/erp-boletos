@@ -2,6 +2,7 @@
 // passos do Painel enquanto o sistema está quase vazio (passosIniciais, caixaPrimeirosPassos) e o "próximo passo" das
 // listas vazias (proximoPasso). Os textos ficam todos aqui, em português simples, com exemplos de datas e valores.
 import * as C from './calculos.js';
+import { regra } from './config-regras.js';
 import { esc } from './formularios.js';
 
 // --------------------------------------------------------------------------
@@ -16,9 +17,9 @@ export const AJUDA_TELAS = {
     titulo: 'Painel',
     serve: 'É a tela de entrada: mostra num relance quantos imóveis e inquilinos você tem, os avisos do que precisa de atenção (boleto vencido, reajuste, seguro, documento faltando) e o calendário do mês.',
     primeiro: ['Leia os alertas de cima para baixo: cada um tem um link que leva direto ao que precisa ser feito.',
-      'Use "Registrar pagamento" quando um inquilino pagar.',
-      'No calendário, clique (no celular, toque) num dia para ver o que vence nele.'],
-    exemplo: 'No dia 20/11/2026 o calendário avisa "boletos": é o dia de gerar os boletos do aluguel de novembro, que vencem em dezembro. No dia 01/12/2026 avisa "NFs": é o dia de numerar as NFs dos pagamentos de novembro.',
+      'Use "Confirmar pagamento" quando um inquilino pagar.',
+      'No calendário, clique num dia para ver o que vence nele (no celular, o calendário vira uma lista: toque na semana).'],
+    exemplo: 'No dia {dia_gerar_boletos}/11/2026 o calendário avisa "boletos": é o dia de gerar os boletos do aluguel de novembro, que vencem em dezembro. No dia 01/12/2026 avisa "NFs": é o dia de numerar as NFs dos pagamentos de novembro.',
   },
   imoveis: {
     titulo: 'Imóveis',
@@ -73,13 +74,13 @@ export const AJUDA_TELAS = {
     serve: 'Guarda o pedido de quem quer alugar: dados da pessoa e dos fiadores, a reserva paga e os documentos (renda, identidade). É aqui que a ficha é aprovada ou reprovada.',
     primeiro: ['Confira os documentos de cada pessoa da ficha.',
       'Registre a reserva, se o interessado pagou.',
-      'Aprove para virar contrato, ou reprove (a reserva é devolvida e os documentos saem depois de 3 meses).'],
+      'Aprove para virar contrato, ou reprove (a reserva é devolvida e os documentos saem depois de {meses_documentos_ficha|mês|meses}).'],
     exemplo: 'Ficha recebida em 05/11/2026 com reserva de R$ 500,00: aprovada em 08/11/2026, o contrato já vem preenchido com os dados dela e a reserva é descontada do primeiro boleto.',
   },
   cobrancas: {
     titulo: 'Boletos',
     serve: 'Os boletos do aluguel de cada mês. O mês da tela é o mês de uso do imóvel: o boleto do aluguel de novembro vence em dezembro. No alto, o botão "E-mails da régua" abre os e-mails de cobrança preparados pelo sistema, esperando a autorização do administrador (nada é enviado sozinho).',
-    primeiro: ['A partir do dia 20, clique em "Gerar boletos" do mês: o sistema calcula o valor de cada inquilino (aluguel, IPTU, seguro, descontos).',
+    primeiro: ['A partir do dia {dia_gerar_boletos}, clique em "Gerar boletos" do mês: o sistema calcula o valor de cada inquilino (aluguel, IPTU, seguro, descontos).',
       'Quando o inquilino pagar, clique em "Confirmar pagamento" na linha e informe o dia em que o dinheiro entrou na conta.',
       'Depois, numere as NFs na tela NF.'],
     exemplo: 'Aluguel de novembro de 2026, R$ 2.000,00 com bonificação de 10%, vencendo em 10/12/2026: em dia, R$ 1.800,00. Se o dia 10 cair num sábado, vale até o próximo dia útil sem multa.',
@@ -148,13 +149,27 @@ export function chaveDaAjuda(hash) {
   return Object.hasOwn(AJUDA_TELAS, nome) ? nome : '';
 }
 
+/**
+ * Prazos que o administrador muda (Regras do sistema) entram no texto na hora de mostrar: {dia_gerar_boletos} → "20"
+ * (ou "05"); {meses_documentos_ficha|mês|meses} → "3 meses" (ou "1 mês").
+ */
+export function comRegras(texto) {
+  return String(texto).replace(/\{([a-z_]+)(?:\|([^|}]+)\|([^}]+))?\}/g, (todo, chave, um, varios) => {
+    let v;
+    try { v = regra(chave); } catch { return todo; }
+    if (v === undefined || v === null) return todo;
+    if (um) return C.plural(v, um, varios);
+    return chave.startsWith('dia_') ? String(v).padStart(2, '0') : String(v);
+  });
+}
+
 /** O texto da ajuda (HTML já escapado). */
 export function textoDaAjuda(chave) {
   const a = AJUDA_TELAS[chave];
   if (!a) return '';
-  return `<p><b>Para que serve:</b> ${esc(a.serve)}</p>
-    <p><b>O que fazer primeiro:</b></p><ol>${a.primeiro.map((p) => `<li>${esc(p)}</li>`).join('')}</ol>
-    <p><b>Exemplo:</b> ${esc(a.exemplo)}</p>`;
+  return `<p><b>Para que serve:</b> ${esc(comRegras(a.serve))}</p>
+    <p><b>O que fazer primeiro:</b></p><ol>${a.primeiro.map((p) => `<li>${esc(comRegras(p))}</li>`).join('')}</ol>
+    <p><b>Exemplo:</b> ${esc(comRegras(a.exemplo))}</p>`;
 }
 
 const ajudasAbertas = new Set(); // a ajuda aberta continua aberta quando a mesma tela é desenhada de novo
