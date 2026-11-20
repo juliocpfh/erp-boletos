@@ -400,6 +400,8 @@ export const TELAS = {
   banco: (rota) => telaBanco(rota),
   inadimplencia: () => telaInadimplencia(),
   regua: async () => (await parteAdiada('regua')).telaRegua(),
+  // TEMPORÁRIA (20/11/2026): teste de todos os PDFs pelo dono; apagar depois do teste (ver o topo de telas/teste-pdfs.js)
+  'teste-pdfs': async () => (await parteAdiada('testePdfs')).telaTestePdfs(),
   garantias: () => telaGarantias(),
   // painel de Gestão (números do mês para o dono): carregado só quando aberto (ADIADOS do sw.js)
   gestao: async (rota) => (await carregarParte(() => import('./telas/gestao.js'))).telaGestao(rota.q),

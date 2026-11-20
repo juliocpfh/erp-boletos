@@ -337,7 +337,7 @@ export async function telaDados(q = {}) {
     await (await E.pasta.getDirectoryHandle(S.PASTA_MODELOS)).getFileHandle(S.MODELO_FATURA);
     modeloProprio = true;
   } catch { /* usa o modelo padrão */ }
-  return `<div class="cabecalho"><h1>Dados e backup</h1><div class="acoes">${link('#/empresas', 'Empresas', 'botao secundario')}${link('#/regras', 'Regras do sistema', 'botao secundario')}${AI.ligado() ? link('#/arquivo-impresso', 'Arquivo impresso', 'botao secundario') : ''}${link('#/historico', 'Histórico de alterações', 'botao secundario')}</div></div>
+  return `<div class="cabecalho"><h1>Dados e backup</h1><div class="acoes">${link('#/empresas', 'Empresas', 'botao secundario')}${link('#/regras', 'Regras do sistema', 'botao secundario')}${AI.ligado() ? link('#/arquivo-impresso', 'Arquivo impresso', 'botao secundario') : ''}${link('#/historico', 'Histórico de alterações', 'botao secundario')}${podeUsuario('admin') ? link('#/teste-pdfs', 'Teste dos PDFs (temporário)', 'botao secundario') : ''}</div></div>
     ${conflitos.length ? `<div class="alerta perigo">O OneDrive criou cópia(s) em conflito: <b>${conflitos.map(esc).join(', ')}</b>. Isso acontece quando dois computadores gravam ao mesmo tempo. Confira se falta alguma alteração recente e, depois de conferir, apague a cópia na pasta.</div>` : ''}
     ${opera() ? AJ.caixaReabrirPassos(d(), E.usuario?.login || '', { backupLigado: !!(E.seguro && E.seguro.chave) }) : ''}
     <div class="cartao"><div class="grade">

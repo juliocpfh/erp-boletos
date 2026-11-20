@@ -2,7 +2,9 @@
 
 Pedido do dono em 20/11/2026, depois de as PRs #329 a #332 entrarem na `main` (os 17 lotes de `MUTIRAO_19_11.md` estão corrigidos). **A próxima conversa começa por aqui.** Faça na ordem, uma PR por item (não empilhe PRs: cada uma parte da `main` depois que a anterior entrar). Antes de mudar regra de dinheiro, confirme com o dono um exemplo em reais e datas. Teste na tela em `?teste` e diga o que não foi visto. Marque `[x]` aqui, na mesma PR, ao concluir cada item.
 
-## 1. [ ] Página temporária de teste de todos os PDFs (fazer primeiro)
+## 1. [x] Página temporária de teste de todos os PDFs (fazer primeiro)
+
+**Feito em 20/11/2026:** Dados e backup → **Teste dos PDFs (temporário)** (`#/teste-pdfs`, só administrador), em `docs/js/telas/teste-pdfs.js`. São 27 PDFs em 4 grupos (contrato, aditivos, chaves e vistorias; recibos e termos; demonstrativos e NF; carta, IR, gestão e todos os dados); cada linha diz o registro usado ou o que cadastrar. "Abrir" leva à página do documento (Imprimir / Baixar PDF); nos recibos e na carta há também o PDF do jeito que vai no e-mail. Testado em `?teste` com dados fictícios: os 10 PDFs com registro abriram e baixaram sem erro, e a página cabe em 375 px. Na mesma PR: a página da carta de reajuste dava erro no "Baixar PDF" (variável `comp` inexistente). **Apagar depois do teste do dono:** `telas/teste-pdfs.js`, a rota `'teste-pdfs'` (`telas.js`), `testePdfs` em `PARTES_ADIADAS` (`telas/comum.js`) e no teste `tests/telas.test.mjs`, `'js/telas/teste-pdfs.js'` em `ADIADOS` (`sw.js`) e o link em Dados e backup (`telas/admin.js`).
 
 - Uma tela só para o dono (administrador), por exemplo `#/teste-pdfs`, com **um botão por PDF que o sistema gera, um assunto de cada vez** (agrupados por assunto: contrato, termos aditivos, recibos e termos de quitação, NF, demonstrativos, cartas, notificações, ficha, vistoria, declaração do IR etc.).
 - O dono vai abrir cada um **pelo computador e pelo celular (Android)**, ver se o PDF sai certo e anotar os textos a mudar. Depois a tela é apagada (é temporária: deixe isso escrito no código e aqui).
