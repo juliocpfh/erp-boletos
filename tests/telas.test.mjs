@@ -346,3 +346,28 @@ test('telas raras carregadas só quando usadas (2ª rodada do mutirão de 16/11)
     assert.deepEqual(chamou, { x: '1' });
   } finally { parte.ACOES_REGRAS.baixarArquivoRegras = antes; }
 });
+
+test('mutirão 19/11 (lote K): exclusão do contrato barrada com boleto emitido no C6, boleto ligado ao extrato ou troca de titular; ficha com reserva não devolvida', async () => {
+  const { d, c, cb, loja } = comInquilino('Fulano de Teste');
+  entrarComo(E, 'admin');
+  const { motivoNaoExcluirContrato, origemDaImpressao, descricaoDaExclusao } = await import('../docs/js/telas/acoes.js');
+  assert.equal(motivoNaoExcluirContrato(d, c), null);
+  cb.banco = { situacao: 'emitido' };
+  assert.match(motivoNaoExcluirContrato(d, c), /emitido no C6/);
+  cb.banco = null;
+  d.movimentacoes_banco.push({ id: 900, conta_id: 1, data: '2026-11-10', tipo: 'entrada', valor: 180000, classificacao: 'boleto', cobranca_id: cb.id });
+  assert.match(motivoNaoExcluirContrato(d, c), /desfaça o destino das movimentações/);
+  d.movimentacoes_banco.length = 0;
+  R.inserir(d, 'contratos', { imovel_id: loja.id, inquilino_nome: 'Beltrano Novo', contrato_anterior_id: c.id, data_entrada: '2026-08-01' }, 'teste');
+  assert.match(motivoNaoExcluirContrato(d, c), /continua com Beltrano Novo/);
+  // ficha com reserva de R$ 1.000,00 recebida e não devolvida: a exclusão é recusada antes de qualquer pergunta
+  const f = R.inserir(E.d, 'fichas', { inquilino_nome: 'Ciclano Ficha', situacao: 'Reprovada', reserva_valor: 100000, reserva_data: '2026-11-05' }, 'teste');
+  const antes = janelas.length;
+  await assert.rejects(T.ACOES.excluir({ tabela: 'fichas', id: f.id }), /reserva de R\$\s1\.000,00 recebida e não devolvida/);
+  assert.equal(janelas.length, antes);
+  // "Voltar" da impressão aberta em aba nova e o texto do Histórico na exclusão
+  assert.equal(origemDaImpressao('#/imprimir/faturas?mes=2026-01'), '#/faturas?mes=2026-01');
+  assert.equal(origemDaImpressao('#/imprimir/demonstrativos?comp=2026-07&ids=1,2'), '#/cobrancas?comp=2026-07');
+  assert.equal(origemDaImpressao('#/imprimir/recibo?tipo=garantia&contrato=7'), '#/contrato/7');
+  assert.equal(descricaoDaExclusao(d, 'cobrancas', cb), 'Boleto de 07/2026 · Fulano de Teste');
+});
