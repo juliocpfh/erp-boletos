@@ -52,7 +52,7 @@ function comSaida(saldo) {
   return { d, c, e };
 }
 
-test('boleto do saldo do cálculo final: avulso, sem NF, sem multa; o e-mail diz "Segue o boleto do saldo"', () => {
+test('boleto do saldo do cálculo final: avulso, sem NF, com a multa e os juros do contrato; o e-mail diz "Segue o boleto do saldo"', () => {
   const { d, c, e } = comSaida(-30000);
   assert.doesNotMatch(texto(d, 'saida_calculo', { contrato: c }), /Segue o boleto/);
   assert.throws(() => R.gerarBoletoDoSaldo(d, e.id, '2026-11-10', 'j', '2026-11-20'), /antes de hoje/);
@@ -60,13 +60,18 @@ test('boleto do saldo do cálculo final: avulso, sem NF, sem multa; o e-mail diz
   assert.equal(cb.outros, 30000);
   assert.equal(cb.aluguel, 0);
   assert.equal(cb.saldo_saida_de, e.id);
-  assert.ok(R.ehBoletoAvulso(cb) && R.ehSaldoSaida(cb) && R.semMultaJuros(cb));
+  assert.ok(R.ehBoletoAvulso(cb) && R.ehSaldoSaida(cb) && !R.semMultaJuros(cb));
+  assert.equal(cb.multa_percentual, 10);
+  assert.equal(cb.juros_mensal_percentual, 1);
   assert.equal(R.totais(cb).a_pagar_sem_desconto, 30000);
   assert.equal(R.boletoDoMes(d, c.id, cb.competencia), null); // não é o aluguel do mês
   assert.equal(R.cobrancasEmAberto(d, c.id).some((x) => x.id === cb.id), false); // não entra nos débitos de novo
   assert.throws(() => R.gerarBoletoDoSaldo(d, e.id, '2026-11-30', 'j', '2026-11-20'), /já foi gerado/);
-  // atrasado: sem multa e juros
-  assert.equal(C.liquidar(cb, '2026-12-20').valor_devido, 30000);
+  // atrasado: multa e juros do contrato (10% e 1% ao mês), sem bonificação
+  const atraso = C.liquidar(cb, '2026-12-20');
+  assert.equal(atraso.multa, 3000);
+  assert.ok(atraso.juros > 0 && atraso.valor_devido === 30000 + 3000 + atraso.juros);
+  assert.equal(C.liquidar(cb, '2026-11-30').valor_devido, 30000);
   const t = texto(d, 'saida_calculo', { contrato: c });
   assert.match(t, /Segue o boleto do saldo de R\$ 300,00, com vencimento em 30\/11\/2026\./);
   assert.doesNotMatch(t, /deposite ou faça o Pix/);
@@ -135,4 +140,14 @@ test('IPTU com parcela arredondada: a guia real vai à prefeitura e a sobra abat
   // Resultados do ano: o IPTU do dono é a sobra (negativa = abate o custo)
   const linha = R.resultadosFinanceiros(d, '2026-01-01', '2027-12-31').find((x) => x.imovel.id === i.id);
   assert.equal(linha.iptu, -463);
+});
+
+test('boleto do saldo pago: marca sozinho o saldo cobrado; desfazer o pagamento volta a etapa', () => {
+  const { d, e } = comSaida(-30000);
+  const cb = R.gerarBoletoDoSaldo(d, e.id, '2026-11-30', 'j', '2026-11-20');
+  R.registrarPagamento(d, cb.id, '2026-11-28', null, 'j');
+  assert.equal(R.buscar(d, 'encerramentos', e.id).garantia_devolvida_em, '2026-11-28');
+  assert.equal(R.buscar(d, 'cobrancas', cb.id).valor_nf, 0); // sem NF
+  R.estornarPagamento(d, cb.id, 'j');
+  assert.equal(R.buscar(d, 'encerramentos', e.id).garantia_devolvida_em, null);
 });
