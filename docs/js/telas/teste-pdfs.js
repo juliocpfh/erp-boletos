@@ -16,7 +16,7 @@ import { cartaReajuste } from './reajustes.js';
 
 const nomeContrato = (c) => { const i = buscar('imoveis', c.imovel_id); return `${i ? `${i.nome} · ` : ''}${c.inquilino_nome}`; };
 const nomeFicha = (f) => `ficha nº ${f.id} · ${f.inquilino_nome || 'sem nome'}`;
-const abrir = (hash) => link(hash, 'Abrir (Imprimir / Baixar PDF)', 'botao pequeno');
+const abrir = (hash) => link(hash, 'Abrir', 'botao pequeno');
 
 /** Primeiro contrato (ou ficha) em que o recibo pode sair: { alvo, usado } ou { motivo }. */
 function alvoDoRecibo(tipo) {
