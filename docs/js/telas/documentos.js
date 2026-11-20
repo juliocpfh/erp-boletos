@@ -27,7 +27,7 @@ export async function telaImprimir(rota) {
     const r = R.reajusteNaCompetencia(d(), c, rota.q.comp);
     const carta = cartaReajuste(c, rota.q.comp);
     // sem o índice, não há carta (só o aviso): sem botão de PDF
-    return `<div class="impressao">${voltar(carta.includes('class="carta"') ? { seletor: '.impressao .carta', nome: nomeArquivoDoc('Carta reajuste', c, comp || '') } : null)}
+    return `<div class="impressao">${voltar(carta.includes('class="carta"') ? { seletor: '.impressao .carta', nome: nomeArquivoDoc('Carta reajuste', c, rota.q.comp) } : null)}
       ${r && opera() ? `<div class="acoes nao-imprimir" style="margin-bottom:12px">${botoesReajuste(c, r, true)}</div>` : ''}
       ${carta}</div>`;
   }
