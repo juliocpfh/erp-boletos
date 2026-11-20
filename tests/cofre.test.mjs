@@ -411,3 +411,19 @@ test('backups (banco inteiro, com as senhas e sessões de todos): pelo Worker co
   assert.equal((await papel('?nivel=dono')).status, 400);
   assert.equal((await papel('')).status, 400);
 });
+
+test('entrar, sair ou trocar a própria senha não muda "Última atualização … por" (mutirão 19/11, nuvem-016)', () => {
+  const c = carregado();
+  const antes = c.tudo();
+  hora = new Date(hora.getTime() + 60000);
+  c.aplicar(lote([{ op: 'alterar', tabela: 'usuarios', id: 4, campos: { sessoes: { antes: undefined, depois: ['t1'] } } }]), CONSULTA);
+  c.aplicar(lote([{ op: 'alterar', tabela: 'usuarios', id: 3, campos: { sessoes: { antes: undefined, depois: ['t2'] } } }]), OPERADOR);
+  const depois = c.tudo();
+  assert.equal(depois.revisao, antes.revisao, 'entrar não conta como alteração');
+  assert.equal(depois.atualizado_por, antes.atualizado_por);
+  assert.equal(depois.atualizado_em, antes.atualizado_em);
+  assert.deepEqual(depois.usuarios.find((u) => u.id === 4).sessoes, ['t1'], 'a sessão foi gravada');
+  c.aplicar(lote([{ op: 'alterar', tabela: 'contratos', id: 20, campos: { vencimento_dia: { antes: 10, depois: 12 } } }]), OPERADOR);
+  assert.equal(c.tudo().revisao, antes.revisao + 1, 'mudança nos dados conta');
+  assert.equal(c.tudo().atualizado_por, OPERADOR);
+});

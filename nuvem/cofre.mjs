@@ -504,7 +504,8 @@ export class Cofre {
         // senão a nuvem apagaria uma parte e deixaria, por exemplo, boleto sem contrato (mutirão 3000, item 2)
         const disputados = novosConflitos.filter((c) => c.tipo === 'exclusao');
         if (emGrupo && disputados.length) throw new ExclusaoEmGrupo(disputados.map((c) => ({ tabela: c.tabela, id: Number(c.reg_id) })));
-        return this.fecharLote(lote, email, resultados, novosConflitos);
+        // entrar, sair ou trocar a própria senha não é "atualização" dos dados (a faixa do topo dizia "por co" só porque ele entrou)
+        return this.fecharLote(lote, email, resultados, novosConflitos, { soAcesso: this.soProprioAcesso(lote.ops, quem) });
       });
     } catch (e) {
       if (!(e instanceof ExclusaoEmGrupo)) throw e;
@@ -512,8 +513,8 @@ export class Cofre {
     }
   }
 
-  fecharLote(lote, email, resultados, novosConflitos) {
-    if (lote.ops.length) {
+  fecharLote(lote, email, resultados, novosConflitos, { soAcesso = false } = {}) {
+    if (lote.ops.length && !soAcesso) {
       this.controle('revisao', Number(this.controle('revisao') || 0) + 1);
       this.controle('atualizado_em', this.agora());
       this.controle('atualizado_por', email);

@@ -598,7 +598,31 @@ function ligarPoupancaDaGarantia(raiz) {
   trazer();
 }
 
+/**
+ * Novo contrato: ao trocar a finalidade, o prazo passa ao da regra daquela finalidade (não residencial: `prazo_comercial_padrao`,
+ * em branco = campo vazio), só enquanto o campo estiver vazio ou com o prazo padrão da finalidade anterior (o digitado fica).
+ */
+function ligarPrazoPorFinalidade(raiz) {
+  const form = raiz.querySelector('form[data-form=cadastro]');
+  if (!form || !/^#\/novo\/contratos/.test(location.hash)) return;
+  const fin = form.querySelector('[name=finalidade]');
+  const prazo = form.querySelector('[name=prazo_meses]');
+  if (!fin || !prazo) return;
+  const perfil = () => Number(form.elements.perfil_regras_id?.value) || null;
+  const padrao = (f) => { const v = R.prazoPadraoNovoContrato(f, perfil()); return v === null ? '' : String(v); };
+  let anterior = 'Residencial';
+  const aplicar = () => {
+    const atual = fin.value || 'Residencial';
+    if (atual === anterior) return;
+    if (prazo.value.trim() === '' || prazo.value.trim() === padrao(anterior)) prazo.value = padrao(atual);
+    anterior = atual;
+  };
+  fin.addEventListener('change', aplicar);
+  aplicar(); // finalidade que já veio da ficha ou da pessoa
+}
+
 export function ligarCamposAutomaticos(raiz) {
+  ligarPrazoPorFinalidade(raiz);
   ligarPoupancaDoAditivo(raiz);
   ligarPoupancaDaGarantia(raiz);
   ligarReajusteManual(raiz);

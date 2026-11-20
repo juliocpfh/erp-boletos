@@ -148,7 +148,7 @@ async function janelaEmail(chave, alvo) {
   });
   q('[data-copiar]').addEventListener('click', async () => {
     const e = atual();
-    aviso(await copiar(`${e.assunto}\n\n${e.texto}`) ? `Assunto e texto copiados: cole no e-mail.${pendente() ? ` ${pendente()}` : ''}` : 'O navegador não deixou copiar: selecione o texto e use Ctrl+C.', pendente() ? 'aviso' : 'ok');
+    aviso(await copiar(`${e.assunto}\n\n${e.texto}`) ? `Assunto e texto copiados: cole no e-mail.${pendente() ? ` ${pendente()}` : ''}` : 'O navegador não deixou copiar: selecione o texto e copie.', pendente() ? 'aviso' : 'ok');
   });
   q('[data-gmail]').addEventListener('click', async () => {
     const e = atual();
@@ -252,7 +252,7 @@ export const ACOES_EMAILS = {
     const campo = document.querySelector('[data-retorno-gmail]');
     if (!campo) return;
     if (await copiar(campo.value)) aviso('Endereço copiado. Cole no Google Cloud, na credencial.');
-    else { campo.select(); aviso('O navegador não deixou copiar: o endereço ficou selecionado, use Ctrl+C.', 'info'); }
+    else { campo.select(); aviso('O navegador não deixou copiar: o endereço ficou selecionado, é só copiar.', 'info'); }
   },
 
   async abrirEmail({ chave, contrato, ficha, aditivo, notificacao }) {
@@ -308,7 +308,7 @@ export function telaModelosEmail() {
     <td class="n nw">${opera() ? link(`#/modelo-email/${m.chave}`, 'Editar') : ''} ${opera() && m.editado ? botao('restaurarModeloEmail', 'Voltar ao texto padrão', { chave: m.chave }, 'secundario pequeno', `Trocar o texto de "${m.nome}" pelo padrão? As alterações se perdem.`) : ''}</td></tr>`; };
   return `<p class="suave"><a href="#/dados">← Dados e backup</a></p>
     <div class="cabecalho"><h1>Modelos de e-mail</h1>${botao('baixarModelosEmail', 'Baixar todos (TXT)', {}, 'secundario pequeno')}</div>
-    <p class="suave">Um e-mail para cada etapa da ficha, da entrada e da saída do inquilino, e o informe anual do Imposto de Renda. O botão <b>✉ E-mail</b> de cada etapa abre o texto já preenchido para copiar, abrir no Gmail ou enviar.</p>
+    <p class="suave">Um e-mail para cada etapa da ficha, da entrada e da saída do inquilino, a régua de cobrança (lembretes antes e no dia do vencimento, boleto em atraso), as notificações ao inquilino, o novo valor do aluguel, os termos aditivos e o informe anual do Imposto de Renda. O botão <b>✉ E-mail</b> de cada etapa abre o texto já preenchido para copiar, abrir no Gmail ou enviar.</p>
     <div class="cartao"><table><tr><th>E-mail</th><th>Etapa</th><th></th></tr>${etapas.map((e) => MODELOS_EMAIL.filter((m) => m.etapa === e).map(linha).join('')).join('')}</table></div>${AJUDA}`;
 }
 

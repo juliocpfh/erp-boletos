@@ -278,32 +278,32 @@ export async function versaoDoPrograma(dir) {
   } catch { return ''; }
 }
 
-export const TEXTO_LEIAME = `PASTA DO BACKUP SEGURO - Administracao de Imoveis
+export const TEXTO_LEIAME = `PASTA DO BACKUP SEGURO - Administração de Imóveis
 ==================================================
 
-O que tem aqui (tudo cifrado: so abre com a SENHA DO BACKUP, que nao esta em lugar nenhum deste computador):
-- ${PASTA_DIARIO}/   uma copia do banco de dados por dia (ficam ${MANTER_DIARIOS})
-- ${PASTA_HORAS}/   uma copia do banco de cada hora em que houve gravacao (ficam os ultimos dias; para voltar a uma hora antes de um erro)
+O que tem aqui (tudo cifrado: só abre com a SENHA DO BACKUP, que não está em lugar nenhum deste computador):
+- ${PASTA_DIARIO}/   uma cópia do banco de dados por dia (ficam ${MANTER_DIARIOS})
+- ${PASTA_HORAS}/   uma cópia do banco de cada hora em que houve gravação (ficam os últimos dias; para voltar a uma hora antes de um erro)
 - ${PASTA_SEMANAL}/   backup completo por semana, com os anexos
-- ${PASTA_PROGRAMA}/   uma copia do programa (${ARQUIVO_PROGRAMA}), atualizada sozinha: reserva para um desastre
+- ${PASTA_PROGRAMA}/   uma cópia do programa (${ARQUIVO_PROGRAMA}), atualizada sozinha: reserva para um desastre
 
 SEM CIFRAR (para abrir, imprimir e copiar no Windows):
-- Arquivos dos imoveis/   copia aberta dos arquivos do sistema (imovel -> Inquilinos -> pessoa), atualizada sozinha.
-  E so para consulta: o que for posto ou mudado ali NAO vai para o sistema (anexe sempre pelo sistema).
+- Arquivos dos imoveis/   cópia aberta dos arquivos do sistema (imóvel -> Inquilinos -> pessoa), atualizada sozinha.
+  É só para consulta: o que for posto ou mudado ali NÃO vai para o sistema (anexe sempre pelo sistema).
 
-SE O SITE OU O CLOUDFLARE CAIREM (ou sem internet):
-Abra o sistema pelo icone do aplicativo instalado (ou pelo endereco de sempre no Chrome). Ele abre com os dados da
-ultima vez que este computador esteve conectado; trabalhe normalmente: o que voce fizer sobe sozinho quando o site voltar.
-Nao precisa desta pasta.
+SE O SITE OU A NUVEM CAÍREM (ou sem internet):
+Abra o sistema pelo ícone do aplicativo instalado (ou pelo endereço de sempre no Chrome). Ele abre com os dados da
+última vez que este computador esteve conectado; trabalhe normalmente: o que você fizer sobe sozinho quando o site voltar.
+Não precisa desta pasta.
 
-SO EM CASO DE DESASTRE (dados da nuvem perdidos, ex.: conta do Cloudflare perdida), com ajuda:
+SÓ EM CASO DE DESASTRE (dados da nuvem perdidos, ex.: conta da nuvem perdida; a nuvem fica na empresa Cloudflare), com ajuda:
 1. Abra ${PASTA_PROGRAMA}/${ARQUIVO_PROGRAMA} com dois cliques (Chrome ou Edge).
-2. Clique em "restaurar um backup seguro", escolha a copia mais recente de ${PASTA_DIARIO}/ (ou um completo),
+2. Clique em "restaurar um backup seguro", escolha a cópia mais recente de ${PASTA_DIARIO}/ (ou um completo),
    digite a senha do backup e mande abrir numa pasta nova do computador.
-3. O sistema abre inteiro, com os dados daquela copia. Pode trabalhar normalmente.
+3. O sistema abre inteiro, com os dados daquela cópia. Pode trabalhar normalmente.
 4. Para levar de volta a uma nuvem nova: Dados e backup -> "Substituir os dados da nuvem pelos de uma pasta".
 
-Nao mova nem renomeie os arquivos desta pasta. chave-do-backup.json e a chave: sem ele e sem a senha, nada abre.
+Não mova nem renomeie os arquivos desta pasta. chave-do-backup.json é a chave: sem ele e sem a senha, nada abre.
 `;
 
 /** LEIA-ME na pasta (sem cifrar, sem dados): como abrir a versão PC quando o site cair. */
@@ -312,7 +312,8 @@ export async function gravarLeiaMe(dir) {
     const atual = await (await (await dir.getFileHandle(ARQUIVO_LEIAME)).getFile()).text();
     if (atual === TEXTO_LEIAME) return;
   } catch { /* ainda não existe */ }
-  await gravar(dir, ARQUIVO_LEIAME, TEXTO_LEIAME);
+  // Com a marca de início (BOM), para o Bloco de Notas abrir os acentos certos; text() a tira ao comparar.
+  await gravar(dir, ARQUIVO_LEIAME, '﻿' + TEXTO_LEIAME);
 }
 
 /** Arquivos da pasta segura, do mais novo para o mais antigo. */
