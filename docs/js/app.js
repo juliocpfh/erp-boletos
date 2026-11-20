@@ -1461,7 +1461,9 @@ document.addEventListener('click', async (ev) => {
     const apaga = el.classList.contains('perigo') || el.classList.contains('x-excluir');
     const rotulo = (el.textContent || '').trim();
     el.dataset.ocupado = '1';
-    const ok = await confirmar(el.dataset.confirmar, { sim: rotulo && rotulo !== '×' && rotulo.length <= 40 ? rotulo : apaga ? 'Excluir' : 'Confirmar', forte: apaga });
+    const sim = rotulo && rotulo !== '×' && rotulo.length <= 40 ? rotulo : apaga ? 'Excluir' : 'Confirmar';
+    // a ação que já se chama "Cancelar…" não pode ter o "Cancelar" de desistir ao lado: o de desistir vira "Voltar"
+    const ok = await confirmar(el.dataset.confirmar, { sim, nao: /^cancelar/i.test(sim) ? 'Voltar' : 'Cancelar', forte: apaga });
     delete el.dataset.ocupado;
     if (!ok) return;
   }

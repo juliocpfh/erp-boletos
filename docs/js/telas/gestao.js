@@ -105,7 +105,7 @@ export function telaGestao(q) {
   return `<h1>Financeiro</h1>${abasFinanceiro('gestao')}
     <div class="cabecalho"><h2>Gestão · números de ${compBr(mes)}</h2>
       <div class="acoes"><a class="botao secundario" href="#/gestao?mes=${g.anterior}">← ${compBr(g.anterior)}</a>
-      <form data-form="ir" data-ir="gestao" class="acoes"><input type="month" name="mes" value="${esc(mes)}" max="${atual}" style="width:160px"><button class="secundario">Ir</button></form>
+      <form data-form="ir" data-ir="gestao" class="acoes"><input type="month" name="mes" value="${esc(mes)}" max="${atual}" class="campo-mes"><button class="secundario">Ir</button></form>
       ${mes < atual ? `<a class="botao secundario" href="#/gestao?mes=${g.proximo}">${compBr(g.proximo)} →</a>` : ''}
       ${botao('relatorioGestao', 'Relatório em PDF', { mes }, '')}</div></div>
     <div class="numeros numeros-largos">

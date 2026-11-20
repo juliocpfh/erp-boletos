@@ -13,7 +13,10 @@ import { botao, buscar, d, etiqueta, link, opera } from './comum.js';
 function origemTexto(f) {
   if (f.origem_tipo === 'cobranca') {
     const cb = buscar('cobrancas', f.origem_id);
-    return cb ? `<a href="#/cobranca/${cb.id}">Aluguel ${compBr(cb.competencia)}</a>` : 'Aluguel';
+    if (!cb) return 'Aluguel';
+    // parcela de acordo: o mês do boleto é interno; a NF cobra a parcela dos meses do acordo
+    if (R.ehParcelaAcordo(cb)) return `<a href="#/cobranca/${cb.id}">Acordo${cb.acordo_parcela ? ` ${esc(cb.acordo_parcela)}` : ''}${cb.acordo_referente ? ` (${esc(cb.acordo_referente)})` : ''}</a>`;
+    return `<a href="#/cobranca/${cb.id}">Aluguel ${compBr(cb.competencia)}</a>`;
   }
   if (f.origem_tipo === 'avulsa') {
     const a = buscar('avulsas', f.origem_id);
@@ -59,7 +62,7 @@ export function telaFaturas(mes) {
   const emitidas = grupos.filter(([, fs]) => fs[0].situacao === 'Emitida');
   return `<div class="cabecalho"><h1>NFs emitidas em ${compBr(mes)}</h1>
       <div class="acoes"><a class="botao secundario" href="#/faturas?mes=${C.somarMeses(mes, -1)}">← ${compBr(C.somarMeses(mes, -1))}</a>
-      <form data-form="ir" data-ir="faturas" class="acoes"><input type="month" name="mes" value="${esc(mes)}" style="width:160px"><button class="secundario">Ir</button></form>
+      <form data-form="ir" data-ir="faturas" class="acoes"><input type="month" name="mes" value="${esc(mes)}" class="campo-mes"><button class="secundario">Ir</button></form>
       <a class="botao secundario" href="#/faturas?mes=${C.somarMeses(mes, 1)}">${compBr(C.somarMeses(mes, 1))} →</a></div></div>
     <div class="cartao"><h2>Pagamentos aguardando número</h2>
       <p class="suave">Última NF: ${ultima ? `<b>Nº ${R.numeroFatura(ultima.numero)}</b> de ${dataBr(ultima.emissao)}` : 'nenhuma ainda'} · próximo número: <b>${R.numeroFatura(d().proxima_fatura)}</b>. A numeração segue a data contábil (em que o dinheiro entrou), e a data de emissão é essa data. Inquilinos marcados "sem NF" não entram.</p>
@@ -81,7 +84,7 @@ export function telaFaturas(mes) {
       ${grupos.map(([n, fs]) => { const ok = fs[0].situacao === 'Emitida'; return `<tr class="${ok ? '' : 'cancelada'}"><td>${ok ? `<input type="checkbox" data-nf="${n}">` : ''}</td><td><b>${R.numeroFatura(n)}</b>${fs[0].externa ? `<br>${etiqueta('fora do sistema', 'neutra')}` : ''}</td><td>${dataBr(fs[0].emissao)}</td><td>${esc(fs[0].tomador_nome)}</td><td>${origemTexto(fs[0])}</td>
         <td>${fs.map((f) => `${esc(buscar('emitentes', f.emitente_id).nome)}: ${reais(f.valor)}${ok ? ` ${botao('pdf', `PDF ${esc(siglaEmpresa(buscar('emitentes', f.emitente_id)))}`, { id: f.id }, 'link-botao')}` : ''}`).join('<br>')}</td><td class="n">${reais(fs.reduce((s, f) => s + f.valor, 0))}</td>
         <td>${etiqueta(fs[0].situacao, ok ? 'ok' : 'perigo')}</td>
-        <td class="n nw">${ok ? `${link(`#/imprimir/faturas?numero=${n}`, 'Ver')} ${botao('excel', 'Excel', { numero: n })}${opera() ? ` ${botao('cancelarNumero', 'Cancelar', { numero: n }, 'perigo pequeno', `Cancelar a NF nº ${R.numeroFatura(n)}? O pagamento volta para a fila e recebe um número novo. O número ${R.numeroFatura(n)} não será reaproveitado.`)}` : ''}`
+        <td class="n nw">${ok ? `${link(`#/imprimir/faturas?numero=${n}`, 'Ver')} ${botao('excel', 'Excel', { numero: n })}${opera() ? ` ${botao('cancelarNumero', 'Cancelar a NF', { numero: n }, 'perigo pequeno', `Cancelar a NF nº ${R.numeroFatura(n)}? O pagamento volta para a fila e recebe um número novo. O número ${R.numeroFatura(n)} não será reaproveitado.`)}` : ''}`
           : (podeUsuario('admin') ? botao('apagarCanceladas', '×', { numero: n }, 'x-excluir', `Apagar a NF cancelada nº ${R.numeroFatura(n)} da lista? Fica só o registro no Histórico.`) : '')}</td></tr>`; }).join('')
       || `<tr><td colspan="9">${mesSemNf(mes, pend)}</td></tr>`}</table></div>
     ${emitidas.length ? `<div class="acoes"><a class="botao" target="_blank" rel="noopener" href="#/imprimir/faturas?mes=${esc(mes)}">Imprimir todas as NFs de ${compBr(mes)}</a> ${botao('pdfMes', 'Baixar todas em PDF (ZIP)', { mes })}

@@ -145,13 +145,18 @@ export const CLAUSULAS_FCI = `[se fci]## FUNDO DE CONSERVAÇÃO DO IMÓVEL (FCI)
 
 **Parágrafo oitavo** – Havendo transferência do contrato a novo titular, com a anuência {l:da LOCADORA|das LOCADORAS}, o saldo do FCI acompanha a locação e será acertado com o titular que entregar as chaves, salvo ajuste diverso, por escrito, entre os titulares.[fim]`;
 
+/** Seguro incêndio por conta do inquilino (texto até 2026-11-20): sai dos modelos gravados (ATUALIZACOES_MODELO). */
+const SEGURO_ANTIGO = "[se residencial]**Parágrafo primeiro** – Diante da responsabilidade acima, o LOCATÁRIO autoriza desde já que seja feito o seguro de incêndio do imóvel locado, sendo seus prêmios e despesas por sua exclusiva conta, cobrados juntamente com o aluguel, já a partir do primeiro a vencer.[senão]**Parágrafo primeiro** – Diante da responsabilidade acima, o LOCATÁRIO deve apresentar apólice de cobertura de incêndio em até 30 (trinta) dias corridos da data de assinatura deste contrato ou contratá-la junto à administradora, sendo os prêmios e despesas por sua exclusiva conta, cobrados juntamente com o aluguel, já a partir do primeiro a vencer.[fim]\r";
+/** Seguro incluso no aluguel: a locadora contrata e o custo já está no aluguel (mutirão de 19/11, entrada-024). */
+const SEGURO_INCENDIO = `[se seguro_incluso]**Parágrafo primeiro** – O seguro contra incêndio do imóvel é contratado {l:pela LOCADORA|pelas LOCADORAS} e o seu custo já está incluído no valor do aluguel, sem cobrança à parte do LOCATÁRIO.[senão]${SEGURO_ANTIGO}[fim]`;
+
 const RESTITUICAO = `${VISTORIA_ENTRADA}
 
 **CLÁUSULA #** – Na ocasião do encerramento da relação locatícia, seja por término do contrato, rescisão ou despejo, o imóvel deverá ser entregue {l:à LOCADORA|às LOCADORAS} livre e desocupado de pessoas ou coisas, de forma a poder ser imediatamente ocupado por outrem, sem depender de reparos, limpezas ou reformas, na mesma forma e condições de apresentação e conservação em que foi entregue ao LOCATÁRIO.
 
 **CLÁUSULA #** – Responderá o LOCATÁRIO pelo incêndio do imóvel, se não provar caso fortuito ou força maior, vício de construção ou propagação de fogo originado de outro prédio.
 
-[se residencial]**Parágrafo primeiro** – Diante da responsabilidade acima, o LOCATÁRIO autoriza desde já que seja feito o seguro de incêndio do imóvel locado, sendo seus prêmios e despesas por sua exclusiva conta, cobrados juntamente com o aluguel, já a partir do primeiro a vencer.[senão]**Parágrafo primeiro** – Diante da responsabilidade acima, o LOCATÁRIO deve apresentar apólice de cobertura de incêndio em até 30 (trinta) dias corridos da data de assinatura deste contrato ou contratá-la junto à administradora, sendo os prêmios e despesas por sua exclusiva conta, cobrados juntamente com o aluguel, já a partir do primeiro a vencer.[fim]
+${SEGURO_INCENDIO}
 
 **Parágrafo segundo** – Até a data da emissão da apólice de seguro, responde o LOCATÁRIO[se fiador], solidariamente com {f:seu FIADOR|seus FIADORES},[fim] pelo incêndio do imóvel.
 
@@ -183,7 +188,7 @@ const RESCISAO = (horas) => `## RESCISÃO CONTRATUAL
 
 **CLÁUSULA #** – O LOCATÁRIO, ao término da locação, obriga-se a apresentar, na entrega das chaves, a quitação de todos os impostos e taxas (contas de água e esgoto, luz, condomínio, IPTU etc.) que forem de sua responsabilidade durante a vigência da locação.
 
-**CLÁUSULA #** – O presente contrato considerar-se-á rescindido de pleno direito, independentemente de qualquer formalidade judicial ou extrajudicial, nos casos de desapropriação, incêndio ou desabamento do imóvel locado[se fiador], bem como de falecimento, insolvência, recuperação judicial ou falência do fiador, de sua exoneração da fiança, da venda ou oneração dos imóveis que garantiam a fiança, ou de sua mudança para outra localidade, se não for substituído em até 30 (trinta) dias, contados da notificação ao LOCATÁRIO, por outro idôneo a critério {l:da LOCADORA|das LOCADORAS}, ficando neste caso o LOCATÁRIO em mora e sujeito a imediata ação de despejo[fim].`;
+**CLÁUSULA #** – O presente contrato considerar-se-á rescindido de pleno direito, independentemente de qualquer formalidade judicial ou extrajudicial, nos casos de desapropriação, incêndio ou desabamento do imóvel locado[se fiador], bem como de falecimento, insolvência, recuperação judicial ou falência {f:do fiador|de qualquer dos fiadores}, de sua exoneração da fiança, da venda ou oneração dos imóveis que garantiam a fiança, ou de sua mudança para outra localidade, se não for substituído em até 30 (trinta) dias, contados da notificação ao LOCATÁRIO, por outro idôneo a critério {l:da LOCADORA|das LOCADORAS}, ficando neste caso o LOCATÁRIO em mora e sujeito a imediata ação de despejo[fim].`;
 
 const GARANTIA = `[se fiador]## GARANTIA DO CONTRATO – {f:FIADOR|FIADORES}
 
@@ -191,11 +196,11 @@ const GARANTIA = `[se fiador]## GARANTIA DO CONTRATO – {f:FIADOR|FIADORES}
 
 [se imovel_fiador]**Parágrafo único** – A título de registro, {f:o FIADOR declara ser proprietário do seguinte imóvel|os FIADORES declaram ser proprietários dos seguintes imóveis}: {fiadores_imoveis}.[fim]
 
-**CLÁUSULA #** – O LOCATÁRIO nomeia e constitui {f:o FIADOR|os FIADORES} seu procurador, para fim especial, conjunta ou separadamente, de receber citações iniciais em ações de despejo ou de rescisão da locação e todas e quaisquer intimações ou notificações judiciais ou extrajudiciais referentes à presente locação, mandato este aceito com a assinatura do presente.[fim]
+**CLÁUSULA #** – O LOCATÁRIO nomeia e constitui {f:o FIADOR seu procurador|os FIADORES seus procuradores}, para fim especial, conjunta ou separadamente, de receber citações iniciais em ações de despejo ou de rescisão da locação e todas e quaisquer intimações ou notificações judiciais ou extrajudiciais referentes à presente locação, mandato este aceito com a assinatura do presente.[fim]
 
 [se caucao]## GARANTIA DO CONTRATO – CAUÇÃO
 
-**CLÁUSULA #** – O LOCATÁRIO concorda, desde já, em dar em caução, a título de garantia, o valor de {caucao_valor}, equivalente a {caucao_meses} meses de aluguel.
+**CLÁUSULA #** – O LOCATÁRIO concorda, desde já, em dar em caução, a título de garantia, o valor de {caucao_valor}, equivalente a {caucao_meses_aluguel} de aluguel.
 
 **Parágrafo único** – A cada 12 (doze) meses, concomitantemente ao reajuste estabelecido, o LOCATÁRIO pagará a diferença do reajuste, atualizando assim o valor da caução conforme o valor do aluguel.
 
@@ -229,7 +234,7 @@ ${REPRESENTACAO}
 ${extra}
 ${NEGATIVACAO}
 
-**CLÁUSULA #** – O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES}[fim] aceitam como válidas todas as comunicações ou notificações enviadas por via postal com aviso de recebimento (AR) ou por mensagem eletrônica (e-mail).
+**CLÁUSULA #** – O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES} aceitam[senão] aceita[fim] como válidas todas as comunicações ou notificações enviadas por via postal com aviso de recebimento (AR) ou por mensagem eletrônica (e-mail).
 
 **Parágrafo único** – As partes se obrigam a comunicar qualquer mudança de endereço, inclusive de endereço eletrônico.
 
@@ -254,7 +259,7 @@ const ADITIVO_VENCIMENTO = `# {numero_aditivo} TERMO ADITIVO AO CONTRATO DE LOCA
 
 ${PARTES}
 
-As partes acima, já qualificadas no Contrato de Locação {finalidade} do imóvel {objeto}, firmado em {data_contrato}, resolvem, de comum acordo e a pedido do LOCATÁRIO, celebrar o presente Termo Aditivo, conforme o art. 18 da Lei nº 8.245/91, mediante as cláusulas a seguir:
+As partes acima, já qualificadas no Contrato de Locação {finalidade} que tem por objeto {objeto}, firmado em {data_contrato}, resolvem, de comum acordo e a pedido do LOCATÁRIO, celebrar o presente Termo Aditivo, conforme o art. 18 da Lei nº 8.245/91, mediante as cláusulas a seguir:
 
 **CLÁUSULA #** – O aluguel mensal e os demais encargos da locação passam a vencer todo dia {dia_vencimento_novo} de cada mês, e não mais no dia {dia_vencimento_anterior}, a partir do vencimento de {primeiro_vencimento}, referente ao mês de {mes_referencia}.
 
@@ -283,7 +288,7 @@ const ADITIVO_VALOR = `# {numero_aditivo} TERMO ADITIVO AO CONTRATO DE LOCAÇÃO
 
 ${PARTES}
 
-As partes acima, já qualificadas no Contrato de Locação {finalidade} do imóvel {objeto}, firmado em {data_contrato}, resolvem, de comum acordo, fixar novo valor para o aluguel, conforme o art. 18 da Lei nº 8.245/91, mediante as cláusulas a seguir:
+As partes acima, já qualificadas no Contrato de Locação {finalidade} que tem por objeto {objeto}, firmado em {data_contrato}, resolvem, de comum acordo, fixar novo valor para o aluguel, conforme o art. 18 da Lei nº 8.245/91, mediante as cláusulas a seguir:
 
 **CLÁUSULA #** – A partir de {data_novo_valor}, o aluguel mensal passa de {aluguel_anterior} para **{aluguel_novo}**[se bonificacao], com bonificação de {bonificacao_novo} para pagamento até o vencimento, ficando em {aluguel_bonificado_novo}[fim].
 
@@ -367,7 +372,7 @@ const ADITIVO_TROCA = `# {numero_aditivo} TERMO ADITIVO AO CONTRATO DE LOCAÇÃO
 
 [se fiador]**#i. {f:FIADOR|FIADORES}:** {fiadores}, doravante {f:denominado|denominados} simplesmente {f:FIADOR|FIADORES}.[fim]
 
-As partes acima qualificadas, de comum acordo, resolvem aditar o Contrato de Locação {finalidade} do imóvel {objeto}, firmado em {data_contrato}, para substituir o locatário, com o consentimento prévio e por escrito {l:da LOCADORA|das LOCADORAS} exigido pelo art. 13 da Lei nº 8.245/91, mediante as cláusulas a seguir:
+As partes acima qualificadas, de comum acordo, resolvem aditar o Contrato de Locação {finalidade} que tem por objeto {objeto}, firmado em {data_contrato}, para substituir o locatário, com o consentimento prévio e por escrito {l:da LOCADORA|das LOCADORAS} exigido pelo art. 13 da Lei nº 8.245/91, mediante as cláusulas a seguir:
 
 ## DA SUBSTITUIÇÃO DO LOCATÁRIO
 
@@ -509,6 +514,15 @@ export const ATUALIZACOES_MODELO = [
   [ACERTO_CAUCAO_ANTIGO, `${ACERTO_CAUCAO_ANTIGO}${ACERTO_POUPANCA}`],
   [ACERTO_DEPOSITO_ANTIGO, `${ACERTO_DEPOSITO_ANTIGO}${ACERTO_POUPANCA}`],
   [DEVOLUCAO_ANTIGA, `será devolvida {a:ao LOCATÁRIO SAINTE|aos LOCATÁRIOS SAINTES}, com a correção prevista no contrato${DEVOLUCAO_POUPANCA}, descontados`],
+  // mutirão de 19/11 (lote F1): seguro incluso, concordância com um ou vários fiadores, caução de 1 aluguel, abertura dos aditivos
+  [SEGURO_ANTIGO, SEGURO_INCENDIO, '[se seguro_incluso]'],
+  ['recuperação judicial ou falência do fiador, de sua exoneração', 'recuperação judicial ou falência {f:do fiador|de qualquer dos fiadores}, de sua exoneração'],
+  ['constitui {f:o FIADOR|os FIADORES} seu procurador,', 'constitui {f:o FIADOR seu procurador|os FIADORES seus procuradores},'],
+  ['equivalente a {caucao_meses} meses de aluguel', 'equivalente a {caucao_meses_aluguel} de aluguel'],
+  ['O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES}[fim] aceitam como válidas', 'O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES} aceitam[senão] aceita[fim] como válidas'],
+  // a negativação (revisão de 13/11) entra antes das comunicações também quando elas já estão no texto novo
+  ["**CLÁUSULA #** – O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES} aceitam[senão] aceita[fim] como válidas todas as comunicações", `${NEGATIVACAO}\n\n**CLÁUSULA #** – O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES} aceitam[senão] aceita[fim] como válidas todas as comunicações`, 'depois do aviso prévio feito pelo próprio órgão'],
+  ['Contrato de Locação {finalidade} do imóvel {objeto},', 'Contrato de Locação {finalidade} que tem por objeto {objeto},'],
   [" úteis para providenciar a vistoria do imóvel. O aluguel e os encargos", ` úteis para providenciar a vistoria do imóvel. ${CONVITE_SAIDA} O aluguel e os encargos`, 'convidado por escrito, por e-mail, a acompanhar a vistoria'],
 ];
 

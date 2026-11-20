@@ -84,6 +84,14 @@ function porMesDoReajuste(lista, atual, q) {
   return [...grupos].map(([mes, rs], k) => [mes, rs, tudo || k === 0 || mes === atual || mes === proximo || mes === q.mes || rs.some((r) => String(r.contrato.id) === q.contrato)]);
 }
 
+/** Valores de uma correção já aplicada, no formato do cálculo (lista de reajustes em aberto). */
+function doCorrigido(c, r) {
+  const x = r.corrigido;
+  const bonif = (v) => v - C.descontoPorPercentual(v, R.percentualBonificacao(c));
+  return { ...r.calculo, indiceContrato: x.indice_contrato || r.calculo.indiceContrato || x.indice, escolhido: { indice: x.indice, registro: { mes_ref: x.data_indice || C.somarMeses(x.data_vigencia.slice(0, 7), -1) } },
+    percentual: x.percentual, faltando: [], atual: x.valor_anterior, novo: x.valor_novo, atualBonificado: bonif(x.valor_anterior), novoBonificado: bonif(x.valor_novo) };
+}
+
 /** Reajustes: índices acumulados informados por vocês e os contratos que corrigem nos próximos meses. */
 export function telaReajustes(q) {
   const atual = C.competenciaDe(C.hojeIso());
@@ -97,7 +105,8 @@ export function telaReajustes(q) {
   const meses = [...new Set(d().indices_acumulados.map((x) => x.mes_ref))].sort().reverse().slice(0, 12);
   const celula = (mes, nome) => {
     const x = d().indices_acumulados.find((y) => y.mes_ref === mes && y.indice === nome);
-    return x ? `${pct(x.percentual)}${opera() ? ` ${botao('excluir', '×', { tabela: 'indices_acumulados', id: x.id }, 'x-excluir', `Excluir ${x.indice} de ${compBr(mes)}?`)}` : ''}` : '<span class="suave">-</span>';
+    const usado = x && (d().correcoes || []).filter((y) => y.indice === x.indice && y.data_indice === x.mes_ref).length;
+    return x ? `${pct(x.percentual)}${opera() ? ` ${botao('excluir', '×', { tabela: 'indices_acumulados', id: x.id }, 'x-excluir', `Excluir ${x.indice} de ${compBr(mes)}?${usado ? ` Este índice já foi usado em ${usado} reajuste(s) aplicado(s): as correções continuam valendo, mas os reajustes ainda em aberto que dependem dele ficam sem o índice.` : ''}`)}` : ''}` : '<span class="suave">-</span>';
   };
   const nomesIndices = [...new Set(R.lista(d(), 'indices').flatMap((n) => n.replace(/\(.*\)/, '').split('/').map((x) => x.trim())).filter(Boolean))];
   return `<h1>Reajustes do aluguel</h1>
@@ -113,7 +122,7 @@ export function telaReajustes(q) {
       <p class="suave">Todos os reajustes do aluguel e da caução, de qualquer ano, são aplicados aqui (na página do inquilino fica só o histórico). O índice e os novos aluguéis vêm preenchidos pelo índice cadastrado: para usar outro índice ou arredondar, mude o % (recalcula os aluguéis), o aluguel cheio ou o bonificado (recalculam o % e o outro aluguel) e clique em "Aplicar correção" antes de gerar a carta: a carta sai com os valores aplicados. De anos anteriores não há carta. Ao aplicar, o sistema pergunta o vencimento e as parcelas do boleto do complemento da caução.</p>
       <div class="reajustes-lista">
       ${porMesDoReajuste(lista, atual, q).map(([mes, rs, aberto]) => (!aberto ? `<div class="reajuste-mes-fechado"><b>Aluguel de ${compBr(mes)}</b> <span class="suave">${rs.length} reajuste(s)</span>${mes < atual ? ` ${etiqueta('atrasado', 'aviso')}` : ''} ${link(`#/reajustes?mes=${mes}`, 'Mostrar')}</div>`
-    : `${rs.length < lista.length ? `<h3 class="reajuste-grupo">Aluguel de ${compBr(mes)} <span class="suave">(${rs.length})</span></h3>` : ''}${rs.map((r) => { const k = r.calculo; const c = r.contrato; const i = buscar('imoveis', c.imovel_id); const p = partesReajuste(c, r);
+    : `${rs.length < lista.length ? `<h3 class="reajuste-grupo">Aluguel de ${compBr(mes)} <span class="suave">(${rs.length})</span></h3>` : ''}${rs.map((r) => { const c = r.contrato; const k = r.corrigido ? doCorrigido(c, r) : r.calculo; const i = buscar('imoveis', c.imovel_id); const p = partesReajuste(c, r);
     // prévia da caução: segue as Regras do sistema (acompanha o reajuste? pelo aluguel com bonificação ou pelo cheio?), como o boleto do complemento
     const caucao = r.corrigido ? caucaoDoReajuste(c, r.corrigido) : R.regra('caucao_acompanha', c) && R.temCaucao(c) && R.garantiaDepositada(c) && c.caucao_meses > 0 && k.novo !== null
       ? `${reais(R.valorGarantia(d(), c))} → <b>${reais(c.caucao_meses * R.aluguelDaCaucao(k.novo, c))}</b>` : '<span class="suave">-</span>';
@@ -151,6 +160,20 @@ export function telaReajustes(q) {
       <p class="suave">"Desfazer correção" aparece só na correção mais recente de cada inquilino; com boleto da caução já pago, desfaça o pagamento antes.</p></div>`;
 }
 
+/**
+ * Frase da cobrança do depósito adicional da caução: pelos boletos do complemento já gerados (parcelado: cada parcela com o
+ * valor e o vencimento), senão um boleto com o vencimento do aluguel corrigido. Ex.: 2 × R$ 81,00 → "em 2 boletos separados:
+ * R$ 81,00 com vencimento em 10/12/2026 e R$ 81,00 com vencimento em 10/01/2027."
+ */
+function cobrancaDoComplemento(r, vencNovo) {
+  const bs = r && r.corrigido ? R.boletosCaucaoDa(d(), r.corrigido) : [];
+  if (bs.length > 1) {
+    const partes = bs.map((cb) => `<b>${reais(R.totais(cb).a_pagar_pontual)}</b> com vencimento em <b>${dataBr(cb.vencimento)}</b>`);
+    return `O depósito adicional será cobrado em <b>${bs.length} boletos separados</b>: ${partes.slice(0, -1).join(', ')} e ${partes.at(-1)}.`;
+  }
+  return `O depósito adicional será cobrado em <b>boleto separado</b>, com vencimento em <b>${dataBr(bs.length ? bs[0].vencimento : vencNovo)}</b>.`;
+}
+
 /** Carta de reajuste com a logo: felicitações por mais um ano e os novos valores. */
 export function cartaReajuste(c, comp) {
   const i = buscar('imoveis', c.imovel_id);
@@ -175,7 +198,8 @@ export function cartaReajuste(c, comp) {
   // texto do índice: digitado à mão (arredondado ou outro %) mostra também o acumulado do índice, quando cadastrado
   // índice negativo: o aluguel fica igual, como diz o contrato
   const negativo = x ? (x.percentual_indice < 0 ? x.percentual_indice : null) : k.indiceNegativo;
-  const indiceTexto = negativo !== null && negativo !== undefined && !(x && x.digitado)
+  const semMudanca = negativo !== null && negativo !== undefined && !(x && x.digitado);
+  const indiceTexto = semMudanca
     ? `o <b>${esc(k.escolhido.indice)}</b> acumulado nos últimos 12 meses ficou negativo (<b>${pct(negativo)}</b>): como diz o contrato, o aluguel continua o mesmo`
     : x && x.digitado
     ?`o aluguel será corrigido em <b>${pct(k.percentual)}</b>${k.doIndice !== null && k.doIndice !== k.percentual ? ` (${esc(k.escolhido.indice)} acumulado nos últimos 12 meses: ${pct(k.doIndice)})` : ''}`
@@ -190,15 +214,15 @@ export function cartaReajuste(c, comp) {
     <p>Prezado(a) <b>${esc(c.inquilino_nome)}</b>,<br>Imóvel: <b>${esc(i ? `${i.nome} - ${R.enderecoCompleto(i)}` : '')}</b></p>
     <p>Com o aluguel de <b>${K.mesPorExtenso(comp)}</b> completamos <b>${r ? r.anos : ''} ano${r && r.anos > 1 ? 's' : ''}</b> de parceria. Agradecemos a confiança${pontualNoAno(c, comp) ? ' e a pontualidade' : ''}, e é uma satisfação ter você conosco.</p>
     <p>Conforme a cláusula de reajuste anual do contrato, ${indiceTexto}.</p>
-    <table class="carta-tabela"><tr><th></th><th class="n">Atual</th><th class="n">A partir do aluguel de ${compBr(comp)}</th></tr>
-      <tr><td>Aluguel</td><td class="n">${reais(k.atual)}</td><td class="n"><b>${reais(k.novo)}</b></td></tr>
-      ${k.bonificacao ? `<tr><td>Aluguel com bonificação (pagamento em dia)</td><td class="n">${reais(k.atualBonificado)}</td><td class="n"><b>${reais(k.novoBonificado)}</b></td></tr>` : ''}</table>
-    <p>O novo valor será cobrado a partir do boleto do aluguel de <b>${compBr(comp)}</b>, com vencimento em <b>${dataBr(vencNovo)}</b>.${caucao ? '' : ' As demais condições do contrato permanecem as mesmas.'}</p>
-    ${caucao ? `<p>Conforme o contrato, a caução dada em garantia equivale a <b>${caucao.meses} aluguéis</b> e acompanha o valor do aluguel corrigido. Por isso é necessário um depósito adicional:</p>
+    <table class="carta-tabela"><tr><th></th><th class="n">${semMudanca ? 'Valor' : 'Atual'}</th>${semMudanca ? '' : `<th class="n">A partir do aluguel de ${compBr(comp)}</th>`}</tr>
+      <tr><td>Aluguel</td><td class="n">${reais(k.atual)}</td>${semMudanca ? '' : `<td class="n"><b>${reais(k.novo)}</b></td>`}</tr>
+      ${k.bonificacao ? `<tr><td>Aluguel com bonificação (pagamento em dia)</td><td class="n">${reais(k.atualBonificado)}</td>${semMudanca ? '' : `<td class="n"><b>${reais(k.novoBonificado)}</b></td>`}</tr>` : ''}</table>
+    <p>${semMudanca ? 'O valor do aluguel não muda.' : `O novo valor será cobrado a partir do boleto do aluguel de <b>${compBr(comp)}</b>, com vencimento em <b>${dataBr(vencNovo)}</b>.`}${caucao ? '' : ' As demais condições do contrato permanecem as mesmas.'}</p>
+    ${caucao ? `<p>Conforme o contrato, a caução dada em garantia equivale a <b>${caucao.meses} ${caucao.meses === 1 ? 'aluguel' : 'aluguéis'}</b> e acompanha o valor do aluguel corrigido. Por isso é necessário um depósito adicional:</p>
     <table class="carta-tabela"><tr><td>Caução já depositada</td><td class="n">${reais(caucao.atual)}</td></tr>
       <tr><td>Caução necessária (${caucao.meses} × aluguel atualizado)</td><td class="n">${reais(caucao.nova)}</td></tr>
       <tr><td><b>Depósito adicional</b></td><td class="n"><b>${reais(caucao.nova - caucao.atual)}</b></td></tr></table>
-    <p>O depósito adicional será cobrado em <b>boleto separado</b>, com vencimento em <b>${dataBr(vencNovo)}</b>. As demais condições do contrato permanecem as mesmas.</p>` : ''}
+    <p>${cobrancaDoComplemento(r, vencNovo)} As demais condições do contrato permanecem as mesmas.</p>` : ''}
     <p>Seguimos à sua disposição para sanar qualquer dúvida.</p>
     <p>Atenciosamente,<br><b>${esc(empresa.nome)}</b></p></div>`;
 }

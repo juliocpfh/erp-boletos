@@ -124,7 +124,7 @@ function caixaGarantia(c) {
   // caução e depósito: registro em depósitos (data, valor, comprovante opcional) até completar o valor do contrato
   const formDeposito = (qual, falta) => (opera() ? `<form data-form="garantiaPaga" class="acoes linha-deposito"><input type="hidden" name="contrato" value="${c.id}"><input type="hidden" name="qual" value="${qual}">
       <input type="date" name="data" value="${esc(C.hojeIso())}" title="Data do depósito">${F.atalhosData()}
-      <input name="valor" value="${esc(C.reais(falta, false))}" title="Valor depositado (R$)" class="valor">
+      <input name="valor" inputmode="decimal" data-dinheiro value="${esc(C.reais(falta, false))}" title="Valor depositado (R$)" class="valor">
       <label class="botao secundario mini enviar" title="Comprovante (PDF ou foto); pode anexar depois"><span data-nome-escolhido>📎 comprovante</span><input type="file" name="arquivo" accept="application/pdf,image/*" data-arquivo-doc></label>
       <button class="mini">Registrar depósito</button></form>` : '');
   const anexoDeposito = (qual, x) => ({ tabela: 'depositos_garantia', id: x.id, campo: 'comprovante', tipo: qual === 'caucao' ? 'caucao' : 'deposito-garantia', data: x.data });
@@ -275,7 +275,7 @@ function caixaGarantia(c) {
         <td class="n nw">${editar(`#/editar/aplicacoes/${a.id}?contrato=${c.id}`)} ${excluir('aplicacoes', a.id, 'Excluir esta aplicação? O comprovante também é apagado.')}</td></tr>`; }).join('')}
       <tr class="total"><td colspan="7">Aplicado de ${reais(sit.total)}${R.garantiaDepositada(c) ? '' : ' <span class="suave">(já depositado)</span>'}</td><td class="n">${reais(sit.soma)}</td><td colspan="2">${situacaoTotal}</td></tr></table>`;
   }
-  return `${html}${linkRecibo('garantia', c, `Recibo da ${R.temCaucao(c) ? 'caução' : 'garantia'} (para o inquilino)`)}</div>`;
+  return `${html}${linkRecibo('garantia', c, `Recibo da ${R.temCaucao(c) || (REC.garantiaPaga(d(), c) || {}).qual === 'caucao' ? 'caução' : 'garantia'} (para o inquilino)`)}</div>`;
 }
 
 /**
