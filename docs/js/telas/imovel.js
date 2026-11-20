@@ -38,7 +38,8 @@ function caixaEmpresas(i) {
 function tabelaIptu(p) {
   const ps = R.parcelasIptu(d(), p);
   const parteInquilino = (pc) => (!pc.inquilinos.length ? '<span class="suave">-</span>' : pc.inquilinos.map((x) => `<a href="#/contrato/${x.contrato.id}">${esc(x.contrato.inquilino_nome)}</a> ${reais(x.valor)}${x.dias < x.diasMes ? ` <span class="suave">(${x.dias}/${x.diasMes} dias)</span>` : ''}`).join('<br>'));
-  const suaParte = (pc) => (!pc.valorProprietario ? '<span class="suave">-</span>' : `<b>${reais(pc.valorProprietario)}</b>${pc.n === 0 ? '' : ` <span class="suave">(${pc.valorInquilino ? 'dias vazios' : 'imóvel vazio ou sem IPTU no contrato'})</span>`}`);
+  // parcela com valor fixo arredondado (2026-11-20): o inquilino paga um pouco mais que a guia e a sobra é sua
+  const suaParte = (pc) => (!pc.valorProprietario ? '<span class="suave">-</span>' : pc.valorProprietario < 0 ? `<span class="suave">sobra ${reais(-pc.valorProprietario)} (arredondamento da parcela)</span>` : `<b>${reais(pc.valorProprietario)}</b>${pc.n === 0 ? '' : ` <span class="suave">(${pc.valorInquilino ? 'dias vazios' : 'imóvel vazio ou sem IPTU no contrato'})</span>`}`);
   const guia = (pc) => {
     if (pc.paga) return `${etiqueta(`paga em ${dataBr(pc.paga)}`, 'ok')} ${opera() ? botao('iptuPago', 'desfazer', { id: p.id, n: pc.n, data: '' }, 'link-botao', 'Desfazer o pagamento desta guia?') : ''}`;
     const aberta = pc.proprietario ? etiqueta('em aberto', 'perigo') : '';
@@ -46,15 +47,15 @@ function tabelaIptu(p) {
     const texto = `IPTU ${p.ano} · ${pc.rotulo}${pc.n === 0 ? '' : ' parcela'}: sua parte ${reais(pc.valorProprietario)}${pc.vencimento ? ` · vence ${dataBr(pc.vencimento)}` : ''}`;
     return opera() ? `${aberta} ${botao('iptuPago', 'Marcar como paga', { id: p.id, n: pc.n, texto }, 'secundario pequeno')}` : aberta;
   };
-  return `<div class="rolagem"><table><tr><th>Parcela</th><th>Vence na prefeitura</th><th>Boleto do inquilino</th><th class="n">Valor</th><th>Parte do inquilino</th><th>Sua parte</th><th>Guia na prefeitura</th></tr>
-    ${ps.map((pc) => `<tr><td>${pc.rotulo}</td><td>${pc.vencimento ? dataBr(pc.vencimento) : '<span class="suave">-</span>'}</td><td>${pc.mesBoleto ? compBr(pc.mesBoleto) : pc.comp ? `<span class="suave">aluguel de ${compBr(pc.comp)}</span>` : '-'}</td><td class="n">${reais(pc.valor)}</td>
+  return `<div class="rolagem"><table><tr><th>Parcela</th><th>Vence na prefeitura</th><th>Boleto do inquilino</th><th class="n">Valor da guia</th><th>Parte do inquilino</th><th>Sua parte</th><th>Guia na prefeitura</th></tr>
+    ${ps.map((pc) => `<tr><td>${pc.rotulo}</td><td>${pc.vencimento ? dataBr(pc.vencimento) : '<span class="suave">-</span>'}</td><td>${pc.mesBoleto ? compBr(pc.mesBoleto) : pc.comp ? `<span class="suave">aluguel de ${compBr(pc.comp)}</span>` : '-'}</td><td class="n">${reais(pc.valor)}${pc.valorCobrado !== undefined && pc.valorCobrado !== pc.valor ? `<br><span class="suave">no boleto ${reais(pc.valorCobrado)}</span>` : ''}</td>
       <td>${parteInquilino(pc)}</td><td>${suaParte(pc)}</td><td>${guia(pc)}</td></tr>`).join('')}</table></div>`;
 }
 
 /** Uma linha: quanto do IPTU do ano os inquilinos pagam nos boletos e quanto fica com você. */
 function resumoIptu(p) {
   const t = R.totaisIptu(d(), p);
-  return `<p>Inquilino(s) pagam <b>${reais(t.inquilino)}</b> nos boletos · ${t.proprietario < 0 ? `sobra <b>${reais(-t.proprietario)}</b> para você (desconto do pagamento à vista)` : `sua parte <b>${reais(t.proprietario)}</b>`}${t.emAberto ? ` · ${etiqueta(`${reais(t.emAberto)} em aberto`, 'perigo')}` : ''}</p>`;
+  return `<p>Inquilino(s) pagam <b>${reais(t.inquilino)}</b> nos boletos · ${t.proprietario < 0 ? `sobra <b>${reais(-t.proprietario)}</b> para você (desconto do pagamento à vista ou arredondamento da parcela)` : `sua parte <b>${reais(t.proprietario)}</b>`}${t.emAberto ? ` · ${etiqueta(`${reais(t.emAberto)} em aberto`, 'perigo')}` : ''}</p>`;
 }
 
 function caixaIptu(i) {

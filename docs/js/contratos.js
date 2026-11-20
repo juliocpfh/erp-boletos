@@ -388,6 +388,8 @@ export function pendenciasDoContrato(d, c) {
   if (c.garantia_tipo === 'Caução' && !(c.caucao_valor > 0) && !(c.caucao_meses > 0)) falta.push('caução: valor ou quantos aluguéis');
   if (!c.vigencia_inicio || (c.prazo_tipo !== 'Indeterminado' && !c.vigencia_fim)) falta.push('datas do contrato');
   if (!c.indice_correcao) falta.push('índice de correção');
+  // o seguro contra incêndio sempre existe (2026-11-20): contrato antigo "Não tem" sai com o texto do seguro por conta do inquilino
+  if (c.conta_seguro === 'Não tem') falta.push('seguro contra incêndio: escolha quem paga (o contrato está como "Não tem"; sai como "por conta do inquilino")');
   // troca de titular com a garantia que continua: o fiador ainda está no contrato de quem sai (vai ao termo, `fiadoresDaTroca`)
   if (['Fiador', 'Fiador + depósito'].includes(c.garantia_tipo) && !d.fiadores.some((f) => f.contrato_id === c.id && !f.substituido_por_id)
     && !(c.contrato_anterior_id && fiadoresDaTroca(d, c).length)) falta.push('fiador');

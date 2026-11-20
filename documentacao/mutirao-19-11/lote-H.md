@@ -60,8 +60,8 @@ Como trabalhar: ver `../MUTIRAO_19_11.md`. Marque `[x]` ao corrigir. G = grave, 
   - Vê-se: Em todo boleto, a linha "Aluguel R$ 1.500,00 (Bonif. R$ 1.350,00)" não quebra e empurra a tabela do demonstrativo 22 px para fora do cartão (a página fica com 342 de largura numa tela de 320). O celular encolhe a página inteira ou deixa a tela escorregando pa…
   - Causa: `docs/js/telas/cobrancas.js:271 + docs/css/estilo.css:42 (td.n nowrap) e estilo.css:158 (.demonstrativo padding 24px)`
   - Fazer: No celular, '.demonstrativo td.n { white-space: normal }' (ou pôr o '(Bonif. …)' em linha própria) e padding menor no .demonstrativo.
-- [ ] **textos-022** [L] O mês do aluguel tem quatro nomes: "Competência", "Mês de referência", "Mês da conta" e "mês de uso"
-  - Nota (20/11): NÃO corrigido: falta o dono escolher o nome único (ex.: "mês de referência" em vez de "Competência", "Mês da conta", "mês de uso").
+- [x] **textos-022** [L] O mês do aluguel tem quatro nomes: "Competência", "Mês de referência", "Mês da conta" e "mês de uso"
+  - Feito (20/11): o dono escolheu "Mês de referência": rótulos e textos das telas (Boletos, demonstrativo, inquilino, contas pagas por nós, Banco, Fechamento, ajuda, Excel) trocados; os campos do banco (`competencia`) não mudam.
   - Vê-se: Em Boletos: "Competência é o mês de uso do imóvel." Fora dali o sistema usa "Mês de referência" (custos, Airbnb), "Mês da conta" (contas do imóvel), "mês de uso" (ajuda) e "aluguel de novembro". "Competência" é palavra de contador e só é explicada nessa linha.
   - Causa: `docs/js/telas/cobrancas.js:159; docs/js/telas/financeiro.js:119,215,235; docs/js/telas/banco.js:629,735,736`
   - Fazer: Escolher um nome com o dono (ex.: "mês de referência") e usar em todos os rótulos.

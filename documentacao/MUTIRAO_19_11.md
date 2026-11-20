@@ -1,6 +1,6 @@
 # Mutirão de 19–20/11/2026: busca geral de erros (índice dos lotes)
 
-Pedido do dono (19/11): achar tudo o que está quebrado, sem sentido ou duplicado. 13 frentes procuraram e um segundo agente conferiu cada achado pelo código. **345 confirmados** (15 graves, 107 médios, 223 leves; uns 57 são o mesmo defeito achado por duas frentes). **Em 20/11 foram corrigidos todos os lotes** (PRs #329 e a seguinte). `[~]` = falta item que espera o dono: F1 impressos-011 (seguro incêndio sempre existe, decisão de 20/11), H textos-022 (nome único para o mês do aluguel), I fios-019 (apagar 4 telas antigas, aprovado em 20/11), J1 mensal-033 (IPTU: sobra abate o custo, decisão de 20/11). Os achados estão em lotes na pasta `mutirao-19-11/`; cada lote é uma PR.
+Pedido do dono (19/11): achar tudo o que está quebrado, sem sentido ou duplicado. 13 frentes procuraram e um segundo agente conferiu cada achado pelo código. **345 confirmados** (15 graves, 107 médios, 223 leves; uns 57 são o mesmo defeito achado por duas frentes). **Em 20/11 foram corrigidos todos os lotes** (PRs #329 e as seguintes); os 4 itens que esperavam o dono (F1 impressos-011, H textos-022, I fios-019, J1 mensal-033) foram feitos com as decisões de 20/11 (branch `claude/mutirao-19-11-decisoes`). Os achados estão em lotes na pasta `mutirao-19-11/`; cada lote é uma PR.
 
 ## Para a próxima instância (leia só isto e o lote da vez)
 
@@ -22,12 +22,12 @@ Pedido do dono (19/11): achar tudo o que está quebrado, sem sentido ou duplicad
 | [x] | [D1](mutirao-19-11/lote-D1.md) | Ficha pela internet, fichas e comunicados (1/2) | 32 | 0/9/23 | `comunicados.js` `nuvem/contatos-publico.mjs` `nuvem/ficha-publica.mjs` `t/comunicacoes.js` `t/fichas.js` |
 | [x] | [D2](mutirao-19-11/lote-D2.md) | Ficha pela internet, fichas e comunicados (2/2) | 1 | 0/0/1 | `t/fichas.js` |
 | [x] | [E](mutirao-19-11/lote-E.md) | E-mails e notificações | 22 | 0/5/17 | `email-dados.js` `modelos-email.js` `t/emails.js` `t/notificacoes.js` `t/regua.js` |
-| [~] | [F1](mutirao-19-11/lote-F1.md) | Contrato, vistoria, recibos e impressos (1/2) | 32 | 0/12/20 | `contratos.js` `modelos-contrato.js` `recibos.js` `t/documentos.js` |
+| [x] | [F1](mutirao-19-11/lote-F1.md) | Contrato, vistoria, recibos e impressos (1/2) | 32 | 0/12/20 | `contratos.js` `modelos-contrato.js` `recibos.js` `t/documentos.js` |
 | [x] | [F2](mutirao-19-11/lote-F2.md) | Contrato, vistoria, recibos e impressos (2/2) | 9 | 0/2/7 | `t/documentos.js` `t/faturas.js` `t/reajustes.js` |
 | [x] | [G](mutirao-19-11/lote-G.md) | Banco e Financeiro | 29 | 0/5/24 | `conciliacao.js` `t/banco-c6.js` `t/banco.js` `t/fechamento.js` `t/financeiro.js` `t/gestao.js` |
-| [~] | [H](mutirao-19-11/lote-H.md) | Boletos e pagamentos (telas) | 23 | 0/7/16 | `t/cobrancas.js` `t/envios.js` |
-| [~] | [I](mutirao-19-11/lote-I.md) | Cadastros e formulários (valores aceitos sem conferir) | 27 | 0/12/15 | `calculos.js` `formularios.js` `t/cadastros.js` `t/campos.js` |
-| [~] | [J1](mutirao-19-11/lote-J1.md) | Regras de negócio (regras.js) (1/2) | 32 | 0/18/14 | `regras.js` |
+| [x] | [H](mutirao-19-11/lote-H.md) | Boletos e pagamentos (telas) | 23 | 0/7/16 | `t/cobrancas.js` `t/envios.js` |
+| [x] | [I](mutirao-19-11/lote-I.md) | Cadastros e formulários (valores aceitos sem conferir) | 27 | 0/12/15 | `calculos.js` `formularios.js` `t/cadastros.js` `t/campos.js` |
+| [x] | [J1](mutirao-19-11/lote-J1.md) | Regras de negócio (regras.js) (1/2) | 32 | 0/18/14 | `regras.js` |
 | [x] | [J2](mutirao-19-11/lote-J2.md) | Regras de negócio (regras.js) (2/2) | 5 | 0/0/5 | `regras.js` |
 | [x] | [K](mutirao-19-11/lote-K.md) | Ações dos botões (telas/acoes.js) | 21 | 0/6/15 | `t/acoes.js` |
 | [x] | [L](mutirao-19-11/lote-L.md) | Aparência e celular (estilo.css, app.js, visualizador) | 29 | 0/4/25 | `app.js` `estilo.css` `indice.js` `t/comum.js` `t/consultas.js` `t/contrato.js` … |

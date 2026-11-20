@@ -133,8 +133,9 @@ export const DEFINICOES_REGRAS = [
     explica: 'Quem paga o IPTU nos contratos novos.', consequencia: 'Só muda o que vem preenchido.', lei: LI + ', art. 22, VIII, e art. 25.' },
   { chave: 'conta_seguro_padrao', grupo: 'contrato', rotulo: 'Seguro contra incêndio que vem preenchido', tipo: 'opcao', padrao: 'Por conta do inquilino',
     opcoes: [['Por conta do inquilino', 'Por conta do inquilino (padrão do sistema)', 'Legal com cláusula expressa no contrato (art. 22, VIII).'],
-      ['Incluso no aluguel', 'Incluso no aluguel', 'O locador paga, como diz a lei quando o contrato não fala nada. Legal.'], ['Não tem', 'Não tem', 'Risco: o imóvel fica sem seguro.']],
-    explica: 'Quem paga o seguro obrigatório nos contratos novos.', consequencia: 'Só muda o que vem preenchido.', lei: LI + ', art. 22, VIII.' },
+      ['Incluso no aluguel', 'Incluso no aluguel', 'O locador paga, como diz a lei quando o contrato não fala nada. Legal.']],
+    // sem "Não tem" (decisão do dono de 2026-11-20: o seguro contra incêndio sempre existe); escolha antiga "Não tem" volta ao padrão
+    explica: 'Quem paga o seguro obrigatório nos contratos novos (o seguro sempre existe).', consequencia: 'Só muda o que vem preenchido.', lei: LI + ', art. 22, VIII.' },
 
   // ------------------------------------------------------------------ rotina
   { chave: 'regua_cobranca', grupo: 'rotina', rotulo: 'Régua de cobrança', tipo: 'regua',

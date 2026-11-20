@@ -30,7 +30,7 @@ const ROTULOS = { numero: 'Número', divida_na_data: 'Dívida na data', dias_mes
   fci_devolver: 'FCI a devolver', fci_usado: 'FCI usado', fci_credito: 'Crédito do FCI', fci_danos: 'Danos pagos pelo FCI', fci_valor: 'Valor do FCI',
   fci_data: 'Data do FCI', fci_calculado_em: 'FCI calculado em', fci_indice: 'Índice do FCI', fci_percentual: 'FCI (%)', valor_nf: 'Valor da NF',
   acordo_parcela_de: 'Parcela do acordo nº', diferenca_devida: 'Diferença devida (vai ao boleto seguinte)', diferenca_no_boleto: 'Diferença cobrada no boleto nº',
-  competencia: 'Competência', situacao: 'Situação', descricao: 'Descrição', observacao: 'Observação', observacoes: 'Observações',
+  competencia: 'Mês de referência', situacao: 'Situação', descricao: 'Descrição', observacao: 'Observação', observacoes: 'Observações',
   criado_em: 'Criado em', alterado_em: 'Alterado em', data_pagamento: 'Data do pagamento', valor_pago: 'Valor pago', vencimento: 'Vencimento',
   regra: 'Regra', chave: 'Chave' };
 

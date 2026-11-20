@@ -257,11 +257,7 @@ test('troca de garantia e de fiador ficam no histórico', () => {
   assert.equal(ct.garantia_tipo, 'Fiador');
   assert.equal(R.valorGarantia(d, ct), 0);
   assert.deepEqual(R.trocasGarantiaDo(d, c.id).map((t) => [t.tipo_anterior, t.tipo_novo, t.valor_anterior]), [['Caução', 'Fiador', 630000]]);
-  const f1 = R.inserir(d, 'fiadores', { contrato_id: c.id, nome: 'Fiador A' }, 'julio');
-  R.trocarFiador(d, f1.id, { data_troca: '2026-05-01', nome: 'Fiador B' }, 'julio');
-  assert.deepEqual(R.fiadoresDo(d, c.id).map((f) => f.nome), ['Fiador B']);
-  assert.deepEqual(R.fiadoresAnterioresDo(d, c.id).map((f) => [f.nome, f.data_saida]), [['Fiador A', '2026-04-30']]); // sai na véspera da troca (mutirão 3000, item 29)
-  assert.throws(() => R.trocarFiador(d, f1.id, { data_troca: '2026-06-01', nome: 'C' }, 'julio'));
+  // (a troca de um fiador por outro avulsa saiu em 2026-11-20: é feita em "Trocar garantia ou fiador", trocarGarantia)
   // volta para caução: correções da caução antiga não contam
   R.trocarGarantia(d, c.id, { data: '2026-07-01', garantia_tipo: 'Caução', caucao_valor: 700000, caucao_data: '2026-07-01' }, 'julio');
   assert.equal(R.valorGarantia(d, R.buscar(d, 'contratos', c.id)), 700000);

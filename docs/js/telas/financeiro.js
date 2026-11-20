@@ -1,4 +1,5 @@
 // Financeiro: visão geral do mês (extratos), resultado bruto e líquido por imóvel (custos e Airbnb lançados ali), impostos, inadimplência, onde está a caução e contas pagas por nós.
+import { podeUsuario } from '../app.js';
 import * as C from '../calculos.js';
 import * as Z from '../conciliacao.js';
 import { compBr, dataBr, hojeIso, pct, reais } from '../calculos.js';
@@ -80,7 +81,9 @@ const maisAntigos = (total, mostrados, href) => (total > mostrados ? `<p class="
  * "×" de excluir a conta paga por nós: só na lançada à mão. A que veio do extrato mostra "extrato" e a paga pelo sistema via C6,
  * "pelo banco" (excluir as duas é recusado: o destino se desfaz na tela Banco). Mesma regra no quadro "+ custo" e em "Contas pagas por nós".
  */
-const excluirDespesa = (x) => (x.movimentacao_id ? '<span class="suave">extrato</span>' : x.pagamento_banco_id ? '<span class="suave">pelo banco</span>'
+// conta paga pelo banco (2026-11-20): só o administrador corrige o lançamento (valor, mês, imóvel); o pagamento no banco fica
+const corrigirBanco = (x) => (x.pagamento_banco_id && podeUsuario('admin') ? `<br>${botao('corrigirContaBanco', 'Corrigir', { id: x.id }, 'secundario mini')}` : '');
+const excluirDespesa = (x) => (x.movimentacao_id ? `<span class="suave">extrato</span>${corrigirBanco(x)}` : x.pagamento_banco_id ? `<span class="suave">pelo banco</span>${corrigirBanco(x)}`
   : opera() ? botao('excluir', '×', { tabela: 'despesas', id: x.id }, 'x-excluir', `Excluir ${x.tipo} de ${compBr(x.competencia)} (${reais(x.valor)})?`) : '');
 
 /** Coluna "Banco" dos lançamentos: movimentação do extrato ligada à conta (com o comprovante) ou "sem extrato". */
@@ -130,7 +133,7 @@ export function telaContas(rota) {
       O IPTU pago por nós é lançado na caixa do IPTU do imóvel (já abate dos resultados).</div>
     <form class="cartao" data-form="lancarContas">
       <input type="hidden" name="imovel" value="${i.id}">
-      <div class="acoes" style="margin-bottom:10px"><label style="margin:0">Mês da conta</label><input type="month" name="competencia" value="${esc(comp)}" style="width:auto" data-trocar-mes="${i.id}">
+      <div class="acoes" style="margin-bottom:10px"><label style="margin:0">Mês de referência</label><input type="month" name="competencia" value="${esc(comp)}" style="width:auto" data-trocar-mes="${i.id}">
         <button type="button" class="secundario pequeno" data-acao="repetirContas">Repetir os últimos valores</button></div>
       <div class="rolagem"><table class="responsiva"><tr><th>Conta</th><th>Valor pago</th><th>Vencimento</th><th>Pago em</th><th>Observação</th><th></th></tr>
         ${R.TIPOS_DESPESA.map(linha).join('')}</table></div>
@@ -243,7 +246,7 @@ function painelCusto(i, voltar) {
     ${s.rotulo ? `<p>${etiqueta(s.rotulo, s.classe)}</p>` : '<p class="suave">Pelo contrato, o inquilino paga as contas: lance aqui só o que for nosso (ex.: débito antigo, troca de titular).</p>'}
     ${opera() ? `<form data-form="lancarCusto" class="grade-lancar"><input type="hidden" name="imovel" value="${i.id}">
       <label>Conta<select name="tipo">${R.TIPOS_DESPESA.map((t) => `<option>${esc(t)}</option>`).join('')}</select></label>
-      <label>Mês da conta<input type="month" name="competencia" value="${C.competenciaDe(hoje)}"></label>
+      <label>Mês de referência<input type="month" name="competencia" value="${C.competenciaDe(hoje)}"></label>
       <label>Valor pago<input name="valor" data-dinheiro inputmode="decimal" placeholder="0,00"></label>
       <label>Vencimento<input type="date" name="vencimento"></label>
       <label>Pago em<input type="date" name="data_pagamento" value="${hoje}">${F.atalhosData()}</label>

@@ -108,11 +108,11 @@ Como trabalhar: ver `../MUTIRAO_19_11.md`. Marque `[x]` ao corrigir. G = grave, 
   - Vê-se: No boleto 1/2 do complemento (R$ 81,00) o demonstrativo diz "Caução já depositada R$ 3.600,00 · Nova caução (2 aluguéis) R$ 3.681,00". Dois aluguéis são R$ 3.762,00; R$ 3.681,00 é só a caução depois desta parcela. O texto para o banco repete: "NOVA CAUÇÃO RS3…
   - Causa: `docs/js/regras.js:998 e 5033; docs/js/telas/cobrancas.js:249`
   - Fazer: Com parcela, mostrar "Parcela 1/2", a caução depois desta parcela e a caução necessária.
-- [ ] **mensal-033** [L] IPTU com parcela arredondada: a tela diz que você paga à prefeitura a soma das parcelas arredondadas, não o valor real
+- [x] **mensal-033** [L] IPTU com parcela arredondada: a tela diz que você paga à prefeitura a soma das parcelas arredondadas, não o valor real
   - Vê-se: Quando o IPTU tem "Valor fixo cobrado por parcela" (a ajuda do campo dá o exemplo de arredondar para R$ 213,00), o sistema usa esse valor arredondado também como o valor da guia da prefeitura. Ex.: IPTU de R$ 2.125,37 em 10 parcelas com valor fixo de R$ 213,0…
   - Causa: `docs/js/regras.js:1377 (valoresIptu), 1536-1542 (valor da guia e valorProprietario), 1599-1605 (custo); docs/js/telas/consultas.js:237`
   - Fazer: Em parcelasIptu, usar dividirIptu(p) para o valor da guia e o valor fixo só para o que é cobrado do inquilino; mostrar a diferença como sobra do proprietário.
-  - Pendente (20/11): muda o custo do IPTU nos Resultados (a sobra do arredondamento passa a abater o custo do proprietário): espera o dono confirmar.
+  - Feito (20/11, decisão do dono): `parcelasIptu` usa a guia real (`valor`) e o valor fixo só no boleto (`valorCobrado`); a sobra (ex.: R$ 4,63) fica como parte do dono negativa e abate o IPTU nos Resultados (quando a guia é marcada paga ou, sem ela, quando o inquilino pagou o boleto).
 - [x] **saida-021** [L] Dar baixa na 2ª notificação não fecha a 1ª quando ela tem multa: fica "Multa gerada" em aberto para sempre
   - Vê-se: A baixa na notificação mais nova resolve as anteriores do mesmo assunto que estão "Reiterada". Mas se a 1ª teve multa gerada, ela está como "Multa gerada" e não é fechada: o assunto está resolvido (2ª "Resolvida"), e a 1ª segue na lista "Em aberto" em vermelh…
   - Causa: `docs/js/regras.js:5829 e 5811`

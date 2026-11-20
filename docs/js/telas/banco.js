@@ -636,7 +636,7 @@ export function caixaPagarPeloBanco(i, comp) {
     ${bancoAtivo() ? '' : avisoNaoConfigurado()}${config().permitir_pagamentos ? '' : avisoPagamentosDesligados()}
     ${!opera() || !config().permitir_pagamentos ? '' : `<form data-form="pagarPeloBanco"><input type="hidden" name="imovel" value="${i.id}"><input type="hidden" name="competencia" value="${comp}">
       <div class="acoes" style="margin-bottom:10px"><label style="margin:0">Conta que paga</label><select name="conta" style="width:auto">${lista.map((c) => `<option value="${esc(c.id)}" ${c.id === sugerida ? 'selected' : ''}>${esc(nomeConta(c.id))}</option>`).join('') || '<option value="">(nenhuma conta configurada)</option>'}</select>
-        <span class="suave">Mês da conta: <b>${compBr(comp)}</b> (troque no formulário acima)</span></div>
+        <span class="suave">Mês de referência: <b>${compBr(comp)}</b> (troque no formulário acima)</span></div>
       ${permitidas.tipos.length ? `<div class="rolagem"><table><tr><th>Conta</th><th>Código de barras ou Pix</th><th>Valor</th><th>Pagar em</th></tr>${R.TIPOS_DESPESA.filter((t) => permitidas.tipos.includes(t)).map((t) => linha(t, R.TIPOS_DESPESA.indexOf(t))).join('')}</table></div>
       <p class="suave">Preencha só as contas que quer pagar. "Preparar pagamento" guarda o pagamento como rascunho e manda os códigos ao banco, que confere o beneficiário e o vencimento e mostra aqui. Nada é pago nesta etapa.${config().limite_pagamento > 0 ? ` Limite por pagamento: ${reais(config().limite_pagamento)}.` : ''}</p>
       <div class="acoes">${bancoAtivo() ? '<button>Preparar pagamento</button>' : botaoInativo('Preparar pagamento', R.motivoBancoInativo(d()) || TITULO_AGUARDANDO, '')}</div>`
@@ -743,7 +743,7 @@ async function janelaDestino(m, inicialDe = null) {
     <p data-campo="despesa"><label>Conta do imóvel já lançada</label><select name="despesa" style="width:100%"></select>
       <span class="suave">Contas lançadas no mês anterior e no mês desta saída. Escolha qual conta e de qual mês é; se não for nenhuma, "lançar agora": o sistema cria a conta com o valor e a data da movimentação.</span></p>
     <p data-campo="tipo_despesa"><label>Qual conta</label><select name="tipo_despesa" style="width:100%"></select>
-      <label>Mês da conta</label><input type="month" name="competencia" value="${compInicial}" style="width:100%"></p>
+      <label>Mês de referência</label><input type="month" name="competencia" value="${compInicial}" style="width:100%"></p>
     <div data-campo="airbnb"><p><label>Mês de referência do Airbnb</label><input type="month" name="competencia_air" value="${compInicial}" style="width:100%"></p>
       <p><label>Quanto é de cada imóvel vago</label></p><div data-air-lista></div>
       <p class="suave" data-air-soma></p></div>
