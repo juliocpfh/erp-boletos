@@ -1,6 +1,7 @@
 // Boletos: lista do mês (#/cobrancas), página do boleto (#/cobranca/ID), baixa em lote, ajuste do mês e demonstrativo.
 import * as AJ from '../ajuda.js';
 import * as C from '../calculos.js';
+import { rotuloDocumento } from '../contratos.js';
 import { compBr, dataBr, pct, reais } from '../calculos.js';
 import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
@@ -243,10 +244,10 @@ export function demonstrativo(cb) {
     return `<div class="demonstrativo"><div class="cabecalho"><div><h2 style="margin:0">Demonstrativo do boleto: complemento da caução</h2><div class="suave">Aluguel corrigido a partir de ${compBr(cb.competencia)}</div></div>
       <div style="text-align:right"><div class="suave">Vencimento</div><div class="maior"><b>${dataBr(cb.vencimento)}</b></div></div></div>
     <div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>
-    <p><b>Inquilino:</b> ${esc(c.inquilino_nome)}${c.inquilino_cpf ? ` · CPF/CNPJ ${esc(c.inquilino_cpf)}` : ''}${c.inquilino_telefone ? ` · ${esc(c.inquilino_telefone)}` : ''}</p>
+    <p><b>Inquilino:</b> ${esc(c.inquilino_nome)}${c.inquilino_cpf ? ` · ${rotuloDocumento(c.inquilino_cpf)} ${esc(c.inquilino_cpf)}` : ''}${c.inquilino_telefone ? ` · ${esc(c.inquilino_telefone)}` : ''}</p>
     <table><tr><th>Descrição</th><th class="n">Valor</th></tr>
       ${linha('Caução já depositada', reais(cb.caucao_anterior))}
-      ${linha(`Nova caução${c.caucao_meses ? ` (${c.caucao_meses} aluguéis)` : ''}`, reais(cb.caucao_nova))}
+      ${linha(`Nova caução${c.caucao_meses ? ` (${c.caucao_meses} ${c.caucao_meses === 1 ? 'aluguel' : 'aluguéis'})` : ''}`, reais(cb.caucao_nova))}
       <tr class="total"><td>Depósito adicional a pagar até ${dataBr(cb.vencimento)}</td><td class="n maior">${reais(t.a_pagar_pontual)}</td></tr>
       <tr><td colspan="2" class="suave">Após o vencimento: sem multa e juros.</td></tr></table>
     ${cb.data_pagamento ? `<p><b>Pago em ${dataBr(cb.data_pagamento)}</b>${cb.dias_atraso ? ` com ${cb.dias_atraso} dia(s) de atraso` : ''} · recebido ${reais(cb.valor_pago)}</p>` : ''}
@@ -256,7 +257,7 @@ export function demonstrativo(cb) {
     return `<div class="demonstrativo"><div class="cabecalho"><div><h2 style="margin:0">Demonstrativo do boleto: acordo${cb.acordo_parcela ? ` (parcela ${esc(cb.acordo_parcela)})` : ''}</h2><div class="suave">Referente a ${esc(cb.acordo_referente || '')}</div></div>
       <div style="text-align:right"><div class="suave">Vencimento</div><div class="maior"><b>${dataBr(cb.vencimento)}</b></div></div></div>
     <div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>
-    <p><b>Inquilino:</b> ${esc(c.inquilino_nome)}${c.inquilino_cpf ? ` · CPF/CNPJ ${esc(c.inquilino_cpf)}` : ''}${c.inquilino_telefone ? ` · ${esc(c.inquilino_telefone)}` : ''}</p>
+    <p><b>Inquilino:</b> ${esc(c.inquilino_nome)}${c.inquilino_cpf ? ` · ${rotuloDocumento(c.inquilino_cpf)} ${esc(c.inquilino_cpf)}` : ''}${c.inquilino_telefone ? ` · ${esc(c.inquilino_telefone)}` : ''}</p>
     <table><tr><th>Descrição</th><th class="n">Valor</th></tr>
       ${linha(`Parcela${cb.acordo_parcela ? ` ${esc(cb.acordo_parcela)}` : ''} do acordo dos boletos em atraso (${esc(cb.acordo_referente || '')})`, reais(t.total_sem_desconto))}
       <tr class="total"><td>Valor a pagar até ${dataBr(cb.vencimento)}${prazoNaoUtil(cb)}</td><td class="n maior">${reais(t.a_pagar_pontual)}</td></tr>
@@ -266,7 +267,7 @@ export function demonstrativo(cb) {
   return `<div class="demonstrativo"><div class="cabecalho"><div><h2 style="margin:0">Demonstrativo do boleto de aluguel</h2><div class="suave">Competência ${compBr(cb.competencia)}</div></div>
       <div style="text-align:right"><div class="suave">Vencimento</div><div class="maior"><b>${dataBr(cb.vencimento)}</b></div></div></div>
     <div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>
-    <p><b>Inquilino:</b> ${esc(c.inquilino_nome)}${c.inquilino_cpf ? ` · CPF/CNPJ ${esc(c.inquilino_cpf)}` : ''}${c.inquilino_telefone ? ` · ${esc(c.inquilino_telefone)}` : ''}</p>
+    <p><b>Inquilino:</b> ${esc(c.inquilino_nome)}${c.inquilino_cpf ? ` · ${rotuloDocumento(c.inquilino_cpf)} ${esc(c.inquilino_cpf)}` : ''}${c.inquilino_telefone ? ` · ${esc(c.inquilino_telefone)}` : ''}</p>
     <table><tr><th>Descrição</th><th class="n">Valor</th></tr>
       ${cb.carencia ? linha('Aluguel: carência (não cobrado neste mês)', reais(0)) : linha(`Aluguel${cb.dias_cobrados < cb.dias_mes ? ` proporcional: ${cb.dias_cobrados} de ${cb.dias_mes} dias de ${reais(cb.aluguel_mensal)}` : ''}`, `${reais(cb.aluguel)}${cb.desconto ? ` <span class="suave">(Bonif. ${reais(cb.aluguel - cb.desconto)})</span>` : ''}`)}
       ${cb.iptu ? linha(`IPTU${cb.iptu_parcela ? ` (${esc(cb.iptu_parcela)})` : ''}`, reais(cb.iptu)) : ''}

@@ -452,7 +452,7 @@ export const CORRECAO = [
 export const SEGURO = [
   campo('seguradora', 'Seguradora'),
   campo('apolice', 'Nº da apólice'),
-  campo('telefone_assistencia', 'Telefone da assistência', 'texto', { ajuda: 'Ex.: 0800 000 0000 (chaveiro, encanador, vidraceiro do seguro)' }),
+  campo('telefone_assistencia', 'Telefone da assistência', 'texto', { teclado: 'tel', ajuda: 'Ex.: 0800 000 0000 (chaveiro, encanador, vidraceiro do seguro)' }),
   campo('data_contratacao', 'Data de contratação', 'data'),
   campo('vigencia_inicio', 'Início da vigência', 'data', { obrig: true }),
   campo('vigencia_fim', 'Fim da vigência', 'data', { obrig: true }),
@@ -585,7 +585,7 @@ export const AVULSA = [
   campo('periodo_inicio', 'Período: de', 'data'),
   campo('periodo_fim', 'Período: até', 'data'),
   campo('tomador_nome', 'Cliente na NF', 'texto', { obrig: true, largo: true, max: LIMITES.tomador_nome }),
-  campo('tomador_documento', 'CPF / CNPJ do cliente'),
+  campo('tomador_documento', 'CPF / CNPJ do cliente', 'cpfcnpj'),
   campo('tomador_telefone', 'Telefone do cliente', 'tel'),
   campo('tomador_endereco', 'Endereço na NF', 'texto', { largo: true, max: LIMITES.tomador_endereco }),
   campo('municipio', 'Município', 'texto', { padrao: 'CURITIBA', max: LIMITES.municipio }),
@@ -853,7 +853,8 @@ export function camposHtml(campos, valores = {}, erros = {}, { compacto = false 
       // link fica como texto: o navegador recusaria "onedrive.live.com/..." sem https://, e ler() completa sozinho
       const tipo = { data: 'date', mes: 'month', email: 'email', tel: 'tel' }[c.tipo] || 'text';
       const extra = c.tipo === 'dinheiro' ? 'inputmode="decimal" data-dinheiro placeholder="0,00"' : c.tipo === 'pct' ? 'inputmode="decimal"' : c.tipo === 'inteiro' ? 'inputmode="numeric"'
-        : [...DOCUMENTOS, 'tel'].includes(c.tipo) ? `inputmode="numeric" data-mascara="${c.tipo}"${c.preencher ? ` data-preencher="${esc(JSON.stringify(c.preencher))}"` : ''}${c.buscarPessoa ? ' data-buscar-pessoa' : ''}` : '';
+        : [...DOCUMENTOS, 'tel'].includes(c.tipo) ? `inputmode="numeric" data-mascara="${c.tipo}"${c.preencher ? ` data-preencher="${esc(JSON.stringify(c.preencher))}"` : ''}${c.buscarPessoa ? ' data-buscar-pessoa' : ''}`
+        : c.teclado ? `inputmode="${c.teclado}"` : ''; // teclado: 'tel' (0800 e números curtos, sem a conferência do telefone com DDD)
       const vinc = c.vinculo ? `data-vinculo="${c.vinculo}" data-tipo="${c.tipo}"` : c.base ? 'data-vinculo-base' : '';
       // sugestões: o que já foi escrito antes aparece para escolher (e dá para escrever outro)
       const lista = c.sugestoes ? `list="${id}_sugestoes" autocomplete="off"` : '';
