@@ -345,6 +345,11 @@ table.compacta td, table.compacta th { padding: 3px 6px; font-size: 13px; }
 .carta-tabela { margin: 14px 0; }
 .carta-tabela td, .carta-tabela th { padding: 6px 10px; }
 @media print { .carta { border: 0; padding: 0; position: static; overflow: visible; } }
+/* celular: a carta (reajuste, recibos) com menos margem; a tabela quebra a linha do título e, se ainda não couber, rola */
+@media screen and (max-width: 760px) {
+  .carta { padding: 20px 14px; overflow-x: auto; overflow-y: hidden; }
+  .carta-tabela th.n, .carta-tabela th { white-space: normal; }
+}
 
 /* NF emitida fora do sistema */
 .nf-externa { display: inline-block; text-align: left; }
@@ -389,9 +394,11 @@ pre.texto-modelo { white-space: pre-wrap; font: inherit; background: #f4f5f7; bo
 textarea.texto-modelo { min-height: 60vh; font-family: Consolas, 'Courier New', monospace; font-size: 13px; line-height: 1.5; }
 @media (max-width: 640px) { .contrato { padding: 24px 18px 90px; } .ct-grupo-assina, .ct-grupo-assina.um { grid-template-columns: 1fr; } .contrato .ct-rodape { left: 18px; right: 18px; } }
 @media print {
-  @page { size: A4; margin: 2.2cm 2.2cm 2cm 2.8cm; }
+  /* margens só do contrato (página com nome): a NF, as cartas e os recibos ficam com a margem geral de 10 mm */
+  .contrato { page: contrato; }
+  @page contrato { size: A4; margin: 2.2cm 2.2cm 2cm 2.8cm; }
   /* 1ª página: margem de cima menor (dentro da área que a impressora imprime): a logo fica a 1 cm da borda, como no PDF e no Word */
-  @page :first { margin-top: 1cm; }
+  @page contrato:first { margin-top: 1cm; }
   .contrato { border: 0; padding: 0; max-width: none; overflow: visible; font-size: 11pt; position: static; overflow-wrap: anywhere; }
   /* nada passa da margem: endereço comprido quebra a linha e foto/tabela cabe na largura da folha */
   .contrato .ct-pagina { table-layout: fixed; }
@@ -764,3 +771,46 @@ form[data-alterado] .barra-salvar::before { content: "Há mudanças não salvas:
 /* Regras do sistema: busca */
 .busca-regras { position: sticky; top: 0; z-index: 5; }
 .busca-regras input { max-width: 420px; }
+/* Avisos ("Salvo." e os outros que não são erro): presos no alto da tela, por cima do conteúdo, também no fim de uma
+   página comprida (antes ficavam no topo da página, fora da vista de quem estava rolado lá embaixo) */
+#mensagens { position: sticky; top: 0; z-index: 60; }
+#mensagens .alerta.mensagem { box-shadow: 0 4px 14px rgba(15, 23, 42, .18); }
+@media print { #mensagens { position: static; } }
+/* NF na tela: largura fixa; no celular rola dentro da caixa (a página não alarga e os botões não encolhem) */
+.rolagem-nf { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
+@media print { .rolagem-nf { overflow: visible; } }
+/* documentos de entrada (página do inquilino): "Documento perdido" (vermelho) separado de "Marcar"/"Falta assinatura" */
+.doc-acoes { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+/* IPTU de cada ano (página do imóvel): título de um lado, Editar e × do outro */
+.titulo-iptu { display: flex; justify-content: space-between; align-items: center; gap: 6px 12px; flex-wrap: wrap; margin: 16px 0 8px; }
+.titulo-iptu h3 { margin: 0; }
+.titulo-iptu .acoes { gap: 10px; }
+/* seta de recolher a caixa: dentro do título, junto dele */
+h2 > .recolher-caixa { margin-right: 2px; }
+@media (max-width: 760px) {
+  /* alvos de toque de 40 px também nas telas de impressão, nas janelas e no visualizador */
+  .impressao button, .impressao .botao, dialog button, dialog .botao, .vis-topo button, .vis-topo .botao { min-height: 40px; }
+  /* links com cara de botão: o texto no meio da altura (antes ficava colado em cima) */
+  main a.botao, main label.botao, main span.botao, .impressao a.botao, .impressao label.botao, dialog a.botao, dialog label.botao {
+    display: inline-flex; align-items: center; justify-content: center; }
+  main .x-excluir, main button.x-excluir { min-width: 40px; }
+  /* link "⚠ anexar o termo assinado" e parecidos */
+  .anexar-falta { display: inline-flex; align-items: center; min-height: 36px; }
+  /* topo: "Trocar senha" e "Sair" com altura de dedo e afastados; botão do menu também */
+  header.topo .conta { gap: 18px; flex-wrap: wrap; }
+  header.topo .conta a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 8px; font-size: 14px; }
+  .menu-botao { min-height: 40px; }
+  /* linhas de abrir/fechar e caixinhas de marcar maiores */
+  main summary { min-height: 40px; padding-top: 9px; padding-bottom: 9px; box-sizing: border-box; }
+  main input[type=checkbox], main input[type=radio], dialog input[type=checkbox], dialog input[type=radio] { width: 22px; height: 22px; }
+  /* seta de recolher a caixa: alvo de 40 px */
+  .recolher-caixa, button.recolher-caixa { min-width: 40px; text-align: center; padding: 0; }
+  /* textos grandes (modelo de contrato e de e-mail, descritivo da vistoria): 16 px para o iPhone não ampliar a tela */
+  textarea.texto-modelo { font-size: 16px; }
+  /* IPTU's: clipe de anexar a guia com tamanho de dedo */
+  .clipes-iptu .clipe-anexar { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; min-height: 40px; }
+  /* Imóveis em cartões: o nome de cada valor (o aluguel e o valor do imóvel ficavam soltos); sem valor, nada */
+  table.lista-imoveis.cartoes-auto td.aluguel-imovel::before { content: "Aluguel (bonificado)"; display: block; font-size: 11px; color: var(--suave); text-transform: uppercase; letter-spacing: .03em; }
+  table.lista-imoveis.cartoes-auto td.valor-imovel::before { content: "Valor do imóvel: "; display: inline; text-transform: none; font-size: 12px; }
+  table.lista-imoveis.cartoes-auto td.valor-imovel.sem-valor { display: none; }
+}

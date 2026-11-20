@@ -1070,7 +1070,8 @@ export async function listaArquivos(escopo, id, modo = '') {
       // tipo forçado pela extensão conhecida: um arquivo estranho na pasta não abre como página
       const u = URL.createObjectURL(new Blob([await S.abrirArquivo(dir, a.nome)], { type: S.tipoParaAbrir(a.nome) || 'application/octet-stream' }));
       urls.push(u);
-      return `<figure><a href="${u}" target="_blank" rel="noopener noreferrer"><img src="${u}" alt="${esc(a.nome)}"></a><figcaption><span>${esc(a.nome)}</span>${opera() ? botao('excluirArquivo', '×', { escopo, id, nome: a.nome }, 'x-excluir', 'Excluir esta foto?') : ''}</figcaption></figure>`;
+      // abre como os outros anexos (no celular, no visualizador do sistema com "Baixar" e "Fechar"), não numa aba solta
+      return `<figure><a href="#" data-acao="abrirArquivo" data-escopo="anuncio" data-id="${id}" data-nome="${esc(a.nome)}" title="Abrir ${esc(a.nome)}"><img src="${u}" alt="${esc(a.nome)}"></a><figcaption><span>${esc(a.nome)}</span>${opera() ? botao('excluirArquivo', '×', { escopo, id, nome: a.nome }, 'x-excluir', 'Excluir esta foto?') : ''}</figcaption></figure>`;
     }));
     return `<div class="fotos">${figs.join('')}</div>`;
   }

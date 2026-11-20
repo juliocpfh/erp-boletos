@@ -20,7 +20,7 @@ function guardarRecolhidas(pagina, conjunto) {
 const tituloDa = (cx) => {
   const t = cx.matches('details') ? cx.querySelector(':scope > summary') : (cx.querySelector(':scope > .cabecalho > h2, :scope > h2') || cx.querySelector('h2'));
   // sem o ☰ (alça do administrador para arrastar), a contagem "(3)" e o que vem depois de " · "
-  return t ? t.textContent.replace(/☰/g, '').replace(/\s*\([^)]*\)\s*$/, '').split(' · ')[0].replace(/\s+/g, ' ').trim() : '';
+  return t ? t.textContent.replace(/[☰▾▸]/g, '').replace(/\s*\([^)]*\)\s*$/, '').split(' · ')[0].replace(/\s+/g, ' ').trim() : '';
 };
 const idDe = (texto) => paraNomeDeArquivo(texto).slice(0, 40);
 
@@ -73,8 +73,14 @@ export function montarIndice(raiz, pagina) {
       b.setAttribute('aria-expanded', String(!agora));
       if (agora) recolhidas.add(x.nome); else recolhidas.delete(x.nome);
       guardarRecolhidas(pagina, recolhidas);
+      // abriu: as tabelas dela não foram medidas no desenho (estavam escondidas); app.js as arruma (cartões no celular)
+      if (!agora) x.cx.dispatchEvent(new CustomEvent('caixa-aberta', { bubbles: true }));
     });
-    (cab.tagName === 'H2' ? x.cx : cab).insertBefore(b, cab.tagName === 'H2' ? cab : cab.firstChild);
+    // a seta entra no começo do título (h2), para seta e título ficarem juntos à esquerda (no cabeçalho com
+    // "space-between" a seta solta empurrava o título para o meio ou para a direita)
+    const h2 = cab.tagName === 'H2' ? cab : cab.querySelector(':scope > h2');
+    if (h2) h2.insertBefore(b, h2.firstChild);
+    else cab.insertBefore(b, cab.firstChild);
   }
   if (!COM_INDICE.has(pagina)) return;
   const nav = document.createElement('nav');

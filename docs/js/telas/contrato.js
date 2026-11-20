@@ -689,12 +689,12 @@ function caixaDocumentos(c) {
   const linhas = R.DOCUMENTOS_ENTRADA.map(([k, nome, feito]) => `<tr${(perdido(k) && !aguardaPerda(k)) || perdaAnterior(k) ? ' class="doc-perdido"' : parcial(k) ? ' class="doc-parcial"' : ''}><td><b>${esc(nome)}</b></td>
     <td>${situacaoDoc(k, feito)}</td>
     <td class="nw">${doc(k) || perdido(k) || parcial(k) || original ? '' : gerar[k]}</td>
-    <td class="n nw">${herdado(k) ? abrir(k) : c[k] ? `${abrirProprio(k)}
+    <td class="n nw"><div class="doc-acoes">${herdado(k) ? abrir(k) : c[k] ? `${abrirProprio(k)}
       ${opera() ? botao('desmarcarDocumento', 'Desfazer', { contrato: c.id, campo: k }, 'link-botao', `Voltar "${nome}" para pendente? O arquivo assinado também é apagado.`) : ''}`
     : !opera() || perdido(k) || original ? '' : formMarcarDocumento(c, k, feito, !parcial(k))}
       ${opera() && !doc(k) && !original ? (perdido(k) ? botao('desmarcarPerdido', 'Desfazer "perdido"', { contrato: c.id, campo: k }, 'link-botao')
         : parcial(k) ? botao('desfazerParcial', 'Desfazer "falta assinatura"', { contrato: c.id, campo: k }, 'link-botao', 'Tirar o registro de assinatura faltante? O documento volta a pendente e o arquivo é apagado.')
-        : botao('documentoPerdido', 'Documento perdido', { contrato: c.id, campo: k }, 'perigo pequeno', `Registrar "${nome}" como perdido? A linha fica em vermelho, sem alerta geral.${adm ? '' : ' O administrador vai analisar.'}`)) : ''}</td></tr>`).join('');
+        : botao('documentoPerdido', 'Documento perdido', { contrato: c.id, campo: k }, 'perigo pequeno', `Registrar "${nome}" como perdido? A linha fica em vermelho, sem alerta geral.${adm ? '' : ' O administrador vai analisar.'}`)) : ''}</div></td></tr>`).join('');
   return `<div class="cartao" id="documentos"><div class="cabecalho"><h2>Contrato, Vistoria, Termos e Aditivos</h2>
       ${opera() && !R.fimDeVinculo(d(), c) ? link(`#/vistoria/novo?contrato=${c.id}&tipo=Saída`, 'Fazer vistoria de saída') : ''}</div>
     <div class="rolagem"><table>${linhas}</table></div>
@@ -801,8 +801,9 @@ export function telaContrato(c) {
   const novo = !!c.data_entrada && hoje < C.somarMesesData(c.data_entrada, 2);
   // as duas caixas mudam de lugar juntas; a posição de "inquilino novo" e a de depois são arrumadas à parte (ícone ☰)
   const contas = `<div data-caixa="Titularidade e leituras · ${novo ? 'inquilino novo' : 'depois de 2 meses'}"><div class="cartao"><div class="cabecalho"><h2>Trocas de titularidade deste inquilino</h2>${opera() && i ? link(`#/novo/titularidades?imovel=${i.id}&contrato=${c.id}`, 'Registrar protocolo') : ''}</div>
-      <table><tr><th>Data</th><th>Concessionária</th><th>Tipo</th><th>Protocolo</th><th>Situação</th></tr>
-      ${d().titularidades.filter((t) => t.contrato_id === c.id).map((t) => `<tr><td>${dataBr(t.data)}</td><td>${esc(t.concessionaria)}</td><td>${esc(t.tipo || '-')}</td><td><b>${esc(t.protocolo || '-')}</b></td><td>${esc(t.situacao || '-')}</td></tr>`).join('') || '<tr><td colspan="5" class="suave">Nenhum protocolo registrado.</td></tr>'}</table></div>
+      ${((tt) => tt.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Concessionária</th><th>Tipo</th><th>Protocolo</th><th>Situação</th></tr>
+      ${tt.map((t) => `<tr><td>${dataBr(t.data)}</td><td>${esc(t.concessionaria)}</td><td>${esc(t.tipo || '-')}</td><td><b>${esc(t.protocolo || '-')}</b></td><td>${esc(t.situacao || '-')}</td></tr>`).join('')}</table></div>`
+    : '<p class="suave">Nenhum protocolo registrado.</p>')(d().titularidades.filter((t) => t.contrato_id === c.id))}</div>
     ${caixaLeituras(R.leiturasDo(d(), c.id), opera() && i ? link(`#/novo/leituras?imovel=${i.id}&contrato=${c.id}`, 'Registrar leitura') : '', false)}</div>`;
   return `<p class="suave">${i ? `<a href="#/imovel/${i.id}">← ${esc(i.nome)}</a> · ` : ''}<a href="#/inquilinos">Todos os inquilinos</a></p>
     <div class="cabecalho"><h1>${esc(c.inquilino_nome)}${c.inquilino_apelido ? ` <span class="suave">(${esc(c.inquilino_apelido)})</span>` : ''}</h1><div class="acoes">

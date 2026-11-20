@@ -335,7 +335,8 @@ export const TELAS = {
     // contas embaixo do endereço, cada uma numa coluna sem título (alinhadas de cima a baixo; a coluna cresce com o número maior)
     // o endereço ocupa as colunas das contas e mais uma de sobra, sem quebrar; sem número, "vazio"
     const CONTAS = [['💧', 'sanepar_matricula'], ['⚡', 'copel_uc'], ['🔥', 'gas_relogio'], ['📶', 'internet'], ['🏢', 'administradora_nome']];
-    const celulasContas = (i) => CONTAS.map(([t, k]) => `<td class="conta">${t} ${i[k] ? `<b>${esc(i[k])}</b>` : '<span class="vazio">vazio</span>'}</td>`).join('');
+    const NOMES_CONTAS = { sanepar_matricula: 'Água', copel_uc: 'Luz', gas_relogio: 'Gás', internet: 'Internet', administradora_nome: 'Condomínio' };
+    const celulasContas = (i) => CONTAS.map(([t, k]) => `<td class="conta" title="${NOMES_CONTAS[k]}">${t}<span class="so-celular"> ${NOMES_CONTAS[k]}</span> ${i[k] ? `<b>${esc(i[k])}</b>` : '<span class="vazio">vazio</span>'}</td>`).join('');
     // matrícula ao lado do nome (número ou vazio); embaixo do nome, os clipes dela (📎1, 📎2…, apagar em "✎ Editar") e o botão "Anexar"
     const numeroMatricula = (i) => `<span class="contas">📄 Matrícula ${i.matricula ? `nº <b>${esc(i.matricula)}</b>` : '<span class="vazio">vazio</span>'}</span>`;
     const anexosMatricula = (i) => `<span class="contas matricula"><span data-arquivos="matricula:${i.id}"></span>
@@ -345,8 +346,8 @@ export const TELAS = {
       const atuais = d().contratos.filter((c) => c.imovel_id === i.id && R.contratoAtivo(c, hoje) && !R.herancaAgendada(d(), c, hoje)).sort((a, b) => b.data_entrada.localeCompare(a.data_entrada));
       const aluguel = atuais.length ? atuais.map((c) => `${R.geraNf(c) ? '' : `${etiqueta('boleto de controle', 'controle')}<br>`}<span class="nw">${reais(R.aluguelAtual(d(), c))}</span>${c.bonificacao === false ? '' : ` <span class="suave nw">(${reais(valorBonificado(c))})</span>`}`).join('<br>') : etiqueta('Vago', 'aviso');
       return `<tr class="imovel-l1"><td class="nome"><a href="#/imovel/${i.id}"><b>${esc(i.nome)}</b></a> ${numeroMatricula(i)}</td>
-        <td colspan="${CONTAS.length + 1}" class="end-imovel">${esc(R.enderecoCompleto(i))}${i.sublote ? ` <span class="sublote">${esc(/^sublote/i.test(i.sublote) ? i.sublote : `Sublote ${i.sublote}`)}</span>` : ''}</td><td class="n">${aluguel}</td></tr>
-        <tr class="imovel-l2"><td class="anexos">${anexosMatricula(i)}</td>${celulasContas(i)}<td class="sobra"></td><td class="n nw valor-imovel" title="Valor do imóvel">${i.valor_imovel ? reais(i.valor_imovel) : '-'}</td></tr>`;
+        <td colspan="${CONTAS.length + 1}" class="end-imovel">${esc(R.enderecoCompleto(i))}${i.sublote ? ` <span class="sublote">${esc(/^sublote/i.test(i.sublote) ? i.sublote : `Sublote ${i.sublote}`)}</span>` : ''}</td><td class="n aluguel-imovel">${aluguel}</td></tr>
+        <tr class="imovel-l2"><td class="anexos">${anexosMatricula(i)}</td>${celulasContas(i)}<td class="sobra"></td><td class="n nw valor-imovel${i.valor_imovel ? '' : ' sem-valor'}" title="Valor do imóvel">${i.valor_imovel ? reais(i.valor_imovel) : '-'}</td></tr>`;
     }).join('');
     return `<div class="cabecalho"><h1>Imóveis</h1><div class="acoes">${link('#/iptu', "IPTU's", 'botao secundario')}${opera() ? link('#/novo/imoveis', 'Novo imóvel', 'botao') : ''}</div></div>
       <div class="cartao"><div class="rolagem"><table class="lista-imoveis"><tr><th>Imóvel</th><th colspan="6">Endereço</th><th class="n">Aluguel (bonif.)<br><span class="suave">Valor do imóvel</span></th></tr>
