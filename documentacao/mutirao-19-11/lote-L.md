@@ -1,0 +1,129 @@
+# Lote L: Aparência e celular (estilo.css, app.js, visualizador)
+
+29 itens (0 graves, 4 médios, 25 leves). Arquivos: `app.js`, `estilo.css`, `indice.js`, `telas/comum.js`, `telas/consultas.js`, `telas/contrato.js`, `telas/imovel.js`.
+Como trabalhar: ver `../MUTIRAO_19_11.md`. Marque `[x]` ao corrigir. G = grave, M = médio, L = leve.
+
+- [ ] **links-pc-001** [M] Quem já está dentro do sistema consegue abrir a tela "Primeiro acesso" e criar outro administrador
+  - Vê-se: Digitando #/primeiroAcesso no fim do endereço, com o sistema aberto e cheio de dados, aparece a tela "Primeiro acesso" dizendo "Esta pasta ainda não tem dados: crie o usuário administrador". Preenchi nome, login "intruso" e uma senha, cliquei em "Criar e entrar": o sistema criou o usuário "intruso" como ADMINISTRADOR, junto dos que já existiam (qa, operador1, consulta1), e já entrou com ele. Não pede a senha de ninguém. Um usuário que só consulta vira administrador assim. No teste foi no modo pasta (?teste); no mo…
+  - Causa: `docs/js/app.js:1012-1014 (TELAS[nome] sem lista do que pode); docs/js/app.js:771-774 (criarBanco usa E.d já aberto); docs/js/telas/envios.js:376-385 (sem conferir usuários)`
+  - Fazer: Em criarBanco (e no formulário primeiroAcesso), recusar com ErroUsuario se E.d já tem usuários; em mostrar(), não aceitar pelo endereço as telas de antes do login.
+  - Certo é: Com usuários já cadastrados, esse endereço devia dar "Página não encontrada" e o botão devia recusar criar o administrador.
+- [ ] **android-022** [M] O aviso "Salvo." (e os outros avisos verdes e amarelos) aparece no topo da página, fora da vista de quem está rolado lá embaixo
+  - Vê-se: Os avisos que não são erro são escritos no alto da página. Depois de uma ação na mesma página o sistema mantém a rolagem (não sobe). No celular a página da inquilina Maria Teste da Silva tem mais de 11.000 px de altura: tocando num botão no meio ou no fim dela (anexar, marcar assinado, desligar um alerta, registrar depósito), o aviso de que deu certo fica mais de 11.000 px acima e some sozinho em 10 segundos, sem ninguém ver. É o "salvou ou não salvou?". No computador acontece igual, mas no celular a página é muit…
+  - Causa: `docs/js/app.js:467-473 (aviso) e :968/:1016 (#mensagens no começo do <main>, sem position fixed/sticky no CSS) + app.js:1030-1044 (mantém a rolagem na mesma página)`
+  - Fazer: #mensagens preso na tela (position: sticky/fixed no alto ou no pé, por cima do conteúdo).
+  - Certo é: O aviso aparecer onde a pessoa está olhando (preso no alto ou no pé da tela), como já acontece com os erros (janela "Entendi").
+  - Atenção (conferente): Li o código: os avisos que não são erro ('Salvo.', confirmações) vão para uma faixa no alto da página, que não acompanha a rolagem; e depois de uma ação na mesma página o sistema devolve a rolagem onde estava. Quem está no meio ou no fim de uma página comprida (inquilino, imóvel) não vê o aviso, que some em 10 segundo…
+- [ ] **android-023** [M] Caixa que estava recolhida, ao abrir no celular, mostra a tabela larga e cortada (não vira cartões nem avisa para arrastar)
+  - Vê-se: O celular transforma em cartões as tabelas que não cabem, mas mede isso só quando a página é desenhada. A caixa que o usuário deixou recolhida (o sistema lembra) está escondida nessa hora e não é medida. Quando ele toca no ▸ para abrir, a tabela aparece como no computador: Boletos com 578 px numa caixa de 362, Seguro obrigatório 568, "Contrato, Vistoria, Termos e Aditivos" 582, sem o aviso "arraste para o lado"; em "Garantia: Fiador" (486 em 386) e "Correção anual do aluguel" (531 em 386) nem há caixa de rolagem: …
+  - Causa: `docs/js/app.js:1136-1138 e 1162-1178 (arrumarTabelas/cartoesNoCelular só no desenho e quando chegam anexos) + docs/js/indice.js:68-76 (o clique que abre não arruma as tabelas); estilo.css:215 (caixa recolhida = display none)`
+  - Fazer: Ao abrir a caixa (indice.js), chamar a arrumação das tabelas daquela caixa (exportar arrumarTabelas ou disparar um evento que o app.js escuta).
+  - Certo é: Ao abrir a caixa, a tabela virar cartões como as outras.
+- [ ] **links-pc-005** [L] O Voltar do navegador sempre devolve a página no topo: perde-se o lugar onde estava
+  - Vê-se: Na página do inquilino (Maria Teste da Silva, página comprida, mais de 4.000 pontos de altura), desci até o meio, cliquei em "Registrar solicitação" e apertei o Voltar do navegador: a página do inquilino voltou no topo, não onde eu estava. O mesmo vale para a…
+  - Causa: `docs/js/app.js:1483 e 1028-1030`
+  - Fazer: Guardar a rolagem por endereço ao sair e devolvê-la quando a troca vier do Voltar (popstate); subir ao topo só em navegação nova.
+  - Atenção (conferente): Li o código: toda troca de endereço (inclusive o Voltar do navegador) marca "subir ao topo"; a rolagem só é guardada no redesenho da mesma página. Não achei decisão do dono sobre isso. É melhoria de conforto, não erro: nada se perde.
+- [ ] **links-pc-007** [L] Telas de antes do login e pedaços internos abrem pelo endereço com o usuário já dentro
+  - Vê-se: Com o sistema aberto: #/login mostra a tela de Login (com "Trocar de pasta" e "Primeiro acesso?"); #/pedirAcesso mostra "Pedir acesso"; #/inicio mostra a tela de escolher pasta; #/semSuporte diz "Este navegador não consegue salvar numa pasta"; #/_naoEncontrad…
+  - Causa: `docs/js/app.js:1012-1014; docs/js/telas.js:69-71 e 195-252`
+  - Fazer: Aceitar pelo endereço só as rotas de verdade (Object.hasOwn e barrar as de antes do login e as que começam com _).
+- [ ] **nuvem-010** [L] O aviso "Chegaram mudanças de outro aparelho…" aparece repetido e em telas onde ninguém está editando
+  - Vê-se: Quando chega mudança de outro aparelho, o sistema só redesenha a tela se não houver nenhum formulário nela. Várias telas têm formulário fixo (Dados e backup, NF com "Desfazer a partir deste número" etc.): nelas a tela não se atualiza e aparece "Chegaram mudan…
+  - Causa: `docs/js/app.js:405-407 (aoMudarNuvem) e 453-454; docs/js/telas/comum.js:323 (SELETOR_FORMULARIO); docs/js/app.js:467-474 (aviso sem conferir repetido)`
+  - Fazer: Usar o formulário com data-alterado (como em app.js:1270) para decidir entre avisar e redesenhar, e não repetir aviso com o mesmo texto ainda na tela.
+- [ ] **android-019** [L] Página do inquilino: tabela vazia das trocas de titularidade passa da borda do cartão
+  - Vê-se: Na caixa "Trocas de titularidade deste inquilino", sem nenhum protocolo registrado, a linha de títulos "DATA CONCESSIONÁRIA TIPO PROTOCOLO SITUAÇÃO" não cabe: a palavra SITUAÇÃO sai do cartão branco e encosta na borda da tela (a tabela vai até 412 e o cartão …
+  - Causa: `docs/js/app.js:1171 (compara com caixa.clientWidth, que inclui o padding; e com window.innerWidth + 2) + docs/js/telas/contrato.js:804 (tabela direto no cartão, sem .rolagem)`
+  - Fazer: Na medição, descontar o padding da caixa (comparar com a largura útil); e, com a lista vazia, mostrar só a frase 'Nenhum protocolo registrado.' sem a linha de títulos.
+- [ ] **android-024** [L] "Baixa em lote" fecha sozinha quando a tela é redesenhada (depois de cada "Confirmar os marcados")
+  - Vê-se: A caixa Baixa em lote separa os boletos por vencimento (ex.: 10/11/2026 e 15/11/2026), cada grupo com o seu botão. Quando a tela é redesenhada a caixa volta fechada: para dar baixa no grupo seguinte é preciso abrir de novo. O sistema só reabre as caixas que t…
+  - Causa: `docs/js/app.js:1020-1022 e 1045-1046 (só details[id]); sem id: docs/js/telas/cobrancas.js:81, contrato.js:378, 529, 531, imovel.js:70, comum.js:1021; a baixa redesenha em envios.js:134-135`
+  - Fazer: Dar id a essas caixas (ou guardar as abertas pelo texto do título quando não houver id).
+  - Atenção (conferente): Li o código: depois de uma ação a página é redesenhada e só as caixas de abrir que têm nome interno (id) voltam abertas. 'Baixa em lote' não tem id, e a baixa de um grupo chama o redesenho: a caixa fecha e é preciso abrir de novo para o grupo seguinte. O mesmo com 'Pagamentos (N)', 'Mostrar os N boletos anteriores', '…
+- [ ] **textos-006** [L] Em várias telas nenhum item do menu fica aceso: Ficha, Comunicações, termo aditivo, Arquivo impresso, Pasta física, Acessos, Backups da nuvem, Conflitos, Dados de uma pessoa, Aparência dos alertas
+  - Vê-se: O item do menu acende conforme o começo do endereço. A regra de "Inquilinos" é "^inquilino|^contrato|^vistoria|^solicitacoes|^notificac": ficam de fora #/ficha/<id> (ficha em análise), #/comunicacoes (que é a 2ª aba de Inquilinos), #/aceite-contatos, #/aditiv…
+  - Causa: `docs/js/app.js:906-909 (MENU) e :958-959`
+  - Fazer: Acrescentar às regras: Inquilinos "|^ficha|^comunicacoes|^aceite|^aditivo"; Dados e backup "|^acessos|^conflitos|^pessoa|^arquivo-impresso|^pasta-"; Painel "|^alertas".
+- [ ] **android-002** [M] Carta de reajuste no celular: a coluna do aluguel novo fica cortada e não dá para rolar
+  - Vê-se: Na carta de reajuste da Maria (aluguel de R$ 2.000,00 para R$ 2.090,00), a tabela "Atual / A partir do aluguel de 11/2026" não cabe na tela do celular. O título aparece cortado ("A PARTIR DO ALUGUEL DE…") e do valor novo só se vê "R$ 2" (em vez de R$ 2.090,00 e R$ 1.881,00). Não há rolagem para o lado: a parte que sobra some. No celular não dá para conferir a carta antes de mandar.
+  - Causa: `docs/css/estilo.css:342 (.carta: overflow hidden, padding 40px 48px, sem @media) e :42 (th.n/td.n nowrap); docs/js/telas/reajustes.js:193`
+  - Fazer: No @media (max-width: 760px): .carta { padding: 20px 14px; overflow-x: auto } e .carta-tabela th.n { white-space: normal }.
+  - Certo é: A carta inteira legível no celular (tabela que quebra a linha do título, ou a carta com rolagem para o lado).
+- [ ] **saida-027** [L] Link "⚠ anexar o termo assinado" tem 21 px de altura no celular (difícil de acertar com o dedo)
+  - Vê-se: No Pixel 7 (412 de largura), o link para anexar o termo de devolução das chaves, no roteiro da saída, mede 21 px de altura, colado no botão "🧾 Termo de devolução das chaves" e no "✉ E-mail". Os botões vizinhos têm mais de 30 px. É o mesmo tipo de link usado …
+  - Causa: `docs/css/estilo.css:526 (.anexar-falta) e 739 (alvos de toque no celular); docs/js/telas/cadastros.js:100`
+  - Fazer: Incluir .anexar-falta na regra do celular (altura mínima de 32 a 40 px, alinhado ao centro).
+- [ ] **impressos-021** [L] Ao imprimir, NF, cartas e recibos usam as margens do contrato: a NF sai 10% menor e fora do centro
+  - Vê-se: A folha de estilo define margem de 10 mm para a impressão em geral e, mais abaixo, a margem do contrato (2,8 cm à esquerda, 2,2 cm à direita e em cima, 1 cm em cima na primeira folha). Como a segunda regra não está presa ao contrato, vale para tudo o que se i…
+  - Causa: `docs/css/estilo.css:228 (@page geral) contra :392-394 (@page do contrato sem nome); :244-245 (NF com zoom .88)`
+  - Fazer: Dar nome à página do contrato: "@page contrato {...}", "@page contrato:first {...}" e ".contrato { page: contrato; }".
+- [ ] **impressos-022** [L] No celular, a tela da NF fica "longe": a página inteira encolhe e os botões ficam minúsculos
+  - Vê-se: A NF tem largura fixa (766 pontos) e a caixa dela não rola para o lado. No celular de 412 pontos de largura a página inteira passa a ter 790 pontos e o navegador mostra tudo reduzido à metade: os botões "Imprimir", "Voltar", "Baixar PDF" e "Baixar este número…
+  - Causa: `docs/css/estilo.css:162 (.fatura-xls { width: max-content }); a tela de impressão não tem caixa com rolagem (docs/js/app.js:1016)`
+  - Fazer: Pôr a NF dentro de uma caixa com overflow-x: auto na tela (sem mexer na largura da tabela), deixando os botões fora dela.
+- [ ] **impressos-023** [L] Botões pequenos demais para o dedo nas telas de impressão
+  - Vê-se: No celular, alguns botões das telas de impressão têm 22 a 27 pontos de altura: "✉ E-mail" (64×22), os anos "2026" e "2025" da declaração (46×25), "✉ Enviar por e-mail" (132×25) e "Marcar carta enviada" (140×27) na carta de reajuste, "Baixar PDF" (81×27) e "Ba…
+  - Causa: `docs/css/estilo.css:739 (main button, main .botao { min-height: 40px }); docs/js/app.js:1016 (rota "imprimir" sem <main>)`
+  - Fazer: Incluir ".impressao button, .impressao .botao" na regra da linha 739.
+- [ ] **android-004** [L] Botões pequenos que são links ficam com o texto grudado no alto do botão
+  - Vê-se: No celular os botões ganham 40 de altura, mas nos botões pequenos feitos como link o texto não desce para o meio: fica colado em cima, com um vazio embaixo. Ex.: "Escolher a logo", "Abrir o fechamento do mês", "Ver os cadastros incompletos" e "Ligar o backup …
+  - Causa: `docs/css/estilo.css:739 (min-height: 40px sem alinhar) com :32, :37 e :525 (.botao inline-block; .pequeno e .mini com padding de 1-3 px)`
+  - Fazer: No mesmo @media: main a.botao, main label.botao { display: inline-flex; align-items: center; justify-content: center; }.
+- [ ] **android-008** [L] "Trocar senha" e "Sair" no topo são letras miúdas, coladas uma na outra
+  - Vê-se: No celular, embaixo da busca ficam "Testador QA Trocar senha · Sair" em letra 12. "Sair" tem 20 por 17 e "Trocar senha" 67 por 17, com 10 de distância: fácil tocar em "Sair" querendo outra coisa (e sair derruba o login). O botão "☰ Menu" tem 32 de altura.
+  - Causa: `docs/css/estilo.css:581 (header.topo .conta: font-size 12px, gap 10px) e :585 (.menu-botao padding 6px 10px); a regra de 40 px (:739) começa com 'main'`
+  - Fazer: No celular, levar 'Trocar senha' e 'Sair' para o fim do menu ☰ (itens de 40) ou dar min-height 40 e gap maior aos links do topo.
+- [ ] **android-009** [L] Botões dentro das janelas e do visualizador são pequenos demais para o dedo
+  - Vê-se: A regra dos 40 de altura só vale para os botões da página; dentro das janelas ficam pequenos: "Hoje" e "Ontem" na janela "Confirmar pagamento" têm 41×22 e 53×22; "Baixar os marcados" na janela do e-mail tem 118×22; no visualizador de PDF/foto, "Baixar" tem 54…
+  - Causa: `docs/css/estilo.css:739 (seletores começam com 'main'); janelas criadas em document.body (app.js:556/582, emails.js:122) e .visualizador (estilo.css:646)`
+  - Fazer: Estender a regra no @media: dialog button, dialog .botao, .vis-topo button { min-height: 40px }.
+- [ ] **android-011** [L] IPTU's no celular: o clipe de anexar a guia tem 9 de largura e o valor de cada mês só aparece "passando o mouse"
+  - Vê-se: No mapa do IPTU, o clipe 📎 ao lado do nome do imóvel (para anexar a guia) aparece cortado, com 9×19: quase impossível de tocar. E a explicação diz "passe o mouse para ver o valor": no celular não há mouse, e tocar num quadradinho de mês sem parcela não mostr…
+  - Causa: `docs/css/estilo.css:557-558 (.clipes-iptu .clipe-anexar sem min-width/min-height); docs/js/telas/consultas.js:135 (valor só no title) e :243 (texto 'passe o mouse')`
+  - Fazer: No celular: min-width/min-height de 36-40 no clipe; ao tocar no quadradinho, mostrar mês e valor num aviso; trocar o texto por 'toque'.
+- [ ] **android-013** [L] Imóveis no celular: desenhos das contas e valores sem dizer o que são
+  - Vê-se: No cartão de cada imóvel aparece uma fila de desenhos "💧 vazio ⚡ vazio 🔥 vazio 📶 vazio 🏢 vazio" sem nome (água, luz, gás, internet, condomínio) e, embaixo, "R$ 300.000,00" solto (é o valor do imóvel) ou só um tracinho "-" no Apto 2. O aluguel "R$ 2.090,00…
+  - Causa: `docs/css/estilo.css:618 (table.lista-imoveis.cartoes-auto td::before { display: none }) e docs/js/telas.js:346-349 (valor-imovel só com title; '-' quando vazio)`
+  - Fazer: No celular, mostrar um rótulo curto nas células .n ('Aluguel (bonif.)', 'Valor do imóvel') e esconder a célula do valor quando for '-'.
+  - Atenção (conferente): Li o código: na lista de Imóveis em cartões, os rótulos das células são desligados de propósito (o cartão foi desenhado à mão) e o 'Valor do imóvel' só tem a dica do mouse; no celular o aluguel, o bonificado e o valor do imóvel ficam sem nome, e imóvel sem valor mostra um '-' solto. Ressalva: os desenhos 💧 ⚡ 🔥 📶 🏢…
+- [ ] **android-027** [L] Linhas de abrir/fechar ("ver", "Alertas deste inquilino", "Ver as outras 10 tabelas") e caixinhas de marcar são finas demais para o dedo
+  - Vê-se: A altura mínima de 40 px do celular vale só para botões. As linhas que abrem uma caixa têm 17 a 22 px de altura: "ver" do Histórico (17), as caixas do Painel (17), "Alertas deste inquilino" (19), "Ver as outras 10 tabela(s)" (19), "Como escrever um modelo" (2…
+  - Causa: `docs/css/estilo.css:739 (regra só para button, .botao, .link-botao); summary em :59, :204, :464, :469-470 sem min-height; docs/js/telas/cobrancas.js:205 e comum.js:136`
+  - Fazer: No @media do celular: main summary { min-height: 40px; display: flex/list-item com padding } e caixinhas maiores (ex.: 22 px) ou célula inteira clicável.
+- [ ] **iphone-005** [L] No iPhone a tela dá um salto de zoom ao tocar no texto do modelo de contrato, do modelo de e-mail e no descritivo da vistoria
+  - Vê-se: O iPhone aproxima a tela sozinho quando se toca num campo com letra menor que 16 px, e a tela fica aproximada (precisa "beliscar" para voltar). O sistema já acertou isso em todos os campos (16 px no celular), menos em três caixas grandes de texto, que ficaram…
+  - Causa: `docs/css/estilo.css:389 contra estilo.css:737; campos em docs/js/telas/documentos.js:470, 547, 655, 710, 767 e emails.js:322`
+  - Fazer: Dentro do @media (max-width: 760px), acrescentar 'textarea.texto-modelo { font-size: 16px; }'.
+- [ ] **iphone-008** [L] No celular, o texto dos links-botão fica colado no alto do botão em vez de no meio
+  - Vê-se: No celular os botões ganham altura mínima de 40 px. Nos botões de verdade o texto fica no meio; nos links com cara de botão ("Escolher a logo", "Ver os cadastros incompletos", "Abrir o fechamento do mês", "Ligar o backup seguro", "Ver a lista", "Editar", "Abr…
+  - Causa: `docs/css/estilo.css:739 (main .botao { min-height: 40px }) com estilo.css:32 (.botao display: inline-block); a correção parcial está em estilo.css:680`
+  - Fazer: No bloco do celular: 'main a.botao, main label.botao, main span.botao { display: inline-flex; align-items: center; justify-content: center; }'.
+- [ ] **android-007** [L] Página do inquilino: títulos das caixas ora à esquerda, ora no meio, ora à direita, com a setinha ▾ minúscula
+  - Vê-se: Na página da Maria, a setinha de recolher (▾) entra antes do título e empurra cada título para um lugar: "Identificação e contato" fica à esquerda; "Garantia: Fiador" e "Seguro obrigatório" no meio; "Notificações ao inquilino", "Histórico de solicitações do i…
+  - Causa: `docs/js/indice.js:62-77 (botão inserido antes do título dentro de .cabecalho) + docs/css/estilo.css:30 (.cabecalho: justify-content space-between, flex-wrap) e :211`
+  - Fazer: Pôr a setinha dentro do h2 (ou num bloco junto com o título) e dar min-width de 40 a .recolher-caixa no celular.
+- [ ] **iphone-009** [L] Títulos das caixas da página do inquilino e do imóvel ficam desalinhados no celular
+  - Vê-se: Nas caixas que abrem e fecham, a setinha ▾ fica sozinha numa linha quando o título é comprido ("Leitura dos relógios (água, energia, gás)", "Contrato, Vistoria, Termos e Aditivos", "Renovação e novo valor negociado"), e quando o título é curto ele vai parar n…
+  - Causa: `docs/js/indice.js:77 (insere o botão no .cabecalho) + docs/css/estilo.css:30 (.cabecalho justify-content: space-between; flex-wrap: wrap)`
+  - Fazer: Pôr a seta dentro do h2 do cabeçalho (ou '.cabecalho > .recolher-caixa + h2 { flex: 1 }'), para seta e título andarem juntos à esquerda.
+- [ ] **iphone-019** [L] Foto do anúncio aberta no celular vai para outra aba, diferente dos outros anexos
+  - Vê-se: No celular, PDF e foto dos anexos abrem numa janela do próprio sistema, com "Baixar" e "✕ Fechar". As fotos do anúncio do imóvel não: cada miniatura é um link que abre a foto em outra aba, com endereço temporário, sem botão de voltar ao sistema. No aplicativo…
+  - Causa: `docs/js/telas/comum.js:1069-1075`
+  - Fazer: Trocar o link por data-acao="abrirArquivo" com escopo 'anuncio', como nas outras listas.
+- [ ] **android-012** [L] Inquilinos: "Contrato" cinza não faz nada ao tocar (sem explicação) e "Matrícula" azul, também sem arquivo, dá erro
+  - Vê-se: No cartão da Maria há dois botões lado a lado. "Contrato" está cinza porque o contrato assinado não foi anexado: ao tocar, não acontece nada e não aparece o motivo (a explicação só existe para quem passa o mouse, no computador). "Matrícula" está azul, como se…
+  - Causa: `docs/js/telas/consultas.js:86-90 (botaoContrato: <span class desligado> só com title) e :101 (matricula: sempre link ativo); docs/js/telas/acoes.js:2093-2097`
+  - Fazer: Dar ao botão apagado uma ação que mostra o texto do title com aviso(); desenhar a Matrícula apagada quando o imóvel não tem arquivo de matrícula (a lista de clipes já vistos permite saber).
+- [ ] **iphone-010** [L] IPTU no celular manda "passar o mouse" para ver o valor da parcela, e o botão Lançar fica cortado
+  - Vê-se: A legenda do mapa do IPTU diz "Cada quadradinho é o boleto do mês em que a parcela entra; passe o mouse para ver o valor". No celular não há mouse. Além disso, a 320 a tabela rola para o lado e o botão "Lançar" do imóvel sem IPTU (Apto 2 - Rua Dois) aparece c…
+  - Causa: `docs/js/telas/consultas.js:243 (texto) e consultas.js:140-150 (valor só no title)`
+  - Fazer: Texto com 'so-pc'/'so-celular' como em consultas.js:282, e no toque do quadradinho mostrar o texto do title num aviso.
+- [ ] **android-010** [L] Botão vermelho "Documento perdido" encostado em "Marcar assinado" e "Falta assinatura"
+  - Vê-se: Na caixa dos documentos do inquilino, cada documento tem os botões "Marcar assinado", "Falta assinatura" e, logo abaixo, sem nenhum espaço (0 de distância), o vermelho "Documento perdido". No celular é fácil o dedo pegar o vermelho ao tocar em "Falta assinatu…
+  - Causa: `docs/js/telas/contrato.js:692-697 (formMarcarDocumento e botão 'Documento perdido' na mesma célula, sem .acoes/gap)`
+  - Fazer: Envolver os botões da célula num <div class="acoes"> (flex com gap 8) alinhado à direita.
+- [ ] **android-014** [L] Página do imóvel no celular: botão "EDITAR" do IPTU em maiúsculas e o × de excluir estreito, colado nele
+  - Vê-se: Na caixa IPTU da Casa 1, a linha "2026 · TOTAL R$ 1.530,00 EM 10 PARCELA(S)" vira título em maiúsculas e leva junto o botão, que aparece como "EDITAR" em negrito; o × vermelho de excluir o IPTU do ano fica com 22 de largura, encostado no Editar. As 10 parcela…
+  - Causa: `docs/js/telas/imovel.js:62-63 (link e × dentro do <h3>) + docs/css/estilo.css:28 (h3 text-transform uppercase) e :741 (min-width 40 só para 'main table button.x-excluir')`
+  - Fazer: Tirar os botões de dentro do h3 (cabeçalho com o título de um lado e as ações do outro) e aplicar min-width: 40px a todo main .x-excluir no celular.
