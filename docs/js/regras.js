@@ -1739,6 +1739,12 @@ export function marcarIptuPago(d, iptuId, n, data, usuario, { peloBanco = false 
  * Calcula (sem gravar) a cobrança de um contrato numa competência, sem a reserva: quem decide a reserva de cada boleto
  * é ``realocarReserva``, chamada depois de gerar ou recalcular.
  */
+/** Continuação (troca de titular) que entra no dia 31: o anterior pagou 30/30 e este contrato não tem dia a pagar no mês. */
+export function semDiaAPagar(c, comp) {
+  if (!c.contrato_anterior_id || CR.regra('proporcional', c) !== 'mes_30' || C.diasOcupados(comp, c.data_entrada, c.data_saida) >= C.diasNoMes(comp)) return false;
+  return C.diasComerciais(comp, c.data_entrada, c.data_saida, { continuacao: true }) === 0;
+}
+
 export function montarCobranca(d, contrato, comp) {
   const dias = C.diasOcupados(comp, contrato.data_entrada, contrato.data_saida);
   if (dias === 0 || trocaAguardaAditivo(d, contrato)) return null;
@@ -1768,6 +1774,8 @@ export function montarCobranca(d, contrato, comp) {
     descontoPercentual: bonificacaoNaCompetencia(d, contrato, comp), iptu, seguro,
     taxaBoleto: cobra('taxa') ? contrato.taxa_boleto || 0 : 0, contrato,
   });
+  // troca de titular no dia 31: o anterior já pagou 30/30 e o novo não tem dia a pagar no mês (saida-016): sem boleto
+  if (r.dias_cobrados === 0) return null;
   // o FCI do mês incompleto é sempre pelos dias reais (regra `proporcional`), também com o mês comercial de 30 dias
   // Ex.: entrada 15/02/2027, R$ 1.800,00 bonificado, FCI 5%: 14/28 → R$ 45,00 (e não 16/30 → R$ 48,00)
   const aluguelReal = r.dias_mes === diasMes ? r.aluguel : C.aluguelProporcional(r.aluguel_mensal, dias, diasMes);
@@ -6806,7 +6814,7 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso(), { pendentes = null 
   const marcado = (chave) => d.fechamentos.find((f) => f.competencia === mes && f.etapa === chave) || null;
   const ativos = d.contratos.filter((c) => c.ativo !== false && c.imovel_id);
   // troca de titular à espera do termo assinado: o boleto ainda sai no contrato anterior (como em montarCobranca)
-  const semBoleto = ativos.filter((c) => C.diasOcupados(mes, c.data_entrada, c.data_saida) > 0 && !boletoDoMes(d, c.id, mes) && !trocaAguardaAditivo(d, c));
+  const semBoleto = ativos.filter((c) => C.diasOcupados(mes, c.data_entrada, c.data_saida) > 0 && !boletoDoMes(d, c.id, mes) && !trocaAguardaAditivo(d, c) && !semDiaAPagar(c, mes));
   // o boleto à parte do complemento da caução não é aluguel: não conta como gerado nem como pagamento do mês
   const gerados = d.cobrancas.filter((x) => x.competencia === mes && !ehBoletoAvulso(x)).length;
   // boletos que vencem neste mês, pelo vencimento (contrato que cobra no próprio mês também entra) e com as parcelas de acordo;
