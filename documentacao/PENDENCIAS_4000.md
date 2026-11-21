@@ -41,22 +41,22 @@ Estão no fim de `MUTIRAO_19_11.md` ("Fora da lista"). **Não corrija nada antes
 
 | Item | Assunto | Decisão do dono |
 |---|---|---|
-| links-pc-015 | Endereço com inquilino, mês ou conta que não existe abre a tela normal sem avisar | |
-| entrada-007 | "Lembrar" no dia seguinte gera outro link da ficha e mata o anterior | |
-| entrada-034 | Imóvel com saída marcada não aparece para reserva até o inquilino sair | |
-| mensal-009 | Pago a mais à mão: obriga mudar a NF e não registra o que tem de devolver | |
-| saida-016 | Troca de titular no dia 28/02 ou 31: os dois boletos somam 28 ou 31 dias de 30 | |
-| financeiro-banco-024 | Pagamento aguardando número de NF aparece em todos os meses seguintes do Fechamento | |
-| impressos-002 | Declaração do IR do novo titular soma os aluguéis pagos pelo anterior | |
-| comunicacoes-007 | Comunicado de contatos não vai ao inquilino solidário nem ao representante da empresa | |
-| comunicacoes-027 | Coluna "NF" da página do inquilino mostra um número só (derrubado: as duas NFs têm o mesmo número) | |
-| comunicacoes-030 | "Solicitação" nomeia duas coisas (reserva e pedido do inquilino) | |
-| nuvem-012 | A nuvem de teste do computador não serve /privacidade (só a ferramenta do programador) | |
-| iphone-012 | Contas do imóvel: no iPhone, escolher o mês troca de tela a cada giro da roleta | |
-| iphone-014 | PDF comprido no iPhone pode ficar com páginas em branco (memória do visualizador) | |
-| textos-017 | Lista "Movimentações sem destino" existe em duas telas (Financeiro e Banco) | |
+| links-pc-015 | Endereço com inquilino, mês ou conta que não existe abre a tela normal sem avisar || 21/11: quer conversar (não entendeu). Explicar com exemplo. |
+| entrada-007 | "Lembrar" no dia seguinte gera outro link da ficha e mata o anterior || 21/11: corrigir. O link antigo continua valendo para preencher, com a validade original fixa (o "Lembrar" não gera outro link). |
+| entrada-034 | Imóvel com saída marcada não aparece para reserva até o inquilino sair || 21/11: manter (reserva só de imóvel vago). |
+| mensal-009 | Pago a mais à mão: obriga mudar a NF e não registra o que tem de devolver || 21/11: quer conversar. Pede um jeito de lançar no boleto um valor extra esporádico (ex.: vidro quebrado, TV), discriminado, escolhendo se entra na NF ou não, e que não se repita no boleto seguinte. Conferir o que já existe ("outros") antes de propor. |
+| saida-016 | Troca de titular no dia 28/02 ou 31: os dois boletos somam 28 ou 31 dias de 30 || 21/11: corrigir. A soma fecha sempre em 30/30, ajustando a parte de quem entra. |
+| financeiro-banco-024 | Pagamento aguardando número de NF aparece em todos os meses seguintes do Fechamento || 21/11: manter. |
+| impressos-002 | Declaração do IR do novo titular soma os aluguéis pagos pelo anterior || 21/11: corrigir. Cada titular declara só o que pagou. |
+| comunicacoes-007 | Comunicado de contatos não vai ao inquilino solidário nem ao representante da empresa || 21/11: corrigir. O comunicado vai a todos que assinaram e respondem pelo contrato: inquilino, solidário, fiadores e representantes da empresa. |
+| comunicacoes-027 | Coluna "NF" da página do inquilino mostra um número só (derrubado: as duas NFs têm o mesmo número) || 21/11: mostrar todas as NFs de mesmo número (uma por empresa). |
+| comunicacoes-030 | "Solicitação" nomeia duas coisas (reserva e pedido do inquilino) || 21/11: trocar o nome: "Pedido de reserva" é uma coisa e "Solicitação do inquilino" é outra. |
+| nuvem-012 | A nuvem de teste do computador não serve /privacidade (só a ferramenta do programador) || 21/11: quer conversar (achou que era o modo anônimo do navegador). Explicar. |
+| iphone-012 | Contas do imóvel: no iPhone, escolher o mês troca de tela a cada giro da roleta || 21/11: corrigir com o botão "Ir". |
+| iphone-014 | PDF comprido no iPhone pode ficar com páginas em branco (memória do visualizador) || 21/11: corrigir. |
+| textos-017 | Lista "Movimentações sem destino" existe em duas telas (Financeiro e Banco) || 21/11: quer conversar (o C6 ainda não está ligado). Explicar depois de ligar o banco. |
 
-Item que o dono mandar corrigir: uma PR para ele (ou para os pequenos juntos), com teste.
+Item que o dono mandar corrigir: uma PR para ele (ou para os pequenos juntos), com teste. Respostas de 21/11 dadas numa página de decisão item a item.
 
 ## 6. [ ] Testes do dono (ele faz; anote o resultado aqui)
 
