@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-BaKc7AxW3En4fgfLYt0qYEcyS97K6w2CCqBcvvA2NHY=' 'sha256-SkXZ/NBS19KOkrWS0wChwZECv8mfLe0O6/ApF20Uh04='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-BaKc7AxW3En4fgfLYt0qYEcyS97K6w2CCqBcvvA2NHY=' 'sha256-Fa0hODfYRazaNTj8TBVOXbcWP4i7/KjH2pXrUrFi85k='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="9b7f3d61f4de2b67">
+<meta name="fontes" content="1e9aa7717758475d">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -34739,7 +34739,8 @@ ${xref}
       O IPTU pago por nós é lançado na caixa do IPTU do imóvel (já abate dos resultados).</div>
     <form class="cartao" data-form="lancarContas">
       <input type="hidden" name="imovel" value="${i.id}">
-      <div class="acoes" style="margin-bottom:10px"><label style="margin:0">Mês de referência</label><input type="month" name="competencia" value="${esc(comp)}" style="width:auto" data-trocar-mes="${i.id}">
+      <div class="acoes" style="margin-bottom:10px"><label style="margin:0" for="contas-mes">Mês de referência</label><input type="hidden" name="competencia" value="${esc(comp)}">
+        <input type="month" id="contas-mes" value="${esc(comp)}" style="width:auto" class="campo-mes" data-sem-aviso>${botao("irMesContas", "Ir", { imovel: i.id }, "secundario pequeno")}
         <button type="button" class="secundario pequeno" data-acao="repetirContas">Repetir os últimos valores</button></div>
       <div class="rolagem"><table class="responsiva"><tr><th>Conta</th><th>Valor pago</th><th>Vencimento</th><th>Pago em</th><th>Observação</th><th></th></tr>
         ${TIPOS_DESPESA.map(linha).join("")}</table></div>
@@ -36426,6 +36427,12 @@ ${MODELO_COMODOS[comodo].join("\n")}
           await mostrar();
         },
         /** Contas pagas por nós: preenche cada valor vazio com o último lançado. */
+        /** Contas do imóvel: vai ao mês escolhido (só no botão "Ir": no iPhone a roleta do mês avisa a mudança a cada giro, iphone-012). */
+        irMesContas({ imovel }) {
+          const mes = (document.getElementById("contas-mes") || {}).value || "";
+          if (!competenciaValida(mes)) throw new ErroUsuario("Escolha o mês de referência.");
+          ir(`#/contas/${Number(imovel)}?comp=${mes}`);
+        },
         repetirContas() {
           const form = document.querySelector("form[data-form=lancarContas]");
           form.querySelectorAll("input[name^=valor_]").forEach((el) => {
@@ -40934,10 +40941,6 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
         }
         if (ev.target.matches("input[data-boleto]")) {
           atualizarBarraLote();
-          return;
-        }
-        if (ev.target.matches("input[data-trocar-mes]") && ev.target.value) {
-          ir(`#/contas/${ev.target.dataset.trocarMes}?comp=${ev.target.value}`);
           return;
         }
         if (ev.target.matches("select[data-previa]")) {
