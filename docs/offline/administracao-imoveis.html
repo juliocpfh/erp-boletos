@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-BaKc7AxW3En4fgfLYt0qYEcyS97K6w2CCqBcvvA2NHY=' 'sha256-jkprxqhpBQhReGY8eoTsQgmBbiWCax4SlFp9jZ1ZgA4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-BaKc7AxW3En4fgfLYt0qYEcyS97K6w2CCqBcvvA2NHY=' 'sha256-uDJgtVJlfSMVUqT9MbP8CCZkfNhmTHxcHw9Wo42s9s4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="97c064738a98a255">
+<meta name="fontes" content="4bc75563535c8f13">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -2571,8 +2571,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       multa,
       juros,
       valor_devido: pontual ? t.a_pagar_pontual : t.a_pagar_sem_desconto + multa + juros,
-      // o ressarcimento só sai da NF quando a empresa decidiu assim (opção em Empresas)
-      valor_nf: valorNotaFiscal(cobranca.aluguel, cobranca.desconto, multa, juros, pontual) - (cobranca.ressarcimento_na_nf ? cobranca.ressarcimento || 0 : 0)
+      // o ressarcimento só sai da NF quando a empresa decidiu assim (opção em Empresas); o ajuste do mês só entra quando
+      // marcado no boleto (decisão do dono, 21/11/2026, mensal-009: ex.: TV vendida junto entra, vidro quebrado não)
+      valor_nf: valorNotaFiscal(cobranca.aluguel, cobranca.desconto, multa, juros, pontual) - (cobranca.ressarcimento_na_nf ? cobranca.ressarcimento || 0 : 0) + (cobranca.outros_na_nf ? cobranca.outros || 0 : 0)
     };
   }
   function dividir(total, percentuais) {
@@ -5308,6 +5309,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         campo("fci", "FCI (fundo de conservação do imóvel)", "dinheiro", { ajuda: "Fora da NF, da multa e dos juros" }),
         campo("outros", "Ajuste do mês: cobrança adicional (+) ou ressarcimento (−)", "dinheiro", { negativo: true, ajuda: "Valor negativo desconta do boleto. Ex.: -150,00" }),
         campo("outros_descricao", "Motivo do ajuste", "texto", { ajuda: "Ex.: reforma do banheiro, acerto do mês anterior" }),
+        campo("outros_na_nf", "O ajuste entra na NF", "simnao", { ajuda: "Marcado: o valor do ajuste soma na NF e o motivo vai nas observações dela (ex.: TV vendida junto). Desmarcado (padrão): fica fora da NF (ex.: vidro quebrado, multa)" }),
         campo("reserva_utilizada", "Reserva utilizada", "dinheiro"),
         campo("multa_percentual", "Multa por atraso (%)", "pct", { min: 0 }),
         campo("juros_mensal_percentual", "Juros por atraso (% ao mês)", "pct", { min: 0 }),
@@ -7651,7 +7653,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       const acordo = ehParcelaAcordo(registro) && registro.acordo_periodo;
       const [ini, fim] = acordo || periodoServico(registro.competencia, contrato.data_entrada, contrato.data_saida);
       const ref = acordo ? `acordo${registro.acordo_parcela ? ` ${registro.acordo_parcela}` : ""} (${registro.acordo_referente})` : "";
-      const proporcional = !acordo && registro.dias_cobrados > 0 && registro.dias_cobrados < registro.dias_mes;
+      const ajusteNaNf = !!(registro.outros_na_nf && registro.outros);
+      const proporcional = !acordo && !ajusteNaNf && registro.dias_cobrados > 0 && registro.dias_cobrados < registro.dias_mes;
       return {
         imovel,
         valor: registro.valor_nf,
@@ -7659,7 +7662,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         periodo_fim: fim,
         ...proporcional ? { dias: registro.dias_cobrados, dias_mes: registro.dias_mes } : {},
         descricao: `${contrato.inquilino_nome} · ${imovel.nome} · ${ref || compBr(registro.competencia)}`,
-        observacoes: registro.observacoes_nf || (ref ? `Parcela do ${ref}` : ""),
+        observacoes: registro.observacoes_nf || [ref ? `Parcela do ${ref}` : "", ajusteNaNf ? `Inclui ${registro.outros_descricao || "ajuste do mês"}: ${reais(registro.outros)}` : ""].filter(Boolean).join(". "),
         tomador: {
           nome: contrato.inquilino_nome,
           documento: contrato.inquilino_cpf || "",
@@ -11771,7 +11774,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (!/^\d{4}-\d{2}-\d{2}$/.test(primeiro_vencimento || "") || primeiro_vencimento < hoje3) throw new Error("Informe o vencimento do primeiro boleto do acordo (hoje ou depois).");
     const original = lista3.reduce((s, cb) => s + totais(cb).a_pagar_sem_desconto, 0);
     const divida = lista3.reduce((s, cb) => s + liquidar(cb, hoje3).valor_devido, 0);
-    const foraDaNf = Math.min(total, lista3.reduce((s, cb) => s + totais(cb).a_pagar_sem_desconto - (cb.aluguel || 0) + (cb.ressarcimento_na_nf ? cb.ressarcimento || 0 : 0), 0));
+    const foraDaNf = Math.min(total, lista3.reduce((s, cb) => s + totais(cb).a_pagar_sem_desconto - (cb.aluguel || 0) + (cb.ressarcimento_na_nf ? cb.ressarcimento || 0 : 0) - (cb.outros_na_nf ? cb.outros || 0 : 0), 0));
     if (total < n) throw new ErroUsuario(`Com ${n} parcelas, o total precisa ser de pelo menos ${reais(n)} (nenhuma parcela pode ficar com R$ 0,00).`);
     const valores = parcelas(total, n);
     const fora = parcelas(foraDaNf, n);
@@ -29169,12 +29172,12 @@ ${m.texto}`);
   function formNfDivergente(cb, p2) {
     const r = previstoNoPagamento(cb, p2.data, p2);
     const dif = p2.valor - r.valor_devido;
-    const ress = cb.ressarcimento_na_nf && cb.ressarcimento ? ` − ressarcimento ${reais(cb.ressarcimento)}` : "";
+    const ress = (cb.ressarcimento_na_nf && cb.ressarcimento ? ` − ressarcimento ${reais(cb.ressarcimento)}` : "") + (cb.outros_na_nf && cb.outros ? ` + ajuste ${reais(cb.outros)}` : "");
     const conta = r.pontual ? `aluguel ${reais(cb.aluguel)} − desconto ${reais(cb.desconto)}${ress}` : `aluguel ${reais(cb.aluguel)} + multa ${reais(r.multa)} + juros ${reais(r.juros)}${ress} (${plural(r.dias_atraso, "dia")} de atraso, sem desconto)`;
     return `<div class="alerta aviso"><b>Valor recebido diferente do previsto.</b> Confira o cálculo e informe o valor da NF (cálculo manual). Nada foi salvo ainda.</div>
     <div class="grade">${item("Dinheiro entrou na conta em (data da NF)", dataBr(p2.data))}${item("Pagou em", dataBr(p2.pagouEmDia ? cb.vencimento : p2.dataPagou || p2.data))}
       ${item("Previsto", reais(r.valor_devido))}${item("Recebido", `<b>${reais(p2.valor)}</b>`)}${item("Diferença", `<b>${dif > 0 ? "+" : "−"}${reais(Math.abs(dif))}</b>`)}</div>
-    <p><b>Cálculo da NF:</b> ${conta} = <b>${reais(r.valor_nf)}</b>. IPTU, seguro, tarifa, FCI e ajuste do mês não entram.</p>
+    <p><b>Cálculo da NF:</b> ${conta} = <b>${reais(r.valor_nf)}</b>. IPTU, seguro, tarifa e FCI não entram${cb.outros_na_nf ? "" : ", nem o ajuste do mês"}.</p>
     <form data-form="pagamentoNf" data-id="${cb.id}" class="formulario">
       <div class="largo"><label>Justificativa da divergência</label><textarea name="justificativa" rows="2">${esc(p2.justificativa)}</textarea><div class="ajuda">Fica só no sistema (histórico do boleto)</div></div>
       <div><label>Valor da NF</label><input name="valor_nf" inputmode="decimal" data-dinheiro value="${dinheiroTexto(r.valor_nf)}" data-calculado="${dinheiroTexto(r.valor_nf)}" class="valor-calculado">
