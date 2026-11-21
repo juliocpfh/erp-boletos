@@ -224,3 +224,27 @@ test('termo de devolução das chaves (B4): só com a data de saída; chaves, vi
   assert.match(anexosProntos(d, modeloEmail(d, 'saida_chaves'), { contrato: cc }).map((x) => x.rotulo).join(), /termo de devolução das chaves assinado/);
   assert.equal(dadosDoEmail(d, { contrato: cc }).perguntas.data_vistoria, '16/05/2029 às 14:00');
 });
+
+test('recibo da devolução da garantia (troca de garantia): corrigida pela poupança, débitos, a pessoa assina; sem saldo não há recibo', () => {
+  const { d, c } = base();
+  const t = R.inserir(d, 'trocas_garantia', { contrato_id: c.id, data: '2026-12-01', tipo_anterior: 'Caução', tipo_novo: 'Fiador', valor_anterior: 315000, devolucao_movimentos: [{ data: '2026-11-14', valor: 315000 }] }, 'j');
+  assert.equal(reciboDisponivel(d, 'devolucao_garantia', { contrato: c }).ok, false, 'sem devolução registrada');
+  const dev = R.inserir(d, 'devolucoes_garantia', { contrato_id: c.id, troca_id: t.id, data: '2026-12-05', garantia_valor: 315000, indice_percentual: 0.6, garantia_corrigida: 316890,
+    debitos: 0, saldo: 316890, comprovante: 'devolucao.pdf' }, 'j');
+  const r = montarRecibo(d, 'devolucao_garantia', { contrato: c, id: dev.id }, '2026-12-05');
+  assert.equal(r.titulo, 'RECIBO DE DEVOLUÇÃO DA CAUÇÃO');
+  assert.match(r.paragrafos[0], /^Recebi de ANK ADMINISTRADORA DE BENS LTDA, CNPJ 11\.222\.333\/0001-81, em 05\/12\/2026, a importância de R\$ 3\.168,90/);
+  assert.match(r.paragrafos[0], /troca da garantia \(Caução por fiador\) em 01\/12\/2026/);
+  const tab = Object.fromEntries(r.tabela);
+  assert.equal(tab['Garantia depositada'], 'R$ 3.150,00');
+  assert.equal(tab['= Valor devolvido'], 'R$ 3.168,90');
+  assert.deepEqual(r.assinaturas.map((a) => a.nome), ['Maria Souza', 'ANK ADMINISTRADORA DE BENS LTDA']);
+  assert.ok(r.depois.some((p) => /continua, agora com a nova garantia/.test(p)));
+  // débitos levaram tudo: não há devolução nem recibo
+  R.atualizar(d, 'devolucoes_garantia', dev.id, { debitos: 316890, saldo: 0 }, 'j');
+  assert.match(reciboDisponivel(d, 'devolucao_garantia', { contrato: c, id: dev.id }).motivo, /Não sobrou saldo/);
+  // o recibo assinado anexado entra nos arquivos do contrato
+  R.atualizar(d, 'devolucoes_garantia', dev.id, { saldo: 316890, debitos: 0 }, 'j');
+  R.anexarComprovante(d, 'devolucoes_garantia', dev.id, 'termo_assinado', 'recibo-assinado.pdf', 'j');
+  assert.ok(R.arquivosReferenciados(d).some((a) => a.nome === 'recibo-assinado.pdf'));
+});

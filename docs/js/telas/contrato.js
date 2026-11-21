@@ -200,6 +200,7 @@ function caixaGarantia(c) {
           <td class="n nw"><b>${dev.saldo >= 0 ? 'devolvido' : 'a cobrar'} ${reais(Math.abs(dev.saldo))}</b></td>
           <td>${dev.saldo > 0 || dev.comprovante ? linkComprovante(c.id, dev.comprovante, { tabela: 'devolucoes_garantia', id: dev.id, campo: 'comprovante', tipo: 'devolucao-garantia', data: dev.data }) : ''}</td>
           <td class="n nw">${editar(`#/editar/devolucoes_garantia/${dev.id}`)} ${excluir('devolucoes_garantia', dev.id, 'Excluir o registro da devolução? O comprovante também é apagado e volta o alerta "Devolver garantia".')}</td></tr></table>
+        ${reciboDevolucaoHtml(c, dev)}
         ${contas.length > 1 ? `<p class="suave">Sai de onde foi aplicada: ${contas.map((x) => `${esc(x.nome)} ${reais(x.valor)}`).join('; ')}.</p>` : ''}
         ${dev.debitos_descricao ? `<p class="pre suave">${esc(dev.debitos_descricao)}</p>` : ''}${dev.observacoes ? `<p class="pre suave">${esc(dev.observacoes)}</p>` : ''}`;
     } else if (pend) {
@@ -268,6 +269,7 @@ function caixaGarantia(c) {
           <td class="n nw"><b>${dev.saldo >= 0 ? 'devolvido' : 'a cobrar'} ${reais(Math.abs(dev.saldo))}</b></td>
           <td>${dev.saldo > 0 || dev.comprovante ? linkComprovante(c.id, dev.comprovante, { tabela: 'devolucoes_garantia', id: dev.id, campo: 'comprovante', tipo: 'devolucao-garantia', data: dev.data }) : ''}</td>
           <td class="n nw">${editar(`#/editar/devolucoes_garantia/${dev.id}`)} ${excluir('devolucoes_garantia', dev.id, 'Excluir o registro da devolução? O comprovante também é apagado e volta o alerta "Devolver garantia".')}</td></tr></table>
+        ${reciboDevolucaoHtml(c, dev)}
         ${dev.debitos_descricao ? `<p class="pre suave">${esc(dev.debitos_descricao)}</p>` : ''}${dev.observacoes ? `<p class="pre suave">${esc(dev.observacoes)}</p>` : ''}`;
     } else if (t.valor_anterior > 0) {
       html += `<div class="alerta aviso"><b>Devolver a garantia:</b> na troca de ${dataBr(t.data)} (${esc(t.tipo_anterior)} → ${esc(t.tipo_novo)}), ${t.tipo_anterior === 'Caução' ? 'a caução' : 'o depósito'} de ${reais(t.valor_anterior)} volta a ${esc(c.inquilino_nome)},
@@ -294,6 +296,16 @@ function caixaGarantia(c) {
  * Link do recibo ou termo (recibos.js) que já pode sair: abre a página para imprimir, baixar o PDF ou mandar por e-mail.
  * Ex.: caução paga → "🧾 Recibo da caução (para o inquilino)". ``solto``: só o link, sem parágrafo.
  */
+/**
+ * Recibo da devolução da garantia para a pessoa assinar e o assinado anexado (item 4 de PENDENCIAS_4000, 2026-11-21). Sem saldo
+ * devolvido, não há recibo. Ex.: "🧾 Recibo da devolução para assinar · Recibo assinado: anexar".
+ */
+function reciboDevolucaoHtml(c, dev) {
+  if (!REC.reciboDisponivel(d(), 'devolucao_garantia', { contrato: c, id: dev.id }).ok) return '';
+  return `<p class="suave">${link(`#/imprimir/recibo?tipo=devolucao_garantia&contrato=${c.id}&id=${dev.id}`, '🧾 Recibo da devolução para assinar (a pessoa assina que recebeu)', '')}
+    · Recibo assinado: ${linkComprovante(c.id, dev.termo_assinado, { tabela: 'devolucoes_garantia', id: dev.id, campo: 'termo_assinado', tipo: 'recibo-devolucao-garantia-assinado', data: dev.data })}</p>`;
+}
+
 function linkRecibo(tipo, c, texto, solto = false) {
   if (!REC.reciboDisponivel(d(), tipo, { contrato: c }).ok) return '';
   const a = link(`#/imprimir/recibo?tipo=${tipo}&contrato=${c.id}`, `🧾 ${texto}`, '');
