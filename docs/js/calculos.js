@@ -596,6 +596,11 @@ const FORMATOS_PARAMETRO = {
   gmail: /^[a-z-]{1,20}$/, // Dados e backup: aviso da volta do Google ao conectar o Gmail (AVISOS_VOLTA_GMAIL de nuvem/worker.mjs)
 };
 
+/** Parâmetros conhecidos que vieram fora do formato (sanearParametros os tira). Ex.: { comp: '2026-13', contrato: '7' } → ['comp']. */
+export function parametrosDescartados(q) {
+  return Object.entries(q || {}).filter(([k, v]) => FORMATOS_PARAMETRO[k] && !FORMATOS_PARAMETRO[k].test(String(v))).map(([k]) => k);
+}
+
 /** Devolve só os parâmetros no formato esperado (os conhecidos fora do formato somem; a tela usa o padrão). */
 export function sanearParametros(q) {
   const limpo = {};
