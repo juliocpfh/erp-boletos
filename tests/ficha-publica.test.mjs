@@ -226,3 +226,36 @@ test('política de privacidade: página pública no endereço da ficha, sem scri
   const p = await FP.atenderFicha(new Request('https://ficha.ankjck.com.br/privacidade', { method: 'POST' }), { DADOS: {} });
   assert.equal(p.status, 404);
 });
+
+test('entrada-007: mandar de novo (manter) deixa o link antigo valendo e não muda a validade; encerrar mata os dois', async () => {
+  const ctx = ambiente();
+  const primeira = await criar(ctx);
+  const ler = () => JSON.parse(new TextDecoder().decode(ctx.env.DADOS.m.get('publico/fichas/7/interessado.json').dados));
+  const vence = ler().vence_em;
+  // um dia depois: a validade continua a do primeiro link
+  const reg = ler(); reg.vence_em = new Date(Date.parse(vence) - 86400000).toISOString(); await ctx.env.DADOS.put('publico/fichas/7/interessado.json', JSON.stringify(reg));
+  const venceAntes = ler().vence_em;
+  const r = await ctx.equipe('POST', 'link', { ficha_id: 7, pessoa: 'interessado', pasta: PASTA, formulario: FORMULARIO, valores: {}, contexto: { nome: 'Maria Souza' }, manter: true });
+  const { url, vence_em: venceNovo } = await r.json();
+  const segunda = url.split('#')[1];
+  assert.equal(venceNovo, venceAntes, 'mesma validade');
+  assert.equal((await ctx.publico(primeira, 'GET', 'ficha')).status, 200, 'o antigo continua abrindo');
+  assert.equal((await ctx.publico(segunda, 'GET', 'ficha')).status, 200);
+  assert.equal((await (await ctx.equipe('GET', 'lista')).json()).links[0].hashes, undefined, 'os hashes não vão à equipe');
+  // "Gerar novo link" (sem manter): troca de vez, os dois antigos param
+  const terceira = await criar(ctx);
+  assert.equal((await ctx.publico(primeira, 'GET', 'ficha')).status, 404);
+  assert.equal((await ctx.publico(segunda, 'GET', 'ficha')).status, 404);
+  assert.equal((await ctx.publico(terceira, 'GET', 'ficha')).status, 200);
+  // manter com o link vencido: começa outro prazo e o antigo para
+  const v = ler(); v.vence_em = new Date(Date.now() - 1000).toISOString(); await ctx.env.DADOS.put('publico/fichas/7/interessado.json', JSON.stringify(v));
+  const quarta = await criar(ctx, { manter: true });
+  assert.ok(ler().vence_em > new Date().toISOString());
+  assert.equal((await ctx.publico(terceira, 'GET', 'ficha')).status, 404);
+  // encerrar: nenhum abre e os ponteiros saem
+  const quinta = await criar(ctx, { manter: true });
+  await ctx.equipe('POST', 'atualizar', { ficha_id: 7, pessoa: 'interessado', situacao: 'Encerrado' });
+  assert.equal((await ctx.publico(quarta, 'GET', 'ficha')).status, 404);
+  assert.equal((await ctx.publico(quinta, 'GET', 'ficha')).status, 404);
+  assert.ok(![...ctx.env.DADOS.m.keys()].some((k) => k.startsWith('publico/tokens/')), 'sem ponteiros sobrando');
+});

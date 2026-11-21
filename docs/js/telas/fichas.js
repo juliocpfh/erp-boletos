@@ -176,17 +176,19 @@ const COR_LINK = { Respondida: 'info', Assinada: 'ok', Desistiu: 'perigo', 'Falt
 const linkValido = (f, pessoa) => { const l = (f.links_ficha || {})[pessoa]; return l && !l.encerrado && String(l.vence_em) > new Date().toISOString() ? l : null; };
 
 /**
- * O link para mostrar: o gerado nesta aba (o endereço não fica no banco) ou, perguntando antes, um link novo (o anterior deixa
- * de valer; o que a pessoa já mandou continua guardado). null se a pessoa da equipe preferir não gerar.
+ * O link para mostrar: o gerado nesta aba (o endereço não fica no banco) ou, perguntando antes, um link novo que vence na mesma
+ * data, com o anterior ainda valendo (decisão do dono, 21/11/2026, entrada-007). null se a pessoa da equipe preferir não gerar.
  */
 async function linkParaMandar(f, pessoa) {
   const naAba = FO.urlDoLink(f.id, pessoa);
   if (naAba) return naAba;
-  const ok = await janela({ titulo: 'Gerar um link novo?', sim: 'Gerar e mostrar', nao: 'Voltar',
+  const vale = linkValido(f, pessoa);
+  const ate = vale ? dataBr(String(vale.vence_em).slice(0, 10)) : '';
+  const ok = await janela({ titulo: 'Mandar o link de novo', sim: 'Gerar e mostrar', nao: 'Voltar',
     html: `<p>Por segurança, o link da ficha só aparece na hora em que é gerado (ele não fica guardado no sistema).</p>
-      <p>Para mandar de novo a <b>${esc(FO.nomeDaPessoa(f, pessoa))}</b>, o sistema gera um link novo: o anterior deixa de funcionar. O que a pessoa já mandou continua guardado.</p>` });
+      <p>Para mandar de novo a <b>${esc(FO.nomeDaPessoa(f, pessoa))}</b>, o sistema gera outro endereço${ate ? `, que vale até a mesma data (<b>${ate}</b>). O link que a pessoa já tem continua funcionando` : ''}. O que ela já mandou continua guardado.</p>` });
   if (!ok) return null;
-  return novoLinkDaFicha(f, pessoa, { pdf: false });
+  return novoLinkDaFicha(f, pessoa, { pdf: false, manter: !!vale });
 }
 
 /**
@@ -205,8 +207,9 @@ async function linkNovoSeVencido(f, pessoa, l) {
 }
 
 /** Cria o link na nuvem (com a ficha em PDF, se ``pdf``), guarda na ficha só a validade e devolve { url, vence_em }. */
-async function novoLinkDaFicha(f, pessoa, { pdf = true } = {}) {
-  const link = await FO.criarLinkNaNuvem(FO.pedidoDoLink(d(), f, pessoa, f.pasta || nomePastaFicha(f)));
+async function novoLinkDaFicha(f, pessoa, { pdf = true, manter = false } = {}) {
+  // manter: mandar de novo um link no prazo; o anterior continua valendo e a validade não muda (entrada-007)
+  const link = await FO.criarLinkNaNuvem({ ...FO.pedidoDoLink(d(), f, pessoa, f.pasta || nomePastaFicha(f)), ...(manter ? { manter: true } : {}) });
   FO.lembrarUrlDoLink(f.id, pessoa, link);
   // a ficha em PDF (com o que já se sabe) para quem prefere imprimir; sem ela, o link funciona do mesmo jeito
   let pdfSha = null;
@@ -218,7 +221,7 @@ async function novoLinkDaFicha(f, pessoa, { pdf = true } = {}) {
     const links = { ...(R.buscar(db, 'fichas', f.id).links_ficha || {}) };
     const { url, encerrado, ...anterior } = links[pessoa] || {}; // eslint-disable-line no-unused-vars
     links[pessoa] = { ...anterior, vence_em: link.vence_em, criado_em: new Date().toISOString(), por: login(), ...(pdfSha ? { pdf_sha256: pdfSha } : {}) };
-    R.atualizar(db, 'fichas', f.id, { links_ficha: links }, login(), `Link da ficha de ${FO.nomeDaPessoa(f, pessoa)} gerado (vale até ${dataBr(link.vence_em.slice(0, 10))})`);
+    R.atualizar(db, 'fichas', f.id, { links_ficha: links }, login(), `Link da ficha de ${FO.nomeDaPessoa(f, pessoa)} ${manter ? 'mandado de novo (o anterior continua valendo)' : 'gerado'} (vale até ${dataBr(link.vence_em.slice(0, 10))})`);
   });
   return { url: link.url, vence_em: link.vence_em };
 }
@@ -573,7 +576,7 @@ async function janelaDoLink(f, pessoa, link, { lembrete = false, faltando = [] }
   await janela({
     titulo: `Link da ficha: ${FO.nomeDaPessoa(f, pessoa)}`, sim: 'Fechar', nao: 'Voltar',
     html: `<p>Vale até <b>${dataBr(String(link.vence_em).slice(0, 10))}</b>. É só desta pessoa: não publique.</p>
-      <p class="texto-aviso"><b>Copie agora:</b> por segurança, este link não fica guardado no sistema. Para mandar de novo depois, o sistema gera outro (e este deixa de valer).</p>
+      <p class="texto-aviso"><b>Copie agora:</b> por segurança, este link não fica guardado no sistema. Para mandar de novo depois, o sistema gera outro endereço com a mesma validade (e este continua valendo).</p>
       <p><textarea rows="5" readonly data-texto-link style="width:100%">${esc(texto)}</textarea></p>
       <p class="acoes"><button type="button" class="secundario pequeno" data-copiar-link>Copiar a mensagem</button>
       ${tel ? `<a class="botao pequeno" target="_blank" rel="noopener noreferrer" href="https://wa.me/${tel}" data-abrir-zap>Copiar e abrir o WhatsApp</a>` : '<span class="suave">Sem telefone cadastrado para o WhatsApp.</span>'}</p>

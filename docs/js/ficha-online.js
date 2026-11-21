@@ -123,7 +123,8 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
 
 /**
  * O endereço do link (com a chave da pessoa depois do "#") só fica na memória desta aba, até recarregar: no banco fica só a
- * validade (decisão de 2026-11-16). Mandar de novo depois disso gera outro link (o anterior deixa de valer).
+ * validade (decisão de 2026-11-16). Mandar de novo depois disso gera outro endereço com a mesma validade, e o anterior continua
+ * valendo (decisão de 2026-11-21, entrada-007); "Gerar novo link" (botão da ficha) troca de vez e começa outro prazo.
  */
 const urlsDestaAba = new Map(); // "ficha|pessoa" → { url, vence_em }
 export function lembrarUrlDoLink(fichaId, pessoa, link) {
