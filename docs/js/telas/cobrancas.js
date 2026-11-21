@@ -27,7 +27,8 @@ function pagoAMaisHtml(cb) {
   const falta = cb.valor_a_mais ? R.pagoAMaisDo(cb) : 0;
   const lista = linhas.sort((a, b) => String(a.data).localeCompare(String(b.data))).map((m) => `<li><a href="#/banco?conta=${esc(m.conta_id)}&mes=${String(m.data).slice(0, 7)}">${dataBr(m.data)} · ${m.pago_a_mais ? 'entrou de novo (a mais)' : 'devolvido ao inquilino'} · ${reais(m.valor)}</a></li>`).join('');
   return `<div class="alerta ${falta ? 'aviso' : 'info'}"><b>${falta ? `Pago a mais: falta devolver ${reais(falta)} ao inquilino` : 'Pago a mais e devolvido'}</b> (devido ${reais(R.devidoDoPago(cb))}). A NF não muda.
-    ${lista ? `<ul style="margin:6px 0 0">${lista}</ul>` : ''}${falta ? '<p class="suave">Quando devolver, dê à saída do extrato o destino "Devolução ao inquilino" (tela Banco).</p>' : ''}</div>`;
+    ${lista ? `<ul style="margin:6px 0 0">${lista}</ul>` : ''}${falta ? `<p class="suave">Quando devolver, dê à saída do extrato o destino "Devolução ao inquilino" (tela Banco). Devolveu por fora do extrato (outra conta, dinheiro)? Marque aqui:</p>
+    ${opera() ? `<form data-form="devolvidoAMao" data-id="${cb.id}" class="acoes"><input type="date" name="data" value="${C.hojeIso()}" aria-label="Dia da devolução"><button class="secundario pequeno">Devolvi ${reais(falta)}</button></form>` : ''}` : ''}</div>`;
 }
 
 /**
@@ -73,14 +74,15 @@ function formNfDivergente(cb, p) {
   const dif = p.valor - r.valor_devido;
   const ress = (cb.ressarcimento_na_nf && cb.ressarcimento ? ` − ressarcimento ${reais(cb.ressarcimento)}` : '') + (cb.outros_na_nf && cb.outros ? ` + ajuste ${reais(cb.outros)}` : '');
   const conta = r.pontual ? `aluguel ${reais(cb.aluguel)} − desconto ${reais(cb.desconto)}${ress}` : `aluguel ${reais(cb.aluguel)} + multa ${reais(r.multa)} + juros ${reais(r.juros)}${ress} (${C.plural(r.dias_atraso, 'dia')} de atraso, sem desconto)`;
-  return `<div class="alerta aviso"><b>Valor recebido diferente do previsto.</b> Confira o cálculo e informe o valor da NF (cálculo manual). Nada foi salvo ainda.</div>
+  const aMais = dif > 0;
+  return `<div class="alerta aviso"><b>Valor recebido diferente do previsto.</b> ${aMais ? `Pagou ${reais(dif)} a mais: confirmando com a NF no valor calculado, a diferença fica anotada como <b>a devolver ao inquilino</b>. Só altere a NF se o valor a mais fizer parte do aluguel.` : 'Confira o cálculo e informe o valor da NF (cálculo manual).'} Nada foi salvo ainda.</div>
     <div class="grade">${item('Dinheiro entrou na conta em (data da NF)', dataBr(p.data))}${item('Pagou em', dataBr(p.pagouEmDia ? cb.vencimento : p.dataPagou || p.data))}
       ${item('Previsto', reais(r.valor_devido))}${item('Recebido', `<b>${reais(p.valor)}</b>`)}${item('Diferença', `<b>${dif > 0 ? '+' : '−'}${reais(Math.abs(dif))}</b>`)}</div>
     <p><b>Cálculo da NF:</b> ${conta} = <b>${reais(r.valor_nf)}</b>. IPTU, seguro, tarifa e FCI não entram${cb.outros_na_nf ? '' : ', nem o ajuste do mês'}.</p>
     <form data-form="pagamentoNf" data-id="${cb.id}" class="formulario">
-      <div class="largo"><label>Justificativa da divergência</label><textarea name="justificativa" rows="2">${esc(p.justificativa)}</textarea><div class="ajuda">Fica só no sistema (histórico do boleto)</div></div>
+      <div class="largo"><label>Justificativa da divergência${aMais ? ' (opcional se a NF ficar no valor calculado)' : ''}</label><textarea name="justificativa" rows="2">${esc(p.justificativa)}</textarea><div class="ajuda">Fica só no sistema (histórico do boleto)</div></div>
       <div><label>Valor da NF</label><input name="valor_nf" inputmode="decimal" data-dinheiro value="${F.dinheiroTexto(r.valor_nf)}" data-calculado="${F.dinheiroTexto(r.valor_nf)}" class="valor-calculado">
-        <div class="ajuda">Veio o valor calculado: altere para o valor do cálculo manual</div></div>
+        <div class="ajuda">${aMais ? 'Veio o valor calculado: deixe assim para anotar a diferença a devolver' : 'Veio o valor calculado: altere para o valor do cálculo manual'}</div></div>
       ${dif < 0 ? `<div class="largo alerta perigo">Pagou a menos: não existe pagamento em parte. Ao confirmar, o pagamento é recusado e o boleto continua em aberto (para quitar, faça um acordo).</div>` : ''}
       <div class="acoes" style="align-self:end"><button>Confirmar pagamento</button>${botao('cancelarPagamentoDivergente', 'Cancelar', {}, 'secundario')}</div></form>`;
 }

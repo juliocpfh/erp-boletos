@@ -1374,7 +1374,6 @@ test('pagamento com valor diferente do previsto: NF digitada (diferente da calcu
   assert.throws(() => R.registrarPagamento(d, cb.id, cb.vencimento, previsto.valor_devido - 5000, 'julio', { valorNf: 100000, justificativa: 'Pagou sem o IPTU' }),
     (e) => e instanceof C.ErroUsuario && /menor que o devido.*Não existe pagamento em parte: o boleto continua em aberto\. Para quitar, faça um acordo/.test(e.message));
   const recebido = previsto.valor_devido + 5000;
-  assert.throws(() => R.registrarPagamento(d, cb.id, cb.vencimento, recebido, 'julio', { valorNf: previsto.valor_nf, justificativa: 'Pagou o IPTU duas vezes' }), /Altere o valor da NF/);
   assert.throws(() => R.registrarPagamento(d, cb.id, cb.vencimento, recebido, 'julio', { valorNf: 100000, justificativa: ' ' }), /justificativa/);
   assert.equal(cb.data_pagamento, null, 'nada salvo enquanto não confere');
   R.registrarPagamento(d, cb.id, cb.vencimento, recebido, 'julio', { valorNf: 100000, justificativa: 'Pagou o IPTU duas vezes' });
@@ -1385,6 +1384,30 @@ test('pagamento com valor diferente do previsto: NF digitada (diferente da calcu
   R.estornarPagamento(d, cb.id, 'julio');
   assert.equal(cb.nf_manual, false);
   assert.equal(cb.divergencia, null);
+});
+
+test('mensal-009: pago a mais com a NF calculada fica anotado a devolver; devolução fora do extrato', () => {
+  const { d } = base();
+  R.gerarCobrancas(d, '2026-08', 'julio');
+  const cb = d.cobrancas[0];
+  const previsto = R.previstoNoPagamento(cb, cb.vencimento);
+  R.registrarPagamento(d, cb.id, cb.vencimento, previsto.valor_devido + 10000, 'julio', { valorNf: previsto.valor_nf, justificativa: '' });
+  assert.equal(cb.valor_nf, previsto.valor_nf, 'a NF não muda');
+  assert.equal(cb.nf_manual, false);
+  assert.equal(R.pagoAMaisDo(cb), 10000, 'R$ 100,00 a devolver');
+  assert.match(d.historico.at(-1).descricao, /R\$ 100,00 a devolver ao inquilino/);
+  assert.throws(() => R.marcarDevolvidoAMao(d, cb.id, '2026-01-01', 'julio'), /antes do pagamento/);
+  assert.equal(R.marcarDevolvidoAMao(d, cb.id, cb.vencimento, 'julio'), 10000);
+  assert.equal(R.pagoAMaisDo(cb), 0);
+  assert.equal(cb.valor_devolvido, 10000);
+  assert.throws(() => R.marcarDevolvidoAMao(d, cb.id, cb.vencimento, 'julio'), /não tem valor a devolver/);
+  // sem informar a NF (ex.: confirmação que não passa pela tela): também anota
+  R.gerarCobrancas(d, '2026-09', 'julio');
+  const cb2 = d.cobrancas.find((x) => x.competencia === '2026-09');
+  const p2 = R.previstoNoPagamento(cb2, cb2.vencimento);
+  R.registrarPagamento(d, cb2.id, cb2.vencimento, p2.valor_devido + 5000, 'julio');
+  assert.equal(R.pagoAMaisDo(cb2), 5000);
+  assert.equal(cb2.valor_a_mais, 5000);
 });
 
 test('termo aditivo gerado: aguarda assinatura sem marcar "possui termo aditivo"; altera e assina', () => {
