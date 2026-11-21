@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-BaKc7AxW3En4fgfLYt0qYEcyS97K6w2CCqBcvvA2NHY=' 'sha256-Fa0hODfYRazaNTj8TBVOXbcWP4i7/KjH2pXrUrFi85k='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-BaKc7AxW3En4fgfLYt0qYEcyS97K6w2CCqBcvvA2NHY=' 'sha256-uTX4+Nrn4b9W6N53Wjt9/1swejPqA0Mkpc/7yORSDJ0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="1e9aa7717758475d">
+<meta name="fontes" content="f2c0b7e3cd25b27e">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -685,7 +685,8 @@ button[disabled], .botao[disabled] { opacity: .5; cursor: not-allowed; filter: n
 .vis-nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
 .vis-corpo { flex: 1; overflow: auto; padding: 8px; display: flex; flex-direction: column; align-items: center; gap: 8px; -webkit-overflow-scrolling: touch; }
 /* flex: none — no iPhone (Safari) as páginas numa coluna flex encolhiam a cada página nova e a tela pulava ao rolar */
-.vis-corpo canvas, .vis-corpo img { flex: none; max-width: 100%; height: auto; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .4); }.vis-aviso { color: #fff; margin-top: 30px; text-align: center; }
+.vis-pagina, .vis-corpo img { flex: none; max-width: 100%; height: auto; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .4); }
+.vis-pagina canvas { display: block; width: 100%; height: 100%; }.vis-aviso { color: #fff; margin-top: 30px; text-align: center; }
 body.com-visualizador { overflow: hidden; }
 /* botão sem destino (ex.: "Contrato" sem o arquivo assinado anexado): apagado, só com a explicação ao passar o mouse */
 .botao.desligado, button.desligado { opacity: .45; cursor: default; pointer-events: auto; filter: grayscale(1); }
@@ -13521,6 +13522,7 @@ ${dentro}` : ""));
   function fechar(janela2, urls2, voltar = true) {
     if (janela2.fechada) return;
     janela2.fechada = true;
+    janela2.limpar?.();
     janela2.remove();
     urls2.forEach((u) => URL.revokeObjectURL(u));
     document.body.classList.remove("com-visualizador");
@@ -13579,23 +13581,73 @@ ${dentro}` : ""));
       const nitidez = Math.min(window.devicePixelRatio || 1, 2);
       const paginas = [];
       for (let n = 1; n <= pdf.numPages; n += 1) {
-        if (!janela2.isConnected) return;
+        if (!janela2.isConnected) {
+          pdf.destroy?.();
+          return;
+        }
         const pagina = await pdf.getPage(n);
         const escala = largura / pagina.getViewport({ scale: 1 }).width;
         const vista = pagina.getViewport({ scale: escala * nitidez });
+        const caixa = document.createElement("div");
+        caixa.className = "vis-pagina";
+        caixa.style.width = `${Math.floor(vista.width / nitidez)}px`;
+        caixa.style.height = `${Math.floor(vista.height / nitidez)}px`;
+        corpo.appendChild(caixa);
+        paginas.push({ pagina, vista, caixa, tela: null, tarefa: null, perto: false });
+      }
+      let fila = Promise.resolve();
+      const soltar2 = (pg) => {
+        if (pg.tarefa) {
+          try {
+            pg.tarefa.cancel();
+          } catch {
+          }
+          pg.tarefa = null;
+        }
+        if (!pg.tela) return;
+        pg.tela.width = 0;
+        pg.tela.height = 0;
+        pg.tela.remove();
+        pg.tela = null;
+      };
+      const desenhar = async (pg) => {
+        if (pg.tela || !pg.perto || !janela2.isConnected) return;
         const tela = document.createElement("canvas");
-        tela.width = Math.floor(vista.width);
-        tela.height = Math.floor(vista.height);
-        tela.style.width = `${Math.floor(vista.width / nitidez)}px`;
-        tela.style.height = `${Math.floor(vista.height / nitidez)}px`;
-        corpo.appendChild(tela);
-        paginas.push({ pagina, vista, tela });
-      }
-      for (const { pagina, vista, tela } of paginas) {
-        if (!janela2.isConnected) return;
-        await pagina.render({ canvasContext: tela.getContext("2d"), viewport: vista }).promise;
-      }
-      pdf.destroy?.();
+        tela.width = Math.floor(pg.vista.width);
+        tela.height = Math.floor(pg.vista.height);
+        pg.caixa.appendChild(tela);
+        pg.tela = tela;
+        pg.tarefa = pg.pagina.render({ canvasContext: tela.getContext("2d"), viewport: pg.vista });
+        try {
+          await pg.tarefa.promise;
+        } catch {
+        } finally {
+          pg.tarefa = null;
+        }
+      };
+      const pedir3 = (pg) => {
+        fila = fila.then(() => desenhar(pg));
+      };
+      janela2.limpar = () => {
+        observador && observador.disconnect();
+        paginas.forEach(soltar2);
+        pdf.destroy?.();
+      };
+      const observador = typeof IntersectionObserver === "function" ? new IntersectionObserver((entradas) => {
+        for (const ent of entradas) {
+          const pg = paginas.find((x) => x.caixa === ent.target);
+          if (!pg) continue;
+          pg.perto = ent.isIntersecting;
+          if (pg.perto) pedir3(pg);
+          else soltar2(pg);
+        }
+      }, { root: corpo, rootMargin: "150% 0px" }) : null;
+      if (observador) paginas.forEach((pg) => observador.observe(pg.caixa));
+      else paginas.forEach((pg) => {
+        pg.perto = true;
+        pedir3(pg);
+      });
+      await fila;
     } catch (e) {
       const p2 = document.createElement("p");
       p2.className = "vis-aviso";
