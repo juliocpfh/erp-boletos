@@ -76,8 +76,10 @@ export function empresasDoTopo(d) {
 }
 
 /**
- * Quem recebe: o inquilino de cada contrato ativo e os fiadores atuais dele. Ordem: imóvel, depois inquilino antes do fiador.
- * Ex.: contrato 12 (Ana, Apto 101) com o fiador 5 (Diego) → [{ chave: 'c12', tipo: 'inquilino' }, { chave: 'f5', tipo: 'fiador' }].
+ * Quem recebe: todos que assinaram e respondem pelo contrato ativo (decisão do dono, 21/11/2026, comunicacoes-007): o inquilino,
+ * o inquilino solidário, o representante da empresa (inquilino empresa) e os fiadores atuais. Ordem: imóvel, depois inquilino,
+ * solidário, representante e fiadores. Ex.: contrato 12 (Ana, Apto 101, solidário Bruno) com o fiador 5 (Diego) →
+ * [{ chave: 'c12', tipo: 'inquilino' }, { chave: 's12', tipo: 'solidario' }, { chave: 'f5', tipo: 'fiador' }].
  */
 export function destinatarios(d, hoje = C.hojeIso()) {
   const lista = [];
@@ -86,11 +88,24 @@ export function destinatarios(d, hoje = C.hojeIso()) {
     .sort((a, b) => String(a.i ? a.i.nome : '~').localeCompare(String(b.i ? b.i.nome : '~'), 'pt-BR'));
   for (const { c, i } of ativos) {
     lista.push({ chave: `c${c.id}`, tipo: 'inquilino', contrato_id: c.id, fiador_id: null, nome: c.inquilino_nome, email: c.inquilino_email || '', telefone: c.inquilino_telefone || '', whatsapp: !!c.inquilino_whatsapp, imovel: i, contrato: c });
+    for (const tipo of ['solidario', 'representante']) {
+      const p = pessoaDoContrato(c, tipo);
+      if (p) lista.push({ chave: `${tipo[0]}${c.id}`, tipo, contrato_id: c.id, fiador_id: null, ...p, whatsapp: false, imovel: i, contrato: c });
+    }
     for (const f of R.fiadoresDo(d, c.id, hoje)) {
       lista.push({ chave: `f${f.id}`, tipo: 'fiador', contrato_id: c.id, fiador_id: f.id, nome: f.nome, email: f.email || '', telefone: f.telefone || '', whatsapp: false, imovel: i, contrato: c });
     }
   }
   return lista;
+}
+
+/** Papel de quem recebe, para os rótulos. Ex.: 'solidario' → 'inquilino solidário'. O inquilino não tem rótulo. */
+export const PAPEIS = { fiador: 'fiador', solidario: 'inquilino solidário', representante: 'representante da empresa' };
+
+/** Solidário ou representante da empresa do contrato: { nome, email, telefone } ou null (sem nome no cadastro). */
+function pessoaDoContrato(c, tipo) {
+  const nome = String(c[`${tipo}_nome`] || '').trim();
+  return nome ? { nome, email: c[`${tipo}_email`] || '', telefone: c[`${tipo}_telefone`] || '' } : null;
 }
 
 /** Endereço do imóvel por extenso (rua, complemento, bairro, cidade/UF) e o curto (o nome do imóvel). */
@@ -123,7 +138,7 @@ export function contextoDoLink(d, com, p, logo = '') {
   return {
     empresas: e.nomes, cnpjs: e.cnpjs, cidade: e.cidade, logo, titulo: com.titulo,
     nome: p.nome, tipo: p.tipo, imovel: dados.campos.imovel, desde: c && c.data_entrada ? C.compBr(String(c.data_entrada).slice(0, 7)) : '',
-    locatario: p.tipo === 'fiador' && c ? c.inquilino_nome : '', email: p.email, telefone: p.telefone, whatsapp: !!p.whatsapp,
+    locatario: p.tipo !== 'inquilino' && c ? c.inquilino_nome : '', email: p.email, telefone: p.telefone, whatsapp: !!p.whatsapp,
     prazo: com.prazo, aviso: preencher(com.aviso, dados), ciencia: preencher(com.ciencia, dados),
     email_empresa: com.email_empresa, telefone_empresa: com.telefone_empresa,
   };
@@ -178,6 +193,11 @@ export function mudancaNoCadastro(d, x) {
   const c = R.buscar(d, 'contratos', x.contrato_id);
   if (!c) return null;
   const dados = {};
+  if (x.tipo === 'solidario' || x.tipo === 'representante') {
+    if (String(c[`${x.tipo}_email`] || '').trim().toLowerCase() !== r.email) dados[`${x.tipo}_email`] = r.email;
+    if (!mesmoTel(c[`${x.tipo}_telefone`])) dados[`${x.tipo}_telefone`] = tel;
+    return Object.keys(dados).length ? { tabela: 'contratos', id: c.id, dados } : null;
+  }
   if (String(c.inquilino_email || '').trim().toLowerCase() !== r.email) dados.inquilino_email = r.email;
   if (!mesmoTel(c.inquilino_telefone)) dados.inquilino_telefone = tel;
   if (!!c.inquilino_whatsapp !== !!r.whatsapp) dados.inquilino_whatsapp = !!r.whatsapp;
@@ -192,6 +212,7 @@ const soNumeros = (v) => String(v || '').replace(/\D/g, '');
  * [{ tipo: 'inquilino', contrato_id: 15 }]. Sem CPF no cadastro, nada (não dá para saber se é a mesma pessoa).
  */
 export function mesmaPessoaEmOutrosContratos(d, x, hoje = C.hojeIso()) {
+  if (x.tipo === 'solidario' || x.tipo === 'representante') return [];
   if (x.tipo === 'fiador') {
     const f = R.buscar(d, 'fiadores', x.fiador_id);
     const doc = f ? soNumeros(f.cpf) : '';
@@ -211,6 +232,7 @@ export function mesmaPessoaEmOutrosContratos(d, x, hoje = C.hojeIso()) {
 export function destinoAtivo(d, x, hoje = C.hojeIso()) {
   const c = x && R.buscar(d, 'contratos', x.contrato_id);
   if (!c || !R.contratoAtivo(c, hoje)) return false;
+  if (x.tipo === 'solidario' || x.tipo === 'representante') return !!pessoaDoContrato(c, x.tipo);
   if (x.tipo !== 'fiador') return true;
   return R.fiadoresDo(d, c.id, hoje).some((f) => f.id === x.fiador_id);
 }
@@ -270,6 +292,10 @@ export function pessoaDoDestino(d, x) {
     const f = R.buscar(d, 'fiadores', x.fiador_id);
     if (!f) return null;
     return { ...x, nome: f.nome, email: f.email || '', telefone: f.telefone || '', whatsapp: false, imovel: i, contrato: c };
+  }
+  if (x.tipo === 'solidario' || x.tipo === 'representante') {
+    const p = pessoaDoContrato(c, x.tipo);
+    return p ? { ...x, ...p, whatsapp: false, imovel: i, contrato: c } : null;
   }
   return { ...x, nome: c.inquilino_nome, email: c.inquilino_email || '', telefone: c.inquilino_telefone || '', whatsapp: !!c.inquilino_whatsapp, imovel: i, contrato: c };
 }

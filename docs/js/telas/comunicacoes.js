@@ -152,7 +152,7 @@ function telaNovoComunicado(q, editarId = null) {
   return `${voltar}<h1>${editado ? 'Corrigir o comunicado' : 'Novo comunicado a todos'}</h1>
     <form data-form="criarComunicado" class="cartao"><input type="hidden" name="modelo" value="${esc(chave)}">${editado ? `<input type="hidden" name="id" value="${editado.id}">` : ''}
       <p><b>Modelo:</b> ${esc((CM.MODELOS[chave] || CM.MODELOS.contatos).nome)}</p>
-      <p><b>Vai para ${pessoas.length} pessoa(s):</b> ${pessoas.filter((p) => p.tipo === 'inquilino').length} inquilino(s) e ${pessoas.filter((p) => p.tipo === 'fiador').length} fiador(es) dos contratos ativos${editado ? ' do dia em que foi criado' : ' de hoje'}.
+      <p><b>Vai para ${pessoas.length} pessoa(s):</b> ${pessoas.filter((p) => p.tipo === 'inquilino').length} inquilino(s), ${pessoas.filter((p) => p.tipo === 'solidario').length} solidário(s), ${pessoas.filter((p) => p.tipo === 'representante').length} representante(s) de empresa e ${pessoas.filter((p) => p.tipo === 'fiador').length} fiador(es) dos contratos ativos${editado ? ' do dia em que foi criado' : ' de hoje'}.
         ${semContato.length ? `<br>${etiqueta(`${semContato.length} sem e-mail nem celular`, 'aviso')} ${esc(semContato.map((p) => p.nome).join(', '))}: o link aparece para você copiar e mandar de outro jeito.` : ''}</p>
       ${comLink ? `<div class="alerta aviso">${comLink} link(s) já gerado(s) deixam de valer ao salvar (são gerados de novo, com o texto corrigido, no envio).</div>` : ''}
       <div class="grade">
@@ -205,7 +205,7 @@ async function telaComunicado(id) {
       : opera() && p ? `${botao('emailComunicado', 'E-mail', { id: com.id, chave: x.chave })} ${botao('whatsComunicado', 'WhatsApp', { id: com.id, chave: x.chave })} ${botao('linkComunicado', 'Copiar link', { id: com.id, chave: x.chave })}
         ${x.url ? `<br>${botao('novoLinkComunicado', 'Gerar novo link', { id: com.id, chave: x.chave }, 'secundario mini', `Gerar um link novo para ${x.nome}? O link atual deixa de valer e a contagem de códigos recomeça.`)} ${botao('desligarLinkComunicado', 'Desligar o link', { id: com.id, chave: x.chave }, 'secundario mini', `Desligar o link de ${x.nome}? A pessoa não consegue mais abrir (para mandar de novo, o sistema gera outro).`)}`
     : x.link_desligado_em ? `<br><span class="suave">link desligado em ${C.dataHoraBr(x.link_desligado_em)}</span>` : ''}` : '';
-    return `<tr><td><b>${esc(x.nome)}</b>${x.tipo === 'fiador' ? ' <span class="suave">(fiador)</span>' : ''}</td><td>${esc(imovel)}</td><td>${contatos}</td>
+    return `<tr><td><b>${esc(x.nome)}</b>${CM.PAPEIS[x.tipo] ? ` <span class="suave">(${CM.PAPEIS[x.tipo]})</span>` : ''}</td><td>${esc(imovel)}</td><td>${contatos}</td>
       <td>${etiqueta(s.texto, s.cor)}<span class="suave">${quando}</span>${x.resposta && x.resposta.mudou ? `<br>${etiqueta('mudou o contato', 'info')}` : ''}${x.resposta ? `<br><span class="suave">melhor: ${esc(x.resposta.melhor)}</span>` : ''}</td>
       <td class="suave">${envios || '-'}</td><td class="nw">${acoes}</td></tr>`;
   };
@@ -229,7 +229,7 @@ export function telaAceiteContatos(q = {}) {
   if (!x || !x.resposta) return naoEncontrado('Aceite não encontrado', com ? `#/comunicacoes?id=${com.id}` : '#/comunicacoes', com ? 'Ver o comunicado' : 'Ver as comunicações');
   const r = x.resposta;
   const e = CM.empresasDoTopo(d());
-  const linhas = [['Pessoa', `${x.nome}${x.tipo === 'fiador' ? ' (fiador)' : ''}`], ['Confirmado em', C.dataHoraBr(r.em)], ['E-mail', `${r.email} (confirmado por código enviado a ele)`],
+  const linhas = [['Pessoa', `${x.nome}${CM.PAPEIS[x.tipo] ? ` (${CM.PAPEIS[x.tipo]})` : ''}`], ['Confirmado em', C.dataHoraBr(r.em)], ['E-mail', `${r.email} (confirmado por código enviado a ele)`],
     ['Celular', `${CM.telefoneBr(r.telefone)}${r.whatsapp ? ' (WhatsApp)' : ''}`], ['Melhor forma de contato', r.melhor], ['Aberto por', r.canal === 'whatsapp' ? 'link do WhatsApp' : r.canal === 'email' ? 'link do e-mail' : 'link direto'],
     ['Endereço de internet (IP)', r.ip || '-'], ['Aparelho', r.aparelho || '-'], ['Código do texto (SHA-256)', r.texto_sha256 || '-']];
   return `<p class="suave nao-imprimir"><a href="#/comunicacoes?id=${com.id}">← ${esc(com.titulo)}</a> · ${botao('imprimir', 'Imprimir / salvar em PDF', {}, 'pequeno')}</p>
@@ -328,7 +328,7 @@ async function filaWhatsapp(comId, fila, { lembrete = false } = {}) {
     const texto = CM.preencher(lembrete ? com.lembrete : com.whatsapp, CM.camposDe(d(), com, p, url));
     let abriu = false;
     const resp = await janela({
-      titulo: `WhatsApp ${i + 1} de ${fila.length}: ${x.nome}${x.tipo === 'fiador' ? ' (fiador)' : ''}`, sim: i + 1 < fila.length ? 'Próximo' : 'Terminar', nao: 'Parar',
+      titulo: `WhatsApp ${i + 1} de ${fila.length}: ${x.nome}${CM.PAPEIS[x.tipo] ? ` (${CM.PAPEIS[x.tipo]})` : ''}`, sim: i + 1 < fila.length ? 'Próximo' : 'Terminar', nao: 'Parar',
       html: `<p><textarea rows="6" readonly data-texto style="width:100%">${esc(texto)}</textarea></p>
         <p class="acoes">${tel ? `<a class="botao pequeno" target="_blank" rel="noopener noreferrer" href="https://wa.me/${tel}" data-zap>Copiar e abrir o WhatsApp (${esc(CM.telefoneBr(p.telefone))})</a>` : '<span class="suave">Sem celular no cadastro: copie e mande de outro jeito.</span>'}
         <button type="button" class="secundario pequeno" data-copiar>Copiar a mensagem</button></p>

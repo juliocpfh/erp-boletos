@@ -47,8 +47,8 @@ const chaveRegistro = (com, dest) => `publico/contatos/${com}/${dest}.json`;
 const chaveToken = (hash) => `publico/tokens-contatos/${hash}`;
 
 const comunicadoValido = (v) => { const n = Number(v); if (!Number.isInteger(n) || n <= 0) throw new ErroContatos(400, 'Comunicado inválido.'); return n; };
-/** Destino: "c<id do contrato>" (inquilino) ou "f<id do fiador>". */
-const destinoValido = (v) => { const s = String(v || ''); if (!/^[cf][1-9][0-9]{0,9}$/.test(s)) throw new ErroContatos(400, 'Pessoa inválida.'); return s; };
+/** Destino: "c<id do contrato>" (inquilino), "s<id>" (solidário), "r<id>" (representante da empresa) ou "f<id do fiador>". */
+const destinoValido = (v) => { const s = String(v || ''); if (!/^[cfsr][1-9][0-9]{0,9}$/.test(s)) throw new ErroContatos(400, 'Pessoa inválida.'); return s; };
 const dataValida = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? String(v) : null);
 const logoValida = (v) => { const s = String(v || ''); return /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(s) && s.length <= MAX_LOGO ? s : ''; };
 const assinaturaValida = (v) => { const s = String(v || ''); if (!s) return ''; if (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(s) || s.length > MAX_ASSINATURA) throw new ErroContatos(400, 'Assinatura inválida. Limpe e assine de novo.'); return s; };
@@ -97,7 +97,7 @@ export function contextoValido(ctx = {}) {
   if (!aviso) throw new ErroContatos(400, 'Falta o texto do aviso.');
   return {
     empresas: lista(ctx.empresas, 4, 160), cnpjs: lista(ctx.cnpjs, 4, 20), cidade: texto(ctx.cidade, 80), logo: logoValida(ctx.logo),
-    titulo: texto(ctx.titulo, 160), nome: texto(ctx.nome, 160), tipo: ctx.tipo === 'fiador' ? 'fiador' : 'inquilino',
+    titulo: texto(ctx.titulo, 160), nome: texto(ctx.nome, 160), tipo: ['fiador', 'solidario', 'representante'].includes(ctx.tipo) ? ctx.tipo : 'inquilino',
     imovel: texto(ctx.imovel, 300), desde: texto(ctx.desde, 20), locatario: texto(ctx.locatario, 160),
     email: texto(ctx.email, 254), telefone: texto(ctx.telefone, 30), whatsapp: ctx.whatsapp === true,
     prazo, aviso, ciencia: texto(ctx.ciencia, 1200) || 'Li o aviso acima e concordo.',
@@ -360,7 +360,7 @@ export async function confirmarContatos(request, env, { buscar = fetch, avisar =
     });
   } catch (e) { console.warn('anotar o comprovante dos contatos', e.message); }
   if (avisar) {
-    const quem = dest.startsWith('f') ? 'Um fiador' : 'Um inquilino';
+    const quem = { f: 'Um fiador', s: 'Um inquilino solidário', r: 'Um representante de empresa' }[dest[0]] || 'Um inquilino';
     try { await avisarAparelhos(env, { titulo: 'Contatos confirmados', texto: `${quem} confirmou os contatos. Toque para abrir.`, url: './#/comunicacoes', tag: `contatos-${com}` }, { buscar }); } catch (e) { console.warn('aviso no celular (contatos)', e.message); }
   }
   return json(200, { ok: true, em, comprovante: comprovanteSaiu });
@@ -440,6 +440,7 @@ button.sec{background:transparent;color:var(--cor);border:1px solid var(--cor)}b
     + '<div class="nome">' + esc(c.empresas.join(' e ') || 'Administração de imóveis') + '</div>'
     + (c.cnpjs.length ? '<div class="suave">CNPJ ' + esc(c.cnpjs.join(' · ')) + (c.cidade ? ' · ' + esc(c.cidade) : '') + '</div>' : '')
     + '<div class="seguro">Endereço seguro: <b>' + esc(location.host) + '</b>' + (c.email_empresa ? ' · e-mail oficial: <b>' + esc(c.email_empresa) + '</b>' : '') + '</div></div>';
+  const PAPEL = { fiador: 'Você é fiador(a) da locação de ', solidario: 'Você é inquilino(a) solidário(a) na locação de ', representante: 'Você é representante da empresa ' };
   const rodape = (c) => '<p class="rodape">A conta e a chave Pix para pagamento não mudam. Nunca pedimos pagamento em outra conta.' + (c.telefone_empresa ? ' Na dúvida, ligue para ' + esc(c.telefone_empresa) + '.' : '') + '</p>';
 
   function feito(c, resp, novo) {
@@ -458,7 +459,7 @@ button.sec{background:transparent;color:var(--cor);border:1px solid var(--cor)}b
     const melhor = antes ? antes.melhor : (zap ? 'WhatsApp' : '');
     app.innerHTML = topo(c)
       + '<div class="cartao"><h1>Olá, ' + esc(String(c.nome).split(' ')[0]) + '</h1>'
-      + '<p class="suave">' + (c.tipo === 'fiador' ? 'Você é fiador(a) da locação de ' + esc(c.locatario) + ', no imóvel ' : 'Imóvel: ') + esc(c.imovel) + (c.desde ? ' · contrato desde ' + esc(c.desde) : '') + '</p>'
+      + '<p class="suave">' + (PAPEL[c.tipo] ? PAPEL[c.tipo] + esc(c.locatario) + ', no imóvel ' : 'Imóvel: ') + esc(c.imovel) + (c.desde ? ' · contrato desde ' + esc(c.desde) : '') + '</p>'
       + (c.titulo ? '<h2>' + esc(c.titulo) + '</h2>' : '') + '<div class="texto">' + esc(c.aviso) + '</div>'
       + '<p class="suave">Prazo para confirmar: <b>' + esc(dataBr(c.prazo)) + '</b>.</p></div>'
       + '<div class="cartao"><h2>1. Seus contatos</h2><p class="suave">Confira e, se mudou, corrija.</p>'
