@@ -93,6 +93,9 @@ const novaChave = () => { const b = crypto.getRandomValues(new Uint8Array(32)); 
 const chaveRegistro = (fichaId, pessoa) => `publico/fichas/${fichaId}/${pessoa}.json`;
 const chavePdf = (fichaId, pessoa) => `publico/fichas/${fichaId}/${pessoa}.pdf`;
 const chaveToken = (hash) => `publico/tokens/${hash}`;
+/** Hashes das chaves que ainda abrem o registro: o link mandado de novo ("manter") não mata o anterior (entrada-007, 21/11/2026). */
+const hashesDe = (r) => [...new Set([...(Array.isArray(r.hashes) ? r.hashes : []), r.hash].filter(Boolean))];
+const ponteirosDe = (r) => hashesDe(r).map(chaveToken);
 
 async function lerRegistro(env, fichaId, pessoa) {
   const obj = await env.DADOS.get(chaveRegistro(fichaId, pessoa));
@@ -246,6 +249,9 @@ export const nomeSimples = (t) => String(t || '').normalize('NFD').replace(/[̀-
 /**
  * Cria (ou troca) o link de uma pessoa da ficha. Corpo: { ficha_id, pessoa, pasta, contexto, formulario, valores }.
  * Devolve { url, vence_em }. O link anterior da mesma pessoa deixa de valer; as respostas dele continuam no registro.
+ * Com `manter: true` (mandar de novo um link ainda no prazo; decisão do dono, 21/11/2026, entrada-007): o anterior continua
+ * valendo e o novo vence na MESMA data (a validade é a do primeiro, para a equipe controlar o prazo). Ex.: link de 10/11 até
+ * 17/11; "Lembrar" em 12/11 → link novo também até 17/11, e o de 10/11 continua abrindo.
  */
 export async function criarLink(request, env, email) {
   const p = await lerJson(request);
@@ -270,19 +276,21 @@ export async function criarLink(request, env, email) {
   const vence = new Date(agora.getTime() + DIAS_LINK * 86400000).toISOString();
   // O registro só entra se ninguém mexeu nele desde a leitura (a pessoa pode estar enviando pelo link antigo agora mesmo):
   // senão lê de novo e repete, para não perder a resposta ou o arquivo que acabou de chegar.
-  let hashAntigo = null; let gravado = false;
+  let antigos = []; let gravado = false; let vale = vence;
   for (let i = 0; i < 4 && !gravado; i += 1) {
     const anterior = await lerRegistro(env, fichaId, pessoa);
     const lido = anterior ? anterior.registro : {};
-    hashAntigo = lido.hash || null;
     // registro de outra ficha com o mesmo código (pasta diferente: a ficha antiga saiu e o código voltou a ser usado):
     // começa do zero, senão a pessoa nova veria os dados e os arquivos da antiga (e o primeiro documento não avisaria)
     const velho = lido.pasta && lido.pasta !== pasta ? {} : lido;
+    const manter = p.manter === true && velho.vence_em > agora.toISOString() && !['Encerrado', 'Desistiu'].includes(velho.situacao) && hashesDe(velho).length > 0;
+    antigos = manter ? [] : hashesDe(lido);
+    vale = manter ? velho.vence_em : vence;
     const registro = {
-      ficha_id: fichaId, pessoa, hash, pasta, contexto, formulario, valores_iniciais: valores,
-      criado_em: agora.toISOString(), criado_por: email, vence_em: vence, atualizado_em: agora.toISOString(),
+      ficha_id: fichaId, pessoa, hash, hashes: manter ? [...hashesDe(velho), hash].slice(-5) : [hash], pasta, contexto, formulario, valores_iniciais: valores,
+      criado_em: manter && velho.criado_em ? velho.criado_em : agora.toISOString(), criado_por: email, vence_em: vale, atualizado_em: agora.toISOString(),
       situacao: velho.situacao && !['Encerrado', 'Desistiu'].includes(velho.situacao) ? velho.situacao : 'Aguardando',
-      faltando: velho.faltando || [], respostas: velho.respostas || [], arquivos: velho.arquivos || [], eventos: [...(velho.eventos || []), { em: agora.toISOString(), texto: `link ${anterior ? 'renovado' : 'criado'} por ${email}` }].slice(-50),
+      faltando: velho.faltando || [], respostas: velho.respostas || [], arquivos: velho.arquivos || [], eventos: [...(velho.eventos || []), { em: agora.toISOString(), texto: `link ${manter ? 'mandado de novo (o anterior continua valendo)' : anterior ? 'renovado' : 'criado'} por ${email}` }].slice(-50),
       visto_em: velho.visto_em || null, desistiu_em: null, pdf: !!velho.pdf,
     };
     gravado = !!(await env.DADOS.put(chaveRegistro(fichaId, pessoa), JSON.stringify(registro), {
@@ -291,10 +299,11 @@ export async function criarLink(request, env, email) {
   }
   if (!gravado) throw new ErroFicha(409, 'Outra mudança ao mesmo tempo: tente de novo.');
   await env.DADOS.put(chaveToken(hash), JSON.stringify({ ficha_id: fichaId, pessoa }));
-  // o ponteiro antigo só sai depois de gravados o registro e o ponteiro novos (ele já não vale: o registro tem outro hash)
-  if (hashAntigo && hashAntigo !== hash) await env.DADOS.delete(chaveToken(hashAntigo));
+  // os ponteiros antigos só saem depois de gravados o registro e o ponteiro novos (já não valem: o registro tem outro hash)
+  const sair = antigos.filter((h) => h !== hash);
+  if (sair.length) await env.DADOS.delete(sair.map(chaveToken));
   const base = String(env.URL_FICHA || 'https://ficha.ankjck.com.br/');
-  return json(200, { ok: true, url: `${base}#${chave}`, vence_em: vence });
+  return json(200, { ok: true, url: `${base}#${chave}`, vence_em: vale });
 }
 
 /** Ficha em PDF para a pessoa baixar (a do link, já com os dados que temos). */
@@ -329,7 +338,7 @@ export async function faxinaDosLinks(env) {
       if (!obj) continue;
       let reg; try { reg = JSON.parse(await obj.text()); } catch { continue; }
       if (passou(reg.vence_em, DIAS_GUARDA)) {
-        await env.DADOS.delete([o.key, o.key.replace(/\.json$/, '.pdf'), ...(reg.hash ? [chaveToken(reg.hash)] : [])]);
+        await env.DADOS.delete([o.key, o.key.replace(/\.json$/, '.pdf'), ...ponteirosDe(reg)]);
         apagados += 1;
       }
     }
@@ -338,7 +347,7 @@ export async function faxinaDosLinks(env) {
   return apagados;
 }
 
-const paraEquipe = (r) => { const { hash, ...resto } = r; return resto; };
+const paraEquipe = (r) => { const { hash, hashes, ...resto } = r; return resto; }; // eslint-disable-line no-unused-vars
 
 /** Links de uma ficha (?ficha=ID: tudo, com as respostas) ou de todas (resumo para o Painel). */
 export async function listarLinks(env, url) {
@@ -352,7 +361,7 @@ export async function listarLinks(env, url) {
     const reg = JSON.parse(await obj.text());
     // guarda: 90 dias depois do prazo o link sai inteiro (registro, ponteiro e PDF); os documentos ficam na pasta da ficha
     if (passou(reg.vence_em, DIAS_GUARDA)) {
-      await env.DADOS.delete([chave, chave.replace(/\.json$/, '.pdf'), ...(reg.hash ? [chaveToken(reg.hash)] : [])]);
+      await env.DADOS.delete([chave, chave.replace(/\.json$/, '.pdf'), ...ponteirosDe(reg)]);
       return null;
     }
     return ficha ? paraEquipe(reg) : {
@@ -394,7 +403,7 @@ export async function atualizarLink(request, env, email, avisar = null) {
     r.eventos = r.eventos.slice(-50);
     mudou = antes !== JSON.stringify([r.situacao, r.faltando]);
   });
-  if (novo.situacao === 'Encerrado' && novo.hash) await env.DADOS.delete(chaveToken(novo.hash));
+  if (novo.situacao === 'Encerrado' && hashesDe(novo).length) await env.DADOS.delete(ponteirosDe(novo));
   // avisa a pessoa só quando muda de verdade (clicar duas vezes não repete) e com o link ainda no prazo
   const noPrazo = novo.vence_em > new Date().toISOString();
   if (avisar && mudou && noPrazo && p.situacao === 'Falta documento') await avisar(env, novo, 'falta');
@@ -413,7 +422,7 @@ async function registroDaChave(request, env, { gravar = false } = {}) {
   if (!ponteiro) throw new ErroFicha(404, 'Este link não vale mais. Peça um novo para quem enviou.');
   const { ficha_id: fichaId, pessoa } = JSON.parse(await ponteiro.text());
   const atual = await lerRegistro(env, fichaId, pessoa);
-  if (!atual || atual.registro.hash !== hash) throw new ErroFicha(404, 'Este link não vale mais. Peça um novo para quem enviou.');
+  if (!atual || !hashesDe(atual.registro).includes(hash)) throw new ErroFicha(404, 'Este link não vale mais. Peça um novo para quem enviou.');
   const r = atual.registro;
   if (r.situacao === 'Encerrado') throw new ErroFicha(410, 'Esta ficha foi encerrada. Qualquer dúvida, fale com quem enviou o link.');
   if (passou(r.vence_em, DIAS_LEITURA)) throw new ErroFicha(410, 'Este link não vale mais. Peça um novo para quem enviou.');
