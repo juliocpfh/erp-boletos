@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-BaKc7AxW3En4fgfLYt0qYEcyS97K6w2CCqBcvvA2NHY=' 'sha256-pGzrDoR1v4pcV3wj5P4DXC01f1A+lOe3xFfKX9oj/l4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-BaKc7AxW3En4fgfLYt0qYEcyS97K6w2CCqBcvvA2NHY=' 'sha256-14fn+Gs7Ee5w/BhaZShygF5mOzONmRaGYl3ICzY5iEQ='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="a21b1325c32c53db">
+<meta name="fontes" content="7d870bee51da795c">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -2834,6 +2834,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     }
     for (const a of (d2.acordos || []).filter((x) => x.contrato_id === c.id && x.termo_assinado)) {
       poe({ vaga: `acordo:${a.id}`, grupo: "contrato", rotulo: `Termo do acordo de ${dataBr(a.data)} assinado (${a.referente})`, data: a.data, escopo: "contrato", pasta: c.id, nome: a.termo_assinado });
+    }
+    for (const x of (d2.devolucoes_garantia || []).filter((y) => y.contrato_id === c.id && y.termo_assinado).sort((a, b) => String(a.data).localeCompare(String(b.data)) || a.id - b.id)) {
+      poe({ vaga: `devolucao-garantia:${x.id}`, grupo: "contrato", rotulo: `Recibo da devolução da garantia de ${dataBr(x.data)} assinado`, data: x.data, escopo: "contrato", pasta: c.id, nome: x.termo_assinado });
     }
     for (const n of (d2.notificacoes || []).filter((x) => x.contrato_id === c.id && x.arquivo_assinado && x.situacao !== "Cancelada").sort((a, b) => String(a.data).localeCompare(String(b.data)) || a.id - b.id)) {
       poe({ vaga: `notificacao:${n.id}`, grupo: "contrato", rotulo: `Notificação de ${dataBr(n.data)} assinada (${n.assunto})`, data: n.data, escopo: "contrato", pasta: c.id, nome: n.arquivo_assinado });
@@ -8548,7 +8551,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return out;
   }
   function anexarComprovante(d2, tabela, id, campo2, arquivo, usuario) {
-    const ok = { contratos: ["comprovante_caucao", "comprovante_deposito", "comprovante_reserva", "termo_chaves_saida", "contra_vistoria"], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ["comprovante"]])), encerramentos: ["comprovante", "termo_assinado"], acordos: ["termo_assinado"], notificacoes: ["arquivo_assinado", "comprovante_baixa"] };
+    const ok = { contratos: ["comprovante_caucao", "comprovante_deposito", "comprovante_reserva", "termo_chaves_saida", "contra_vistoria"], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ["comprovante"]])), encerramentos: ["comprovante", "termo_assinado"], devolucoes_garantia: ["comprovante", "termo_assinado"], acordos: ["termo_assinado"], notificacoes: ["arquivo_assinado", "comprovante_baixa"] };
     if (!(ok[tabela] || []).includes(campo2)) throw new Error("Comprovante desconhecido.");
     if (!arquivo) throw new Error("Escolha o arquivo do comprovante.");
     const r = buscar(d2, tabela, id);
@@ -8625,7 +8628,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     sincronizarGarantiaHerdeiro(d2, c.id, usuario);
   }
   function removerAnexo(d2, tabela, id, campo2, usuario) {
-    const ok = { contratos: ["comprovante_reserva", "termo_chaves_saida", "contra_vistoria"], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ["comprovante"]])), encerramentos: ["comprovante", "termo_assinado"], acordos: ["termo_assinado"], notificacoes: ["arquivo_assinado", "comprovante_baixa"] };
+    const ok = { contratos: ["comprovante_reserva", "termo_chaves_saida", "contra_vistoria"], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ["comprovante"]])), encerramentos: ["comprovante", "termo_assinado"], devolucoes_garantia: ["comprovante", "termo_assinado"], acordos: ["termo_assinado"], notificacoes: ["arquivo_assinado", "comprovante_baixa"] };
     if (!(ok[tabela] || []).includes(campo2)) throw new Error("Este arquivo não pode ser apagado por aqui.");
     const r = buscar(d2, tabela, id);
     if (!r || !r[campo2]) throw new Error("Arquivo não encontrado.");
@@ -9659,6 +9662,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     for (const x of d2.encerramentos || []) usa("contrato", x.contrato_id, x.termo_assinado);
     for (const a of d2.aditivos) usa("aditivos", a.contrato_id, a.arquivo);
     for (const a of d2.acordos || []) usa("contrato", a.contrato_id, a.termo_assinado);
+    for (const x of d2.devolucoes_garantia || []) usa("contrato", x.contrato_id, x.termo_assinado);
     for (const x of d2.encerramentos || []) usa("contrato", x.contrato_id, x.termo_assinado);
     for (const n of d2.notificacoes || []) {
       usa("contrato", n.contrato_id, n.arquivo_assinado);
@@ -9688,6 +9692,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     for (const x of d2.correcoes_garantia) usa(x.contrato_id, x.comprovante, "complemento-caucao", x.data, `comprovante do complemento da caução (${dataBr(x.data)})`);
     for (const x of d2.aplicacoes) usa(x.contrato_id, x.comprovante, "aplicacao-garantia", x.data, `comprovante da aplicação da garantia (${dataBr(x.data)})`);
     for (const x of d2.devolucoes_garantia || []) usa(x.contrato_id, x.comprovante, "devolucao-garantia", x.data, `comprovante da devolução da garantia (${dataBr(x.data)})`);
+    for (const x of d2.devolucoes_garantia || []) usa(x.contrato_id, x.termo_assinado, "recibo-devolucao-garantia-assinado", x.data, `recibo da devolução da garantia assinado (${dataBr(x.data)})`);
     for (const x of d2.encerramentos) usa(x.contrato_id, x.termo_assinado, "termo-quitacao-assinado", x.garantia_devolvida_em || x.data_saida, `termo de quitação assinado (${dataBr(x.garantia_devolvida_em || x.data_saida)})`);
     for (const x of d2.encerramentos) usa(x.contrato_id, x.comprovante, x.saldo > 0 ? "devolucao-saldo" : "pagamento-saldo", x.garantia_devolvida_em, `comprovante ${x.saldo > 0 ? "da devolução" : "do pagamento"} do saldo da saída (${dataBr(x.garantia_devolvida_em)})`);
     return out;
@@ -9711,6 +9716,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     for (const a of d2.aditivos) poe("aditivos", a.contrato_id, a.arquivo, `termo aditivo${a.data ? ` (${dataBr(a.data)})` : ""}`);
     for (const a of d2.acordos || []) poe("contrato", a.contrato_id, a.termo_assinado, `termo do acordo de ${dataBr(a.data)} assinado`);
+    for (const x of d2.devolucoes_garantia || []) poe("contrato", x.contrato_id, x.termo_assinado, `recibo da devolução da garantia de ${dataBr(x.data)} assinado`);
     for (const n of d2.notificacoes || []) {
       poe("contrato", n.contrato_id, n.arquivo_assinado, `notificação de ${dataBr(n.data)} assinada (${n.assunto})`);
       poe("contrato", n.contrato_id, n.comprovante_baixa, `comprovante da baixa da notificação de ${dataBr(n.data)}${n.resolvida_em ? ` (resolvida em ${dataBr(n.resolvida_em)})` : ""}`);
@@ -18335,6 +18341,12 @@ Não mova nem renomeie os arquivos desta pasta. chave-do-backup.json é a chave:
       if (pagador.id !== c.id) return { ok: false, motivo: `O recibo é de quem pagou a garantia (${pagador.inquilino_nome}): tire-o no contrato dele.` };
       return garantiaPaga2(d2, c) ? { ok: true } : { ok: false, motivo: "Registre antes o depósito da garantia (data e comprovante)." };
     }
+    if (tipo === "devolucao_garantia") {
+      if (!c) return { ok: false, motivo: "O recibo da devolução da garantia é do contrato." };
+      const dev = devolucaoDe(d2, c, alvo);
+      if (!dev) return { ok: false, motivo: "Registre antes a devolução da garantia (troca de garantia ou de titular)." };
+      return dev.saldo > 0 ? { ok: true } : { ok: false, motivo: "Não sobrou saldo a devolver: os débitos descontados levaram a garantia inteira." };
+    }
     if (tipo === "devolucao_chaves") {
       if (!c) return { ok: false, motivo: "O termo de devolução das chaves é do contrato." };
       return c.data_saida ? { ok: true } : { ok: false, motivo: "Informe antes a data de saída." };
@@ -18430,6 +18442,7 @@ Não mova nem renomeie os arquivos desta pasta. chave-do-backup.json é a chave:
         arquivo: nomeArq(caucao ? "Recibo caucao" : "Recibo deposito garantia", g.data)
       };
     }
+    if (tipo === "devolucao_garantia") return reciboDevolucaoGarantia(d2, c, devolucaoDe(d2, c, alvo), base, { empresa, e, quem, endereco: endereco2, assinaEmpresa, assinaPessoa, nomeArq });
     if (tipo === "acordo") return termoDoAcordo(d2, c, acordoDe(d2, c, alvo), base, { empresa, e, quem, endereco: endereco2, assinaEmpresa, assinaPessoa, nomeArq });
     if (tipo === "notificacao") return cartaDaNotificacao(d2, c, notificacaoDe(d2, c, alvo), base, { empresa, e, quem, endereco: endereco2, assinaEmpresa, assinaPessoa, nomeArq });
     if (tipo === "devolucao_chaves") return termoDevolucaoChaves(d2, c, base, { empresa, e, quem, endereco: endereco2, assinaEmpresa, assinaPessoa, nomeArq });
@@ -18472,6 +18485,39 @@ Não mova nem renomeie os arquivos desta pasta. chave-do-backup.json é a chave:
     const saldo = quitacao ? enc.saldo >= 0 ? "= Saldo devolvido ao locatário" : "= Saldo pago pelo locatário" : `= Saldo ${enc.saldo >= 0 ? "a devolver" : "a pagar"}`;
     tabela.push([saldo, reais(Math.abs(enc.saldo || 0))]);
     return tabela;
+  }
+  function reciboDevolucaoGarantia(d2, c, dev, base, { empresa, e, quem, endereco: endereco2, assinaEmpresa, assinaPessoa, nomeArq }) {
+    const troca = dev.troca_id ? buscar(d2, "trocas_garantia", dev.troca_id) : null;
+    const caucao = troca ? troca.tipo_anterior === "Caução" : temCaucao(c);
+    const nome = caucao ? "caução" : "depósito de garantia";
+    const motivo = troca ? `em razão da troca da garantia (${troca.tipo_anterior} por ${String(troca.tipo_novo || "").toLocaleLowerCase("pt-BR")}) em ${dataBr(troca.data)}` : (() => {
+      const n = continuadoPor(d2, c);
+      return `em razão da troca de titular do contrato${n ? ` (${n.inquilino_nome} assumiu em ${dataBr(n.data_entrada || n.vigencia_inicio)}, com garantia própria)` : ""}`;
+    })();
+    const tabela = [["Garantia depositada", reais(dev.garantia_valor || 0)]];
+    if (dev.indice_percentual) tabela.push([`Correção pela caderneta de poupança (${String(dev.indice_percentual).replace(".", ",")}%)`, reais((dev.garantia_corrigida || 0) - (dev.garantia_valor || 0))]);
+    tabela.push(["Garantia corrigida", reais(dev.garantia_corrigida || dev.garantia_valor || 0)]);
+    if (dev.debitos > 0) {
+      tabela.push(["(-) Débitos descontados", reais(dev.debitos)]);
+      for (const l of String(dev.debitos_descricao || "").split(/\n+/).map((x) => x.trim()).filter(Boolean)) tabela.push([`   ${l}`, ""]);
+    }
+    tabela.push(["= Valor devolvido", reais(dev.saldo)]);
+    return {
+      ...base,
+      titulo: `RECIBO DE DEVOLUÇÃO ${caucao ? "DA CAUÇÃO" : "DO DEPÓSITO DE GARANTIA"}`,
+      data: dev.data || base.data,
+      paragrafos: [
+        `Recebi de ${empresa}${e.cnpj ? `, CNPJ ${e.cnpj}` : ""}, em ${dataBr(dev.data)}, a importância de ${valorComExtenso(dev.saldo)}, referente à devolução da ${nome} do contrato de locação do imóvel situado na ${endereco2}, ${motivo}, conforme o comprovante bancário anexo.`,
+        `${caucao ? "O valor foi corrigido pelos rendimentos da caderneta de poupança, que são do locatário (Lei 8.245/91, artigo 38, § 2º)" : "O valor foi corrigido"}${dev.debitos > 0 ? ", e descontados apenas os débitos discriminados abaixo:" : ", sem débitos a descontar:"}`
+      ],
+      tabela,
+      depois: [
+        `Com o recebimento, dou quitação da ${nome} acima, nada mais tendo a receber a esse título (Código Civil, artigos 319 e 320).${troca ? " O contrato de locação continua, agora com a nova garantia." : ""}`,
+        "A garantia não é aluguel nem receita da empresa: não há nota fiscal."
+      ],
+      assinaturas: [assinaPessoa("recebi o valor e dou quitação"), assinaEmpresa],
+      arquivo: nomeArq(caucao ? "Recibo devolucao caucao" : "Recibo devolucao deposito garantia", dev.data)
+    };
   }
   function cartaDaNotificacao(d2, c, n, base, x) {
     const numero2 = numeroDaNotificacao(d2, n);
@@ -18692,7 +18738,7 @@ Não mova nem renomeie os arquivos desta pasta. chave-do-backup.json é a chave:
       arquivo: `${nomeArq("Ficha cadastral do fiador", base.data)}${x.nome ? ` - ${x.nome}` : ""}`
     };
   }
-  var PJ3, TIPOS_RECIBO, documentoDe, pessoa, notificacaoDe, acordoDe, EM_BRANCO, ou, dataOu, reaisOu, mesOu, casadoOuUniao2, qualificacaoDe, listaDocumentos, declaracao, COMO_ASSINAR;
+  var PJ3, TIPOS_RECIBO, documentoDe, pessoa, devolucaoDe, notificacaoDe, acordoDe, EM_BRANCO, ou, dataOu, reaisOu, mesOu, casadoOuUniao2, qualificacaoDe, listaDocumentos, declaracao, COMO_ASSINAR;
   var init_recibos = __esm({
     "docs/js/recibos.js"() {
       init_calculos();
@@ -18704,6 +18750,7 @@ Não mova nem renomeie os arquivos desta pasta. chave-do-backup.json é a chave:
         reserva: "Recibo da reserva",
         devolucao_reserva: "Termo de devolução da reserva",
         garantia: "Recibo da garantia",
+        devolucao_garantia: "Recibo da devolução da garantia",
         devolucao_chaves: "Termo de devolução das chaves",
         quitacao: "Termo de quitação",
         acordo: "Termo de confissão de dívida e acordo",
@@ -18713,6 +18760,10 @@ Não mova nem renomeie os arquivos desta pasta. chave-do-backup.json é a chave:
       };
       documentoDe = (p2, campo2 = "inquilino_cpf", tipo = p2.inquilino_tipo) => p2[campo2] ? `${tipo === PJ3 ? "CNPJ" : "CPF"} ${p2[campo2]}` : "";
       pessoa = (nome, doc2) => [nome, doc2].filter(Boolean).join(", ");
+      devolucaoDe = (d2, c, alvo) => {
+        const dev = alvo.id ? buscar(d2, "devolucoes_garantia", Number(alvo.id)) : devolucoesGarantiaDo(d2, c.id).filter((x) => x.saldo > 0).at(-1);
+        return dev && dev.contrato_id === c.id ? dev : null;
+      };
       notificacaoDe = (d2, c, alvo) => {
         const n = alvo.notificacao || buscar(d2, "notificacoes", Number(alvo.id));
         return n && n.contrato_id === c.id ? n : null;
@@ -26312,7 +26363,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       };
       nomeComprovante2 = (tipo, data2, arq) => `comprovante-${tipo}-${data2 || hojeIso()}${extensao(arq.name)}`;
       xAnexo = (acao, dados, confirmar2) => opera() ? botao(acao, "×", dados, "x-excluir", confirmar2).replace("<button ", '<button title="Apagar só o arquivo" ') : "";
-      ANEXOS_COM_X = { contratos: ["comprovante_reserva", "termo_chaves_saida", "contra_vistoria"], correcoes_garantia: ["comprovante"], aplicacoes: ["comprovante"], depositos_garantia: ["comprovante"], devolucoes_garantia: ["comprovante"], encerramentos: ["comprovante", "termo_assinado"], acordos: ["termo_assinado"], notificacoes: ["arquivo_assinado", "comprovante_baixa"] };
+      ANEXOS_COM_X = { contratos: ["comprovante_reserva", "termo_chaves_saida", "contra_vistoria"], correcoes_garantia: ["comprovante"], aplicacoes: ["comprovante"], depositos_garantia: ["comprovante"], devolucoes_garantia: ["comprovante", "termo_assinado"], encerramentos: ["comprovante", "termo_assinado"], acordos: ["termo_assinado"], notificacoes: ["arquivo_assinado", "comprovante_baixa"] };
       linkComprovante = (contratoId, nome, anexo = null) => nome && !(anexo && arquivoSumiu("contrato", contratoId, nome)) ? `<span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="contrato" data-id="${contratoId}" data-nome="${esc(nome)}" title="${esc(nome)}">📎 comprovante</a>${anexo && (ANEXOS_COM_X[anexo.tabela] || []).includes(anexo.campo) ? xAnexo("removerAnexo", { tabela: anexo.tabela, id: anexo.id, campo: anexo.campo }, `Apagar o comprovante "${nome}"? O lançamento continua e volta o aviso para anexar.`) : ""}</span>` : anexo && opera() ? `<label class="anexar-falta" title="${nome ? `O arquivo ${esc(nome)} sumiu da pasta: anexe de novo (PDF ou foto)` : "Sem comprovante: buscar no banco e anexar (PDF ou foto)"}">⚠ ${nome ? "arquivo sumiu: anexar de novo" : "anexar comprovante"}<input type="file" accept="${ACEITA_DOCUMENTOS}"
     data-acao-arquivo="anexarComprovante" data-contrato="${contratoId}" data-tabela="${anexo.tabela}" data-id="${anexo.id}" data-campo="${anexo.campo}" data-tipo="${anexo.tipo}" data-data="${esc(anexo.data || "")}"></label>` : etiqueta("sem comprovante", "aviso");
       fiadoresMudancas = { novos: [], alterados: [] };
@@ -28541,6 +28592,7 @@ ${m.texto}`);
           <td class="n nw"><b>${dev.saldo >= 0 ? "devolvido" : "a cobrar"} ${reais(Math.abs(dev.saldo))}</b></td>
           <td>${dev.saldo > 0 || dev.comprovante ? linkComprovante(c.id, dev.comprovante, { tabela: "devolucoes_garantia", id: dev.id, campo: "comprovante", tipo: "devolucao-garantia", data: dev.data }) : ""}</td>
           <td class="n nw">${editar(`#/editar/devolucoes_garantia/${dev.id}`)} ${excluir2("devolucoes_garantia", dev.id, 'Excluir o registro da devolução? O comprovante também é apagado e volta o alerta "Devolver garantia".')}</td></tr></table>
+        ${reciboDevolucaoHtml(c, dev)}
         ${contas2.length > 1 ? `<p class="suave">Sai de onde foi aplicada: ${contas2.map((x) => `${esc(x.nome)} ${reais(x.valor)}`).join("; ")}.</p>` : ""}
         ${dev.debitos_descricao ? `<p class="pre suave">${esc(dev.debitos_descricao)}</p>` : ""}${dev.observacoes ? `<p class="pre suave">${esc(dev.observacoes)}</p>` : ""}`;
       } else if (pend) {
@@ -28603,6 +28655,7 @@ ${m.texto}`);
           <td class="n nw"><b>${dev.saldo >= 0 ? "devolvido" : "a cobrar"} ${reais(Math.abs(dev.saldo))}</b></td>
           <td>${dev.saldo > 0 || dev.comprovante ? linkComprovante(c.id, dev.comprovante, { tabela: "devolucoes_garantia", id: dev.id, campo: "comprovante", tipo: "devolucao-garantia", data: dev.data }) : ""}</td>
           <td class="n nw">${editar(`#/editar/devolucoes_garantia/${dev.id}`)} ${excluir2("devolucoes_garantia", dev.id, 'Excluir o registro da devolução? O comprovante também é apagado e volta o alerta "Devolver garantia".')}</td></tr></table>
+        ${reciboDevolucaoHtml(c, dev)}
         ${dev.debitos_descricao ? `<p class="pre suave">${esc(dev.debitos_descricao)}</p>` : ""}${dev.observacoes ? `<p class="pre suave">${esc(dev.observacoes)}</p>` : ""}`;
       } else if (t.valor_anterior > 0) {
         html += `<div class="alerta aviso"><b>Devolver a garantia:</b> na troca de ${dataBr(t.data)} (${esc(t.tipo_anterior)} → ${esc(t.tipo_novo)}), ${t.tipo_anterior === "Caução" ? "a caução" : "o depósito"} de ${reais(t.valor_anterior)} volta a ${esc(c.inquilino_nome)},
@@ -28624,6 +28677,11 @@ ${m.texto}`);
       <tr class="total"><td colspan="7">Aplicado de ${reais(sit.total)}${garantiaDepositada(c) ? "" : ' <span class="suave">(já depositado)</span>'}</td><td class="n">${reais(sit.soma)}</td><td colspan="2">${situacaoTotal}</td></tr></table>`;
     }
     return `${html}${linkRecibo("garantia", c, `Recibo da ${temCaucao(c) || (garantiaPaga2(d(), c) || {}).qual === "caucao" ? "caução" : "garantia"} (para o inquilino)`)}</div>`;
+  }
+  function reciboDevolucaoHtml(c, dev) {
+    if (!reciboDisponivel(d(), "devolucao_garantia", { contrato: c, id: dev.id }).ok) return "";
+    return `<p class="suave">${link(`#/imprimir/recibo?tipo=devolucao_garantia&contrato=${c.id}&id=${dev.id}`, "🧾 Recibo da devolução para assinar (a pessoa assina que recebeu)", "")}
+    · Recibo assinado: ${linkComprovante(c.id, dev.termo_assinado, { tabela: "devolucoes_garantia", id: dev.id, campo: "termo_assinado", tipo: "recibo-devolucao-garantia-assinado", data: dev.data })}</p>`;
   }
   function linkRecibo(tipo, c, texto3, solto = false) {
     if (!reciboDisponivel(d(), tipo, { contrato: c }).ok) return "";
@@ -30484,6 +30542,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         reserva: "uma ficha em análise (ou contrato) com o valor e a data da reserva",
         devolucao_reserva: "uma ficha com reserva e a devolução registrada (data e comprovante)",
         garantia: "um contrato com caução ou depósito em dinheiro já depositado",
+        devolucao_garantia: "uma devolução da garantia registrada, com saldo devolvido (troca de garantia ou de titular)",
         devolucao_chaves: "um contrato com a data de saída",
         quitacao: "um contrato com o cálculo final da saída e o saldo acertado",
         acordo: "um acordo de dívida (não desfeito)",
