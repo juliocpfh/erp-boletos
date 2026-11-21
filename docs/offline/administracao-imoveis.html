@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-BaKc7AxW3En4fgfLYt0qYEcyS97K6w2CCqBcvvA2NHY=' 'sha256-/3fhFT3ymVmJLYN1ILY938BGPa6pExy6qnh4dV9Fb3Q='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-BaKc7AxW3En4fgfLYt0qYEcyS97K6w2CCqBcvvA2NHY=' 'sha256-LOLz5e5N5hX4ulsGB0LS1GNmVYnPig7wnRP1cHrm4I0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="a31a9d253098a9a5">
+<meta name="fontes" content="2c44ae0f289203e8">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -17625,7 +17625,7 @@ Não mova nem renomeie os arquivos desta pasta. chave-do-backup.json é a chave:
           titulo: "Inquilinos",
           serve: "Lista quem aluga hoje (ativos) e quem já saiu, com a vigência do contrato, o aluguel atual e a garantia. Em cima ficam as fichas dos interessados que ainda estão em análise.",
           primeiro: [
-            'Alguém quer alugar? Clique em "Nova solicitação de reserva": preencha o imóvel, o contato, a proposta e o que está incluso. Depois, na página da ficha, gere o link para a pessoa preencher o resto.',
+            'Alguém quer alugar? Clique em "Novo pedido de reserva": preencha o imóvel, o contato, a proposta e o que está incluso. Depois, na página da ficha, gere o link para a pessoa preencher o resto.',
             'Ficha aprovada vira o contrato já preenchido. Já tem o contrato? Use "Novo contrato", na caixa "Contratos ativos".',
             "Clique no nome do inquilino para abrir a página dele."
           ],
@@ -24315,9 +24315,9 @@ ${m.texto}
     const linha = (f) => `<tr><td><a href="#/ficha/${f.id}"><b>${esc(f.inquilino_nome)}</b></a></td><td>${esc(nomesDosImoveis(f).join(", ") || "-")}${(f.imoveis_ids || []).length > 1 ? `<br><span class="suave">${esc(f.modo_imoveis === "Todos juntos" ? "todos juntos" : "apenas um deles")}</span>` : ""}</td>
     <td class="nw">${dataBr(f.data_recebida)}</td><td class="n nw">${f.reserva_valor ? reais(f.reserva_valor) : "-"}</td><td>${situacaoDaFicha(f)}</td></tr>`;
     const tabela = (lista3) => `<table><tr><th>Interessado</th><th>Imóvel(is)</th><th>Recebida em</th><th class="n">Reserva</th><th>Situação</th></tr>${lista3.map(linha).join("")}</table>`;
-    return `<div class="cartao rolagem" id="fichas"><div class="cabecalho"><h2>Fichas abertas (${abertas.length})</h2>${opera() ? link("#/novo/fichas", "Nova solicitação de reserva", "botao secundario pequeno") : ""}</div>
-    <p class="suave">1º a solicitação de reserva (imóvel, contato, proposta, o que está incluso e a reserva); depois o interessado preenche a ficha pelo link e manda os documentos. Aprovada, a ficha vira o contrato já preenchido.</p>
-    ${abertas.length ? tabela(abertas) : `<p class="suave">Nenhuma ficha aberta.${!fichas.length && opera() ? ' Quando alguém quiser alugar um imóvel vago, clique em "Nova solicitação de reserva": você preenche o imóvel, o contato e a proposta; o resto a pessoa preenche pelo link da ficha.' : ""}</p>`}
+    return `<div class="cartao rolagem" id="fichas"><div class="cabecalho"><h2>Fichas abertas (${abertas.length})</h2>${opera() ? link("#/novo/fichas", "Novo pedido de reserva", "botao secundario pequeno") : ""}</div>
+    <p class="suave">1º o pedido de reserva (imóvel, contato, proposta, o que está incluso e a reserva); depois o interessado preenche a ficha pelo link e manda os documentos. Aprovada, a ficha vira o contrato já preenchido.</p>
+    ${abertas.length ? tabela(abertas) : `<p class="suave">Nenhuma ficha aberta.${!fichas.length && opera() ? ' Quando alguém quiser alugar um imóvel vago, clique em "Novo pedido de reserva": você preenche o imóvel, o contato e a proposta; o resto a pessoa preenche pelo link da ficha.' : ""}</p>`}
     ${encerradas.length ? `<details id="fichas-encerradas"><summary class="suave">${encerradas.length} ficha(s) encerrada(s): aprovadas que viraram contrato, reprovadas e desistências (clique para ver)</summary>${tabela(encerradas)}</details>` : ""}</div>`;
   }
   function alertaFichas() {
@@ -26373,9 +26373,9 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
           destino: (salvo) => `#/contrato/${salvo.id}`
         },
         fichas: {
-          // começa como solicitação de reserva (pedido do dono, 2026-11-19): a equipe preenche só o imóvel, o contato, a proposta,
+          // começa como pedido de reserva (pedido do dono, 2026-11-19): a equipe preenche só o imóvel, o contato, a proposta,
           // o que está incluso e a reserva; o resto o interessado manda pelo link da ficha (a ficha completa aparece ao editar)
-          titulo: (r) => r ? `Ficha em análise - ${r.inquilino_nome}` : "Nova solicitação de reserva",
+          titulo: (r) => r ? `Ficha em análise - ${r.inquilino_nome}` : "Novo pedido de reserva",
           // imóveis de interesse: uma caixa de marcar por imóvel VAGO (pedido do dono, 2026-11-10: escolher ocupado dava brecha
           // para erro); o que já está na ficha continua na lista. O que já tem outra ficha aberta aparece avisado
           campos: (r) => {
@@ -26401,8 +26401,8 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
             ];
             if (!r) {
               return [
-                { secao: "Solicitação de reserva" },
-                { ...FICHA_INICIO.find((c) => c.nome === "data_recebida"), rotulo: "Solicitação recebida em" },
+                { secao: "Pedido de reserva" },
+                { ...FICHA_INICIO.find((c) => c.nome === "data_recebida"), rotulo: "Pedido recebido em" },
                 ...blocoImoveis,
                 ...p2.contato,
                 ...p2.proposta,
@@ -34248,7 +34248,7 @@ ${xref}
     const simbolo = (sit) => (SITUACOES_SOLICITACAO.find((s) => s.nome === sit) || SITUACOES_SOLICITACAO[0]).simbolo;
     const lista3 = d().solicitacoes.filter((x) => !filtro || (x.situacao || "Aberta") === filtro.nome).sort(maisRecentePrimeiro);
     const volta = filtro ? `&filtro=${filtro.chave}` : "";
-    return `<div class="cabecalho"><h1>Solicitações dos inquilinos</h1>${opera() ? link(`#/novo/solicitacoes?de=solicitacoes${volta}`, "Nova solicitação", "botao") : ""}</div>
+    return `<div class="cabecalho"><h1>Solicitações dos inquilinos</h1>${opera() ? link(`#/novo/solicitacoes?de=solicitacoes${volta}`, "Nova solicitação do inquilino", "botao") : ""}</div>
     ${atalhosComunicacoes("solicitacoes")}
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap">${link("#/solicitacoes", `Todas (${d().solicitacoes.length})`, `botao ${filtro ? "secundario " : ""}pequeno`)}
       ${SITUACOES_SOLICITACAO.map((s) => link(`#/solicitacoes?filtro=${s.chave}`, `${s.simbolo} ${resumo3[s.nome]} ${s.texto}`, `botao ${filtro === s ? "" : "secundario "}pequeno`)).join(" ")}</div>
@@ -34305,8 +34305,8 @@ ${xref}
     const documentosCelular = (x) => x.i ? `<div class="botoes-doc so-celular">${matricula(x, true)}${botaoContrato(x.c, true)}</div>` : "";
     const semAtivos = () => d().contratos.length ? `<span class="suave">${busca ? "Nenhum inquilino ativo encontrado nesta busca." : "Nenhum inquilino ativo hoje."}</span>` : !d().imoveis.length ? proximoPasso("Nenhum inquilino ainda.", "O contrato liga o inquilino a um imóvel: cadastre o imóvel primeiro.", [opera() && ["#/novo/imoveis", "Cadastrar o primeiro imóvel"]]) : proximoPasso(
       "Nenhum inquilino ainda.",
-      "Já tem o contrato assinado? Cadastre o contrato. Alguém ainda vai mandar os documentos para análise? Comece pela solicitação de reserva.",
-      [opera() && ["#/novo/contratos", "Cadastrar o contrato"], opera() && ["#/novo/fichas", "Nova solicitação de reserva"]]
+      "Já tem o contrato assinado? Cadastre o contrato. Alguém ainda vai mandar os documentos para análise? Comece pelo pedido de reserva.",
+      [opera() && ["#/novo/contratos", "Cadastrar o contrato"], opera() && ["#/novo/fichas", "Novo pedido de reserva"]]
     );
     return `<div class="cabecalho"><h1>Inquilinos</h1></div>${abasInquilinos("lista")}
     <div class="acoes" style="margin-bottom:12px;flex-wrap:wrap"><form class="acoes" data-form="ir" data-ir="inquilinos" style="flex-wrap:nowrap;min-width:0;max-width:100%"><input name="busca" value="${esc(q.busca || "")}" placeholder="Buscar por nome, CPF ou imóvel" style="width:300px;max-width:100%;min-width:0"><button class="secundario">Buscar</button>${busca ? link("#/inquilinos", "Limpar") : ""}</form></div>
