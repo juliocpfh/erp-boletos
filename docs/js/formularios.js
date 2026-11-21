@@ -647,6 +647,7 @@ export const COBRANCA = [
   campo('fci', 'FCI (fundo de conservação do imóvel)', 'dinheiro', { ajuda: 'Fora da NF, da multa e dos juros' }),
   campo('outros', 'Ajuste do mês: cobrança adicional (+) ou ressarcimento (−)', 'dinheiro', { negativo: true, ajuda: 'Valor negativo desconta do boleto. Ex.: -150,00' }),
   campo('outros_descricao', 'Motivo do ajuste', 'texto', { ajuda: 'Ex.: reforma do banheiro, acerto do mês anterior' }),
+  campo('outros_na_nf', 'O ajuste entra na NF', 'simnao', { ajuda: 'Marcado: o valor do ajuste soma na NF e o motivo vai nas observações dela (ex.: TV vendida junto). Desmarcado (padrão): fica fora da NF (ex.: vidro quebrado, multa)' }),
   campo('reserva_utilizada', 'Reserva utilizada', 'dinheiro'),
   campo('multa_percentual', 'Multa por atraso (%)', 'pct', { min: 0 }),
   campo('juros_mensal_percentual', 'Juros por atraso (% ao mês)', 'pct', { min: 0 }),
