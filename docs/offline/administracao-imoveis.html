@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-BaKc7AxW3En4fgfLYt0qYEcyS97K6w2CCqBcvvA2NHY=' 'sha256-fSm3SN3LjzriONhYT49qiRrVbPXFvptSTtaN1BN+sb0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-BaKc7AxW3En4fgfLYt0qYEcyS97K6w2CCqBcvvA2NHY=' 'sha256-Ajrt04kmsv6IWkOYYyK2GkG389BfgPslnxorAM1n2JU='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="0ecfc4340d4a4c71">
+<meta name="fontes" content="aec0bc27c5b472e6">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -5655,6 +5655,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     desativarSeSaiu: () => desativarSeSaiu,
     descontoLiberado: () => descontoLiberado,
     desfazerAcordo: () => desfazerAcordo,
+    desfazerAditivo: () => desfazerAditivo,
     desfazerAlteracoes: () => desfazerAlteracoes,
     desfazerNumeracao: () => desfazerNumeracao,
     desfazerReajuste: () => desfazerReajuste,
@@ -8662,6 +8663,41 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       usuario,
       `${c.inquilino_nome}: ${doc2[1].toLocaleLowerCase("pt-BR")}, arquivo ${arquivo ? `anexado (${arquivo})` : "apagado"}`
     );
+  }
+  function desfazerAditivo(d2, id, usuario, { excluirTermo = false } = {}) {
+    const a = buscar(d2, "aditivos", id);
+    if (!a) throw new Error("Termo aditivo não encontrado.");
+    const c = buscar(d2, "contratos", a.contrato_id);
+    const troca = a.tipo === TIPO_ADITIVO_TROCA || !a.tipo && !!c.contrato_anterior_id;
+    if (troca && c.heranca_transferida) throw new ErroUsuario(`A troca de titular já foi completada (boletos e garantia passaram a ${c.inquilino_nome}): não dá para desfazer sozinho. Fale com o administrador antes de excluir este termo.`);
+    const tirar = () => excluirTermo ? excluir(d2, "aditivos", a.id, usuario, `${c.inquilino_nome}: termo aditivo de ${dataBr(a.data)} excluído (não valeu: arquivo errado ou sem a assinatura de todos)`) : atualizar(d2, "aditivos", a.id, { arquivo: null, assinado_em: null, perdido_em: null, perdido_pendente: null }, usuario, `${c.inquilino_nome}: arquivo do termo aditivo de ${dataBr(a.data)} apagado (não valeu: volta a aguardar assinatura)`);
+    if (a.tipo === TIPO_ADITIVO_VALOR && a.renovacao_id && buscar(d2, "renovacoes", a.renovacao_id)) {
+      atualizar(d2, "aditivos", a.id, { arquivo: null, assinado_em: null, perdido_em: null, perdido_pendente: null }, usuario, `${c.inquilino_nome}: termo aditivo do novo valor não valeu`);
+      excluirRenovacao(d2, a.renovacao_id, usuario);
+      recalcularCobrancas(d2, (cb) => cb.contrato_id === c.id, usuario);
+      marcarAditivos(d2, c.id, usuario);
+      return `O novo valor de ${reais(a.valor_novo)} saiu: o aluguel volta a ${reais(a.valor_anterior)} nos boletos em aberto.`;
+    }
+    tirar();
+    marcarAditivos(d2, c.id, usuario);
+    if (a.dia_novo && a.primeiro_vencimento && a.dia_anterior) {
+      if (c.dia_vencimento === a.dia_novo) atualizar(d2, "contratos", c.id, { dia_vencimento: a.dia_anterior }, usuario, `${c.inquilino_nome}: vencimento volta ao dia ${a.dia_anterior} (termo aditivo não valeu)`);
+      const mes = a.primeiro_vencimento.slice(0, 7);
+      let n = 0;
+      for (const cb of d2.cobrancas.filter((x) => x.contrato_id === c.id && !x.data_pagamento && !emAcordo(x) && !ehBoletoAvulso(x) && x.vencimento && x.vencimento.slice(0, 7) >= mes)) {
+        const venc = `${cb.vencimento.slice(0, 7)}-${String(Math.min(a.dia_anterior, diasNoMes(cb.vencimento.slice(0, 7)))).padStart(2, "0")}`;
+        if (venc === cb.vencimento) continue;
+        if (emitidoNoBanco(cb) || cb.editado_manual) {
+          registrar(d2, usuario, "Alteração", "cobrancas", cb.id, `Boleto ${compBr(cb.competencia)} ${emitidoNoBanco(cb) ? "emitido no banco" : "alterado à mão"}: o vencimento continua ${dataBr(cb.vencimento)}; o termo aditivo não valeu e o dia volta a ${a.dia_anterior} (confira este boleto)`, null, { contrato_id: c.id, imovel_id: c.imovel_id });
+          continue;
+        }
+        atualizar(d2, "cobrancas", cb.id, { vencimento: venc }, usuario, `Boleto ${compBr(cb.competencia)}: vencimento ${dataBr(cb.vencimento)} → ${dataBr(venc)} (termo aditivo não valeu)`);
+        n += 1;
+      }
+      return `O vencimento volta ao dia ${a.dia_anterior}${n ? ` (${n} boleto(s) em aberto ajustado(s))` : ""}.`;
+    }
+    if (troca) return `Sem o termo assinado, a troca de titular volta a esperar por ele: ${contratoHerdado(d2, c) ? contratoHerdado(d2, c).inquilino_nome : "o titular anterior"} continua no contrato.`;
+    return "";
   }
   function removerArquivoAditivo(d2, id, usuario) {
     const a = buscar(d2, "aditivos", id);
@@ -28984,8 +29020,8 @@ ${m.texto}`);
         <input type="date" name="data" value="${hojeIso()}" style="width:auto" title="Data da assinatura">${atalhosData()}
         <label class="botao secundario pequeno enviar" title="Termo aditivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}" data-arquivo-doc></label>
         <button class="pequeno">Marcar assinado</button></form>` : ""}</td></tr>`).join("")}</table></div></div>` : ""}
-    ${lista3.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Assunto</th><th>Arquivo</th><th></th></tr>${lista3.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}${a.ciencia_por ? `<br><span class="suave mini">ciência da herança: ${esc(a.ciencia_por)} em ${dataBr(String(a.ciencia_em).slice(0, 10))}</span>` : ""}</td><td class="nw">${aditivoPerdido(a) ? `${abrir2(a)} ${acoesPerdido(a)}` : `${abrir2(a)}${xAnexo("removerArquivoAditivo", { id: a.id }, `Apagar o arquivo "${a.arquivo}"? O termo aditivo continua e volta a "aguardando assinatura".`)}`}</td>
-      <td class="n nw">${a.arquivo ? `${botaoEmail("aditivo_assinado", { contrato: c.id, aditivo: a.id })} ` : ""}${ver(a)} ${opera() ? botao("excluir", "×", { tabela: "aditivos", id: a.id }, "x-excluir", `Excluir o termo aditivo de ${dataBr(a.data)}?${a.arquivo ? " O arquivo assinado também é apagado." : ""}${oQueContinuaDoAditivo(a, c)}`) : ""}</td></tr>`).join("")}</table></div>` : '<p class="suave">Nenhum termo aditivo registrado.</p>'}
+    ${lista3.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Assunto</th><th>Arquivo</th><th></th></tr>${lista3.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}${a.ciencia_por ? `<br><span class="suave mini">ciência da herança: ${esc(a.ciencia_por)} em ${dataBr(String(a.ciencia_em).slice(0, 10))}</span>` : ""}</td><td class="nw">${aditivoPerdido(a) ? `${abrir2(a)} ${acoesPerdido(a)}` : `${abrir2(a)}${xAnexo("excluirAditivoAssinado", { id: a.id, so: "arquivo" })}`}</td>
+      <td class="n nw">${a.arquivo ? `${botaoEmail("aditivo_assinado", { contrato: c.id, aditivo: a.id })} ` : ""}${ver(a)} ${opera() ? a.arquivo ? botao("excluirAditivoAssinado", "×", { id: a.id, so: "termo" }, "x-excluir") : botao("excluir", "×", { tabela: "aditivos", id: a.id }, "x-excluir", `Excluir o termo aditivo de ${dataBr(a.data)}?${oQueContinuaDoAditivo(a, c)}`) : ""}</td></tr>`).join("")}</table></div>` : '<p class="suave">Nenhum termo aditivo registrado.</p>'}
     ${anteriores.map(([x, l]) => `<details open><summary>Histórico: aditivos do contrato anterior de <a href="#/contrato/${x.id}?ir=aditivos">${esc(x.inquilino_nome)}</a> (${l.length})</summary>
       <div class="rolagem"><table>${l.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td><td>${abrir2(a)}</td></tr>`).join("")}</table></div></details>`).join("")}
     ${opera() ? `<form data-form="aditivo" class="acoes"><input type="hidden" name="contrato" value="${c.id}">
@@ -36259,6 +36295,7 @@ ${xref}
       init_banco_c6();
       init_cadastros();
       init_campos();
+      init_contrato();
       init_comum();
       init_icone();
       init_comum();
@@ -36723,6 +36760,41 @@ ${MODELO_COMODOS[comodo].join("\n")}
           if (!await confirmar(`O termo aditivo de ${dataBr(data2)} fica registrado como assinado, mas sem o arquivo, e passa a valer como assinado.${podeUsuario("admin") ? "" : " O administrador vai analisar."}`, { titulo: "Registrar o termo aditivo como perdido?", sim: "Registrar como perdido" })) return;
           await alterar((db) => registrarAditivo(db, Number(contrato), { data: data2, assunto, perdido: true }, login(), podeUsuario("admin")));
           aviso("Termo aditivo registrado como perdido.");
+          await mostrar();
+        },
+        /**
+         * "×" do termo aditivo já anexado (o termo inteiro, ``so: 'termo'``, ou só o arquivo, ``so: 'arquivo'``): pergunta se ele valeu
+         * (decisão do dono, 21/11/2026, saida-031). Assinado por todos: sai com aviso e a mudança continua (ex.: o vencimento fica no
+         * dia 15). Arquivo errado ou sem a assinatura de todos: sai e a mudança é desfeita (o vencimento volta ao dia 10).
+         */
+        async excluirAditivoAssinado({ id, so }) {
+          const a = buscar2("aditivos", id);
+          if (!a) throw new ErroUsuario("Termo aditivo não encontrado.");
+          const c = buscar2("contratos", a.contrato_id);
+          const oque = so === "arquivo" ? `o arquivo "${a.arquivo}"` : `o termo aditivo de ${dataBr(a.data)}`;
+          const resp = await janela({
+            titulo: so === "arquivo" ? "Apagar o arquivo do termo aditivo?" : "Excluir o termo aditivo?",
+            forte: true,
+            sim: "Continuar",
+            html: `<p>Você vai apagar <b>${esc(oque)}</b> (${esc(a.assunto || "termo aditivo")}).</p>
+        <p><b>Este termo valeu?</b></p>
+        <p><label><input type="radio" name="valeu" value="nao" checked> Não: é o arquivo errado ou falta a assinatura de alguém. <b>A mudança é desfeita.</b></label></p>
+        <p><label><input type="radio" name="valeu" value="sim"> Sim: foi assinado por todos. <b>A mudança continua valendo</b> (o inquilino já assinou).</label></p>`
+          });
+          if (!resp) return;
+          const valeu = (resp.valeu || [])[0] === "sim";
+          if (valeu) {
+            const ok = await confirmar(`O termo foi assinado por todos: o que ele mudou continua valendo.${oQueContinuaDoAditivo(a, c)} Apagar ${oque} mesmo assim?`, { titulo: "Confirme", sim: "Apagar", nao: "Voltar", forte: true });
+            if (!ok) return;
+            await alterarApagandoAnexos((db) => so === "arquivo" ? removerArquivoAditivo(db, Number(id), login()) : excluir(db, "aditivos", Number(id), login(), `${c.inquilino_nome}: termo aditivo de ${dataBr(a.data)} excluído (assinado por todos: a mudança continua valendo)`));
+            aviso(so === "arquivo" ? 'Arquivo apagado: o termo voltou a "aguardando assinatura". A mudança continua valendo.' : "Termo aditivo excluído. A mudança continua valendo.");
+          } else {
+            let feito = "";
+            await alterarApagandoAnexos((db) => {
+              feito = desfazerAditivo(db, Number(id), login(), { excluirTermo: so !== "arquivo" });
+            });
+            aviso(`${so === "arquivo" ? 'Arquivo apagado: o termo voltou a "aguardando assinatura".' : "Termo aditivo excluído."} ${feito}`.trim(), "ok");
+          }
           await mostrar();
         },
         /** "×" no arquivo do termo aditivo: o termo volta a "aguardando assinatura". */
