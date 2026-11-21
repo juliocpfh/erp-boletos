@@ -1524,10 +1524,6 @@ document.addEventListener('change', async (ev) => {
     atualizarBarraLote();
     return;
   }
-  if (ev.target.matches('input[data-trocar-mes]') && ev.target.value) {
-    ir(`#/contas/${ev.target.dataset.trocarMes}?comp=${ev.target.value}`);
-    return;
-  }
   if (ev.target.matches('select[data-previa]')) {
     const n = ev.target.dataset.previa;
     const f = ev.target.form;

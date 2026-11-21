@@ -133,7 +133,8 @@ export function telaContas(rota) {
       O IPTU pago por nós é lançado na caixa do IPTU do imóvel (já abate dos resultados).</div>
     <form class="cartao" data-form="lancarContas">
       <input type="hidden" name="imovel" value="${i.id}">
-      <div class="acoes" style="margin-bottom:10px"><label style="margin:0">Mês de referência</label><input type="month" name="competencia" value="${esc(comp)}" style="width:auto" data-trocar-mes="${i.id}">
+      <div class="acoes" style="margin-bottom:10px"><label style="margin:0" for="contas-mes">Mês de referência</label><input type="hidden" name="competencia" value="${esc(comp)}">
+        <input type="month" id="contas-mes" value="${esc(comp)}" style="width:auto" class="campo-mes" data-sem-aviso>${botao('irMesContas', 'Ir', { imovel: i.id }, 'secundario pequeno')}
         <button type="button" class="secundario pequeno" data-acao="repetirContas">Repetir os últimos valores</button></div>
       <div class="rolagem"><table class="responsiva"><tr><th>Conta</th><th>Valor pago</th><th>Vencimento</th><th>Pago em</th><th>Observação</th><th></th></tr>
         ${R.TIPOS_DESPESA.map(linha).join('')}</table></div>
