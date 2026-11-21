@@ -886,6 +886,13 @@ export const ACOES = {
   },
 
   /** Contas pagas por nós: preenche cada valor vazio com o último lançado. */
+  /** Contas do imóvel: vai ao mês escolhido (só no botão "Ir": no iPhone a roleta do mês avisa a mudança a cada giro, iphone-012). */
+  irMesContas({ imovel }) {
+    const mes = (document.getElementById('contas-mes') || {}).value || '';
+    if (!C.competenciaValida(mes)) throw new C.ErroUsuario('Escolha o mês de referência.');
+    ir(`#/contas/${Number(imovel)}?comp=${mes}`);
+  },
+
   repetirContas() {
     const form = document.querySelector('form[data-form=lancarContas]');
     form.querySelectorAll('input[name^=valor_]').forEach((el) => { if (!el.value && el.placeholder && el.placeholder !== '0,00') el.value = el.placeholder; });
