@@ -2773,3 +2773,43 @@ test('B5: valor de cada reparo da vistoria de saída entra no roteiro e só guar
   assert.match(R.roteiroSaida(d, c, '2026-12-02')[1].detalhe, /2 reparo\(s\): R\$ 1\.050,00/);
   assert.throws(() => R.valoresReparos(d, v.id, [{ pendencia: pend[0], valor: -1, orcamento: '' }], 'julio'), /Valor inválido/);
 });
+
+test('saida-031: termo aditivo que não valeu (arquivo errado ou sem assinatura de todos) desfaz a mudança', () => {
+  // vencimento do dia 10 para o 15
+  const { d, c } = base();
+  for (const m of ['2026-11', '2026-12', '2027-01']) R.gerarCobrancas(d, m, 'julio');
+  const dia = c.dia_vencimento;
+  const a = R.salvarAditivoVencimento(d, c.id, { data: '2026-11-05', dia_novo: '15', mes: '2026-12', texto: 'texto' }, 'julio');
+  R.assinarAditivo(d, a.id, { data: '2026-11-06', arquivo: 'termo.pdf' }, 'julio');
+  assert.equal(c.dia_vencimento, 15);
+  const emAberto = () => d.cobrancas.filter((x) => x.contrato_id === c.id && x.vencimento >= '2026-12-01').map((x) => Number(x.vencimento.slice(8)));
+  assert.ok(emAberto().every((x) => x === 15));
+  // um boleto alterado à mão fica como está (anotado)
+  const manual = d.cobrancas.find((x) => x.contrato_id === c.id && x.vencimento.startsWith('2027-01'));
+  R.atualizar(d, 'cobrancas', manual.id, { editado_manual: true }, 'julio');
+  const txt = R.desfazerAditivo(d, a.id, 'julio');
+  assert.match(txt, new RegExp(`volta ao dia ${dia}`));
+  assert.equal(c.dia_vencimento, dia);
+  assert.equal(R.buscar(d, 'aditivos', a.id).arquivo, null, 'o termo volta a aguardar assinatura');
+  assert.equal(Number(manual.vencimento.slice(8)), 15, 'alterado à mão não muda');
+  assert.ok(d.cobrancas.filter((x) => x.contrato_id === c.id && x.vencimento >= '2026-12-01' && x.id !== manual.id).every((x) => Number(x.vencimento.slice(8)) === dia));
+  assert.match(d.historico.map((h) => h.descricao).join('\n'), /alterado à mão: o vencimento continua/);
+  // novo valor: a renovação sai e os boletos em aberto voltam ao aluguel anterior
+  const antes = R.boletoDoMes(d, c.id, '2027-01').aluguel;
+  const r = R.registrarRenovacao(d, c.id, { data: '2026-12-01', tipo: 'Novo valor negociado', novo_valor: 150000, vale_desde: '2027-01' }, 'julio');
+  R.atualizar(d, 'cobrancas', manual.id, { editado_manual: false }, 'julio');
+  R.recalcularCobrancas(d, (x) => x.contrato_id === c.id, 'julio');
+  const termo = R.aditivoDaRenovacao(d, r.id);
+  R.atualizar(d, 'aditivos', termo.id, { arquivo: 'aceite.pdf', assinado_em: '2026-12-02' }, 'julio');
+  assert.notEqual(R.boletoDoMes(d, c.id, '2027-01').aluguel, antes);
+  R.desfazerAditivo(d, termo.id, 'julio');
+  assert.ok(!R.buscar(d, 'renovacoes', r.id));
+  assert.ok(!R.buscar(d, 'aditivos', termo.id));
+  assert.equal(R.boletoDoMes(d, c.id, '2027-01').aluguel, antes);
+  // excluir o termo inteiro
+  const b = R.salvarAditivoVencimento(d, c.id, { data: '2026-11-07', dia_novo: '20', mes: '2026-12', texto: 'texto' }, 'julio');
+  R.assinarAditivo(d, b.id, { data: '2026-11-08', arquivo: 'termo2.pdf' }, 'julio');
+  R.desfazerAditivo(d, b.id, 'julio', { excluirTermo: true });
+  assert.ok(!R.buscar(d, 'aditivos', b.id));
+  assert.equal(c.dia_vencimento, dia);
+});

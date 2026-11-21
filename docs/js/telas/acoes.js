@@ -21,6 +21,7 @@ import { ACOES_EMAILS } from './emails.js';
 import { htmlSaude } from './banco-c6.js';
 import { ANEXOS_COM_X, CADASTROS, nomeComprovante } from './cadastros.js';
 import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria, indicesMensaisFci } from './campos.js';
+import { oQueContinuaDoAditivo } from './contrato.js';
 import { adiados, alterarApagandoAnexos, anexosEmUso, botao, apagarAnexos, apagarPastaDaFicha, nomePastaFicha, arquivoApagadoNoFormulario, buscar, carregarParte, chavePasta, parteAdiada, conferirArquivos, conferirHerancas, d, ehMatricula, encerrarLinksDaFicha, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, SO_ADMIN_NUMERACAO, vinculoDoEscopo } from './comum.js';
 import { ACOES_ICONE } from './icone.js';
 import { alertasAbertos } from './comum.js';
@@ -1122,6 +1123,37 @@ export const ACOES = {
     if (!(await confirmar(`O termo aditivo de ${C.dataBr(data)} fica registrado como assinado, mas sem o arquivo, e passa a valer como assinado.${podeUsuario('admin') ? '' : ' O administrador vai analisar.'}`, { titulo: 'Registrar o termo aditivo como perdido?', sim: 'Registrar como perdido' }))) return;
     await alterar((db) => R.registrarAditivo(db, Number(contrato), { data, assunto, perdido: true }, login(), podeUsuario('admin')));
     aviso('Termo aditivo registrado como perdido.');
+    await mostrar();
+  },
+
+  /**
+   * "×" do termo aditivo já anexado (o termo inteiro, ``so: 'termo'``, ou só o arquivo, ``so: 'arquivo'``): pergunta se ele valeu
+   * (decisão do dono, 21/11/2026, saida-031). Assinado por todos: sai com aviso e a mudança continua (ex.: o vencimento fica no
+   * dia 15). Arquivo errado ou sem a assinatura de todos: sai e a mudança é desfeita (o vencimento volta ao dia 10).
+   */
+  async excluirAditivoAssinado({ id, so }) {
+    const a = buscar('aditivos', id);
+    if (!a) throw new C.ErroUsuario('Termo aditivo não encontrado.');
+    const c = buscar('contratos', a.contrato_id);
+    const oque = so === 'arquivo' ? `o arquivo "${a.arquivo}"` : `o termo aditivo de ${dataBr(a.data)}`;
+    const resp = await janela({ titulo: so === 'arquivo' ? 'Apagar o arquivo do termo aditivo?' : 'Excluir o termo aditivo?', forte: true, sim: 'Continuar',
+      html: `<p>Você vai apagar <b>${esc(oque)}</b> (${esc(a.assunto || 'termo aditivo')}).</p>
+        <p><b>Este termo valeu?</b></p>
+        <p><label><input type="radio" name="valeu" value="nao" checked> Não: é o arquivo errado ou falta a assinatura de alguém. <b>A mudança é desfeita.</b></label></p>
+        <p><label><input type="radio" name="valeu" value="sim"> Sim: foi assinado por todos. <b>A mudança continua valendo</b> (o inquilino já assinou).</label></p>` });
+    if (!resp) return;
+    const valeu = (resp.valeu || [])[0] === 'sim';
+    if (valeu) {
+      const ok = await confirmar(`O termo foi assinado por todos: o que ele mudou continua valendo.${oQueContinuaDoAditivo(a, c)} Apagar ${oque} mesmo assim?`, { titulo: 'Confirme', sim: 'Apagar', nao: 'Voltar', forte: true });
+      if (!ok) return;
+      await alterarApagandoAnexos((db) => (so === 'arquivo' ? R.removerArquivoAditivo(db, Number(id), login())
+        : R.excluir(db, 'aditivos', Number(id), login(), `${c.inquilino_nome}: termo aditivo de ${dataBr(a.data)} excluído (assinado por todos: a mudança continua valendo)`)));
+      aviso(so === 'arquivo' ? 'Arquivo apagado: o termo voltou a "aguardando assinatura". A mudança continua valendo.' : 'Termo aditivo excluído. A mudança continua valendo.');
+    } else {
+      let feito = '';
+      await alterarApagandoAnexos((db) => { feito = R.desfazerAditivo(db, Number(id), login(), { excluirTermo: so !== 'arquivo' }); });
+      aviso(`${so === 'arquivo' ? 'Arquivo apagado: o termo voltou a "aguardando assinatura".' : 'Termo aditivo excluído.'} ${feito}`.trim(), 'ok');
+    }
     await mostrar();
   },
 
