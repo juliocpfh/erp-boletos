@@ -1,22 +1,66 @@
-21/11: manter; decidir depois de ligar o C6.
+# Pendências 4000 (20/11/2026): o que fazer depois do mutirão de 19/11
+
+Pedido do dono em 20/11/2026, depois de as PRs #329 a #332 entrarem na `main` (os 17 lotes de `MUTIRAO_19_11.md` estão corrigidos). **A próxima conversa começa por aqui.** Faça na ordem, uma PR por item (não empilhe PRs: cada uma parte da `main` depois que a anterior entrar). Antes de mudar regra de dinheiro, confirme com o dono um exemplo em reais e datas. Teste na tela em `?teste` e diga o que não foi visto. Marque `[x]` aqui, na mesma PR, ao concluir cada item.
+
+## 1. [x] Página temporária de teste de todos os PDFs (fazer primeiro)
+
+**Feito em 20/11/2026:** Dados e backup → **Teste dos PDFs (temporário)** (`#/teste-pdfs`, só administrador), em `docs/js/telas/teste-pdfs.js`. São 27 PDFs em 4 grupos (contrato, aditivos, chaves e vistorias; recibos e termos; demonstrativos e NF; carta, IR, gestão e todos os dados); cada linha diz o registro usado ou o que cadastrar. "Abrir" leva à página do documento (Imprimir / Baixar PDF); nos recibos e na carta há também o PDF do jeito que vai no e-mail. Testado em `?teste` com dados fictícios: os 10 PDFs com registro abriram e baixaram sem erro, e a página cabe em 375 px. Na mesma PR: a página da carta de reajuste dava erro no "Baixar PDF" (variável `comp` inexistente). **Apagar depois do teste do dono:** `telas/teste-pdfs.js`, a rota `'teste-pdfs'` (`telas.js`), `testePdfs` em `PARTES_ADIADAS` (`telas/comum.js`) e no teste `tests/telas.test.mjs`, `'js/telas/teste-pdfs.js'` em `ADIADOS` (`sw.js`) e o link em Dados e backup (`telas/admin.js`).
+
+- Uma tela só para o dono (administrador), por exemplo `#/teste-pdfs`, com **um botão por PDF que o sistema gera, um assunto de cada vez** (agrupados por assunto: contrato, termos aditivos, recibos e termos de quitação, NF, demonstrativos, cartas, notificações, ficha, vistoria, declaração do IR etc.).
+- O dono vai abrir cada um **pelo computador e pelo celular (Android)**, ver se o PDF sai certo e anotar os textos a mudar. Depois a tela é apagada (é temporária: deixe isso escrito no código e aqui).
+- Levante a lista pelo código (não confie só na lista acima): `recibos.js` (tipos de `reciboDisponivel`/`pdfDoRecibo`), `fatura.js`, contratos e aditivos (`modelos-contrato.js`, `#/imprimir/...`), demonstrativos, carta de reajuste, notificação (PDF tipo `notificacao`), PDF da ficha, vistoria, declaração de aluguéis do IR, `baixarPdfTela`/`documentoPdf`.
+- Cada botão precisa de dados: use os do próprio banco quando existir um registro que sirva (o primeiro contrato, boleto, ficha…) e diga na tela qual registro foi usado; se não houver, diga o que cadastrar. Não grave nada só para gerar o PDF.
+- Deixe a tela fora do menu (link em Dados e backup, só administrador). Rota nova precisa de entrada em `TELAS` e, se tiver parâmetro, em `FORMATOS_PARAMETRO`.
+
+## 2. [x] Termo aditivo excluído (corrige o aviso do saida-031)
+
+**Feito em 21/11 (PR #347):** ao apagar o termo anexado (ou só o arquivo), o sistema pergunta se valeu. Não valeu (arquivo errado ou sem a assinatura de todos): a mudança é desfeita. Assinado por todos: o dono decidiu que **pode ser apagado com aviso e confirmação**, e a mudança continua.
+
+Decisão do dono: **o termo aditivo assinado por todos, uma vez anexado, já vale** (ex.: vencimento passou do dia 10 para o dia 15) e não pode mais ser excluído, porque o inquilino já assinou. Só o anexo **errado ou sem a assinatura de todos** (a mudança ainda não valeu de fato) pode sair, e aí **os boletos voltam ao que eram** (dia 10) e nada da mudança fica.
+- Barrar a exclusão do termo aditivo assinado por todos, explicando o motivo.
+- Na exclusão do anexo incompleto, ou do termo que ainda não valeu, desfazer o efeito: dia do vencimento, novo valor e troca de titular voltam ao anterior, e os boletos em aberto são recalculados. Respeite `editado_manual` e os boletos emitidos no banco (`divergenciaBancaria`).
+- Hoje (`telas/contrato.js`, `telas/acoes.js`, lote K saida-031/saida-043) a exclusão só avisa o que continua valendo.
+
+## 3. [x] Adiar a saída e refazer as contas (corrige o aviso do saida-007)
+
+**Feito em 21/11 (PR #349).** Resposta do dono ao exemplo: o inquilino nunca paga adiantado; o boleto do último mês ainda está em aberto e é recalculado até a entrega das chaves; o acerto de tudo (aluguel e vistoria) fica no cálculo final, sem boleto à parte. A vistoria marcada anda os mesmos dias.
+
+Decisão do dono: acontece de o inquilino precisar de mais dias para arrumar o imóvel (marcou a saída para dia 10 e vai ficar até dia 15). Precisa haver **um lugar no sistema para adiar a saída** (nova data) que **refaça o que ele deve**:
+- o boleto proporcional do último mês passa a cobrar os dias novos; se já foi pago, a diferença é cobrada (ex.: pagou 10/30, agora são 15/30 → falta 5/30);
+- o cálculo final, se já existir, é refeito ou avisa para refazer;
+- a vistoria marcada e o roteiro da saída acompanham a data nova.
+- Hoje (lote J, saida-007) desfazer ou adiar a saída só avisa a diferença (ex.: "faltam R$ 750,00") e não lança nada.
+- Antes de programar, confirme o exemplo com o dono: aluguel de R$ 3.000,00, saída de 10/12 adiada para 15/12, boleto de dezembro já pago com 10/30 = R$ 1.000,00 → falta R$ 500,00 (5/30), cobrado como e quando?
+
+## 4. [ ] Recibo/termo de devolução da garantia na troca de garantia
+
+Decisão do dono: quando a caução é trocada (ex.: por fiador) e devolvida, o sistema gera um **termo de devolução da garantia, que é um recibo**, com o **valor corrigido pela poupança e devolvido** (ex.: caução de R$ 3.150,00 trocada por fiador em 01/12/2026, devolvida corrigida). O dono anexa o **comprovante da devolução** e **a pessoa assina que recebeu** (anexar o termo assinado, como os outros recibos).
+- Tipo novo em `recibos.js` (com `reciboDisponivel`), rota `#/imprimir/recibo?tipo=…`, PDF `pdfDoRecibo`; dados da devolução em `devolucoes_garantia` (`troca_id`), movimentos em `trocas_garantia.devolucao_movimentos`.
+- Campo do termo assinado: entra em `arquivosReferenciados`, `rotulosDosArquivos` e no arquivo impresso (`itensDaPasta`, com `vaga` estável), se for para a pasta física.
+- Entra também na página de teste dos PDFs (item 1).
+
+## 5. [x] Os 14 itens "fora da lista" do mutirão de 19/11: decidir com o dono, um por um
+
+Estão no fim de `MUTIRAO_19_11.md` ("Fora da lista"). **Não corrija nada antes de o dono decidir.** Traga **um item por vez**, em português simples, com exemplo de valores e datas, e a pergunta, e anote a resposta aqui:
+
 | Item | Assunto | Decisão do dono |
 |---|---|---|
-| links-pc-015 | Endereço com inquilino, mês ou conta que não existe abre a tela normal sem avisar || 21/11: quer conversar (não entendeu). Explicar com exemplo. |
-| entrada-007 | "Lembrar" no dia seguinte gera outro link da ficha e mata o anterior || 21/11: corrigir. O link antigo continua valendo para preencher, com a validade original fixa (o "Lembrar" não gera outro link). |
-| entrada-034 | Imóvel com saída marcada não aparece para reserva até o inquilino sair || 21/11: manter (reserva só de imóvel vago). |
-| mensal-009 | Pago a mais à mão: obriga mudar a NF e não registra o que tem de devolver || 21/11: quer conversar. Pede um jeito de lançar no boleto um valor extra esporádico (ex.: vidro quebrado, TV), discriminado, escolhendo se entra na NF ou não, e que não se repita no boleto seguinte. Conferir o que já existe ("outros") antes de propor. |
-| saida-016 | Troca de titular no dia 28/02 ou 31: os dois boletos somam 28 ou 31 dias de 30 || 21/11: corrigir. A soma fecha sempre em 30/30, ajustando a parte de quem entra. |
-| financeiro-banco-024 | Pagamento aguardando número de NF aparece em todos os meses seguintes do Fechamento || 21/11: manter. |
-| impressos-002 | Declaração do IR do novo titular soma os aluguéis pagos pelo anterior || 21/11: corrigir. Cada titular declara só o que pagou. |
-| comunicacoes-007 | Comunicado de contatos não vai ao inquilino solidário nem ao representante da empresa || 21/11: corrigir. O comunicado vai a todos que assinaram e respondem pelo contrato: inquilino, solidário, fiadores e representantes da empresa. |
-| comunicacoes-027 | Coluna "NF" da página do inquilino mostra um número só (derrubado: as duas NFs têm o mesmo número) || 21/11: mostrar todas as NFs de mesmo número (uma por empresa). |
-| comunicacoes-030 | "Solicitação" nomeia duas coisas (reserva e pedido do inquilino) || 21/11: trocar o nome: "Pedido de reserva" é uma coisa e "Solicitação do inquilino" é outra. |
-| nuvem-012 | A nuvem de teste do computador não serve /privacidade (só a ferramenta do programador) || 21/11: quer conversar (achou que era o modo anônimo do navegador). Explicar. |
-| iphone-012 | Contas do imóvel: no iPhone, escolher o mês troca de tela a cada giro da roleta || 21/11: corrigir com o botão "Ir". |
-| iphone-014 | PDF comprido no iPhone pode ficar com páginas em branco (memória do visualizador) || 21/11: corrigir. |
-| textos-017 | Lista "Movimentações sem destino" existe em duas telas (Financeiro e Banco) || 21/11: quer conversar (o C6 ainda não está ligado). Explicar depois de ligar o banco. |
+| links-pc-015 | Endereço com inquilino, mês ou conta que não existe abre a tela normal sem avisar | 21/11: avisar. A tela abre com o padrão e mostra "Endereço com dado errado" no alto (PR #344). |
+| entrada-007 | "Lembrar" no dia seguinte gera outro link da ficha e mata o anterior | 21/11: o link antigo continua valendo, com a validade do primeiro; "Gerar novo link" troca de vez (PR #343). |
+| entrada-034 | Imóvel com saída marcada não aparece para reserva até o inquilino sair | 21/11: manter (reserva só de imóvel vago). |
+| mensal-009 | Pago a mais à mão: obriga mudar a NF e não registra o que tem de devolver | 21/11: cada ajuste do boleto escolhe se entra na NF (PR #345) e o pago a mais fica anotado "a devolver", com o botão "Devolvi" (PR #346). |
+| saida-016 | Troca de titular no dia 28/02 ou 31: os dois boletos somam 28 ou 31 dias de 30 | 21/11: a soma fecha sempre em 30/30, ajustando a parte de quem entra (PR #337). |
+| financeiro-banco-024 | Pagamento aguardando número de NF aparece em todos os meses seguintes do Fechamento | 21/11: manter. |
+| impressos-002 | Declaração do IR do novo titular soma os aluguéis pagos pelo anterior | 21/11: cada titular declara só o que pagou (PR #336). |
+| comunicacoes-007 | Comunicado de contatos não vai ao inquilino solidário nem ao representante da empresa | 21/11: vai a todos que assinaram: inquilino, solidário, representante da empresa e fiadores (PR #339). |
+| comunicacoes-027 | Coluna "NF" da página do inquilino mostra um número só (derrubado: as duas NFs têm o mesmo número) | 21/11: mostrar todas as NFs de mesmo número, uma por empresa (PR #340). |
+| comunicacoes-030 | "Solicitação" nomeia duas coisas (reserva e pedido do inquilino) | 21/11: "Pedido de reserva" e "Solicitação do inquilino" são nomes diferentes (PR #338). |
+| nuvem-012 | A nuvem de teste do computador não serve /privacidade (só a ferramenta do programador) | 21/11: nada a fazer; o dono abre a página de privacidade no endereço de verdade e confere. |
+| iphone-012 | Contas do imóvel: no iPhone, escolher o mês troca de tela a cada giro da roleta | 21/11: botão "Ir" em Contas do imóvel (PR #341). |
+| iphone-014 | PDF comprido no iPhone pode ficar com páginas em branco (memória do visualizador) | 21/11: o visualizador desenha só as páginas perto da tela e solta a memória (PR #342). |
+| textos-017 | Lista "Movimentações sem destino" existe em duas telas (Financeiro e Banco) | 21/11: manter; decidir depois de ligar o C6. |
 
-Item que o dono mandar corrigir: uma PR para ele (ou para os pequenos juntos), com teste. Respostas de 21/11 dadas numa página de decisão item a item.
+Item que o dono mandar corrigir: uma PR para ele (ou para os pequenos juntos), com teste. Respostas de 21/11 dadas numa página de decisão item a item; todos decididos e corrigidos (PRs #336 a #346).
 
 ## 6. [ ] Testes do dono (ele faz; anote o resultado aqui)
 
