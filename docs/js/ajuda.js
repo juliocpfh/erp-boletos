@@ -40,7 +40,7 @@ export const AJUDA_TELAS = {
   inquilinos: {
     titulo: 'Inquilinos',
     serve: 'Lista quem aluga hoje (ativos) e quem já saiu, com a vigência do contrato, o aluguel atual e a garantia. Em cima ficam as fichas dos interessados que ainda estão em análise.',
-    primeiro: ['Alguém quer alugar? Clique em "Nova solicitação de reserva": preencha o imóvel, o contato, a proposta e o que está incluso. Depois, na página da ficha, gere o link para a pessoa preencher o resto.',
+    primeiro: ['Alguém quer alugar? Clique em "Novo pedido de reserva": preencha o imóvel, o contato, a proposta e o que está incluso. Depois, na página da ficha, gere o link para a pessoa preencher o resto.',
       'Ficha aprovada vira o contrato já preenchido. Já tem o contrato? Use "Novo contrato", na caixa "Contratos ativos".',
       'Clique no nome do inquilino para abrir a página dele.'],
     exemplo: 'Inquilino que entrou em 10/03/2026 com contrato de 30 meses aparece em "Contratos ativos" com a vigência 10/03/2026 a 09/09/2028. Quando sair, a saída é registrada na página dele e ele passa para "Inativos".',
