@@ -3391,7 +3391,7 @@ export function comprovantesPendentes(d, c) {
 
 /** Anexa depois o comprovante que faltava (só os campos de comprovante de depósito). */
 export function anexarComprovante(d, tabela, id, campo, arquivo, usuario) {
-  const ok = { contratos: ['comprovante_caucao', 'comprovante_deposito', 'comprovante_reserva', 'termo_chaves_saida', 'contra_vistoria'], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ['comprovante']])), encerramentos: ['comprovante', 'termo_assinado'], acordos: ['termo_assinado'], notificacoes: ['arquivo_assinado', 'comprovante_baixa'] };
+  const ok = { contratos: ['comprovante_caucao', 'comprovante_deposito', 'comprovante_reserva', 'termo_chaves_saida', 'contra_vistoria'], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ['comprovante']])), encerramentos: ['comprovante', 'termo_assinado'], devolucoes_garantia: ['comprovante', 'termo_assinado'], acordos: ['termo_assinado'], notificacoes: ['arquivo_assinado', 'comprovante_baixa'] };
   if (!(ok[tabela] || []).includes(campo)) throw new Error('Comprovante desconhecido.');
   if (!arquivo) throw new Error('Escolha o arquivo do comprovante.');
   const r = buscar(d, tabela, id);
@@ -3482,7 +3482,7 @@ export function removerComprovanteGarantia(d, contratoId, qual, usuario) {
  * paga em parcelas: o contrato guarda a cópia do comprovante do último depósito, que é conferida de novo.
  */
 export function removerAnexo(d, tabela, id, campo, usuario) {
-  const ok = { contratos: ['comprovante_reserva', 'termo_chaves_saida', 'contra_vistoria'], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ['comprovante']])), encerramentos: ['comprovante', 'termo_assinado'], acordos: ['termo_assinado'], notificacoes: ['arquivo_assinado', 'comprovante_baixa'] };
+  const ok = { contratos: ['comprovante_reserva', 'termo_chaves_saida', 'contra_vistoria'], ...Object.fromEntries(TABELAS_COMPROVANTE.map((t) => [t, ['comprovante']])), encerramentos: ['comprovante', 'termo_assinado'], devolucoes_garantia: ['comprovante', 'termo_assinado'], acordos: ['termo_assinado'], notificacoes: ['arquivo_assinado', 'comprovante_baixa'] };
   if (!(ok[tabela] || []).includes(campo)) throw new Error('Este arquivo não pode ser apagado por aqui.');
   const r = buscar(d, tabela, id);
   if (!r || !r[campo]) throw new Error('Arquivo não encontrado.');
@@ -4928,6 +4928,7 @@ export function arquivosReferenciados(d) {
   for (const x of d.encerramentos || []) usa('contrato', x.contrato_id, x.termo_assinado);
   for (const a of d.aditivos) usa('aditivos', a.contrato_id, a.arquivo);
   for (const a of d.acordos || []) usa('contrato', a.contrato_id, a.termo_assinado); // termo do acordo assinado (2026-11-15)
+  for (const x of d.devolucoes_garantia || []) usa('contrato', x.contrato_id, x.termo_assinado); // recibo da devolução da garantia assinado (2026-11-21)
   // termo de quitação assinado da saída (estava fora: a limpeza "arquivos sem lançamento" o apagava, mutirão 19/11 fios-002)
   for (const x of d.encerramentos || []) usa('contrato', x.contrato_id, x.termo_assinado);
   // notificação ao inquilino (2026-11-17): a assinada e o comprovante da baixa (foto ou arquivo de que foi resolvido)
@@ -4971,6 +4972,7 @@ export function comprovantesComNome(d) {
   for (const x of d.correcoes_garantia) usa(x.contrato_id, x.comprovante, 'complemento-caucao', x.data, `comprovante do complemento da caução (${C.dataBr(x.data)})`);
   for (const x of d.aplicacoes) usa(x.contrato_id, x.comprovante, 'aplicacao-garantia', x.data, `comprovante da aplicação da garantia (${C.dataBr(x.data)})`);
   for (const x of d.devolucoes_garantia || []) usa(x.contrato_id, x.comprovante, 'devolucao-garantia', x.data, `comprovante da devolução da garantia (${C.dataBr(x.data)})`);
+  for (const x of d.devolucoes_garantia || []) usa(x.contrato_id, x.termo_assinado, 'recibo-devolucao-garantia-assinado', x.data, `recibo da devolução da garantia assinado (${C.dataBr(x.data)})`);
   // termo de entrega do imóvel, acerto final e quitação assinado por todos (vai no e-mail do encerramento)
   for (const x of d.encerramentos) usa(x.contrato_id, x.termo_assinado, 'termo-quitacao-assinado', x.garantia_devolvida_em || x.data_saida, `termo de quitação assinado (${C.dataBr(x.garantia_devolvida_em || x.data_saida)})`);
   for (const x of d.encerramentos) usa(x.contrato_id, x.comprovante, x.saldo > 0 ? 'devolucao-saldo' : 'pagamento-saldo', x.garantia_devolvida_em, `comprovante ${x.saldo > 0 ? 'da devolução' : 'do pagamento'} do saldo da saída (${C.dataBr(x.garantia_devolvida_em)})`);
@@ -5000,6 +5002,7 @@ export function rotulosDosArquivos(d) {
   }
   for (const a of d.aditivos) poe('aditivos', a.contrato_id, a.arquivo, `termo aditivo${a.data ? ` (${C.dataBr(a.data)})` : ''}`);
   for (const a of d.acordos || []) poe('contrato', a.contrato_id, a.termo_assinado, `termo do acordo de ${C.dataBr(a.data)} assinado`);
+  for (const x of d.devolucoes_garantia || []) poe('contrato', x.contrato_id, x.termo_assinado, `recibo da devolução da garantia de ${C.dataBr(x.data)} assinado`);
   for (const n of d.notificacoes || []) {
     poe('contrato', n.contrato_id, n.arquivo_assinado, `notificação de ${C.dataBr(n.data)} assinada (${n.assunto})`);
     poe('contrato', n.contrato_id, n.comprovante_baixa, `comprovante da baixa da notificação de ${C.dataBr(n.data)}${n.resolvida_em ? ` (resolvida em ${C.dataBr(n.resolvida_em)})` : ''}`);

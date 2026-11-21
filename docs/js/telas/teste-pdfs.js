@@ -41,6 +41,7 @@ const FALTA_RECIBO = {
   reserva: 'uma ficha em análise (ou contrato) com o valor e a data da reserva',
   devolucao_reserva: 'uma ficha com reserva e a devolução registrada (data e comprovante)',
   garantia: 'um contrato com caução ou depósito em dinheiro já depositado',
+  devolucao_garantia: 'uma devolução da garantia registrada, com saldo devolvido (troca de garantia ou de titular)',
   devolucao_chaves: 'um contrato com a data de saída',
   quitacao: 'um contrato com o cálculo final da saída e o saldo acertado',
   acordo: 'um acordo de dívida (não desfeito)',

@@ -23,6 +23,7 @@ export const TIPOS_RECIBO = {
   reserva: 'Recibo da reserva',
   devolucao_reserva: 'Termo de devolução da reserva',
   garantia: 'Recibo da garantia',
+  devolucao_garantia: 'Recibo da devolução da garantia',
   devolucao_chaves: 'Termo de devolução das chaves',
   quitacao: 'Termo de quitação',
   acordo: 'Termo de confissão de dívida e acordo',
@@ -131,6 +132,13 @@ export function reciboDisponivel(d, tipo, alvo) {
     if (pagador.id !== c.id) return { ok: false, motivo: `O recibo é de quem pagou a garantia (${pagador.inquilino_nome}): tire-o no contrato dele.` };
     return garantiaPaga(d, c) ? { ok: true } : { ok: false, motivo: 'Registre antes o depósito da garantia (data e comprovante).' };
   }
+  if (tipo === 'devolucao_garantia') {
+    if (!c) return { ok: false, motivo: 'O recibo da devolução da garantia é do contrato.' };
+    const dev = devolucaoDe(d, c, alvo);
+    if (!dev) return { ok: false, motivo: 'Registre antes a devolução da garantia (troca de garantia ou de titular).' };
+    // sem saldo a devolver (os débitos levaram tudo), não há devolução nem recibo (decisão do dono, 2026-11-21)
+    return dev.saldo > 0 ? { ok: true } : { ok: false, motivo: 'Não sobrou saldo a devolver: os débitos descontados levaram a garantia inteira.' };
+  }
   if (tipo === 'devolucao_chaves') {
     if (!c) return { ok: false, motivo: 'O termo de devolução das chaves é do contrato.' };
     return c.data_saida ? { ok: true } : { ok: false, motivo: 'Informe antes a data de saída.' };
@@ -238,6 +246,7 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
     };
   }
 
+  if (tipo === 'devolucao_garantia') return reciboDevolucaoGarantia(d, c, devolucaoDe(d, c, alvo), base, { empresa, e, quem, endereco, assinaEmpresa, assinaPessoa, nomeArq });
   if (tipo === 'acordo') return termoDoAcordo(d, c, acordoDe(d, c, alvo), base, { empresa, e, quem, endereco, assinaEmpresa, assinaPessoa, nomeArq });
   if (tipo === 'notificacao') return cartaDaNotificacao(d, c, notificacaoDe(d, c, alvo), base, { empresa, e, quem, endereco, assinaEmpresa, assinaPessoa, nomeArq });
   if (tipo === 'devolucao_chaves') return termoDevolucaoChaves(d, c, base, { empresa, e, quem, endereco, assinaEmpresa, assinaPessoa, nomeArq });
@@ -290,6 +299,51 @@ export function linhasDoAcerto(enc, { quitacao = false } = {}) {
   const saldo = quitacao ? (enc.saldo >= 0 ? '= Saldo devolvido ao locatário' : '= Saldo pago pelo locatário') : `= Saldo ${enc.saldo >= 0 ? 'a devolver' : 'a pagar'}`;
   tabela.push([saldo, C.reais(Math.abs(enc.saldo || 0))]);
   return tabela;
+}
+
+/**
+ * Devolução da garantia do documento: a de ``alvo.id`` ou, sem ele, a última do contrato com saldo; só se for deste contrato.
+ * (Tabela devolucoes_garantia: troca de garantia, com ``troca_id``, ou troca de titular com garantia nova.)
+ */
+const devolucaoDe = (d, c, alvo) => {
+  const dev = alvo.id ? R.buscar(d, 'devolucoes_garantia', Number(alvo.id)) : R.devolucoesGarantiaDo(d, c.id).filter((x) => x.saldo > 0).at(-1);
+  return dev && dev.contrato_id === c.id ? dev : null;
+};
+
+/**
+ * Recibo da devolução da garantia (item 4 de PENDENCIAS_4000, decisão do dono de 2026-11-21): na troca de garantia (ex.: caução
+ * de R$ 3.150,00 trocada por fiador em 01/12/2026) ou de titular com garantia nova, a caução ou o depósito volta a quem depositou,
+ * corrigido pela poupança e descontados os débitos; a pessoa assina que recebeu e o recibo assinado é anexado. A garantia não
+ * passa adiante (decisão da direção, 2026-11-13) e não é receita: sem NF.
+ */
+function reciboDevolucaoGarantia(d, c, dev, base, { empresa, e, quem, endereco, assinaEmpresa, assinaPessoa, nomeArq }) {
+  const troca = dev.troca_id ? R.buscar(d, 'trocas_garantia', dev.troca_id) : null;
+  const caucao = troca ? troca.tipo_anterior === 'Caução' : R.temCaucao(c);
+  const nome = caucao ? 'caução' : 'depósito de garantia';
+  const motivo = troca ? `em razão da troca da garantia (${troca.tipo_anterior} por ${String(troca.tipo_novo || '').toLocaleLowerCase('pt-BR')}) em ${C.dataBr(troca.data)}`
+    : (() => { const n = R.continuadoPor(d, c); return `em razão da troca de titular do contrato${n ? ` (${n.inquilino_nome} assumiu em ${C.dataBr(n.data_entrada || n.vigencia_inicio)}, com garantia própria)` : ''}`; })();
+  const tabela = [['Garantia depositada', C.reais(dev.garantia_valor || 0)]];
+  if (dev.indice_percentual) tabela.push([`Correção pela caderneta de poupança (${String(dev.indice_percentual).replace('.', ',')}%)`, C.reais((dev.garantia_corrigida || 0) - (dev.garantia_valor || 0))]);
+  tabela.push(['Garantia corrigida', C.reais(dev.garantia_corrigida || dev.garantia_valor || 0)]);
+  if (dev.debitos > 0) {
+    tabela.push(['(-) Débitos descontados', C.reais(dev.debitos)]);
+    for (const l of String(dev.debitos_descricao || '').split(/\n+/).map((x) => x.trim()).filter(Boolean)) tabela.push([`   ${l}`, '']);
+  }
+  tabela.push(['= Valor devolvido', C.reais(dev.saldo)]);
+  return {
+    ...base, titulo: `RECIBO DE DEVOLUÇÃO ${caucao ? 'DA CAUÇÃO' : 'DO DEPÓSITO DE GARANTIA'}`, data: dev.data || base.data,
+    paragrafos: [
+      `Recebi de ${empresa}${e.cnpj ? `, CNPJ ${e.cnpj}` : ''}, em ${C.dataBr(dev.data)}, a importância de ${K.valorComExtenso(dev.saldo)}, referente à devolução da ${nome} do contrato de locação do imóvel situado na ${endereco}, ${motivo}, conforme o comprovante bancário anexo.`,
+      `${caucao ? 'O valor foi corrigido pelos rendimentos da caderneta de poupança, que são do locatário (Lei 8.245/91, artigo 38, § 2º)' : 'O valor foi corrigido'}${dev.debitos > 0 ? ', e descontados apenas os débitos discriminados abaixo:' : ', sem débitos a descontar:'}`,
+    ],
+    tabela,
+    depois: [
+      `Com o recebimento, dou quitação da ${nome} acima, nada mais tendo a receber a esse título (Código Civil, artigos 319 e 320).${troca ? ' O contrato de locação continua, agora com a nova garantia.' : ''}`,
+      'A garantia não é aluguel nem receita da empresa: não há nota fiscal.',
+    ],
+    assinaturas: [assinaPessoa('recebi o valor e dou quitação'), assinaEmpresa],
+    arquivo: nomeArq(caucao ? 'Recibo devolucao caucao' : 'Recibo devolucao deposito garantia', dev.data),
+  };
 }
 
 /** Notificação do documento (``alvo.notificacao``: o registro, ou ``alvo.id``), só se for deste contrato. */

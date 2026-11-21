@@ -86,6 +86,10 @@ export function itensDaPasta(d, c, soltos = null) {
   for (const a of (d.acordos || []).filter((x) => x.contrato_id === c.id && x.termo_assinado)) {
     poe({ vaga: `acordo:${a.id}`, grupo: 'contrato', rotulo: `Termo do acordo de ${C.dataBr(a.data)} assinado (${a.referente})`, data: a.data, escopo: 'contrato', pasta: c.id, nome: a.termo_assinado });
   }
+  // recibo da devolução da garantia assinado pela pessoa (troca de garantia ou de titular, 2026-11-21): uma vaga por devolução
+  for (const x of (d.devolucoes_garantia || []).filter((y) => y.contrato_id === c.id && y.termo_assinado).sort((a, b) => String(a.data).localeCompare(String(b.data)) || a.id - b.id)) {
+    poe({ vaga: `devolucao-garantia:${x.id}`, grupo: 'contrato', rotulo: `Recibo da devolução da garantia de ${C.dataBr(x.data)} assinado`, data: x.data, escopo: 'contrato', pasta: c.id, nome: x.termo_assinado });
+  }
   // notificação ao inquilino assinada (2026-11-17): uma vaga por notificação (o comprovante da baixa, foto, não vai para o papel)
   for (const n of (d.notificacoes || []).filter((x) => x.contrato_id === c.id && x.arquivo_assinado && x.situacao !== 'Cancelada').sort((a, b) => String(a.data).localeCompare(String(b.data)) || a.id - b.id)) {
     poe({ vaga: `notificacao:${n.id}`, grupo: 'contrato', rotulo: `Notificação de ${C.dataBr(n.data)} assinada (${n.assunto})`, data: n.data, escopo: 'contrato', pasta: c.id, nome: n.arquivo_assinado });
