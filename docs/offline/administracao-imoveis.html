@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-BaKc7AxW3En4fgfLYt0qYEcyS97K6w2CCqBcvvA2NHY=' 'sha256-LOLz5e5N5hX4ulsGB0LS1GNmVYnPig7wnRP1cHrm4I0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-BaKc7AxW3En4fgfLYt0qYEcyS97K6w2CCqBcvvA2NHY=' 'sha256-RPBTLiyqGi/hhzd3lG639iGl8JlgD4yT0NWNt3Yf+Aw='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="2c44ae0f289203e8">
+<meta name="fontes" content="545b68f4278820e3">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -2705,8 +2705,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         anterior: /^\d+$/,
         // nova notificação ao inquilino: modelo do texto, prazo em dias úteis e a que ela reitera
         ver: /^[a-z]{1,20}$/,
-        chave: /^[cf]\d{1,10}$/,
-        // Comunicações: a parte da tela (novo, modelos) e a pessoa do aceite (c<contrato> ou f<fiador>)
+        chave: /^[cfsr]\d{1,10}$/,
+        // Comunicações: a parte da tela (novo, modelos) e a pessoa do aceite (c|s|r<contrato>: inquilino, solidário, representante; f<fiador>)
         perfil: /^(\d+|novo)$/,
         regras: /^\d+$/,
         // Regras do sistema: a regra especial aberta; Novo contrato: preencher com uma regra especial
@@ -27034,11 +27034,19 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     const ativos = d2.contratos.filter((c) => contratoAtivo(c, hoje3)).map((c) => ({ c, i: c.imovel_id ? buscar(d2, "imoveis", c.imovel_id) : null })).sort((a, b) => String(a.i ? a.i.nome : "~").localeCompare(String(b.i ? b.i.nome : "~"), "pt-BR"));
     for (const { c, i } of ativos) {
       lista3.push({ chave: `c${c.id}`, tipo: "inquilino", contrato_id: c.id, fiador_id: null, nome: c.inquilino_nome, email: c.inquilino_email || "", telefone: c.inquilino_telefone || "", whatsapp: !!c.inquilino_whatsapp, imovel: i, contrato: c });
+      for (const tipo of ["solidario", "representante"]) {
+        const p2 = pessoaDoContrato(c, tipo);
+        if (p2) lista3.push({ chave: `${tipo[0]}${c.id}`, tipo, contrato_id: c.id, fiador_id: null, ...p2, whatsapp: false, imovel: i, contrato: c });
+      }
       for (const f of fiadoresDo(d2, c.id, hoje3)) {
         lista3.push({ chave: `f${f.id}`, tipo: "fiador", contrato_id: c.id, fiador_id: f.id, nome: f.nome, email: f.email || "", telefone: f.telefone || "", whatsapp: false, imovel: i, contrato: c });
       }
     }
     return lista3;
+  }
+  function pessoaDoContrato(c, tipo) {
+    const nome = String(c[`${tipo}_nome`] || "").trim();
+    return nome ? { nome, email: c[`${tipo}_email`] || "", telefone: c[`${tipo}_telefone`] || "" } : null;
   }
   function enderecoDoImovel(i) {
     if (!i) return { longo: "", curto: "" };
@@ -27078,7 +27086,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       tipo: p2.tipo,
       imovel: dados.campos.imovel,
       desde: c && c.data_entrada ? compBr(String(c.data_entrada).slice(0, 7)) : "",
-      locatario: p2.tipo === "fiador" && c ? c.inquilino_nome : "",
+      locatario: p2.tipo !== "inquilino" && c ? c.inquilino_nome : "",
       email: p2.email,
       telefone: p2.telefone,
       whatsapp: !!p2.whatsapp,
@@ -27129,12 +27137,18 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     const c = buscar(d2, "contratos", x.contrato_id);
     if (!c) return null;
     const dados = {};
+    if (x.tipo === "solidario" || x.tipo === "representante") {
+      if (String(c[`${x.tipo}_email`] || "").trim().toLowerCase() !== r.email) dados[`${x.tipo}_email`] = r.email;
+      if (!mesmoTel(c[`${x.tipo}_telefone`])) dados[`${x.tipo}_telefone`] = tel;
+      return Object.keys(dados).length ? { tabela: "contratos", id: c.id, dados } : null;
+    }
     if (String(c.inquilino_email || "").trim().toLowerCase() !== r.email) dados.inquilino_email = r.email;
     if (!mesmoTel(c.inquilino_telefone)) dados.inquilino_telefone = tel;
     if (!!c.inquilino_whatsapp !== !!r.whatsapp) dados.inquilino_whatsapp = !!r.whatsapp;
     return Object.keys(dados).length ? { tabela: "contratos", id: c.id, dados } : null;
   }
   function mesmaPessoaEmOutrosContratos(d2, x, hoje3 = hojeIso()) {
+    if (x.tipo === "solidario" || x.tipo === "representante") return [];
     if (x.tipo === "fiador") {
       const f = buscar(d2, "fiadores", x.fiador_id);
       const doc3 = f ? soNumeros(f.cpf) : "";
@@ -27152,6 +27166,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
   function destinoAtivo(d2, x, hoje3 = hojeIso()) {
     const c = x && buscar(d2, "contratos", x.contrato_id);
     if (!c || !contratoAtivo(c, hoje3)) return false;
+    if (x.tipo === "solidario" || x.tipo === "representante") return !!pessoaDoContrato(c, x.tipo);
     if (x.tipo !== "fiador") return true;
     return fiadoresDo(d2, c.id, hoje3).some((f) => f.id === x.fiador_id);
   }
@@ -27212,6 +27227,10 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       if (!f) return null;
       return { ...x, nome: f.nome, email: f.email || "", telefone: f.telefone || "", whatsapp: false, imovel: i, contrato: c };
     }
+    if (x.tipo === "solidario" || x.tipo === "representante") {
+      const p2 = pessoaDoContrato(c, x.tipo);
+      return p2 ? { ...x, ...p2, whatsapp: false, imovel: i, contrato: c } : null;
+    }
     return { ...x, nome: c.inquilino_nome, email: c.inquilino_email || "", telefone: c.inquilino_telefone || "", whatsapp: !!c.inquilino_whatsapp, imovel: i, contrato: c };
   }
   function htmlDoEmail(texto3, { empresas = [], cnpjs = [], cidade = "", link: link2 = "", logo = false, botao: botao2 = "Confirmar meus contatos", rodape = "" } = {}) {
@@ -27231,7 +27250,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
 <tr><td style="padding:12px 20px;border-top:1px solid #d9dde3;font-size:12px;color:#616e7c">${escH(rodape || [empresas.join(" e "), cnpjs.length ? `CNPJ ${cnpjs.join(" · ")}` : "", cidade].filter(Boolean).join(" · "))}</td></tr>
 </table></td></tr></table></body></html>`;
   }
-  var MODELOS, preencher, soNumeros, escH;
+  var MODELOS, PAPEIS2, preencher, soNumeros, escH;
   var init_comunicados = __esm({
     "docs/js/comunicados.js"() {
       init_calculos();
@@ -27273,6 +27292,7 @@ A conta e a chave Pix para pagamento não mudam. Nunca pedimos pagamento em outr
           ciencia: "Li e concordo: os e-mails da administração saem de {email_empresa}; o e-mail e o celular acima são os meus contatos atuais; as mensagens enviadas a eles valem como recebidas; e vou avisar a administração se eles mudarem."
         }
       };
+      PAPEIS2 = { fiador: "fiador", solidario: "inquilino solidário", representante: "representante da empresa" };
       preencher = (texto3, dados) => preencherEmail(texto3, dados);
       soNumeros = (v) => String(v || "").replace(/\D/g, "");
       escH = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -27401,7 +27421,7 @@ A conta e a chave Pix para pagamento não mudam. Nunca pedimos pagamento em outr
     return `${voltar}<h1>${editado ? "Corrigir o comunicado" : "Novo comunicado a todos"}</h1>
     <form data-form="criarComunicado" class="cartao"><input type="hidden" name="modelo" value="${esc(chave)}">${editado ? `<input type="hidden" name="id" value="${editado.id}">` : ""}
       <p><b>Modelo:</b> ${esc((MODELOS[chave] || MODELOS.contatos).nome)}</p>
-      <p><b>Vai para ${pessoas.length} pessoa(s):</b> ${pessoas.filter((p2) => p2.tipo === "inquilino").length} inquilino(s) e ${pessoas.filter((p2) => p2.tipo === "fiador").length} fiador(es) dos contratos ativos${editado ? " do dia em que foi criado" : " de hoje"}.
+      <p><b>Vai para ${pessoas.length} pessoa(s):</b> ${pessoas.filter((p2) => p2.tipo === "inquilino").length} inquilino(s), ${pessoas.filter((p2) => p2.tipo === "solidario").length} solidário(s), ${pessoas.filter((p2) => p2.tipo === "representante").length} representante(s) de empresa e ${pessoas.filter((p2) => p2.tipo === "fiador").length} fiador(es) dos contratos ativos${editado ? " do dia em que foi criado" : " de hoje"}.
         ${semContato.length ? `<br>${etiqueta(`${semContato.length} sem e-mail nem celular`, "aviso")} ${esc(semContato.map((p2) => p2.nome).join(", "))}: o link aparece para você copiar e mandar de outro jeito.` : ""}</p>
       ${comLink ? `<div class="alerta aviso">${comLink} link(s) já gerado(s) deixam de valer ao salvar (são gerados de novo, com o texto corrigido, no envio).</div>` : ""}
       <div class="grade">
@@ -27458,7 +27478,7 @@ ${esc(m.lembrete)}</pre></details></div>`).join("")}
       const envios = [x.email_em && `e-mail ${dataHoraBr(x.email_em)}`, x.whats_em && `WhatsApp ${dataHoraBr(x.whats_em)}`, x.lembrete_em && `lembrete ${dataHoraBr(x.lembrete_em)}`].filter(Boolean).join("<br>");
       const acoes = x.confirmado_em ? link(`#/aceite-contatos?id=${com.id}&chave=${x.chave}`, "Ver aceite") : opera() && p2 ? `${botao("emailComunicado", "E-mail", { id: com.id, chave: x.chave })} ${botao("whatsComunicado", "WhatsApp", { id: com.id, chave: x.chave })} ${botao("linkComunicado", "Copiar link", { id: com.id, chave: x.chave })}
         ${x.url ? `<br>${botao("novoLinkComunicado", "Gerar novo link", { id: com.id, chave: x.chave }, "secundario mini", `Gerar um link novo para ${x.nome}? O link atual deixa de valer e a contagem de códigos recomeça.`)} ${botao("desligarLinkComunicado", "Desligar o link", { id: com.id, chave: x.chave }, "secundario mini", `Desligar o link de ${x.nome}? A pessoa não consegue mais abrir (para mandar de novo, o sistema gera outro).`)}` : x.link_desligado_em ? `<br><span class="suave">link desligado em ${dataHoraBr(x.link_desligado_em)}</span>` : ""}` : "";
-      return `<tr><td><b>${esc(x.nome)}</b>${x.tipo === "fiador" ? ' <span class="suave">(fiador)</span>' : ""}</td><td>${esc(imovel)}</td><td>${contatos}</td>
+      return `<tr><td><b>${esc(x.nome)}</b>${PAPEIS2[x.tipo] ? ` <span class="suave">(${PAPEIS2[x.tipo]})</span>` : ""}</td><td>${esc(imovel)}</td><td>${contatos}</td>
       <td>${etiqueta(s.texto, s.cor)}<span class="suave">${quando3}</span>${x.resposta && x.resposta.mudou ? `<br>${etiqueta("mudou o contato", "info")}` : ""}${x.resposta ? `<br><span class="suave">melhor: ${esc(x.resposta.melhor)}</span>` : ""}</td>
       <td class="suave">${envios || "-"}</td><td class="nw">${acoes}</td></tr>`;
     };
@@ -27481,7 +27501,7 @@ ${esc(m.lembrete)}</pre></details></div>`).join("")}
     const r = x.resposta;
     const e = empresasDoTopo(d());
     const linhas2 = [
-      ["Pessoa", `${x.nome}${x.tipo === "fiador" ? " (fiador)" : ""}`],
+      ["Pessoa", `${x.nome}${PAPEIS2[x.tipo] ? ` (${PAPEIS2[x.tipo]})` : ""}`],
       ["Confirmado em", dataHoraBr(r.em)],
       ["E-mail", `${r.email} (confirmado por código enviado a ele)`],
       ["Celular", `${telefoneBr(r.telefone)}${r.whatsapp ? " (WhatsApp)" : ""}`],
@@ -27584,7 +27604,7 @@ ${m.texto}`);
       const texto3 = preencher(lembrete ? com.lembrete : com.whatsapp, camposDe(d(), com, p2, url));
       let abriu = false;
       const resp = await janela({
-        titulo: `WhatsApp ${i + 1} de ${fila.length}: ${x.nome}${x.tipo === "fiador" ? " (fiador)" : ""}`,
+        titulo: `WhatsApp ${i + 1} de ${fila.length}: ${x.nome}${PAPEIS2[x.tipo] ? ` (${PAPEIS2[x.tipo]})` : ""}`,
         sim: i + 1 < fila.length ? "Próximo" : "Terminar",
         nao: "Parar",
         html: `<p><textarea rows="6" readonly data-texto style="width:100%">${esc(texto3)}</textarea></p>
