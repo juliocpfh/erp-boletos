@@ -174,3 +174,23 @@ test('resposta volta ao cadastro uma vez (contrato e fiador), com histórico', (
   assert.equal(CM.resumo(c).mudaram, 1);
   assert.equal(CM.juntarRespostas(d, com.id, links, 'teste'), 0, 'não aplica de novo');
 });
+
+test('comunicacoes-007: vai também ao inquilino solidário e ao representante da empresa, e a resposta volta ao campo certo', () => {
+  const d = banco();
+  R.atualizar(d, 'contratos', 12, { solidario_nome: 'Bruno Solidário', solidario_email: 'bruno@exemplo.com.br', representante_nome: 'Carla Representante', representante_telefone: '41911112222' }, 'teste');
+  const lista = CM.destinatarios(d, '2026-11-18');
+  assert.deepEqual(lista.map((p) => p.chave), ['c12', 's12', 'r12', 'f5']);
+  assert.equal(lista[1].nome, 'Bruno Solidário');
+  const com = R.inserir(d, 'comunicados', CM.novoComunicado(d, 'contatos', { prazo: '2026-11-28', email_empresa: 'a@exemplo.com.br', telefone_empresa: '(41) 3333-0000' }, '2026-11-18'), 'teste');
+  const ctx = CM.contextoDoLink(d, com, lista[1]);
+  assert.equal(ctx.tipo, 'solidario');
+  assert.equal(ctx.locatario, 'Ana Teste');
+  assert.equal(CP.contextoValido(ctx).tipo, 'solidario');
+  assert.equal(CM.destinoAtivo(d, com.destinos[2], '2026-11-18'), true);
+  const links = [{ destino: 'r12', aberto_em: '2026-11-18T15:00:00Z', resposta: { em: '2026-11-18T15:40:00Z', email: 'carla@exemplo.com.br', telefone: '41911112222', whatsapp: false, melhor: 'E-mail' } }];
+  assert.equal(CM.juntarRespostas(d, com.id, links, 'teste'), 1);
+  const c = R.buscar(d, 'contratos', 12);
+  assert.equal(c.representante_email, 'carla@exemplo.com.br');
+  assert.equal(c.inquilino_email, R.buscar(d, 'contratos', 12).inquilino_email); // o do inquilino não muda
+  assert.equal(CM.pessoaDoDestino(d, com.destinos[1]).email, 'bruno@exemplo.com.br');
+});
