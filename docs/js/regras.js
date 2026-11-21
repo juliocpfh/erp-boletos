@@ -2214,12 +2214,14 @@ export function baseDaFatura(d, tipo, registro) {
     const [ini, fim] = acordo || C.periodoServico(registro.competencia, contrato.data_entrada, contrato.data_saida);
     const ref = acordo ? `acordo${registro.acordo_parcela ? ` ${registro.acordo_parcela}` : ''} (${registro.acordo_referente})` : '';
     // mês incompleto (entrada ou saída): a NF mostra a quantidade em dias do mês (ex.: 16/30), não "1 mês"
-    const proporcional = !acordo && registro.dias_cobrados > 0 && registro.dias_cobrados < registro.dias_mes;
+    // com o ajuste do mês na NF, o total não é só o aluguel: a linha sai como "1" (senão o valor unitário ficaria errado)
+    const ajusteNaNf = !!(registro.outros_na_nf && registro.outros);
+    const proporcional = !acordo && !ajusteNaNf && registro.dias_cobrados > 0 && registro.dias_cobrados < registro.dias_mes;
     return {
       imovel, valor: registro.valor_nf, periodo_inicio: ini, periodo_fim: fim,
       ...(proporcional ? { dias: registro.dias_cobrados, dias_mes: registro.dias_mes } : {}),
       descricao: `${contrato.inquilino_nome} · ${imovel.nome} · ${ref || C.compBr(registro.competencia)}`,
-      observacoes: registro.observacoes_nf || (ref ? `Parcela do ${ref}` : ''),
+      observacoes: registro.observacoes_nf || [ref ? `Parcela do ${ref}` : '', ajusteNaNf ? `Inclui ${registro.outros_descricao || 'ajuste do mês'}: ${C.reais(registro.outros)}` : ''].filter(Boolean).join('. '),
       tomador: { nome: contrato.inquilino_nome, documento: contrato.inquilino_cpf || '',
         telefone: contrato.inquilino_telefone || '', endereco: enderecoCompleto(imovel) },
       partes: participacoesDo(d, imovel.id), origem: `no imóvel "${imovel.nome}"`,
@@ -7469,7 +7471,7 @@ export function previaAcordo(d, { contrato_id, ids, total, parcelas, primeiro_ve
   const divida = lista.reduce((s, cb) => s + C.liquidar(cb, hoje).valor_devido, 0);
   // o que separa o pago da NF no pagamento atrasado normal (``C.liquidar``): IPTU, seguro, tarifa e FCI ficam fora; a reserva
   // já abatida e o ressarcimento que não sai da NF entram (NF com o aluguel cheio): pode dar negativo (NF maior que o pago)
-  const foraDaNf = Math.min(total, lista.reduce((s, cb) => s + totais(cb).a_pagar_sem_desconto - (cb.aluguel || 0) + (cb.ressarcimento_na_nf ? cb.ressarcimento || 0 : 0), 0));
+  const foraDaNf = Math.min(total, lista.reduce((s, cb) => s + totais(cb).a_pagar_sem_desconto - (cb.aluguel || 0) + (cb.ressarcimento_na_nf ? cb.ressarcimento || 0 : 0) - (cb.outros_na_nf ? cb.outros || 0 : 0), 0));
   if (total < n) throw new C.ErroUsuario(`Com ${n} parcelas, o total precisa ser de pelo menos ${C.reais(n)} (nenhuma parcela pode ficar com R$ 0,00).`);
   const valores = C.parcelas(total, n);
   const fora = C.parcelas(foraDaNf, n);

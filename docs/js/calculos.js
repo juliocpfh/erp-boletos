@@ -504,8 +504,10 @@ export function liquidar(cobranca, pagamento) {
   return {
     dias_atraso: dias, pontual, multa, juros,
     valor_devido: pontual ? t.a_pagar_pontual : t.a_pagar_sem_desconto + multa + juros,
-    // o ressarcimento só sai da NF quando a empresa decidiu assim (opção em Empresas)
-    valor_nf: valorNotaFiscal(cobranca.aluguel, cobranca.desconto, multa, juros, pontual) - (cobranca.ressarcimento_na_nf ? cobranca.ressarcimento || 0 : 0),
+    // o ressarcimento só sai da NF quando a empresa decidiu assim (opção em Empresas); o ajuste do mês só entra quando
+    // marcado no boleto (decisão do dono, 21/11/2026, mensal-009: ex.: TV vendida junto entra, vidro quebrado não)
+    valor_nf: valorNotaFiscal(cobranca.aluguel, cobranca.desconto, multa, juros, pontual) - (cobranca.ressarcimento_na_nf ? cobranca.ressarcimento || 0 : 0)
+      + (cobranca.outros_na_nf ? cobranca.outros || 0 : 0),
   };
 }
 
