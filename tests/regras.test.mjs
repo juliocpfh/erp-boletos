@@ -2680,6 +2680,24 @@ test('D9: declaração anual soma as NFs do ano por empresa, só do aluguel pago
   assert.equal(R.declaracaoAnual(d, c.id, 2025).empresas.length, 0);
 });
 
+test('impressos-002: na troca de titular cada um declara só o que pagou; na renovação da mesma pessoa, soma o anterior', () => {
+  const { d, c } = base(); // Maria, CPF 000.000.000-00
+  for (const m of ['2026-06', '2026-07']) R.gerarCobrancas(d, m, 'julio');
+  for (const cb of d.cobrancas.filter((x) => x.contrato_id === c.id)) R.registrarPagamento(d, cb.id, cb.vencimento, null, 'julio', { pagouEmDia: true });
+  R.numerarFaturas(d, 'julio');
+  const daMaria = R.declaracaoAnual(d, c.id, 2026).total;
+  assert.ok(daMaria > 0);
+  // troca de titular: outra pessoa (sem CPF, nome diferente) → nada do anterior
+  const pedro = R.inserir(d, 'contratos', { imovel_id: c.imovel_id, inquilino_nome: 'Pedro Novo', contrato_anterior_id: c.id, data_entrada: '2026-08-01', ativo: true }, 'julio');
+  assert.equal(R.declaracaoAnual(d, pedro.id, 2026).total, 0);
+  // renovação: mesmo CPF (escrito sem pontos) → soma o anterior
+  const renov = R.inserir(d, 'contratos', { imovel_id: c.imovel_id, inquilino_nome: 'outro nome', inquilino_cpf: '00000000000', contrato_anterior_id: c.id, data_entrada: '2026-08-01', ativo: true }, 'julio');
+  assert.equal(R.declaracaoAnual(d, renov.id, 2026).total, daMaria);
+  // sem CPF nos dois: pelo nome, sem acento nem maiúsculas
+  assert.equal(R.mesmaPessoaDoContrato({ inquilino_nome: 'José  da Silva' }, { inquilino_nome: 'JOSE DA SILVA' }), true);
+  assert.equal(R.mesmaPessoaDoContrato({ inquilino_nome: 'José' }, { inquilino_nome: 'Pedro' }), false);
+});
+
 test('NFs: numera só os pagamentos marcados (mês fechado) e lembra do Airbnb antes', () => {
   const { d } = base();
   const sala = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Apto 204', endereco: 'Rua Teste, 1' }, 'julio');

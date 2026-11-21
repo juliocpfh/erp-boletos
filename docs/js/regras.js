@@ -8301,18 +8301,33 @@ export function marcarGarantiaDevolvida(d, encerramentoId, data, usuario) {
   return e;
 }
 
+/**
+ * Os dois contratos são do mesmo inquilino? Pelo CPF/CNPJ (só os números) quando os dois têm; senão, pelo nome (sem acento,
+ * maiúsculas ou espaços a mais). Ex.: renovação da Maria → sim; troca de titular da Maria para o Pedro → não.
+ */
+export function mesmaPessoaDoContrato(a, b) {
+  const doc = (x) => String(x.inquilino_cpf || '').replace(/\D/g, '');
+  if (doc(a) && doc(b)) return doc(a) === doc(b);
+  const nome = (x) => String(x.inquilino_nome || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toLocaleUpperCase('pt-BR');
+  return !!nome(a) && nome(a) === nome(b);
+}
+
 // --------------------------------------------------------------------------
 // Declaração anual de aluguéis para o IRPF do inquilino (D9): por empresa que emitiu as NFs, o aluguel efetivamente pago no ano
 // --------------------------------------------------------------------------
 /**
  * Valores que o inquilino pagou de aluguel no ano-calendário, por empresa emitente: as NFs emitidas (não canceladas) dos boletos
- * do contrato (e dos contratos anteriores da mesma cadeia, quando é continuação), com emissão no ano. A NF é só o aluguel
- * (sem IPTU, seguro, tarifa e FCI), por isso serve de base. Ex.: 12 NFs de R$ 1.218,50 em 2026 → total R$ 14.622,00.
+ * do contrato (e dos contratos anteriores da mesma cadeia que são da mesma pessoa: renovação), com emissão no ano. A NF é só o
+ * aluguel (sem IPTU, seguro, tarifa e FCI), por isso serve de base. Ex.: 12 NFs de R$ 1.218,50 em 2026 → total R$ 14.622,00.
+ * Troca de titular (decisão do dono, 21/11/2026, impressos-002): cada um declara só o que pagou. Ex.: Maria pagou jan a jun e
+ * passou o contrato ao Pedro em julho → a declaração do Pedro tem só jul a dez; a da Maria (no contrato dela) tem jan a jun.
  */
 export function declaracaoAnual(d, contratoId, ano) {
   const c = buscar(d, 'contratos', contratoId);
   if (!c) throw new Error('Inquilino não encontrado.');
-  const ids = new Set([c.id, ...cadeiaDeContratos(d, c).antes.map((x) => x.id)]);
+  const ids = new Set([c.id]);
+  // sobe a cadeia enquanto for a mesma pessoa; o primeiro contrato de outro titular (e os de antes dele) fica de fora
+  for (const x of [...cadeiaDeContratos(d, c).antes].reverse()) { if (!mesmaPessoaDoContrato(x, c)) break; ids.add(x.id); }
   const cobrancas = new Map(d.cobrancas.filter((x) => ids.has(x.contrato_id)).map((x) => [x.id, x]));
   const nfs = d.faturas.filter((f) => f.situacao === 'Emitida' && f.origem_tipo === 'cobranca' && cobrancas.has(f.origem_id) && String(f.emissao).slice(0, 4) === String(ano))
     .sort((a, b) => a.emissao.localeCompare(b.emissao) || a.numero - b.numero);
