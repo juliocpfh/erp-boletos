@@ -185,6 +185,29 @@ test('[17] FCI do mês incompleto pelos dias reais também com o mês de 30 dias
   } finally { CR.usarRegras(null); }
 });
 
+test('saida-016: troca de titular fecha sempre 30/30 (quem entra paga o que falta)', () => {
+  const soma = (troca, vespera, comp) => C.diasComerciais(comp, null, vespera) + C.diasComerciais(comp, troca, null, { continuacao: true });
+  assert.equal(C.diasComerciais('2027-02', '2027-02-28', null, { continuacao: true }), 3); // anterior 27/30, novo 3/30
+  assert.equal(soma('2027-02-28', '2027-02-27', '2027-02'), 30);
+  assert.equal(soma('2027-03-31', '2027-03-30', '2027-03'), 30); // novo 0/30
+  assert.equal(soma('2026-12-15', '2026-12-14', '2026-12'), 30); // 14 + 16, como antes
+  assert.equal(soma('2027-02-15', '2027-02-14', '2027-02'), 30);
+  // inquilino novo (sem contrato anterior) continua como em 17/11: entrada no último dia de fevereiro = 1/30
+  assert.equal(C.diasComerciais('2027-02', '2027-02-28', null), 1);
+  // no boleto: o herdeiro que entra em 28/02 paga 3/30; o que entra em 31/03 não tem boleto em março
+  const { d, c } = base({ data_entrada: '2026-06-01', vigencia_inicio: '2026-06-01' });
+  d.config_regras = [{ chave: 'proporcional', valor: 'mes_30' }];
+  CR.usarRegras(d);
+  try {
+    const novo = { ...c, id: 999, contrato_anterior_id: c.id, heranca_transferida: true, data_entrada: '2027-02-28', data_saida: null }; // termo da troca já assinado
+    assert.equal(R.montarCobranca(d, novo, '2027-02').dias_cobrados, 3);
+    const dia31 = { ...novo, data_entrada: '2027-03-31' };
+    assert.equal(R.montarCobranca(d, dia31, '2027-03'), null);
+    assert.equal(R.semDiaAPagar(dia31, '2027-03'), true);
+    assert.equal(R.montarCobranca(d, dia31, '2027-04').dias_cobrados, 30);
+  } finally { CR.usarRegras(null); }
+});
+
 test('[19] devolução pela conta: reparte a garantia menos os débitos', () => {
   assert.equal(R.garantiaADevolverNaSaida({ garantia_corrigida: 594000, debitos: 100000 }), 494000);
   assert.equal(R.garantiaADevolverNaSaida({ garantia_corrigida: 500000, debitos: 0, fci_danos: 150000, fci_usado: 120000 }), 470000);

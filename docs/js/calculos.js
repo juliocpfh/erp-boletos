@@ -428,12 +428,16 @@ export function totaisCobranca(cobranca, reservaDisponivel = 0, ctx = cobranca) 
  * 30/04) conta 1 dia. Ex.: entrada 15/02 → 16/30; saída 27/02 → 27/30; saída 28/02 (ano não bissexto) → 30/30;
  * entrada 02/01 → 29/30; entrada 31/01 → 1/30. Mês inteiro = 30.
  */
-export function diasComerciais(comp, entrada, saida) {
+export function diasComerciais(comp, entrada, saida, { continuacao = false } = {}) {
   const [ini, fim] = periodoServico(comp, entrada, saida);
   if (ini > fim) return 0;
   const ultimo = diasNoMes(comp);
   const dia = (x) => Number(x.slice(8, 10));
-  const s = dia(ini) === ultimo ? 30 : Math.min(dia(ini), 30);
+  // continuação (troca de titular ou renovação no meio do mês: o anterior sai na véspera): quem entra paga o que falta para
+  // fechar 30/30 (decisão do dono, 21/11/2026, saida-016). Ex.: troca em 28/02 → anterior 27/30, novo 3/30 (e não 1/30);
+  // troca em 31/03 → anterior 30/30, novo 0/30; troca em 15/12 → 14/30 + 16/30, como antes.
+  const s = continuacao && ini === entrada && dia(ini) > 1 ? Math.min(dia(ini) - 1, 30) + 1
+    : dia(ini) === ultimo ? 30 : Math.min(dia(ini), 30);
   const e = dia(fim) === ultimo ? 30 : Math.min(dia(fim), 30);
   return Math.max(0, Math.min(30, e - s + 1));
 }
@@ -443,7 +447,7 @@ export function calcularCobranca({ competencia, aluguelMensal, entrada, saida, d
   const diasReais = diasOcupados(competencia, entrada, saida);
   // regra `proporcional`: mês comercial de 30 dias (padrão desde 17/11/2026, `diasComerciais`) ou dias reais do mês (14/28)
   const comercial = regra('proporcional', contrato) === 'mes_30' && diasReais < diasNoMes(competencia);
-  const dias = comercial ? diasComerciais(competencia, entrada, saida) : diasReais;
+  const dias = comercial ? diasComerciais(competencia, entrada, saida, { continuacao: !!(contrato && contrato.contrato_anterior_id) }) : diasReais;
   const diasMes = comercial ? 30 : diasNoMes(competencia);
   const aluguel = aluguelProporcional(aluguelMensal, dias, diasMes);
   const desconto = descontoPorPercentual(aluguel, descontoPercentual);
