@@ -2,6 +2,7 @@
 // documentos de entrada e termos aditivos.
 import { caixaPastaFisica } from './arquivo-impresso.js';
 import { botaoEmail } from './emails.js';
+import { siglaEmpresa } from './faturas.js';
 import { botaoDesistenciaContrato } from './fichas.js';
 import { caixaNotificacoes } from './notificacoes.js';
 import { janela, podeUsuario } from '../app.js';
@@ -527,6 +528,17 @@ export function situacaoBoleto(cb, hoje = C.hojeIso()) {
   return cb.pagou_em_dia ? `<span title="Pagou até o vencimento; o banco compensou depois">${situacao(cb.situacao)}</span>` : situacao(cb.situacao);
 }
 
+/**
+ * As NFs de um boleto, uma por empresa (decisão do dono, 21/11/2026, comunicacoes-027): o número é o mesmo nas duas, então cada
+ * uma leva a sigla da empresa e o valor. Ex.: "Nº 0077 ANK R$ 609,25" e "Nº 0077 JCK R$ 609,25"; com uma empresa, só "Nº 0077".
+ */
+function nfsDoBoleto(fs) {
+  const sigla = (f) => { const e = buscar('emitentes', f.emitente_id); return e ? siglaEmpresa(e) : ''; };
+  const um = (f) => link(`#/imprimir/faturas?numero=${f.numero}`, `Nº ${R.numeroFatura(f.numero)}${fs.length > 1 ? ` ${esc(sigla(f))}` : ''}`, '')
+    + (fs.length > 1 ? ` <span class="suave">${reais(f.valor)}</span>` : '');
+  return fs.map(um).join('<br>');
+}
+
 /** Boletos na página do inquilino: os 12 mais recentes numa tabela compacta; os anteriores ficam recolhidos. */
 const BOLETOS_INQUILINO = 12;
 
@@ -538,7 +550,7 @@ function caixaBoletosInquilino(c, cobs, hoje) {
     return `<tr><td class="nw"><a href="#/cobranca/${x.id}">${compBr(x.competencia)}</a>${x.carencia ? ` ${etiqueta('carência', 'aviso')}` : ''}${R.ehComplementoCaucao(x) ? ` ${etiqueta('caução', 'info')}` : ''}${R.ehParcelaAcordo(x) ? ` ${etiqueta(`acordo ${x.acordo_parcela || ''}`.trim(), 'info')}` : ''}</td>
       <td class="nw">${dataBr(x.vencimento)}</td><td class="n">${reais(R.totais(x).a_pagar_pontual)}</td>
       <td>${situacaoBoleto(x, hoje)}${x.data_pagamento ? ` <span class="suave">em ${dataBr(x.data_pagamento)}</span>` : ''}${atraso}${R.aCobrar(x) && opera() ? ` ${botao('lembrete', C.vencido(x.vencimento, hoje) ? 'Cobrar' : 'Lembrete', { id: x.id }, 'secundario mini')}` : ''}</td>
-      <td class="n">${x.valor_nf !== null ? reais(x.valor_nf) : '-'}</td><td class="nw">${fs.length ? `Nº ${R.numeroFatura(fs[0].numero)}` : (c.gerar_nf === false ? etiqueta('controle', 'controle') : '-')}</td></tr>`;
+      <td class="n">${x.valor_nf !== null ? reais(x.valor_nf) : '-'}</td><td class="nw">${fs.length ? nfsDoBoleto(fs) : (c.gerar_nf === false ? etiqueta('controle', 'controle') : '-')}</td></tr>`;
   };
   const cab = '<tr><th>Mês de referência</th><th>Vencimento</th><th class="n">Valor pontual</th><th>Situação</th><th class="n">Valor NF</th><th>NF</th></tr>';
   const recentes = cobs.slice(0, BOLETOS_INQUILINO);
