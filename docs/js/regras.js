@@ -3520,6 +3520,53 @@ export function arquivoDocumento(d, contratoId, campo, arquivo, usuario) {
     `${c.inquilino_nome}: ${doc[1].toLocaleLowerCase('pt-BR')}, arquivo ${arquivo ? `anexado (${arquivo})` : 'apagado'}`);
 }
 
+/**
+ * Termo aditivo anexado que NÃO valeu (arquivo errado ou sem a assinatura de todos; decisão do dono, 21/11/2026, saida-031):
+ * tira o arquivo e desfaz o que ele mudou. O termo assinado por todos não passa por aqui: sai com aviso e a mudança continua.
+ * - Vencimento (ex.: dia 10 → 15 desde 15/12): o cadastro volta ao dia 10 e os boletos em aberto desde dezembro também; os
+ *   pagos ficam, e os emitidos no banco e os alterados à mão ficam como estão, anotados no Histórico.
+ * - Novo valor: o novo valor negociado sai (a renovação que o criou é excluída) e os boletos em aberto voltam ao aluguel anterior.
+ * - Troca de titular: o contrato volta a esperar o termo (o titular anterior continua cobrando); se a troca já foi completada
+ *   (boletos e garantia passados ao novo), não dá para desfazer sozinho.
+ * ``excluirTermo``: apaga também o termo (senão ele volta a "aguardando assinatura"). Devolve o texto do que foi desfeito.
+ */
+export function desfazerAditivo(d, id, usuario, { excluirTermo = false } = {}) {
+  const a = buscar(d, 'aditivos', id);
+  if (!a) throw new Error('Termo aditivo não encontrado.');
+  const c = buscar(d, 'contratos', a.contrato_id);
+  const troca = a.tipo === TIPO_ADITIVO_TROCA || (!a.tipo && !!c.contrato_anterior_id);
+  if (troca && c.heranca_transferida) throw new C.ErroUsuario(`A troca de titular já foi completada (boletos e garantia passaram a ${c.inquilino_nome}): não dá para desfazer sozinho. Fale com o administrador antes de excluir este termo.`);
+  const tirar = () => (excluirTermo ? excluir(d, 'aditivos', a.id, usuario, `${c.inquilino_nome}: termo aditivo de ${C.dataBr(a.data)} excluído (não valeu: arquivo errado ou sem a assinatura de todos)`)
+    : atualizar(d, 'aditivos', a.id, { arquivo: null, assinado_em: null, perdido_em: null, perdido_pendente: null }, usuario, `${c.inquilino_nome}: arquivo do termo aditivo de ${C.dataBr(a.data)} apagado (não valeu: volta a aguardar assinatura)`));
+  if (a.tipo === TIPO_ADITIVO_VALOR && a.renovacao_id && buscar(d, 'renovacoes', a.renovacao_id)) {
+    atualizar(d, 'aditivos', a.id, { arquivo: null, assinado_em: null, perdido_em: null, perdido_pendente: null }, usuario, `${c.inquilino_nome}: termo aditivo do novo valor não valeu`);
+    excluirRenovacao(d, a.renovacao_id, usuario); // exclui também o termo (agora sem assinatura)
+    recalcularCobrancas(d, (cb) => cb.contrato_id === c.id, usuario);
+    marcarAditivos(d, c.id, usuario);
+    return `O novo valor de ${C.reais(a.valor_novo)} saiu: o aluguel volta a ${C.reais(a.valor_anterior)} nos boletos em aberto.`;
+  }
+  tirar();
+  marcarAditivos(d, c.id, usuario);
+  if (a.dia_novo && a.primeiro_vencimento && a.dia_anterior) {
+    if (c.dia_vencimento === a.dia_novo) atualizar(d, 'contratos', c.id, { dia_vencimento: a.dia_anterior }, usuario, `${c.inquilino_nome}: vencimento volta ao dia ${a.dia_anterior} (termo aditivo não valeu)`);
+    const mes = a.primeiro_vencimento.slice(0, 7);
+    let n = 0;
+    for (const cb of d.cobrancas.filter((x) => x.contrato_id === c.id && !x.data_pagamento && !emAcordo(x) && !ehBoletoAvulso(x) && x.vencimento && x.vencimento.slice(0, 7) >= mes)) {
+      const venc = `${cb.vencimento.slice(0, 7)}-${String(Math.min(a.dia_anterior, C.diasNoMes(cb.vencimento.slice(0, 7)))).padStart(2, '0')}`;
+      if (venc === cb.vencimento) continue;
+      if (emitidoNoBanco(cb) || cb.editado_manual) {
+        registrar(d, usuario, 'Alteração', 'cobrancas', cb.id, `Boleto ${C.compBr(cb.competencia)} ${emitidoNoBanco(cb) ? 'emitido no banco' : 'alterado à mão'}: o vencimento continua ${C.dataBr(cb.vencimento)}; o termo aditivo não valeu e o dia volta a ${a.dia_anterior} (confira este boleto)`, null, { contrato_id: c.id, imovel_id: c.imovel_id });
+        continue;
+      }
+      atualizar(d, 'cobrancas', cb.id, { vencimento: venc }, usuario, `Boleto ${C.compBr(cb.competencia)}: vencimento ${C.dataBr(cb.vencimento)} → ${C.dataBr(venc)} (termo aditivo não valeu)`);
+      n += 1;
+    }
+    return `O vencimento volta ao dia ${a.dia_anterior}${n ? ` (${n} boleto(s) em aberto ajustado(s))` : ''}.`;
+  }
+  if (troca) return `Sem o termo assinado, a troca de titular volta a esperar por ele: ${contratoHerdado(d, c) ? contratoHerdado(d, c).inquilino_nome : 'o titular anterior'} continua no contrato.`;
+  return '';
+}
+
 /** Termo aditivo assinado: apaga só o arquivo; o termo volta a "aguardando assinatura". */
 export function removerArquivoAditivo(d, id, usuario) {
   const a = buscar(d, 'aditivos', id);
