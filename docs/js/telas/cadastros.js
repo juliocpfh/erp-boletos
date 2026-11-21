@@ -530,9 +530,9 @@ export const CADASTROS = {
     destino: (salvo) => `#/contrato/${salvo.id}`,
   },
   fichas: {
-    // começa como solicitação de reserva (pedido do dono, 2026-11-19): a equipe preenche só o imóvel, o contato, a proposta,
+    // começa como pedido de reserva (pedido do dono, 2026-11-19): a equipe preenche só o imóvel, o contato, a proposta,
     // o que está incluso e a reserva; o resto o interessado manda pelo link da ficha (a ficha completa aparece ao editar)
-    titulo: (r) => (r ? `Ficha em análise - ${r.inquilino_nome}` : 'Nova solicitação de reserva'),
+    titulo: (r) => (r ? `Ficha em análise - ${r.inquilino_nome}` : 'Novo pedido de reserva'),
     // imóveis de interesse: uma caixa de marcar por imóvel VAGO (pedido do dono, 2026-11-10: escolher ocupado dava brecha
     // para erro); o que já está na ficha continua na lista. O que já tem outra ficha aberta aparece avisado
     campos: (r) => {
@@ -548,8 +548,8 @@ export const CADASTROS = {
           ajuda: `Apenas um: o interessado vai alugar um dos imóveis marcados. Todos juntos: aluga todos os marcados (um contrato para cada). Só aparecem os imóveis vagos${imoveis.length ? '' : ' (nenhum vago no momento)'}` },
         { quebra: true }, ...imoveis];
       if (!r) {
-        return [{ secao: 'Solicitação de reserva' },
-          { ...F.FICHA_INICIO.find((c) => c.nome === 'data_recebida'), rotulo: 'Solicitação recebida em' },
+        return [{ secao: 'Pedido de reserva' },
+          { ...F.FICHA_INICIO.find((c) => c.nome === 'data_recebida'), rotulo: 'Pedido recebido em' },
           ...blocoImoveis, ...p.contato, ...p.proposta, { secao: 'Observações' }, F.FICHA_FIM.find((c) => c.nome === 'observacoes')];
       }
       return [...F.FICHA_INICIO, ...blocoImoveis,
@@ -570,7 +570,7 @@ export const CADASTROS = {
       ? [`Devolução de ${reais(dados.devolucao_valor)} de uma reserva de ${reais(dados.reserva_valor)}: ficam ${reais(dados.reserva_valor - dados.devolucao_valor)} sem devolver. O recibo da reserva promete a devolução por inteiro; o alerta "devolver a reserva" some e o termo sai como devolução de parte.`] : []),
     ajustar(dados, erros, r, form) {
       const hoje = C.hojeIso();
-      // solicitação de reserva: começa em análise; o link da ficha vai pelo e-mail ou pelo WhatsApp
+      // pedido de reserva: começa em análise; o link da ficha vai pelo e-mail ou pelo WhatsApp
       if (!r) {
         dados.situacao = dados.situacao || 'Em análise';
         dados.inquilino_tipo = dados.inquilino_tipo || 'Pessoa física';

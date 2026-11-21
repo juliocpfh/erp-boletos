@@ -34,9 +34,9 @@ export function caixaFichas() {
   const linha = (f) => `<tr><td><a href="#/ficha/${f.id}"><b>${esc(f.inquilino_nome)}</b></a></td><td>${esc(nomesDosImoveis(f).join(', ') || '-')}${(f.imoveis_ids || []).length > 1 ? `<br><span class="suave">${esc(f.modo_imoveis === 'Todos juntos' ? 'todos juntos' : 'apenas um deles')}</span>` : ''}</td>
     <td class="nw">${dataBr(f.data_recebida)}</td><td class="n nw">${f.reserva_valor ? reais(f.reserva_valor) : '-'}</td><td>${situacaoDaFicha(f)}</td></tr>`;
   const tabela = (lista) => `<table><tr><th>Interessado</th><th>Imóvel(is)</th><th>Recebida em</th><th class="n">Reserva</th><th>Situação</th></tr>${lista.map(linha).join('')}</table>`;
-  return `<div class="cartao rolagem" id="fichas"><div class="cabecalho"><h2>Fichas abertas (${abertas.length})</h2>${opera() ? link('#/novo/fichas', 'Nova solicitação de reserva', 'botao secundario pequeno') : ''}</div>
-    <p class="suave">1º a solicitação de reserva (imóvel, contato, proposta, o que está incluso e a reserva); depois o interessado preenche a ficha pelo link e manda os documentos. Aprovada, a ficha vira o contrato já preenchido.</p>
-    ${abertas.length ? tabela(abertas) : `<p class="suave">Nenhuma ficha aberta.${!fichas.length && opera() ? ' Quando alguém quiser alugar um imóvel vago, clique em "Nova solicitação de reserva": você preenche o imóvel, o contato e a proposta; o resto a pessoa preenche pelo link da ficha.' : ''}</p>`}
+  return `<div class="cartao rolagem" id="fichas"><div class="cabecalho"><h2>Fichas abertas (${abertas.length})</h2>${opera() ? link('#/novo/fichas', 'Novo pedido de reserva', 'botao secundario pequeno') : ''}</div>
+    <p class="suave">1º o pedido de reserva (imóvel, contato, proposta, o que está incluso e a reserva); depois o interessado preenche a ficha pelo link e manda os documentos. Aprovada, a ficha vira o contrato já preenchido.</p>
+    ${abertas.length ? tabela(abertas) : `<p class="suave">Nenhuma ficha aberta.${!fichas.length && opera() ? ' Quando alguém quiser alugar um imóvel vago, clique em "Novo pedido de reserva": você preenche o imóvel, o contato e a proposta; o resto a pessoa preenche pelo link da ficha.' : ''}</p>`}
     ${encerradas.length ? `<details id="fichas-encerradas"><summary class="suave">${encerradas.length} ficha(s) encerrada(s): aprovadas que viraram contrato, reprovadas e desistências (clique para ver)</summary>${tabela(encerradas)}</details>` : ''}</div>`;
 }
 
