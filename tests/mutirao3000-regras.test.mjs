@@ -306,3 +306,17 @@ test('[e2e 30] NF do mês incompleto: quantidade 16/30, unitário do mês inteir
   assert.equal(`${f.dias}/${f.dias_mes}`, '16/30');
   assert.equal(FT.quantidadeDaFatura(f).quantidade, '16/30');
 });
+
+test('mensal-009: ajuste do mês fica fora da NF; marcado "entra na NF", soma e vai nas observações', () => {
+  const { d, c } = base({ data_entrada: '2026-01-01', vigencia_inicio: '2026-01-01' });
+  R.gerarCobrancas(d, '2026-06', 'j');
+  const cb = R.boletoDoMes(d, c.id, '2026-06');
+  const semAjuste = C.liquidar(cb, cb.vencimento).valor_nf;
+  R.atualizar(d, 'cobrancas', cb.id, { outros: 30000, outros_descricao: 'vidro quebrado' }, 'j');
+  assert.equal(C.liquidar(R.buscar(d, 'cobrancas', cb.id), cb.vencimento).valor_nf, semAjuste, 'fora da NF');
+  R.atualizar(d, 'cobrancas', cb.id, { outros_na_nf: true, outros_descricao: 'TV vendida junto' }, 'j');
+  const x = R.buscar(d, 'cobrancas', cb.id);
+  assert.equal(C.liquidar(x, cb.vencimento).valor_nf, semAjuste + 30000, 'entra na NF');
+  const base2 = R.baseDaFatura(d, 'cobranca', { ...x, valor_nf: semAjuste + 30000 });
+  assert.match(base2.observacoes, /Inclui TV vendida junto: R\$ 300,00/);
+});
