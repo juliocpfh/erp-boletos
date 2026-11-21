@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-BaKc7AxW3En4fgfLYt0qYEcyS97K6w2CCqBcvvA2NHY=' 'sha256-YlkDA9OIIS2uYchjjxw5JfAJCf5Sqe+ixnD7JA4Vl3w='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-BaKc7AxW3En4fgfLYt0qYEcyS97K6w2CCqBcvvA2NHY=' 'sha256-jkprxqhpBQhReGY8eoTsQgmBbiWCax4SlFp9jZ1ZgA4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="e68611d9d473424c">
+<meta name="fontes" content="97c064738a98a255">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -2216,6 +2216,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     numero: () => numero,
     paraData: () => paraData,
     paraNomeDeArquivo: () => paraNomeDeArquivo,
+    parametrosDescartados: () => parametrosDescartados,
     parcelaNaCompetencia: () => parcelaNaCompetencia,
     parcelas: () => parcelas,
     parcelasAntigas: () => parcelasAntigas,
@@ -2595,6 +2596,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   function dataValida(texto3, padrao = "") {
     const t = String(texto3 || "");
     return DATA_RE.test(t) && Number(t.slice(8, 10)) <= diasNoMes(t.slice(0, 7)) ? t : padrao;
+  }
+  function parametrosDescartados(q) {
+    return Object.entries(q || {}).filter(([k, v]) => FORMATOS_PARAMETRO[k] && !FORMATOS_PARAMETRO[k].test(String(v))).map(([k]) => k);
   }
   function sanearParametros(q) {
     const limpo = {};
@@ -40263,7 +40267,16 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
   function rotaAtual() {
     const [caminho, consulta2] = (location.hash.slice(1) || "/").split("?");
     const partes = caminho.split("/").filter(Boolean);
-    return { partes, q: sanearParametros(Object.fromEntries(new URLSearchParams(consulta2 || ""))) };
+    const bruto = Object.fromEntries(new URLSearchParams(consulta2 || ""));
+    return { partes, q: sanearParametros(bruto), descartados: parametrosDescartados(bruto) };
+  }
+  function avisoDoEndereco(rota) {
+    const errados = [...new Set((rota.descartados || []).map((k) => NOMES_PARAMETRO[k] || `"${k}"`))].map((n) => `${n} em formato errado`);
+    for (const [k, t] of Object.entries(TABELA_DO_PARAMETRO)) {
+      const v = rota.q[k];
+      if (v && /^\d+$/.test(v) && E.d && Array.isArray(E.d[t]) && !buscar(E.d, t, Number(v))) errados.push(`${NOMES_PARAMETRO[k]} nº ${v} não existe`);
+    }
+    return errados.length ? `<div class="alerta aviso nao-imprimir"><b>Endereço com dado errado:</b> ${esc(errados.join("; "))}. A tela abriu sem ele. Confira o endereço ou use os botões do sistema.</div>` : "";
   }
   function atualizarFaixa() {
     const el = document.getElementById("faixa");
@@ -40395,7 +40408,7 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
         gravarSessao(E.usuario.login);
         const nome = rota.partes[0] || "painel";
         const tela = telaDaRota(nome);
-        const conteudo = tela ? await tela(rota, estadoForm) : TELAS._naoEncontrado("Página não encontrada");
+        const conteudo = tela ? `${avisoDoEndereco(rota)}${await tela(rota, estadoForm)}` : TELAS._naoEncontrado("Página não encontrada");
         if (meu !== desenhos) return;
         html = rota.partes[0] === "imprimir" ? `<div id="mensagens" class="nao-imprimir" role="status" aria-live="polite"></div>${conteudo}` : layout(conteudo, rota);
       }
@@ -40603,7 +40616,7 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
       if (t) t.textContent = n ? `${n} ${n === 1 ? "boleto marcado" : "boletos marcados"}` : "";
     }
   }
-  var E, login, SESSAO, DURACAO_SESSAO, LIMITE_SESSAO, MAX_SESSOES2, deposito, tokenDaSessao, novoToken, usuarioDoEmail, usuarioDaSessao, podeUsuario, filaGravacao, ERRO_ARQUIVO_SUMIU, soSessaoNoDisco, travaDaPasta, backupDoDiaAndando, backupDoDiaFalhouEm, filaSegura, falhasDaChave, chaveTentadaEm, ESPERA_CHAVE, AVISAR_DEPOIS_DE, espelharUmaVez, DIAS_BACKUP_EMPRESA, AVISAR_FEITO_A_CADA, feitoAvisadoEm, backupEmpresaLidoEm, filaCopia, copiaAgendada, chaveNaNuvem, arquivoConferido, memoriaIgualAoDisco, conferindo, mensagens, proximaMensagem, logarErro, janelasAbertas, ESPERA_VOLTAR, msgCompactar, scripts, excelJs, jsZip, jsPdf, MODO_NUVEM, TABELAS_DO_SISTEMA, TENTATIVAS_LOGIN, LIMITE_TENTATIVAS_LOGIN, esperaDoLogin, MENU, MENU_DO_FORMULARIO, versaoIcone, logoDoTopo, paginaDesenhada, anexosVistos, CLIPES_GUARDADOS, ehClipe, clipesCarregados, TELAS_SEM_ENDERECO, desenhos, subirAoTopo, rolagensDoHistorico, entradaAtual, rolagemDaVolta, NOMES_DOS_CAMPOS, idsDeRotulo, SEM_CARTOES, NAO_ALTERA, formularioAlterado;
+  var E, login, SESSAO, DURACAO_SESSAO, LIMITE_SESSAO, MAX_SESSOES2, deposito, tokenDaSessao, novoToken, usuarioDoEmail, usuarioDaSessao, podeUsuario, filaGravacao, ERRO_ARQUIVO_SUMIU, soSessaoNoDisco, travaDaPasta, backupDoDiaAndando, backupDoDiaFalhouEm, filaSegura, falhasDaChave, chaveTentadaEm, ESPERA_CHAVE, AVISAR_DEPOIS_DE, espelharUmaVez, DIAS_BACKUP_EMPRESA, AVISAR_FEITO_A_CADA, feitoAvisadoEm, backupEmpresaLidoEm, filaCopia, copiaAgendada, chaveNaNuvem, arquivoConferido, memoriaIgualAoDisco, conferindo, mensagens, proximaMensagem, logarErro, janelasAbertas, ESPERA_VOLTAR, msgCompactar, scripts, excelJs, jsZip, jsPdf, MODO_NUVEM, TABELAS_DO_SISTEMA, TENTATIVAS_LOGIN, LIMITE_TENTATIVAS_LOGIN, esperaDoLogin, NOMES_PARAMETRO, TABELA_DO_PARAMETRO, MENU, MENU_DO_FORMULARIO, versaoIcone, logoDoTopo, paginaDesenhada, anexosVistos, CLIPES_GUARDADOS, ehClipe, clipesCarregados, TELAS_SEM_ENDERECO, desenhos, subirAoTopo, rolagensDoHistorico, entradaAtual, rolagemDaVolta, NOMES_DOS_CAMPOS, idsDeRotulo, SEM_CARTOES, NAO_ALTERA, formularioAlterado;
   var init_app = __esm({
     "docs/js/app.js"() {
       init_armazenamento();
@@ -40732,6 +40745,22 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
       TENTATIVAS_LOGIN = "imoveis-tentativas";
       LIMITE_TENTATIVAS_LOGIN = 10;
       esperaDoLogin = (erros) => erros < 3 ? 0 : Math.min(30, 2 ** (erros - 2));
+      NOMES_PARAMETRO = {
+        comp: "mês",
+        mes: "mês",
+        data: "data",
+        de: "data",
+        ate: "data",
+        ano: "ano",
+        contrato: "inquilino",
+        imovel: "imóvel",
+        ficha: "ficha",
+        troca: "troca de garantia",
+        anterior: "notificação",
+        perfil: "regra especial",
+        regras: "regra especial"
+      };
+      TABELA_DO_PARAMETRO = { contrato: "contratos", imovel: "imoveis", ficha: "fichas", troca: "trocas_garantia", anterior: "notificacoes", perfil: "perfis_regras", regras: "perfis_regras" };
       MENU = [
         ["#/", "Painel", "^$|^fechamento|^pendencias|^alertas"],
         ["#/inquilinos", "Inquilinos", "^inquilino|^contrato|^vistoria|^solicitacoes|^notificac|^ficha|^comunicacoes|^aceite|^aditivo"],
