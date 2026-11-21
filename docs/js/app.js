@@ -910,7 +910,23 @@ function rotaAtual() {
   const [caminho, consulta] = (location.hash.slice(1) || '/').split('?');
   const partes = caminho.split('/').filter(Boolean);
   // parâmetros fora do formato esperado (ex.: comp=2026-01"><img…) são descartados: a tela usa o padrão
-  return { partes, q: C.sanearParametros(Object.fromEntries(new URLSearchParams(consulta || ''))) };
+  const bruto = Object.fromEntries(new URLSearchParams(consulta || ''));
+  return { partes, q: C.sanearParametros(bruto), descartados: C.parametrosDescartados(bruto) };
+}
+
+// Endereço com dado errado ou que não existe (decisão do dono, 21/11/2026, links-pc-015): a tela continua abrindo com o
+// padrão, mas avisa no alto. Só acontece com endereço digitado ou colado errado (os links do sistema são sempre válidos).
+const NOMES_PARAMETRO = { comp: 'mês', mes: 'mês', data: 'data', de: 'data', ate: 'data', ano: 'ano', contrato: 'inquilino', imovel: 'imóvel', ficha: 'ficha',
+  troca: 'troca de garantia', anterior: 'notificação', perfil: 'regra especial', regras: 'regra especial' };
+const TABELA_DO_PARAMETRO = { contrato: 'contratos', imovel: 'imoveis', ficha: 'fichas', troca: 'trocas_garantia', anterior: 'notificacoes', perfil: 'perfis_regras', regras: 'perfis_regras' };
+/** Faixa de aviso da tela, ou ''. Ex.: #/novo/solicitacoes?contrato=999 → "… inquilino nº 999 não existe …". */
+function avisoDoEndereco(rota) {
+  const errados = [...new Set((rota.descartados || []).map((k) => NOMES_PARAMETRO[k] || `"${k}"`))].map((n) => `${n} em formato errado`);
+  for (const [k, t] of Object.entries(TABELA_DO_PARAMETRO)) {
+    const v = rota.q[k];
+    if (v && /^\d+$/.test(v) && E.d && Array.isArray(E.d[t]) && !R.buscar(E.d, t, Number(v))) errados.push(`${NOMES_PARAMETRO[k]} nº ${v} não existe`);
+  }
+  return errados.length ? `<div class="alerta aviso nao-imprimir"><b>Endereço com dado errado:</b> ${esc(errados.join('; '))}. A tela abriu sem ele. Confira o endereço ou use os botões do sistema.</div>` : '';
 }
 
 function atualizarFaixa() {
@@ -1089,7 +1105,7 @@ export async function mostrar(estadoForm = null) {
       gravarSessao(E.usuario.login); // usar o sistema mantém o login lembrado
       const nome = rota.partes[0] || 'painel';
       const tela = telaDaRota(nome);
-      const conteudo = tela ? await tela(rota, estadoForm) : TELAS._naoEncontrado('Página não encontrada');
+      const conteudo = tela ? `${avisoDoEndereco(rota)}${await tela(rota, estadoForm)}` : TELAS._naoEncontrado('Página não encontrada');
       if (meu !== desenhos) return;
       html = rota.partes[0] === 'imprimir' ? `<div id="mensagens" class="nao-imprimir" role="status" aria-live="polite"></div>${conteudo}` : layout(conteudo, rota);
     }

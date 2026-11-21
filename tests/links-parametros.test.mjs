@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { sanearParametros } from '../docs/js/calculos.js';
+import { parametrosDescartados, sanearParametros } from '../docs/js/calculos.js';
 
 const raiz = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'docs', 'js');
 const PULAR = /simulado-banco\.js$/;
@@ -39,4 +39,9 @@ test('modelo de contrato padrão (código negativo) passa pelo endereço', () =>
   assert.equal(sanearParametros({ modelo: '7' }).modelo, '7');
   assert.equal(sanearParametros({ modelo: '-' }).modelo, undefined);
   assert.equal(sanearParametros({ modelo: '2-1' }).modelo, undefined);
+});
+
+test('links-pc-015: parâmetro fora do formato é apontado para o aviso da tela', () => {
+  assert.deepEqual(parametrosDescartados({ comp: '2026-13', contrato: '7', mes: '2026-02', ano: '26' }), ['comp', 'ano']);
+  assert.deepEqual(parametrosDescartados({ desconhecido: 'x<y' }), []);
 });
