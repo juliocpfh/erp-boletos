@@ -320,3 +320,22 @@ test('mensal-009: ajuste do mês fica fora da NF; marcado "entra na NF", soma e 
   const base2 = R.baseDaFatura(d, 'cobranca', { ...x, valor_nf: semAjuste + 30000 });
   assert.match(base2.observacoes, /Inclui TV vendida junto: R\$ 300,00/);
 });
+
+test('saida-007: adiar a saída recalcula o último boleto em aberto e leva a vistoria marcada junto', () => {
+  const { d, c } = base({ data_entrada: '2026-01-01', vigencia_inicio: '2026-01-01', aluguel_inicial: 300000, desconto_pontualidade_percentual: 0, cobranca_mes_seguinte: true });
+  d.config_regras = [{ chave: 'proporcional', valor: 'mes_30' }];
+  CR.usarRegras(d);
+  try {
+    R.informarSaida(d, c.id, '2026-12-10', 'j', '2026-11-21');
+    R.gerarCobrancas(d, '2026-12', 'j');
+    const cb = R.boletoDoMes(d, c.id, '2026-12');
+    assert.equal(cb.aluguel, 100000); // 10/30 de R$ 3.000,00
+    R.marcarVistoriaSaida(d, c.id, '2026-12-11', '10:00', 'j', '2026-11-21');
+    R.informarSaida(d, c.id, '2026-12-15', 'j', '2026-11-21');
+    R.recalcularCobrancas(d, (x) => x.contrato_id === c.id, 'j'); // a tela recalcula junto (mudarContrato)
+    assert.equal(R.buscar(d, 'cobrancas', cb.id).aluguel, 150000, '15/30 = R$ 1.500,00');
+    assert.equal(c.vistoria_saida_data, '2026-12-16', 'a vistoria anda os mesmos 5 dias');
+    assert.equal(c.vistoria_saida_hora, '10:00');
+    assert.ok(d.historico.some((h) => /\(era 10\/12\/2026\); vistoria de saída passa a 16\/12\/2026/.test(h.descricao)));
+  } finally { CR.usarRegras(null); }
+});

@@ -3132,8 +3132,13 @@ export function informarSaida(d, contratoId, data, usuario, hoje = C.hojeIso()) 
   if (encerramentoDo(d, c.id)) throw new Error('A saída já tem o cálculo final: desfaça o cálculo antes de mudar a data.');
   if (c.data_entrada && data < c.data_entrada) throw new C.ErroUsuario('A saída não pode ser antes da entrada.');
   const reativar = c.ativo === false && !fimDeVinculo(d, c) && !deveDesativar(d, { ...c, ativo: true, data_saida: data }, hoje);
-  atualizar(d, 'contratos', c.id, { data_saida: data, ...(reativar ? { ativo: true } : {}) }, usuario,
-    `Saída do inquilino em ${C.dataBr(data)}${reativar ? ' (ativo de novo até a saída)' : ''}`);
+  const antes = c.data_saida;
+  // saída adiada (ou antecipada) com a vistoria já marcada: a vistoria anda o mesmo tanto de dias (decisão do dono, 21/11/2026,
+  // saida-007; a tela avisa para mandar o convite de novo). Ex.: saída 10/12 → 15/12 e vistoria 11/12 às 10:00 → 16/12 às 10:00.
+  // O último boleto (ainda em aberto) é recalculado pelos dias novos e o acerto final fica para o cálculo final.
+  const vistoria = antes && antes !== data && c.vistoria_saida_data ? C.somarDias(c.vistoria_saida_data, C.diasEntre(antes, data)) : null;
+  atualizar(d, 'contratos', c.id, { data_saida: data, ...(reativar ? { ativo: true } : {}), ...(vistoria ? { vistoria_saida_data: vistoria, vistoria_saida_marcada_em: hoje } : {}) }, usuario,
+    `Saída do inquilino em ${C.dataBr(data)}${antes && antes !== data ? ` (era ${C.dataBr(antes)})` : ''}${reativar ? ' (ativo de novo até a saída)' : ''}${vistoria ? `; vistoria de saída passa a ${C.dataBr(vistoria)}` : ''}`);
   desativarSeSaiu(d, c, usuario, hoje);
   return c;
 }
