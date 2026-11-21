@@ -555,7 +555,17 @@ export const FORMULARIOS = {
       return res;
     });
     memoria.pagamentoDivergente = null;
-    aviso(`Pagamento confirmado com valor diferente do previsto. Recebido ${reais(p.valor)}; NF de ${reais(valorNf)} (calculada ${reais(r.valor_nf)}). Data da NF: ${dataBr(p.data)}.`, 'aviso');
+    const aMais = p.valor > r.valor_devido && valorNf === r.valor_nf ? p.valor - r.valor_devido : 0;
+    aviso(aMais ? `Pagamento confirmado. Recebido ${reais(p.valor)}; NF de ${reais(valorNf)}. Ficaram ${reais(aMais)} anotados para devolver ao inquilino. Data da NF: ${dataBr(p.data)}.`
+      : `Pagamento confirmado com valor diferente do previsto. Recebido ${reais(p.valor)}; NF de ${reais(valorNf)} (calculada ${reais(r.valor_nf)}). Data da NF: ${dataBr(p.data)}.`, 'aviso');
+  },
+
+  /** Pago a mais devolvido por fora do extrato (outra conta, dinheiro): anota a devolução no boleto (mensal-009). */
+  async devolvidoAMao(form) {
+    const data = String(new FormData(form).get('data') || '');
+    const v = await alterar((db) => R.marcarDevolvidoAMao(db, Number(form.dataset.id), data, login()));
+    aviso(`Devolução de ${reais(v)} anotada.`, 'ok');
+    await mostrar();
     await mostrar();
   },
 
@@ -817,12 +827,13 @@ export async function confirmarPagamentoBoleto(id, f) {
     const resp = await janela({ titulo: 'Valor diferente do previsto',
       html: `<p>Previsto para ${dataBr(pagouEmDia ? cb.vencimento : dataPagou || data)}: <b>${reais(previsto.valor_devido)}</b><br>Recebido: <b>${reais(valor)}</b><br>
         Diferença: <b class="${dif < 0 ? 'negativo' : ''}">${dif > 0 ? '+' : '−'}${reais(Math.abs(dif))}</b></p>
-        <p><label>Justificativa da divergência</label><textarea name="justificativa" rows="3" required></textarea></p>
-        <p class="suave">Fica só no sistema (não sai na NF nem no boleto). Em seguida, informe o valor da NF na página do boleto.</p>`,
+        ${dif > 0 ? `<p>Pagou a mais: na página do boleto, confirmando com a NF no valor calculado, os ${reais(dif)} ficam anotados como <b>a devolver ao inquilino</b>.</p>` : ''}
+        <p><label>Justificativa da divergência${dif > 0 ? ' (opcional)' : ''}</label><textarea name="justificativa" rows="3"${dif > 0 ? '' : ' required'}></textarea></p>
+        <p class="suave">Fica só no sistema (não sai na NF nem no boleto). Em seguida, ${dif > 0 ? 'confira' : 'informe'} o valor da NF na página do boleto.</p>`,
       sim: 'Continuar', nao: 'Cancelar' });
     const justificativa = resp && String((resp.justificativa || [])[0] || '').trim();
     if (!resp) return;
-    if (!justificativa) throw new C.ErroUsuario('Informe a justificativa da divergência. Nada foi salvo.');
+    if (!justificativa && dif < 0) throw new C.ErroUsuario('Informe a justificativa da divergência. Nada foi salvo.');
     memoria.pagamentoDivergente = { id: cb.id, data, valor, pagouEmDia, dataPagou, justificativa };
     ir(`#/cobranca/${cb.id}?ir=pagamento`);
     return;

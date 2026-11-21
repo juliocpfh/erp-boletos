@@ -1925,6 +1925,21 @@ export function devidoDoPago(cb) {
   const v = previstoNoPagamento(cb, cb.data_pagamento, { pagouEmDia: !!cb.pagou_em_dia, dataPagou: cb.data_pagou || null }).valor_devido;
   return Number.isFinite(v) ? v : 0;
 }
+/**
+ * Devolução do pago a mais feita fora do extrato (ex.: Pix de outra conta, dinheiro): o recebido volta ao devido e o devolvido
+ * fica anotado, como na devolução pelo extrato. Ex.: recebido R$ 3.100,00, devido R$ 3.000,00 → devolvido R$ 100,00 em 25/11.
+ */
+export function marcarDevolvidoAMao(d, cobrancaId, data, usuario) {
+  const cb = buscar(d, 'cobrancas', cobrancaId);
+  const falta = pagoAMaisDo(cb);
+  if (!falta) throw new C.ErroUsuario('Este boleto não tem valor a devolver.');
+  if (!C.dataValida(data)) throw new C.ErroUsuario('Informe o dia da devolução.');
+  if (data < cb.data_pagamento) throw new C.ErroUsuario(`A devolução (${C.dataBr(data)}) é antes do pagamento (${C.dataBr(cb.data_pagamento)}).`);
+  atualizar(d, 'cobrancas', cb.id, { valor_pago: cb.valor_pago - falta, valor_devolvido: (cb.valor_devolvido || 0) + falta }, usuario,
+    `Devolução ao inquilino de ${C.reais(falta)} em ${C.dataBr(data)} (fora do extrato): recebido ${C.reais(cb.valor_pago)} → ${C.reais(cb.valor_pago - falta)}. A NF não muda`);
+  return falta;
+}
+
 /** Quanto o boleto pago recebeu a mais do que devia (0 se não recebeu a mais). */
 export const pagoAMaisDo = (cb) => (cb && cb.data_pagamento ? Math.max(0, (cb.valor_pago || 0) - devidoDoPago(cb)) : 0);
 
@@ -1966,14 +1981,20 @@ export function registrarPagamento(d, cobrancaId, dataContabil, valorPago, usuar
   const compensadoDepois = pagouEmDia && dataContabil > cb.vencimento;
   const caucao = ehComplementoCaucao(cb);
   const saldoSaida = ehSaldoSaida(cb); // boleto do saldo da saída: sem NF, como o complemento da caução
-  const manual = valorNf !== null && !caucao && !saldoSaida;
+  // pago a mais com a NF no valor calculado (decisão do dono, 21/11/2026, mensal-009): a NF não muda e a diferença fica
+  // anotada como "falta devolver" (a mesma conta do pago a mais pelo extrato, pagoAMaisDo). Ex.: devido R$ 3.000,00,
+  // recebido R$ 3.100,00 → NF pelo cálculo e R$ 100,00 a devolver. NF digitada diferente: é o cálculo manual de antes.
+  const aMais = valorPago !== null && valorPago !== undefined && valorPago > r.valor_devido && !caucao && (valorNf === null || valorNf === r.valor_nf) ? valorPago - r.valor_devido : 0;
+  const manual = valorNf !== null && !caucao && !saldoSaida && !aMais;
   if (manual) conferirDivergencia(cb, r, valorPago, valorNf, justificativa);
   atualizar(d, 'cobrancas', cb.id, {
     data_pagamento: dataContabil, data_pagou: pagouEmDia ? null : (dataPagou || null), valor_pago: valorPago ?? r.valor_devido,
     dias_atraso: r.dias_atraso, multa: r.multa, juros: r.juros, valor_nf: caucao || saldoSaida ? 0 : manual ? valorNf : r.valor_nf, pagou_em_dia: compensadoDepois,
     situacao: r.pontual ? 'Paga em dia' : 'Paga com atraso', nf_manual: manual, divergencia: manual ? String(justificativa).trim() : null,
+    ...(aMais ? { valor_a_mais: aMais } : {}),
   }, usuario, `${compensadoDepois ? `Pagamento confirmado (pagou em dia, entrou em ${C.dataBr(dataContabil)})` : 'Pagamento confirmado'}: boleto ${ehParcelaAcordo(cb) ? `do acordo ${cb.acordo_parcela || ''}`.trim() : C.compBr(cb.competencia)} de ${buscar(d, 'contratos', cb.contrato_id)?.inquilino_nome || 'inquilino'}${manual
-    ? `. Recebido ${C.reais(valorPago)}, previsto ${C.reais(r.valor_devido)}; NF digitada ${C.reais(valorNf)} (calculada ${C.reais(r.valor_nf)}). Justificativa: ${String(justificativa).trim()}` : ''}`);
+    ? `. Recebido ${C.reais(valorPago)}, previsto ${C.reais(r.valor_devido)}; NF digitada ${C.reais(valorNf)} (calculada ${C.reais(r.valor_nf)}). Justificativa: ${String(justificativa).trim()}` : ''}${aMais
+    ? `. Recebido ${C.reais(valorPago)}, previsto ${C.reais(r.valor_devido)}: ${C.reais(aMais)} a devolver ao inquilino (a NF não muda)${String(justificativa || '').trim() ? `. Motivo: ${String(justificativa).trim()}` : ''}` : ''}`);
   // complemento da caução pago: soma na caução atual (parcelas, em qualquer ordem); a data nunca fica antes da última correção
   if (caucao) {
     const c = buscar(d, 'contratos', cb.contrato_id);
