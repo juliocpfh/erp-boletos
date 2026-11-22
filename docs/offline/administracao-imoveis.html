@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-UiHW3gaXBfOYN2Mfz8Mwuz4oYaVHrr0g91sz/K4YUJA=' 'sha256-3hJlIAs0ocihFbagqNyTv3+UvG/iM3vqTlYnhApnYkY='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-UiHW3gaXBfOYN2Mfz8Mwuz4oYaVHrr0g91sz/K4YUJA=' 'sha256-/bgO2fbvRoBEnpTkdNjA6pHyZCbBCTJNby567eBUD2s='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="d5d0898b9b343e04">
+<meta name="fontes" content="fadf9b0377ca3afa">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -38,6 +38,7 @@ h2 { font-size: 18px; margin: 0 0 12px; }
 h3 { font-size: 15px; margin: 16px 0 8px; color: var(--suave); text-transform: uppercase; letter-spacing: .03em; }
 .cartao { background: var(--cartao); border: 1px solid var(--borda); border-radius: 10px; padding: 16px 18px; margin-bottom: 18px; }
 .cabecalho { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.cabecalho-sistema { margin-bottom: 16px; } /* muitos botões: descem de linha e encostariam na primeira caixa */
 .acoes { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .botao, button { display: inline-block; background: var(--primaria); color: #fff; border: 0; border-radius: 6px;
   padding: 7px 14px; font: inherit; font-size: 14px; cursor: pointer; text-decoration: none; }
@@ -1810,7 +1811,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           rotulo: "Compactar anexos (fotos e PDFs escaneados)",
           tipo: "simnao",
           padrao: true,
-          explica: 'Ao anexar, o sistema diminui sozinho as fotos e os PDFs escaneados, sem perguntar e sem guardar o original. Ex.: foto do RG de 4 MB → cerca de 400 KB; PDF escaneado de 10 páginas com 12 MB → cerca de 1,5 MB, ainda legível. PDF com texto (gerado pelo banco, por um sistema ou pelo Word) fica como está, e PDF com assinatura digital (gov.br, ICP-Brasil, banco) nunca é mexido. Os documentos que a pessoa manda pelo link da ficha são compactados depois que chegam: quando a ficha é aberta, o sistema primeiro faz a conferência de montagem (que olha dentro do arquivo como ele chegou), guarda o resultado na ficha e só então compacta. Os que já estavam no sistema: botão "Compactar os anexos" em Dados e backup.',
+          explica: 'Ao anexar, o sistema diminui sozinho as fotos e os PDFs escaneados, sem perguntar e sem guardar o original. Ex.: foto do RG de 4 MB → cerca de 400 KB; PDF escaneado de 10 páginas com 12 MB → cerca de 1,5 MB, ainda legível. PDF com texto (gerado pelo banco, por um sistema ou pelo Word) fica como está, e PDF com assinatura digital (gov.br, ICP-Brasil, banco) nunca é mexido. Os documentos que a pessoa manda pelo link da ficha são compactados depois que chegam: quando a ficha é aberta, o sistema primeiro faz a conferência de montagem (que olha dentro do arquivo como ele chegou), guarda o resultado na ficha e só então compacta. Os que já estavam no sistema: botão "Compactar os anexos" em Sistema.',
           consequencia: "Não: os arquivos são guardados como chegaram (ocupam mais espaço e demoram mais para abrir no celular). Os que já foram compactados não voltam ao tamanho de antes.",
           lei: "Sem lei: rotina. O documento assinado digitalmente não é mexido porque qualquer mudança no arquivo invalida a assinatura (MP 2.200-2/2001 e Lei 14.063/2020)."
         },
@@ -1822,7 +1823,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           rotulo: "Assinatura digital dos recibos e termos (certificado da empresa no PC)",
           tipo: "simnao",
           padrao: false,
-          explica: 'Sim: em cada recibo, termo e notificação aparecem "Enviar para assinar" e, depois de assinado, "Baixar PDF assinado". O programa do PC, com o certificado digital A1 (e-CNPJ) da ANK instalado (Dados e backup → Anexar o certificado digital), assina sozinho os documentos da fila: acrescenta uma página "Assinatura digital" no fim do PDF, com a assinatura ICP-Brasil. O e-mail da etapa só leva o recibo depois de assinado. Se o PC estiver desligado, os documentos esperam na fila e o Painel avisa para ligá-lo. A ficha cadastral (que a pessoa preenche) não passa por aqui. Ex.: recibo da garantia → Enviar para assinar → em cerca de 1 minuto, "Assinado digitalmente em 05/12/2026 às 10:32" → o e-mail leva o PDF assinado.',
+          explica: 'Sim: em cada recibo, termo e notificação aparecem "Enviar para assinar" e, depois de assinado, "Baixar PDF assinado". O programa do PC, com o certificado digital A1 (e-CNPJ) da ANK instalado (Sistema → Empresas → Anexar o certificado digital), assina sozinho os documentos da fila: acrescenta uma página "Assinatura digital" no fim do PDF, com a assinatura ICP-Brasil. O e-mail da etapa só leva o recibo depois de assinado. Se o PC estiver desligado, os documentos esperam na fila e o Painel avisa para ligá-lo. A ficha cadastral (que a pessoa preenche) não passa por aqui. Ex.: recibo da garantia → Enviar para assinar → em cerca de 1 minuto, "Assinado digitalmente em 05/12/2026 às 10:32" → o e-mail leva o PDF assinado.',
           consequencia: "Não (padrão até instalar o certificado no PC): os recibos e termos saem e vão por e-mail sem a assinatura digital da empresa, como antes; a empresa assina à mão ou pelo gov.br.",
           lei: 'A assinatura com certificado ICP-Brasil tem a mesma validade da assinatura de próprio punho (MP 2.200-2/2001, art. 10, § 1º) e é a "qualificada" da Lei 14.063/2020 (art. 4º, III). A empresa assina pelo seu administrador (Código Civil, art. 47); o e-CNPJ identifica a empresa e o responsável. Quitação é de quem recebe (Código Civil, arts. 319 e 320).'
         },
@@ -2124,7 +2125,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           padrao: 180,
           min: 30,
           max: 730,
-          explica: "O servidor da nuvem anota quem baixou o banco inteiro, abriu ou anexou arquivos, baixou backups, mandou e-mail, mexeu na ficha pela internet e ligou o programa do PC (com a data, o endereço de internet e o tamanho). O administrador vê em Dados e backup → Acessos. Depois deste prazo, a anotação é apagada sozinha. Ex.: 180 dias → o acesso de 17/11/2026 sai em 16/05/2027.",
+          explica: "O servidor da nuvem anota quem baixou o banco inteiro, abriu ou anexou arquivos, baixou backups, mandou e-mail, mexeu na ficha pela internet e ligou o programa do PC (com a data, o endereço de internet e o tamanho). O administrador vê em Sistema → Acessos. Depois deste prazo, a anotação é apagada sozinha. Ex.: 180 dias → o acesso de 17/11/2026 sai em 16/05/2027.",
           consequencia: "Prazo maior ajuda a descobrir um vazamento antigo, mas guarda mais dados das pessoas da equipe (e-mail e endereço de internet); prazo menor apaga antes. Vale na próxima faxina da noite.",
           lei: "Marco Civil da Internet (Lei 12.965/2014), art. 15 (registros de acesso guardados por 6 meses); LGPD (Lei 13.709/2018), arts. 6º, III e X, 37 e 46 (registro das operações e segurança, guardando só o necessário)."
         },
@@ -2729,7 +2730,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         regras: /^\d+$/,
         // Regras do sistema: a regra especial aberta; Novo contrato: preencher com uma regra especial
         gmail: /^[a-z-]{1,20}$/
-        // Dados e backup: aviso da volta do Google ao conectar o Gmail (AVISOS_VOLTA_GMAIL de nuvem/worker.mjs)
+        // Sistema → Comunicação E-mail: aviso da volta do Google ao conectar o Gmail (AVISOS_VOLTA_GMAIL de nuvem/worker.mjs)
       };
     }
   });
@@ -3992,13 +3993,13 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
       return `<p class="ct-par">${runsHtml(b.runs)}</p>`;
     }
   }
-  function imagemX(id, rId, larguraCm, alturaCm, { ancora = false, topo: topo2 = null, transparencia = 0 } = {}) {
+  function imagemX(id, rId, larguraCm, alturaCm, { ancora = false, topo: topo3 = null, transparencia = 0 } = {}) {
     const cx = Math.round(larguraCm * EMU_CM);
     const cy = Math.round(alturaCm * EMU_CM);
     const pic = `<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="logo${id}.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rId}">${transparencia ? `<a:alphaModFix amt="${Math.round((1 - transparencia) * 1e5)}"/>` : ""}</a:blip><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic>`;
-    if (!ancora && topo2 === null) return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${id}" name="Logo ${id}"/>${pic}</wp:inline></w:drawing></w:r>`;
-    const capa = topo2 !== null;
-    return `<w:r><w:drawing><wp:anchor distT="0" distB="${capa ? Math.round(LOGO.espacoCm * EMU_CM) : 0}" distL="0" distR="0" simplePos="0" relativeHeight="${capa ? 1 : 0}" behindDoc="${capa ? 0 : 1}" locked="1" layoutInCell="1" allowOverlap="${capa ? 0 : 1}"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH><wp:positionV relativeFrom="page">${capa ? `<wp:posOffset>${Math.round(topo2 * EMU_CM)}</wp:posOffset>` : "<wp:align>center</wp:align>"}</wp:positionV><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/>${capa ? "<wp:wrapTopAndBottom/>" : "<wp:wrapNone/>"}<wp:docPr id="${id}" name="${capa ? "Logo" : "Marca"} ${id}"/><wp:cNvGraphicFramePr/>${pic}</wp:anchor></w:drawing></w:r>`;
+    if (!ancora && topo3 === null) return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${id}" name="Logo ${id}"/>${pic}</wp:inline></w:drawing></w:r>`;
+    const capa = topo3 !== null;
+    return `<w:r><w:drawing><wp:anchor distT="0" distB="${capa ? Math.round(LOGO.espacoCm * EMU_CM) : 0}" distL="0" distR="0" simplePos="0" relativeHeight="${capa ? 1 : 0}" behindDoc="${capa ? 0 : 1}" locked="1" layoutInCell="1" allowOverlap="${capa ? 0 : 1}"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:align>center</wp:align></wp:positionH><wp:positionV relativeFrom="page">${capa ? `<wp:posOffset>${Math.round(topo3 * EMU_CM)}</wp:posOffset>` : "<wp:align>center</wp:align>"}</wp:positionV><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/>${capa ? "<wp:wrapTopAndBottom/>" : "<wp:wrapNone/>"}<wp:docPr id="${id}" name="${capa ? "Logo" : "Marca"} ${id}"/><wp:cNvGraphicFramePr/>${pic}</wp:anchor></w:drawing></w:r>`;
   }
   async function contratoDocx(JSZip, blocos, { logo, rodape, titulo: titulo2 }) {
     const prop = logo ? logo.altura / logo.largura : 0;
@@ -4973,8 +4974,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         // "Ativo" não é mais campo: o inquilino fica inativo pela saída
         campo("imovel_id", "Imóvel", "opcao", { opcoes: [], soNovo: true, obrig: true, ajuda: "Escolha o imóvel deste inquilino" }),
         campo("gerar_nf", "Emite NF (desmarcado: boleto de controle)", "simnao", { padrao: true, ajuda: "Boleto de controle: o pagamento é controlado (em dia ou atrasado), mas não gera NF nem entra nas somas dos boletos e nos resultados" }),
-        // regras especiais (pedido do dono de 18/11/2026): só aparece quando existe alguma (Dados e backup → Regras do sistema)
-        campo("perfil_regras_id", "Regras deste contrato", "opcao", { opcoes: [], vazio: "Regras do sistema", ajuda: "Regras do sistema (as de todos) ou uma regra especial criada em Dados e backup → Regras do sistema" }),
+        // regras especiais (pedido do dono de 18/11/2026): só aparece quando existe alguma (Sistema → Regras do sistema)
+        campo("perfil_regras_id", "Regras deste contrato", "opcao", { opcoes: [], vazio: "Regras do sistema", ajuda: "Regras do sistema (as de todos) ou uma regra especial criada em Sistema → Regras do sistema" }),
         secao("Inquilino (responsável pelo contrato)"),
         // ordem pedida: tipo, documento e RG/inscrição estadual na mesma linha; depois nome, contatos e, numa linha nova, o endereço
         campo("inquilino_tipo", "Tipo", "opcao", { obrig: true, padrao: "Pessoa física", opcoes: ["Pessoa física", "Pessoa jurídica (empresa)"] }),
@@ -4992,7 +4993,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         CEP_DA_PESSOA("inquilino_"),
         campo("inquilino_endereco", "Endereço (residência, comercial ou sede da empresa)", "texto", { largo: true }),
         QUEBRA,
-        campo("notificacao_banco", "Avisos do banco (C6) sobre o boleto por e-mail/SMS", "opcao", { padrao: "Usar o padrão da conta", opcoes: ["Usar o padrão da conta", "Não notificar", "Escolher"], ajuda: "O banco avisa o inquilino do boleto. O padrão é o da conta, em Dados e backup" }),
+        campo("notificacao_banco", "Avisos do banco (C6) sobre o boleto por e-mail/SMS", "opcao", { padrao: "Usar o padrão da conta", opcoes: ["Usar o padrão da conta", "Não notificar", "Escolher"], ajuda: "O banco avisa o inquilino do boleto. O padrão é o da conta, em Sistema → Banco" }),
         campo("notif_email", "Por e-mail", "simnao", { ...quando("notificacao_banco", "Escolher"), padrao: true }),
         campo("notif_sms", "Por SMS", "simnao", { ...quando("notificacao_banco", "Escolher"), padrao: true }),
         campo("notif_emissao", "Na emissão", "simnao", { ...quando("notificacao_banco", "Escolher"), padrao: true }),
@@ -6433,16 +6434,16 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       const h = hist[i];
       if (h.desfaz !== void 0 && h.detalhes) for (const k of Object.keys(h.detalhes)) desfeitos.add(`${h.desfaz}:${k}`);
     }
-    const topo2 = /* @__PURE__ */ new Map();
+    const topo3 = /* @__PURE__ */ new Map();
     for (let i = Math.max(0, desde); i < hist.length; i += 1) {
       const h = hist[i];
       if (h.acao !== "Alteração" || !h.tabela || h.registro_id === null || !h.detalhes || h.desfaz !== void 0) continue;
       for (const [k, m] of Object.entries(h.detalhes)) {
-        if (m && typeof m === "object" && "de" in m && !desfeitos.has(`${i}:${k}`)) topo2.set(`${h.tabela}:${h.registro_id}:${k}`, i);
+        if (m && typeof m === "object" && "de" in m && !desfeitos.has(`${i}:${k}`)) topo3.set(`${h.tabela}:${h.registro_id}:${k}`, i);
       }
     }
     const out = /* @__PURE__ */ new Set();
-    for (const [chave, i] of topo2) {
+    for (const [chave, i] of topo3) {
       const h = d2.historico[i];
       const k = chave.split(":").slice(2).join(":");
       if (SEM_DESFAZER.has(h.tabela) || CAMPOS_SEM_DESFAZER.has(k) || !Array.isArray(d2[h.tabela])) continue;
@@ -10153,8 +10154,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   }
   function motivoBancoInativo(d2) {
     const cfg6 = configBanco(d2);
-    if (!cfg6.contas.length) return "Aguardando as chaves de acesso do C6: cadastre as contas em Dados e backup → Banco (C6)";
-    if (!cfg6.ativo) return "Integração com o C6 desligada: ative em Dados e backup → Banco (C6)";
+    if (!cfg6.contas.length) return "Aguardando as chaves de acesso do C6: cadastre as contas em Sistema → Banco → Banco (C6)";
+    if (!cfg6.ativo) return "Integração com o C6 desligada: ative em Sistema → Banco → Banco (C6)";
     return "";
   }
   function salvarConfigBanco(d2, dados, usuario) {
@@ -10404,7 +10405,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (b.desconto > 0) {
       const c = buscar(d2, "contratos", cb.contrato_id);
       if (b.desconto >= b.valor) throw new ErroUsuario(`O desconto do boleto de ${c.inquilino_nome} (${reais(b.desconto)}) não pode ser igual ou maior que o valor do boleto (${reais(b.valor)}).`);
-      if (!descontoLiberado(conta)) throw new ErroUsuario(`O boleto de ${c.inquilino_nome} (${compBr(cb.competencia)}) não foi ao banco: a conta ${conta.apelido || conta.id} está em produção e o tipo do desconto de pontualidade ainda não foi conferido num boleto de teste. Emita um boleto no sandbox, confira no PDF que o desconto sai de ${reais(b.desconto)} no total (e não por dia) e marque "Conferi o desconto no boleto de teste" na conta (Dados e backup → Banco (C6)).`);
+      if (!descontoLiberado(conta)) throw new ErroUsuario(`O boleto de ${c.inquilino_nome} (${compBr(cb.competencia)}) não foi ao banco: a conta ${conta.apelido || conta.id} está em produção e o tipo do desconto de pontualidade ainda não foi conferido num boleto de teste. Emita um boleto no sandbox, confira no PDF que o desconto sai de ${reais(b.desconto)} no total (e não por dia) e marque "Conferi o desconto no boleto de teste" na conta (Sistema → Banco → Banco (C6)).`);
       Object.assign(fees, { [K.desconto_tipo]: conta.tipo_desconto || CONTA_BANCO_PADRAO.tipo_desconto, [K.desconto_valor]: centavosParaReais(b.desconto), [K.desconto_prazo]: Number(conta.desconto_dias_antes) || 0 });
     }
     return fees;
@@ -10560,7 +10561,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (!cb.banco || cb.banco.situacao !== "emitido") throw new Error("Só um boleto emitido e em aberto no banco pode ser negativado.");
     if (aguardandoCredito(cb) || cb.data_pagamento) throw new ErroUsuario("Este boleto já foi pago (o banco ainda confirma o crédito, ou o pagamento já está registrado aqui): não pode ser negativado.");
     const conta = contaBanco(d2, cb.banco.conta_id);
-    if (!conta || !conta.negativacao.ativa) throw new Error("A negativação está desligada nesta conta (Dados e backup → Banco (C6)).");
+    if (!conta || !conta.negativacao.ativa) throw new Error("A negativação está desligada nesta conta (Sistema → Banco → Banco (C6)).");
     const r = resposta || {};
     const n = normalizarRespostaC6(r).negativacao || { situacao: r[RESPOSTA.negativacao_situacao] || null, data: r[RESPOSTA.negativacao_data] || null, pode_cancelar: null };
     const banco = { ...cb.banco, negativacao: { situacao: n.situacao || STATUS_NEGATIVACAO.agendada, data: n.data || null, dias_atraso: Number(dias) || null, pode_cancelar: n.pode_cancelar ?? true, agendada_em: (/* @__PURE__ */ new Date()).toISOString(), cancelada_em: null } };
@@ -14649,7 +14650,7 @@ ${naoIncluidos.join("\r\n")}\r
   }
   function urlDaPonte(cfg6, caminho) {
     const base = String(cfg6.ponte_url || "").trim().replace(/\/+$/, "");
-    if (!base) throw new Error("Falta o endereço e a senha da ponte neste computador (Dados e backup → Banco (C6)).");
+    if (!base) throw new Error("Falta o endereço e a senha da ponte neste computador (Sistema → Banco → Banco (C6)).");
     return `${base}${caminho.startsWith("/") ? "" : "/"}${caminho}`;
   }
   async function chamarPonteCrua(metodo, caminho, corpo = null, opcoes2 = {}) {
@@ -14682,7 +14683,7 @@ ${naoIncluidos.join("\r\n")}\r
     }
     if (!resposta.ok) {
       const msg = dados && (dados.erro || dados.mensagem || dados.message) || `A ponte respondeu com erro ${resposta.status}.`;
-      if (resposta.status === 401) throw new ErroPonte("A ponte recusou a senha. Confira a senha da ponte em Dados e backup → Banco (C6) e no .env da ponte.", { status: resposta.status, detalhes: dados });
+      if (resposta.status === 401) throw new ErroPonte("A ponte recusou a senha. Confira a senha da ponte em Sistema → Banco → Banco (C6) e no .env da ponte.", { status: resposta.status, detalhes: dados });
       throw new ErroPonte(msg, { status: resposta.status, detalhes: dados });
     }
     return dados;
@@ -14713,7 +14714,7 @@ ${naoIncluidos.join("\r\n")}\r
   function negativarBoleto(d2, cb, dias, opcoes2 = {}) {
     if (!pontePronta(d2)) throw new Error(motivoIndisponivel(d2));
     const conta = contaBanco(d2, cb.banco && cb.banco.conta_id);
-    if (!conta || !conta.negativacao.ativa) throw new Error("A negativação está desligada nesta conta (Dados e backup → Banco (C6)).");
+    if (!conta || !conta.negativacao.ativa) throw new Error("A negativação está desligada nesta conta (Sistema → Banco → Banco (C6)).");
     return chamarPonte(cb.banco && cb.banco.conta_id, "POST", `/boletos/${idNoBanco(cb)}/negativar`, pedidoNegativacaoC6(dias), opcoes2);
   }
   function cancelarNegativacao(d2, cb, opcoes2 = {}) {
@@ -14743,7 +14744,7 @@ ${naoIncluidos.join("\r\n")}\r
       ponteLocal = () => ({ ...PONTE_PADRAO, ...local, ponte_url: local.ponte_url, configurada: !!local.ponte_url });
       configuracaoBanco = (d2) => ({ ...configBanco(d2), ...local.ponte_url ? { ponte_url: local.ponte_url, senha_ponte: local.senha_ponte } : { ponte_url: "", senha_ponte: "" } });
       pontePronta = (d2) => bancoAtivo(d2) && !!local.ponte_url;
-      motivoIndisponivel = (d2) => motivoBancoInativo(d2) || (!local.ponte_url ? "Informe o endereço e a senha da ponte neste computador (Dados e backup → Banco (C6))" : "");
+      motivoIndisponivel = (d2) => motivoBancoInativo(d2) || (!local.ponte_url ? "Informe o endereço e a senha da ponte neste computador (Sistema → Banco → Banco (C6))" : "");
       ErroPonte = class extends Error {
         constructor(mensagem, { status = 0, detalhes = null } = {}) {
           super(mensagem);
@@ -14825,13 +14826,13 @@ ${naoIncluidos.join("\r\n")}\r
     const conteudo = await sutil().encrypt({ name: "AES-GCM", iv, additionalData: cabecalhoBytes }, aes, bytes2);
     const prefixo = texto(`${MAGICO}
 `);
-    const topo2 = new Uint8Array(prefixo.length + cabecalhoBytes.length + 1);
-    topo2.set(prefixo, 0);
-    topo2.set(cabecalhoBytes, prefixo.length);
-    topo2[topo2.length - 1] = 10;
-    const saida = new Uint8Array(topo2.length + conteudo.byteLength);
-    saida.set(topo2, 0);
-    saida.set(new Uint8Array(conteudo), topo2.length);
+    const topo3 = new Uint8Array(prefixo.length + cabecalhoBytes.length + 1);
+    topo3.set(prefixo, 0);
+    topo3.set(cabecalhoBytes, prefixo.length);
+    topo3[topo3.length - 1] = 10;
+    const saida = new Uint8Array(topo3.length + conteudo.byteLength);
+    saida.set(topo3, 0);
+    saida.set(new Uint8Array(conteudo), topo3.length);
     return saida;
   }
   function cabecalhoDe(bytes2) {
@@ -15059,7 +15060,7 @@ SÓ EM CASO DE DESASTRE (dados da nuvem perdidos, ex.: conta da nuvem perdida; a
 2. Clique em "restaurar um backup seguro", escolha a cópia mais recente de ${PASTA_DIARIO}/ (ou um completo),
    digite a senha do backup e mande abrir numa pasta nova do computador.
 3. O sistema abre inteiro, com os dados daquela cópia. Pode trabalhar normalmente.
-4. Para levar de volta a uma nuvem nova: Dados e backup -> "Substituir os dados da nuvem pelos de uma pasta".
+4. Para levar de volta a uma nuvem nova: Sistema -> "Substituir os dados da nuvem pelos de uma pasta".
 
 Não mova nem renomeie os arquivos desta pasta. chave-do-backup.json é a chave: sem ele e sem a senha, nada abre.
 `;
@@ -17630,348 +17631,6 @@ Não mova nem renomeie os arquivos desta pasta. chave-do-backup.json é a chave:
     }
   });
 
-  // docs/js/ajuda.js
-  function chaveDaAjuda(hash) {
-    const nome = String(hash || "").replace(/^#\/?/, "").split(/[/?]/)[0] || "painel";
-    return Object.hasOwn(AJUDA_TELAS, nome) ? nome : "";
-  }
-  function comRegras(texto3) {
-    return String(texto3).replace(/\{([a-z_]+)(?:\|([^|}]+)\|([^}]+))?\}/g, (todo, chave, um, varios) => {
-      let v;
-      try {
-        v = regra(chave);
-      } catch {
-        return todo;
-      }
-      if (v === void 0 || v === null) return todo;
-      if (um) return plural(v, um, varios);
-      return chave.startsWith("dia_") ? String(v).padStart(2, "0") : String(v);
-    });
-  }
-  function textoDaAjuda(chave) {
-    const a = AJUDA_TELAS[chave];
-    if (!a) return "";
-    return `<p><b>Para que serve:</b> ${esc(comRegras(a.serve))}</p>
-    <p><b>O que fazer primeiro:</b></p><ol>${a.primeiro.map((p2) => `<li>${esc(comRegras(p2))}</li>`).join("")}</ol>
-    <p><b>Exemplo:</b> ${esc(comRegras(a.exemplo))}</p>`;
-  }
-  function ligarAjuda(raiz, hash = globalThis.location?.hash) {
-    if (!raiz || typeof raiz.querySelector !== "function") return;
-    ligarPrimeirosPassos(raiz);
-    const chave = chaveDaAjuda(hash);
-    const h1 = chave && raiz.querySelector("h1");
-    if (!h1 || h1.querySelector(".botao-ajuda")) return;
-    const id = `ajuda-${chave}`;
-    const aberta = ajudasAbertas.has(chave);
-    h1.insertAdjacentHTML("beforeend", ` <button type="button" class="botao-ajuda nao-imprimir" aria-controls="${id}" aria-expanded="${aberta}" title="Ajuda: para que serve esta tela e por onde começar">?</button>`);
-    const depoisDe = h1.parentElement && h1.parentElement.classList.contains("cabecalho") ? h1.parentElement : h1;
-    depoisDe.insertAdjacentHTML("afterend", `<div class="ajuda-tela nao-imprimir" id="${id}" role="region" aria-label="Ajuda: ${esc(AJUDA_TELAS[chave].titulo)}" ${aberta ? "" : "hidden"}>
-    ${textoDaAjuda(chave)}<p class="acoes"><button type="button" class="secundario pequeno" data-fechar-ajuda>Fechar a ajuda</button></p></div>`);
-    const botao2 = h1.querySelector(".botao-ajuda");
-    const caixa = raiz.querySelector(`#${id}`);
-    const abrir2 = (sim2) => {
-      caixa.hidden = !sim2;
-      botao2.setAttribute("aria-expanded", String(sim2));
-      if (sim2) ajudasAbertas.add(chave);
-      else ajudasAbertas.delete(chave);
-    };
-    botao2.addEventListener("click", () => abrir2(caixa.hidden));
-    caixa.querySelector("[data-fechar-ajuda]").addEventListener("click", () => {
-      abrir2(false);
-      botao2.focus();
-    });
-  }
-  function passosIniciais(db, { hoje: hoje3 = hojeIso(), backupLigado = false } = {}) {
-    const contratos = (db.contratos || []).filter((c) => c.ativo !== false && c.imovel_id);
-    const padrao = somarMeses(competenciaDe(hoje3), -1);
-    const entradas = contratos.map((c) => competenciaDe(c.data_entrada || c.vigencia_inicio || hoje3)).sort();
-    const mesBoleto = entradas.length && entradas[0] > padrao ? entradas[0] : padrao;
-    return [
-      {
-        chave: "empresa",
-        feito: (db.emitentes || []).length > 0,
-        soAdmin: true,
-        href: "#/novo/emitentes",
-        botao: "Cadastrar a empresa",
-        titulo: "Dados da empresa",
-        texto: "Nome, CNPJ e endereço da empresa que recebe os aluguéis e emite as NFs. Digite o CNPJ: o resto vem sozinho."
-      },
-      {
-        chave: "imovel",
-        feito: (db.imoveis || []).length > 0,
-        href: "#/novo/imoveis",
-        botao: "Cadastrar o primeiro imóvel",
-        titulo: "Primeiro imóvel",
-        texto: "Endereço (pelo CEP), matrícula e as contas de água e luz."
-      },
-      {
-        chave: "contrato",
-        feito: (db.contratos || []).length > 0,
-        depois: "imovel",
-        href: "#/novo/contratos",
-        botao: "Cadastrar o inquilino e o contrato",
-        titulo: "Primeiro inquilino e contrato",
-        texto: "Quem aluga, o aluguel, o dia do vencimento e a garantia. Ex.: R$ 2.000,00, vencendo todo dia 10."
-      },
-      {
-        chave: "boleto",
-        feito: (db.cobrancas || []).length > 0,
-        depois: "contrato",
-        href: `#/cobrancas?comp=${mesBoleto}`,
-        botao: `Gerar o boleto de ${compBr(mesBoleto)}`,
-        titulo: "Primeiro boleto",
-        texto: `Na tela Boletos, gere os boletos do aluguel de ${compBr(mesBoleto)}: o sistema calcula o valor de cada inquilino.`
-      },
-      {
-        chave: "backup",
-        feito: zipBaixado(db) || !!backupLigado,
-        href: "#/dados",
-        botao: "Fazer a cópia dos dados",
-        titulo: "Cópia de segurança (backup)",
-        texto: "Baixe o ZIP com todos os dados (em Dados e backup) e guarde fora do computador, num pen drive ou no seu e-mail."
-      }
-    ];
-  }
-  function escondidos() {
-    try {
-      const v = JSON.parse(globalThis.localStorage?.getItem(CHAVE_ESCONDIDOS) || "[]");
-      return Array.isArray(v) ? v : [];
-    } catch {
-      return [];
-    }
-  }
-  function esconderPassos(quem, esconder = true) {
-    const lista3 = escondidos().filter((x) => x !== String(quem || ""));
-    if (esconder) lista3.push(String(quem || ""));
-    try {
-      globalThis.localStorage?.setItem(CHAVE_ESCONDIDOS, JSON.stringify(lista3));
-    } catch {
-    }
-  }
-  function mostrarPassos(db, quem, opcoes2 = {}) {
-    if (!sistemaComecando(db) || passosEscondidos(quem)) return false;
-    return passosIniciais(db, opcoes2).some((p2) => !p2.feito);
-  }
-  function caixaPrimeirosPassos(db, { quem = "", pode: pode2 = true, admin: admin3 = false, hoje: hoje3, backupLigado = false } = {}) {
-    if (!pode2 || !mostrarPassos(db, quem, { hoje: hoje3, backupLigado })) return "";
-    const passos = passosIniciais(db, { hoje: hoje3, backupLigado });
-    const feitos = passos.filter((p2) => p2.feito).length;
-    const proximo = passos.find((p2) => !p2.feito && !(p2.soAdmin && !admin3) && !(p2.depois && !passos.find((x) => x.chave === p2.depois).feito));
-    const item3 = (p2, n) => {
-      const espera = p2.depois && !passos.find((x) => x.chave === p2.depois).feito;
-      const acao = p2.feito ? '<span class="passo-feito">feito</span>' : p2.soAdmin && !admin3 ? '<span class="suave">(o administrador faz)</span>' : espera ? `<span class="suave">(depois do passo ${passos.findIndex((x) => x.chave === p2.depois) + 1})</span>` : `<a class="botao${p2 === proximo ? "" : " secundario"} pequeno" href="${esc(p2.href)}">${esc(p2.botao)}</a>`;
-      return `<li class="${p2.feito ? "feito" : ""}"><span class="passo-numero" aria-hidden="true">${p2.feito ? "✓" : n}</span>
-      <div><b>${esc(p2.titulo)}</b><br><span class="suave">${esc(p2.texto)}</span><div class="passo-acao">${acao}</div></div></li>`;
-    };
-    return `<div class="primeiros-passos" id="primeiros-passos">
-    <div class="cabecalho"><h2>Primeiros passos <span class="suave">(${feitos} de ${passos.length} feitos)</span></h2>
-      <button type="button" class="secundario pequeno" data-esconder-passos="${esc(quem)}" title="Esconder esta caixa. Para ver de novo: Dados e backup">Já sei usar</button></div>
-    <p class="suave">Para começar a usar o sistema, siga os passos na ordem. Cada um fica marcado com ✓ sozinho quando estiver feito. Em cada tela, o botão <b>?</b> ao lado do título explica para que ela serve.</p>
-    <ol class="lista-passos">${passos.map((p2, i) => item3(p2, i + 1)).join("")}</ol></div>`;
-  }
-  function caixaReabrirPassos(db, quem, opcoes2 = {}) {
-    if (!passosEscondidos(quem) || !sistemaComecando(db) || !passosIniciais(db, opcoes2).some((p2) => !p2.feito)) return "";
-    return `<div class="cartao" id="reabrir-passos"><h2>Primeiros passos</h2><p>A lista dos primeiros passos (empresa, imóvel, contrato, boleto e backup) está escondida no Painel.</p>
-    <p><button type="button" class="secundario pequeno" data-mostrar-passos="${esc(quem)}">Mostrar os primeiros passos no Painel</button></p></div>`;
-  }
-  function ligarPrimeirosPassos(raiz) {
-    const esconder = raiz.querySelector("[data-esconder-passos]");
-    if (esconder) {
-      esconder.addEventListener("click", () => {
-        esconderPassos(esconder.dataset.esconderPassos, true);
-        esconder.closest(".primeiros-passos")?.remove();
-      });
-    }
-    const mostrar2 = raiz.querySelector("[data-mostrar-passos]");
-    if (mostrar2) {
-      mostrar2.addEventListener("click", () => {
-        esconderPassos(mostrar2.dataset.mostrarPassos, false);
-        globalThis.location.hash = "#/";
-      });
-    }
-  }
-  function proximoPasso(titulo2, texto3, botoes = []) {
-    const lista3 = botoes.filter(Boolean);
-    const um = (b, i) => typeof b === "string" ? b : `<a class="botao${i ? " secundario" : ""} pequeno" href="${esc(b[0])}">${esc(b[1])}</a>`;
-    return `<div class="proximo-passo"><b>${esc(titulo2)}</b>${texto3 ? ` <span>${esc(texto3)}</span>` : ""}${lista3.length ? `<div class="acoes">${lista3.map(um).join(" ")}</div>` : ""}</div>`;
-  }
-  var AJUDA_TELAS, ajudasAbertas, LIMITES_SISTEMA_NOVO, sistemaComecando, zipBaixado, CHAVE_ESCONDIDOS, passosEscondidos;
-  var init_ajuda = __esm({
-    "docs/js/ajuda.js"() {
-      init_calculos();
-      init_config_regras();
-      init_formularios();
-      AJUDA_TELAS = {
-        painel: {
-          titulo: "Painel",
-          serve: "É a tela de entrada: mostra num relance quantos imóveis e inquilinos você tem, os avisos do que precisa de atenção (boleto vencido, reajuste, seguro, documento faltando) e o calendário do mês.",
-          primeiro: [
-            "Leia os alertas de cima para baixo: cada um tem um link que leva direto ao que precisa ser feito.",
-            'Use "Confirmar pagamento" quando um inquilino pagar.',
-            "No calendário, clique num dia para ver o que vence nele (no celular, o calendário vira uma lista: toque na semana)."
-          ],
-          exemplo: 'No dia {dia_gerar_boletos}/11/2026 o calendário avisa "boletos": é o dia de gerar os boletos do aluguel de novembro, que vencem em dezembro. No dia 01/12/2026 avisa "NFs": é o dia de numerar as NFs dos pagamentos de novembro.'
-        },
-        imoveis: {
-          titulo: "Imóveis",
-          serve: 'Lista todos os imóveis, com o endereço, a matrícula, as contas (água, luz, gás, internet, condomínio) e o aluguel de hoje. Imóvel sem inquilino aparece como "Vago".',
-          primeiro: [
-            'Clique em "Novo imóvel" e digite o CEP: a rua, o bairro e a cidade vêm sozinhos.',
-            'Anexe o arquivo da matrícula no botão "📎 Anexar".',
-            'Depois, cadastre o inquilino em Inquilinos → "Novo contrato".'
-          ],
-          exemplo: "Apartamento 101 com aluguel de R$ 2.000,00 e bonificação de 10%: a lista mostra R$ 2.000,00 e, entre parênteses, R$ 1.800,00 (o que o inquilino paga em dia)."
-        },
-        imovel: {
-          titulo: "Página do imóvel",
-          serve: "Junta tudo de um imóvel: dados e documentos, o inquilino de agora e os anteriores, o IPTU de cada ano, as contas de água e luz e o que entrou e saiu no banco ligado a ele.",
-          primeiro: [
-            'Confira o endereço e as contas em "Editar imóvel".',
-            "Lance o IPTU do ano na caixa do IPTU.",
-            'Para alugar, use "Novo contrato" (ou a ficha do interessado, em Inquilinos).'
-          ],
-          exemplo: "IPTU de 2026 de R$ 2.130,00 em 10 parcelas: cada boleto do inquilino leva R$ 213,00 a partir do mês escolhido (ex.: o boleto que vence em março de 2026)."
-        },
-        inquilinos: {
-          titulo: "Inquilinos",
-          serve: "Lista quem aluga hoje (ativos) e quem já saiu, com a vigência do contrato, o aluguel atual e a garantia. Em cima ficam as fichas dos interessados que ainda estão em análise.",
-          primeiro: [
-            'Alguém quer alugar? Clique em "Novo pedido de reserva": preencha o imóvel, o contato, a proposta e o que está incluso. Depois, na página da ficha, gere o link para a pessoa preencher o resto.',
-            'Ficha aprovada vira o contrato já preenchido. Já tem o contrato? Use "Novo contrato", na caixa "Contratos ativos".',
-            "Clique no nome do inquilino para abrir a página dele."
-          ],
-          exemplo: 'Inquilino que entrou em 10/03/2026 com contrato de 30 meses aparece em "Contratos ativos" com a vigência 10/03/2026 a 09/09/2028. Quando sair, a saída é registrada na página dele e ele passa para "Inativos".'
-        },
-        contrato: {
-          titulo: "Página do inquilino",
-          serve: "Tudo de um contrato: dados do inquilino e dos fiadores, boletos, documentos assinados, garantia (caução ou seguro), reajustes, solicitações e, no fim, a saída com o cálculo final.",
-          primeiro: [
-            'Confira os dados em "Editar contrato" (o valor, o dia do vencimento e a garantia).',
-            'Siga a "Rotina de entrada do inquilino": gerar o contrato, colher as assinaturas, vistoria, caução. Cada etapa fica marcada sozinha quando é registrada.',
-            'Quando o inquilino for sair, use "Saída do inquilino": o sistema faz o cálculo final.'
-          ],
-          exemplo: "Aluguel de R$ 2.000,00 com vencimento no dia 10 e bonificação de 10%: pago até 10/12/2026, o boleto de novembro sai por R$ 1.800,00; pago depois, é R$ 2.000,00 mais multa e juros."
-        },
-        notificacoes: {
-          titulo: "Notificações ao inquilino",
-          serve: "Lista as notificações que a administração mandou aos inquilinos para resolver algo num prazo (o contrário das solicitações, que são pedidos do inquilino). As em aberto vêm primeiro; o prazo vencido aparece em vermelho.",
-          primeiro: [
-            'Clique em "Nova notificação", escolha o inquilino e o assunto e clique em "Montar o texto".',
-            'Troque no texto o que estiver em "[preencher: …]" pelo caso real e salve.',
-            "Abra a notificação: imprima o PDF, assine no gov.br, anexe a assinada e envie."
-          ],
-          exemplo: "Ar-condicionado instalado errado: notificação de 17/11/2026 com 10 dias úteis vence em 02/12/2026 (20/11 é feriado). O lembrete aparece no Painel em 27/11; em 03/12, se não resolveu, dá para mandar a 2ª notificação ou gerar a multa no próximo boleto."
-        },
-        notificacao: {
-          titulo: "Notificação ao inquilino",
-          serve: "Acompanha uma notificação do começo ao fim: o PDF para assinar, a assinada, o envio, o prazo em dias úteis, a baixa quando o inquilino resolve e, se não resolver, outra notificação do mesmo assunto ou a multa.",
-          primeiro: [
-            'Clique em "PDF para assinar", baixe e assine no gov.br (assinador.iti.br).',
-            'Anexe a notificação assinada e envie por e-mail (o "Enviar agora" já marca a data do envio) ou entregue à mão e marque como enviada.',
-            "Quando o inquilino resolver, dê a baixa com a data e uma foto."
-          ],
-          exemplo: 'Prazo até 02/12/2026 e nada resolvido: em 03/12 clique em "Gerar multa", digite R$ 2.000,00 (o sistema sugere 1 aluguel) e confira o boleto que recebe. O boleto de 11/2026, que vence em 10/12, passa de R$ 2.000,00 para R$ 4.000,00, e a multa fica fora da NF.'
-        },
-        ficha: {
-          titulo: "Ficha em análise",
-          serve: "Guarda o pedido de quem quer alugar: dados da pessoa e dos fiadores, a reserva paga e os documentos (renda, identidade). É aqui que a ficha é aprovada ou reprovada.",
-          primeiro: [
-            "Confira os documentos de cada pessoa da ficha.",
-            "Registre a reserva, se o interessado pagou.",
-            "Aprove para virar contrato, ou reprove (a reserva é devolvida e os documentos saem depois de {meses_documentos_ficha|mês|meses})."
-          ],
-          exemplo: "Ficha recebida em 05/11/2026 com reserva de R$ 500,00: aprovada em 08/11/2026, o contrato já vem preenchido com os dados dela e a reserva é descontada do primeiro boleto."
-        },
-        cobrancas: {
-          titulo: "Boletos",
-          serve: 'Os boletos do aluguel de cada mês. O mês da tela é o mês de referência do aluguel: o boleto do aluguel de novembro vence em dezembro. No alto, o botão "E-mails da régua" abre os e-mails de cobrança preparados pelo sistema, esperando a autorização do administrador (nada é enviado sozinho).',
-          primeiro: [
-            'A partir do dia {dia_gerar_boletos}, clique em "Gerar boletos" do mês: o sistema calcula o valor de cada inquilino (aluguel, IPTU, seguro, descontos).',
-            'Quando o inquilino pagar, clique em "Confirmar pagamento" na linha e informe o dia em que o dinheiro entrou na conta.',
-            "Depois, numere as NFs na tela NF."
-          ],
-          exemplo: "Aluguel de novembro de 2026, R$ 2.000,00 com bonificação de 10%, vencendo em 10/12/2026: em dia, R$ 1.800,00. Se o dia 10 cair num sábado, vale até o próximo dia útil sem multa."
-        },
-        cobranca: {
-          titulo: "Boleto",
-          serve: "Mostra um boleto por dentro: cada valor que entra (aluguel, IPTU, seguro, descontos), o vencimento, a situação e o pagamento.",
-          primeiro: [
-            "Confira os valores antes de mandar ao inquilino.",
-            'Use "Confirmar pagamento" quando o dinheiro entrar.',
-            "Precisa mudar um valor? Mude no cadastro e recalcule; o boleto alterado à mão não muda mais sozinho."
-          ],
-          exemplo: "Inquilino que entrou em 15/11/2026: o boleto de novembro é proporcional, 16 de 30 dias. Com aluguel de R$ 2.000,00, sai R$ 1.066,67."
-        },
-        faturas: {
-          titulo: "NF",
-          serve: 'Numera e guarda as notas fiscais (NF) dos aluguéis recebidos. Cada pagamento confirmado em Boletos fica aqui "aguardando número".',
-          primeiro: [
-            "Espere o mês virar: as NFs de novembro são numeradas a partir de 01/12.",
-            'Marque os pagamentos e clique em "Numerar as NFs marcadas".',
-            "Imprima ou baixe em PDF para mandar ao inquilino."
-          ],
-          exemplo: "Em novembro de 2026 entraram três aluguéis, nos dias 05, 08 e 12. Em 01/12/2026, ao numerar, quem pagou no dia 05 recebe o primeiro número, depois o do dia 08 e por último o do dia 12."
-        },
-        banco: {
-          titulo: "Banco",
-          serve: "Traz o extrato da conta no banco (C6) para dentro do sistema e diz para onde foi cada entrada e saída: aluguel de qual boleto, conta de qual imóvel, imposto, reforma.",
-          primeiro: [
-            'O administrador liga o banco em Dados e backup (caixa "Banco (C6)").',
-            'Clique em "Buscar extrato" do mês (ou importe o arquivo OFX baixado no app do C6).',
-            'Dê o destino de cada linha "sem destino": o sistema sugere e você confirma.'
-          ],
-          exemplo: "Entrada de R$ 1.800,00 em 10/12/2026 com o nome do inquilino: o sistema propõe ligar ao boleto de novembro desse inquilino; você confere e confirma o pagamento."
-        },
-        reajustes: {
-          titulo: "Reajustes do aluguel",
-          serve: "Corrige o aluguel uma vez por ano pelo índice do contrato (IGP-M, IPCA etc.) e prepara a carta de reajuste para o inquilino.",
-          primeiro: [
-            "No começo do mês, informe o índice acumulado de 12 meses (IGP-M, IPCA, INPC e IGP-DI vêm do Banco Central para conferir).",
-            'Em cada reajuste em aberto, clique em "Aplicar correção".',
-            "Gere a carta e mande junto com o boleto do mês."
-          ],
-          exemplo: "Inquilino que entrou em março de 2026 tem o reajuste no aluguel de março de 2027 (o 13º mês; a regra pode ser mudada em Regras do sistema). Aluguel de R$ 2.000,00 com índice de 4,5%: passa a R$ 2.090,00. Índice negativo: o aluguel fica igual."
-        },
-        iptu: {
-          titulo: "IPTU's",
-          serve: "Mostra o IPTU do ano de todos os imóveis: o que o inquilino paga no boleto, o que é sua parte e as guias que você ainda precisa pagar.",
-          primeiro: [
-            'Clique em "Lançar" no imóvel em amarelo (sem o IPTU do ano).',
-            "Informe o valor, o número de parcelas e o mês do primeiro boleto com IPTU.",
-            "Marque como paga cada guia sua quando pagar."
-          ],
-          exemplo: 'IPTU de 2026 de R$ 2.130,00 em 10 parcelas, a partir do boleto que vence em março: o inquilino paga R$ 213,00 por mês de março a dezembro. Em mês sem inquilino, a parcela é sua e aparece em "Guias suas a pagar".'
-        },
-        dados: {
-          titulo: "Dados e backup",
-          serve: "Mostra onde os dados estão guardados e as cópias de segurança. Daqui também se chega às Empresas, às Regras do sistema, ao Histórico de alterações e à configuração do banco.",
-          primeiro: [
-            "Baixe o ZIP com todos os dados de vez em quando e guarde fora do computador (pen drive ou e-mail).",
-            "Administrador: ligue o backup seguro neste computador.",
-            "Confira as Regras do sistema (multa, juros, caução, reajuste) antes do primeiro boleto."
-          ],
-          exemplo: "Baixou o ZIP em 16/11/2026? Guarde o arquivo num pen drive. Com os dados na nuvem, a tela lembra a data e, a partir de 24/11/2026 (mais de 7 dias), avisa que vale baixar outra cópia."
-        },
-        empresas: {
-          titulo: "Empresas",
-          serve: "As empresas que recebem os aluguéis e emitem as NFs. Os dados delas (nome, CNPJ, endereço, conta) saem nos contratos, nos recibos e nas NFs.",
-          primeiro: [
-            'Clique em "Nova empresa" e digite o CNPJ: o nome e o endereço vêm sozinhos (confira os acentos).',
-            "Envie a logo: ela aparece nos documentos e no ícone do aplicativo.",
-            "Tem duas empresas? Cadastre as duas; em cada imóvel você diz quanto da NF é de cada uma."
-          ],
-          exemplo: "Imóvel dividido 50% e 50% entre duas empresas: a NF de um aluguel de R$ 2.000,00 sai em duas partes de R$ 1.000,00, uma para cada empresa."
-        }
-      };
-      ajudasAbertas = /* @__PURE__ */ new Set();
-      LIMITES_SISTEMA_NOVO = { imoveis: 10, cobrancas: 24, faturas: 12 };
-      sistemaComecando = (db) => (db.imoveis || []).length <= LIMITES_SISTEMA_NOVO.imoveis && (db.cobrancas || []).length <= LIMITES_SISTEMA_NOVO.cobrancas && (db.faturas || []).length <= LIMITES_SISTEMA_NOVO.faturas;
-      zipBaixado = (db) => (db.historico || []).some((h) => h.acao === "Exportação" && /ZIP/.test(h.descricao || ""));
-      CHAVE_ESCONDIDOS = "primeiros-passos-escondidos";
-      passosEscondidos = (quem) => escondidos().includes(String(quem || ""));
-    }
-  });
-
   // docs/js/exportar.js
   var exportar_exports = {};
   __export(exportar_exports, {
@@ -19514,7 +19173,7 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
       init_comum();
       cpfEscolhido = "";
       SO_ADMIN = "<h1>Acesso só para administradores</h1>";
-      topo = (titulo2) => `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>${titulo2}</h1>`;
+      topo = (titulo2) => `<p class="suave"><a href="#/lgpd">← LGPD</a></p><h1>${titulo2}</h1>`;
       doc = (v) => mascarar("cpfcnpj", v);
       rotulo = (t) => TABELAS[t] || t;
       campoEmPalavras = (campo2) => campo2.replace(/\.\d+\./g, " → ").replace(/_/g, " ");
@@ -19649,7 +19308,7 @@ Lei Geral de Proteção de Dados (Lei 13.709/2018), art. 18: direito de acesso a
     const linhas2 = [
       "",
       "",
-      `REGRAS EM USO EM ${dataBr(hoje3)} (Dados e backup → Regras do sistema)`,
+      `REGRAS EM USO EM ${dataBr(hoje3)} (Sistema → Regras do sistema)`,
       "O texto acima descreve o padrão do sistema (ex.: boletos a partir do dia 20, reajuste no 13º mês). Onde o administrador mudou, vale o que está aqui."
     ];
     let mudadas = 0;
@@ -19768,7 +19427,7 @@ Lei Geral de Proteção de Dados (Lei 13.709/2018), art. 18: direito de acesso a
     const regras = regrasDe(d());
     const mudadas = DEFINICOES_REGRAS.filter((x) => !mesmoValor(regras[x.chave], x.padrao));
     const versoes = [...d().versoes_regras || []].sort((a, b) => String(b.salvo_em).localeCompare(String(a.salvo_em)));
-    return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Regras do sistema</h1>
+    return `<p class="suave"><a href="#/dados">← Sistema</a></p><h1>Regras do sistema</h1>
     <div class="alerta info">Cada regra mostra o que faz, a consequência de cada escolha e a lei. O <b>padrão do sistema</b> são as regras originais, gravadas no programa: elas valem enquanto nada for mudado e sempre dá para voltar a elas. O sistema avisa quando uma escolha tem risco legal, mas não proíbe.
       ${mudadas.length ? `<br>Hoje <b>${mudadas.length} regra(s)</b> diferente(s) do padrão: ${mudadas.map((x) => esc(x.rotulo)).join("; ")}.` : "<br>Hoje todas as regras estão no padrão do sistema."}</div>
     ${admin3 ? "" : '<div class="alerta aviso">Só o administrador muda as regras.</div>'}
@@ -21017,7 +20676,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
   }
   function exigirConta(d2, contaId) {
     const c = contaBancaria(d2, contaId);
-    if (!c) throw new Error(`Conta bancária "${contaId}" não está configurada em Dados e backup → Banco (C6).`);
+    if (!c) throw new Error(`Conta bancária "${contaId}" não está configurada em Sistema → Banco → Banco (C6).`);
     return c;
   }
   function movimentacaoDoC6(contaId, e) {
@@ -22345,11 +22004,11 @@ ${DICA_DOCUMENTOS}`].join("\n");
   }
   function validarPagamento(d2, dados) {
     const conf = cfg4(d2);
-    if (!conf.permitir_pagamentos) throw new Error("Os pagamentos pelo banco estão desligados em Dados e backup → Banco: conciliação e pagamentos.");
+    if (!conf.permitir_pagamentos) throw new Error("Os pagamentos pelo banco estão desligados em Sistema → Banco → Banco: conciliação e pagamentos.");
     exigirConta(d2, dados.conta_id);
     if (!contasConfiguradas(d2).some((c) => c.id === dados.conta_id)) throw new ErroUsuario("Esta conta é de outro banco (só extrato por arquivo): o pagamento pelo banco sai só por uma conta do C6.");
     if (!(Number(dados.valor) > 0)) throw new Error("Informe o valor a pagar.");
-    if (conf.limite_pagamento > 0 && dados.valor > conf.limite_pagamento) throw new ErroUsuario(`O valor (${reais(dados.valor)}) passa do limite por pagamento (${reais(conf.limite_pagamento)}) definido em Dados e backup → Banco: conciliação e pagamentos.`);
+    if (conf.limite_pagamento > 0 && dados.valor > conf.limite_pagamento) throw new ErroUsuario(`O valor (${reais(dados.valor)}) passa do limite por pagamento (${reais(conf.limite_pagamento)}) definido em Sistema → Banco → Banco: conciliação e pagamentos.`);
     if (dados.imovel_id && !buscar(d2, "imoveis", dados.imovel_id)) throw new Error("Imóvel não encontrado.");
     if (!["boleto", "pix"].includes(dados.forma)) throw new Error("Escolha a forma: boleto (código de barras) ou Pix.");
     const content = conteudoDoPagamento(dados);
@@ -22470,7 +22129,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
   }
   function aprovarPagamento(d2, pagId, aprovador) {
     const p2 = exigirPagamento(d2, pagId);
-    if (!cfg4(d2).permitir_pagamentos) throw new Error("Os pagamentos pelo banco estão desligados em Dados e backup → Banco: conciliação e pagamentos.");
+    if (!cfg4(d2).permitir_pagamentos) throw new Error("Os pagamentos pelo banco estão desligados em Sistema → Banco → Banco: conciliação e pagamentos.");
     if (p2.situacao !== "rascunho") throw new Error(`Este pagamento está "${SITUACOES_PAGAMENTO[p2.situacao]}" e não pode ser aprovado de novo.`);
     atualizar(
       d2,
@@ -23336,7 +22995,7 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
     try {
       lista3 = (await listar(await pastaBackups())).filter((a) => diaDoBackup(a.nome).length);
     } catch (e) {
-      return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backups da nuvem</h1><div class="alerta erro">${esc(e.message)}</div>`;
+      return `<p class="suave"><a href="#/dados">← Sistema</a></p><h1>Backups da nuvem</h1><div class="alerta erro">${esc(e.message)}</div>`;
     }
     lista3.sort((a, b) => b.nome.localeCompare(a.nome));
     const linhas2 = lista3.map((a) => {
@@ -23345,9 +23004,9 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
       <td>${botao("baixarBackupNuvem", "Baixar", { nome: a.nome }, "secundario pequeno")} ${botao("restaurarBackupNuvem", "Voltar para este dia", { nome: a.nome }, "perigo pequeno")}</td></tr>`;
     }).join("");
     const exemplo = dataBr(lista3.map((a) => diaDoBackup(a.nome)).find(([, , motivo]) => !motivo)?.[0] || hojeIso()).slice(0, 5);
-    return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backups da nuvem</h1>
+    return `<p class="suave"><a href="#/dados">← Sistema</a></p><h1>Backups da nuvem</h1>
     <div class="cartao"><p>A nuvem guarda uma cópia do banco de dados por dia (os 30 dias mais recentes), feita às 3h da manhã (horário de Brasília): o backup de ${exemplo} é como os dados estavam às 3h de ${exemplo}. Os anexos não entram: eles ficam guardados uma vez só e não mudam.</p>
-      <p>${lista3.some((a) => cifrado(a.nome)) ? "🔒 Os backups marcados como cifrados só abrem com a <b>senha do backup seguro</b> (a mesma da pasta segura): quem tiver acesso à nuvem não consegue ler os dados." : "Os backups estão <b>sem cifrar</b>. Ligue o backup seguro neste computador (Dados e backup → Backup seguro): os próximos backups da nuvem passam a sair cifrados com a senha do backup."}</p>
+      <p>${lista3.some((a) => cifrado(a.nome)) ? "🔒 Os backups marcados como cifrados só abrem com a <b>senha do backup seguro</b> (a mesma da pasta segura): quem tiver acesso à nuvem não consegue ler os dados." : "Os backups estão <b>sem cifrar</b>. Ligue o backup seguro neste computador (Sistema → Backup seguro): os próximos backups da nuvem passam a sair cifrados com a senha do backup."}</p>
       <p><b>Voltar para este dia</b> troca os dados da nuvem pelos daquele backup (antes, a nuvem guarda uma cópia de como estava agora). Tudo o que foi lançado depois das 3h daquele dia se perde, em todos os aparelhos. Use só em caso de erro geral.</p>
       <div class="rolagem"><table><tr><th>Dia</th><th>O que é</th><th class="n">Tamanho</th><th></th></tr>${linhas2 || '<tr><td colspan="4" class="suave">Nenhum backup ainda (o primeiro é feito às 3h da manhã).</td></tr>'}</table></div></div>`;
   }
@@ -23371,8 +23030,8 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
     return r;
   }
   async function telaAcessos(q = {}) {
-    const topo2 = '<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Acessos</h1>';
-    if (!E.nuvem) return `${topo2}<p class="suave">Só existe com os dados na nuvem.</p>`;
+    const topo3 = '<p class="suave"><a href="#/dados">← Sistema</a></p><h1>Acessos</h1>';
+    if (!E.nuvem) return `${topo3}<p class="suave">Só existe com os dados na nuvem.</p>`;
     if (!podeUsuario("admin")) return "<h1>Acesso só para administradores</h1>";
     const filtro = { de: q.de && /^\d{4}-\d{2}-\d{2}$/.test(q.de) ? q.de : "", ate: q.ate || "", email: q.quem || "", antes: q.antes || "" };
     let r;
@@ -23380,7 +23039,7 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
       const busca = new URLSearchParams(Object.entries(filtro).filter(([, v]) => v));
       r = await apiDados()("GET", `acessos${String(busca) ? `?${busca}` : ""}`);
     } catch (e) {
-      return `${topo2}<div class="alerta erro">Não deu para ver os acessos agora: ${esc(e.message)}</div>`;
+      return `${topo3}<div class="alerta erro">Não deu para ver os acessos agora: ${esc(e.message)}</div>`;
     }
     const form = `<form class="cartao acoes" data-form="ir" data-ir="acessos"><label style="margin:0">De</label><input type="date" name="de" value="${esc(filtro.de)}" style="width:160px">
     <label style="margin:0">até</label><input type="date" name="ate" value="${esc(filtro.ate)}" style="width:160px">
@@ -23391,7 +23050,7 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
     <td class="n">${tamanho(a.bytes)}</td><td>${a.origem === "pc" ? "Programa do PC" : "Site"}${a.ip ? `<br><span class="suave">${esc(a.ip)}</span>` : ""}</td></tr>`).join("");
     const ultimo = (r.acessos || []).at(-1);
     const mais = r.mais && ultimo ? `<p>${link(`#/acessos?${new URLSearchParams(Object.entries({ de: filtro.de, ate: filtro.ate, quem: filtro.email, antes: String(ultimo.n) }).filter(([, v]) => v))}`, "Ver os mais antigos")}</p>` : "";
-    return `${topo2}
+    return `${topo3}
     <div class="cartao"><p>A nuvem anota quem <b>baixou todos os dados</b>, <b>abriu, anexou ou apagou arquivos</b>, baixou <b>backups</b>, mandou <b>e-mail</b> pela conta da empresa, mexeu na <b>ficha pela internet</b> e ligou o <b>programa do PC</b>, com a data, o endereço de internet e o tamanho. Fica guardado por ${Number(r.dias) || 180} dias (<a href="#/regras">Regras do sistema</a>, "Registro de acessos").</p>
       <p class="suave">Use para conferir se alguém baixou dados demais ou tentou entrar sem poder (linhas "Recusado"). Abrir telas e listas de anexos não entra.</p></div>
     ${form}
@@ -23990,14 +23649,14 @@ Abrir o Gmail mesmo assim? O texto vai com o buraco, e você completa por lá.`,
   }
   async function caixaGmailHtml(volta = "") {
     if (!podeUsuario("admin")) return "";
-    const topo2 = '<div class="cartao"><h2>E-mail pelo Gmail</h2>';
+    const topo3 = '<div class="cartao"><h2>E-mail pelo Gmail</h2>';
     if (!E.nuvem) {
-      return `${topo2}<p class="suave">O envio direto (botão <b>Enviar agora</b>) só existe no sistema na nuvem (erp.ankjck.com.br), onde o administrador liga o Gmail da empresa com o botão <b>Conectar o Gmail</b>. Aqui, os e-mails saem por <b>Copiar texto</b> ou <b>Abrir no Gmail</b>.</p></div>`;
+      return `${topo3}<p class="suave">O envio direto (botão <b>Enviar agora</b>) só existe no sistema na nuvem (erp.ankjck.com.br), onde o administrador liga o Gmail da empresa com o botão <b>Conectar o Gmail</b>. Aqui, os e-mails saem por <b>Copiar texto</b> ou <b>Abrir no Gmail</b>.</p></div>`;
     }
     const s = await situacaoGmail();
     const [tipo, texto3] = VOLTA_GMAIL[volta] || [];
     const avisoVolta = texto3 ? `<div class="alerta ${tipo}">${texto3}</div>` : "";
-    if (!s) return `${topo2}${avisoVolta}<p class="suave">Não deu para ver a situação agora (sem internet?). Recarregue a página para tentar de novo.</p></div>`;
+    if (!s) return `${topo3}${avisoVolta}<p class="suave">Não deu para ver a situação agora (sem internet?). Recarregue a página para tentar de novo.</p></div>`;
     let situacao2;
     if (s.origem === "conta" && s.ligado) {
       situacao2 = `<p>${etiqueta("Ligado", "ok")} Os e-mails saem pela conta <b>${esc(s.conta || "")}</b>${s.remetente && s.remetente !== s.conta ? `, com o remetente <b>${esc(s.remetente)}</b>` : ""}${s.ligado_em ? ` <span class="suave">(conectado em ${dataBr(String(s.ligado_em).slice(0, 10))})</span>` : ""}.</p>`;
@@ -24015,7 +23674,7 @@ Abrir o Gmail mesmo assim? O texto vai com o buraco, e você completa por lá.`,
     ${s.origem === "conta" ? botao("desconectarGmail", "Desconectar", {}, "perigo pequeno", 'Desconectar o Gmail? O botão "Enviar agora" some até alguém conectar de novo; a permissão também é retirada na conta do Google.') : ""}</p>`;
     const retorno = s.retorno ? `<p><label>Endereço de retorno <span class="suave">(para o técnico: Google Cloud, credencial, "URIs de redirecionamento autorizados")</span></label>
     <span class="nw"><input readonly value="${esc(s.retorno)}" data-retorno-gmail style="max-width:480px"> ${botao("copiarRetornoGmail", "Copiar", {}, "secundario pequeno")}</span></p>` : "";
-    return `${topo2}${avisoVolta}${ilegivel}
+    return `${topo3}${avisoVolta}${ilegivel}
     <p class="suave">Com o Gmail conectado, os e-mails das etapas (boleto, NF, recibos, avisos) saem pelo botão <b>Enviar agora</b>, pela conta da empresa. Conectar é como entrar com o Google em qualquer site: <b>Conectar o Gmail → escolher a conta → Permitir</b>. O sistema só <b>envia</b>: não lê a caixa de entrada.</p>
     ${situacao2}${falta}${botoes}${retorno}</div>`;
   }
@@ -24026,7 +23685,7 @@ Abrir o Gmail mesmo assim? O texto vai com o buraco, e você completa por lá.`,
       return `<tr><td><b>${esc(m.nome)}</b>${m.editado ? ' <span class="suave">(editado)</span>' : ""}<br><span class="suave">${esc(m.assunto)}</span></td><td class="nw">${esc(m.etapa)}</td>
     <td class="n nw">${opera() ? link(`#/modelo-email/${m.chave}`, "Editar") : ""} ${opera() && m.editado ? botao("restaurarModeloEmail", "Voltar ao texto padrão", { chave: m.chave }, "secundario pequeno", `Trocar o texto de "${m.nome}" pelo padrão? As alterações se perdem.`) : ""}</td></tr>`;
     };
-    return `<p class="suave"><a href="#/dados">← Dados e backup</a></p>
+    return `<p class="suave"><a href="#/sistema-email">← Comunicação E-mail</a></p>
     <div class="cabecalho"><h1>Modelos de e-mail</h1>${botao("baixarModelosEmail", "Baixar todos (TXT)", {}, "secundario pequeno")}</div>
     <p class="suave">Um e-mail para cada etapa da ficha, da entrada e da saída do inquilino, a régua de cobrança (lembretes antes e no dia do vencimento, boleto em atraso), as notificações ao inquilino, o novo valor do aluguel, os termos aditivos e o informe anual do Imposto de Renda. O botão <b>✉ E-mail</b> de cada etapa abre o texto já preenchido para copiar, abrir no Gmail ou enviar.</p>
     <div class="cartao"><table><tr><th>E-mail</th><th>Etapa</th><th></th></tr>${etapas.map((e) => MODELOS_EMAIL.filter((m) => m.etapa === e).map(linha).join("")).join("")}</table></div>${AJUDA}`;
@@ -24110,7 +23769,7 @@ Abrir o Gmail mesmo assim? O texto vai com o buraco, e você completa por lá.`,
         async desconectarGmail() {
           const r = await desconectarGmail();
           aviso(r.segredo_antigo ? "Gmail desconectado. Atenção: o jeito antigo ainda está guardado na nuvem e continua enviando até o técnico apagá-lo (para ele: segredo GMAIL_REFRESH_TOKEN no Cloudflare)." : r.havia && !r.revogado ? "Gmail desconectado aqui. O Google não confirmou a retirada da permissão: confira em Conta do Google → Segurança → Apps com acesso." : "Gmail desconectado.", r.segredo_antigo || r.havia && !r.revogado ? "aviso" : "ok");
-          if (/[?&]gmail=/.test(window.location.hash)) ir("#/dados");
+          if (/[?&]gmail=/.test(window.location.hash)) ir("#/sistema-email");
           else await mostrar();
         },
         async copiarRetornoGmail() {
@@ -24176,6 +23835,388 @@ ${m.texto}
   bonificacao, reserva, saida_antecipada, devolver, cobrar, garantia_depositada (caução ou depósito já registrado), inclusos, iptu_valor, seguro_valor, link, link_fiador, varios_fiadores,
   novo_bonificacao (termo do novo valor), reiteracao e vence_hoje (notificação). Também "[se não pj]". Qualquer campo serve de condição: "[se valor_deposito]" sai só quando o campo tem valor.</p>
   <p class="suave">O fecho ("Agradecemos e ficamos à disposição em caso de dúvidas." e a assinatura) entra sozinho no fim de todo e-mail.</p></div>`;
+    }
+  });
+
+  // docs/js/ajuda.js
+  function chaveDaAjuda(hash) {
+    const nome = String(hash || "").replace(/^#\/?/, "").split(/[/?]/)[0] || "painel";
+    return Object.hasOwn(AJUDA_TELAS, nome) ? nome : "";
+  }
+  function comRegras(texto3) {
+    return String(texto3).replace(/\{([a-z_]+)(?:\|([^|}]+)\|([^}]+))?\}/g, (todo, chave, um, varios) => {
+      let v;
+      try {
+        v = regra(chave);
+      } catch {
+        return todo;
+      }
+      if (v === void 0 || v === null) return todo;
+      if (um) return plural(v, um, varios);
+      return chave.startsWith("dia_") ? String(v).padStart(2, "0") : String(v);
+    });
+  }
+  function textoDaAjuda(chave) {
+    const a = AJUDA_TELAS[chave];
+    if (!a) return "";
+    return `<p><b>Para que serve:</b> ${esc(comRegras(a.serve))}</p>
+    <p><b>O que fazer primeiro:</b></p><ol>${a.primeiro.map((p2) => `<li>${esc(comRegras(p2))}</li>`).join("")}</ol>
+    <p><b>Exemplo:</b> ${esc(comRegras(a.exemplo))}</p>`;
+  }
+  function ligarAjuda(raiz, hash = globalThis.location?.hash) {
+    if (!raiz || typeof raiz.querySelector !== "function") return;
+    ligarPrimeirosPassos(raiz);
+    const chave = chaveDaAjuda(hash);
+    const h1 = chave && raiz.querySelector("h1");
+    if (!h1 || h1.querySelector(".botao-ajuda")) return;
+    const id = `ajuda-${chave}`;
+    const aberta = ajudasAbertas.has(chave);
+    h1.insertAdjacentHTML("beforeend", ` <button type="button" class="botao-ajuda nao-imprimir" aria-controls="${id}" aria-expanded="${aberta}" title="Ajuda: para que serve esta tela e por onde começar">?</button>`);
+    const depoisDe = h1.parentElement && h1.parentElement.classList.contains("cabecalho") ? h1.parentElement : h1;
+    depoisDe.insertAdjacentHTML("afterend", `<div class="ajuda-tela nao-imprimir" id="${id}" role="region" aria-label="Ajuda: ${esc(AJUDA_TELAS[chave].titulo)}" ${aberta ? "" : "hidden"}>
+    ${textoDaAjuda(chave)}<p class="acoes"><button type="button" class="secundario pequeno" data-fechar-ajuda>Fechar a ajuda</button></p></div>`);
+    const botao2 = h1.querySelector(".botao-ajuda");
+    const caixa = raiz.querySelector(`#${id}`);
+    const abrir2 = (sim2) => {
+      caixa.hidden = !sim2;
+      botao2.setAttribute("aria-expanded", String(sim2));
+      if (sim2) ajudasAbertas.add(chave);
+      else ajudasAbertas.delete(chave);
+    };
+    botao2.addEventListener("click", () => abrir2(caixa.hidden));
+    caixa.querySelector("[data-fechar-ajuda]").addEventListener("click", () => {
+      abrir2(false);
+      botao2.focus();
+    });
+  }
+  function passosIniciais(db, { hoje: hoje3 = hojeIso(), backupLigado = false } = {}) {
+    const contratos = (db.contratos || []).filter((c) => c.ativo !== false && c.imovel_id);
+    const padrao = somarMeses(competenciaDe(hoje3), -1);
+    const entradas = contratos.map((c) => competenciaDe(c.data_entrada || c.vigencia_inicio || hoje3)).sort();
+    const mesBoleto = entradas.length && entradas[0] > padrao ? entradas[0] : padrao;
+    return [
+      {
+        chave: "empresa",
+        feito: (db.emitentes || []).length > 0,
+        soAdmin: true,
+        href: "#/novo/emitentes",
+        botao: "Cadastrar a empresa",
+        titulo: "Dados da empresa",
+        texto: "Nome, CNPJ e endereço da empresa que recebe os aluguéis e emite as NFs. Digite o CNPJ: o resto vem sozinho."
+      },
+      {
+        chave: "imovel",
+        feito: (db.imoveis || []).length > 0,
+        href: "#/novo/imoveis",
+        botao: "Cadastrar o primeiro imóvel",
+        titulo: "Primeiro imóvel",
+        texto: "Endereço (pelo CEP), matrícula e as contas de água e luz."
+      },
+      {
+        chave: "contrato",
+        feito: (db.contratos || []).length > 0,
+        depois: "imovel",
+        href: "#/novo/contratos",
+        botao: "Cadastrar o inquilino e o contrato",
+        titulo: "Primeiro inquilino e contrato",
+        texto: "Quem aluga, o aluguel, o dia do vencimento e a garantia. Ex.: R$ 2.000,00, vencendo todo dia 10."
+      },
+      {
+        chave: "boleto",
+        feito: (db.cobrancas || []).length > 0,
+        depois: "contrato",
+        href: `#/cobrancas?comp=${mesBoleto}`,
+        botao: `Gerar o boleto de ${compBr(mesBoleto)}`,
+        titulo: "Primeiro boleto",
+        texto: `Na tela Boletos, gere os boletos do aluguel de ${compBr(mesBoleto)}: o sistema calcula o valor de cada inquilino.`
+      },
+      {
+        chave: "backup",
+        feito: zipBaixado(db) || !!backupLigado,
+        href: "#/dados",
+        botao: "Fazer a cópia dos dados",
+        titulo: "Cópia de segurança (backup)",
+        texto: "Baixe o ZIP com todos os dados (em Sistema) e guarde fora do computador, num pen drive ou no seu e-mail."
+      }
+    ];
+  }
+  function escondidos() {
+    try {
+      const v = JSON.parse(globalThis.localStorage?.getItem(CHAVE_ESCONDIDOS) || "[]");
+      return Array.isArray(v) ? v : [];
+    } catch {
+      return [];
+    }
+  }
+  function esconderPassos(quem, esconder = true) {
+    const lista3 = escondidos().filter((x) => x !== String(quem || ""));
+    if (esconder) lista3.push(String(quem || ""));
+    try {
+      globalThis.localStorage?.setItem(CHAVE_ESCONDIDOS, JSON.stringify(lista3));
+    } catch {
+    }
+  }
+  function mostrarPassos(db, quem, opcoes2 = {}) {
+    if (!sistemaComecando(db) || passosEscondidos(quem)) return false;
+    return passosIniciais(db, opcoes2).some((p2) => !p2.feito);
+  }
+  function caixaPrimeirosPassos(db, { quem = "", pode: pode2 = true, admin: admin3 = false, hoje: hoje3, backupLigado = false } = {}) {
+    if (!pode2 || !mostrarPassos(db, quem, { hoje: hoje3, backupLigado })) return "";
+    const passos = passosIniciais(db, { hoje: hoje3, backupLigado });
+    const feitos = passos.filter((p2) => p2.feito).length;
+    const proximo = passos.find((p2) => !p2.feito && !(p2.soAdmin && !admin3) && !(p2.depois && !passos.find((x) => x.chave === p2.depois).feito));
+    const item3 = (p2, n) => {
+      const espera = p2.depois && !passos.find((x) => x.chave === p2.depois).feito;
+      const acao = p2.feito ? '<span class="passo-feito">feito</span>' : p2.soAdmin && !admin3 ? '<span class="suave">(o administrador faz)</span>' : espera ? `<span class="suave">(depois do passo ${passos.findIndex((x) => x.chave === p2.depois) + 1})</span>` : `<a class="botao${p2 === proximo ? "" : " secundario"} pequeno" href="${esc(p2.href)}">${esc(p2.botao)}</a>`;
+      return `<li class="${p2.feito ? "feito" : ""}"><span class="passo-numero" aria-hidden="true">${p2.feito ? "✓" : n}</span>
+      <div><b>${esc(p2.titulo)}</b><br><span class="suave">${esc(p2.texto)}</span><div class="passo-acao">${acao}</div></div></li>`;
+    };
+    return `<div class="primeiros-passos" id="primeiros-passos">
+    <div class="cabecalho"><h2>Primeiros passos <span class="suave">(${feitos} de ${passos.length} feitos)</span></h2>
+      <button type="button" class="secundario pequeno" data-esconder-passos="${esc(quem)}" title="Esconder esta caixa. Para ver de novo: Sistema">Já sei usar</button></div>
+    <p class="suave">Para começar a usar o sistema, siga os passos na ordem. Cada um fica marcado com ✓ sozinho quando estiver feito. Em cada tela, o botão <b>?</b> ao lado do título explica para que ela serve.</p>
+    <ol class="lista-passos">${passos.map((p2, i) => item3(p2, i + 1)).join("")}</ol></div>`;
+  }
+  function caixaReabrirPassos(db, quem, opcoes2 = {}) {
+    if (!passosEscondidos(quem) || !sistemaComecando(db) || !passosIniciais(db, opcoes2).some((p2) => !p2.feito)) return "";
+    return `<div class="cartao" id="reabrir-passos"><h2>Primeiros passos</h2><p>A lista dos primeiros passos (empresa, imóvel, contrato, boleto e backup) está escondida no Painel.</p>
+    <p><button type="button" class="secundario pequeno" data-mostrar-passos="${esc(quem)}">Mostrar os primeiros passos no Painel</button></p></div>`;
+  }
+  function ligarPrimeirosPassos(raiz) {
+    const esconder = raiz.querySelector("[data-esconder-passos]");
+    if (esconder) {
+      esconder.addEventListener("click", () => {
+        esconderPassos(esconder.dataset.esconderPassos, true);
+        esconder.closest(".primeiros-passos")?.remove();
+      });
+    }
+    const mostrar2 = raiz.querySelector("[data-mostrar-passos]");
+    if (mostrar2) {
+      mostrar2.addEventListener("click", () => {
+        esconderPassos(mostrar2.dataset.mostrarPassos, false);
+        globalThis.location.hash = "#/";
+      });
+    }
+  }
+  function proximoPasso(titulo2, texto3, botoes = []) {
+    const lista3 = botoes.filter(Boolean);
+    const um = (b, i) => typeof b === "string" ? b : `<a class="botao${i ? " secundario" : ""} pequeno" href="${esc(b[0])}">${esc(b[1])}</a>`;
+    return `<div class="proximo-passo"><b>${esc(titulo2)}</b>${texto3 ? ` <span>${esc(texto3)}</span>` : ""}${lista3.length ? `<div class="acoes">${lista3.map(um).join(" ")}</div>` : ""}</div>`;
+  }
+  var AJUDA_TELAS, ajudasAbertas, LIMITES_SISTEMA_NOVO, sistemaComecando, zipBaixado, CHAVE_ESCONDIDOS, passosEscondidos;
+  var init_ajuda = __esm({
+    "docs/js/ajuda.js"() {
+      init_calculos();
+      init_config_regras();
+      init_formularios();
+      AJUDA_TELAS = {
+        painel: {
+          titulo: "Painel",
+          serve: "É a tela de entrada: mostra num relance quantos imóveis e inquilinos você tem, os avisos do que precisa de atenção (boleto vencido, reajuste, seguro, documento faltando) e o calendário do mês.",
+          primeiro: [
+            "Leia os alertas de cima para baixo: cada um tem um link que leva direto ao que precisa ser feito.",
+            'Use "Confirmar pagamento" quando um inquilino pagar.',
+            "No calendário, clique num dia para ver o que vence nele (no celular, o calendário vira uma lista: toque na semana)."
+          ],
+          exemplo: 'No dia {dia_gerar_boletos}/11/2026 o calendário avisa "boletos": é o dia de gerar os boletos do aluguel de novembro, que vencem em dezembro. No dia 01/12/2026 avisa "NFs": é o dia de numerar as NFs dos pagamentos de novembro.'
+        },
+        imoveis: {
+          titulo: "Imóveis",
+          serve: 'Lista todos os imóveis, com o endereço, a matrícula, as contas (água, luz, gás, internet, condomínio) e o aluguel de hoje. Imóvel sem inquilino aparece como "Vago".',
+          primeiro: [
+            'Clique em "Novo imóvel" e digite o CEP: a rua, o bairro e a cidade vêm sozinhos.',
+            'Anexe o arquivo da matrícula no botão "📎 Anexar".',
+            'Depois, cadastre o inquilino em Inquilinos → "Novo contrato".'
+          ],
+          exemplo: "Apartamento 101 com aluguel de R$ 2.000,00 e bonificação de 10%: a lista mostra R$ 2.000,00 e, entre parênteses, R$ 1.800,00 (o que o inquilino paga em dia)."
+        },
+        imovel: {
+          titulo: "Página do imóvel",
+          serve: "Junta tudo de um imóvel: dados e documentos, o inquilino de agora e os anteriores, o IPTU de cada ano, as contas de água e luz e o que entrou e saiu no banco ligado a ele.",
+          primeiro: [
+            'Confira o endereço e as contas em "Editar imóvel".',
+            "Lance o IPTU do ano na caixa do IPTU.",
+            'Para alugar, use "Novo contrato" (ou a ficha do interessado, em Inquilinos).'
+          ],
+          exemplo: "IPTU de 2026 de R$ 2.130,00 em 10 parcelas: cada boleto do inquilino leva R$ 213,00 a partir do mês escolhido (ex.: o boleto que vence em março de 2026)."
+        },
+        inquilinos: {
+          titulo: "Inquilinos",
+          serve: "Lista quem aluga hoje (ativos) e quem já saiu, com a vigência do contrato, o aluguel atual e a garantia. Em cima ficam as fichas dos interessados que ainda estão em análise.",
+          primeiro: [
+            'Alguém quer alugar? Clique em "Novo pedido de reserva": preencha o imóvel, o contato, a proposta e o que está incluso. Depois, na página da ficha, gere o link para a pessoa preencher o resto.',
+            'Ficha aprovada vira o contrato já preenchido. Já tem o contrato? Use "Novo contrato", na caixa "Contratos ativos".',
+            "Clique no nome do inquilino para abrir a página dele."
+          ],
+          exemplo: 'Inquilino que entrou em 10/03/2026 com contrato de 30 meses aparece em "Contratos ativos" com a vigência 10/03/2026 a 09/09/2028. Quando sair, a saída é registrada na página dele e ele passa para "Inativos".'
+        },
+        contrato: {
+          titulo: "Página do inquilino",
+          serve: "Tudo de um contrato: dados do inquilino e dos fiadores, boletos, documentos assinados, garantia (caução ou seguro), reajustes, solicitações e, no fim, a saída com o cálculo final.",
+          primeiro: [
+            'Confira os dados em "Editar contrato" (o valor, o dia do vencimento e a garantia).',
+            'Siga a "Rotina de entrada do inquilino": gerar o contrato, colher as assinaturas, vistoria, caução. Cada etapa fica marcada sozinha quando é registrada.',
+            'Quando o inquilino for sair, use "Saída do inquilino": o sistema faz o cálculo final.'
+          ],
+          exemplo: "Aluguel de R$ 2.000,00 com vencimento no dia 10 e bonificação de 10%: pago até 10/12/2026, o boleto de novembro sai por R$ 1.800,00; pago depois, é R$ 2.000,00 mais multa e juros."
+        },
+        notificacoes: {
+          titulo: "Notificações ao inquilino",
+          serve: "Lista as notificações que a administração mandou aos inquilinos para resolver algo num prazo (o contrário das solicitações, que são pedidos do inquilino). As em aberto vêm primeiro; o prazo vencido aparece em vermelho.",
+          primeiro: [
+            'Clique em "Nova notificação", escolha o inquilino e o assunto e clique em "Montar o texto".',
+            'Troque no texto o que estiver em "[preencher: …]" pelo caso real e salve.',
+            "Abra a notificação: imprima o PDF, assine no gov.br, anexe a assinada e envie."
+          ],
+          exemplo: "Ar-condicionado instalado errado: notificação de 17/11/2026 com 10 dias úteis vence em 02/12/2026 (20/11 é feriado). O lembrete aparece no Painel em 27/11; em 03/12, se não resolveu, dá para mandar a 2ª notificação ou gerar a multa no próximo boleto."
+        },
+        notificacao: {
+          titulo: "Notificação ao inquilino",
+          serve: "Acompanha uma notificação do começo ao fim: o PDF para assinar, a assinada, o envio, o prazo em dias úteis, a baixa quando o inquilino resolve e, se não resolver, outra notificação do mesmo assunto ou a multa.",
+          primeiro: [
+            'Clique em "PDF para assinar", baixe e assine no gov.br (assinador.iti.br).',
+            'Anexe a notificação assinada e envie por e-mail (o "Enviar agora" já marca a data do envio) ou entregue à mão e marque como enviada.',
+            "Quando o inquilino resolver, dê a baixa com a data e uma foto."
+          ],
+          exemplo: 'Prazo até 02/12/2026 e nada resolvido: em 03/12 clique em "Gerar multa", digite R$ 2.000,00 (o sistema sugere 1 aluguel) e confira o boleto que recebe. O boleto de 11/2026, que vence em 10/12, passa de R$ 2.000,00 para R$ 4.000,00, e a multa fica fora da NF.'
+        },
+        ficha: {
+          titulo: "Ficha em análise",
+          serve: "Guarda o pedido de quem quer alugar: dados da pessoa e dos fiadores, a reserva paga e os documentos (renda, identidade). É aqui que a ficha é aprovada ou reprovada.",
+          primeiro: [
+            "Confira os documentos de cada pessoa da ficha.",
+            "Registre a reserva, se o interessado pagou.",
+            "Aprove para virar contrato, ou reprove (a reserva é devolvida e os documentos saem depois de {meses_documentos_ficha|mês|meses})."
+          ],
+          exemplo: "Ficha recebida em 05/11/2026 com reserva de R$ 500,00: aprovada em 08/11/2026, o contrato já vem preenchido com os dados dela e a reserva é descontada do primeiro boleto."
+        },
+        cobrancas: {
+          titulo: "Boletos",
+          serve: 'Os boletos do aluguel de cada mês. O mês da tela é o mês de referência do aluguel: o boleto do aluguel de novembro vence em dezembro. No alto, o botão "E-mails da régua" abre os e-mails de cobrança preparados pelo sistema, esperando a autorização do administrador (nada é enviado sozinho).',
+          primeiro: [
+            'A partir do dia {dia_gerar_boletos}, clique em "Gerar boletos" do mês: o sistema calcula o valor de cada inquilino (aluguel, IPTU, seguro, descontos).',
+            'Quando o inquilino pagar, clique em "Confirmar pagamento" na linha e informe o dia em que o dinheiro entrou na conta.',
+            "Depois, numere as NFs na tela NF."
+          ],
+          exemplo: "Aluguel de novembro de 2026, R$ 2.000,00 com bonificação de 10%, vencendo em 10/12/2026: em dia, R$ 1.800,00. Se o dia 10 cair num sábado, vale até o próximo dia útil sem multa."
+        },
+        cobranca: {
+          titulo: "Boleto",
+          serve: "Mostra um boleto por dentro: cada valor que entra (aluguel, IPTU, seguro, descontos), o vencimento, a situação e o pagamento.",
+          primeiro: [
+            "Confira os valores antes de mandar ao inquilino.",
+            'Use "Confirmar pagamento" quando o dinheiro entrar.',
+            "Precisa mudar um valor? Mude no cadastro e recalcule; o boleto alterado à mão não muda mais sozinho."
+          ],
+          exemplo: "Inquilino que entrou em 15/11/2026: o boleto de novembro é proporcional, 16 de 30 dias. Com aluguel de R$ 2.000,00, sai R$ 1.066,67."
+        },
+        faturas: {
+          titulo: "NF",
+          serve: 'Numera e guarda as notas fiscais (NF) dos aluguéis recebidos. Cada pagamento confirmado em Boletos fica aqui "aguardando número".',
+          primeiro: [
+            "Espere o mês virar: as NFs de novembro são numeradas a partir de 01/12.",
+            'Marque os pagamentos e clique em "Numerar as NFs marcadas".',
+            "Imprima ou baixe em PDF para mandar ao inquilino."
+          ],
+          exemplo: "Em novembro de 2026 entraram três aluguéis, nos dias 05, 08 e 12. Em 01/12/2026, ao numerar, quem pagou no dia 05 recebe o primeiro número, depois o do dia 08 e por último o do dia 12."
+        },
+        banco: {
+          titulo: "Banco",
+          serve: "Traz o extrato da conta no banco (C6) para dentro do sistema e diz para onde foi cada entrada e saída: aluguel de qual boleto, conta de qual imóvel, imposto, reforma.",
+          primeiro: [
+            'O administrador liga o banco em Sistema → Banco (caixa "Banco (C6)").',
+            'Clique em "Buscar extrato" do mês (ou importe o arquivo OFX baixado no app do C6).',
+            'Dê o destino de cada linha "sem destino": o sistema sugere e você confirma.'
+          ],
+          exemplo: "Entrada de R$ 1.800,00 em 10/12/2026 com o nome do inquilino: o sistema propõe ligar ao boleto de novembro desse inquilino; você confere e confirma o pagamento."
+        },
+        reajustes: {
+          titulo: "Reajustes do aluguel",
+          serve: "Corrige o aluguel uma vez por ano pelo índice do contrato (IGP-M, IPCA etc.) e prepara a carta de reajuste para o inquilino.",
+          primeiro: [
+            "No começo do mês, informe o índice acumulado de 12 meses (IGP-M, IPCA, INPC e IGP-DI vêm do Banco Central para conferir).",
+            'Em cada reajuste em aberto, clique em "Aplicar correção".',
+            "Gere a carta e mande junto com o boleto do mês."
+          ],
+          exemplo: "Inquilino que entrou em março de 2026 tem o reajuste no aluguel de março de 2027 (o 13º mês; a regra pode ser mudada em Regras do sistema). Aluguel de R$ 2.000,00 com índice de 4,5%: passa a R$ 2.090,00. Índice negativo: o aluguel fica igual."
+        },
+        iptu: {
+          titulo: "IPTU's",
+          serve: "Mostra o IPTU do ano de todos os imóveis: o que o inquilino paga no boleto, o que é sua parte e as guias que você ainda precisa pagar.",
+          primeiro: [
+            'Clique em "Lançar" no imóvel em amarelo (sem o IPTU do ano).',
+            "Informe o valor, o número de parcelas e o mês do primeiro boleto com IPTU.",
+            "Marque como paga cada guia sua quando pagar."
+          ],
+          exemplo: 'IPTU de 2026 de R$ 2.130,00 em 10 parcelas, a partir do boleto que vence em março: o inquilino paga R$ 213,00 por mês de março a dezembro. Em mês sem inquilino, a parcela é sua e aparece em "Guias suas a pagar".'
+        },
+        dados: {
+          titulo: "Sistema",
+          serve: "Mostra onde os dados estão guardados e as cópias de segurança. Os botões do alto levam a Empresas, Banco, Comunicação E-mail, Modelos de documentos, LGPD, Regras do sistema e Histórico de alterações.",
+          primeiro: [
+            "Baixe o ZIP com todos os dados de vez em quando e guarde fora do computador (pen drive ou e-mail).",
+            "Administrador: ligue o backup seguro neste computador.",
+            "Confira as Regras do sistema (multa, juros, caução, reajuste) antes do primeiro boleto."
+          ],
+          exemplo: "Baixou o ZIP em 16/11/2026? Guarde o arquivo num pen drive. Com os dados na nuvem, a tela lembra a data e, a partir de 24/11/2026 (mais de 7 dias), avisa que vale baixar outra cópia."
+        },
+        empresas: {
+          titulo: "Empresas",
+          serve: "As empresas que recebem os aluguéis e emitem as NFs. Os dados delas (nome, CNPJ, endereço, conta) saem nos contratos, nos recibos e nas NFs.",
+          primeiro: [
+            'Clique em "Nova empresa" e digite o CNPJ: o nome e o endereço vêm sozinhos (confira os acentos).',
+            "Envie a logo: ela aparece nos documentos e no ícone do aplicativo.",
+            "Tem duas empresas? Cadastre as duas; em cada imóvel você diz quanto da NF é de cada uma."
+          ],
+          exemplo: "Imóvel dividido 50% e 50% entre duas empresas: a NF de um aluguel de R$ 2.000,00 sai em duas partes de R$ 1.000,00, uma para cada empresa."
+        },
+        "sistema-banco": {
+          titulo: "Banco (configuração)",
+          serve: "Liga o sistema ao banco: a ponte e as contas do C6, qual empresa emite os boletos e as opções de conciliação e pagamentos. O extrato fica no menu Banco.",
+          primeiro: [
+            'Com as chaves do C6, preencha o endereço e a senha da ponte e clique em "Testar conexão".',
+            "Cadastre uma conta para cada empresa e escolha qual emite os boletos.",
+            "Só ligue os pagamentos pelo banco se for usar, e ponha um limite por pagamento."
+          ],
+          exemplo: "Limite por pagamento de R$ 5.000,00: o sistema recusa preparar um pagamento de R$ 5.000,01."
+        },
+        "sistema-email": {
+          titulo: "Comunicação E-mail",
+          serve: "Liga o Gmail da empresa e guarda os textos dos e-mails de cada etapa (ficha, entrada, cobrança, saída).",
+          primeiro: [
+            'Administrador: clique em "Conectar o Gmail", escolha a conta da empresa e permita o envio.',
+            "Abra os modelos de e-mail e ajuste os textos que quiser.",
+            "Mande um e-mail de teste para você antes de mandar aos inquilinos."
+          ],
+          exemplo: 'Com o Gmail conectado em 18/11/2026, o botão "Enviar agora" manda o lembrete do boleto de R$ 1.800,00 pela conta da empresa.'
+        },
+        "sistema-modelos": {
+          titulo: "Modelos de documentos",
+          serve: "Guarda os modelos dos documentos: contratos, termos aditivos e a planilha Excel da NF.",
+          primeiro: [
+            "Confira o modelo de contrato antes de gerar o primeiro.",
+            "Confira os três tipos de termo aditivo (vencimento, troca de inquilino e novo valor).",
+            "Só envie um Excel próprio se a NF precisar de outro desenho."
+          ],
+          exemplo: "Modelo de contrato mudado em 22/11/2026: os contratos gerados daí em diante saem com o texto novo; os já assinados não mudam."
+        },
+        lgpd: {
+          titulo: "LGPD",
+          serve: "Atende a lei de proteção de dados: mostra tudo o que o sistema guarda de uma pessoa e apaga o que já passou do prazo.",
+          primeiro: [
+            'Quando alguém pedir os dados, procure pelo CPF em "Dados de uma pessoa" e baixe o arquivo.',
+            'De tempos em tempos, veja "Pessoas com mais de 10 anos do fim do contrato".',
+            "Confira bem antes de apagar: não tem volta pelo Histórico."
+          ],
+          exemplo: "Contrato que terminou em 30/11/2016: a partir de 30/11/2026 dá para apagar os dados dessa pessoa."
+        }
+      };
+      ajudasAbertas = /* @__PURE__ */ new Set();
+      LIMITES_SISTEMA_NOVO = { imoveis: 10, cobrancas: 24, faturas: 12 };
+      sistemaComecando = (db) => (db.imoveis || []).length <= LIMITES_SISTEMA_NOVO.imoveis && (db.cobrancas || []).length <= LIMITES_SISTEMA_NOVO.cobrancas && (db.faturas || []).length <= LIMITES_SISTEMA_NOVO.faturas;
+      zipBaixado = (db) => (db.historico || []).some((h) => h.acao === "Exportação" && /ZIP/.test(h.descricao || ""));
+      CHAVE_ESCONDIDOS = "primeiros-passos-escondidos";
+      passosEscondidos = (quem) => escondidos().includes(String(quem || ""));
     }
   });
 
@@ -24417,16 +24458,16 @@ ${m.texto}
     if (JSON.stringify(antes) !== JSON.stringify(depois) && noPainel) await mostrar();
   }
   function telaArquivoImpresso(q = {}) {
-    const topo2 = '<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Arquivo impresso</h1>';
+    const topo3 = '<p class="suave"><a href="#/dados">← Sistema</a></p><h1>Arquivo impresso</h1>';
     conferirSoltosUmaVez().catch(() => {
     });
-    if (!ligado()) return `${topo2}${DESLIGADA}`;
+    if (!ligado()) return `${topo3}${DESLIGADA}`;
     const hoje3 = hojeIso();
     const todos = q.todos === "1";
     const linhas2 = contratosDaRotina(d(), hoje3).map((c) => ({ c, s: situacaoPasta(d(), c, hoje3) })).sort((a, b) => Number(b.s.precisa) - Number(a.s.precisa) || nomeImovel(a.c).localeCompare(nomeImovel(b.c), "pt-BR"));
     const visiveis = linhas2.filter((x) => todos || x.s.precisa);
     const tipo = (s) => s.precisa ? "aviso" : s.aguardando ? "neutra" : "ok";
-    return `${topo2}
+    return `${topo3}
     <p class="suave">A pasta de papel de cada inquilino: o que imprimir na entrada, quando chega documento novo importante (termo aditivo, carta de reajuste, termo de acordo, notificação) e na saída. Notas fiscais, comprovantes, boletos, documentos de renda, fotos, apólices e e-mails não vão para a pasta. Arquivo posto à mão na pasta do inquilino (ex.: uma notificação) aparece como documento novo depois que o Painel confere as pastas (a cada abertura do sistema).</p>
     <div class="acoes" style="margin-bottom:10px"><span class="suave">Mostrar:</span> ${link("#/arquivo-impresso", "Com pendência", `botao ${todos ? "secundario " : ""}pequeno`)} ${link("#/arquivo-impresso?todos=1", "Todos", `botao ${todos ? "" : "secundario "}pequeno`)}</div>
     <div class="cartao"><table class="responsiva"><tr><th>Inquilino</th><th>Imóvel</th><th>Situação</th><th></th></tr>
@@ -24465,8 +24506,8 @@ ${m.texto}
   async function telaPastaFisica(id) {
     const c = buscar2("contratos", id);
     if (!c) return naoEncontrado("Inquilino não encontrado", "#/arquivo-impresso", "Ver o Arquivo impresso");
-    const topo2 = `<p class="suave"><a href="#/contrato/${c.id}">← ${esc(c.inquilino_nome)}</a> · <a href="#/arquivo-impresso">Arquivo impresso</a></p>`;
-    if (!ligado()) return `${topo2}<h1>Pasta física</h1>${DESLIGADA}`;
+    const topo3 = `<p class="suave"><a href="#/contrato/${c.id}">← ${esc(c.inquilino_nome)}</a> · <a href="#/arquivo-impresso">Arquivo impresso</a></p>`;
+    if (!ligado()) return `${topo3}<h1>Pasta física</h1>${DESLIGADA}`;
     const hoje3 = hojeIso();
     const s = situacaoPasta(d(), c, hoje3, await soltosDe(c));
     const a = s.anterior;
@@ -24484,7 +24525,7 @@ ${m.texto}
     const acoes = opera() ? `<div class="acoes" style="margin-top:10px">${botao("pastaImprimir", "Ver a capa e imprimir tudo", { contrato: c.id }, "botao")}
       ${botao("pastaPapel", "Já está tudo em papel", { contrato: c.id }, "secundario", 'Marcar os documentos marcados como já impressos na pasta (sem imprimir)? Os desmarcados ficam "fora da pasta".')}</div>
       <p class="suave">Marcado = vai para o papel agora. Ao confirmar, o que ficou desmarcado e ainda não estava na pasta passa a "fora da pasta" (não avisa de novo).</p>` : "";
-    return `${topo2}<h1>Pasta física · ${esc(c.inquilino_nome)} <span class="suave">· ${esc(i ? `${i.nome} (${endereco(i)})` : "sem imóvel")}</span></h1>
+    return `${topo3}<h1>Pasta física · ${esc(c.inquilino_nome)} <span class="suave">· ${esc(i ? `${i.nome} (${endereco(i)})` : "sem imóvel")}</span></h1>
     <p class="suave">${esc(momento)} · contrato de ${dataBr(c.data_entrada)}${fimDoContrato(d(), c) ? ` a ${dataBr(fimDoContrato(d(), c))}` : ""}${c.garantia_tipo ? ` · garantia: ${esc(c.garantia_tipo)}` : ""}${fiadores.length ? ` · fiador: ${esc(fiadores.join(", "))}` : ""}${c.data_saida ? ` · saída em ${dataBr(c.data_saida)}, guardar até ${dataBr(guardarAte(c))}` : ""}</p>
     ${espera}
     <form id="pasta-fisica" data-sem-envio>${passo1}${passo2}
@@ -24670,7 +24711,7 @@ ${m.texto}
       init_comum();
       init_documentos();
       init_reajustes();
-      DESLIGADA = '<div class="alerta info">A rotina <b>Arquivo impresso</b> está desligada. Para ligar: Dados e backup → Regras do sistema → "Arquivo impresso (pasta física de cada inquilino)".</div>';
+      DESLIGADA = '<div class="alerta info">A rotina <b>Arquivo impresso</b> está desligada. Para ligar: Sistema → Regras do sistema → "Arquivo impresso (pasta física de cada inquilino)".</div>';
       SITUACAO_ITEM = { impresso: "impresso", ja_tinha: "já estava em papel", fora: "fora da pasta" };
       soltosConferidos = false;
       nomeImovel = (c) => (buscar2("imoveis", c.imovel_id) || {}).nome || "sem imóvel";
@@ -28064,7 +28105,7 @@ ${esc(m.lembrete)}</pre></details></div>`).join("")}
     return `<p class="suave"><a href="#/comunicacoes">← Comunicações</a></p>
     <div class="cabecalho"><h1>${esc(com.titulo)}</h1>${etiqueta(`prazo ${dataBr(com.prazo)}`, com.prazo < hojeIso() ? "neutra" : "aviso")}</div>
     ${!E.nuvem ? `<div class="alerta aviso">${SO_NUVEM}</div>` : ""}${erroNuvem ? `<div class="alerta aviso">Situação de agora não veio da nuvem: ${esc(erroNuvem)}</div>` : ""}
-    ${gmailDesligado ? `<div class="alerta perigo"><b>O envio pelo Gmail está desligado.</b> Para confirmar, a pessoa recebe um código por e-mail: sem o Gmail ligado ninguém consegue confirmar, nem quem recebeu o link pelo WhatsApp. Ligue em Dados e backup → Conectar o Gmail.</div>` : ""}
+    ${gmailDesligado ? `<div class="alerta perigo"><b>O envio pelo Gmail está desligado.</b> Para confirmar, a pessoa recebe um código por e-mail: sem o Gmail ligado ninguém consegue confirmar, nem quem recebeu o link pelo WhatsApp. Ligue em Sistema → Comunicação E-mail → Conectar o Gmail.</div>` : ""}
     ${opera() && E.nuvem && nadaEnviado(com) ? `<p class="acoes">${link(`#/comunicacoes?ver=editar&id=${com.id}`, "Corrigir prazo, telefone e textos", "botao secundario pequeno")} ${botao("excluirComunicado", "Excluir comunicado", { id: com.id }, "perigo pequeno", `Excluir o comunicado "${com.titulo}"? Nada foi enviado ainda.`)}</p>` : ""}
     <div class="cartao"><div class="numeros-cartao">${quadro("Confirmaram", r.confirmaram, "ok")}${quadro("Abriram", r.abriram)}${quadro("Não abriram", r.naoAbriram, r.naoAbriram ? "perigo" : "")}${quadro("Não enviados", r.naoEnviados)}${quadro("Mudaram o contato", r.mudaram)}</div>
       ${opera() ? `<p class="acoes">${botao("emailTodosComunicado", "✉ Enviar e-mail a todos", { id: com.id }, "pequeno")} ${botao("whatsTodosComunicado", "WhatsApp a todos", { id: com.id })}
@@ -28111,7 +28152,7 @@ ${esc(m.lembrete)}</pre></details></div>`).join("")}
   }
   async function seguirSemGmail() {
     if (await gmailLigado()) return true;
-    return confirmar("O envio pelo Gmail está desligado: a pessoa abre o link, mas não recebe o código por e-mail e não consegue confirmar. Ligue o Gmail antes (Dados e backup → Conectar o Gmail). Mandar assim mesmo?", { titulo: "Gmail desligado", sim: "Mandar assim mesmo" });
+    return confirmar("O envio pelo Gmail está desligado: a pessoa abre o link, mas não recebe o código por e-mail e não consegue confirmar. Ligue o Gmail antes (Sistema → Comunicação E-mail → Conectar o Gmail). Mandar assim mesmo?", { titulo: "Gmail desligado", sim: "Mandar assim mesmo" });
   }
   async function linkDe(com, x, { novo = false } = {}) {
     if (x.url && !novo) return x.url;
@@ -28148,7 +28189,7 @@ ${url}
     return { para: p2.email, assunto, texto: texto3, html, imagens: imagemDaLogo(logo) };
   }
   async function enviarEmails(com, alvos, { lembrete = false } = {}) {
-    if (!await emailLigado()) throw new ErroUsuario("O envio pelo Gmail não está ligado (Dados e backup → Conectar o Gmail).");
+    if (!await emailLigado()) throw new ErroUsuario("O envio pelo Gmail não está ligado (Sistema → Comunicação E-mail → Conectar o Gmail).");
     let ok = 0;
     const falhas = [];
     for (const [n, x] of alvos.entries()) {
@@ -28921,7 +28962,7 @@ ${m.texto}`);
     }
     if (herdeiro && (temCaucao(c) || temDeposito(c))) {
       html += `${subtitulo("Onde o valor foi aplicado", opera() ? link(`#/novo/aplicacoes?contrato=${herdeiro.id}`, `Registrar aplicação em ${esc(herdeiro.inquilino_nome)}`) : "")}
-      <p class="suave">A aplicação desta garantia fica em <a href="#/contrato/${herdeiro.id}?ir=garantia">${esc(herdeiro.inquilino_nome)}</a>, com o comprovante.${aplic.length ? ` ${aplic.length} aplicação(ões) ainda aqui passam para lá ao abrir o Painel (ou em "Conferir arquivos agora", em Dados e backup).` : ""}</p>`;
+      <p class="suave">A aplicação desta garantia fica em <a href="#/contrato/${herdeiro.id}?ir=garantia">${esc(herdeiro.inquilino_nome)}</a>, com o comprovante.${aplic.length ? ` ${aplic.length} aplicação(ões) ainda aqui passam para lá ao abrir o Painel (ou em "Conferir arquivos agora", em Sistema).` : ""}</p>`;
     } else if (temCaucao(c) || temDeposito(c) || aplic.length) {
       const situacaoTotal = sit.ok ? etiqueta("100% aplicado", "ok") : sit.total ? etiqueta(`falta aplicar ${reais(sit.falta)}`, "aviso") : "";
       html += `${subtitulo("Onde o valor foi aplicado", opera() ? link(`#/novo/aplicacoes?contrato=${c.id}`, "Registrar aplicação") : "", "Na saída, o valor é devolvido corrigido pela poupança (informado no cálculo final), pela conta em que foi depositado.")}
@@ -29974,10 +30015,10 @@ ${m.texto}`);
     }
     return fins;
   }
-  function cortesDoDocumento(el, topo2 = el.getBoundingClientRect().top) {
+  function cortesDoDocumento(el, topo3 = el.getBoundingClientRect().top) {
     const blocos = [...el.querySelectorAll(".ct-pagina > * > tr > td > *, .ct-tabela tr, .ct-fotos figure, .ct-grupo-assina, .ct-assina, .demonstrativo, tr, p, li, h2, h3")].filter((x) => !x.matches("h1, h2, h3")).map((x) => x.getBoundingClientRect().bottom);
     const linhas2 = [...el.querySelectorAll(".ct-par")].flatMap((p2) => linhasDoParagrafo(p2).slice(1, -2));
-    return [...blocos, ...linhas2].map((y) => y - topo2).sort((a, b) => a - b);
+    return [...blocos, ...linhas2].map((y) => y - topo3).sort((a, b) => a - b);
   }
   async function marcaDaguaPdf(img) {
     if (!img || !img.getAttribute("src")) return null;
@@ -30002,12 +30043,12 @@ ${m.texto}`);
   async function pdfDoDocumento(el, rodape = [], { margemLado = 0, alturaMaxima = 0 } = {}) {
     const { html2canvas, jsPDF } = await bibliotecasPdf();
     const caixa = el.getBoundingClientRect();
-    const topo2 = caixa.top;
+    const topo3 = caixa.top;
     const links = [...el.querySelectorAll(".ct-link a")].map((a) => {
       const x = a.getBoundingClientRect();
-      return { url: a.href, x: x.left - caixa.left, y: x.top - topo2, w: x.width, h: x.height };
+      return { url: a.href, x: x.left - caixa.left, y: x.top - topo3, w: x.width, h: x.height };
     });
-    const cortes = cortesDoDocumento(el, topo2);
+    const cortes = cortesDoDocumento(el, topo3);
     const marca2 = await marcaDaguaPdf(el.querySelector(".ct-marca"));
     const opcoes2 = { scale: ESCALA_PDF, backgroundColor: "#ffffff", onclone: (doc2) => {
       doc2.querySelectorAll(".ct-rodape, .ct-marcas").forEach((x) => x.remove());
@@ -30020,7 +30061,7 @@ ${m.texto}`);
     const pxMm = el.offsetWidth / largura;
     const [margemTopo, margemPe] = [12, 24];
     const capa = el.querySelector(".ct-capa");
-    const inicio = capa ? Math.max(0, capa.getBoundingClientRect().top - topo2) : 0;
+    const inicio = capa ? Math.max(0, capa.getBoundingClientRect().top - topo3) : 0;
     const topoDa = (n2) => n2 || !capa ? margemTopo : LOGO.topoCm * 10;
     const alturaFolha = (297 - margemTopo - margemPe) * pxMm;
     const total = el.offsetHeight;
@@ -30494,9 +30535,9 @@ ${m.texto}`);
       ${opera() ? `${link(`#/modelo-contrato/${m.id}`, "Editar")} ${botao("copiarModelo", "Copiar", { id: m.id })}` : ""}
       ${opera() && m.padrao && MODELOS_PADRAO.some((x) => x.nome === m.padrao) ? botao("restaurarModelo", "Voltar ao texto padrão", { id: m.id }, "secundario pequeno", `Trocar o texto de "${m.nome}" pelo texto padrão? As alterações feitas nele se perdem.`) : ""}
       ${podeUsuario("admin") && m.id > 0 && modelosDe(d(), tipo).length > 1 ? botao("excluirModelo", "×", { id: m.id }, "x-excluir", `Excluir o modelo "${m.nome}"?`) : ""}</td></tr>`;
-    return `<p class="suave"><a href="#/dados">← Dados e backup</a></p>
-    <h1>Modelos de contrato</h1>
-    ${Object.entries(TIPOS_MODELO).map(([tipo, titulo2]) => `<div class="cartao"><div class="cabecalho"><h2>${titulo2}</h2>${opera() ? link(`#/modelo-contrato/novo${tipo === "contrato" ? "" : `?tipo=${tipo}`}`, NOVO_MODELO[tipo], "botao secundario pequeno") : ""}</div>
+    return `<p class="suave"><a href="#/sistema-modelos">← Modelos de documentos</a></p>
+    <h1>Modelos de contrato e termos aditivos</h1>
+    ${Object.entries(TIPOS_MODELO).map(([tipo, titulo2]) => `<div class="cartao" id="modelos-${tipo}"><div class="cabecalho"><h2>${titulo2}</h2>${opera() ? link(`#/modelo-contrato/novo${tipo === "contrato" ? "" : `?tipo=${tipo}`}`, NOVO_MODELO[tipo], "botao secundario pequeno") : ""}</div>
       <table><tr><th>Modelo</th><th></th></tr>${modelosDe(d(), tipo).map((m) => linha(m, tipo)).join("")}</table></div>`).join("")}
     <p class="suave">Para gerar um contrato, abra o inquilino e clique em <b>Gerar contrato</b>; o termo aditivo, em <b>Gerar termo aditivo</b> (em "Termos aditivos"), escolhendo vencimento ou troca de inquilino.
       Edite à vontade: os modelos ficam guardados no banco de dados.</p>
@@ -30780,7 +30821,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     out.push(["Declaração anual de aluguéis (IR)", ir2 ? `${esc(nomeContrato(ir2.c))} · ano ${ir2.ano}` : linhaFalta("um contrato com NF de aluguel emitida"), ir2 ? abrir(`#/imprimir/declaracao?contrato=${ir2.c.id}&ano=${ir2.ano}`) : ""]);
     const mes = competenciaDe(hojeIso());
     out.push(["Resumo de gestão do mês", `mês ${compBr(mes)}`, `${botao("relatorioGestao", "Baixar PDF", { mes })} ${link(`#/gestao?mes=${mes}`, "Na tela Gestão", "botao secundario pequeno")}`]);
-    out.push(["Todos os dados (planilha e PDF)", "o banco inteiro", `${link("#/dados", "Em Dados e backup", "botao secundario pequeno")} <span class="suave">(botão "Baixar todos os dados em planilha e PDF"; ele anota a exportação no histórico)</span>`]);
+    out.push(["Todos os dados (planilha e PDF)", "o banco inteiro", `${link("#/dados", "Em Sistema", "botao secundario pequeno")} <span class="suave">(botão "Baixar todos os dados em planilha e PDF"; ele anota a exportação no histórico)</span>`]);
     return out;
   }
   function telaTestePdfs() {
@@ -30795,7 +30836,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       return `<div class="cartao"><h2>${esc(titulo2)}</h2><table><tr><th>PDF</th><th>Registro usado</th><th>Abrir</th></tr>
       ${linhas2.map(([nome, usado, botoes]) => `<tr><td><b>${esc(nome)}</b></td><td>${usado}</td><td class="acoes">${botoes || ""}</td></tr>`).join("")}</table></div>`;
     }).join("");
-    return `<div class="cabecalho"><h1>Teste dos PDFs (página temporária)</h1><div class="acoes">${link("#/dados", "Voltar a Dados e backup", "botao secundario")}</div></div>
+    return `<div class="cabecalho"><h1>Teste dos PDFs (página temporária)</h1><div class="acoes">${link("#/dados", "Voltar ao Sistema", "botao secundario")}</div></div>
     <div class="alerta info">Abra cada PDF <b>no computador e no celular (Android)</b>, confira se sai certo e anote os textos a mudar. "Abrir" leva à página do documento, com <b>Imprimir</b> e <b>Baixar PDF</b>; o botão ao lado baixa o PDF do mesmo jeito que vai anexado no e-mail ou guardado na pasta. Esta página não grava nada (só o "Baixar PDF" do contrato e do termo das chaves marca, como sempre, a etapa "gerado" no roteiro da entrada, se ainda não estava). Ela será apagada depois do teste.</div>
     ${grupos}`;
   }
@@ -31146,7 +31187,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       null,
       a.contrato ? { contrato_id: a.contrato.id, imovel_id: a.contrato.imovel_id || null } : vinculoDoEscopo(a.escopo, a.id)
     )));
-    if (falharam.length) aviso(`Não deu para apagar da pasta: ${falharam.join(", ")}. O arquivo pode estar aberto ou sendo sincronizado; o administrador apaga depois em Dados e backup ("Procurar arquivos sem lançamento").`, "aviso");
+    if (falharam.length) aviso(`Não deu para apagar da pasta: ${falharam.join(", ")}. O arquivo pode estar aberto ou sendo sincronizado; o administrador apaga depois em Sistema ("Procurar arquivos sem lançamento").`, "aviso");
     return apagados.length;
   }
   async function alterarApagandoAnexos(fn) {
@@ -31901,7 +31942,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const qr = imagemQrPix(cb);
     const semPix = b.situacao === "emitido" && !b.pix_copia_cola;
     return `<div class="cartao" id="banco-c6"><div class="cabecalho">${titulo2}<div>${etiquetaBanco(cb)}${semPix ? ` ${etiqueta("sem Pix", "aviso")}` : ""}</div></div>
-    ${semPix ? `<div class="alerta aviso"><b>O boleto saiu sem o Pix</b>${conta && conta.chave_pix ? ": a ponte não tem a chave Pix desta conta. O inquilino paga só pela linha digitável; para ter o QR Code, peça ao técnico para pôr a chave Pix da conta na ponte e emita de novo." : ": a conta não tem chave Pix cadastrada (Dados e backup → Banco (C6))."}</div>` : ""}
+    ${semPix ? `<div class="alerta aviso"><b>O boleto saiu sem o Pix</b>${conta && conta.chave_pix ? ": a ponte não tem a chave Pix desta conta. O inquilino paga só pela linha digitável; para ter o QR Code, peça ao técnico para pôr a chave Pix da conta na ponte e emita de novo." : ": a conta não tem chave Pix cadastrada (Sistema → Banco → Banco (C6))."}</div>` : ""}
     ${cb.data_pagamento && b.situacao === "emitido" && !cb.pagamento_c6 && !aguardandoCredito(cb) ? `<div class="alerta perigo"><b>Pago aqui, mas ainda em aberto no C6.</b> O inquilino ainda consegue pagar este boleto de novo${b.negativacao && b.negativacao.pode_cancelar ? " e a negativação agendada continua valendo" : ""}. Clique em "Consultar situação no banco" (se o banco já recebeu este pagamento, acerta sozinho); se o pagamento foi por fora (Pix direto, dinheiro), use "Cancelar no banco"${b.negativacao && b.negativacao.pode_cancelar ? ' e "Cancelar negativação"' : ""}.</div>` : ""}
     ${b.pagamentos_no_banco > 1 ? `<div class="alerta perigo"><b>O banco recebeu ${b.pagamentos_no_banco} pagamentos deste boleto</b>${b.valor_pago_total ? ` (${reais(b.valor_pago_total)} no total)` : ""}: o inquilino pagou mais de uma vez (ex.: Pix e código de barras). Registre só um aqui e devolva a diferença ao inquilino.</div>` : ""}
     ${aguardandoCredito(cb) ? '<div class="alerta info"><b>O inquilino pagou</b> e o banco ainda está confirmando o crédito. Consulte de novo mais tarde para registrar o pagamento aqui.</div>' : ""}
@@ -31932,7 +31973,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       <div class="largo"><label class="check-mini"><input type="radio" name="modo" value="escolher" ${cfg6.modo_conta_boleto === "escolher" ? "checked" : ""}> Escolher a empresa boleto a boleto</label>
         <div class="ajuda">Ao emitir, o sistema pergunta sempre a conta, mesmo quando o imóvel tem uma só empresa (ela já vem marcada; senão, a padrão). Em "Emitir no C6 todos em aberto do mês", pergunta uma vez para o lote.</div></div>
       <div class="acoes" style="align-self:end"><button class="secundario">Salvar</button></div></form>
-      <p class="suave">Com a empresa padrão, todos os boletos saem pela conta dela, mesmo quando o imóvel é dividido com outra empresa.</p>` : '<p class="suave">Nenhuma conta bancária cadastrada ainda: cadastre as contas em <a href="#/dados?ir=banco">Dados e backup → Banco (C6)</a>.</p>'}</div>`;
+      <p class="suave">Com a empresa padrão, todos os boletos saem pela conta dela, mesmo quando o imóvel é dividido com outra empresa.</p>` : '<p class="suave">Nenhuma conta bancária cadastrada ainda: cadastre as contas em <a href="#/sistema-banco?ir=banco">Banco (C6)</a>, nesta página.</p>'}</div>`;
   }
   function caixaConfigBanco() {
     if (!podeUsuario("admin")) return "";
@@ -31949,7 +31990,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     };
     return `<div class="cartao" id="banco"><div class="cabecalho"><h2>Banco (C6) — boleto com Pix</h2><div>${situacao2}</div></div>
     <p>Emite os boletos (com QR Code Pix) direto na conta do C6, pelo botão <b>Emitir no C6</b> da tela Boletos. Como o banco exige certificado digital, o site fala com uma <b>ponte</b>: um programinha que o técnico instala no computador de quem emite. As chaves do banco ficam só na ponte, nunca aqui.</p>
-    <p class="suave">Até as chaves chegarem, a ponte pode rodar em <b>modo simulado</b>: os botões funcionam e devolvem boletos fictícios, para treinar. Qual empresa emite os boletos (${emissora ? `padrão ${esc(emissora.apelido)}` : "a padrão"}, ou escolher um a um) se define em <a href="#/empresas?ir=conta-boletos">Empresas</a>.</p>
+    <p class="suave">Até as chaves chegarem, a ponte pode rodar em <b>modo simulado</b>: os botões funcionam e devolvem boletos fictícios, para treinar. Qual empresa emite os boletos (${emissora ? `padrão ${esc(emissora.apelido)}` : "a padrão"}, ou escolher um a um) se define na caixa <a href="#/sistema-banco?ir=conta-boletos">Emissão de boletos no banco (C6)</a>, nesta página.</p>
     <form data-form="configBanco" class="formulario">
       <div><label>Endereço da ponte (neste computador)</label><input name="ponte_url" value="${esc(ponteLocal().configurada ? ponteLocal().ponte_url : "")}" placeholder="http://localhost:8765"><div class="ajuda">O técnico informa este endereço ao instalar a ponte</div></div>
       <div><label>Senha da ponte (neste computador)</label><input type="password" name="senha_ponte" value="${esc(ponteLocal().senha_ponte)}" autocomplete="off"><div class="ajuda">A senha combinada com o técnico ao instalar a ponte</div></div>
@@ -32710,7 +32751,7 @@ ${xref}
     if (!contasVistas.length) {
       return `<h1>Banco</h1>${avisoNaoConfigurado()}
       <div class="cartao"><h2>O que esta tela faz</h2><p>${AJUDA_BANCO}</p>
-      <p class="acoes">${link("#/dados", "Ir para Dados e backup", "botao")} ${link("#/banco/pagamentos", "Pagamentos pelo banco")}</p></div>`;
+      <p class="acoes">${podeUsuario("admin") ? link("#/sistema-banco", "Configurar o banco", "botao") : ""} ${link("#/banco/pagamentos", "Pagamentos pelo banco")}</p></div>`;
     }
     const conta = contasVistas.includes(rota.q.conta) ? rota.q.conta : config().conta_padrao_id && contasVistas.includes(config().conta_padrao_id) ? config().conta_padrao_id : contasVistas[0];
     const mes = /^\d{4}-\d{2}$/.test(rota.q.mes || "") ? rota.q.mes : competenciaDe(hojeIso());
@@ -32879,7 +32920,7 @@ ${xref}
     const problemas = [];
     const linhaConta = (c) => {
       const p2 = c.arquivo ? null : ponte2[c.id];
-      const cert = c.arquivo ? '<span class="suave">extrato por arquivo (outro banco)</span>' : !p2 ? `<span class="suave">certificado e entrada no banco: ${bancoAtivo2() && !ponteLocal().configurada ? 'informe o endereço e a senha da ponte neste computador em <a href="#/dados?ir=banco">Dados e backup → Banco (C6)</a>' : !bancoAtivo2() ? "o banco ainda não está ligado" : "a ponte ainda não respondeu"}</span>` : p2.simulado ? etiqueta("ponte em modo simulado", "aviso") : `${p2.certificado_valido_ate ? `certificado válido até ${dataBr(p2.certificado_valido_ate)}${p2.certificado_dias !== null && p2.certificado_dias <= 30 ? ` ${etiqueta(p2.certificado_dias < 0 ? "vencido" : `vence em ${p2.certificado_dias} dia(s)`, "perigo")}` : ""}` : p2.certificado === "faltando" ? etiqueta("falta o certificado", "perigo") : "certificado: sem data"}
+      const cert = c.arquivo ? '<span class="suave">extrato por arquivo (outro banco)</span>' : !p2 ? `<span class="suave">certificado e entrada no banco: ${bancoAtivo2() && !ponteLocal().configurada ? 'informe o endereço e a senha da ponte neste computador em <a href="#/sistema-banco?ir=banco">Sistema → Banco → Banco (C6)</a>' : !bancoAtivo2() ? "o banco ainda não está ligado" : "a ponte ainda não respondeu"}</span>` : p2.simulado ? etiqueta("ponte em modo simulado", "aviso") : `${p2.certificado_valido_ate ? `certificado válido até ${dataBr(p2.certificado_valido_ate)}${p2.certificado_dias !== null && p2.certificado_dias <= 30 ? ` ${etiqueta(p2.certificado_dias < 0 ? "vencido" : `vence em ${p2.certificado_dias} dia(s)`, "perigo")}` : ""}` : p2.certificado === "faltando" ? etiqueta("falta o certificado", "perigo") : "certificado: sem data"}
           · última entrada no banco ${p2.token === "falhou" ? `${etiqueta("falhou", "perigo")} <span class="suave">${esc(p2.erro_token || "")}</span>` : p2.ultimo_token_em ? dataHoraBr(p2.ultimo_token_em) : "ainda não feita"}`;
       if (p2 && !p2.simulado && (p2.certificado_dias !== null && p2.certificado_dias <= 30 || p2.token === "falhou" || p2.certificado === "faltando")) problemas.push(c.id);
       const atrasado = c.atrasado;
@@ -33006,7 +33047,7 @@ ${xref}
     const arquivo = () => new File([blob], `${base}.pdf`, { type: "application/pdf" });
     const p2 = pastaDoComprovante(d(), x);
     const c = config().copiar_para_contador !== false ? pastaContador(d(), x) : null;
-    if (!p2 && !c) throw new ErroUsuario("Não há pasta para guardar: a movimentação não tem imóvel e a conta não está ligada a uma empresa (Dados e backup → Banco (C6)).");
+    if (!p2 && !c) throw new ErroUsuario("Não há pasta para guardar: a movimentação não tem imóvel e a conta não está ligada a uma empresa (Sistema → Banco → Banco (C6)).");
     const comprovante2 = p2 ? await salvarArquivo(await pastaDoEscopo(p2.escopo, p2.id), arquivo()) : null;
     const contador = c ? await salvarArquivo(await pastaDoEscopo(c.escopo, c.id), arquivo()) : null;
     await alterar((db) => registrarComprovante(db, x.id, { nome_arquivo: base, comprovante: comprovante2, comprovante_contador: contador, origem }, login(), tabela));
@@ -33494,7 +33535,7 @@ ${xref}
       init_comum();
       TITULO_AGUARDANDO = "Aguardando as chaves de acesso do C6";
       SO_ARQUIVO = 'Esta conta é de outro banco, que não fala com o sistema: o extrato entra só pelo arquivo OFX ou CSV (botão "Importar o extrato").';
-      BANCO_DESLIGADO = "O banco ainda não está ligado ao sistema (faltam as chaves do C6). Peça ao administrador para ligar em Dados e backup → Banco (C6).";
+      BANCO_DESLIGADO = "O banco ainda não está ligado ao sistema (faltam as chaves do C6). Peça ao administrador para ligar em Sistema → Banco → Banco (C6).";
       config = () => d().config_banco || {};
       contas = () => config().contas || [];
       contasArquivo = () => contasSoArquivo(d());
@@ -33548,10 +33589,10 @@ ${xref}
       };
       botaoPonte = (acao, texto3, dados = {}, cls = "secundario pequeno") => bancoAtivo2() ? botao(acao, texto3, dados, cls) : botaoInativo(texto3, motivoBancoInativo(d()) || TITULO_AGUARDANDO, cls);
       estado = { saldos: {}, conferencia: null, avisos: null, saudePonte: null, saudePonteEm: 0, saudePonteErro: "" };
-      avisoNaoConfigurado = () => `<div class="alerta aviso" id="banco-nao-configurado"><b>O banco ainda não está ligado.</b> As chaves de acesso do C6 são configuradas em <a href="#/dados?ir=banco">Dados e backup → Banco (C6)</a>.
+      avisoNaoConfigurado = () => `<div class="alerta aviso" id="banco-nao-configurado"><b>O banco ainda não está ligado.</b> As chaves de acesso do C6 são configuradas em <a href="#/sistema-banco?ir=banco">Sistema → Banco → Banco (C6)</a>.
   Até lá, os botões que falam com o banco ficam desligados; o que já foi importado continua aqui.</div>`;
       avisoContaArquivo = (a) => `<div class="alerta info" id="conta-arquivo"><b>Conta no ${esc(a.banco || "outro banco")}: extrato por arquivo.</b> Este banco não fala com o sistema: baixe o extrato em OFX (ou CSV) no site ou no aplicativo do banco e importe aqui. O sistema confere o saldo do arquivo e não deixa entrar o mesmo lançamento duas vezes. O arquivo não traz o código do boleto: as entradas que parecem aluguel não se ligam sozinhas; vincule cada uma em "Dar destino".</div>`;
-      avisoPagamentosDesligados = () => `<div class="alerta aviso"><b>Os pagamentos pelo banco estão desligados.</b> O administrador liga em <a href="#/dados?ir=config-banco2">Dados e backup → Banco: conciliação e pagamentos</a>. Enquanto isso, as contas são pagas fora do sistema e só o extrato é conferido aqui.</div>`;
+      avisoPagamentosDesligados = () => `<div class="alerta aviso"><b>Os pagamentos pelo banco estão desligados.</b> O administrador liga em <a href="#/sistema-banco?ir=config-banco2">Sistema → Banco → Banco: conciliação e pagamentos</a>. Enquanto isso, as contas são pagas fora do sistema e só o extrato é conferido aqui.</div>`;
       CHAVE_AVISOS = "avisos-banco-lidos";
       INTERVALO_AVISOS_MS = 5 * 6e4;
       MAX_RECONSULTAS = 20;
@@ -33689,7 +33730,7 @@ ${xref}
         /** Painel de saúde: consulta a ponte agora (certificado, último token). */
         async conferirSaudeBanco() {
           if (!bancoAtivo2()) throw new ErroUsuario(TITULO_AGUARDANDO);
-          if (!ponteLocal().configurada) throw new ErroUsuario("Falta informar o endereço e a senha da ponte neste computador: o administrador preenche em Dados e backup → Banco (C6) (ficam só neste computador).");
+          if (!ponteLocal().configurada) throw new ErroUsuario("Falta informar o endereço e a senha da ponte neste computador: o administrador preenche em Sistema → Banco → Banco (C6) (ficam só neste computador).");
           estado.saudePonteEm = Date.now();
           await conferirSaudePonte();
           if (estado.saudePonteErro) throw new ErroUsuario(`A ponte do banco não respondeu (${estado.saudePonteErro}). Confira se o computador da ponte está ligado e tente de novo.`);
@@ -33835,7 +33876,7 @@ ${xref}
         async enviarGrupoAprovacao({ conta, grupo: grupo2 }) {
           if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador envia pagamentos para aprovação.");
           if (!bancoAtivo2()) throw new ErroUsuario(BANCO_DESLIGADO);
-          if (!config().permitir_pagamentos) throw new ErroUsuario("Os pagamentos pelo banco estão desligados em Dados e backup → Banco: conciliação e pagamentos.");
+          if (!config().permitir_pagamentos) throw new ErroUsuario("Os pagamentos pelo banco estão desligados em Sistema → Banco → Banco: conciliação e pagamentos.");
           const pags = pagamentosDoLote(grupo2, conta);
           if (!pags.length) throw new ErroUsuario("Nenhum pagamento deste lote está pronto para enviar (prepare de novo).");
           const { items } = await itensDoGrupo(conta, grupo2);
@@ -34066,6 +34107,69 @@ ${xref}
           await mostrar();
         }
       };
+    }
+  });
+
+  // docs/js/telas/sistema.js
+  function botoesDoSistema() {
+    const admin3 = podeUsuario("admin");
+    return [
+      ["#/empresas", "Empresas"],
+      admin3 && ["#/sistema-banco", "Banco"],
+      ["#/sistema-email", "Comunicação E-mail"],
+      ["#/sistema-modelos", "Modelos de documentos"],
+      admin3 && ["#/lgpd", "LGPD"]
+    ].filter(Boolean).map(([endereco2, nome]) => link(endereco2, nome, "botao secundario")).join("");
+  }
+  function enderecoMudado(tela, q = {}) {
+    if (tela === "dados" && q.gmail) return `#/sistema-email?gmail=${q.gmail}`;
+    const mudaram = { dados: ["banco", "config-banco2"], empresas: ["conta-boletos"] }[tela] || [];
+    return mudaram.includes(q.ir) ? `#/sistema-banco?ir=${q.ir}` : "";
+  }
+  function telaSistemaBanco() {
+    if (!podeUsuario("admin")) return soAdministrador("Banco (configuração)");
+    return `${topo2("Banco (configuração)", link("#/banco", "Ver extrato e movimentações", "botao secundario"))}
+    ${caixaConfigBanco()}
+    ${caixaContaDosBoletos()}
+    ${caixaConfigBanco2()}`;
+  }
+  async function telaSistemaEmail(q = {}) {
+    return `${topo2("Comunicação E-mail")}
+    ${await caixaGmailHtml(q.gmail)}
+    <div class="cartao" id="modelos-de-email"><h2>Modelos de e-mail</h2><p>Um e-mail para cada etapa da ficha, da entrada e da saída do inquilino, a régua de cobrança (lembretes antes e no dia do vencimento, boleto em atraso), as notificações ao inquilino, o novo valor do aluguel, os termos aditivos e o informe anual do Imposto de Renda (botão <b>✉ E-mail</b> em cada etapa).</p>${link("#/modelos-email", "Ver e editar os modelos de e-mail")}</div>`;
+  }
+  async function telaSistemaModelos() {
+    let modeloProprio = false;
+    try {
+      await (await E.pasta.getDirectoryHandle(PASTA_MODELOS)).getFileHandle(MODELO_FATURA);
+      modeloProprio = true;
+    } catch {
+    }
+    return `${topo2("Modelos de documentos")}
+    <div class="cartao" id="modelos-de-contrato"><h2>Modelos de contrato</h2><p>Textos usados no botão <b>Gerar contrato</b> do inquilino (residencial, não residencial e os que você criar).</p>${link("#/modelos-contrato", "Ver e editar os modelos de contrato")}</div>
+    <div class="cartao" id="modelos-de-aditivo"><h2>Termos aditivos</h2><p>Textos usados no botão <b>Gerar termo aditivo</b> do inquilino: troca do vencimento, troca de inquilino e novo valor do aluguel.</p>${link("#/modelos-contrato?ir=modelos-aditivo", "Ver e editar os termos aditivos")}</div>
+    <div class="cartao" id="modelo-excel"><h2>Modelo Excel da NF</h2>
+      <p>${modeloProprio ? `${etiqueta("Modelo próprio", "ok")} usando o arquivo enviado (${PASTA_MODELOS}/${MODELO_FATURA}).` : "Usando o modelo padrão do sistema (uma NF por empresa, com os dados do cadastro de Empresas)."}</p>
+      <p class="suave">Para trocar, envie um .xlsx com uma aba por empresa no mesmo desenho. Os dados são preenchidos nas mesmas células da planilha original (peça ao técnico se precisar do detalhe).</p>
+      ${opera() ? `<form data-form="modeloExcel" class="acoes"><input type="file" name="modelo" accept=".xlsx" style="max-width:380px"><button class="secundario">Enviar modelo</button>${modeloProprio ? botao("removerModelo", "Voltar ao modelo padrão", {}, "perigo pequeno", "Voltar ao modelo padrão?") : ""}</form>` : ""}</div>`;
+  }
+  function telaLgpd() {
+    if (!podeUsuario("admin")) return soAdministrador("LGPD");
+    return `${topo2("LGPD")}
+    <div class="cartao" id="dados-de-uma-pessoa"><h2>Dados de uma pessoa</h2><p>Pelo CPF: onde a pessoa aparece e um arquivo com tudo dela (quando ela pedir). Dez anos depois do fim do último contrato, apagar tudo dela de uma vez.</p>
+      <p class="acoes">${link("#/pessoa", "Dados de uma pessoa", "botao secundario pequeno")} ${link("#/pessoas-antigas", "Pessoas com mais de 10 anos do fim do contrato", "botao secundario pequeno")}</p></div>`;
+  }
+  var topo2, soAdministrador;
+  var init_sistema = __esm({
+    "docs/js/telas/sistema.js"() {
+      init_app();
+      init_armazenamento();
+      init_banco_c6();
+      init_banco2();
+      init_comum();
+      init_emails();
+      topo2 = (titulo2, acoes = "") => `<p class="suave"><a href="#/dados">← Sistema</a></p><div class="cabecalho"><h1>${titulo2}</h1>${acoes ? `<div class="acoes">${acoes}</div>` : ""}</div>`;
+      soAdministrador = (titulo2) => `${topo2(titulo2)}<div class="alerta aviso">Só o administrador vê esta página.</div>`;
     }
   });
 
@@ -34352,7 +34456,7 @@ ${xref}
     if (!E.seguro || !E.seguro.chave) {
       const nova = E.pastaSeguraNova;
       const chaveExistente = nova ? await lerChave(nova) : null;
-      return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backup seguro</h1>
+      return `<p class="suave"><a href="#/dados">← Sistema</a></p><h1>Backup seguro</h1>
       ${E.nuvem && E.backupEmpresa?.feito_em ? `<div class="alerta ${avisoDaEmpresa(E.backupEmpresa, Date.now(), DIAS_BACKUP_EMPRESA) ? "aviso" : "ok"}"><b>Backup seguro da empresa:</b> última cópia em ${esc(ultimaCopiaDaEmpresa())}, feita por outro computador. Basta um computador com o backup ligado: ligue neste só se ele for passar a ser o computador do backup (ou um segundo, de reserva).</div>` : ""}
       ${E.seguro && E.seguro.desconectado ? `<div class="alerta aviso">A pasta <b>${esc(E.seguro.dir.name)}</b> já está configurada, mas o navegador pede para liberar o acesso de novo. ${botao("reconectarSeguro", "Reconectar", {}, "pequeno")}</div>` : ""}
       <div class="cartao"><h2>1. Escolha a pasta segura</h2>
@@ -34370,7 +34474,7 @@ ${xref}
     const copia2 = await situacaoCopia(E.seguro.dir);
     const ultimo = (pasta) => lista3.find((x) => x.pasta === pasta);
     const quando3 = (x) => x ? dataHoraBr(x.alterado) : "nenhum ainda";
-    return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backup seguro</h1>
+    return `<p class="suave"><a href="#/dados">← Sistema</a></p><h1>Backup seguro</h1>
     ${E.seguroErro ? `<div class="alerta erro">A última cópia falhou: ${esc(E.seguroErro)}</div>` : ""}
     <div class="cartao"><div class="grade">
       ${item("Pasta segura (só neste computador)", esc(E.seguro.dir.name))}
@@ -34448,7 +34552,7 @@ ${xref}
     ${link("#/backup-seguro", "Ligar o backup seguro", "botao pequeno")} ${botao("dispensarAvisoSeguro", "Não avisar neste aparelho", {}, "secundario pequeno")}</div>`;
   }
   function telaEmpresas() {
-    return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><div class="cabecalho"><h1>Empresas que emitem as NFs</h1>${podeUsuario("admin") ? link("#/novo/emitentes", "Nova empresa", "botao") : ""}</div>
+    return `<p class="suave"><a href="#/dados">← Sistema</a></p><div class="cabecalho"><h1>Empresas que emitem as NFs</h1>${podeUsuario("admin") ? link("#/novo/emitentes", "Nova empresa", "botao") : ""}</div>
     <div class="cartao rolagem"><table><tr><th>Nome</th><th>Razão social</th><th>CNPJ</th><th>Representante (contratos)</th><th>Aba no Excel</th><th>Situação</th><th></th></tr>
     ${ordenar(d().emitentes, "nome").map((e) => `<tr><td><b>${esc(e.nome)}</b></td><td>${esc(e.razao_social)}</td><td>${esc(e.cnpj || "-")}</td><td>${e.representante_nome ? esc(e.representante_nome) : '<span class="suave">falta</span>'}</td><td>${esc(e.aba_modelo || e.nome.split(/\s+/)[0])}</td><td>${e.ativo ? etiqueta("Ativa", "ok") : etiqueta("Inativa", "neutra")}</td><td class="n">${podeUsuario("admin") ? link(`#/editar/emitentes/${e.id}`, "Editar") : ""}</td></tr>`).join("") || '<tr><td colspan="7" class="suave">Nenhuma empresa cadastrada.</td></tr>'}</table>
     <p class="suave">Em cada imóvel você define quais empresas emitem a NF e o percentual de cada uma (ex.: 50% / 50%).</p></div>
@@ -34459,7 +34563,7 @@ ${xref}
       ${podeUsuario("admin") ? `<form data-form="logo" class="acoes"><input type="file" name="arquivo" accept="image/png,image/jpeg,image/svg+xml,image/webp" style="max-width:360px"><button class="secundario">${d().logo ? "Trocar logo" : "Enviar logo"}</button>
         ${d().logo ? botao("removerLogo", "Remover logo", {}, "perigo pequeno", "Remover a logo?") : ""}</form>` : ""}</div>
     ${caixaIcone()}
-    ${caixaContaDosBoletos()}`;
+    ${caixaCertificado()}`;
   }
   async function desfazerItens(itens) {
     if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador desfaz alterações. Peça a ele, se precisar.");
@@ -34522,7 +34626,7 @@ ${xref}
     <span class="suave">Página ${pagina} de ${paginas} (registros ${lista3.length - fim + 1} a ${lista3.length - fim + mostrados.length} de ${lista3.length}, do mais recente para o mais antigo)</span>
     ${pagina < paginas ? `${irPara(pagina + 1, "Mais antigos ›")} ${irPara(paginas, "Os primeiros »")}` : ""}</p>` : "";
     const usadas = new Set(d().historico.map((h) => h.tabela));
-    return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Histórico de alterações</h1>
+    return `<p class="suave"><a href="#/dados">← Sistema</a></p><h1>Histórico de alterações</h1>
     <details class="cartao" open><summary><b>Histórico</b> <span class="suave">· ${lista3.length} registro(s)${filtrando ? " com o filtro aplicado" : ""}</span></summary>
     ${trocadas ? `<div class="alerta info">A data "De" estava depois da "Até": mostrando de ${dataBr(q.de)} até ${dataBr(q.ate)}.</div>` : ""}
     <form class="formulario" data-form="ir" data-ir="historico" style="margin-top:12px">
@@ -34574,15 +34678,9 @@ ${xref}
     <p class="suave">${E.nuvem ? "Na nuvem, cada aparelho guarda uma cópia deste tamanho." : `É o tamanho do arquivo ${ARQUIVO_BANCO}.`} Os anexos (PDFs e fotos) ficam à parte, na pasta dos arquivos: o botão conta quantos são e quanto ocupam${E.nuvem ? " (precisa de internet)" : ""}.</p>
     <p>${botao("medirAnexos", "Medir a pasta dos anexos", { status: "Contando os anexos…" })}</p></div>`;
   }
-  async function telaDados(q = {}) {
+  async function telaDados() {
     const conflitos = E.nuvem ? [] : await copiasEmConflito(E.pasta);
-    let modeloProprio = false;
-    try {
-      await (await E.pasta.getDirectoryHandle(PASTA_MODELOS)).getFileHandle(MODELO_FATURA);
-      modeloProprio = true;
-    } catch {
-    }
-    return `<div class="cabecalho"><h1>Dados e backup</h1><div class="acoes">${link("#/empresas", "Empresas", "botao secundario")}${link("#/regras", "Regras do sistema", "botao secundario")}${ligado() ? link("#/arquivo-impresso", "Arquivo impresso", "botao secundario") : ""}${link("#/historico", "Histórico de alterações", "botao secundario")}${podeUsuario("admin") ? link("#/teste-pdfs", "Teste dos PDFs (temporário)", "botao secundario") : ""}</div></div>
+    return `<div class="cabecalho cabecalho-sistema"><h1>Sistema</h1><div class="acoes">${botoesDoSistema()}${link("#/regras", "Regras do sistema", "botao secundario")}${ligado() ? link("#/arquivo-impresso", "Arquivo impresso", "botao secundario") : ""}${link("#/historico", "Histórico de alterações", "botao secundario")}${podeUsuario("admin") ? link("#/teste-pdfs", "Teste dos PDFs (temporário)", "botao secundario") : ""}</div></div>
     ${conflitos.length ? `<div class="alerta perigo">O OneDrive criou cópia(s) em conflito: <b>${conflitos.map(esc).join(", ")}</b>. Isso acontece quando dois computadores gravam ao mesmo tempo. Confira se falta alguma alteração recente e, depois de conferir, apague a cópia na pasta.</div>` : ""}
     ${opera() ? caixaReabrirPassos(d(), E.usuario?.login || "", { backupLigado: !!(E.seguro && E.seguro.chave) }) : ""}
     <div class="cartao"><div class="grade">
@@ -34605,9 +34703,6 @@ ${xref}
       <p>${E.seguro && E.seguro.chave ? etiqueta(`Ligado neste computador · pasta ${E.seguro.dir.name}`, "ok") : E.seguro && E.seguro.desconectado ? etiqueta("Desconectado: falta liberar a pasta", "aviso") : etiqueta("Não configurado neste aparelho", "neutra")}
       ${link("#/backup-seguro", "Abrir o backup seguro")}</p>
       ${E.nuvem && E.backupEmpresa ? `<p>Na empresa: ${E.backupEmpresa.feito_em ? `${etiqueta(`última cópia em ${ultimaCopiaDaEmpresa()}`, avisoDaEmpresa(E.backupEmpresa, Date.now(), DIAS_BACKUP_EMPRESA) ? "aviso" : "ok")} <span class="suave">(basta um computador com o backup ligado; parado há mais de ${DIAS_BACKUP_EMPRESA} dias, o Painel avisa os administradores)</span>` : etiqueta("nenhum computador com o backup seguro ligado", "aviso")}</p>` : ""}</div>` : ""}
-    ${caixaCertificado()}
-    ${caixaConfigBanco()}
-    ${caixaConfigBanco2()}
     <div class="cartao"><h2>Exportar tudo em ZIP</h2><p>Todos os dados e todos os anexos num único arquivo, ${E.nuvem ? 'para guardar. Para voltar com ele: descompacte numa pasta do computador e use "Avançado: substituir os dados da nuvem pelos de uma pasta" (acima); para voltar o banco a um dia, use os Backups da nuvem.' : "para guardar ou levar para outro computador."}${E.nuvem && !podeUsuario("admin") ? ' <span class="suave">Na nuvem, só o administrador baixa o ZIP com tudo (só o aparelho dele recebe as senhas de todos os usuários).</span>' : ""}</p>${zipPermitido() ? botao("exportar", "Baixar ZIP com todos os dados", { status: "Montando o ZIP…" }, "") : ""}<div id="progresso-exportar" aria-live="polite"></div>
       <p style="margin-top:14px">Para ler ou imprimir: todos os cadastros numa planilha Excel (uma aba por cadastro, mais o histórico de alterações) e num PDF (uma ficha por registro). Os anexos não entram e estes arquivos não servem para importar.</p>
       ${opera() ? botao("exportarPlanilhaPdf", "Baixar todos os dados em planilha e PDF", { status: "Montando a planilha e o PDF…" }, "secundario") : ""}
@@ -34622,18 +34717,9 @@ ${xref}
     ${podeUsuario("admin") ? `<div class="cartao"><h2>Compactar os anexos</h2><p>Fotos e PDFs escaneados são compactados sozinhos ao anexar (${link("#/regras", "Regras do sistema", "")} → "Compactar anexos"${regra("compactar_anexos") ? "" : ", hoje desligada"}). Ex.: foto do RG de 4 MB → cerca de 400 KB; PDF escaneado de 10 páginas com 12 MB → cerca de 1,5 MB.
       Este botão faz o mesmo com os que já estavam no sistema, trocando cada um no lugar, com o mesmo nome. O original não é guardado. PDF com assinatura digital (gov.br, ICP-Brasil, banco) e PDF com texto ficam como estão; documento mandado pelo link da ficha só entra depois de conferido (a conferência fica guardada na ficha).</p>
       ${botao("compactarAnexos", "Compactar os anexos que já estão no sistema", { status: "Procurando os anexos…" }, "secundario", "Compactar agora as fotos e os PDFs escaneados já anexados? O arquivo original não é guardado (PDF assinado nunca é mexido). Pode levar alguns minutos: deixe esta tela aberta até o fim.")}</div>` : ""}
-    ${podeUsuario("admin") ? `<div class="cartao"><h2>Dados de uma pessoa (LGPD)</h2><p>Pelo CPF: onde a pessoa aparece e um arquivo com tudo dela (quando ela pedir). Dez anos depois do fim do último contrato, apagar tudo dela de uma vez.</p>
-      <p class="acoes">${link("#/pessoa", "Dados de uma pessoa", "botao secundario pequeno")} ${link("#/pessoas-antigas", "Pessoas com mais de 10 anos do fim do contrato", "botao secundario pequeno")}</p></div>` : ""}
     ${podeUsuario("admin") ? `<div class="cartao"><h2>Arquivos sem lançamento</h2><p>Ao excluir um lançamento (aditivo, comprovante, depósito, apólice, vistoria, documento assinado), o arquivo anexado é apagado junto.
       Os que sobraram de exclusões antigas podem ser apagados aqui: o sistema mostra a lista antes de apagar. As fichas e documentos anexados à mão em "Arquivos do inquilino" não entram.</p>
-      ${botao("limparAnexosSoltos", "Procurar arquivos sem lançamento", { status: "Procurando arquivos sem lançamento…" })}</div>` : ""}
-    <div class="cartao"><h2>Modelos de contrato</h2><p>Textos usados nos botões <b>Gerar contrato</b> (residencial, não residencial e os que você criar) e <b>Gerar termo aditivo</b> (troca do vencimento e troca de inquilino) do inquilino.</p>${link("#/modelos-contrato", "Ver e editar os modelos")}</div>
-    <div class="cartao"><h2>Modelos de e-mail</h2><p>Um e-mail para cada etapa da ficha, da entrada e da saída do inquilino, a régua de cobrança (lembretes antes e no dia do vencimento, boleto em atraso), as notificações ao inquilino, o novo valor do aluguel, os termos aditivos e o informe anual do Imposto de Renda (botão <b>✉ E-mail</b> em cada etapa).</p>${link("#/modelos-email", "Ver e editar os modelos de e-mail")}</div>
-    ${await caixaGmailHtml(q.gmail)}
-    <div class="cartao"><h2>Modelo Excel da NF</h2>
-      <p>${modeloProprio ? `${etiqueta("Modelo próprio", "ok")} usando o arquivo enviado (${PASTA_MODELOS}/${MODELO_FATURA}).` : "Usando o modelo padrão do sistema (uma NF por empresa, com os dados do cadastro de Empresas)."}</p>
-      <p class="suave">Para trocar, envie um .xlsx com uma aba por empresa no mesmo desenho. Os dados são preenchidos nas mesmas células da planilha original (peça ao técnico se precisar do detalhe).</p>
-      ${opera() ? `<form data-form="modeloExcel" class="acoes"><input type="file" name="modelo" accept=".xlsx" style="max-width:380px"><button class="secundario">Enviar modelo</button>${modeloProprio ? botao("removerModelo", "Voltar ao modelo padrão", {}, "perigo pequeno", "Voltar ao modelo padrão?") : ""}</form>` : ""}</div>`;
+      ${botao("limparAnexosSoltos", "Procurar arquivos sem lançamento", { status: "Procurando arquivos sem lançamento…" })}</div>` : ""}`;
   }
   function larguraLogo(dataUrl) {
     try {
@@ -34681,20 +34767,18 @@ ${xref}
       init_copia_aberta();
       init_formularios();
       init_regras();
-      init_banco_c6();
-      init_banco2();
       init_cadastros();
       init_comum();
-      init_emails();
       init_icone();
+      init_sistema();
       tamanho2 = (b) => b > 1048576 ? `${(b / 1048576).toFixed(1).replace(".", ",")} MB` : `${Math.max(1, Math.round(b / 1024))} KB`;
       FORM_RESTAURAR = `<form data-form="restaurarSeguro" class="formulario">
     <div><label>Arquivo de backup (.bkp)</label><input type="file" name="arquivo" accept="${EXTENSAO}"></div>
     <div><label>Senha do backup</label><input type="password" name="senha" autocomplete="off"></div>
     ${suportado() ? '<div><label>O que fazer</label><select name="destino"><option value="pasta">Abrir numa pasta nova do computador (o sistema abre com esses dados)</option><option value="zip">Só baixar o ZIP</option></select></div>' : '<input type="hidden" name="destino" value="zip">'}
     <div class="check"><button>Abrir o backup</button></div></form>
-  <p class="suave">${suportado() ? `<b>Abrir numa pasta:</b> escolha uma pasta nova e vazia; o sistema grava ali os dados (e os anexos, se o backup for completo) e abre. Só para desastre (dados da nuvem perdidos): com o site só fora do ar, use o aplicativo instalado, que envia sozinho depois. Na pasta, para levar de volta à nuvem, <b>Dados e backup → Substituir os dados da nuvem pelos de uma pasta</b> leva o que fez para a nuvem (para só voltar o banco a um dia, <b>Backups da nuvem</b> é mais simples).` : "Neste aparelho só dá para baixar o ZIP: abrir o backup numa pasta (e levar de volta à nuvem) se faz no computador, no Chrome ou no Edge."}
-    <b>ZIP:</b> igual ao do "Exportar tudo", para guardar. Para voltar os dados com ele: com os dados numa pasta do computador, "Importar ZIP" em Dados e backup; na nuvem (onde não há "Importar ZIP"), use "Backups da nuvem" ou abra o backup numa pasta nova do computador e depois "Substituir os dados da nuvem pelos de uma pasta". Os usuários e senhas voltam junto.</p>`;
+  <p class="suave">${suportado() ? `<b>Abrir numa pasta:</b> escolha uma pasta nova e vazia; o sistema grava ali os dados (e os anexos, se o backup for completo) e abre. Só para desastre (dados da nuvem perdidos): com o site só fora do ar, use o aplicativo instalado, que envia sozinho depois. Na pasta, para levar de volta à nuvem, <b>Sistema → Substituir os dados da nuvem pelos de uma pasta</b> leva o que fez para a nuvem (para só voltar o banco a um dia, <b>Backups da nuvem</b> é mais simples).` : "Neste aparelho só dá para baixar o ZIP: abrir o backup numa pasta (e levar de volta à nuvem) se faz no computador, no Chrome ou no Edge."}
+    <b>ZIP:</b> igual ao do "Exportar tudo", para guardar. Para voltar os dados com ele: com os dados numa pasta do computador, "Importar ZIP" em Sistema; na nuvem (onde não há "Importar ZIP"), use "Backups da nuvem" ou abra o backup numa pasta nova do computador e depois "Substituir os dados da nuvem pelos de uma pasta". Os usuários e senhas voltam junto.</p>`;
       noComputador = () => !window.matchMedia?.("(max-width: 760px), (hover: none) and (pointer: coarse)").matches;
       noWindows = () => /Windows/.test(navigator.userAgent);
       AVISO_SEGURO_DISPENSADO = "imoveis-aviso-backup-seguro";
@@ -35262,7 +35346,7 @@ ${xref}
       <table><tr><th>Imposto</th><th class="n">Base (faturamento)</th><th class="n">Alíquota</th><th class="n">Guia esperada</th><th>Valor do contador</th><th class="n">Diferença</th></tr>
         ${x.guias.map((g) => guiaLinha(x.empresa, g)).join("")}
         <tr class="total"><td colspan="3">Total a pagar no mês${meses[2] === comp ? "" : " (IRPJ e CSLL ainda parciais)"}</td><td class="n">${reais(x.guias.reduce((t, g) => t + (g.abaixoDoMinimo ? 0 : g.aPagar), 0))}</td>
-          <td>${contadorNoMes(x.guias).length ? reais(contadorNoMes(x.guias).reduce((t, g) => t + g.contador.valor, 0)) : ""}</td><td></td></tr></table></div>`).join("") || '<div class="cartao"><p class="suave">Nenhuma empresa cadastrada. Cadastre em Dados e backup → Empresas.</p></div>'}`;
+          <td>${contadorNoMes(x.guias).length ? reais(contadorNoMes(x.guias).reduce((t, g) => t + g.contador.valor, 0)) : ""}</td><td></td></tr></table></div>`).join("") || '<div class="cartao"><p class="suave">Nenhuma empresa cadastrada. Cadastre em Sistema → Empresas.</p></div>'}`;
   }
   function periodo(q, base) {
     const hoje3 = hojeIso();
@@ -36038,7 +36122,7 @@ ${xref}
 - Banco (C6): quando um campo passa do limite do banco (nome 40 caracteres, rua e número 40, e-mail 70 etc.), o sistema avisa em vez de cortar em silêncio.
 
 15. USUÁRIOS E SEGURANÇA
-- Regras do sistema (Dados e backup → Regras do sistema, só o administrador muda): reajuste, feriados da cidade, base da multa, proporcional, dia de gerar boletos, caução, valores que o Novo contrato traz, régua de cobrança e prazos. Cada regra mostra a explicação, a consequência e a lei; o sistema avisa quando a escolha tem risco legal, mas não proíbe. As regras deste texto são o padrão do sistema: valem enquanto nada for mudado, e dá para voltar a elas, a uma versão salva ou a um arquivo das regras.
+- Regras do sistema (Sistema → Regras do sistema, só o administrador muda): reajuste, feriados da cidade, base da multa, proporcional, dia de gerar boletos, caução, valores que o Novo contrato traz, régua de cobrança e prazos. Cada regra mostra a explicação, a consequência e a lei; o sistema avisa quando a escolha tem risco legal, mas não proíbe. As regras deste texto são o padrão do sistema: valem enquanto nada for mudado, e dá para voltar a elas, a uma versão salva ou a um arquivo das regras.
 - Papéis: administrador (tudo, desfaz alterações de cadastro, backup seguro), operador (lança e edita) e consulta (só vê).
 - Senhas guardadas com PBKDF2-SHA256. Todas as alterações ficam no histórico.
 - Backup diário (na nuvem: 30 dias no servidor, com "Backups da nuvem" para baixar ou voltar a um dia), ZIP com os anexos e backup seguro cifrado numa segunda pasta, só do administrador (também na nuvem).
@@ -36048,8 +36132,8 @@ ${xref}
 - Cada movimentação precisa de um destino: conta do imóvel (água, luz, gás, condomínio, internet, outra), aluguel recebido (boleto), IPTU pago na prefeitura, imposto da empresa, tarifa do banco, transferência entre as nossas contas, outro ou ignorar. O sistema sugere o destino (matrícula/UC cadastrada no imóvel, valor do boleto, descrição, última movimentação igual), mas nada é gravado sem alguém confirmar.
 - Dar destino "conta do imóvel" cria a conta em "Contas pagas por nós" com o valor e a data do extrato (em qualquer imóvel); desfazer o destino exclui a conta criada (e os comprovantes guardados). IPTU marca a parcela paga pelo proprietário; a transferência liga as duas pontas (a conta que enviou e a que recebeu) para não virar conta duas vezes.
 - Aluguel: a entrada do extrato (ou a lista de pagos do Bolepix) confirma o pagamento do boleto com a data em que o dinheiro entrou (data contábil). Valor diferente do previsto segue o fluxo de divergência (NF digitada com justificativa). Boleto já pago não é confirmado de novo; desfazer o pagamento devolve a movimentação a "sem destino".
-- Comprovante: PDF do banco com nome padrão "AAAA-MM-DD Empresa Imóvel Conta Valor" (ex.: "2026-11-05 Empresa Loja 1 Agua 123,45.pdf"), sem acento, modelo editável em Dados e backup. Guardado na pasta do imóvel ("Contas pagas/ano"; IPTU em "IPTU (guias)/ano") e numa cópia para o contador ("_Contador/Empresa/AAAA-MM").
-- Pagamentos pelo banco: nunca automáticos. Alguém prepara (rascunho) e o banco lê os códigos; o administrador confere e aprova numa janela só, digitando o valor total ("Aprovar e enviar"), o pedido vai ao C6 como lote e é aprovado no app do banco por quem tem poderes (duas confirmações ao todo: uma aqui, outra no app). Cancelar antes do envio tira o item do lote lido pelo banco; pagamento enviado que o C6 cancelou ou recusou sem avisar, o administrador marca com "Foi cancelado no C6". Boleto (código de barras), Pix copia e cola ou chave Pix; limite por pagamento e liga/desliga em Dados e backup. Pago, a conta do imóvel é lançada (ou marcada) com a data do pagamento e o comprovante; a saída no extrato confirma e fecha o ciclo.
+- Comprovante: PDF do banco com nome padrão "AAAA-MM-DD Empresa Imóvel Conta Valor" (ex.: "2026-11-05 Empresa Loja 1 Agua 123,45.pdf"), sem acento, modelo editável em Sistema → Banco. Guardado na pasta do imóvel ("Contas pagas/ano"; IPTU em "IPTU (guias)/ano") e numa cópia para o contador ("_Contador/Empresa/AAAA-MM").
+- Pagamentos pelo banco: nunca automáticos. Alguém prepara (rascunho) e o banco lê os códigos; o administrador confere e aprova numa janela só, digitando o valor total ("Aprovar e enviar"), o pedido vai ao C6 como lote e é aprovado no app do banco por quem tem poderes (duas confirmações ao todo: uma aqui, outra no app). Cancelar antes do envio tira o item do lote lido pelo banco; pagamento enviado que o C6 cancelou ou recusou sem avisar, o administrador marca com "Foi cancelado no C6". Boleto (código de barras), Pix copia e cola ou chave Pix; limite por pagamento e liga/desliga em Sistema → Banco. Pago, a conta do imóvel é lançada (ou marcada) com a data do pagamento e o comprovante; a saída no extrato confirma e fecha o ciclo.
 - Boleto emitido no C6: valor cheio do aluguel, com o desconto da bonificação válido até o vencimento (valor fixo; prazo configurável). Multa e juros sobre o valor cheio, como o sistema já calcula. Quem paga atrasado perde o desconto — isso não é multa.
 - Notificação ao pagador (e-mail/SMS) automática e personalizável por conta e por contrato. Negativação disponível, só pelo administrador, com confirmação dupla.
 - Fechamento do mês ganha a etapa "Banco" (extrato buscado e tudo com destino) e o Painel avisa movimentações sem destino há mais de 7 dias, comprovantes não baixados e pagamentos enviados sem confirmação. O histórico registra tudo; movimentações e pagamentos não se desfazem pelo Histórico.
@@ -36265,14 +36349,14 @@ ${xref}
     const sugerida = cb && contaSugerida(d(), cb);
     if (sugerida && !lote2) return sugerida;
     const contas2 = configBanco(d()).contas;
-    if (!contas2.length) throw new ErroUsuario("Nenhuma conta bancária cadastrada: configure em Dados e backup → Banco (C6).");
+    if (!contas2.length) throw new ErroUsuario("Nenhuma conta bancária cadastrada: configure em Sistema → Banco → Banco (C6).");
     if (contas2.length === 1) return contas2[0];
     const marcada = cb ? contaPreMarcada(d(), cb) : contaEmissora(d());
     const resp = await janela({
       titulo: "Por qual empresa emitir o boleto?",
       html: `<p>${lote2 || `Boleto de <b>${esc(buscar2("contratos", cb.contrato_id).inquilino_nome)}</b> (${esc(compBr(cb.competencia))}, ${esc(reais(totais(cb).a_pagar_sem_desconto))}).`} Escolha a conta do C6 que recebe:</p>
       ${contas2.map((x) => `<p><label class="check-mini"><input type="radio" name="conta" value="${esc(x.id)}" ${marcada && marcada.id === x.id ? "checked" : ""}> <b>${esc((buscar2("emitentes", x.emitente_id) || {}).nome || x.apelido)}</b> · conta ${esc(x.apelido)}${x.ambiente === "sandbox" ? " (sandbox: teste)" : ""}</label></p>`).join("")}
-      <p class="suave">Para não perguntar, escolha "Sempre pela empresa padrão" em Empresas.</p>`,
+      <p class="suave">Para não perguntar, escolha "Sempre pela empresa padrão" em Sistema → Banco.</p>`,
       sim: "Emitir",
       nao: "Cancelar"
     });
@@ -36582,13 +36666,13 @@ ${xref}
     if (!chave || !m || !m.c || !opera() || (m.c.rotina_entrada || {})[chave]) return;
     await alterar((db) => marcarGeradoNaRotina(db, m.c.id, chave, login()));
   }
-  function janelaMensagem(titulo2, l, topo2 = "") {
+  function janelaMensagem(titulo2, l, topo3 = "") {
     const tel = l.telefone ? l.telefone.length <= 11 ? `55${l.telefone}` : l.telefone : "";
     return janela({
       titulo: titulo2,
       sim: "Fechar",
       nao: "",
-      html: `${topo2}<p class="suave" style="margin-bottom:6px">Confira o texto (pode editar) e escolha por onde enviar. O e-mail é o canal oficial da empresa.</p>
+      html: `${topo3}<p class="suave" style="margin-bottom:6px">Confira o texto (pode editar) e escolha por onde enviar. O e-mail é o canal oficial da empresa.</p>
         <p><label>Assunto</label><input name="assunto" value="${esc(l.assunto)}"></p>
         <p><label>Mensagem</label><textarea name="texto" rows="11" style="width:100%;font-family:inherit">${esc(l.texto)}</textarea></p>
         <div class="acoes"><a class="botao" data-enviar="email" href="#" target="_blank" rel="noopener">✉ Abrir e-mail${l.email ? ` para ${esc(l.email)}` : " (sem e-mail no cadastro)"}</a>
@@ -37281,7 +37365,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
           else await mostrar();
         },
         /** Arquivos que sobraram de lançamentos excluídos antes (comprovantes, fotos da vistoria, assinados, aditivos): lista e apaga. */
-        /** Dados e backup: quantos arquivos há na pasta dos anexos e quanto ocupam (na nuvem, numa ida; na pasta, percorrendo as pastas). */
+        /** Sistema: quantos arquivos há na pasta dos anexos e quanto ocupam (na nuvem, numa ida; na pasta, percorrendo as pastas). */
         async medirAnexos(_dados, el) {
           const status = statusDoBotao(el);
           let n = 0;
@@ -38498,7 +38582,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         recarregarPagina() {
           location.reload();
         },
-        /** Dados e backup: apaga as telas guardadas no aparelho (não os dados nem o que espera envio) e abre a versão nova. */
+        /** Sistema: apaga as telas guardadas no aparelho (não os dados nem o que espera envio) e abre a versão nova. */
         async atualizarSistema() {
           if (window.caches) for (const k of await caches.keys()) await caches.delete(k);
           for (const reg of await navigator.serviceWorker?.getRegistrations?.() || []) await reg.update().catch(() => {
@@ -38508,8 +38592,8 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
         // ------------------------------------------------------------------------
         // Banco (C6): boleto com Pix pela ponte. A chamada ao banco fica fora do alterar(); o resultado é gravado depois.
         // ------------------------------------------------------------------------
-        /** Dados e backup: chama /saude da ponte e mostra o que falta (certificado, chaves, token, modo simulado). */
-        /** Dados e backup: apaga o endereço e a senha da ponte guardados neste navegador (nada muda no arquivo de dados). */
+        /** Sistema: chama /saude da ponte e mostra o que falta (certificado, chaves, token, modo simulado). */
+        /** Sistema: apaga o endereço e a senha da ponte guardados neste navegador (nada muda no arquivo de dados). */
         async esquecerPonteC6() {
           if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador altera a integração com o banco.");
           await esquecerPonteLocal();
@@ -38630,7 +38714,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador negativa um pagador.");
           const cb = buscar2("cobrancas", id);
           const conta = contaBanco(d(), cb.banco && cb.banco.conta_id);
-          if (!conta || !conta.negativacao.ativa) throw new ErroUsuario("A negativação está desligada nesta conta (Dados e backup → Banco (C6)).");
+          if (!conta || !conta.negativacao.ativa) throw new ErroUsuario("A negativação está desligada nesta conta (Sistema → Banco → Banco (C6)).");
           const c = buscar2("contratos", cb.contrato_id);
           const resp = await janela({
             titulo: "2ª confirmação: negativar no birô de crédito",
@@ -38703,7 +38787,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
             return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
           } });
         },
-        /** Dados e backup: confere agora os arquivos dos lançamentos (devolve os que estavam em outra pasta; alerta os que sumiram). */
+        /** Sistema: confere agora os arquivos dos lançamentos (devolve os que estavam em outra pasta; alerta os que sumiram). */
         async conferirArquivos(_dados, el) {
           const status = statusDoBotao(el);
           await conferirHerancas();
@@ -38711,7 +38795,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           status.mostrar(`${r.conferidos} arquivo(s) conferido(s).${r.devolvidos.length ? ` ${r.devolvidos.length} estavam em outra pasta e voltaram ao lugar.` : ""}${r.faltando.length ? ` ${r.faltando.length} não foram encontrados: veja o alerta no Painel.` : " Nenhum faltando."}`, r.faltando.length ? "aviso" : "ok");
         },
         /**
-         * Dados e backup (administrador): compacta as fotos e os PDFs escaneados que já estão no sistema (compactar.js), trocando
+         * Sistema (administrador): compacta as fotos e os PDFs escaneados que já estão no sistema (compactar.js), trocando
          * no lugar com o mesmo nome. PDF assinado fica como está; documento do link da ficha, só depois de conferido.
          */
         async compactarAnexos(_dados, el) {
@@ -38912,7 +38996,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           }
           if (f.get("destino") !== "pasta") {
             baixar(blob, `backup-restaurado-${info.tipo === "completo" ? "completo" : "banco"}-${data2}.zip`);
-            aviso(E.nuvem ? `Backup de ${dataHoraBr(info.criado_em)} baixado como ZIP (para guardar). Para voltar os dados da nuvem a esse dia: use "Backups da nuvem" em Dados e backup ou, no computador (Chrome ou Edge), abra o backup numa pasta nova e depois "Substituir os dados da nuvem pelos de uma pasta".` : `Backup de ${dataHoraBr(info.criado_em)} aberto. Agora use "Importar ZIP" em Dados e backup com o arquivo baixado.`);
+            aviso(E.nuvem ? `Backup de ${dataHoraBr(info.criado_em)} baixado como ZIP (para guardar). Para voltar os dados da nuvem a esse dia: use "Backups da nuvem" em Sistema ou, no computador (Chrome ou Edge), abra o backup numa pasta nova e depois "Substituir os dados da nuvem pelos de uma pasta".` : `Backup de ${dataHoraBr(info.criado_em)} aberto. Agora use "Importar ZIP" em Sistema com o arquivo baixado.`);
             return;
           }
           let dir;
@@ -38927,7 +39011,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           await importarZip(JSZip, dir, blob, null, lidos);
           await lembrarPasta(dir);
           await abrirPasta(dir);
-          aviso(`Backup de ${dataHoraBr(info.criado_em)} aberto na pasta ${dir.name}. Entre com seu usuário e senha de sempre. Quando o site voltar, Dados e backup → "Substituir os dados da nuvem pelos de uma pasta" leva o que você fizer aqui para a nuvem.${foraDoZip(lidos)}`, lidos.naoIncluidos.length ? "aviso" : "ok");
+          aviso(`Backup de ${dataHoraBr(info.criado_em)} aberto na pasta ${dir.name}. Entre com seu usuário e senha de sempre. Quando o site voltar, Sistema → "Substituir os dados da nuvem pelos de uma pasta" leva o que você fizer aqui para a nuvem.${foraDoZip(lidos)}`, lidos.naoIncluidos.length ? "aviso" : "ok");
         },
         async modeloVistoria(form) {
           const f = Object.fromEntries(new FormData(form));
@@ -39528,7 +39612,7 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
           aviso(`Dados importados. Uma cópia do banco anterior ficou na pasta backups.${foraDoZip(lidos)}`, lidos.naoIncluidos.length ? "aviso" : "ok");
           ir("#/");
         },
-        /** Dados e backup: configuração geral da integração com o banco (ponte, senha, ativar, conta padrão). Só administrador. */
+        /** Sistema: configuração geral da integração com o banco (ponte, senha, ativar, conta padrão). Só administrador. */
         async configBanco(form) {
           if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador altera a integração com o banco.");
           const f = new FormData(form);
@@ -39537,7 +39621,7 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
           aviso(E.d.config_banco.ativo ? 'Integração com o C6 ativa: os botões "Emitir no C6" estão ligados neste computador.' : "Configuração salva (integração desligada). A senha da ponte ficou só neste computador.");
           await mostrar();
         },
-        /** Empresas: qual conta emite os boletos (sempre a padrão ou escolher boleto a boleto). */
+        /** Sistema → Banco: qual conta emite os boletos (sempre a padrão ou escolher boleto a boleto). */
         async modoContaBoleto(form) {
           if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador altera a integração com o banco.");
           const f = new FormData(form);
@@ -39545,7 +39629,7 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
           aviso(f.get("modo") === "escolher" ? "Ao emitir, o sistema vai perguntar a empresa de cada boleto." : "Os boletos saem sempre pela empresa padrão.");
           await mostrar();
         },
-        /** Dados e backup: inclui ou altera uma conta bancária da integração (uma por empresa). */
+        /** Sistema: inclui ou altera uma conta bancária da integração (uma por empresa). */
         async contaBanco(form) {
           if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador altera a integração com o banco.");
           const f = Object.fromEntries(new FormData(form));
@@ -39553,7 +39637,7 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
           aviso(`Conta ${conta.apelido} salva. Lembre de pedir ao técnico para cadastrar a mesma conta (código "${conta.id}") na ponte.`);
           await mostrar();
         },
-        /** Dados e backup: inclui ou altera uma conta de outro banco (só o extrato por arquivo OFX ou CSV, sem a ponte). */
+        /** Sistema: inclui ou altera uma conta de outro banco (só o extrato por arquivo OFX ou CSV, sem a ponte). */
         async contaArquivo(form) {
           if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador altera as contas do banco.");
           const f = Object.fromEntries(new FormData(form));
@@ -39608,6 +39692,12 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
     }).catch(() => {
     });
   }
+  function levarAoEnderecoNovo(tela, q) {
+    const novo = enderecoMudado(tela, q);
+    if (!novo) return "";
+    globalThis.location?.replace?.(novo);
+    return '<p class="suave">Abrindo…</p>';
+  }
   var admin2, LINK_RESTAURAR, primeirosPassos, TELAS, minhaSenhaHtml;
   var init_telas = __esm({
     "docs/js/telas.js"() {
@@ -39620,6 +39710,7 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
       init_formularios();
       init_formularios();
       init_regras();
+      init_sistema();
       init_admin();
       init_banco2();
       init_cadastros();
@@ -39827,7 +39918,7 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
       <p class="suave">Ou, para começar do zero:</p>` : ""}
     ${E.nuvem ? "" : `<div class="alerta info"><b>Já usa o sistema?</b> Usuários e senhas ficam guardados na pasta dos dados, não no programa.
       Se você já tem dados, clique em <b>Escolher outra pasta</b> e escolha a mesma pasta de sempre: aparece o login e você entra com a senha de sempre.
-      Para levar tudo para esta pasta nova: crie aqui o administrador e depois use <b>Dados e backup → Importar ZIP</b> com o ZIP baixado no site (os usuários antigos voltam junto).</div>`}
+      Para levar tudo para esta pasta nova: crie aqui o administrador e depois use <b>Sistema → Importar ZIP</b> com o ZIP baixado no site (os usuários antigos voltam junto).</div>`}
     <form data-form="primeiroAcesso">
       <p><label for="ent_nome">Seu nome</label><input id="ent_nome" name="nome" autofocus></p>
       <p><label for="ent_login">Login</label><input id="ent_login" name="login" autocomplete="username"></p>
@@ -40018,14 +40109,18 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
           return `<p class="suave"><a href="#/">← Painel</a></p><h1>Aparência e prazos dos alertas</h1>
       <p class="suave">Escolha a cor, a ênfase e a prioridade de cada tipo de aviso. Prioridade 1 aparece primeiro; com a mesma prioridade, vem antes o mais grave.
         "Aparece" diz quanto tempo antes do prazo o alerta surge no Painel (ex.: IPTU com 15 dias: a guia de 10/03 aparece em 23/02); o atrasado continua aparecendo.
-        Esses prazos também ficam em Dados e backup → Regras do sistema.
+        Esses prazos também ficam em Sistema → Regras do sistema.
         Cor "Padrão": vermelho quando urgente, laranja quando aviso, azul quando informação.</p>
       <form data-form="estilosAlertas" class="cartao"><div class="rolagem"><table><tr><th>Tipo de aviso</th><th>Cor</th><th>Ênfase</th><th>Prioridade</th><th>Aparece</th><th>Como fica</th></tr>${linhas2}</table></div>
         <div class="acoes" style="margin-top:10px"><button>Salvar</button> ${botao("estilosAlertasPadrao", "Voltar ao padrão do sistema", {}, "secundario", "Voltar todos os alertas para a aparência e os prazos padrão?")} <a class="botao secundario" href="#/">Cancelar</a></div></form>`;
         },
         pendencias: () => telaPendencias(),
         "modelo-contrato": (rota) => telaModelo(rota),
-        empresas: () => telaEmpresas(),
+        empresas: (rota) => levarAoEnderecoNovo("empresas", rota.q) || telaEmpresas(),
+        "sistema-banco": () => telaSistemaBanco(),
+        "sistema-email": (rota) => telaSistemaEmail(rota.q),
+        "sistema-modelos": () => telaSistemaModelos(),
+        lgpd: () => telaLgpd(),
         regras: async (rota) => (await parteAdiada("regras")).telaRegras(rota.q),
         inquilinos: (rota) => telaInquilinos(rota.q),
         comunicacoes: (rota) => telaComunicacoes(rota.q),
@@ -40038,7 +40133,7 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
         "notificacao-nova": (rota) => telaNovaNotificacao(rota.q),
         iptu: (rota) => telaIptu(Number(rota.q.ano) || (/* @__PURE__ */ new Date()).getFullYear()),
         historico: (rota) => telaHistorico(rota.q),
-        dados: (rota) => telaDados(rota.q),
+        dados: (rota) => levarAoEnderecoNovo("dados", rota.q) || telaDados(),
         "arquivo-impresso": (rota) => telaArquivoImpresso(rota.q),
         "pasta-fisica": (rota) => telaPastaFisica(Number(rota.partes[1])),
         "pasta-impressao": (rota) => telaPastaImpressao(Number(rota.partes[1])),
@@ -40205,7 +40300,7 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
       E.seguro = { dir: h, desconectado: true, falhou: true };
       E.seguroErro = e.message;
       logarErro(e.causa || e);
-      if (falhasDaChave === AVISAR_DEPOIS_DE && podeUsuario("admin")) aviso(`Backup seguro: ${e.message} Confira a pasta segura em Dados e backup.`, "aviso");
+      if (falhasDaChave === AVISAR_DEPOIS_DE && podeUsuario("admin")) aviso(`Backup seguro: ${e.message} Confira a pasta segura em Sistema.`, "aviso");
       return false;
     }
     if (falhasDaChave) E.seguroErro = "";
@@ -41281,7 +41376,7 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
         ["#/banco", "Banco", "^banco"],
         ["#/imoveis", "Imóveis", "^imove|^novo|^editar|^iptu$|^modelo-vistoria"],
         ["#/financeiro", "Financeiro", "^financeiro|^gestao|^resultados|^liquido|^contas|^impostos|^inadimplencia|^garantias"],
-        ["#/dados", "Dados e backup", "^dados|^historico|^modelos?-contrato|^modelos?-email|^regras|^backup|^empresas|^acessos|^conflitos|^pessoa|^arquivo-impresso|^pasta-"]
+        ["#/dados", "Sistema", "^dados|^sistema-|^lgpd|^modelo-email|^historico|^modelos?-contrato|^modelos?-email|^regras|^backup|^empresas|^acessos|^conflitos|^pessoa|^arquivo-impresso|^pasta-"]
       ];
       MENU_DO_FORMULARIO = {
         imoveis: "imoveis",
@@ -41465,8 +41560,8 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
       document.addEventListener("click", async (ev) => {
         const menu = ev.target.closest("[data-menu]");
         if (menu) {
-          const topo2 = menu.closest("header.topo");
-          const aberto = topo2.classList.toggle("menu-aberto");
+          const topo3 = menu.closest("header.topo");
+          const aberto = topo3.classList.toggle("menu-aberto");
           menu.setAttribute("aria-expanded", String(aberto));
           return;
         }
