@@ -55,7 +55,25 @@ test('criar e apagar tarefas: diz o que falhou e não apaga o que não existe', 
   assert.deepEqual(falharam.map((t) => t.nome), ['Imoveis - atualizador da versao PC (ao entrar)'], 'a de "ao entrar" pede administrador');
   const apagar = [];
   P.apagarTarefas({ dizer: () => {}, rodar: (a) => { apagar.push(a.join(' ')); return { status: a[0] === '/Query' && a[2].includes('hora em hora') ? 1 : 0 }; } });
-  assert.equal(apagar.filter((a) => a.startsWith('/Delete')).length, 2);
+  // as duas que existem e a da assinatura digital (criada pelo --certificado, também apagada quando existe)
+  assert.equal(apagar.filter((a) => a.startsWith('/Delete')).length, 3);
+  assert.ok(apagar.some((a) => a === `/Delete /F /TN ${P.TAREFA_ASSINATURA.nome}`));
+});
+
+test('assinatura digital no programa: --assinar sem certificado sai na hora sem ir à internet; com ele, assina a fila', async () => {
+  const fs2 = await import('node:fs'); const os = await import('node:os'); const path2 = await import('node:path');
+  const env = { IMOVEIS_CONFIG: fs2.mkdtempSync(path2.join(os.tmpdir(), 'imoveis-cert-')) };
+  const ditos = [];
+  let chamou = false;
+  const assinar = async () => { chamou = true; return { assinados: 2, erros: ['Carta · Ana: certificado vencido'] }; };
+  assert.equal(await P.rodadaDeAssinatura({ env, dizer: (t) => ditos.push(t), assinar, lerLig: () => ({ site: 'https://x', cracha: 'ap1_x' }) }), 0);
+  assert.equal(chamou, false, 'sem certificado: nem chama a nuvem');
+  fs2.writeFileSync(path2.join(env.IMOVEIS_CONFIG, 'certificado.json'), JSON.stringify({ pfx: 'cifrado', senha: 'cifrada', nome: 'ANK TESTE LTDA', cnpj: '11.222.333/0001-81', validade: '2099-01-01' }));
+  assert.equal(await P.rodadaDeAssinatura({ env, dizer: (t) => ditos.push(t), assinar, lerLig: () => ({ site: 'https://x', cracha: 'ap1_x' }), lerCert: () => ({ nome: 'ANK TESTE LTDA' }) }), 0);
+  assert.equal(chamou, true);
+  assert.match(ditos.at(-1), /2 documento\(s\) assinado\(s\); não assinados: Carta · Ana: certificado vencido/);
+  assert.equal(await P.rodadaDeAssinatura({ env, dizer: (t) => ditos.push(t), assinar, lerLig: () => null }), 1, 'computador desligado do sistema');
+  fs2.rmSync(env.IMOVEIS_CONFIG, { recursive: true, force: true });
 });
 
 test('simular não mexe em nada e mostra os comandos; o .vbs não leva o caminho (nome de usuário com acento)', async () => {
