@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-UiHW3gaXBfOYN2Mfz8Mwuz4oYaVHrr0g91sz/K4YUJA=' 'sha256-KX+uPpZq8yEussE+eddojVax2zTfpX+icQAhSOm4yeI='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-UiHW3gaXBfOYN2Mfz8Mwuz4oYaVHrr0g91sz/K4YUJA=' 'sha256-3hJlIAs0ocihFbagqNyTv3+UvG/iM3vqTlYnhApnYkY='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="1c3d0f0239f22034">
+<meta name="fontes" content="d5d0898b9b343e04">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1822,7 +1822,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           rotulo: "Assinatura digital dos recibos e termos (certificado da empresa no PC)",
           tipo: "simnao",
           padrao: false,
-          explica: 'Sim: em cada recibo, termo e notificação aparecem "Enviar para assinar" e, depois de assinado, "Baixar PDF assinado". O programa do PC, com o certificado digital A1 (e-CNPJ) da ANK instalado, assina sozinho os documentos da fila: acrescenta uma página "Assinatura digital" no fim do PDF, com a assinatura ICP-Brasil. O e-mail da etapa só leva o recibo depois de assinado. Se o PC estiver desligado, os documentos esperam na fila e o Painel avisa para ligá-lo. A ficha cadastral (que a pessoa preenche) não passa por aqui. Ex.: recibo da garantia → Enviar para assinar → em cerca de 1 minuto, "Assinado digitalmente em 05/12/2026 às 10:32" → o e-mail leva o PDF assinado.',
+          explica: 'Sim: em cada recibo, termo e notificação aparecem "Enviar para assinar" e, depois de assinado, "Baixar PDF assinado". O programa do PC, com o certificado digital A1 (e-CNPJ) da ANK instalado (Dados e backup → Anexar o certificado digital), assina sozinho os documentos da fila: acrescenta uma página "Assinatura digital" no fim do PDF, com a assinatura ICP-Brasil. O e-mail da etapa só leva o recibo depois de assinado. Se o PC estiver desligado, os documentos esperam na fila e o Painel avisa para ligá-lo. A ficha cadastral (que a pessoa preenche) não passa por aqui. Ex.: recibo da garantia → Enviar para assinar → em cerca de 1 minuto, "Assinado digitalmente em 05/12/2026 às 10:32" → o e-mail leva o PDF assinado.',
           consequencia: "Não (padrão até instalar o certificado no PC): os recibos e termos saem e vão por e-mail sem a assinatura digital da empresa, como antes; a empresa assina à mão ou pelo gov.br.",
           lei: 'A assinatura com certificado ICP-Brasil tem a mesma validade da assinatura de próprio punho (MP 2.200-2/2001, art. 10, § 1º) e é a "qualificada" da Lei 14.063/2020 (art. 4º, III). A empresa assina pelo seu administrador (Código Civil, art. 47); o e-CNPJ identifica a empresa e o responsável. Quitação é de quem recebe (Código Civil, arts. 319 e 320).'
         },
@@ -6319,7 +6319,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return { imovel_id: r.imovel_id || null };
   }
-  function registrar(d2, usuario, acao, tabela, registroId, descricao, detalhes, vinc = {}, alteraDados = true) {
+  function registrar(d2, usuario, acao, tabela, registroId, descricao2, detalhes, vinc = {}, alteraDados = true) {
     const quando3 = (/* @__PURE__ */ new Date()).toISOString();
     d2.historico.push({
       quando: quando3,
@@ -6327,7 +6327,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       acao,
       tabela,
       registro_id: registroId ?? null,
-      descricao: descricao || null,
+      descricao: descricao2 || null,
       detalhes: detalhes || null,
       imovel_id: vinc.imovel_id ?? null,
       contrato_id: vinc.contrato_id ?? null
@@ -6376,16 +6376,16 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       throw new ErroUsuario(`Valor inválido em "${rotulo3}" (${TABELAS[tabela]}): "${mostrar2}". Use reais com centavos, ex.: 1.250,50. Nada foi gravado.`);
     }
   }
-  function inserir(d2, tabela, dados, usuario, descricao, { historico = true } = {}) {
+  function inserir(d2, tabela, dados, usuario, descricao2, { historico = true } = {}) {
     conferirCentavos(tabela, dados);
     d2.seq[tabela] = proximoCodigo(d2, tabela);
     const r = { id: d2.seq[tabela], ...dados };
     d2[tabela].push(r);
     if (tabela === "contratos") lembrarContrato(r);
-    if (historico) registrar(d2, usuario, "Inclusão", tabela, r.id, descricao, visivel(dados), vinculos(d2, tabela, r));
+    if (historico) registrar(d2, usuario, "Inclusão", tabela, r.id, descricao2, visivel(dados), vinculos(d2, tabela, r));
     return r;
   }
-  function atualizar(d2, tabela, id, dados, usuario, descricao) {
+  function atualizar(d2, tabela, id, dados, usuario, descricao2) {
     const r = buscar(d2, tabela, id);
     if (!r) throw new Error(`${TABELAS[tabela]} não encontrado`);
     conferirCentavos(tabela, dados, r);
@@ -6400,7 +6400,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       if (tabela === "contratos" && "perfil_regras_id" in mudancas) lembrarContrato(r);
       const det = Object.fromEntries(Object.entries(mudancas).filter(([k]) => !OCULTOS.has(k)).map(([k, m]) => [k, tabela === "comunicados" && k === "destinos" ? destinosParaHistorico(m.de, m.para) : { de: semPeso(tabela, k, m.de), para: semPeso(tabela, k, m.para) }]));
       if (mudancas.senha_hash) det.senha = "alterada";
-      registrar(d2, usuario, "Alteração", tabela, r.id, descricao, det, vinculos(d2, tabela, r));
+      registrar(d2, usuario, "Alteração", tabela, r.id, descricao2, det, vinculos(d2, tabela, r));
     }
     return mudancas;
   }
@@ -6537,11 +6537,11 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     for (const cb of d2.cobrancas) if (!ficaram.has(cb.id)) boletos.push(`Boleto ${compBr(cb.competencia)} de ${doContrato(cb)}: excluído (nenhum dia ocupado no mês)`);
     return { campos, boletos };
   }
-  function excluir(d2, tabela, id, usuario, descricao) {
+  function excluir(d2, tabela, id, usuario, descricao2) {
     const i = d2[tabela].findIndex((r2) => r2.id === Number(id));
     if (i < 0) return;
     const [r] = d2[tabela].splice(i, 1);
-    registrar(d2, usuario, "Exclusão", tabela, r.id, descricao, visivel(r), vinculos(d2, tabela, r));
+    registrar(d2, usuario, "Exclusão", tabela, r.id, descricao2, visivel(r), vinculos(d2, tabela, r));
     if (tabela === "cobrancas") soltarDoBoletoExcluido(d2, r.id, usuario);
   }
   function aluguelAtual(d2, contrato, dataRef = hojeIso()) {
@@ -7521,13 +7521,13 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     for (const cb of pendentes) {
       const destino = d2.cobrancas.filter((x) => x.contrato_id === contratoId && x.competencia > cb.competencia && !ehBoletoAvulso(x) && aCobrar(x) && !emitidoNoBanco(x)).sort((a, b) => a.competencia.localeCompare(b.competencia))[0];
       if (!destino) continue;
-      const descricao = [destino.outros_descricao, textoDiferenca(cb)].filter(Boolean).join("; ");
+      const descricao2 = [destino.outros_descricao, textoDiferenca(cb)].filter(Boolean).join("; ");
       const lista3 = [...destino.diferencas_cobradas || [], { cobranca_id: cb.id, valor: cb.diferenca_devida, texto: textoDiferenca(cb) }];
       atualizar(
         d2,
         "cobrancas",
         destino.id,
-        { outros: (destino.outros || 0) + cb.diferenca_devida, outros_descricao: descricao, diferencas_cobradas: lista3 },
+        { outros: (destino.outros || 0) + cb.diferenca_devida, outros_descricao: descricao2, diferencas_cobradas: lista3 },
         usuario,
         `Boleto ${compBr(destino.competencia)}: + ${reais(cb.diferenca_devida)} da diferença do boleto ${compBr(cb.competencia)} (pago em parte)`
       );
@@ -7882,13 +7882,13 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     desfazerNumeracao(d2, ciclo.de, usuario, `Numeração desfeita: nº ${numeroFatura(ciclo.de)} a ${numeroFatura(ciclo.ate)}`);
     return ciclo;
   }
-  function desfazerNumeracao(d2, aPartirDe, usuario, descricao = null) {
+  function desfazerNumeracao(d2, aPartirDe, usuario, descricao2 = null) {
     const n = Number(aPartirDe);
     if (!Number.isInteger(n) || n < 1) throw new Error("Número inválido.");
     const fs = d2.faturas.filter((f) => f.numero >= n);
     if (!fs.length) throw new Error(`Não há NF com número ${numeroFatura(n)} ou maior.`);
     for (const f of fs) excluir(d2, "faturas", f.id, usuario, `NF nº ${numeroFatura(f.numero)} desfeita para numerar de novo`);
-    registrar(d2, usuario, "Alteração", "faturas", null, descricao || `Numeração desfeita a partir do nº ${numeroFatura(n)}`, { proxima_fatura: { de: d2.proxima_fatura, para: n } });
+    registrar(d2, usuario, "Alteração", "faturas", null, descricao2 || `Numeração desfeita a partir do nº ${numeroFatura(n)}`, { proxima_fatura: { de: d2.proxima_fatura, para: n } });
     d2.proxima_fatura = n;
     return new Set(fs.map((f) => f.numero)).size;
   }
@@ -8298,7 +8298,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     for (const c of contratos) excluirContrato(d2, c.id, usuario, `${c.inquilino_nome} (desistiu antes de assinar)`);
     return buscar(d2, "fichas", f.id);
   }
-  function excluirContrato(d2, contratoId, usuario, descricao) {
+  function excluirContrato(d2, contratoId, usuario, descricao2) {
     const c = buscar(d2, "contratos", contratoId);
     if (!c) return;
     for (const s of (d2.seguros || []).filter((x) => x.contrato_id === c.id && x.herdado_de && buscar(d2, "contratos", x.herdado_de))) {
@@ -8309,7 +8309,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       d2[t].filter((x) => x && x.contrato_id === c.id).forEach((x) => excluir(d2, t, x.id, usuario));
     }
     for (const a of d2.contratos.filter((x) => x.garantia_transferida_para === c.id)) atualizar(d2, "contratos", a.id, { garantia_transferida_para: null }, usuario, `${a.inquilino_nome}: garantia volta para este contrato (${c.inquilino_nome} excluído)`);
-    excluir(d2, "contratos", c.id, usuario, descricao || c.inquilino_nome);
+    excluir(d2, "contratos", c.id, usuario, descricao2 || c.inquilino_nome);
   }
   function gravarLeitura(d2, c, momento, data2, valores, usuario) {
     const falta = relogiosObrigatorios(c).filter((k) => !String(valores[k] || "").trim());
@@ -8409,8 +8409,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return r;
   }
-  function boletosDescontadosNaSaida(d2, c, descricao) {
-    const texto3 = String(descricao || "");
+  function boletosDescontadosNaSaida(d2, c, descricao2) {
+    const texto3 = String(descricao2 || "");
     if (!texto3) return [];
     return cobrancasEmAberto(d2, c.id).filter((cb) => texto3.includes(`${nomeDebitoSaida(cb)} em aberto`));
   }
@@ -10810,12 +10810,12 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         const k = partes.indexOf(t);
         if (k >= 0) partes.splice(k, 1);
       }
-      const descricao = partes.filter(Boolean).join("; ");
+      const descricao2 = partes.filter(Boolean).join("; ");
       atualizar(
         d2,
         "cobrancas",
         cb.id,
-        { outros: (cb.outros || 0) - tira, outros_descricao: descricao, multas_notificacao: ficam },
+        { outros: (cb.outros || 0) - tira, outros_descricao: descricao2, multas_notificacao: ficam },
         usuario,
         `Boleto ${compBr(cb.competencia)}: sai a multa de ${reais(tira)} (${textos.join("; ")})`
       );
@@ -12602,7 +12602,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const sistema = regrasDe(d2);
     return DEFINICOES_REGRAS.filter((def) => def.chave in v && !mesmoValor(v[def.chave], sistema[def.chave])).map((def) => ({ def, valor: v[def.chave], sistema: sistema[def.chave] }));
   }
-  function salvarPerfilRegras(d2, id, { nome, descricao = "", valores = {} }, usuario) {
+  function salvarPerfilRegras(d2, id, { nome, descricao: descricao2 = "", valores = {} }, usuario) {
     const n = String(nome || "").trim().slice(0, 60);
     if (!n) throw new ErroUsuario('Dê um nome à regra especial (ex.: "Regra especial A" ou "Regra 15 dias").');
     if (/^regras? do sistema$/i.test(n)) throw new ErroUsuario('"Regras do sistema" é o nome das regras de todos: escolha outro nome.');
@@ -12615,7 +12615,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       const x = limparValorRegra(k, v);
       if (!mesmoValor(x, sistema[k])) limpos[k] = x;
     }
-    const dados = { nome: n, descricao: String(descricao || "").trim().slice(0, 300), valores: limpos };
+    const dados = { nome: n, descricao: String(descricao2 || "").trim().slice(0, 300), valores: limpos };
     const r = id ? buscar(d2, "perfis_regras", Number(id)) : null;
     if (id && !r) throw new ErroUsuario("Regra especial não encontrada.");
     const salvo = r ? (atualizar(d2, "perfis_regras", r.id, dados, usuario, `Regra especial "${n}" alterada`), r) : inserir(d2, "perfis_regras", { ...dados, criado_em: hojeIso() }, usuario, `Regra especial "${n}" criada`);
@@ -21312,9 +21312,9 @@ ${DICA_DOCUMENTOS}`].join("\n");
       if (/^(D|DEBITO|SAIDA|S)$/.test(tipo)) valor = -Math.abs(valor);
       else if (/^(C|CREDITO|ENTRADA|E)$/.test(tipo)) valor = Math.abs(valor);
       const titulo2 = col.titulo !== null ? f[col.titulo] || "" : "";
-      const descricao = (col.descricao !== null ? f[col.descricao] : "") || titulo2;
+      const descricao2 = (col.descricao !== null ? f[col.descricao] : "") || titulo2;
       const idArquivo = col.id !== null ? String(f[col.id] || "").trim() : "";
-      const chave = `${data2}|${valor}|${descricaoComparavel(descricao)}`;
+      const chave = `${data2}|${valor}|${descricaoComparavel(descricao2)}`;
       const n = (vezes.get(chave) || 0) + 1;
       vezes.set(chave, n);
       const l = {
@@ -21322,7 +21322,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
         data: data2,
         valor_centavos: valor,
         tipo: valor < 0 ? "saida" : "entrada",
-        descricao,
+        descricao: descricao2,
         titulo: titulo2 || null,
         end_to_end_id: /^E\d{8}/.test(idArquivo) ? idArquivo : null,
         local_reference: idArquivo && !/^E\d{8}/.test(idArquivo) ? idArquivo : null,
@@ -22137,16 +22137,16 @@ ${DICA_DOCUMENTOS}`].join("\n");
       if (mov2.tipo !== "saida") throw new ErroUsuario("Uma entrada no extrato não pode ser reforma.");
       const i = destino.imovel_id ? buscar(d2, "imoveis", destino.imovel_id) : null;
       if (!i) throw new ErroUsuario("Escolha o imóvel da reforma.");
-      const descricao = String(destino.descricao_reforma || obs || "").trim();
-      if (!descricao) throw new ErroUsuario("Diga o que foi feito na reforma (ex.: piso da cozinha).");
+      const descricao2 = String(destino.descricao_reforma || obs || "").trim();
+      if (!descricao2) throw new ErroUsuario("Diga o que foi feito na reforma (ex.: piso da cozinha).");
       const r = inserir(
         d2,
         "reformas",
-        { imovel_id: i.id, data: mov2.data, descricao, valor: mov2.valor, fornecedor: "", documento: "", observacoes: obs, movimentacao_id: mov2.id },
+        { imovel_id: i.id, data: mov2.data, descricao: descricao2, valor: mov2.valor, fornecedor: "", documento: "", observacoes: obs, movimentacao_id: mov2.id },
         usuario,
-        `Reforma: ${descricao} ${reais(mov2.valor)} (extrato)`
+        `Reforma: ${descricao2} ${reais(mov2.valor)} (extrato)`
       );
-      atualizar(d2, "movimentacoes_banco", mov2.id, { ...base, classificacao: cl, imovel_id: i.id, reforma_id: r.id }, usuario, `Destino: ${i.nome} · reforma (${descricao})`);
+      atualizar(d2, "movimentacoes_banco", mov2.id, { ...base, classificacao: cl, imovel_id: i.id, reforma_id: r.id }, usuario, `Destino: ${i.nome} · reforma (${descricao2})`);
       return mov2;
     }
     if ((cl === "iptu" || cl === "imposto") && mov2.tipo !== "saida") throw new ErroUsuario(`Uma entrada no extrato não pode ser ${cl === "iptu" ? "IPTU pago" : "imposto pago"}.`);
@@ -22340,8 +22340,8 @@ ${DICA_DOCUMENTOS}`].join("\n");
   }
   function itemC6(d2, p2) {
     const i = p2.imovel_id ? buscar(d2, "imoveis", p2.imovel_id) : null;
-    const descricao = (p2.descricao || `${i ? `${i.nome} ` : ""}${p2.tipo_conta || ""} ${p2.competencia ? compBr(p2.competencia) : ""} ${p2.referencia || ""}`).replace(/\s+/g, " ").trim();
-    return { content: conteudoDoPagamento(p2), amount: reaisParaC6(p2.valor), description: nomeSemAcento(descricao).slice(0, 100), transaction_date: p2.data_pagamento || hoje2() };
+    const descricao2 = (p2.descricao || `${i ? `${i.nome} ` : ""}${p2.tipo_conta || ""} ${p2.competencia ? compBr(p2.competencia) : ""} ${p2.referencia || ""}`).replace(/\s+/g, " ").trim();
+    return { content: conteudoDoPagamento(p2), amount: reaisParaC6(p2.valor), description: nomeSemAcento(descricao2).slice(0, 100), transaction_date: p2.data_pagamento || hoje2() };
   }
   function validarPagamento(d2, dados) {
     const conf = cfg4(d2);
@@ -23595,6 +23595,166 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
           if (!await janela({ titulo: "Esquecer este anexo?", html: "<p>O arquivo some deste aparelho e não está na nuvem.</p>", sim: "Esquecer", forte: true })) return;
           await E.anexos.esquecerNaoEnviado(ds.id);
           await mostrar();
+        }
+      };
+    }
+  });
+
+  // docs/js/certificado-pc.js
+  async function programaEsperando({ buscar: buscar3 = fetch } = {}) {
+    try {
+      const r = await buscar3(`${BASE}/estado`, { cache: "no-store", credentials: "omit", redirect: "error", signal: AbortSignal.timeout(6e4) });
+      if (!r.ok) return null;
+      const d2 = await r.json();
+      return d2?.programa === IDENTIDADE ? { ligado: !!d2.ligado, atual: d2.atual || null } : null;
+    } catch {
+      return null;
+    }
+  }
+  function conferirEscolha(arquivo, senha) {
+    if (!arquivo || !/\.(pfx|p12)$/i.test(arquivo.name || "")) throw new ErroUsuario("Escolha o arquivo do certificado A1 (termina em .pfx ou .p12).");
+    if (!arquivo.size || arquivo.size > MAX_PFX) throw new ErroUsuario("Este arquivo não parece um certificado A1 (ele tem poucos KB, no máximo 64 KB).");
+    if (!senha) throw new ErroUsuario("Digite a senha do certificado.");
+  }
+  async function entregarCertificado(arquivo, senha, { buscar: buscar3 = fetch } = {}) {
+    conferirEscolha(arquivo, senha);
+    const pfx = btoa(Array.from(new Uint8Array(await arquivo.arrayBuffer()), (b) => String.fromCharCode(b)).join(""));
+    let r;
+    try {
+      r = await buscar3(`${BASE}/instalar`, {
+        method: "POST",
+        cache: "no-store",
+        credentials: "omit",
+        redirect: "error",
+        signal: AbortSignal.timeout(9e4),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pfx, senha })
+      });
+    } catch {
+      throw new ErroUsuario("O programa do PC parou de responder. Feche esta janela e clique no botão de novo.");
+    }
+    const d2 = await r.json().catch(() => ({}));
+    if (!r.ok) throw new ErroUsuario(`${d2.erro || `O programa do PC recusou o certificado (erro ${r.status}).`}${d2.acabou ? " Foram tentativas demais: feche esta janela e clique no botão de novo." : ""}`);
+    return d2;
+  }
+  var PROTOCOLO, PORTA, IDENTIDADE, URL_PROGRAMA, MAX_PFX, BASE;
+  var init_certificado_pc = __esm({
+    "docs/js/certificado-pc.js"() {
+      init_calculos();
+      PROTOCOLO = "imoveis-certificado";
+      PORTA = 47631;
+      IDENTIDADE = "imoveis-certificado";
+      URL_PROGRAMA = "https://github.com/juliocpfh/erp-boletos/releases/download/programa-pc/Instalar-Administracao-de-Imoveis.exe";
+      MAX_PFX = 64 * 1024;
+      BASE = `http://127.0.0.1:${PORTA}`;
+    }
+  });
+
+  // docs/js/telas/certificado.js
+  var certificado_exports = {};
+  __export(certificado_exports, {
+    ACOES_CERTIFICADO: () => ACOES_CERTIFICADO
+  });
+  function abrirJanela() {
+    const dlg = document.createElement("dialog");
+    dlg.className = "janela-erro janela-pergunta";
+    dlg.innerHTML = `<h3>Certificado digital da empresa</h3>
+    <div class="corpo">
+      <div class="alerta info" data-estado role="status">Procurando o programa deste computador… Se o navegador perguntar, clique em <b>Abrir</b> e em <b>Permitir</b>.</div>
+      <div class="alerta aviso" data-ajuda hidden>O programa ainda não respondeu. Se ele é de antes de 22/11/2026 ou não está instalado,
+        <a href="${URL_PROGRAMA}" target="_blank" rel="noopener noreferrer">baixe o programa atualizado</a>, abra com dois cliques, espere terminar e clique no botão de novo.
+        Se você bloqueou o acesso a este computador, libere no cadeado ao lado do endereço do site.</div>
+      <form>
+        <fieldset disabled style="border:0;padding:0;margin:0">
+          <label>Arquivo do certificado A1 (.pfx ou .p12)<input name="arquivo" type="file" accept=".pfx,.p12"></label>
+          <label>Senha do certificado<input name="senha" type="password" autocomplete="off"></label>
+          <p class="suave">O arquivo e a senha vão direto para o programa deste computador e ficam cifrados pelo Windows. Não vão para a nuvem nem para os backups.</p>
+          <button>Guardar neste computador</button>
+        </fieldset>
+      </form>
+    </div>
+    <div class="acoes" style="justify-content:flex-end"><button type="button" class="secundario" data-fechar>Fechar</button></div>`;
+    const estado2 = dlg.querySelector("[data-estado]");
+    const ajuda = dlg.querySelector("[data-ajuda]");
+    const form = dlg.querySelector("form");
+    const campos = form.querySelector("fieldset");
+    const senha = form.querySelector('[name="senha"]');
+    const dizer = (html, tipo = "info") => {
+      estado2.className = `alerta ${tipo}`;
+      estado2.innerHTML = html;
+    };
+    let aberta = true;
+    dlg.querySelector("[data-fechar]").addEventListener("click", () => dlg.close());
+    dlg.addEventListener("close", () => {
+      aberta = false;
+      form.reset();
+      dlg.remove();
+    });
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const arquivo = form.querySelector('[name="arquivo"]').files[0];
+      const digitada = senha.value;
+      campos.disabled = true;
+      dizer("Conferindo o certificado…");
+      try {
+        const c = await entregarCertificado(arquivo, digitada);
+        form.reset();
+        form.hidden = true;
+        const tarefa = c.tarefa ? "<br>Este computador já pode assinar sozinho, a cada minuto." : "<br><b>Atenção:</b> o Windows não deixou criar a tarefa que assina sozinha. Avise o suporte com esta mensagem.";
+        const semCnpj = c.cnpj ? "" : "<br><b>Atenção:</b> não achei CNPJ neste certificado. Confira se é o e-CNPJ da empresa (e não o e-CPF de uma pessoa).";
+        dizer(`Pronto: certificado de ${descricao(c)} guardado neste computador.${semCnpj}${tarefa}
+        <br>Confira se a regra <b>Assinatura digital dos recibos e termos</b> está em Sim (Regras do sistema).`, c.tarefa && c.cnpj ? "ok" : "aviso");
+      } catch (e) {
+        dizer(esc(e.message), "perigo");
+        campos.disabled = false;
+        senha.focus();
+        senha.select();
+      }
+    });
+    voltarFecha(dlg);
+    document.body.appendChild(dlg);
+    dlg.showModal();
+    (async () => {
+      const mostrarAjuda = setTimeout(() => {
+        ajuda.hidden = false;
+      }, DEMORA_AJUDA);
+      while (aberta) {
+        const p2 = await programaEsperando();
+        if (!aberta) break;
+        if (p2) {
+          ajuda.hidden = true;
+          if (!p2.ligado) {
+            dizer("Este computador ainda não está ligado ao sistema: abra o programa do PC com dois cliques, entre com o e-mail e a senha e clique no botão de novo.", "perigo");
+            break;
+          }
+          dizer(p2.atual ? `Programa encontrado. Hoje está instalado: ${descricao(p2.atual)}. Anexar outro troca o atual.` : "Programa encontrado. Escolha o arquivo e digite a senha.", "ok");
+          campos.disabled = false;
+          break;
+        }
+        await new Promise((ok) => {
+          setTimeout(ok, INTERVALO);
+        });
+      }
+      clearTimeout(mostrarAjuda);
+    })();
+  }
+  var DEMORA_AJUDA, INTERVALO, descricao, ACOES_CERTIFICADO;
+  var init_certificado = __esm({
+    "docs/js/telas/certificado.js"() {
+      init_app();
+      init_calculos();
+      init_certificado_pc();
+      init_formularios();
+      DEMORA_AJUDA = 8e3;
+      INTERVALO = 1e3;
+      descricao = (c) => `<b>${esc(c.nome)}</b>${c.cnpj ? `, CNPJ ${esc(c.cnpj)}` : ""}${c.validade ? `, válido até ${esc(dataBr(c.validade))}` : ""}`;
+      ACOES_CERTIFICADO = {
+        async anexarCertificado() {
+          if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador anexa o certificado da empresa.");
+          const a = document.createElement("a");
+          a.href = `${PROTOCOLO}:abrir`;
+          a.click();
+          abrirJanela();
         }
       };
     }
@@ -31563,6 +31723,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
           "restaurarBackupNuvem",
           "esquecerNaoEnviado"
         ]] },
+        certificado: { importar: () => Promise.resolve().then(() => (init_certificado(), certificado_exports)), acoes: ["ACOES_CERTIFICADO", ["anexarCertificado"]] },
         // TEMPORÁRIA (20/11/2026): teste de todos os PDFs pelo dono; apagar depois do teste
         testePdfs: { importar: () => Promise.resolve().then(() => (init_teste_pdfs(), teste_pdfs_exports)), acoes: ["ACOES_TESTE_PDFS", ["testePdfRecibo", "testePdfCarta"]] }
       };
@@ -34243,6 +34404,15 @@ ${xref}
     <p class="suave">Pede confirmação no Windows. Depois, se quiser cortar o acesso deste computador, use ${link("#/usuarios", "Usuários → Aparelhos ligados → Desligar", "")}.
       A pasta segura e a pasta <b>${PASTA_COPIA}</b> continuam no computador. Também dá para desinstalar em Configurações do Windows → Aplicativos → Aplicativos instalados.</p></div>`;
   }
+  function caixaCertificado() {
+    if (!E.nuvem || !podeUsuario("admin")) return "";
+    const aqui = noWindows() && !window.matchMedia?.("(hover: none) and (pointer: coarse)").matches;
+    return `<div class="cartao" id="certificado-digital"><h2>Certificado digital da empresa</h2>
+    <p>Anexe o certificado A1 (.pfx ou .p12) e digite a senha: o programa do PC guarda os dois cifrados e passa a assinar os recibos e termos sozinho.</p>
+    ${aqui ? `<div class="acoes">${botao("anexarCertificado", "Anexar o certificado digital", {}, "")}</div>
+      <p class="suave">Faça no computador que vai assinar, com o programa do PC instalado. O navegador pergunta se pode abrir o programa e falar com este computador: responda Abrir e Permitir. O arquivo e a senha não vão para a nuvem nem para os backups.</p>` : '<p class="suave">Abra esta tela no computador com Windows que vai assinar (o certificado fica guardado só nele).</p>'}
+    <p class="suave">Assinatura digital: <b>${regra("assinatura_digital") ? "ligada" : "desligada"}</b> (${link("#/regras", "Regras do sistema", "")}).</p></div>`;
+  }
   function caixaAbrirPasta(copia2) {
     if (!noComputador()) return "";
     const caminho = copia2?.caminho || "";
@@ -34435,6 +34605,7 @@ ${xref}
       <p>${E.seguro && E.seguro.chave ? etiqueta(`Ligado neste computador · pasta ${E.seguro.dir.name}`, "ok") : E.seguro && E.seguro.desconectado ? etiqueta("Desconectado: falta liberar a pasta", "aviso") : etiqueta("Não configurado neste aparelho", "neutra")}
       ${link("#/backup-seguro", "Abrir o backup seguro")}</p>
       ${E.nuvem && E.backupEmpresa ? `<p>Na empresa: ${E.backupEmpresa.feito_em ? `${etiqueta(`última cópia em ${ultimaCopiaDaEmpresa()}`, avisoDaEmpresa(E.backupEmpresa, Date.now(), DIAS_BACKUP_EMPRESA) ? "aviso" : "ok")} <span class="suave">(basta um computador com o backup ligado; parado há mais de ${DIAS_BACKUP_EMPRESA} dias, o Painel avisa os administradores)</span>` : etiqueta("nenhum computador com o backup seguro ligado", "aviso")}</p>` : ""}</div>` : ""}
+    ${caixaCertificado()}
     ${caixaConfigBanco()}
     ${caixaConfigBanco2()}
     <div class="cartao"><h2>Exportar tudo em ZIP</h2><p>Todos os dados e todos os anexos num único arquivo, ${E.nuvem ? 'para guardar. Para voltar com ele: descompacte numa pasta do computador e use "Avançado: substituir os dados da nuvem pelos de uma pasta" (acima); para voltar o banco a um dia, use os Backups da nuvem.' : "para guardar ou levar para outro computador."}${E.nuvem && !podeUsuario("admin") ? ' <span class="suave">Na nuvem, só o administrador baixa o ZIP com tudo (só o aparelho dele recebe as senhas de todos os usuários).</span>' : ""}</p>${zipPermitido() ? botao("exportar", "Baixar ZIP com todos os dados", { status: "Montando o ZIP…" }, "") : ""}<div id="progresso-exportar" aria-live="polite"></div>
@@ -39138,7 +39309,7 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
           if (Object.keys(erros).length) return { erros, valores: Object.fromEntries(new FormData(form)) };
           await confirmarAvisos(cfg6.conferir ? cfg6.conferir(dados, registro, rota.q) : []);
           Object.assign(dados, cfg6.fixos ? cfg6.fixos(registro, rota.q) : {});
-          const descricao = cfg6.descricao ? cfg6.descricao(dados, registro, rota.q) : null;
+          const descricao2 = cfg6.descricao ? cfg6.descricao(dados, registro, rota.q) : null;
           let recalculados = 0;
           let deOutro = [];
           const aberto = registro && memoria.formularioAberto?.chave === `${tabela}:${registro.id}` ? memoria.formularioAberto.valores : null;
@@ -39149,9 +39320,9 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
             let r;
             if (cfg6.salvar) r = cfg6.salvar(db, dados, rota.q, registro);
             else if (registro) {
-              atualizar(db, tabela, registro.id, dados, login(), descricao);
+              atualizar(db, tabela, registro.id, dados, login(), descricao2);
               r = buscar(db, tabela, registro.id);
-            } else r = inserir(db, tabela, dados, login(), descricao);
+            } else r = inserir(db, tabela, dados, login(), descricao2);
             if (cfg6.recalcular) recalculados = recalcularCobrancas(db, cfg6.recalcular(r, db), login());
             return r;
           });
