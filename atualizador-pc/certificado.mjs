@@ -1,5 +1,6 @@
 // Certificado digital A1 (e-CNPJ da ANK) no programa do PC e a rodada que assina a fila (pedido do dono de 21/11/2026; parte 4):
-// - "--certificado": abre uma página só neste computador (127.0.0.1, como a de ligar) para escolher o arquivo .pfx e digitar a
+// - pelo sistema (Dados e backup → Anexar o certificado digital, 22/11): certificado-local.mjs;
+// - "--certificado" (reserva, sem o site): abre uma página só neste computador (127.0.0.1, como a de ligar) para escolher o arquivo .pfx e digitar a
 //   senha; o programa confere o certificado (razão social, CNPJ, validade) e guarda o arquivo e a senha cifrados pelo Windows
 //   (DPAPI: só esta conta deste computador abre), em certificado.json na pasta de configurações (fora do OneDrive e dos backups);
 // - "--assinar" (tarefa do Windows a cada minuto, sem janela): sem certificado, sai na hora sem ir à internet; com ele, busca na
@@ -9,41 +10,54 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import { assinarPdf, dadosDoCertificado } from './assinar-pdf.mjs';
+import { assinarPdf, conferirCertificado } from './assinar-pdf.mjs';
 import { abrirNoNavegador, abrirNoWindows, pastaConfig, protegerNoWindows } from './ligar.mjs';
 
 export const ARQUIVO_CERTIFICADO = 'certificado.json';
-const MAX_PFX = 64 * 1024; // um .pfx A1 tem poucos KB
+export const MAX_PFX = 64 * 1024; // um .pfx A1 tem poucos KB
 export const TEMPO_NUVEM = 60000;
+const dataBr = (iso) => String(iso || '').split('-').reverse().join('/');
+/** O dia neste computador (em UTC, às 21h de Brasília o certificado que vence hoje já contava como vencido). */
+export function diaDaqui(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 /** O certificado guardado: { pfx (base64), senha, nome, cnpj, validade, instalado_em } ou null. */
 export function lerCertificado(env = process.env, { abrir = abrirNoWindows } = {}) {
   const arq = path.join(pastaConfig(env), ARQUIVO_CERTIFICADO);
   if (!fs.existsSync(arq)) return null;
   const c = JSON.parse(fs.readFileSync(arq, 'utf8'));
-  return { ...c, pfx: abrir(c.pfx), senha: abrir(c.senha) };
+  const senha = abrir(c.senha);
+  // formato 2 (22/11/2026): a senha entra na cifra em base64, porque o PowerShell tira os espaços das pontas do texto
+  return { ...c, pfx: abrir(c.pfx), senha: c.formato === 2 ? Buffer.from(senha, 'base64').toString('utf8') : senha };
 }
 
 /** Só os dados que podem aparecer (sem o arquivo e a senha), sem abrir a cifra. */
 export function resumoDoCertificado(env = process.env) {
   const arq = path.join(pastaConfig(env), ARQUIVO_CERTIFICADO);
   if (!fs.existsSync(arq)) return null;
-  const { nome, cnpj, validade, instalado_em: instalado } = JSON.parse(fs.readFileSync(arq, 'utf8'));
-  return { nome, cnpj, validade, instalado_em: instalado };
+  try {
+    const { nome, cnpj, validade, instalado_em: instalado } = JSON.parse(fs.readFileSync(arq, 'utf8'));
+    return { nome, cnpj, validade, instalado_em: instalado };
+  } catch { return null; } // arquivo estragado: é como não ter (instalar de novo conserta)
 }
 
 /**
  * Confere e guarda o certificado. ``pfx``: base64 do arquivo. Recusa senha errada, arquivo sem a chave e certificado vencido.
  * Devolve { nome, cnpj, validade }. ``dados`` e ``proteger`` trocam nos testes.
  */
-export function guardarCertificado({ pfx, senha }, env = process.env, { dados = dadosDoCertificado, proteger = protegerNoWindows, hoje = new Date().toISOString().slice(0, 10) } = {}) {
+export function guardarCertificado({ pfx, senha }, env = process.env, { dados = conferirCertificado, proteger = protegerNoWindows, hoje = diaDaqui() } = {}) {
   if (!pfx || !/^[A-Za-z0-9+/=]+$/.test(pfx)) throw new Error('Escolha o arquivo do certificado (.pfx ou .p12).');
   if (!senha) throw new Error('Digite a senha do certificado.');
   const d = dados(pfx, senha);
   if (d.validade && d.validade < hoje) throw new Error(`Este certificado venceu em ${d.validade.split('-').reverse().join('/')}: renove com a certificadora e instale o novo.`);
+  if (d.inicio && d.inicio > hoje) throw new Error(`Este certificado só vale a partir de ${dataBr(d.inicio)}: instale-o nesse dia ou use o que está valendo.`);
   const dir = pastaConfig(env);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, ARQUIVO_CERTIFICADO), JSON.stringify({ pfx: proteger(pfx), senha: proteger(senha), nome: d.nome, cnpj: d.cnpj, validade: d.validade, instalado_em: new Date().toISOString() }, null, 2));
+  // grava ao lado e só então troca: se faltar luz ou espaço no meio, o certificado anterior continua inteiro
+  const destino = path.join(dir, ARQUIVO_CERTIFICADO);
+  fs.writeFileSync(`${destino}.novo`, JSON.stringify({ formato: 2, pfx: proteger(pfx), senha: proteger(Buffer.from(senha, 'utf8').toString('base64')), nome: d.nome, cnpj: d.cnpj, emissor: d.emissor, validade: d.validade, instalado_em: new Date().toISOString() }, null, 2));
+  fs.renameSync(`${destino}.novo`, destino);
   return { nome: d.nome, cnpj: d.cnpj, validade: d.validade };
 }
 
@@ -122,6 +136,8 @@ export function janelaDoCertificado({ env = process.env, guardar = guardarCertif
 // ---------------------------------------------------------------------------
 // A rodada da assinatura
 // ---------------------------------------------------------------------------
+/** Cabeçalho HTTP não aceita qualquer letra: "ADMINISTRAÇÃO" → "ADMINISTRACAO" (no PDF o nome sai com os acentos). */
+const semAcento = (t) => String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^ -~]/g, ' ');
 /**
  * Assina o que estiver na fila da nuvem. ``ligacao``: { site, cracha, computador }; ``cert``: o lerCertificado. Devolve
  * { assinados, erros }. ``buscar`` e ``assinar`` trocam nos testes.
@@ -138,7 +154,7 @@ export async function assinarFila(ligacao, cert, { buscar = fetch, assinar = ass
   if (!lista.ok) throw new Error(`A nuvem não respondeu à fila de assinatura (${lista.status}).`);
   const { pendentes = [] } = await lista.json();
   const out = { assinados: 0, erros: [] };
-  const vencido = cert.validade && cert.validade < new Date().toISOString().slice(0, 10);
+  const vencido = cert.validade && cert.validade < diaDaqui();
   for (const p of pendentes) {
     try {
       if (vencido) throw new Error(`o certificado da empresa venceu em ${cert.validade.split('-').reverse().join('/')}: instale o novo no programa do PC`);
@@ -146,7 +162,7 @@ export async function assinarFila(ligacao, cert, { buscar = fetch, assinar = ass
       if (r.status === 409) continue; // trocado ou cancelado no site enquanto isso
       if (!r.ok) throw new Error(`não consegui baixar o documento (${r.status})`);
       const assinado = assinar(Buffer.from(await r.arrayBuffer()), { pfx: cert.pfx, senha: cert.senha, dados: { nome: cert.nome, cnpj: cert.cnpj, emissor: cert.emissor }, selo: { documento: p.titulo } });
-      const v = await pedir(`${base}/${p.id}/assinado`, { method: 'PUT', body: assinado, headers: { 'Content-Type': 'application/pdf', 'X-Certificado': `${cert.nome}${cert.cnpj ? `:${cert.cnpj.replace(/\D/g, '')}` : ''}` } });
+      const v = await pedir(`${base}/${p.id}/assinado`, { method: 'PUT', body: assinado, headers: { 'Content-Type': 'application/pdf', 'X-Certificado': semAcento(`${cert.nome}${cert.cnpj ? `:${cert.cnpj.replace(/\D/g, '')}` : ''}`) } });
       if (v.status === 409) continue;
       if (!v.ok) { const d = await v.json().catch(() => ({})); throw new Error(d.erro || `a nuvem recusou o assinado (${v.status})`); }
       out.assinados += 1;

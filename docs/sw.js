@@ -44,7 +44,7 @@ const MAX_TENTATIVAS = 3; // arquivo que nem passando por cima dos caches vem co
 // celular não abria. Bibliotecas só voltam a ser baixadas quando VERSAO_VENDOR muda. A planilha (exceljs), maior, continua
 // guardada só depois do primeiro uso.
 const ADIADOS = ['js/exportar.js', 'js/regras-texto.js', 'js/visualizador.js', 'js/migracao.js', 'js/gestao.js', 'js/telas/gestao.js',
-  'js/telas/nuvem.js', 'js/telas/regras-sistema.js', 'js/telas/regua.js', 'js/telas/pessoa.js', 'js/pessoa.js', 'js/telas/teste-pdfs.js',
+  'js/telas/nuvem.js', 'js/telas/regras-sistema.js', 'js/telas/regua.js', 'js/telas/pessoa.js', 'js/pessoa.js', 'js/telas/teste-pdfs.js', 'js/telas/certificado.js', 'js/certificado-pc.js',
   'vendor/jspdf.umd.min.js', 'vendor/html2canvas.min.js', 'vendor/jszip.min.js', 'vendor/pdf.min.js', 'vendor/pdf.worker.min.js'];
 // O que o navegador pede por fora dos módulos (manifest do aplicativo e ícones): guardado também, para não falhar sem internet
 const EXTRAS = ['manifest.webmanifest', 'icones/erp-192.png', 'icones/erp-512.png', 'icones/aviso-96.png'];

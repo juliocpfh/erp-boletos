@@ -12,6 +12,7 @@ import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { ARQUIVO_REGISTRO, EXE, PASTA_COPIA, principal } from './atualizador.mjs';
 import { ICONE_ICO, NOME_ICONE } from './icone.mjs';
+import { receberDoSistema } from './certificado-local.mjs';
 import { assinarFila, janelaDoCertificado, lerCertificado, resumoDoCertificado } from './certificado.mjs';
 
 export { NOME_ICONE };import { ARQUIVO_CONFIG, lerLigacao, pastaConfig } from './ligar.mjs';
@@ -36,13 +37,21 @@ export const CHAVE_PROTOCOLO = `HKCU\\Software\\Classes\\${PROTOCOLO}`;
 export const PROTOCOLO_DESINSTALAR = 'imoveis-desinstalar';
 export const CHAVE_PROTOCOLO_DESINSTALAR = `HKCU\\Software\\Classes\\${PROTOCOLO_DESINSTALAR}`;
 export const NOME_VBS_DESINSTALAR = 'desinstalar.vbs';
+/**
+ * Botão "Anexar o certificado digital" do sistema (pedido do dono de 22/11): o link `imoveis-certificado:abrir` chama
+ * certificado.vbs, que roda o programa escondido com --certificado-sistema e nada mais; ele só aceita o arquivo e a senha vindos
+ * do próprio site, neste computador (certificado-local.mjs).
+ */
+export const PROTOCOLO_CERTIFICADO = 'imoveis-certificado';
+export const CHAVE_PROTOCOLO_CERTIFICADO = `HKCU\\Software\\Classes\\${PROTOCOLO_CERTIFICADO}`;
+export const NOME_VBS_CERTIFICADO = 'certificado.vbs';
 /** A janela de pergunta do Windows (MsgBox), usada só pelo próprio programa ao desinstalar. */
 export const NOME_VBS_JANELA = 'janela.vbs';
 /** Configurações do Windows → Aplicativos → Aplicativos instalados: registro por usuário (sem administrador). */
 export const CHAVE_DESINSTALAR = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\AdministracaoDeImoveis';
 export const NOME_NO_WINDOWS = 'Administração de Imóveis';
 /** O que o programa grava na pasta `programa` (ao desinstalar, só isto é apagado; a pasta sai se ficar vazia). */
-export const ARQUIVOS_DO_PROGRAMA = [NOME_EXE, NOME_VBS, NOME_VBS_PASTA, NOME_VBS_DESINSTALAR, NOME_VBS_JANELA, NOME_ICONE, NOME_NOVO, NOME_VELHO, NOME_TRAVA];
+export const ARQUIVOS_DO_PROGRAMA = [NOME_EXE, NOME_VBS, NOME_VBS_PASTA, NOME_VBS_DESINSTALAR, NOME_VBS_CERTIFICADO, NOME_VBS_JANELA, NOME_ICONE, NOME_NOVO, NOME_VELHO, NOME_TRAVA];
 export const TEXTO_CONFIRMAR = `Desinstalar ${NOME_NO_WINDOWS}?|As cópias e a pasta de arquivos continuam no computador.|Para cortar o acesso deste computador ao sistema, use Usuários → Aparelhos ligados → Desligar.`;
 export const TEXTO_PRONTO = 'Pronto: programa desinstalado.|As cópias na pasta do backup seguro e a pasta Arquivos dos imoveis continuam no computador.|Para cortar o acesso deste computador ao sistema, use Usuários → Aparelhos ligados → Desligar.';
 /** As mesmas tarefas (e os mesmos nomes) de instalar-tarefa.cmd: criar de novo troca as antigas, que chamavam o Node. */
@@ -51,7 +60,7 @@ export const TAREFAS = [
   { nome: 'Imoveis - atualizador da versao PC (ao entrar)', quando: ['/SC', 'ONLOGON', '/DELAY', '0002:00'], args: '--atualizar', texto: 'ao entrar no Windows: dados, versão PC, arquivos e o próprio programa' },
   { nome: 'Imoveis - copia dos arquivos (de hora em hora)', quando: ['/SC', 'HOURLY'], args: '--arquivos', escondida: true, texto: 'de hora em hora, sem janela: só os arquivos' },
 ];
-/** Assinatura digital (2026-11-21): criada pelo --certificado (só quem instala o certificado precisa dela); sai ao desinstalar. */
+/** Assinatura digital (2026-11-21): criada ao instalar o certificado, pelo sistema ou pelo --certificado (só quem instala o certificado precisa dela); sai ao desinstalar. */
 export const TAREFA_ASSINATURA = { nome: 'Imoveis - assinatura digital (a cada minuto)', quando: ['/SC', 'MINUTE', '/MO', '1'], args: '--assinar', escondida: true, texto: 'a cada minuto, sem janela: assina os documentos da fila' };
 
 /** Onde o programa fica instalado (ao lado do crachá, fora do OneDrive). */
@@ -101,6 +110,16 @@ export const textoVbsDesinstalar = () => [
   '',
 ].join('\r\n');
 
+/** O que o link imoveis-certificado: chama: roda o programa escondido com --certificado-sistema, sem repassar nada do endereço. */
+export const textoVbsCertificado = () => [
+  "' Gerado pelo programa Administracao de Imoveis: botao \"Anexar o certificado digital\" do sistema (endereco imoveis-certificado:).",
+  "' Nao repassa nada do endereco: o programa so aceita o certificado vindo do proprio site, neste computador.",
+  'Dim pasta',
+  'pasta = CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptFullName)',
+  `CreateObject("WScript.Shell").Run """" & pasta & "\\${NOME_EXE}"" --certificado-sistema", 0, False`,
+  '',
+].join('\r\n');
+
 /**
  * A janela do Windows (MsgBox) que o programa abre ao desinstalar: texto (| = quebra de linha), botões e título vêm do
  * programa; devolve o botão clicado (1 = OK, 6 = Sim, 7 = Não). Não fica registrada em lugar nenhum: só o programa a chama.
@@ -139,6 +158,11 @@ export function comandosDoProtocoloDesinstalar(pasta, env = process.env) {
   return comandosDeUmProtocolo(CHAVE_PROTOCOLO_DESINSTALAR, 'URL:Desinstalar o programa Administracao de Imoveis', path.win32.join(pasta, NOME_VBS_DESINSTALAR), path.win32.join(pasta, NOME_ICONE), env);
 }
 
+/** O mesmo para imoveis-certificado: (o botão "Anexar o certificado digital"). */
+export function comandosDoProtocoloCertificado(pasta, env = process.env) {
+  return comandosDeUmProtocolo(CHAVE_PROTOCOLO_CERTIFICADO, 'URL:Anexar o certificado digital da empresa', path.win32.join(pasta, NOME_VBS_CERTIFICADO), path.win32.join(pasta, NOME_ICONE), env);
+}
+
 /**
  * Os argumentos do reg.exe para o programa aparecer em Configurações do Windows → Aplicativos → Aplicativos instalados (por
  * usuário, sem administrador). `versao` = a do .exe; `kb` = o tamanho dele (EstimatedSize é em KB). "Desinstalar" lá roda o
@@ -161,13 +185,13 @@ export function comandosDeAplicativos(pasta, { versao = '', kb = 0 } = {}) {
   ];
 }
 
-/** Tudo o que o programa registra no Windows: os dois botões do sistema e a entrada em Aplicativos instalados. */
+/** Tudo o que o programa registra no Windows: os três botões do sistema e a entrada em Aplicativos instalados. */
 export function comandosDoRegistro(pasta, env = process.env, info = {}) {
-  return [...comandosDoProtocolo(pasta, env), ...comandosDoProtocoloDesinstalar(pasta, env), ...comandosDeAplicativos(pasta, info)];
+  return [...comandosDoProtocolo(pasta, env), ...comandosDoProtocoloDesinstalar(pasta, env), ...comandosDoProtocoloCertificado(pasta, env), ...comandosDeAplicativos(pasta, info)];
 }
 
 /** As chaves que o desinstalar tira (o que comandosDoRegistro cria). */
-export const CHAVES_DO_PROGRAMA = [CHAVE_PROTOCOLO, CHAVE_PROTOCOLO_DESINSTALAR, CHAVE_DESINSTALAR];
+export const CHAVES_DO_PROGRAMA = [CHAVE_PROTOCOLO, CHAVE_PROTOCOLO_DESINSTALAR, CHAVE_PROTOCOLO_CERTIFICADO, CHAVE_DESINSTALAR];
 
 const reg = (args) => spawnSync('reg.exe', args, { windowsHide: true, encoding: 'latin1' });
 
@@ -180,6 +204,7 @@ function gravarVbs(pasta) {
   fs.writeFileSync(path.join(pasta, NOME_VBS), textoVbs(), 'latin1');
   fs.writeFileSync(path.join(pasta, NOME_VBS_PASTA), textoVbsPasta(), 'latin1');
   fs.writeFileSync(path.join(pasta, NOME_VBS_DESINSTALAR), textoVbsDesinstalar(), 'latin1');
+  fs.writeFileSync(path.join(pasta, NOME_VBS_CERTIFICADO), textoVbsCertificado(), 'latin1');
   fs.writeFileSync(path.join(pasta, NOME_VBS_JANELA), textoVbsJanela(), 'latin1');
 }
 
@@ -330,6 +355,12 @@ export function criarTarefas(pasta, { rodar = schtasks, dizer = console.log } = 
   return falharam;
 }
 
+/** A tarefa de cada minuto (quem instalou o programa antes do certificado ainda não a tem). Devolve se ficou criada. */
+export function criarTarefaDaAssinatura(env = process.env, { rodar = schtasks } = {}) {
+  const [t] = comandosDeCriar(pastaInstalada(env), [TAREFA_ASSINATURA]);
+  return rodar(t.comando).status === 0;
+}
+
 export function apagarTarefas({ rodar = schtasks, dizer = console.log } = {}) {
   // a da assinatura só existe onde o certificado foi instalado: sem ela, nada a dizer
   if (tarefaExiste(TAREFA_ASSINATURA.nome, rodar)) dizer(`  ${rodar(['/Delete', '/F', '/TN', TAREFA_ASSINATURA.nome]).status === 0 ? 'apagada' : 'FALHOU '} ${TAREFA_ASSINATURA.nome}`);
@@ -357,6 +388,7 @@ Uso:
   ${NOME_EXE} --atualizar     atualiza agora: dados, versão PC, arquivos e o próprio programa (se saiu versão nova)
   ${NOME_EXE} --arquivos      atualiza agora só a pasta "Arquivos dos imoveis"
   ${NOME_EXE} --certificado   instala (ou troca) o certificado digital A1 da empresa (.pfx e a senha, guardados só aqui, cifrados)
+                              (o jeito normal é pelo sistema: Dados e backup → Anexar o certificado digital)
   ${NOME_EXE} --assinar       assina agora os documentos da fila (a tarefa faz isso a cada minuto, com o certificado instalado)
   ${NOME_EXE} --instalar      só copia o programa e cria as tarefas (20h, ao entrar e de hora em hora)
   ${NOME_EXE} --desinstalar   pergunta antes e desinstala: tarefas, botões do sistema, Aplicativos instalados e a pasta "programa"
@@ -370,7 +402,7 @@ O programa se atualiza sozinho (às 20h e ao entrar no Windows): baixa a versão
 a nova vale a partir da rodada seguinte. O resultado de cada atualização fica em ultima-atualizacao.txt, na pasta do
 backup seguro.`;
 
-const COMANDOS = ['--ligar', '--atualizar', '--arquivos', '--certificado', '--assinar', '--instalar', '--desinstalar', '--versao', '--ajuda'];
+const COMANDOS = ['--ligar', '--atualizar', '--arquivos', '--certificado', '--certificado-sistema', '--assinar', '--instalar', '--desinstalar', '--versao', '--ajuda'];
 
 function esperarEnter(texto = 'Aperte Enter para fechar.') {
   if (!process.stdin.isTTY || !process.stdout.isTTY) return Promise.resolve();
@@ -401,7 +433,7 @@ function instalar({ env, simular, elevado, dizer, rodarReg }) {
     const pasta = pastaInstalada(env);
     dizer(`[simulação: nada foi copiado nem criado]\nCopiaria o programa para ${pasta} e criaria as tarefas:`);
     for (const t of comandosDeCriar(pasta)) dizer(`  schtasks ${comoDigitado(t.comando)}`);
-    dizer('Registraria os botões "Abrir a pasta no Explorer" e "Desinstalar o programa deste computador" (endereços imoveis-pasta: e imoveis-desinstalar:) e a entrada em Aplicativos instalados do Windows, só para este usuário:');
+    dizer('Registraria os botões "Abrir a pasta no Explorer", "Desinstalar o programa deste computador" e "Anexar o certificado digital" (endereços imoveis-pasta:, imoveis-desinstalar: e imoveis-certificado:) e a entrada em Aplicativos instalados do Windows, só para este usuário:');
     for (const a of comandosDoRegistro(pasta, env, { versao: EXE?.versao || '' })) dizer(`  reg ${comoDigitado(a)}`);
     return true;
   }
@@ -425,7 +457,7 @@ function instalar({ env, simular, elevado, dizer, rodarReg }) {
   return true;
 }
 
-const NOMES_DAS_CHAVES = { [CHAVE_PROTOCOLO]: 'Botão "Abrir a pasta no Explorer"', [CHAVE_PROTOCOLO_DESINSTALAR]: 'Botão "Desinstalar o programa deste computador"', [CHAVE_DESINSTALAR]: 'Aplicativos instalados do Windows' };
+const NOMES_DAS_CHAVES = { [CHAVE_PROTOCOLO]: 'Botão "Abrir a pasta no Explorer"', [CHAVE_PROTOCOLO_DESINSTALAR]: 'Botão "Desinstalar o programa deste computador"', [CHAVE_PROTOCOLO_CERTIFICADO]: 'Botão "Anexar o certificado digital"', [CHAVE_DESINSTALAR]: 'Aplicativos instalados do Windows' };
 const comoFicou = (r) => (r === 'apagado' ? 'tirado' : r === 'não havia' ? 'não estava' : 'FALHOU ao tirar');
 
 /**
@@ -446,7 +478,7 @@ async function desinstalar({ env, dizer, simular, elevado, rodarReg, rodarTarefa
   if (elevado) { apagarTarefas({ dizer, rodar: rodarTarefas }); return TAREFAS.some((t) => tarefaExiste(t.nome, rodarTarefas)) ? 1 : 0; }
   if (!(await perguntar(TEXTO_CONFIRMAR, env))) { dizer('Nada foi desinstalado.'); return 0; }
   dizer('Desinstalando o programa deste computador:');
-  for (const chave of [CHAVE_PROTOCOLO, CHAVE_PROTOCOLO_DESINSTALAR]) dizer(`  ${NOMES_DAS_CHAVES[chave]}: ${comoFicou(apagarChave(chave, { rodar: rodarReg }))}.`);
+  for (const chave of CHAVES_DO_PROGRAMA.filter((c) => c !== CHAVE_DESINSTALAR)) dizer(`  ${NOMES_DAS_CHAVES[chave]}: ${comoFicou(apagarChave(chave, { rodar: rodarReg }))}.`);
   dizer('Apagando as tarefas do Windows:');
   apagarTarefas({ dizer, rodar: rodarTarefas });
   if (TAREFAS.some((t) => tarefaExiste(t.nome, rodarTarefas))) {
@@ -479,7 +511,7 @@ async function desinstalar({ env, dizer, simular, elevado, rodarReg, rodarTarefa
 export async function executar(args = [], { env = process.env, dizer = console.log, atualizar = principal, pausar = esperarEnter,
   garantir = garantirRegistro, rodarReg = reg, rodarTarefas = schtasks, abrir = abrirExplorer, perguntar = confirmarNoWindows,
   avisar = (texto, e) => janelaDoWindows(texto, { env: e }), apagarPasta = apagarPastaDoPrograma, elevar = rodarComoAdministrador,
-  programa = () => atualizarPrograma({ env }), lerLig = lerLigacao, lerCert = lerCertificado, assinarFilaFn = assinarFila, janelaCert = janelaDoCertificado } = {}) {
+  programa = () => atualizarPrograma({ env }), lerLig = lerLigacao, lerCert = lerCertificado, assinarFilaFn = assinarFila, janelaCert = janelaDoCertificado, receberCert = receberDoSistema } = {}) {
   // o botão do sistema (imoveis-pasta:): abre só a pasta configurada; qualquer outro argumento (até o endereço) é ignorado
   if (args.includes('--abrir-pasta')) return abrirPasta({ env, abrir });
   const versao = EXE?.versao || '';
@@ -512,14 +544,21 @@ export async function executar(args = [], { env = process.env, dizer = console.l
       return ok ? 0 : 1;
     }
     if (pedido === '--assinar') return await rodadaDeAssinatura({ env, dizer, lerLig, lerCert, assinar: assinarFilaFn, versao });
+    if (pedido === '--certificado-sistema') {
+      // chamado pelo botão do sistema, sem janela: quem conversa com a pessoa é o site
+      let lig = null;
+      try { lig = lerLig(env); } catch { /* crachá que não abre nesta conta do Windows: o site manda ligar de novo */ }
+      const r = await receberCert({ env, ligacao: lig, relerLigacao: () => lerLig(env), aoInstalar: () => !EXE || criarTarefaDaAssinatura(env, { rodar: rodarTarefas }) });
+      if (r.situacao !== 'instalado') return 0;
+      return await rodadaDeAssinatura({ env, dizer, lerLig, lerCert, assinar: assinarFilaFn, versao });
+    }
     if (pedido === '--certificado') {
       if (!lerLig(env)) { dizer('Primeiro ligue este computador ao sistema: abra o programa com dois cliques (e-mail e senha do sistema).'); await pausar(); return 1; }
       dizer('Abrindo a página do certificado no navegador (só neste computador): escolha o arquivo .pfx da empresa e digite a senha dele.');
       const c = await janelaCert({ env });
       dizer(`Certificado instalado: ${c.nome}${c.cnpj ? `, CNPJ ${c.cnpj}` : ''}, válido até ${String(c.validade || '').split('-').reverse().join('/')}.`);
       // a tarefa de cada minuto (quem instalou antes desta versão ainda não a tem); sem ela, só assina quando abrir o programa
-      const [t] = comandosDeCriar(pastaInstalada(env), [TAREFA_ASSINATURA]);
-      if (EXE && t && rodarTarefas(t.comando).status !== 0) dizer(`Aviso: não consegui criar a tarefa "${t.nome}". Clique com o botão direito no programa → "Executar como administrador" e repita.`);
+      if (EXE && !criarTarefaDaAssinatura(env, { rodar: rodarTarefas })) dizer(`Aviso: não consegui criar a tarefa "${TAREFA_ASSINATURA.nome}". Clique com o botão direito no programa → "Executar como administrador" e repita.`);
       const r = await rodadaDeAssinatura({ env, dizer, lerLig, lerCert, assinar: assinarFilaFn, versao });
       await pausar();
       return r;

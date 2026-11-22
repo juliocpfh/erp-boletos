@@ -106,7 +106,7 @@ test('certificado no PC: guarda cifrado (aqui de mentira), recusa vencido e senh
   assert.throws(() => CERT.guardarCertificado({ pfx: 'QUJD', senha: 'x' }, env, { dados: () => ({ ...dados(), validade: '2025-01-01' }), proteger, hoje: '2026-11-21' }), /venceu em 01\/01\/2025/);
   assert.deepEqual(CERT.guardarCertificado({ pfx: 'QUJD', senha: 'segredo' }, env, { dados, proteger, hoje: '2026-11-21' }), dados());
   const guardado = fs.readFileSync(path.join(env.IMOVEIS_CONFIG, 'certificado.json'), 'utf8');
-  assert.ok(!guardado.includes('"segredo"') && guardado.includes('cifrado(segredo)'), 'a senha só vai cifrada');
+  assert.ok(!guardado.includes('"segredo"') && guardado.includes(`cifrado(${Buffer.from('segredo').toString('base64')})`), 'a senha só vai cifrada (em base64 por dentro, para não perder espaço nas pontas)');
   assert.equal(CERT.resumoDoCertificado(env).cnpj, '11.222.333/0001-81');
   assert.equal(CERT.lerCertificado(env, { abrir: (t) => t.slice(8, -1) }).senha, 'segredo');
   // a rodada: dois pendentes; um assina, o outro foi cancelado no site no meio (409); um terceiro dá erro e o erro vai à nuvem

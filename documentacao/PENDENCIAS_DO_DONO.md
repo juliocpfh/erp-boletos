@@ -6,10 +6,10 @@
 
 Tudo o que foi pedido até 21/11 está na `main` (PRs #335 a #355). O que **você** precisa fazer, na ordem:
 
-1. [ ] **Atualizar o Claude Code no PC** (você disse em 22/11).
+1. [x] **Atualizar o Claude Code no PC** (feito em 22/11).
 2. [ ] **Assinatura digital com o certificado A1 da ANK** (PRs #352–#355, prontas; falta só a sua parte):
-   1. Esperar o programa do PC se atualizar sozinho (às 20h ou ao entrar no Windows). Para não esperar: Prompt de Comando (tecla Windows, `cmd`, Enter) → `cd "%LOCALAPPDATA%\Administracao de Imoveis\programa"` → `Administracao-de-Imoveis.exe --atualizar`.
-   2. No mesmo lugar: `Administracao-de-Imoveis.exe --certificado` → na página que abre, escolher o arquivo **.pfx** da ANK e digitar a senha (só você digita; fica cifrado, só neste computador).
+   1. Aceitar a PR do certificado pelo sistema (22/11), esperar uns 10 minutos, baixar o [programa atualizado](https://github.com/juliocpfh/erp-boletos/releases/download/programa-pc/Instalar-Administracao-de-Imoveis.exe) e abrir com dois cliques.
+   2. No sistema, nesse mesmo computador: Dados e backup → Certificado digital da empresa → **Anexar o certificado digital** → Abrir e Permitir (perguntas do Chrome) → escolher o **.pfx** da ANK, digitar a senha → **Guardar neste computador**.
    3. No sistema: Dados e backup → Regras do sistema → ligar **"Assinatura digital dos recibos e termos"**.
    4. Testar: abrir um recibo → **Enviar para assinar** → esperar cerca de 1 minuto → **Baixar PDF assinado** → conferir o arquivo em <https://validar.iti.gov.br> (e no Adobe). Mandar ao Claude qualquer mensagem de erro.
    5. Ainda sem o botão de assinar: carta de reajuste, termos aditivos e contrato (pedir ao Claude quando quiser).
