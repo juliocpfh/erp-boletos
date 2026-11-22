@@ -95,3 +95,40 @@ $ci = New-Object System.Security.Cryptography.Pkcs.ContentInfo(,[Convert]::FromB
 $cms = New-Object System.Security.Cryptography.Pkcs.SignedCms($ci, $true); $cms.Decode([Convert]::FromBase64String($j.s)); $cms.CheckSignature($true)`], { input: JSON.stringify({ c: mexido.toString('base64'), s: assinatura.toString('base64') }), encoding: 'utf8', windowsHide: true });
   assert.notEqual(r2.status, 0, 'PDF alterado depois de assinado: a assinatura não confere');
 });
+
+test('certificado no PC: guarda cifrado (aqui de mentira), recusa vencido e senha vazia; a rodada assina a fila e avisa o erro', async () => {
+  const fs = await import('node:fs'); const os = await import('node:os'); const path = await import('node:path');
+  const CERT = await import('../atualizador-pc/certificado.mjs');
+  const env = { IMOVEIS_CONFIG: fs.mkdtempSync(path.join(os.tmpdir(), 'imoveis-cert-')) };
+  const dados = () => ({ nome: 'ANK TESTE LTDA', cnpj: '11.222.333/0001-81', validade: '2027-06-30' });
+  const proteger = (t) => `cifrado(${t})`;
+  assert.throws(() => CERT.guardarCertificado({ pfx: 'QUJD', senha: '' }, env, { dados, proteger }), /senha do certificado/);
+  assert.throws(() => CERT.guardarCertificado({ pfx: 'QUJD', senha: 'x' }, env, { dados: () => ({ ...dados(), validade: '2025-01-01' }), proteger, hoje: '2026-11-21' }), /venceu em 01\/01\/2025/);
+  assert.deepEqual(CERT.guardarCertificado({ pfx: 'QUJD', senha: 'segredo' }, env, { dados, proteger, hoje: '2026-11-21' }), dados());
+  const guardado = fs.readFileSync(path.join(env.IMOVEIS_CONFIG, 'certificado.json'), 'utf8');
+  assert.ok(!guardado.includes('"segredo"') && guardado.includes('cifrado(segredo)'), 'a senha só vai cifrada');
+  assert.equal(CERT.resumoDoCertificado(env).cnpj, '11.222.333/0001-81');
+  assert.equal(CERT.lerCertificado(env, { abrir: (t) => t.slice(8, -1) }).senha, 'segredo');
+  // a rodada: dois pendentes; um assina, o outro foi cancelado no site no meio (409); um terceiro dá erro e o erro vai à nuvem
+  const chamadas = [];
+  const buscar = async (url, op = {}) => {
+    chamadas.push(`${op.method || 'GET'} ${url.replace('https://x/api/aparelho/assinaturas', '')}`);
+    if (url.endsWith('/assinaturas')) return new Response(JSON.stringify({ pendentes: [{ id: 'a1', titulo: 'Recibo' }, { id: 'a2', titulo: 'Carta' }, { id: 'a3', titulo: 'Termo' }] }));
+    if (url.endsWith('/a2.pdf')) return new Response('{}', { status: 409 });
+    if (url.endsWith('.pdf')) return new Response('%PDF-1.3 doc');
+    if (url.endsWith('/assinado')) return new Response('{"ok":true}');
+    return new Response('{"ok":true}');
+  };
+  const assinar = (buf) => { if (String(buf).includes('doc') && chamadas.some((c) => c.includes('a3.pdf'))) throw new Error('certificado com problema'); return Buffer.concat([buf, Buffer.from(' assinado')]); };
+  const r = await CERT.assinarFila({ site: 'https://x', cracha: 'ap1_x' }, { pfx: 'p', senha: 's', nome: 'ANK TESTE LTDA', cnpj: '11.222.333/0001-81', validade: '2099-01-01' }, { buscar, assinar });
+  assert.equal(r.assinados, 1);
+  assert.deepEqual(r.erros, ['Termo: certificado com problema']);
+  assert.ok(chamadas.includes('PUT /a1/assinado'));
+  assert.ok(!chamadas.includes('PUT /a2/assinado'), 'cancelado no site: pula');
+  assert.ok(chamadas.includes('POST /a3/erro'), 'o erro vai para o site');
+  // certificado vencido: nada é assinado, cada documento recebe o aviso
+  const r2 = await CERT.assinarFila({ site: 'https://x', cracha: 'ap1_x' }, { pfx: 'p', senha: 's', nome: 'ANK', validade: '2025-01-01' }, { buscar, assinar: () => { throw new Error('não devia assinar'); } });
+  assert.equal(r2.assinados, 0);
+  assert.match(r2.erros[0], /venceu em 01\/01\/2025/);
+  fs.rmSync(env.IMOVEIS_CONFIG, { recursive: true, force: true });
+});

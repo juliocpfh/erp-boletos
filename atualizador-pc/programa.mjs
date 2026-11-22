@@ -12,8 +12,9 @@ import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { ARQUIVO_REGISTRO, EXE, PASTA_COPIA, principal } from './atualizador.mjs';
 import { ICONE_ICO, NOME_ICONE } from './icone.mjs';
+import { assinarFila, janelaDoCertificado, lerCertificado, resumoDoCertificado } from './certificado.mjs';
 
-export { NOME_ICONE };import { ARQUIVO_CONFIG, pastaConfig } from './ligar.mjs';
+export { NOME_ICONE };import { ARQUIVO_CONFIG, lerLigacao, pastaConfig } from './ligar.mjs';
 import { NOME_NOVO, NOME_TRAVA, NOME_VELHO, seAtualizar } from './se-atualizar.mjs';
 
 export const NOME_EXE = 'Administracao-de-Imoveis.exe';
@@ -50,6 +51,8 @@ export const TAREFAS = [
   { nome: 'Imoveis - atualizador da versao PC (ao entrar)', quando: ['/SC', 'ONLOGON', '/DELAY', '0002:00'], args: '--atualizar', texto: 'ao entrar no Windows: dados, versão PC, arquivos e o próprio programa' },
   { nome: 'Imoveis - copia dos arquivos (de hora em hora)', quando: ['/SC', 'HOURLY'], args: '--arquivos', escondida: true, texto: 'de hora em hora, sem janela: só os arquivos' },
 ];
+/** Assinatura digital (2026-11-21): criada pelo --certificado (só quem instala o certificado precisa dela); sai ao desinstalar. */
+export const TAREFA_ASSINATURA = { nome: 'Imoveis - assinatura digital (a cada minuto)', quando: ['/SC', 'MINUTE', '/MO', '1'], args: '--assinar', escondida: true, texto: 'a cada minuto, sem janela: assina os documentos da fila' };
 
 /** Onde o programa fica instalado (ao lado do crachá, fora do OneDrive). */
 export const pastaInstalada = (env = process.env) => path.join(pastaConfig(env), 'programa');
@@ -308,9 +311,9 @@ export function abrirPasta({ env = process.env, abrir = abrirExplorer } = {}) {
 }
 
 /** Os argumentos do schtasks para criar cada tarefa. `pasta` = onde estão o .exe e o .vbs. */
-export function comandosDeCriar(pasta) {
+export function comandosDeCriar(pasta, lista = TAREFAS) {
   const exe = path.win32.join(pasta, NOME_EXE); const vbs = path.win32.join(pasta, NOME_VBS);
-  return TAREFAS.map((t) => ({ ...t, comando: ['/Create', '/F', ...t.quando, '/TN', t.nome, '/TR', t.escondida ? `wscript.exe "${vbs}" ${t.args}` : `"${exe}" ${t.args}`] }));
+  return lista.map((t) => ({ ...t, comando: ['/Create', '/F', ...t.quando, '/TN', t.nome, '/TR', t.escondida ? `wscript.exe "${vbs}" ${t.args}` : `"${exe}" ${t.args}`] }));
 }
 
 const schtasks = (args) => spawnSync('schtasks.exe', args, { windowsHide: true, encoding: 'latin1' });
@@ -328,6 +331,8 @@ export function criarTarefas(pasta, { rodar = schtasks, dizer = console.log } = 
 }
 
 export function apagarTarefas({ rodar = schtasks, dizer = console.log } = {}) {
+  // a da assinatura só existe onde o certificado foi instalado: sem ela, nada a dizer
+  if (tarefaExiste(TAREFA_ASSINATURA.nome, rodar)) dizer(`  ${rodar(['/Delete', '/F', '/TN', TAREFA_ASSINATURA.nome]).status === 0 ? 'apagada' : 'FALHOU '} ${TAREFA_ASSINATURA.nome}`);
   for (const t of TAREFAS) {
     if (!tarefaExiste(t.nome, rodar)) { dizer(`  não havia ${t.nome}`); continue; }
     dizer(`  ${rodar(['/Delete', '/F', '/TN', t.nome]).status === 0 ? 'apagada' : 'FALHOU '} ${t.nome}`);
@@ -351,6 +356,8 @@ Uso:
   ${NOME_EXE} --ligar         liga de novo com e-mail e senha (depois de Desligar ou de 90 dias parado) e atualiza
   ${NOME_EXE} --atualizar     atualiza agora: dados, versão PC, arquivos e o próprio programa (se saiu versão nova)
   ${NOME_EXE} --arquivos      atualiza agora só a pasta "Arquivos dos imoveis"
+  ${NOME_EXE} --certificado   instala (ou troca) o certificado digital A1 da empresa (.pfx e a senha, guardados só aqui, cifrados)
+  ${NOME_EXE} --assinar       assina agora os documentos da fila (a tarefa faz isso a cada minuto, com o certificado instalado)
   ${NOME_EXE} --instalar      só copia o programa e cria as tarefas (20h, ao entrar e de hora em hora)
   ${NOME_EXE} --desinstalar   pergunta antes e desinstala: tarefas, botões do sistema, Aplicativos instalados e a pasta "programa"
                               (o backup e os arquivos ficam; o computador continua ligado até Desligar em Usuários)
@@ -363,7 +370,7 @@ O programa se atualiza sozinho (às 20h e ao entrar no Windows): baixa a versão
 a nova vale a partir da rodada seguinte. O resultado de cada atualização fica em ultima-atualizacao.txt, na pasta do
 backup seguro.`;
 
-const COMANDOS = ['--ligar', '--atualizar', '--arquivos', '--instalar', '--desinstalar', '--versao', '--ajuda'];
+const COMANDOS = ['--ligar', '--atualizar', '--arquivos', '--certificado', '--assinar', '--instalar', '--desinstalar', '--versao', '--ajuda'];
 
 function esperarEnter(texto = 'Aperte Enter para fechar.') {
   if (!process.stdin.isTTY || !process.stdout.isTTY) return Promise.resolve();
@@ -472,7 +479,7 @@ async function desinstalar({ env, dizer, simular, elevado, rodarReg, rodarTarefa
 export async function executar(args = [], { env = process.env, dizer = console.log, atualizar = principal, pausar = esperarEnter,
   garantir = garantirRegistro, rodarReg = reg, rodarTarefas = schtasks, abrir = abrirExplorer, perguntar = confirmarNoWindows,
   avisar = (texto, e) => janelaDoWindows(texto, { env: e }), apagarPasta = apagarPastaDoPrograma, elevar = rodarComoAdministrador,
-  programa = () => atualizarPrograma({ env }) } = {}) {
+  programa = () => atualizarPrograma({ env }), lerLig = lerLigacao, lerCert = lerCertificado, assinarFilaFn = assinarFila, janelaCert = janelaDoCertificado } = {}) {
   // o botão do sistema (imoveis-pasta:): abre só a pasta configurada; qualquer outro argumento (até o endereço) é ignorado
   if (args.includes('--abrir-pasta')) return abrirPasta({ env, abrir });
   const versao = EXE?.versao || '';
@@ -504,6 +511,19 @@ export async function executar(args = [], { env = process.env, dizer = console.l
       await pausar();
       return ok ? 0 : 1;
     }
+    if (pedido === '--assinar') return await rodadaDeAssinatura({ env, dizer, lerLig, lerCert, assinar: assinarFilaFn, versao });
+    if (pedido === '--certificado') {
+      if (!lerLig(env)) { dizer('Primeiro ligue este computador ao sistema: abra o programa com dois cliques (e-mail e senha do sistema).'); await pausar(); return 1; }
+      dizer('Abrindo a página do certificado no navegador (só neste computador): escolha o arquivo .pfx da empresa e digite a senha dele.');
+      const c = await janelaCert({ env });
+      dizer(`Certificado instalado: ${c.nome}${c.cnpj ? `, CNPJ ${c.cnpj}` : ''}, válido até ${String(c.validade || '').split('-').reverse().join('/')}.`);
+      // a tarefa de cada minuto (quem instalou antes desta versão ainda não a tem); sem ela, só assina quando abrir o programa
+      const [t] = comandosDeCriar(pastaInstalada(env), [TAREFA_ASSINATURA]);
+      if (EXE && t && rodarTarefas(t.comando).status !== 0) dizer(`Aviso: não consegui criar a tarefa "${t.nome}". Clique com o botão direito no programa → "Executar como administrador" e repita.`);
+      const r = await rodadaDeAssinatura({ env, dizer, lerLig, lerCert, assinar: assinarFilaFn, versao });
+      await pausar();
+      return r;
+    }
     if (pedido === '--desinstalar') return await desinstalar({ env, dizer, simular, elevado, rodarReg, rodarTarefas, perguntar, avisar, apagarPasta, elevar, pausar });
     if (pedido === '--instalar') {
       const ok = instalar({ env, simular, elevado, dizer, rodarReg });
@@ -527,6 +547,21 @@ export async function executar(args = [], { env = process.env, dizer = console.l
     if (!elevado && !pedido) await pausar();
     return 1;
   }
+}
+
+/**
+ * Uma rodada da assinatura digital (--assinar, a cada minuto): sem certificado, sai na hora (0) sem ir à internet; com ele,
+ * assina a fila da nuvem. Devolve 0 (ok) ou 1 (falhou: sem internet, computador desligado do sistema).
+ */
+export async function rodadaDeAssinatura({ env = process.env, dizer = console.log, lerLig = lerLigacao, lerCert = lerCertificado, assinar = assinarFila, versao = '' } = {}) {
+  if (!resumoDoCertificado(env)) return 0;
+  const lig = lerLig(env);
+  if (!lig) { dizer('Assinatura digital: este computador não está ligado ao sistema.'); return 1; }
+  try {
+    const r = await assinar(lig, lerCert(env), { versao });
+    if (r.assinados || r.erros.length) dizer(`Assinatura digital: ${r.assinados} documento(s) assinado(s)${r.erros.length ? `; não assinados: ${r.erros.join('; ')}` : ''}.`);
+    return 0;
+  } catch (e) { dizer(`Assinatura digital: ${e.message}`); return 1; }
 }
 
 // no .exe quem chama é a entrada gerada por tools/gerar-exe.mjs; pelo Node: node programa.mjs --ajuda
