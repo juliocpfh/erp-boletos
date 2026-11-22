@@ -8448,9 +8448,11 @@ export function salvarRegrasSistema(d, valores, usuario, motivo = 'Regras do sis
   const limpos = {};
   for (const [k, v] of Object.entries(valores || {})) if (CR.definicaoRegra(k)) limpos[k] = CR.limparValorRegra(k, v);
   let mudou = 0;
-  const naNfAntes = CR.regrasDe(d).ressarcimento_na_nf;
+  const antes = CR.regrasDe(d);
+  const naNfAntes = antes.ressarcimento_na_nf;
   for (const def of CR.DEFINICOES_REGRAS) {
-    const novo = def.chave in limpos ? limpos[def.chave] : def.padrao;
+    // a que fica em outra tela (`fora`, ex.: a assinatura digital) não vem no formulário das regras: continua como está
+    const novo = def.chave in limpos ? limpos[def.chave] : def.fora ? antes[def.chave] : def.padrao;
     const linha = d.config_regras.find((r) => r.chave === def.chave);
     const padrao = CR.mesmoValor(novo, def.padrao);
     if (linha && padrao) { excluir(d, 'config_regras', linha.id, usuario, `${motivo}: ${def.rotulo} volta ao padrão do sistema`); mudou += 1; }

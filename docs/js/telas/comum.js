@@ -69,7 +69,7 @@ export const PARTES_ADIADAS = {
   regua: { importar: () => import('./regua.js'), acoes: ['ACOES_REGUA', ['recusarRegua', 'copiarRegua', 'abrirReguaGmail', 'enviarReguaSelecionados']] },
   nuvem: { importar: () => import('./nuvem.js'), acoes: ['ACOES_NUVEM', ['desligarAparelho', 'levarParaNuvem', 'resolverConflito', 'acertarPastaConflito', 'esquecerRecusas', 'baixarRecusa', 'esquecerRecusa',
     'baixarNaoEnviado', 'baixarBackupNuvem', 'restaurarBackupNuvem', 'esquecerNaoEnviado']] },
-  certificado: { importar: () => import('./certificado.js'), acoes: ['ACOES_CERTIFICADO', ['anexarCertificado']] },
+  certificado: { importar: () => import('./certificado.js'), acoes: ['ACOES_CERTIFICADO', ['anexarCertificado', 'assinaturaDigital']] },
   // TEMPORÁRIA (20/11/2026): teste de todos os PDFs pelo dono; apagar depois do teste
   testePdfs: { importar: () => import('./teste-pdfs.js'), acoes: ['ACOES_TESTE_PDFS', ['testePdfRecibo', 'testePdfCarta']] },
 };

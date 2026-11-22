@@ -11,6 +11,7 @@ import * as R from '../regras.js';
 import { CADASTROS } from './cadastros.js';
 import { botao, buscarComLimite, carregarParte, d, etiqueta, item, link, opera, ordenar, tabelaHistorico } from './comum.js';
 import { caixaIcone } from './icone.js';
+import * as CR from '../config-regras.js';
 import { botoesDoSistema } from './sistema.js';
 
 // --------------------------------------------------------------------------
@@ -120,7 +121,23 @@ function caixaCertificado() {
     ${aqui ? `<div class="acoes">${botao('anexarCertificado', 'Anexar o certificado digital', {}, '')}</div>
       <p class="suave">Faça no computador que vai assinar, com o programa do PC instalado. O navegador pergunta se pode abrir o programa e falar com este computador: responda Abrir e Permitir. O arquivo e a senha não vão para a nuvem nem para os backups.</p>`
     : '<p class="suave">Abra esta tela no computador com Windows que vai assinar (o certificado fica guardado só nele).</p>'}
-    <p class="suave">Assinatura digital: <b>${R.regra('assinatura_digital') ? 'ligada' : 'desligada'}</b> (${link('#/regras', 'Regras do sistema', '')}).</p></div>`;
+    ${ligaDesligaAssinatura()}</div>`;
+}
+
+/**
+ * Liga e desliga a assinatura digital (regra `assinatura_digital`), na caixa do certificado: é a mesma decisão (pedido do dono
+ * de 2026-11-22). Com a explicação, a consequência e a lei, como as outras regras.
+ */
+function ligaDesligaAssinatura() {
+  const def = CR.definicaoRegra('assinatura_digital');
+  const ligada = R.regra('assinatura_digital');
+  return `<div class="regra-sistema" id="assinatura-digital"><h3>Assinatura digital dos recibos e termos ${ligada ? etiqueta('ligada', 'ok') : etiqueta('desligada', 'neutra')}</h3>
+    <p>${esc(def.explica)}</p>
+    <div class="acoes">${ligada
+      ? botao('assinaturaDigital', 'Desligar a assinatura digital', { liga: '0' }, 'secundario', 'Desligar a assinatura digital? Os recibos e termos voltam a sair e a ir por e-mail sem a assinatura da empresa. Os que já foram assinados continuam assinados.')
+      : botao('assinaturaDigital', 'Ligar a assinatura digital', { liga: '1' }, '', 'Ligar a assinatura digital? Os recibos e termos passam a ir por e-mail só depois de assinados pelo PC com o certificado. Se o PC estiver desligado, eles esperam na fila e o Painel avisa.')}</div>
+    <p class="suave"><b>Consequência:</b> ${esc(def.consequencia)}</p>
+    <p class="suave"><b>Lei:</b> ${esc(def.lei)}</p></div>`;
 }
 
 /**

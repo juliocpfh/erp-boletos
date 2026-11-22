@@ -59,3 +59,24 @@ test('caminho até a nuvem: manda o PDF com a chave, lê a fila, baixa o assinad
   await assert.rejects(() => AS.cancelarAssinatura('zzzzzzzz'), /Não consegui tirar da fila/);
   AS.configurarAssinatura({ base: 'api/', buscar: (...a) => fetch(...a) });
 });
+
+// Pedido do dono de 22/11/2026: liga e desliga junto do certificado (Sistema → Empresas), fora da tela das regras.
+test('assinatura digital fora da tela das regras: não aparece lá e salvar as regras não a desliga', async () => {
+  const R = await import('../docs/js/regras.js');
+  assert.ok(!CR.REGRAS_NA_TELA.some((x) => x.chave === 'assinatura_digital'), 'fora da tela das regras');
+  assert.ok(!CR.buscarRegras('assinatura digital').includes('assinatura_digital'), 'nem na busca das regras');
+  assert.equal(CR.REGRAS_NA_TELA.length, CR.DEFINICOES_REGRAS.length - 1, 'só ela saiu');
+  const d = R.bancoVazio();
+  R.mudarRegraSistema(d, 'assinatura_digital', true, 'teste');
+  assert.equal(CR.regrasDe(d).assinatura_digital, true);
+  // o formulário das regras manda só o que está na tela (sem a assinatura): ela continua ligada
+  const daTela = Object.fromEntries(CR.REGRAS_NA_TELA.map((x) => [x.chave, CR.regrasDe(d)[x.chave]]));
+  R.salvarRegrasSistema(d, { ...daTela, dias_ficha_parada: 3 }, 'teste');
+  assert.equal(CR.regrasDe(d).assinatura_digital, true, 'continua ligada depois de salvar as regras');
+  assert.equal(CR.regrasDe(d).dias_ficha_parada, 3, 'a regra mudada na tela foi salva');
+  R.voltarRegrasAoPadrao(d, 'teste');
+  assert.equal(CR.regrasDe(d).assinatura_digital, true, '"Voltar tudo ao padrão" das regras também não a desliga');
+  R.mudarRegraSistema(d, 'assinatura_digital', false, 'teste');
+  assert.equal(CR.regrasDe(d).assinatura_digital, false, 'desliga pelo botão');
+  assert.ok(d.historico.some((h) => /Assinatura digital/.test(h.descricao)), 'fica no Histórico');
+});
