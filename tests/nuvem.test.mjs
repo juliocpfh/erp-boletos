@@ -540,3 +540,58 @@ test('crachá do aparelho: a versão do programa do PC fica guardada por computa
   await pedir('GET', 'aparelho/saude', { cracha, cab: { 'X-Programa-Versao': '2026-11-20 def5678' } });
   assert.equal(await site(), '2026-11-20 def5678', 'trocou sozinho: a versão nova aparece');
 });
+
+test('fila da assinatura digital: o site pede, o PC (crachá) busca e devolve assinado; o documento não pode mudar', async () => {
+  const { pedir, entrar, env } = await nuvemComCofre();
+  const { cracha } = await (await entrar('dono@exemplo.com.br', 'senha do dono 2026')).json();
+  const agora = Math.floor(Date.now() / 1000);
+  const jwt = await token({ aud: [AUD], iss: `https://${EQUIPE}`, exp: agora + 3600, iat: agora, email: 'dono@exemplo.com.br' });
+  const buscar = async (url) => buscarCerts(url);
+  const equipe = (metodo, caminho, corpo) => W.atender(new Request(`https://erp.ankjck.com.br/api/${caminho}`, {
+    method: metodo, body: corpo, headers: { 'Cf-Access-Jwt-Assertion': jwt, ...(metodo !== 'GET' ? { 'X-Sistema': 'imoveis', Origin: 'https://erp.ankjck.com.br' } : {}) },
+  }), env, buscar);
+  const pc = (metodo, caminho, corpo, cab = {}) => W.atender(new Request(`https://erp.ankjck.com.br/api/aparelho/${caminho}`, {
+    method: metodo, body: corpo, headers: { Authorization: `Bearer ${cracha}`, 'CF-Connecting-IP': '203.0.113.5', ...cab },
+  }), env, buscar);
+  const original = new TextEncoder().encode('%PDF-1.3\nconteudo do recibo\n%%EOF\n');
+  // o site manda o PDF conferido
+  assert.equal((await equipe('POST', 'assinaturas?titulo=Recibo&chave=recibo:1', new TextEncoder().encode('não é pdf'))).status, 400);
+  const pedido = (await (await equipe('POST', 'assinaturas?titulo=Recibo%20da%20garantia&chave=recibo:1&contrato=7&nome=recibo.pdf', original)).json()).pedido;
+  assert.equal(pedido.situacao, 'pendente');
+  assert.equal(pedido.contrato_id, 7);
+  // de novo o mesmo documento (conferido outra vez): troca, não duplica
+  const de_novo = (await (await equipe('POST', 'assinaturas?titulo=Recibo%20da%20garantia&chave=recibo:1&nome=recibo.pdf', original)).json()).pedido;
+  assert.equal(de_novo.id, pedido.id);
+  let fila = await (await equipe('GET', 'assinaturas')).json();
+  assert.equal(fila.pedidos.length, 1);
+  assert.equal(fila.pc, null, 'o PC ainda não olhou a fila');
+  // o PC vê o pendente, baixa e devolve assinado
+  const pend = (await (await pc('GET', 'assinaturas')).json()).pendentes;
+  assert.deepEqual(pend.map((x) => x.id), [pedido.id]);
+  assert.equal(await (await pc('GET', `assinaturas/${pedido.id}.pdf`)).text(), new TextDecoder().decode(original));
+  assert.equal((await equipe('GET', `assinaturas/${pedido.id}.pdf?assinado=1`)).status, 409, 'ainda não assinado');
+  const trocado = new TextEncoder().encode('%PDF-1.3\nOUTRO documento\n%%EOF\n1 0 obj << /ByteRange [0 1 2 3] /SubFilter /adbe.pkcs7.detached >>\n%%EOF\n');
+  assert.equal((await pc('PUT', `assinaturas/${pedido.id}/assinado`, trocado)).status, 400, 'documento trocado é recusado');
+  const semAssinatura = new Uint8Array([...original, ...new TextEncoder().encode('2 0 obj << >>\n%%EOF\n')]);
+  assert.equal((await pc('PUT', `assinaturas/${pedido.id}/assinado`, semAssinatura)).status, 400, 'sem a assinatura digital é recusado');
+  const assinado = new Uint8Array([...original, ...new TextEncoder().encode('9 0 obj << /Type /Sig /SubFilter /adbe.pkcs7.detached /ByteRange [0 1 2 3] >>\n%%EOF\n')]);
+  assert.equal((await pc('PUT', `assinaturas/${pedido.id}/assinado`, assinado, { 'X-Certificado': 'ANK TESTE LTDA:11222333000181' })).status, 200);
+  fila = await (await equipe('GET', 'assinaturas')).json();
+  assert.equal(fila.pedidos[0].situacao, 'assinado');
+  assert.equal(fila.pedidos[0].certificado, 'ANK TESTE LTDA:11222333000181');
+  assert.ok(fila.pc && fila.pc.visto_em, 'o site sabe quando o PC olhou a fila');
+  assert.equal((await (await equipe('GET', `assinaturas/${pedido.id}.pdf?assinado=1`)).arrayBuffer()).byteLength, assinado.length);
+  assert.equal((await pc('PUT', `assinaturas/${pedido.id}/assinado`, assinado)).status, 409, 'já assinado: não aceita de novo');
+  assert.deepEqual((await (await pc('GET', 'assinaturas')).json()).pendentes, []);
+  // erro do PC (ex.: senha do certificado errada) aparece no site
+  const p2 = (await (await equipe('POST', 'assinaturas?titulo=Carta&chave=carta:1', original)).json()).pedido;
+  assert.equal((await pc('POST', `assinaturas/${p2.id}/erro`, JSON.stringify({ mensagem: 'A senha do certificado não confere.' }))).status, 200);
+  assert.equal((await (await equipe('GET', 'assinaturas')).json()).pedidos.find((x) => x.id === p2.id).erro, 'A senha do certificado não confere.');
+  // o crachá continua sem gravar em outro lugar, e sem crachá a fila não abre
+  assert.equal((await pc('PUT', 'arquivos/x.pdf', original)).status, 405);
+  assert.equal((await W.atender(new Request('https://erp.ankjck.com.br/api/aparelho/assinaturas'), env, buscar)).status, 401);
+  // cancelar no site
+  assert.equal((await equipe('DELETE', `assinaturas/${p2.id}`)).status, 200);
+  assert.equal((await (await equipe('GET', 'assinaturas')).json()).pedidos.length, 1);
+  void pedir;
+});
