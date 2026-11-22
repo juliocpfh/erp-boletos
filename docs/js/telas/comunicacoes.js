@@ -213,7 +213,7 @@ async function telaComunicado(id) {
   return `<p class="suave"><a href="#/comunicacoes">← Comunicações</a></p>
     <div class="cabecalho"><h1>${esc(com.titulo)}</h1>${etiqueta(`prazo ${dataBr(com.prazo)}`, com.prazo < C.hojeIso() ? 'neutra' : 'aviso')}</div>
     ${!E.nuvem ? `<div class="alerta aviso">${SO_NUVEM}</div>` : ''}${erroNuvem ? `<div class="alerta aviso">Situação de agora não veio da nuvem: ${esc(erroNuvem)}</div>` : ''}
-    ${gmailDesligado ? `<div class="alerta perigo"><b>O envio pelo Gmail está desligado.</b> Para confirmar, a pessoa recebe um código por e-mail: sem o Gmail ligado ninguém consegue confirmar, nem quem recebeu o link pelo WhatsApp. Ligue em Dados e backup → Conectar o Gmail.</div>` : ''}
+    ${gmailDesligado ? `<div class="alerta perigo"><b>O envio pelo Gmail está desligado.</b> Para confirmar, a pessoa recebe um código por e-mail: sem o Gmail ligado ninguém consegue confirmar, nem quem recebeu o link pelo WhatsApp. Ligue em Sistema → Comunicação E-mail → Conectar o Gmail.</div>` : ''}
     ${opera() && E.nuvem && nadaEnviado(com) ? `<p class="acoes">${link(`#/comunicacoes?ver=editar&id=${com.id}`, 'Corrigir prazo, telefone e textos', 'botao secundario pequeno')} ${botao('excluirComunicado', 'Excluir comunicado', { id: com.id }, 'perigo pequeno', `Excluir o comunicado "${com.titulo}"? Nada foi enviado ainda.`)}</p>` : ''}
     <div class="cartao"><div class="numeros-cartao">${quadro('Confirmaram', r.confirmaram, 'ok')}${quadro('Abriram', r.abriram)}${quadro('Não abriram', r.naoAbriram, r.naoAbriram ? 'perigo' : '')}${quadro('Não enviados', r.naoEnviados)}${quadro('Mudaram o contato', r.mudaram)}</div>
       ${opera() ? `<p class="acoes">${botao('emailTodosComunicado', '✉ Enviar e-mail a todos', { id: com.id }, 'pequeno')} ${botao('whatsTodosComunicado', 'WhatsApp a todos', { id: com.id })}
@@ -258,7 +258,7 @@ async function gmailLigado() {
 /** Antes de mandar link pelo WhatsApp (ou copiar): com o Gmail desligado o código não sai e ninguém consegue confirmar. */
 async function seguirSemGmail() {
   if (await gmailLigado()) return true;
-  return confirmar('O envio pelo Gmail está desligado: a pessoa abre o link, mas não recebe o código por e-mail e não consegue confirmar. Ligue o Gmail antes (Dados e backup → Conectar o Gmail). Mandar assim mesmo?', { titulo: 'Gmail desligado', sim: 'Mandar assim mesmo' });
+  return confirmar('O envio pelo Gmail está desligado: a pessoa abre o link, mas não recebe o código por e-mail e não consegue confirmar. Ligue o Gmail antes (Sistema → Comunicação E-mail → Conectar o Gmail). Mandar assim mesmo?', { titulo: 'Gmail desligado', sim: 'Mandar assim mesmo' });
 }
 
 /** O link da pessoa (cria na nuvem na primeira vez e guarda no comunicado). ``novo``: troca o link (o anterior deixa de valer). */
@@ -295,7 +295,7 @@ async function emailDe(com, x, { lembrete = false } = {}) {
 }
 
 async function enviarEmails(com, alvos, { lembrete = false } = {}) {
-  if (!(await GM.emailLigado())) throw new C.ErroUsuario('O envio pelo Gmail não está ligado (Dados e backup → Conectar o Gmail).');
+  if (!(await GM.emailLigado())) throw new C.ErroUsuario('O envio pelo Gmail não está ligado (Sistema → Comunicação E-mail → Conectar o Gmail).');
   let ok = 0; const falhas = [];
   for (const [n, x] of alvos.entries()) {
     aviso(`Enviando ${n + 1} de ${alvos.length}: ${x.nome}…`, 'info');

@@ -11,7 +11,7 @@ import { apagarPastaDaFicha, botao, d, link, nomePastaContrato, nomePastaFicha, 
 
 let cpfEscolhido = '';
 const SO_ADMIN = '<h1>Acesso só para administradores</h1>';
-const topo = (titulo) => `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>${titulo}</h1>`;
+const topo = (titulo) => `<p class="suave"><a href="#/lgpd">← LGPD</a></p><h1>${titulo}</h1>`;
 const doc = (v) => mascarar('cpfcnpj', v);
 const rotulo = (t) => R.TABELAS[t] || t;
 const campoEmPalavras = (campo) => campo.replace(/\.\d+\./g, ' → ').replace(/_/g, ' ');

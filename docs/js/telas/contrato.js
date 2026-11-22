@@ -280,7 +280,7 @@ function caixaGarantia(c) {
   // troca de titular: a garantia passou ao novo titular; as aplicações são dele (lançadas e mostradas lá)
   if (herdeiro && (R.temCaucao(c) || R.temDeposito(c))) {
     html += `${subtitulo('Onde o valor foi aplicado', opera() ? link(`#/novo/aplicacoes?contrato=${herdeiro.id}`, `Registrar aplicação em ${esc(herdeiro.inquilino_nome)}`) : '')}
-      <p class="suave">A aplicação desta garantia fica em <a href="#/contrato/${herdeiro.id}?ir=garantia">${esc(herdeiro.inquilino_nome)}</a>, com o comprovante.${aplic.length ? ` ${aplic.length} aplicação(ões) ainda aqui passam para lá ao abrir o Painel (ou em "Conferir arquivos agora", em Dados e backup).` : ''}</p>`;
+      <p class="suave">A aplicação desta garantia fica em <a href="#/contrato/${herdeiro.id}?ir=garantia">${esc(herdeiro.inquilino_nome)}</a>, com o comprovante.${aplic.length ? ` ${aplic.length} aplicação(ões) ainda aqui passam para lá ao abrir o Painel (ou em "Conferir arquivos agora", em Sistema).` : ''}</p>`;
   } else if (R.temCaucao(c) || R.temDeposito(c) || aplic.length) {
     const situacaoTotal = sit.ok ? etiqueta('100% aplicado', 'ok') : sit.total ? etiqueta(`falta aplicar ${reais(sit.falta)}`, 'aviso') : '';
     html += `${subtitulo('Onde o valor foi aplicado', opera() ? link(`#/novo/aplicacoes?contrato=${c.id}`, 'Registrar aplicação') : '', 'Na saída, o valor é devolvido corrigido pela poupança (informado no cálculo final), pela conta em que foi depositado.')}

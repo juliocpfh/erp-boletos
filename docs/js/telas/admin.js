@@ -1,4 +1,4 @@
-// Administração: backup seguro, empresas emitentes, histórico de alterações e Dados e backup.
+// Administração: backup seguro, empresas emitentes, histórico de alterações e Sistema.
 import { alterar, aviso, conferirBackupDaEmpresa, DIAS_BACKUP_EMPRESA, E, janela, login, mostrar, podeUsuario } from '../app.js';
 import * as S from '../armazenamento.js';
 import * as AJ from '../ajuda.js';
@@ -8,12 +8,10 @@ import { dataBr, dataHoraBr, ErroUsuario, reais } from '../calculos.js';
 import * as CA from '../copia-aberta.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
-import { caixaConfigBanco, caixaContaDosBoletos } from './banco-c6.js';
-import { caixaConfigBanco2 } from './banco.js';
 import { CADASTROS } from './cadastros.js';
 import { botao, buscarComLimite, carregarParte, d, etiqueta, item, link, opera, ordenar, tabelaHistorico } from './comum.js';
-import { caixaGmailHtml } from './emails.js';
 import { caixaIcone } from './icone.js';
+import { botoesDoSistema } from './sistema.js';
 
 // --------------------------------------------------------------------------
 // Backup seguro do administrador
@@ -25,9 +23,9 @@ const FORM_RESTAURAR = `<form data-form="restaurarSeguro" class="formulario">
     <div><label>Senha do backup</label><input type="password" name="senha" autocomplete="off"></div>
     ${S.suportado() ? '<div><label>O que fazer</label><select name="destino"><option value="pasta">Abrir numa pasta nova do computador (o sistema abre com esses dados)</option><option value="zip">Só baixar o ZIP</option></select></div>' : '<input type="hidden" name="destino" value="zip">'}
     <div class="check"><button>Abrir o backup</button></div></form>
-  <p class="suave">${S.suportado() ? `<b>Abrir numa pasta:</b> escolha uma pasta nova e vazia; o sistema grava ali os dados (e os anexos, se o backup for completo) e abre. Só para desastre (dados da nuvem perdidos): com o site só fora do ar, use o aplicativo instalado, que envia sozinho depois. Na pasta, para levar de volta à nuvem, <b>Dados e backup → Substituir os dados da nuvem pelos de uma pasta</b> leva o que fez para a nuvem (para só voltar o banco a um dia, <b>Backups da nuvem</b> é mais simples).`
+  <p class="suave">${S.suportado() ? `<b>Abrir numa pasta:</b> escolha uma pasta nova e vazia; o sistema grava ali os dados (e os anexos, se o backup for completo) e abre. Só para desastre (dados da nuvem perdidos): com o site só fora do ar, use o aplicativo instalado, que envia sozinho depois. Na pasta, para levar de volta à nuvem, <b>Sistema → Substituir os dados da nuvem pelos de uma pasta</b> leva o que fez para a nuvem (para só voltar o banco a um dia, <b>Backups da nuvem</b> é mais simples).`
     : 'Neste aparelho só dá para baixar o ZIP: abrir o backup numa pasta (e levar de volta à nuvem) se faz no computador, no Chrome ou no Edge.'}
-    <b>ZIP:</b> igual ao do "Exportar tudo", para guardar. Para voltar os dados com ele: com os dados numa pasta do computador, "Importar ZIP" em Dados e backup; na nuvem (onde não há "Importar ZIP"), use "Backups da nuvem" ou abra o backup numa pasta nova do computador e depois "Substituir os dados da nuvem pelos de uma pasta". Os usuários e senhas voltam junto.</p>`;
+    <b>ZIP:</b> igual ao do "Exportar tudo", para guardar. Para voltar os dados com ele: com os dados numa pasta do computador, "Importar ZIP" em Sistema; na nuvem (onde não há "Importar ZIP"), use "Backups da nuvem" ou abra o backup numa pasta nova do computador e depois "Substituir os dados da nuvem pelos de uma pasta". Os usuários e senhas voltam junto.</p>`;
 
 export function telaRestaurarBackup() {
   return `<main><div id="mensagens"></div><div class="cartao login" style="max-width:640px">
@@ -42,7 +40,7 @@ export async function telaBackupSeguro() {
   if (!E.seguro || !E.seguro.chave) {
     const nova = E.pastaSeguraNova;
     const chaveExistente = nova ? await B.lerChave(nova) : null;
-    return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backup seguro</h1>
+    return `<p class="suave"><a href="#/dados">← Sistema</a></p><h1>Backup seguro</h1>
       ${E.nuvem && E.backupEmpresa?.feito_em ? `<div class="alerta ${B.avisoDaEmpresa(E.backupEmpresa, Date.now(), DIAS_BACKUP_EMPRESA) ? 'aviso' : 'ok'}"><b>Backup seguro da empresa:</b> última cópia em ${esc(ultimaCopiaDaEmpresa())}, feita por outro computador. Basta um computador com o backup ligado: ligue neste só se ele for passar a ser o computador do backup (ou um segundo, de reserva).</div>` : ''}
       ${E.seguro && E.seguro.desconectado ? `<div class="alerta aviso">A pasta <b>${esc(E.seguro.dir.name)}</b> já está configurada, mas o navegador pede para liberar o acesso de novo. ${botao('reconectarSeguro', 'Reconectar', {}, 'pequeno')}</div>` : ''}
       <div class="cartao"><h2>1. Escolha a pasta segura</h2>
@@ -62,7 +60,7 @@ export async function telaBackupSeguro() {
   const copia = await CA.situacaoCopia(E.seguro.dir);
   const ultimo = (pasta) => lista.find((x) => x.pasta === pasta);
   const quando = (x) => (x ? dataHoraBr(x.alterado) : 'nenhum ainda');
-  return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backup seguro</h1>
+  return `<p class="suave"><a href="#/dados">← Sistema</a></p><h1>Backup seguro</h1>
     ${E.seguroErro ? `<div class="alerta erro">A última cópia falhou: ${esc(E.seguroErro)}</div>` : ''}
     <div class="cartao"><div class="grade">
       ${item('Pasta segura (só neste computador)', esc(E.seguro.dir.name))}
@@ -176,7 +174,7 @@ export const dispensarAvisoSeguro = (chave) => { try { localStorage.setItem(Stri
 // Empresas, histórico e dados
 // --------------------------------------------------------------------------
 export function telaEmpresas() {
-  return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><div class="cabecalho"><h1>Empresas que emitem as NFs</h1>${podeUsuario('admin') ? link('#/novo/emitentes', 'Nova empresa', 'botao') : ''}</div>
+  return `<p class="suave"><a href="#/dados">← Sistema</a></p><div class="cabecalho"><h1>Empresas que emitem as NFs</h1>${podeUsuario('admin') ? link('#/novo/emitentes', 'Nova empresa', 'botao') : ''}</div>
     <div class="cartao rolagem"><table><tr><th>Nome</th><th>Razão social</th><th>CNPJ</th><th>Representante (contratos)</th><th>Aba no Excel</th><th>Situação</th><th></th></tr>
     ${ordenar(d().emitentes, 'nome').map((e) => `<tr><td><b>${esc(e.nome)}</b></td><td>${esc(e.razao_social)}</td><td>${esc(e.cnpj || '-')}</td><td>${e.representante_nome ? esc(e.representante_nome) : '<span class="suave">falta</span>'}</td><td>${esc(e.aba_modelo || e.nome.split(/\s+/)[0])}</td><td>${e.ativo ? etiqueta('Ativa', 'ok') : etiqueta('Inativa', 'neutra')}</td><td class="n">${podeUsuario('admin') ? link(`#/editar/emitentes/${e.id}`, 'Editar') : ''}</td></tr>`).join('')
     || '<tr><td colspan="7" class="suave">Nenhuma empresa cadastrada.</td></tr>'}</table>
@@ -188,7 +186,7 @@ export function telaEmpresas() {
       ${podeUsuario('admin') ? `<form data-form="logo" class="acoes"><input type="file" name="arquivo" accept="image/png,image/jpeg,image/svg+xml,image/webp" style="max-width:360px"><button class="secundario">${d().logo ? 'Trocar logo' : 'Enviar logo'}</button>
         ${d().logo ? botao('removerLogo', 'Remover logo', {}, 'perigo pequeno', 'Remover a logo?') : ''}</form>` : ''}</div>
     ${caixaIcone()}
-    ${caixaContaDosBoletos()}`;
+    ${caixaCertificado()}`;
 }
 
 /** Desfaz as alterações escolhidas no Histórico (só administrador) e recalcula os boletos em aberto ligados a elas. */
@@ -272,7 +270,7 @@ export function telaHistorico(q) {
     ${pagina < paginas ? `${irPara(pagina + 1, 'Mais antigos ›')} ${irPara(paginas, 'Os primeiros »')}` : ''}</p>` : '';
   // só os tipos de registro que aparecem no histórico (tabela sem uso, como a antiga "recebimentos", não entra no filtro)
   const usadas = new Set(d().historico.map((h) => h.tabela));
-  return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Histórico de alterações</h1>
+  return `<p class="suave"><a href="#/dados">← Sistema</a></p><h1>Histórico de alterações</h1>
     <details class="cartao" open><summary><b>Histórico</b> <span class="suave">· ${lista.length} registro(s)${filtrando ? ' com o filtro aplicado' : ''}</span></summary>
     ${trocadas ? `<div class="alerta info">A data "De" estava depois da "Até": mostrando de ${dataBr(q.de)} até ${dataBr(q.ate)}.</div>` : ''}
     <form class="formulario" data-form="ir" data-ir="historico" style="margin-top:12px">
@@ -344,16 +342,11 @@ function caixaTamanho() {
     <p>${botao('medirAnexos', 'Medir a pasta dos anexos', { status: 'Contando os anexos…' })}</p></div>`;
 }
 
-/** `q.gmail`: aviso da volta do Google ao conectar o Gmail (caixaGmailHtml). */
-export async function telaDados(q = {}) {
+/** Sistema (#/dados; até 22/11/2026, "Dados e backup"): os dados e o backup, e os botões das páginas de dentro (sistema.js). */
+export async function telaDados() {
   // cópias em conflito são coisa do OneDrive (modo pasta): na nuvem não existem
   const conflitos = E.nuvem ? [] : await S.copiasEmConflito(E.pasta);
-  let modeloProprio = false;
-  try {
-    await (await E.pasta.getDirectoryHandle(S.PASTA_MODELOS)).getFileHandle(S.MODELO_FATURA);
-    modeloProprio = true;
-  } catch { /* usa o modelo padrão */ }
-  return `<div class="cabecalho"><h1>Dados e backup</h1><div class="acoes">${link('#/empresas', 'Empresas', 'botao secundario')}${link('#/regras', 'Regras do sistema', 'botao secundario')}${AI.ligado() ? link('#/arquivo-impresso', 'Arquivo impresso', 'botao secundario') : ''}${link('#/historico', 'Histórico de alterações', 'botao secundario')}${podeUsuario('admin') ? link('#/teste-pdfs', 'Teste dos PDFs (temporário)', 'botao secundario') : ''}</div></div>
+  return `<div class="cabecalho cabecalho-sistema"><h1>Sistema</h1><div class="acoes">${botoesDoSistema()}${link('#/regras', 'Regras do sistema', 'botao secundario')}${AI.ligado() ? link('#/arquivo-impresso', 'Arquivo impresso', 'botao secundario') : ''}${link('#/historico', 'Histórico de alterações', 'botao secundario')}${podeUsuario('admin') ? link('#/teste-pdfs', 'Teste dos PDFs (temporário)', 'botao secundario') : ''}</div></div>
     ${conflitos.length ? `<div class="alerta perigo">O OneDrive criou cópia(s) em conflito: <b>${conflitos.map(esc).join(', ')}</b>. Isso acontece quando dois computadores gravam ao mesmo tempo. Confira se falta alguma alteração recente e, depois de conferir, apague a cópia na pasta.</div>` : ''}
     ${opera() ? AJ.caixaReabrirPassos(d(), E.usuario?.login || '', { backupLigado: !!(E.seguro && E.seguro.chave) }) : ''}
     <div class="cartao"><div class="grade">
@@ -376,9 +369,6 @@ export async function telaDados(q = {}) {
       <p>${E.seguro && E.seguro.chave ? etiqueta(`Ligado neste computador · pasta ${E.seguro.dir.name}`, 'ok') : E.seguro && E.seguro.desconectado ? etiqueta('Desconectado: falta liberar a pasta', 'aviso') : etiqueta('Não configurado neste aparelho', 'neutra')}
       ${link('#/backup-seguro', 'Abrir o backup seguro')}</p>
       ${E.nuvem && E.backupEmpresa ? `<p>Na empresa: ${E.backupEmpresa.feito_em ? `${etiqueta(`última cópia em ${ultimaCopiaDaEmpresa()}`, B.avisoDaEmpresa(E.backupEmpresa, Date.now(), DIAS_BACKUP_EMPRESA) ? 'aviso' : 'ok')} <span class="suave">(basta um computador com o backup ligado; parado há mais de ${DIAS_BACKUP_EMPRESA} dias, o Painel avisa os administradores)</span>` : etiqueta('nenhum computador com o backup seguro ligado', 'aviso')}</p>` : ''}</div>` : ''}
-    ${caixaCertificado()}
-    ${caixaConfigBanco()}
-    ${caixaConfigBanco2()}
     <div class="cartao"><h2>Exportar tudo em ZIP</h2><p>Todos os dados e todos os anexos num único arquivo, ${E.nuvem ? 'para guardar. Para voltar com ele: descompacte numa pasta do computador e use "Avançado: substituir os dados da nuvem pelos de uma pasta" (acima); para voltar o banco a um dia, use os Backups da nuvem.' : 'para guardar ou levar para outro computador.'}${E.nuvem && !podeUsuario('admin') ? ' <span class="suave">Na nuvem, só o administrador baixa o ZIP com tudo (só o aparelho dele recebe as senhas de todos os usuários).</span>' : ''}</p>${zipPermitido() ? botao('exportar', 'Baixar ZIP com todos os dados', { status: 'Montando o ZIP…' }, '') : ''}<div id="progresso-exportar" aria-live="polite"></div>
       <p style="margin-top:14px">Para ler ou imprimir: todos os cadastros numa planilha Excel (uma aba por cadastro, mais o histórico de alterações) e num PDF (uma ficha por registro). Os anexos não entram e estes arquivos não servem para importar.</p>
       ${opera() ? botao('exportarPlanilhaPdf', 'Baixar todos os dados em planilha e PDF', { status: 'Montando a planilha e o PDF…' }, 'secundario') : ''}
@@ -393,18 +383,9 @@ export async function telaDados(q = {}) {
     ${podeUsuario('admin') ? `<div class="cartao"><h2>Compactar os anexos</h2><p>Fotos e PDFs escaneados são compactados sozinhos ao anexar (${link('#/regras', 'Regras do sistema', '')} → "Compactar anexos"${R.regra('compactar_anexos') ? '' : ', hoje desligada'}). Ex.: foto do RG de 4 MB → cerca de 400 KB; PDF escaneado de 10 páginas com 12 MB → cerca de 1,5 MB.
       Este botão faz o mesmo com os que já estavam no sistema, trocando cada um no lugar, com o mesmo nome. O original não é guardado. PDF com assinatura digital (gov.br, ICP-Brasil, banco) e PDF com texto ficam como estão; documento mandado pelo link da ficha só entra depois de conferido (a conferência fica guardada na ficha).</p>
       ${botao('compactarAnexos', 'Compactar os anexos que já estão no sistema', { status: 'Procurando os anexos…' }, 'secundario', 'Compactar agora as fotos e os PDFs escaneados já anexados? O arquivo original não é guardado (PDF assinado nunca é mexido). Pode levar alguns minutos: deixe esta tela aberta até o fim.')}</div>` : ''}
-    ${podeUsuario('admin') ? `<div class="cartao"><h2>Dados de uma pessoa (LGPD)</h2><p>Pelo CPF: onde a pessoa aparece e um arquivo com tudo dela (quando ela pedir). Dez anos depois do fim do último contrato, apagar tudo dela de uma vez.</p>
-      <p class="acoes">${link('#/pessoa', 'Dados de uma pessoa', 'botao secundario pequeno')} ${link('#/pessoas-antigas', 'Pessoas com mais de 10 anos do fim do contrato', 'botao secundario pequeno')}</p></div>` : ''}
     ${podeUsuario('admin') ? `<div class="cartao"><h2>Arquivos sem lançamento</h2><p>Ao excluir um lançamento (aditivo, comprovante, depósito, apólice, vistoria, documento assinado), o arquivo anexado é apagado junto.
       Os que sobraram de exclusões antigas podem ser apagados aqui: o sistema mostra a lista antes de apagar. As fichas e documentos anexados à mão em "Arquivos do inquilino" não entram.</p>
-      ${botao('limparAnexosSoltos', 'Procurar arquivos sem lançamento', { status: 'Procurando arquivos sem lançamento…' })}</div>` : ''}
-    <div class="cartao"><h2>Modelos de contrato</h2><p>Textos usados nos botões <b>Gerar contrato</b> (residencial, não residencial e os que você criar) e <b>Gerar termo aditivo</b> (troca do vencimento e troca de inquilino) do inquilino.</p>${link('#/modelos-contrato', 'Ver e editar os modelos')}</div>
-    <div class="cartao"><h2>Modelos de e-mail</h2><p>Um e-mail para cada etapa da ficha, da entrada e da saída do inquilino, a régua de cobrança (lembretes antes e no dia do vencimento, boleto em atraso), as notificações ao inquilino, o novo valor do aluguel, os termos aditivos e o informe anual do Imposto de Renda (botão <b>✉ E-mail</b> em cada etapa).</p>${link('#/modelos-email', 'Ver e editar os modelos de e-mail')}</div>
-    ${await caixaGmailHtml(q.gmail)}
-    <div class="cartao"><h2>Modelo Excel da NF</h2>
-      <p>${modeloProprio ? `${etiqueta('Modelo próprio', 'ok')} usando o arquivo enviado (${S.PASTA_MODELOS}/${S.MODELO_FATURA}).` : 'Usando o modelo padrão do sistema (uma NF por empresa, com os dados do cadastro de Empresas).'}</p>
-      <p class="suave">Para trocar, envie um .xlsx com uma aba por empresa no mesmo desenho. Os dados são preenchidos nas mesmas células da planilha original (peça ao técnico se precisar do detalhe).</p>
-      ${opera() ? `<form data-form="modeloExcel" class="acoes"><input type="file" name="modelo" accept=".xlsx" style="max-width:380px"><button class="secundario">Enviar modelo</button>${modeloProprio ? botao('removerModelo', 'Voltar ao modelo padrão', {}, 'perigo pequeno', 'Voltar ao modelo padrão?') : ''}</form>` : ''}</div>`;
+      ${botao('limparAnexosSoltos', 'Procurar arquivos sem lançamento', { status: 'Procurando arquivos sem lançamento…' })}</div>` : ''}`;
 }
 
 // --------------------------------------------------------------------------

@@ -205,7 +205,7 @@ test('boleto do C6: multa em % sobre o boleto (padrão) ou em reais quando é s�
 
 test('regras que ficavam fora de "Regras do sistema" (ressarcimento na NF, tolerância do boleto): o valor antigo continua valendo e passa para as regras ao salvar', () => {
   try {
-    // banco antigo: ressarcimento abatendo a NF (Empresas) e tolerância de 5 dias (Dados e backup → Banco)
+    // banco antigo: ressarcimento abatendo a NF (Empresas) e tolerância de 5 dias (Sistema → Banco)
     const d = R.bancoVazio();
     d.ressarcimento_abate_nf = true;
     d.config_banco = { tolerancia_dias: 5 };

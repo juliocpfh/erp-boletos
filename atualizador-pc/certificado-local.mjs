@@ -1,4 +1,4 @@
-// Certificado digital anexado pelo sistema (pedido do dono de 22/11/2026): o botão em Dados e backup chama imoveis-certificado:,
+// Certificado digital anexado pelo sistema (pedido do dono de 22/11/2026): o botão em Sistema → Empresas chama imoveis-certificado:,
 // que roda o programa escondido com --certificado-sistema; ele escuta alguns minutos só em 127.0.0.1 e o site, aberto neste
 // computador, entrega o .pfx e a senha direto a ele. Nada passa pela nuvem, pelo banco nem pelos backups.
 // Segurança: só aceita o Host daqui e a origem exata do site em que o computador está ligado (um outro site pode até acordar o

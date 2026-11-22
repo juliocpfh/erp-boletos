@@ -12,6 +12,7 @@ import { compBr, dataBr, reais } from './calculos.js';
 import * as F from './formularios.js';
 import { esc } from './formularios.js';
 import * as R from './regras.js';
+import { enderecoMudado, telaLgpd, telaSistemaBanco, telaSistemaEmail, telaSistemaModelos } from './telas/sistema.js';
 import { avisoBackupSeguro, telaBackupSeguro, telaDados, telaEmpresas, telaHistorico, telaRestaurarBackup } from './telas/admin.js';
 import { lerAvisosAoAbrir, telaBanco } from './telas/banco.js';
 import { telaFormulario } from './telas/cadastros.js';
@@ -77,6 +78,14 @@ function preencherAvisoAssinaturas() {
     const l = AS.avisoDaFila(f);
     if (el && l.length) el.innerHTML = l.map((t) => `<div class="alerta aviso">✍ ${esc(t)}</div>`).join('');
   }).catch(() => { /* sem internet: o aviso volta na próxima abertura */ });
+}
+
+/** Endereço de antes das páginas de Sistema: troca pelo novo sem deixar o antigo no "Voltar" do navegador. */
+function levarAoEnderecoNovo(tela, q) {
+  const novo = enderecoMudado(tela, q);
+  if (!novo) return '';
+  globalThis.location?.replace?.(novo);
+  return '<p class="suave">Abrindo…</p>';
 }
 
 export const TELAS = {
@@ -236,7 +245,7 @@ export const TELAS = {
       <p class="suave">Ou, para começar do zero:</p>` : ''}
     ${E.nuvem ? '' : `<div class="alerta info"><b>Já usa o sistema?</b> Usuários e senhas ficam guardados na pasta dos dados, não no programa.
       Se você já tem dados, clique em <b>Escolher outra pasta</b> e escolha a mesma pasta de sempre: aparece o login e você entra com a senha de sempre.
-      Para levar tudo para esta pasta nova: crie aqui o administrador e depois use <b>Dados e backup → Importar ZIP</b> com o ZIP baixado no site (os usuários antigos voltam junto).</div>`}
+      Para levar tudo para esta pasta nova: crie aqui o administrador e depois use <b>Sistema → Importar ZIP</b> com o ZIP baixado no site (os usuários antigos voltam junto).</div>`}
     <form data-form="primeiroAcesso">
       <p><label for="ent_nome">Seu nome</label><input id="ent_nome" name="nome" autofocus></p>
       <p><label for="ent_login">Login</label><input id="ent_login" name="login" autocomplete="username"></p>
@@ -448,7 +457,7 @@ export const TELAS = {
     return `<p class="suave"><a href="#/">← Painel</a></p><h1>Aparência e prazos dos alertas</h1>
       <p class="suave">Escolha a cor, a ênfase e a prioridade de cada tipo de aviso. Prioridade 1 aparece primeiro; com a mesma prioridade, vem antes o mais grave.
         "Aparece" diz quanto tempo antes do prazo o alerta surge no Painel (ex.: IPTU com 15 dias: a guia de 10/03 aparece em 23/02); o atrasado continua aparecendo.
-        Esses prazos também ficam em Dados e backup → Regras do sistema.
+        Esses prazos também ficam em Sistema → Regras do sistema.
         Cor "Padrão": vermelho quando urgente, laranja quando aviso, azul quando informação.</p>
       <form data-form="estilosAlertas" class="cartao"><div class="rolagem"><table><tr><th>Tipo de aviso</th><th>Cor</th><th>Ênfase</th><th>Prioridade</th><th>Aparece</th><th>Como fica</th></tr>${linhas}</table></div>
         <div class="acoes" style="margin-top:10px"><button>Salvar</button> ${botao('estilosAlertasPadrao', 'Voltar ao padrão do sistema', {}, 'secundario', 'Voltar todos os alertas para a aparência e os prazos padrão?')} <a class="botao secundario" href="#/">Cancelar</a></div></form>`;
@@ -456,7 +465,11 @@ export const TELAS = {
 
   pendencias: () => telaPendencias(),
   'modelo-contrato': (rota) => telaModelo(rota),
-  empresas: () => telaEmpresas(),
+  empresas: (rota) => levarAoEnderecoNovo('empresas', rota.q) || telaEmpresas(),
+  'sistema-banco': () => telaSistemaBanco(),
+  'sistema-email': (rota) => telaSistemaEmail(rota.q),
+  'sistema-modelos': () => telaSistemaModelos(),
+  lgpd: () => telaLgpd(),
   regras: async (rota) => (await parteAdiada('regras')).telaRegras(rota.q),
   inquilinos: (rota) => telaInquilinos(rota.q),
   comunicacoes: (rota) => telaComunicacoes(rota.q),
@@ -469,7 +482,7 @@ export const TELAS = {
   'notificacao-nova': (rota) => telaNovaNotificacao(rota.q),
   iptu: (rota) => telaIptu(Number(rota.q.ano) || new Date().getFullYear()),
   historico: (rota) => telaHistorico(rota.q),
-  dados: (rota) => telaDados(rota.q),
+  dados: (rota) => levarAoEnderecoNovo('dados', rota.q) || telaDados(),
   'arquivo-impresso': (rota) => telaArquivoImpresso(rota.q),
   'pasta-fisica': (rota) => telaPastaFisica(Number(rota.partes[1])),
   'pasta-impressao': (rota) => telaPastaImpressao(Number(rota.partes[1])),

@@ -1,5 +1,5 @@
 // Compactação automática dos anexos (decisão do dono em 2026-11-16, documentacao/DECISOES.md; regra `compactar_anexos`).
-// Ao anexar (armazenamento.js, `salvarArquivo`) e no botão do administrador para os que já estão no sistema (Dados e backup):
+// Ao anexar (armazenamento.js, `salvarArquivo`) e no botão do administrador para os que já estão no sistema (Sistema):
 // - foto (JPG, PNG, WEBP; HEIC se o navegador abrir): lado maior até 2000 px, JPEG qualidade 0,8 (a rotação da câmera é aplicada);
 // - PDF escaneado (todas as páginas são imagem, sem texto): cada página vira um JPEG menor, num PDF novo;
 // - PDF com texto (gerado por sistema, banco, Word) fica como está; PDF com assinatura digital ou protegido NUNCA é mexido
@@ -239,7 +239,7 @@ export const candidato = (nome, tamanho) => CANDIDATO.test(nome) && tamanho >= (
 export const ehDoLink = (nome) => /^link-/.test(nome);
 
 /**
- * Os anexos que já estão no sistema (botão do administrador em Dados e backup): passa por todos dentro de `raiz` (a pasta
+ * Os anexos que já estão no sistema (botão do administrador em Sistema): passa por todos dentro de `raiz` (a pasta
  * `arquivos`) e troca no lugar, com o MESMO nome, os que ficam bem menores.
  * Mesmo nome = o lançamento continua apontando para ele e o arquivo impresso não acusa "arquivo trocado".
  * Documento mandado pelo link da ficha só entra depois de conferido (a conferência fica guardada na ficha; antes disso o

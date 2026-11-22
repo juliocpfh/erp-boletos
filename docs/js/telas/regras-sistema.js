@@ -1,4 +1,4 @@
-// Tela "Regras do sistema" (#/regras, em Dados e backup): o administrador escolhe as regras de aluguel, garantia, contrato e
+// Tela "Regras do sistema" (#/regras, em Sistema): o administrador escolhe as regras de aluguel, garantia, contrato e
 // rotina; cada uma com a explicação, a consequência e a lei. Padrão do sistema (regras do dono) no código: config-regras.js.
 // Também guarda versões das regras, baixa e carrega o arquivo das regras e volta tudo ao padrão.
 import { alterar, aviso, baixar, confirmar, login, mostrar, podeUsuario } from '../app.js';
@@ -35,7 +35,7 @@ export function valorRegraTexto(def, v) {
  */
 export function textoDasRegrasEmUso(hoje = C.hojeIso()) {
   const regras = CR.regrasDe(d());
-  const linhas = ['', '', `REGRAS EM USO EM ${C.dataBr(hoje)} (Dados e backup → Regras do sistema)`,
+  const linhas = ['', '', `REGRAS EM USO EM ${C.dataBr(hoje)} (Sistema → Regras do sistema)`,
     'O texto acima descreve o padrão do sistema (ex.: boletos a partir do dia 20, reajuste no 13º mês). Onde o administrador mudou, vale o que está aqui.'];
   let mudadas = 0;
   for (const [g, titulo] of CR.GRUPOS_REGRAS) {
@@ -151,7 +151,7 @@ export function telaRegras(q = {}) {
   const regras = R.regrasDe(d());
   const mudadas = CR.DEFINICOES_REGRAS.filter((x) => !CR.mesmoValor(regras[x.chave], x.padrao));
   const versoes = [...(d().versoes_regras || [])].sort((a, b) => String(b.salvo_em).localeCompare(String(a.salvo_em)));
-  return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Regras do sistema</h1>
+  return `<p class="suave"><a href="#/dados">← Sistema</a></p><h1>Regras do sistema</h1>
     <div class="alerta info">Cada regra mostra o que faz, a consequência de cada escolha e a lei. O <b>padrão do sistema</b> são as regras originais, gravadas no programa: elas valem enquanto nada for mudado e sempre dá para voltar a elas. O sistema avisa quando uma escolha tem risco legal, mas não proíbe.
       ${mudadas.length ? `<br>Hoje <b>${mudadas.length} regra(s)</b> diferente(s) do padrão: ${mudadas.map((x) => esc(x.rotulo)).join('; ')}.` : '<br>Hoje todas as regras estão no padrão do sistema.'}</div>
     ${admin ? '' : '<div class="alerta aviso">Só o administrador muda as regras.</div>'}

@@ -10,7 +10,7 @@ Navegador (erp.ankjck.com.br)  →  Ponte (computador da empresa, com certificad
 
 Faça as etapas na ordem. Cada uma termina com "Como saber se deu certo".
 
-> Os nomes de pastas, arquivos e telas abaixo (`ponte-c6/credenciais/`, `.env.exemplo`, `/saude`, "modo SIMULADO", caixa do banco C6 em Dados e backup) são os combinados para a ponte. Se o programa final usar um nome um pouco diferente, o `ponte-c6/README` manda.
+> Os nomes de pastas, arquivos e telas abaixo (`ponte-c6/credenciais/`, `.env.exemplo`, `/saude`, "modo SIMULADO", caixa do banco C6 em Sistema → Banco) são os combinados para a ponte. Se o programa final usar um nome um pouco diferente, o `ponte-c6/README` manda.
 
 ---
 
@@ -102,7 +102,7 @@ O computador da ponte deve ficar **ligado** sempre que alguém for emitir boleto
 
 Agora no sistema, no navegador (como administrador).
 
-1. Abra `https://erp.ankjck.com.br` → menu **Dados e backup** → caixa **Banco C6 (ponte)**.
+1. Abra `https://erp.ankjck.com.br` → menu **Sistema** → botão **Banco** → caixa **Banco C6 (ponte)**.
 2. Informe, **uma linha por conta** (ANK e, se houver, JCK):
    - **URL da ponte**: `https://banco.ankjck.com.br` (ou `http://localhost:PORTA` se for no mesmo computador). Sem barra no final.
    - **Senha da ponte**: a mesma que você escreveu no `.env`.

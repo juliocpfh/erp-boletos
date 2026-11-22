@@ -110,7 +110,7 @@ export function escolherPastaNoWindows(inicial = '') {
 export function conferirPasta(pasta) {
   const p = String(pasta || '').trim();
   if (!p) throw new Error('Escolha a pasta do backup seguro.');
-  if (!fs.existsSync(path.join(p, ARQUIVO_CHAVE))) throw new Error(`Esta pasta não é a do backup seguro (falta o arquivo ${ARQUIVO_CHAVE}). Ligue o backup seguro no sistema (Dados e backup → Backup seguro) e escolha a mesma pasta aqui.`);
+  if (!fs.existsSync(path.join(p, ARQUIVO_CHAVE))) throw new Error(`Esta pasta não é a do backup seguro (falta o arquivo ${ARQUIVO_CHAVE}). Ligue o backup seguro no sistema (Sistema → Backup seguro) e escolha a mesma pasta aqui.`);
   return p;
 }
 
@@ -129,7 +129,7 @@ button.sec{background:#e5e7eb;color:#111}#msg{margin-top:16px;padding:10px;borde
 <label>Senha do sistema</label><input name="senha" type="password" autocomplete="current-password" required>
 <label>Nome deste computador</label><input name="computador" required maxlength="60" value="${padrao.computador}"><small>Como vai aparecer em Usuários → Aparelhos ligados.</small>
 <label>Pasta do backup seguro</label><div class="linha"><input name="pasta" required value="${padrao.pasta}"><button type="button" class="sec" id="escolher">Escolher…</button></div>
-<small>A pasta que você escolheu no sistema em Dados e backup → Backup seguro (tem o arquivo chave-do-backup.json).</small>
+<small>A pasta que você escolheu no sistema em Sistema → Backup seguro (tem o arquivo chave-do-backup.json).</small>
 <p><button id="ligar">Ligar</button></p></form><div id="msg"></div></main>
 <script>
 const seg = ${JSON.stringify(seg)}; const f = document.getElementById('f'); const msg = document.getElementById('msg');

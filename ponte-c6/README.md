@@ -14,8 +14,8 @@ Só o [Node.js](https://nodejs.org) (versão 20 ou mais nova). Nada mais: a pont
 
 1. Copie a pasta `ponte-c6` para o computador que vai emitir os boletos (ex.: `C:\Imoveis\ponte-c6`).
 2. Copie `.env.exemplo` para `.env` e preencha:
-   - `PONTE_SENHA`: invente uma frase longa. A mesma senha vai no site, em **Dados e backup → Banco (C6) → Senha da ponte** (fica só no navegador daquele computador: informe em cada computador que vai usar o banco).
-   - `CONTAS=ank,jck`: os identificadores das contas (só letras e números). Os mesmos são cadastrados no site, em **Dados e backup → Banco (C6) → Contas**.
+   - `PONTE_SENHA`: invente uma frase longa. A mesma senha vai no site, em **Sistema → Banco → Banco (C6) → Senha da ponte** (fica só no navegador daquele computador: informe em cada computador que vai usar o banco).
+   - `CONTAS=ank,jck`: os identificadores das contas (só letras e números). Os mesmos são cadastrados no site, em **Sistema → Banco → Banco (C6) → Contas**.
    - Enquanto não tiver as chaves do banco, deixe `SIMULADO=1`: a ponte responde com boletos **fictícios** (no formato exato da API) e dá para testar as telas.
 3. Quando o C6 liberar as chaves de cada conta (veja abaixo), coloque-as na pasta `contas/<id>/` (ex.: `contas/ank/`):
    - `client_id.txt` e `client_secret.txt` (um valor em cada arquivo), ou as variáveis `C6_ANK_CLIENT_ID` / `C6_ANK_CLIENT_SECRET` no `.env`;
@@ -27,7 +27,7 @@ Só o [Node.js](https://nodejs.org) (versão 20 ou mais nova). Nada mais: a pont
    node servidor.mjs
    ```
    Deve aparecer `Ponte C6 v… em http://127.0.0.1:8765` e a situação de cada conta (chaves, validade do certificado).
-5. No site, em **Dados e backup → Banco (C6) — boleto com Pix**: informe o endereço `http://localhost:8765`, a senha e clique em **Testar conexão**. Cadastre as contas (uma por empresa) e ative a integração.
+5. No site, em **Sistema → Banco → Banco (C6) — boleto com Pix**: informe o endereço `http://localhost:8765`, a senha e clique em **Testar conexão**. Cadastre as contas (uma por empresa) e ative a integração.
 
 Deixe a ponte rodando enquanto usa o sistema (uma janela do terminal aberta, ou crie um atalho/tarefa agendada do Windows para `node C:\Imoveis\ponte-c6\servidor.mjs`).
 

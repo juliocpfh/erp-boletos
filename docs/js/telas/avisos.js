@@ -15,7 +15,7 @@ export async function confirmarAvisos(avisos) {
   }
 }
 
-// números dos avisos: regras do sistema (Dados e backup → Regras), padrão 60 dias, 30% e 90 dias
+// números dos avisos: regras do sistema (Sistema → Regras), padrão 60 dias, 30% e 90 dias
 const diasFuturo = () => R.regra('dias_futuro');
 const foraDoPadrao = () => R.regra('fora_do_padrao') / 100;
 

@@ -90,7 +90,7 @@ Exemplo: a Maria Exemplo pagou pelo Pix em **10/12/2026** às 22h, e o C6 credit
 
 Pode buscar quantas vezes quiser no mês (uma vez por semana, por exemplo). O importante é que, no fechamento, as duas contas estejam buscadas até o último dia do mês.
 
-**Conta de outro banco (sem ligação com o sistema).** O administrador cadastra em **Dados e backup → Banco (C6) → Contas de outros bancos** (apelido, banco e empresa; ex.: "Itaú"). Na tela **Banco** ela ganha uma aba (ex.: **Itaú · conta no Itaú (extrato por arquivo)**) com o botão **Importar o extrato do Itaú (arquivo OFX ou CSV)**: baixe o extrato no site ou no aplicativo do banco e escolha o arquivo. Valem as mesmas conferências do C6: o mesmo lançamento não entra duas vezes, arquivo de outra conta é recusado e o saldo do arquivo é conferido com as movimentações. Essa conta não emite boleto, não paga e não gera comprovante pelo banco (anexe o PDF do banco). Como o arquivo não traz o código do boleto, **nenhuma entrada se liga sozinha a um boleto**: a linha mostra "vincular manualmente" e você escolhe o boleto em **Dar destino**.
+**Conta de outro banco (sem ligação com o sistema).** O administrador cadastra em **Sistema → Banco → Banco (C6) → Contas de outros bancos** (apelido, banco e empresa; ex.: "Itaú"). Na tela **Banco** ela ganha uma aba (ex.: **Itaú · conta no Itaú (extrato por arquivo)**) com o botão **Importar o extrato do Itaú (arquivo OFX ou CSV)**: baixe o extrato no site ou no aplicativo do banco e escolha o arquivo. Valem as mesmas conferências do C6: o mesmo lançamento não entra duas vezes, arquivo de outra conta é recusado e o saldo do arquivo é conferido com as movimentações. Essa conta não emite boleto, não paga e não gera comprovante pelo banco (anexe o PDF do banco). Como o arquivo não traz o código do boleto, **nenhuma entrada se liga sozinha a um boleto**: a linha mostra "vincular manualmente" e você escolhe o boleto em **Dar destino**.
 
 ### 2.6 Dar destino a cada movimentação
 
@@ -131,7 +131,7 @@ Regras que o sistema aplica ao atrelar uma conta a um imóvel:
 ### 2.7 Nomear e guardar os comprovantes
 
 1. Na linha da movimentação, clique em **Nomear e baixar comprovante**. O sistema propõe o nome padrão e mostra as duas pastas onde o PDF vai ficar. Pode trocar o nome antes de confirmar.
-2. O nome padrão é **"AAAA-MM-DD empresa imóvel tipo valor"**, sem acento (o padrão pode ser mudado em Dados e backup → Banco):
+2. O nome padrão é **"AAAA-MM-DD empresa imóvel tipo valor"**, sem acento (o padrão pode ser mudado em Sistema → Banco):
    - `2026-11-05 ANK Loja 1 Agua 123,45.pdf`
    - `2026-11-10 ANK Loja 1 IPTU 2026 3a parcela 210,00.pdf`
    - `2026-12-11 ANK Loja 1 Aluguel Maria Exemplo 1.219,50.pdf`
@@ -154,7 +154,7 @@ No começo do mês seguinte (ex.: a partir de **01/12/2026** para novembro), com
 
 ### 2.9 Pagar as contas dos imóveis pelo sistema
 
-Vale para água, luz, gás, condomínio, internet, IPTU e guias de imposto. Precisa estar ligado em **Dados e backup → Banco** ("Permitir pagamentos pelo banco", só o administrador liga; há também um limite por pagamento, opcional).
+Vale para água, luz, gás, condomínio, internet, IPTU e guias de imposto. Precisa estar ligado em **Sistema → Banco** ("Permitir pagamentos pelo banco", só o administrador liga; há também um limite por pagamento, opcional).
 
 **Passo 1 — Preparar** (operador ou administrador). Em **Contas pagas por nós** do imóvel (`#/contas/Loja 1`), no cartão de pagar pelo banco:
 - escolha a conta a pagar (ex.: **Luz**), o mês da conta (**11/2026**), o valor (**R$ 200,00**), o vencimento (**15/11/2026**);
@@ -217,7 +217,7 @@ Use sempre a **data contábil** = dia em que o dinheiro **entrou na conta** (dat
 Quando o C6 entrega o PDF da movimentação pela ligação, o sistema guarda esse PDF: é o **comprovante oficial**, igual ao do aplicativo. Para alguns tipos de lançamento o banco não entrega PDF; nesse caso a ponte gera um PDF simples com os dados da linha do extrato (data, valor, descrição, quem recebeu) só para não deixar a pasta vazia. Ele é marcado como gerado pelo sistema e **não é um documento do banco**. Se o contador precisar do oficial, baixe no aplicativo ou no Web Banking do C6 e troque pelo **Anexar do PC**; o nome padrão e as pastas continuam os mesmos.
 
 **7. A ponte está desligada. O que funciona e o que faço?**
-A tela **Banco** abre normalmente e mostra o aviso "A ponte com o banco não respondeu. Abra o programa 'Ponte C6' neste computador e tente de novo. O que já foi importado continua aqui." Continuam funcionando: ver o que já foi importado, dar destino às linhas, confirmar pagamentos de boleto à mão na tela Boletos e **Anexar do PC** os comprovantes. Não funcionam: emitir boleto, buscar extrato, ver saldo, baixar comprovante do banco e enviar pagamentos. Para religar: no computador da ponte, abra o programa "Ponte C6" (ou confira se ele iniciou com o computador) e teste em **Dados e backup → Banco C6 (ponte) → Testar conexão**. Se continuar fora, veja a tabela "Se der erro" do `LIGAR_C6.md` (Etapa 6).
+A tela **Banco** abre normalmente e mostra o aviso "A ponte com o banco não respondeu. Abra o programa 'Ponte C6' neste computador e tente de novo. O que já foi importado continua aqui." Continuam funcionando: ver o que já foi importado, dar destino às linhas, confirmar pagamentos de boleto à mão na tela Boletos e **Anexar do PC** os comprovantes. Não funcionam: emitir boleto, buscar extrato, ver saldo, baixar comprovante do banco e enviar pagamentos. Para religar: no computador da ponte, abra o programa "Ponte C6" (ou confira se ele iniciou com o computador) e teste em **Sistema → Banco → Banco (C6) (ponte) → Testar conexão**. Se continuar fora, veja a tabela "Se der erro" do `LIGAR_C6.md` (Etapa 6).
 
 **8. Busquei o extrato duas vezes. Duplicou?**
 Não. Cada linha do banco tem um código único; o sistema só importa o que ainda não tinha e avisa "12 novas, 30 já estavam".

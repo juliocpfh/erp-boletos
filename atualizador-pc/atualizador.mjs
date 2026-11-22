@@ -136,7 +136,7 @@ async function lerJson(r, a) {
  */
 export async function atualizar(cfg, { buscar = fetch, hoje = hojeIso() } = {}) {
   const caminhoChave = path.join(cfg.pasta, ARQUIVO_CHAVE);
-  if (!fs.existsSync(caminhoChave)) throw new Error(`A pasta ${cfg.pasta} não é uma pasta de backup seguro (falta ${ARQUIVO_CHAVE}). Ligue o backup seguro no sistema (Dados e backup) nesta pasta primeiro.`);
+  if (!fs.existsSync(caminhoChave)) throw new Error(`A pasta ${cfg.pasta} não é uma pasta de backup seguro (falta ${ARQUIVO_CHAVE}). Ligue o backup seguro no sistema (Sistema) nesta pasta primeiro.`);
   const chave = JSON.parse(fs.readFileSync(caminhoChave, 'utf8'));
   if (chave.formato !== MAGICO) throw new Error(`${ARQUIVO_CHAVE} não é deste sistema.`);
   const a = acesso(cfg);

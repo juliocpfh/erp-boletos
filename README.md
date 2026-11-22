@@ -16,7 +16,7 @@ Não precisa instalar nada. O sistema abre no navegador, mas **os dados ficam nu
 
 ## Sem internet (arquivo único)
 
-Em **Dados e backup → Baixar a versão sem internet** você baixa `Administração de Imóveis.html`: o programa inteiro num único arquivo (código, componentes de Excel/ZIP/PDF e modelo da NF). Guarde no computador e abra com dois cliques no Chrome ou no Edge. Funciona sem internet e mesmo se o site sair do ar; os dados são os mesmos (escolha a mesma pasta). Quando o programa receber melhorias, baixe o arquivo de novo.
+Em **Sistema → Baixar a versão sem internet** você baixa `Administração de Imóveis.html`: o programa inteiro num único arquivo (código, componentes de Excel/ZIP/PDF e modelo da NF). Guarde no computador e abra com dois cliques no Chrome ou no Edge. Funciona sem internet e mesmo se o site sair do ar; os dados são os mesmos (escolha a mesma pasta). Quando o programa receber melhorias, baixe o arquivo de novo.
 
 O site e o arquivo único não dependem de nenhum outro serviço: os componentes de terceiros ficam em `docs/vendor/`.
 
@@ -27,14 +27,14 @@ O site e o arquivo único não dependem de nenhum outro serviço: os componentes
 | `imoveis-dados.json` | O banco de dados. Cada alteração é gravada na hora. |
 | `backups/` | Uma cópia por dia (últimos 30 dias) e uma cópia antes de cada importação. |
 | `arquivos/<Imóvel>/` | `Documentos do imóvel` (matrícula), `IPTU (guias)`, `Seguro (apólices)`, `Reformas`, `Anúncio` (fotos) e uma pasta por inquilino: `Nome (entrada a saída)`. |
-| `modelos/fatura-modelo.xlsx` | Opcional: modelo Excel da fatura enviado em Dados e backup. |
+| `modelos/fatura-modelo.xlsx` | Opcional: modelo Excel da fatura enviado em Sistema. |
 
-Em **Dados e backup** é possível baixar tudo (banco e anexos) em um ZIP e importar um ZIP em outra pasta.
+Em **Sistema** é possível baixar tudo (banco e anexos) em um ZIP e importar um ZIP em outra pasta.
 
 ## Mais de um computador ou usuário
 
 - Antes de gravar, o sistema relê o arquivo da pasta e aplica a alteração sobre a versão mais nova. A cada 30 segundos (e ao voltar para a janela) ele confere se alguém mudou os dados.
-- Se duas pessoas gravarem exatamente ao mesmo tempo em computadores diferentes, o OneDrive pode criar uma cópia em conflito (`imoveis-dados-NOME-PC.json`). O sistema avisa em Dados e backup.
+- Se duas pessoas gravarem exatamente ao mesmo tempo em computadores diferentes, o OneDrive pode criar uma cópia em conflito (`imoveis-dados-NOME-PC.json`). O sistema avisa em Sistema.
 - O login separa permissões (Administrador, Operador, Consulta) e registra quem alterou o quê no Histórico. Quem tem acesso à pasta consegue abrir o arquivo diretamente, então o login não substitui a proteção da pasta.
 
 ## Regras principais

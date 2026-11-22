@@ -86,7 +86,7 @@ test('contrato para assinar: conta da caução só com caução; saída antecipa
   assert.match(v, /até 08\/12\/2026 \(5 dias úteis\)/);
 });
 
-test('modelo editado em Dados e backup vale no lugar do padrão', () => {
+test('modelo editado em Sistema vale no lugar do padrão', () => {
   const { d, c } = base();
   d.modelos_email.push({ id: 1, chave: 'ficha_reprovada', assunto: 'Ficha – {imovel}', texto: 'Oi, {nome}.' });
   assert.equal(texto(d, 'ficha_reprovada', { contrato: c }).texto, `Oi, Maria.\n\n${FECHO}`);

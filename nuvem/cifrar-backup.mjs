@@ -1,7 +1,7 @@
 // Backup diário da nuvem cifrado com a chave pública do backup seguro do administrador (o mesmo formato de docs/js/backup-seguro.js:
 // cada arquivo leva uma chave AES-GCM nova, "embrulhada" com a chave pública RSA, e a chave privada cifrada pela senha do backup).
 // O servidor só tem a chave pública (e a privada já cifrada, que vai em todo arquivo): grava sem senha, mas só quem sabe a senha
-// do backup abre. Abre igual a um backup seguro (Backups da nuvem → Voltar para este dia, ou Dados e backup → Restaurar).
+// do backup abre. Abre igual a um backup seguro (Backups da nuvem → Voltar para este dia, ou Sistema → Restaurar).
 // tests/lgpd-nuvem.test.mjs confere que docs/js/backup-seguro.js (decifrar) abre o que sai daqui.
 
 export const MAGICO = 'IMOVEIS-BACKUP-SEGURO-1'; // igual a docs/js/backup-seguro.js

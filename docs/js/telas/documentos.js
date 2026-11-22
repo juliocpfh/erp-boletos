@@ -775,9 +775,9 @@ export function telaModelos() {
       ${opera() ? `${link(`#/modelo-contrato/${m.id}`, 'Editar')} ${botao('copiarModelo', 'Copiar', { id: m.id })}` : ''}
       ${opera() && m.padrao && MODELOS_PADRAO.some((x) => x.nome === m.padrao) ? botao('restaurarModelo', 'Voltar ao texto padrão', { id: m.id }, 'secundario pequeno', `Trocar o texto de "${m.nome}" pelo texto padrão? As alterações feitas nele se perdem.`) : ''}
       ${podeUsuario('admin') && m.id > 0 && K.modelosDe(d(), tipo).length > 1 ? botao('excluirModelo', '×', { id: m.id }, 'x-excluir', `Excluir o modelo "${m.nome}"?`) : ''}</td></tr>`;
-  return `<p class="suave"><a href="#/dados">← Dados e backup</a></p>
-    <h1>Modelos de contrato</h1>
-    ${Object.entries(TIPOS_MODELO).map(([tipo, titulo]) => `<div class="cartao"><div class="cabecalho"><h2>${titulo}</h2>${opera() ? link(`#/modelo-contrato/novo${tipo === 'contrato' ? '' : `?tipo=${tipo}`}`, NOVO_MODELO[tipo], 'botao secundario pequeno') : ''}</div>
+  return `<p class="suave"><a href="#/sistema-modelos">← Modelos de documentos</a></p>
+    <h1>Modelos de contrato e termos aditivos</h1>
+    ${Object.entries(TIPOS_MODELO).map(([tipo, titulo]) => `<div class="cartao" id="modelos-${tipo}"><div class="cabecalho"><h2>${titulo}</h2>${opera() ? link(`#/modelo-contrato/novo${tipo === 'contrato' ? '' : `?tipo=${tipo}`}`, NOVO_MODELO[tipo], 'botao secundario pequeno') : ''}</div>
       <table><tr><th>Modelo</th><th></th></tr>${K.modelosDe(d(), tipo).map((m) => linha(m, tipo)).join('')}</table></div>`).join('')}
     <p class="suave">Para gerar um contrato, abra o inquilino e clique em <b>Gerar contrato</b>; o termo aditivo, em <b>Gerar termo aditivo</b> (em "Termos aditivos"), escolhendo vencimento ou troca de inquilino.
       Edite à vontade: os modelos ficam guardados no banco de dados.</p>

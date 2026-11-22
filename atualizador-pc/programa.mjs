@@ -22,7 +22,7 @@ export const NOME_EXE = 'Administracao-de-Imoveis.exe';
 export const NOME_VBS = 'rodar-escondido.vbs';
 export const NOME_VBS_PASTA = 'abrir-pasta.vbs';
 /**
- * Botão "Abrir a pasta no Explorer" do sistema (Dados e backup → Backup seguro): o link `imoveis-pasta:abrir` chama este
+ * Botão "Abrir a pasta no Explorer" do sistema (Sistema → Backup seguro): o link `imoveis-pasta:abrir` chama este
  * programa, registrado por usuário (sem administrador) em HKCU\Software\Classes\imoveis-pasta. Segurança: o comando registrado
  * não leva o endereço (sem %1), o .vbs não repassa argumento nenhum e --abrir-pasta ignora o resto: um site qualquer só
  * consegue abrir a pasta da cópia aberta deste computador, nunca outro caminho nem outro comando.
@@ -388,7 +388,7 @@ Uso:
   ${NOME_EXE} --atualizar     atualiza agora: dados, versão PC, arquivos e o próprio programa (se saiu versão nova)
   ${NOME_EXE} --arquivos      atualiza agora só a pasta "Arquivos dos imoveis"
   ${NOME_EXE} --certificado   instala (ou troca) o certificado digital A1 da empresa (.pfx e a senha, guardados só aqui, cifrados)
-                              (o jeito normal é pelo sistema: Dados e backup → Anexar o certificado digital)
+                              (o jeito normal é pelo sistema: Sistema → Empresas → Anexar o certificado digital)
   ${NOME_EXE} --assinar       assina agora os documentos da fila (a tarefa faz isso a cada minuto, com o certificado instalado)
   ${NOME_EXE} --instalar      só copia o programa e cria as tarefas (20h, ao entrar e de hora em hora)
   ${NOME_EXE} --desinstalar   pergunta antes e desinstala: tarefas, botões do sistema, Aplicativos instalados e a pasta "programa"

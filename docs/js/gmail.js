@@ -41,7 +41,7 @@ export async function emailLigado() {
 }
 
 /**
- * Situação completa para a caixa "E-mail pelo Gmail" (Dados e backup), sempre perguntada de novo:
+ * Situação completa para a caixa "E-mail pelo Gmail" (Sistema → Comunicação E-mail), sempre perguntada de novo:
  * { ligado, remetente, origem ('conta' | 'segredo' | 'simulado' | null), conta, cliente, retorno, ligado_em?, ilegivel? }.
  * Sem a nuvem ou sem resposta: null.
  */

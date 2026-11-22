@@ -1,6 +1,6 @@
 // Modelos de e-mail de cada etapa (ficha, entrada, saída e informe anual do IR), aprovados pelo dono em 2026-11-12.
 // Mesma linguagem dos modelos de contrato: {campo} e [se condição]...[senão]...[fim] (também "[se não x]").
-// Os textos podem ser editados em Dados e backup → Modelos de e-mail (tabela modelos_email; sem registro, vale o padrão).
+// Os textos podem ser editados em Sistema → Comunicação E-mail → Modelos de e-mail (tabela modelos_email; sem registro, vale o padrão).
 // Revisão jurídica dos textos: documentacao/REVISAO_JURIDICA_CONTRATO.md (seção E).
 
 /**
@@ -371,7 +371,7 @@ export function atualizarTextoEmail(chave, texto) {
   return t;
 }
 
-/** Modelo de e-mail em uso: o gravado (Dados e backup → Modelos de e-mail) ou o padrão. */
+/** Modelo de e-mail em uso: o gravado (Sistema → Comunicação E-mail → Modelos de e-mail) ou o padrão. */
 export function modeloEmail(d, chave) {
   const padrao = MODELOS_EMAIL.find((m) => m.chave === chave);
   if (!padrao) return null;

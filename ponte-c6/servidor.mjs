@@ -133,8 +133,8 @@ export function validarConfig(cfg) {
     throw new Error('SIMULADO=1 não pode valer com uma conta em produção: ou tire SIMULADO, ou deixe as contas em sandbox (C6_<ID>_AMBIENTE=sandbox / contas/<id>/ambiente.txt).');
   }
   if (cfg.exposta && !cfg.expor) throw new Error(`PONTE_HOST=${cfg.host} expõe a ponte fora deste computador. Se for isso mesmo, defina EXPOR=1 e proteja o acesso (Cloudflare Access ou Tailscale); senão use 127.0.0.1.`);
-  if (String(cfg.senha).length < 20) throw new Error('PONTE_SENHA precisa ter pelo menos 20 caracteres (uma frase): defina no .env. A mesma senha vai no site, em Dados e backup → Banco (C6).');
-  if (SENHAS_DE_EXEMPLO.includes(String(cfg.senha).trim().toLowerCase())) throw new Error('PONTE_SENHA ainda é a senha do exemplo (publicada no GitHub): invente outra frase longa no .env. A mesma senha vai no site, em Dados e backup → Banco (C6).');
+  if (String(cfg.senha).length < 20) throw new Error('PONTE_SENHA precisa ter pelo menos 20 caracteres (uma frase): defina no .env. A mesma senha vai no site, em Sistema → Banco → Banco (C6).');
+  if (SENHAS_DE_EXEMPLO.includes(String(cfg.senha).trim().toLowerCase())) throw new Error('PONTE_SENHA ainda é a senha do exemplo (publicada no GitHub): invente outra frase longa no .env. A mesma senha vai no site, em Sistema → Banco → Banco (C6).');
   for (const c of Object.values(cfg.contas)) {
     if (c.webhook_token && !/^[0-9a-f]{32}$/i.test(c.webhook_token)) throw new Error(`C6_${c.id.toUpperCase()}_WEBHOOK_TOKEN precisa ter 32 caracteres hexadecimais (gere com: node -e "console.log(require('crypto').randomBytes(16).toString('hex'))").`);
     if (!(c.valor_maximo > 0)) throw new Error(`C6_${c.id.toUpperCase()}_VALOR_MAXIMO precisa ser um valor em reais maior que zero.`);
@@ -516,7 +516,7 @@ export function encargosSeguros(fIn, valor = null, vencimento = null) {
   if (valor !== null && fees[K.desconto_valor] !== undefined && fees[K.desconto_valor] >= valor) throw new ErroHttp(400, `O desconto (R$ ${fees[K.desconto_valor].toFixed(2)}) não pode ser igual ou maior que o valor do boleto (R$ ${Number(valor).toFixed(2)}).`);
   if (vencimento && fees[K.desconto_prazo] > 0) {
     const dias = Math.round((Date.parse(`${vencimento}T00:00:00Z`) - Date.parse(`${hojeBrasilia()}T00:00:00Z`)) / 86400000);
-    if (fees[K.desconto_prazo] > dias) throw new ErroHttp(400, `O desconto vale até ${fees[K.desconto_prazo]} dia(s) antes do vencimento, mas faltam só ${Math.max(dias, 0)} dia(s) até ele: o inquilino não teria como ganhar o desconto. Diminua os dias na conta (Dados e backup → Banco C6).`);
+    if (fees[K.desconto_prazo] > dias) throw new ErroHttp(400, `O desconto vale até ${fees[K.desconto_prazo]} dia(s) antes do vencimento, mas faltam só ${Math.max(dias, 0)} dia(s) até ele: o inquilino não teria como ganhar o desconto. Diminua os dias na conta (Sistema → Banco → Banco (C6)).`);
   }
   return Object.keys(fees).length ? fees : null;
 }
