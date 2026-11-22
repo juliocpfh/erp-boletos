@@ -324,7 +324,7 @@ test('telas raras carregadas só quando usadas (2ª rodada do mutirão de 16/11)
   };
   andar(path.join(raiz, 'app.js'));
   const sw = fs.readFileSync(path.join(raiz, '..', 'sw.js'), 'utf8');
-  const arquivos = { pessoa: 'telas/pessoa.js', regras: 'telas/regras-sistema.js', regua: 'telas/regua.js', nuvem: 'telas/nuvem.js', testePdfs: 'telas/teste-pdfs.js' }; // testePdfs: temporária (20/11/2026)
+  const arquivos = { pessoa: 'telas/pessoa.js', regras: 'telas/regras-sistema.js', regua: 'telas/regua.js', nuvem: 'telas/nuvem.js', certificado: 'telas/certificado.js', testePdfs: 'telas/teste-pdfs.js' }; // testePdfs: temporária (20/11/2026)
   assert.deepEqual(Object.keys(COMUM.PARTES_ADIADAS).sort(), Object.keys(arquivos).sort());
   for (const [qual, arq] of Object.entries(arquivos)) {
     assert.equal(vistos.has(path.join(raiz, arq)), false, `${arq} fica fora da abertura`);

@@ -67,7 +67,7 @@ Item que o dono mandar corrigir: uma PR para ele (ou para os pequenos juntos), c
 ## 6. [ ] Testes do dono (ele faz; anote o resultado aqui)
 
 - **Android:** o dono testa no celular dele: botões de 40 px, cartões das tabelas, teclado de números, "Baixar PDF" (deve sair igual ao do computador), visualizador de PDF, avisos presos no alto. Use a página do item 1 para os PDFs.
-- **Assinatura digital** (PRs #352–#355, 21/11): instalar o certificado A1 da ANK no programa do PC (`--certificado`), ligar a regra e conferir um PDF assinado no validar.iti.gov.br e no Adobe (passo a passo no topo de `PENDENCIAS_DO_DONO.md`).
+- **Assinatura digital** (PRs #352–#355, 21/11): instalar o certificado A1 da ANK (Dados e backup → Anexar o certificado digital, desde 22/11), ligar a regra e conferir um PDF assinado no validar.iti.gov.br e no Adobe (passo a passo no topo de `PENDENCIAS_DO_DONO.md`).
 - Não testados por ninguém (ficam anotados): emissão no C6 do boleto do saldo do cálculo final (o `?teste` não tem as contas do C6), iPhone de verdade, páginas públicas da ficha e dos contatos no endereço de verdade.
 
 ## 7. [ ] Limpeza (só no fim, depois de os itens 1 a 6 serem vistos)

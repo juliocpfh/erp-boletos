@@ -110,6 +110,22 @@ function caixaDesinstalarPrograma() {
 }
 
 /**
+ * "Anexar o certificado digital" (pedido do dono de 22/11): a janela (telas/certificado.js) entrega o .pfx e a senha direto
+ * ao programa deste computador; nada vai para a nuvem. Só o administrador, na nuvem, num computador com Windows.
+ */
+function caixaCertificado() {
+  if (!E.nuvem || !podeUsuario('admin')) return '';
+  // pelo mouse, não pela largura: com zoom de 200% ou janela estreita o computador continua sendo computador
+  const aqui = noWindows() && !window.matchMedia?.('(hover: none) and (pointer: coarse)').matches;
+  return `<div class="cartao" id="certificado-digital"><h2>Certificado digital da empresa</h2>
+    <p>Anexe o certificado A1 (.pfx ou .p12) e digite a senha: o programa do PC guarda os dois cifrados e passa a assinar os recibos e termos sozinho.</p>
+    ${aqui ? `<div class="acoes">${botao('anexarCertificado', 'Anexar o certificado digital', {}, '')}</div>
+      <p class="suave">Faça no computador que vai assinar, com o programa do PC instalado. O navegador pergunta se pode abrir o programa e falar com este computador: responda Abrir e Permitir. O arquivo e a senha não vão para a nuvem nem para os backups.</p>`
+    : '<p class="suave">Abra esta tela no computador com Windows que vai assinar (o certificado fica guardado só nele).</p>'}
+    <p class="suave">Assinatura digital: <b>${R.regra('assinatura_digital') ? 'ligada' : 'desligada'}</b> (${link('#/regras', 'Regras do sistema', '')}).</p></div>`;
+}
+
+/**
  * "Abrir a pasta no Explorer" (pedido do dono de 17/11): o navegador não abre pastas do computador, então o link chama o
  * endereço imoveis-pasta:, que o programa do PC registra no Windows (atualizador-pc/programa.mjs, PROTOCOLO) e que sempre
  * abre a pasta da cópia aberta configurada nele (o que vem no endereço é ignorado). Só no computador com Windows; o caminho
@@ -360,6 +376,7 @@ export async function telaDados(q = {}) {
       <p>${E.seguro && E.seguro.chave ? etiqueta(`Ligado neste computador · pasta ${E.seguro.dir.name}`, 'ok') : E.seguro && E.seguro.desconectado ? etiqueta('Desconectado: falta liberar a pasta', 'aviso') : etiqueta('Não configurado neste aparelho', 'neutra')}
       ${link('#/backup-seguro', 'Abrir o backup seguro')}</p>
       ${E.nuvem && E.backupEmpresa ? `<p>Na empresa: ${E.backupEmpresa.feito_em ? `${etiqueta(`última cópia em ${ultimaCopiaDaEmpresa()}`, B.avisoDaEmpresa(E.backupEmpresa, Date.now(), DIAS_BACKUP_EMPRESA) ? 'aviso' : 'ok')} <span class="suave">(basta um computador com o backup ligado; parado há mais de ${DIAS_BACKUP_EMPRESA} dias, o Painel avisa os administradores)</span>` : etiqueta('nenhum computador com o backup seguro ligado', 'aviso')}</p>` : ''}</div>` : ''}
+    ${caixaCertificado()}
     ${caixaConfigBanco()}
     ${caixaConfigBanco2()}
     <div class="cartao"><h2>Exportar tudo em ZIP</h2><p>Todos os dados e todos os anexos num único arquivo, ${E.nuvem ? 'para guardar. Para voltar com ele: descompacte numa pasta do computador e use "Avançado: substituir os dados da nuvem pelos de uma pasta" (acima); para voltar o banco a um dia, use os Backups da nuvem.' : 'para guardar ou levar para outro computador.'}${E.nuvem && !podeUsuario('admin') ? ' <span class="suave">Na nuvem, só o administrador baixa o ZIP com tudo (só o aparelho dele recebe as senhas de todos os usuários).</span>' : ''}</p>${zipPermitido() ? botao('exportar', 'Baixar ZIP com todos os dados', { status: 'Montando o ZIP…' }, '') : ''}<div id="progresso-exportar" aria-live="polite"></div>

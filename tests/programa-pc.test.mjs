@@ -402,12 +402,12 @@ test('--desinstalar com argumento a mais (o que viesse de um endereço) não des
     assert.deepEqual(r.perguntas, []);
   }
   assert.equal(pc.t.tarefas.size, 3);
-  assert.equal(pc.r.chaves.size, 9, 'nada saiu do registro');
+  assert.equal(pc.r.chaves.size, 13, 'nada saiu do registro (4 chaves de cada um dos três botões + Aplicativos)');
   const sim = await desinstalarNoTeste(pc, { args: ['--desinstalar', '--simular'] });
   assert.equal(sim.codigo, 0);
   assert.deepEqual(sim.perguntas, []);
   for (const c of P.CHAVES_DO_PROGRAMA) assert.ok(sim.texto.includes(`reg delete ${c} /f`), c);
   assert.match(sim.texto, /Não mexeria na pasta do backup seguro/);
-  assert.equal(pc.r.chaves.size, 9);
+  assert.equal(pc.r.chaves.size, 13);
   assert.equal(pc.t.tarefas.size, 3);
 });

@@ -178,48 +178,90 @@ export function inserirAssinatura({ pdf, inicio, fim }, der) {
 // ---------------------------------------------------------------------------
 // Windows: o certificado (.pfx) e a assinatura CMS
 // ---------------------------------------------------------------------------
+// O PowerShell 5.1 lê e escreve na página de código antiga (850): tudo vai e volta só em ASCII. Senha com acento vai como \uXXXX
+// no JSON e os textos do certificado voltam em base64 do UTF-8.
+const jsonAscii = (dados) => JSON.stringify(dados).replace(/[\u007f-\uffff]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
+const TEMPO_WINDOWS = 60000; // um PowerShell preso não pode segurar o programa para sempre
+const ERROS_CERTIFICADO = {
+  CERT_SENHA: 'A senha do certificado não confere.',
+  CERT_ARQUIVO: 'Este arquivo não é um certificado .pfx ou .p12 válido.',
+  CERT_SEM_CHAVE: 'O arquivo não tem a chave do certificado: use o .pfx completo (A1) que a certificadora entregou.',
+};
+
 function powershell(script, entrada) {
-  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script], { input: entrada, encoding: 'utf8', windowsHide: true, maxBuffer: 64 * 1024 * 1024 });
+  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script], { input: entrada, encoding: 'utf8', windowsHide: true, maxBuffer: 64 * 1024 * 1024, timeout: TEMPO_WINDOWS });
   if (r.error || r.status !== 0) {
+    const erro = /ERRO:([A-Za-z0-9+/=]+)$/.exec(String(r.stdout || '').trim());
+    if (erro) throw new Error(`O Windows não conseguiu usar o certificado (${Buffer.from(erro[1], 'base64').toString('utf8').replace(/\s+/g, ' ').trim().slice(0, 300)}).`);
+    if (r.error?.code === 'ETIMEDOUT') throw new Error('O Windows demorou demais para usar o certificado. Tente de novo.');
     const msg = String(r.stderr || r.error?.message || '').trim();
-    if (/senha|password|incorreta|incorrect/i.test(msg)) throw new Error('A senha do certificado não confere.');
+    const conhecido = ERROS_CERTIFICADO[String(r.stdout || '').trim()];
+    if (conhecido) throw new Error(conhecido);
     throw new Error(`O Windows não conseguiu usar o certificado (${msg.slice(0, 300)}).`);
   }
   return r.stdout.trim();
 }
 
 // carrega o .pfx (o certificado com a chave e a cadeia que vier junto) sem gravar a chave no Windows
-const PS_CERTIFICADO = `$j = [Console]::In.ReadToEnd() | ConvertFrom-Json; Add-Type -AssemblyName System.Security;
+const PS_CERTIFICADO = `trap { [Console]::Out.Write('ERRO:' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([string]$_.Exception.GetBaseException().Message))); exit 4 };
+$j = [Console]::In.ReadToEnd() | ConvertFrom-Json; Add-Type -AssemblyName System.Security;
 $col = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2Collection;
-$col.Import([Convert]::FromBase64String($j.pfx), $j.senha, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable);
+try { $col.Import([Convert]::FromBase64String($j.pfx), $j.senha, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable) }
+catch { if ($_.Exception.GetBaseException().HResult -eq -2147024810) { [Console]::Out.Write('CERT_SENHA') } else { [Console]::Out.Write('CERT_ARQUIVO') }; exit 3 };
 $cert = $col | Where-Object { $_.HasPrivateKey } | Select-Object -First 1;
-if (-not $cert) { throw 'O arquivo nao tem a chave privada do certificado.' }`;
+if (-not $cert) { [Console]::Out.Write('CERT_SEM_CHAVE'); exit 3 }`;
 
 /** Dados do certificado: { nome, cnpj, titular (o "CN" inteiro), validade (AAAA-MM-DD), emissor }. ``pfx``: Buffer ou base64. */
 export function dadosDoCertificado(pfx, senha) {
   const saida = powershell(`${PS_CERTIFICADO}
-[pscustomobject]@{ titular = $cert.GetNameInfo('SimpleName', $false); emissor = $cert.GetNameInfo('SimpleName', $true); validade = $cert.NotAfter.ToString('yyyy-MM-dd'); inicio = $cert.NotBefore.ToString('yyyy-MM-dd') } | ConvertTo-Json -Compress`,
-  JSON.stringify({ pfx: Buffer.isBuffer(pfx) ? pfx.toString('base64') : pfx, senha }));
-  const x = JSON.parse(saida);
+$info = [pscustomobject]@{ titular = $cert.GetNameInfo('SimpleName', $false); emissor = $cert.GetNameInfo('SimpleName', $true); validade = $cert.NotAfter.ToString('yyyy-MM-dd'); inicio = $cert.NotBefore.ToString('yyyy-MM-dd'); rsa = ($cert.PublicKey.Oid.Value -eq '1.2.840.113549.1.1.1'); usos = (@($cert.Extensions | Where-Object { $_ -is [System.Security.Cryptography.X509Certificates.X509KeyUsageExtension] } | ForEach-Object { [int]$_.KeyUsages }) + 0)[0] } | ConvertTo-Json -Compress;
+[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($info))`,
+  jsonAscii({ pfx: Buffer.isBuffer(pfx) ? pfx.toString('base64') : pfx, senha }));
+  const x = JSON.parse(Buffer.from(saida, 'base64').toString('utf8'));
   // e-CNPJ ICP-Brasil: "RAZAO SOCIAL:12345678000199"
   const [nome, numeros] = String(x.titular).split(':');
   const cnpj = /^\d{14}$/.test(numeros || '') ? numeros.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : '';
-  return { nome: (nome || x.titular).trim(), cnpj, titular: x.titular, emissor: x.emissor, validade: x.validade, inicio: x.inicio };
+  return { nome: (nome || x.titular).trim(), cnpj, titular: x.titular, emissor: x.emissor, validade: x.validade, inicio: x.inicio, rsa: x.rsa, usos: x.usos };
 }
 
-/** Assinatura CMS destacada (DER) de ``conteudo`` com o certificado: SHA-256, cadeia junto e a hora da assinatura. */
+const USOS_DE_ASSINATURA = 128 | 64; // assinatura digital | não repúdio
+
+/**
+ * Para instalar: os dados do certificado, depois de uma assinatura de prova. O que não consegue assinar é recusado na hora,
+ * na frente de quem instala, e não dias depois num recibo.
+ */
+export function conferirCertificado(pfx, senha) {
+  const d = dadosDoCertificado(pfx, senha);
+  if (!d.rsa) throw new Error('Este tipo de certificado não serve para assinar PDF aqui (a chave não é RSA). Use o e-CNPJ A1 da ICP-Brasil.');
+  if (d.usos && !(d.usos & USOS_DE_ASSINATURA)) throw new Error('Este certificado não serve para assinar documentos (é só para cifrar). Use o e-CNPJ A1.');
+  if (assinarCms(Buffer.from('assinatura de prova'), { pfx, senha }).length > ESPACO_ASSINATURA) throw new Error('A assinatura deste certificado é grande demais para o PDF.');
+  return d;
+}
+
+/**
+ * Assinatura CMS destacada (DER) de ``conteudo`` com o certificado: SHA-256, cadeia junto e a hora da assinatura. A cadeia é
+ * montada à mão (EndCertOnly + os certificados achados): com WholeChain o Windows se recusa a assinar quando não confia na
+ * raiz ou falta uma certificadora (achado nos testes de 22/11/2026). Quem confere a confiança é o validador (ITI, Adobe).
+ */
 export function assinarCms(conteudo, { pfx, senha, quando = new Date() }) {
   const b64 = powershell(`${PS_CERTIFICADO}
 $ci = New-Object System.Security.Cryptography.Pkcs.ContentInfo(,[Convert]::FromBase64String($j.conteudo));
 $cms = New-Object System.Security.Cryptography.Pkcs.SignedCms($ci, $true);
 $s = New-Object System.Security.Cryptography.Pkcs.CmsSigner($cert);
 $s.DigestAlgorithm = New-Object System.Security.Cryptography.Oid('2.16.840.1.101.3.4.2.1');
-$s.IncludeOption = [System.Security.Cryptography.X509Certificates.X509IncludeOption]::WholeChain;
-foreach ($c in $col) { if ($c.Thumbprint -ne $cert.Thumbprint) { [void]$s.Certificates.Add($c) } }
+$s.IncludeOption = [System.Security.Cryptography.X509Certificates.X509IncludeOption]::EndCertOnly;
+$cadeia = New-Object System.Security.Cryptography.X509Certificates.X509Chain;
+$cadeia.ChainPolicy.RevocationMode = [System.Security.Cryptography.X509Certificates.X509RevocationMode]::NoCheck;
+$cadeia.ChainPolicy.UrlRetrievalTimeout = [TimeSpan]::FromSeconds(5);
+[void]$cadeia.ChainPolicy.ExtraStore.AddRange($col);
+[void]$cadeia.Build($cert);
+$postos = @{}; $postos[$cert.Thumbprint] = $true;
+foreach ($c in (@($col) + @($cadeia.ChainElements | ForEach-Object { $_.Certificate }))) { if (-not $postos.ContainsKey($c.Thumbprint)) { $postos[$c.Thumbprint] = $true; [void]$s.Certificates.Add($c) } }
 [void]$s.SignedAttributes.Add((New-Object System.Security.Cryptography.Pkcs.Pkcs9SigningTime([DateTime]::Parse($j.quando).ToUniversalTime())));
 $cms.ComputeSignature($s, $true);
+$cms.CheckSignature($true);
 [Convert]::ToBase64String($cms.Encode())`,
-  JSON.stringify({ pfx: Buffer.isBuffer(pfx) ? pfx.toString('base64') : pfx, senha, conteudo: Buffer.from(conteudo).toString('base64'), quando: quando.toISOString() }));
+  jsonAscii({ pfx: Buffer.isBuffer(pfx) ? pfx.toString('base64') : pfx, senha, conteudo: Buffer.from(conteudo).toString('base64'), quando: quando.toISOString() }));
   return Buffer.from(b64, 'base64');
 }
 
