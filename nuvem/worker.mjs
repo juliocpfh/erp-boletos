@@ -27,6 +27,7 @@ import { crachaValido, ERRO_ENTRAR, hashDoCracha } from './aparelhos.mjs';
 import { avisar } from './avisos-ficha.mjs';
 import { SO_SE_NOVO, atenderEquipe, atenderFicha, lerAteLimite } from './ficha-publica.mjs';
 import { atenderEquipeContatos } from './contatos-publico.mjs';
+import { ErroAssinatura, atenderAparelhoAssinaturas, atenderEquipeAssinaturas } from './assinaturas.mjs';
 import {
   ErroEmail, MAX_BYTES_ANEXOS, MAX_PEDIDO, cifrarToken, clienteConfigurado, contaGuardada, decifrarToken, enderecoDeRetorno, enviarEmail,
   esquecerToken, estadoEmail, hashHex, pkce, revogarToken, sorteado, trocarCodigo, urlDeAutorizacao, validarEnvio,
@@ -407,7 +408,8 @@ async function lerRecurso(env, rota, email, url, request = null) {
 // ---------------------------------------------------------------------------
 // Programa do PC (crachá do aparelho, aparelhos.mjs). O Access deixa passar /api/aparelho/ sem login (política Bypass só nesse
 // caminho, nuvem/README.md); aqui nada passa sem crachá, exceto a entrada com e-mail e senha (limite de tentativas no cofre).
-// O crachá só lê. As outras rotas continuam exigindo o login do Access mesmo que o Bypass fique largo demais por engano.
+// O crachá só lê, com UMA exceção: devolver o PDF assinado da fila da assinatura digital (assinaturas.mjs, 21/11/2026). As outras
+// rotas continuam exigindo o login do Access mesmo que o Bypass fique largo demais por engano.
 // ---------------------------------------------------------------------------
 /** A versão PC que o GitHub gera a cada merge na main (repositório público): o Worker busca lá, o atualizador não passa pelo Access. */
 export const URL_PROGRAMA = 'https://raw.githubusercontent.com/juliocpfh/erp-boletos/main/docs/offline/administracao-imoveis.html';
@@ -481,6 +483,14 @@ async function atenderAparelho(request, env, rota, url, buscar, ctx = null) {
       method: 'POST', body: JSON.stringify({ email: pedido.email, senha: pedido.senha, computador: pedido.computador }),
       headers: { 'Content-Type': 'application/json', 'X-Ip': request.headers.get('CF-Connecting-IP') || '' },
     }));
+  }
+  // fila da assinatura digital: o programa do PC busca os pendentes e devolve o PDF assinado (a única gravação do crachá)
+  if (rota === 'assinaturas' || rota.startsWith('assinaturas/')) {
+    const email = await conferirCracha(request, env);
+    let r;
+    try { r = await atenderAparelhoAssinaturas(request, env, rota.slice('assinaturas/'.length), email); } catch (e) { r = respostaDoErro(e); }
+    if (m !== 'GET' || rota !== 'assinaturas') await anotarAcesso(env, ctx, request, rota, email, r, 'pc');
+    return r;
   }
   if (m !== 'GET' && m !== 'HEAD') throw new ErroHttp(405, 'O crachá do aparelho só lê: para gravar, use o site.');
   const email = await conferirCracha(request, env);
@@ -656,6 +666,7 @@ export async function atender(request, env, buscar = fetch, ctx = null) {
 function respostaDoErro(e) {
   if (e instanceof ErroHttp) return json(e.status, { erro: e.message, ...e.extra });
   if (e instanceof ErroEmail) return json(e.status, { erro: e.message });
+  if (e instanceof ErroAssinatura) return json(e.status, { erro: e.message });
   console.error(e);
   return json(500, { erro: 'Erro no servidor da nuvem.' });
 }
@@ -684,6 +695,9 @@ async function atenderComLogin(request, env, rota, email, url, buscar, ctx) {
     if (m !== 'GET') conferirGravacao(request, env);
     await exigirPapel(env, email, 'operador');
     return await atenderEquipeContatos(request, env, rota.slice(9), email);
+  }
+  if (rota === 'assinaturas' || rota.startsWith('assinaturas/')) { // fila da assinatura digital (assinaturas.mjs)
+    return await atenderEquipeAssinaturas(request, env, rota.slice('assinaturas/'.length), email, { exigir: (nivel) => exigirPapel(env, email, nivel), conferirGravacao: () => conferirGravacao(request, env) });
   }
   if (rota === 'apagar' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await apagarPasta(request, env, email); }
   if (rota === 'mover' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await mover(request, env); }
