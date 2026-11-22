@@ -301,7 +301,7 @@ SÓ EM CASO DE DESASTRE (dados da nuvem perdidos, ex.: conta da nuvem perdida; a
 2. Clique em "restaurar um backup seguro", escolha a cópia mais recente de ${PASTA_DIARIO}/ (ou um completo),
    digite a senha do backup e mande abrir numa pasta nova do computador.
 3. O sistema abre inteiro, com os dados daquela cópia. Pode trabalhar normalmente.
-4. Para levar de volta a uma nuvem nova: Dados e backup -> "Substituir os dados da nuvem pelos de uma pasta".
+4. Para levar de volta a uma nuvem nova: Sistema -> "Substituir os dados da nuvem pelos de uma pasta".
 
 Não mova nem renomeie os arquivos desta pasta. chave-do-backup.json é a chave: sem ele e sem a senha, nada abre.
 `;

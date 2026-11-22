@@ -254,7 +254,7 @@ export async function conectarSeguro(pedir = false) {
     E.seguro = { dir: h, desconectado: true, falhou: true };
     E.seguroErro = e.message;
     logarErro(e.causa || e);
-    if (falhasDaChave === AVISAR_DEPOIS_DE && podeUsuario('admin')) aviso(`Backup seguro: ${e.message} Confira a pasta segura em Dados e backup.`, 'aviso');
+    if (falhasDaChave === AVISAR_DEPOIS_DE && podeUsuario('admin')) aviso(`Backup seguro: ${e.message} Confira a pasta segura em Sistema.`, 'aviso');
     return false;
   }
   if (falhasDaChave) E.seguroErro = '';
@@ -402,7 +402,7 @@ function aoMudarNuvem(externo) {
   E.anexos?.listas?.forEach((l) => { l.em = 0; }); // outro aparelho pode ter anexado ou apagado arquivos
   if (E.anexos) E.anexos.tudo = null;
   if (!E.usuario) return mostrar();
-  // só deixa de redesenhar com mudança não salva num formulário (tela com formulário fixo, como Dados e backup, se atualiza)
+  // só deixa de redesenhar com mudança não salva num formulário (tela com formulário fixo, como Sistema, se atualiza)
   if (formularioAlterado()) aviso('Chegaram mudanças de outro aparelho. Ao salvar, sua alteração será aplicada sobre a versão nova.', 'info');
   else mostrar();
 }
@@ -473,7 +473,7 @@ export function aviso(texto, tipo = 'ok') {
   if (tipo !== 'erro') agendarFechar(m.id, tipo === 'aviso' ? 15000 : 10000);
 }
 /**
- * Espaço logo abaixo de um botão para o andamento e o resultado da ação (pedido do dono de 17/11, Dados e backup): o botão
+ * Espaço logo abaixo de um botão para o andamento e o resultado da ação (pedido do dono de 17/11, Sistema): o botão
  * com ``data-status`` (ex.: ``botao('conferirArquivos', 'Conferir', { status: 'Conferindo os arquivos…' })``) mostra esse
  * texto ali enquanto roda, e o erro sai ali também (em vez da janela de erro). A ação escreve o andamento e o resultado com
  * ``statusDoBotao(el).mostrar(texto, tipo)`` (tipo: info, ok, aviso, erro). Tela desenhada de novo no meio (``mostrar()``):
@@ -953,7 +953,7 @@ const MENU = [
   ['#/', 'Painel', '^$|^fechamento|^pendencias|^alertas'], ['#/inquilinos', 'Inquilinos', '^inquilino|^contrato|^vistoria|^solicitacoes|^notificac|^ficha|^comunicacoes|^aceite|^aditivo'],
   ['#/reajustes', 'Reajustes', 'reajustes'], ['#/cobrancas', 'Boletos', 'cobranca|^regua'], ['#/faturas', 'NF', 'fatura'], ['#/banco', 'Banco', '^banco'],
   ['#/imoveis', 'Imóveis', '^imove|^novo|^editar|^iptu$|^modelo-vistoria'], ['#/financeiro', 'Financeiro', '^financeiro|^gestao|^resultados|^liquido|^contas|^impostos|^inadimplencia|^garantias'],
-  ['#/dados', 'Dados e backup', '^dados|^historico|^modelos?-contrato|^modelos?-email|^regras|^backup|^empresas|^acessos|^conflitos|^pessoa|^arquivo-impresso|^pasta-'],
+  ['#/dados', 'Sistema', '^dados|^sistema-|^lgpd|^modelo-email|^historico|^modelos?-contrato|^modelos?-email|^regras|^backup|^empresas|^acessos|^conflitos|^pessoa|^arquivo-impresso|^pasta-'],
 ];
 /** Formulário (#/novo/<tabela>, #/editar/<tabela>/id) → item do menu que acende (antes todos acendiam "Imóveis"). */
 const MENU_DO_FORMULARIO = {

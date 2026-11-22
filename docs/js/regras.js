@@ -57,7 +57,7 @@ export const LISTAS = {
 // Endereço e senha da ponte NÃO ficam aqui (o JSON é compartilhado na pasta/OneDrive): ficam no navegador (armazenamento.js → lembrarPonte).
 export const CONFIG_BANCO_PADRAO = { ativo: false, provedor: 'c6', conta_padrao_id: '', modo_conta_boleto: 'padrao', contas: [] };
 
-/** Qual conta emite os boletos (Empresas): sempre a padrão (ANK, por orientação do contador) ou escolher boleto a boleto. */
+/** Qual conta emite os boletos (Sistema → Banco): sempre a padrão (ANK, por orientação do contador) ou escolher boleto a boleto. */
 export const MODOS_CONTA_BOLETO = { padrao: 'Sempre pela empresa padrão', escolher: 'Escolher a empresa boleto a boleto' };
 
 /**
@@ -104,7 +104,7 @@ export function normalizar(d) {
   d.config_banco.contas = (Array.isArray(d.config_banco.contas) ? d.config_banco.contas : []).map((x) => ({ ...CONTA_BANCO_PADRAO, ...x,
     notificar: { ...CONTA_BANCO_PADRAO.notificar, ...((x && x.notificar) || {}) }, negativacao: { ...CONTA_BANCO_PADRAO.negativacao, ...((x && x.negativacao) || {}) } }));
   for (const cb of d.cobrancas) if (cb.banco === undefined) cb.banco = null;
-  // conta padrão dos boletos sem escolha: era a de identificador "ank" (2026-11-05); passou a ser só a escolhida em Empresas
+  // conta padrão dos boletos sem escolha: era a de identificador "ank" (2026-11-05); passou a ser só a escolhida em Sistema → Banco
   if (!d.config_banco.conta_padrao_id && d.config_banco.contas.some((x) => x.id === 'ank')) d.config_banco.conta_padrao_id = 'ank';
   // o que era fixo da ANK no código (e-mail, assinaturas, conta da caução, cidade, Copel/Sanepar) passou ao cadastro da empresa
   for (const e of d.emitentes) Object.assign(e, camposAntigosDaEmpresa(e));
@@ -4888,7 +4888,7 @@ export function guardarTaxasPoupanca(d, novas, usuario) {
 
 const tamanhosVistos = new WeakMap();
 /**
- * Tamanho dos dados (Dados e backup, pedido do dono de 17/11): bytes do banco inteiro como fica gravado (JSON), cada tabela
+ * Tamanho dos dados (Sistema, pedido do dono de 17/11): bytes do banco inteiro como fica gravado (JSON), cada tabela
  * com o nº de registros e os bytes (da maior para a menor em registros), as linhas do histórico e os anexos ligados a
  * lançamentos (``arquivosReferenciados``; os anexados à mão nas caixas de arquivos não entram). Calculado uma vez por banco
  * (cada gravação monta outro objeto). Ex.: { bytes: 2.411.520, historico: { registros: 5.200, bytes: 1.300.000 },
@@ -5581,8 +5581,8 @@ export function bancoAtivo(d) {
 /** Por que os botões do banco estão desabilitados (texto do ``title``); vazio quando a configuração compartilhada está pronta. */
 export function motivoBancoInativo(d) {
   const cfg = configBanco(d);
-  if (!cfg.contas.length) return 'Aguardando as chaves de acesso do C6: cadastre as contas em Dados e backup → Banco (C6)';
-  if (!cfg.ativo) return 'Integração com o C6 desligada: ative em Dados e backup → Banco (C6)';
+  if (!cfg.contas.length) return 'Aguardando as chaves de acesso do C6: cadastre as contas em Sistema → Banco → Banco (C6)';
+  if (!cfg.ativo) return 'Integração com o C6 desligada: ative em Sistema → Banco → Banco (C6)';
   return '';
 }
 
@@ -5638,7 +5638,7 @@ export function salvarContaBanco(d, dados, usuario) {
     tipo_desconto: tipoDesconto, desconto_dias_antes: diasAntes, desconto_conferido: descontoConferido, notificar,
     negativacao: { ativa: dados.negativacao_ativa === undefined ? (antes ? !!antes.negativacao.ativa : false) : marcado(dados.negativacao_ativa), dias_atraso: diasNeg } };
   cfg.contas = antes ? cfg.contas.map((x) => (x.id === id ? conta : x)) : [...cfg.contas, conta];
-  // a primeira conta vira a padrão (a escolha muda em Empresas → Emissão de boletos)
+  // a primeira conta vira a padrão (a escolha muda em Sistema → Banco → Emissão de boletos)
   if (!cfg.conta_padrao_id) cfg.conta_padrao_id = id;
   d.config_banco = cfg;
   registrar(d, usuario, antes ? 'Alteração' : 'Inclusão', 'banco', null, `Conta bancária "${conta.apelido}" (${id}) ${antes ? 'alterada' : 'incluída'} na integração C6`, { conta: { de: antes, para: conta } });
@@ -5659,7 +5659,7 @@ export function excluirContaBanco(d, contaId, usuario) {
 
 /**
  * Conta padrão dos boletos (DECISOES.md 2026-11-05: por orientação do contador os boletos saem pela ANK e a JCK recebe o repasse
- * depois): a escolhida em Empresas (``conta_padrao_id``); sem escolha, a primeira. As outras contas ficam para extrato, comprovantes e pagamentos.
+ * depois): a escolhida em Sistema → Banco (``conta_padrao_id``); sem escolha, a primeira. As outras contas ficam para extrato, comprovantes e pagamentos.
  */
 export function contaEmissora(d) {
   const cfg = configBanco(d);
@@ -5873,7 +5873,7 @@ export function encargosDoBoletoC6(d, cb, conta, b = dadosBoleto(d, cb)) {
     if (b.desconto >= b.valor) throw new C.ErroUsuario(`O desconto do boleto de ${c.inquilino_nome} (${C.reais(b.desconto)}) não pode ser igual ou maior que o valor do boleto (${C.reais(b.valor)}).`);
     // trava combinada com o dono (16/11/2026): o tipo do desconto (VALUE_PER_DAY = "valor por dia de antecipação" na documentação)
     // pode virar um desconto de R$ 135 POR DIA; em produção só depois de um boleto de teste no sandbox mostrar o desconto certo
-    if (!descontoLiberado(conta)) throw new C.ErroUsuario(`O boleto de ${c.inquilino_nome} (${C.compBr(cb.competencia)}) não foi ao banco: a conta ${conta.apelido || conta.id} está em produção e o tipo do desconto de pontualidade ainda não foi conferido num boleto de teste. Emita um boleto no sandbox, confira no PDF que o desconto sai de ${C.reais(b.desconto)} no total (e não por dia) e marque "Conferi o desconto no boleto de teste" na conta (Dados e backup → Banco (C6)).`);
+    if (!descontoLiberado(conta)) throw new C.ErroUsuario(`O boleto de ${c.inquilino_nome} (${C.compBr(cb.competencia)}) não foi ao banco: a conta ${conta.apelido || conta.id} está em produção e o tipo do desconto de pontualidade ainda não foi conferido num boleto de teste. Emita um boleto no sandbox, confira no PDF que o desconto sai de ${C.reais(b.desconto)} no total (e não por dia) e marque "Conferi o desconto no boleto de teste" na conta (Sistema → Banco → Banco (C6)).`);
     Object.assign(fees, { [K.desconto_tipo]: conta.tipo_desconto || CONTA_BANCO_PADRAO.tipo_desconto, [K.desconto_valor]: centavosParaReais(b.desconto), [K.desconto_prazo]: Number(conta.desconto_dias_antes) || 0 });
   }
   return fees;
@@ -6049,7 +6049,7 @@ export function registrarNegativacao(d, cbId, resposta, usuario, dias) {
   if (!cb.banco || cb.banco.situacao !== 'emitido') throw new Error('Só um boleto emitido e em aberto no banco pode ser negativado.');
   if (aguardandoCredito(cb) || cb.data_pagamento) throw new C.ErroUsuario('Este boleto já foi pago (o banco ainda confirma o crédito, ou o pagamento já está registrado aqui): não pode ser negativado.');
   const conta = contaBanco(d, cb.banco.conta_id);
-  if (!conta || !conta.negativacao.ativa) throw new Error('A negativação está desligada nesta conta (Dados e backup → Banco (C6)).');
+  if (!conta || !conta.negativacao.ativa) throw new Error('A negativação está desligada nesta conta (Sistema → Banco → Banco (C6)).');
   const r = resposta || {};
   const n = normalizarRespostaC6(r).negativacao || { situacao: r[M.RESPOSTA.negativacao_situacao] || null, data: r[M.RESPOSTA.negativacao_data] || null, pode_cancelar: null };
   const banco = { ...cb.banco, negativacao: { situacao: n.situacao || M.STATUS_NEGATIVACAO.agendada, data: n.data || null, dias_atraso: Number(dias) || null, pode_cancelar: n.pode_cancelar ?? true, agendada_em: new Date().toISOString(), cancelada_em: null } };
@@ -8436,7 +8436,7 @@ export function declaracaoAnual(d, contratoId, ano) {
 }
 
 // --------------------------------------------------------------------------
-// Regras do sistema escolhidas pelo administrador (definições e padrão em config-regras.js; tela em Dados e backup → Regras)
+// Regras do sistema escolhidas pelo administrador (definições e padrão em config-regras.js; tela em Sistema → Regras)
 // --------------------------------------------------------------------------
 export { regra, regrasDe, PADRAO_SISTEMA, DEFINICOES_REGRAS, GRUPOS_REGRAS } from './config-regras.js';
 

@@ -251,8 +251,8 @@ export const CONTRATO = [
   // "Ativo" não é mais campo: o inquilino fica inativo pela saída
   campo('imovel_id', 'Imóvel', 'opcao', { opcoes: [], soNovo: true, obrig: true, ajuda: 'Escolha o imóvel deste inquilino' }),
   campo('gerar_nf', 'Emite NF (desmarcado: boleto de controle)', 'simnao', { padrao: true, ajuda: 'Boleto de controle: o pagamento é controlado (em dia ou atrasado), mas não gera NF nem entra nas somas dos boletos e nos resultados' }),
-  // regras especiais (pedido do dono de 18/11/2026): só aparece quando existe alguma (Dados e backup → Regras do sistema)
-  campo('perfil_regras_id', 'Regras deste contrato', 'opcao', { opcoes: [], vazio: 'Regras do sistema', ajuda: 'Regras do sistema (as de todos) ou uma regra especial criada em Dados e backup → Regras do sistema' }),
+  // regras especiais (pedido do dono de 18/11/2026): só aparece quando existe alguma (Sistema → Regras do sistema)
+  campo('perfil_regras_id', 'Regras deste contrato', 'opcao', { opcoes: [], vazio: 'Regras do sistema', ajuda: 'Regras do sistema (as de todos) ou uma regra especial criada em Sistema → Regras do sistema' }),
   secao('Inquilino (responsável pelo contrato)'),
   // ordem pedida: tipo, documento e RG/inscrição estadual na mesma linha; depois nome, contatos e, numa linha nova, o endereço
   campo('inquilino_tipo', 'Tipo', 'opcao', { obrig: true, padrao: 'Pessoa física', opcoes: ['Pessoa física', 'Pessoa jurídica (empresa)'] }),
@@ -270,7 +270,7 @@ export const CONTRATO = [
   CEP_DA_PESSOA('inquilino_'),
   campo('inquilino_endereco', 'Endereço (residência, comercial ou sede da empresa)', 'texto', { largo: true }),
   QUEBRA,
-  campo('notificacao_banco', 'Avisos do banco (C6) sobre o boleto por e-mail/SMS', 'opcao', { padrao: 'Usar o padrão da conta', opcoes: ['Usar o padrão da conta', 'Não notificar', 'Escolher'], ajuda: 'O banco avisa o inquilino do boleto. O padrão é o da conta, em Dados e backup' }),
+  campo('notificacao_banco', 'Avisos do banco (C6) sobre o boleto por e-mail/SMS', 'opcao', { padrao: 'Usar o padrão da conta', opcoes: ['Usar o padrão da conta', 'Não notificar', 'Escolher'], ajuda: 'O banco avisa o inquilino do boleto. O padrão é o da conta, em Sistema → Banco' }),
   campo('notif_email', 'Por e-mail', 'simnao', { ...quando('notificacao_banco', 'Escolher'), padrao: true }),
   campo('notif_sms', 'Por SMS', 'simnao', { ...quando('notificacao_banco', 'Escolher'), padrao: true }),
   campo('notif_emissao', 'Na emissão', 'simnao', { ...quando('notificacao_banco', 'Escolher'), padrao: true }),

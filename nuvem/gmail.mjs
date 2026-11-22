@@ -1,6 +1,6 @@
 // Envio de e-mail pela conta Gmail da empresa (Gmail API, escopo gmail.send), chamado pelo Worker (rotas /api/email/…).
 // Monta a mensagem (MIME) aqui mesmo, sem bibliotecas: só fetch, btoa, TextEncoder e WebCrypto (roda no Worker e no Node 22).
-// Ligar: botão "Conectar o Gmail" (Dados e backup), fluxo OAuth 2.0 de aplicativo da Web com PKCE. O Worker troca o código pelo
+// Ligar: botão "Conectar o Gmail" (Sistema → Comunicação E-mail), fluxo OAuth 2.0 de aplicativo da Web com PKCE. O Worker troca o código pelo
 // refresh token e o guarda CIFRADO no cofre (AES-GCM, chave tirada do GMAIL_CLIENT_SECRET por HKDF; tabela própria em
 // gmail-conta.mjs): nunca no JSON do banco nem no navegador. Segredos do Worker: GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET,
 // GMAIL_REMETENTE e GMAIL_NOME (opcionais: sem remetente, sai pela própria conta ligada), GMAIL_CCO (opcional).
@@ -366,7 +366,7 @@ export async function tokenDeAcesso(env, buscar = fetch, agora = Date.now(), ref
   } catch { throw semRede(); }
   const dados = await r.json().catch(() => ({}));
   if (!r.ok || !dados.access_token) {
-    if (dados.error === 'invalid_grant') throw new ErroEmail(503, 'A autorização do Gmail venceu ou foi retirada. O administrador precisa clicar em "Conectar o Gmail" de novo (Dados e backup → E-mail pelo Gmail).');
+    if (dados.error === 'invalid_grant') throw new ErroEmail(503, 'A autorização do Gmail venceu ou foi retirada. O administrador precisa clicar em "Conectar o Gmail" de novo (Sistema → Comunicação E-mail → E-mail pelo Gmail).');
     if (dados.error === 'invalid_client' || dados.error === 'unauthorized_client') throw new ErroEmail(503, 'O código do aplicativo do Google (GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET) está errado.');
     throw new ErroEmail(502, 'O Google não liberou o envio agora. Tente de novo daqui a pouco.');
   }

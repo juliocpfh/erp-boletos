@@ -207,7 +207,7 @@ export function telaImpostos(comp) {
         ${x.guias.map((g) => guiaLinha(x.empresa, g)).join('')}
         <tr class="total"><td colspan="3">Total a pagar no mês${meses[2] === comp ? '' : ' (IRPJ e CSLL ainda parciais)'}</td><td class="n">${reais(x.guias.reduce((t, g) => t + (g.abaixoDoMinimo ? 0 : g.aPagar), 0))}</td>
           <td>${contadorNoMes(x.guias).length ? reais(contadorNoMes(x.guias).reduce((t, g) => t + g.contador.valor, 0)) : ''}</td><td></td></tr></table></div>`).join('')
-      || '<div class="cartao"><p class="suave">Nenhuma empresa cadastrada. Cadastre em Dados e backup → Empresas.</p></div>'}`;
+      || '<div class="cartao"><p class="suave">Nenhuma empresa cadastrada. Cadastre em Sistema → Empresas.</p></div>'}`;
 }
 
 /** Período da tela (de/até do endereço; padrão: últimos 12 meses) e os atalhos de período para a rota ``base``. */

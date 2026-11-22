@@ -1,5 +1,5 @@
 // E-mails por etapa: botão "E-mail" nas etapas da ficha, da entrada e da saída (e no informe anual do IR), a janela com o
-// texto preenchido (Copiar texto · Abrir no Gmail · Enviar agora) e a tela de edição dos modelos (Dados e backup).
+// texto preenchido (Copiar texto · Abrir no Gmail · Enviar agora) e a tela de edição dos modelos (Sistema → Comunicação E-mail).
 // Modelos e preenchimento: modelos-email.js e email-dados.js. Envio direto: gmail.js (Worker, só na nuvem com o Gmail ligado).
 import { alterar, aviso, baixar, confirmar, E, ir, login, mostrar, podeUsuario, voltarFecha } from '../app.js';
 import * as S from '../armazenamento.js';
@@ -254,7 +254,7 @@ async function janelaEmail(chave, alvo) {
   dlg.showModal();
 }
 
-/** Aviso da volta do Google (#/dados?gmail=…, nuvem/worker.mjs AVISOS_VOLTA_GMAIL). */
+/** Aviso da volta do Google (#/sistema-email?gmail=…, nuvem/worker.mjs AVISOS_VOLTA_GMAIL). */
 const VOLTA_GMAIL = {
   ligado: ['ok', 'Gmail conectado. Faça um teste: abra o e-mail de uma etapa, ponha o seu próprio e-mail e clique em <b>Enviar agora</b>; ele aparece em "Enviados" no Gmail.'],
   cancelado: ['aviso', 'Você cancelou na tela do Google: nada foi ligado.'],
@@ -267,7 +267,7 @@ const VOLTA_GMAIL = {
 };
 
 /**
- * Caixa "E-mail pelo Gmail" (Dados e backup, só administrador): situação, Conectar o Gmail / Desconectar e o endereço de
+ * Caixa "E-mail pelo Gmail" (Sistema → Comunicação E-mail, só administrador): situação, Conectar o Gmail / Desconectar e o endereço de
  * retorno para colar no Google Cloud. `volta`: o código que o Worker manda na volta do Google (?gmail=…).
  */
 export async function caixaGmailHtml(volta = '') {
@@ -313,7 +313,7 @@ export const ACOES_EMAILS = {
     const r = await desconectarGmail();
     aviso(r.segredo_antigo ? 'Gmail desconectado. Atenção: o jeito antigo ainda está guardado na nuvem e continua enviando até o técnico apagá-lo (para ele: segredo GMAIL_REFRESH_TOKEN no Cloudflare).'
       : r.havia && !r.revogado ? 'Gmail desconectado aqui. O Google não confirmou a retirada da permissão: confira em Conta do Google → Segurança → Apps com acesso.' : 'Gmail desconectado.', r.segredo_antigo || (r.havia && !r.revogado) ? 'aviso' : 'ok');
-    if (/[?&]gmail=/.test(window.location.hash)) ir('#/dados'); else await mostrar();
+    if (/[?&]gmail=/.test(window.location.hash)) ir('#/sistema-email'); else await mostrar();
   },
 
   async copiarRetornoGmail() {
@@ -377,7 +377,7 @@ export function telaModelosEmail() {
   const etapas = [...new Set(MODELOS_EMAIL.map((m) => m.etapa))];
   const linha = (p) => { const m = modeloEmail(d(), p.chave); return `<tr><td><b>${esc(m.nome)}</b>${m.editado ? ' <span class="suave">(editado)</span>' : ''}<br><span class="suave">${esc(m.assunto)}</span></td><td class="nw">${esc(m.etapa)}</td>
     <td class="n nw">${opera() ? link(`#/modelo-email/${m.chave}`, 'Editar') : ''} ${opera() && m.editado ? botao('restaurarModeloEmail', 'Voltar ao texto padrão', { chave: m.chave }, 'secundario pequeno', `Trocar o texto de "${m.nome}" pelo padrão? As alterações se perdem.`) : ''}</td></tr>`; };
-  return `<p class="suave"><a href="#/dados">← Dados e backup</a></p>
+  return `<p class="suave"><a href="#/sistema-email">← Comunicação E-mail</a></p>
     <div class="cabecalho"><h1>Modelos de e-mail</h1>${botao('baixarModelosEmail', 'Baixar todos (TXT)', {}, 'secundario pequeno')}</div>
     <p class="suave">Um e-mail para cada etapa da ficha, da entrada e da saída do inquilino, a régua de cobrança (lembretes antes e no dia do vencimento, boleto em atraso), as notificações ao inquilino, o novo valor do aluguel, os termos aditivos e o informe anual do Imposto de Renda. O botão <b>✉ E-mail</b> de cada etapa abre o texto já preenchido para copiar, abrir no Gmail ou enviar.</p>
     <div class="cartao"><table><tr><th>E-mail</th><th>Etapa</th><th></th></tr>${etapas.map((e) => MODELOS_EMAIL.filter((m) => m.etapa === e).map(linha).join('')).join('')}</table></div>${AJUDA}`;

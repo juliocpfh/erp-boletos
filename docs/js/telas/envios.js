@@ -110,8 +110,8 @@ export const FORMULARIOS = {
     if (f.get('destino') !== 'pasta') {
       baixar(blob, `backup-restaurado-${info.tipo === 'completo' ? 'completo' : 'banco'}-${data}.zip`);
       // na nuvem não existe "Importar ZIP": o caminho é abrir numa pasta do computador e substituir os dados da nuvem (ou Backups da nuvem)
-      aviso(E.nuvem ? `Backup de ${C.dataHoraBr(info.criado_em)} baixado como ZIP (para guardar). Para voltar os dados da nuvem a esse dia: use "Backups da nuvem" em Dados e backup ou, no computador (Chrome ou Edge), abra o backup numa pasta nova e depois "Substituir os dados da nuvem pelos de uma pasta".`
-        : `Backup de ${C.dataHoraBr(info.criado_em)} aberto. Agora use "Importar ZIP" em Dados e backup com o arquivo baixado.`);
+      aviso(E.nuvem ? `Backup de ${C.dataHoraBr(info.criado_em)} baixado como ZIP (para guardar). Para voltar os dados da nuvem a esse dia: use "Backups da nuvem" em Sistema ou, no computador (Chrome ou Edge), abra o backup numa pasta nova e depois "Substituir os dados da nuvem pelos de uma pasta".`
+        : `Backup de ${C.dataHoraBr(info.criado_em)} aberto. Agora use "Importar ZIP" em Sistema com o arquivo baixado.`);
       return;
     }
     // abrir numa pasta do computador (versão PC com o site fora do ar): grava o banco e os anexos na pasta escolhida e abre
@@ -122,7 +122,7 @@ export const FORMULARIOS = {
     await S.importarZip(JSZip, dir, blob, null, lidos);
     await S.lembrarPasta(dir);
     await abrirPasta(dir);
-    aviso(`Backup de ${C.dataHoraBr(info.criado_em)} aberto na pasta ${dir.name}. Entre com seu usuário e senha de sempre. Quando o site voltar, Dados e backup → "Substituir os dados da nuvem pelos de uma pasta" leva o que você fizer aqui para a nuvem.${foraDoZip(lidos)}`, lidos.naoIncluidos.length ? 'aviso' : 'ok');
+    aviso(`Backup de ${C.dataHoraBr(info.criado_em)} aberto na pasta ${dir.name}. Entre com seu usuário e senha de sempre. Quando o site voltar, Sistema → "Substituir os dados da nuvem pelos de uma pasta" leva o que você fizer aqui para a nuvem.${foraDoZip(lidos)}`, lidos.naoIncluidos.length ? 'aviso' : 'ok');
   },
 
   async modeloVistoria(form) {
@@ -734,7 +734,7 @@ export const FORMULARIOS = {
     ir('#/');
   },
 
-  /** Dados e backup: configuração geral da integração com o banco (ponte, senha, ativar, conta padrão). Só administrador. */
+  /** Sistema: configuração geral da integração com o banco (ponte, senha, ativar, conta padrão). Só administrador. */
   async configBanco(form) {
     if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador altera a integração com o banco.');
     const f = new FormData(form);
@@ -745,7 +745,7 @@ export const FORMULARIOS = {
     await mostrar();
   },
 
-  /** Empresas: qual conta emite os boletos (sempre a padrão ou escolher boleto a boleto). */
+  /** Sistema → Banco: qual conta emite os boletos (sempre a padrão ou escolher boleto a boleto). */
   async modoContaBoleto(form) {
     if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador altera a integração com o banco.');
     const f = new FormData(form);
@@ -754,7 +754,7 @@ export const FORMULARIOS = {
     await mostrar();
   },
 
-  /** Dados e backup: inclui ou altera uma conta bancária da integração (uma por empresa). */
+  /** Sistema: inclui ou altera uma conta bancária da integração (uma por empresa). */
   async contaBanco(form) {
     if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador altera a integração com o banco.');
     const f = Object.fromEntries(new FormData(form));
@@ -763,7 +763,7 @@ export const FORMULARIOS = {
     await mostrar();
   },
 
-  /** Dados e backup: inclui ou altera uma conta de outro banco (só o extrato por arquivo OFX ou CSV, sem a ponte). */
+  /** Sistema: inclui ou altera uma conta de outro banco (só o extrato por arquivo OFX ou CSV, sem a ponte). */
   async contaArquivo(form) {
     if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador altera as contas do banco.');
     const f = Object.fromEntries(new FormData(form));

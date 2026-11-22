@@ -166,7 +166,7 @@ export async function telaBackupsNuvem() {
   if (!podeUsuario('admin')) return '<h1>Acesso só para administradores</h1>';
   let lista;
   try { lista = (await S.listar(await pastaBackups())).filter((a) => diaDoBackup(a.nome).length); } catch (e) {
-    return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backups da nuvem</h1><div class="alerta erro">${esc(e.message)}</div>`;
+    return `<p class="suave"><a href="#/dados">← Sistema</a></p><h1>Backups da nuvem</h1><div class="alerta erro">${esc(e.message)}</div>`;
   }
   lista.sort((a, b) => b.nome.localeCompare(a.nome));
   const linhas = lista.map((a) => {
@@ -176,9 +176,9 @@ export async function telaBackupsNuvem() {
   }).join('');
   // exemplo com o backup do dia mais recente (ou hoje): "o de 09/11 é como os dados estavam às 3h de 09/11"
   const exemplo = dataBr(lista.map((a) => diaDoBackup(a.nome)).find(([, , motivo]) => !motivo)?.[0] || hojeIso()).slice(0, 5);
-  return `<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Backups da nuvem</h1>
+  return `<p class="suave"><a href="#/dados">← Sistema</a></p><h1>Backups da nuvem</h1>
     <div class="cartao"><p>A nuvem guarda uma cópia do banco de dados por dia (os 30 dias mais recentes), feita às 3h da manhã (horário de Brasília): o backup de ${exemplo} é como os dados estavam às 3h de ${exemplo}. Os anexos não entram: eles ficam guardados uma vez só e não mudam.</p>
-      <p>${lista.some((a) => cifrado(a.nome)) ? '🔒 Os backups marcados como cifrados só abrem com a <b>senha do backup seguro</b> (a mesma da pasta segura): quem tiver acesso à nuvem não consegue ler os dados.' : 'Os backups estão <b>sem cifrar</b>. Ligue o backup seguro neste computador (Dados e backup → Backup seguro): os próximos backups da nuvem passam a sair cifrados com a senha do backup.'}</p>
+      <p>${lista.some((a) => cifrado(a.nome)) ? '🔒 Os backups marcados como cifrados só abrem com a <b>senha do backup seguro</b> (a mesma da pasta segura): quem tiver acesso à nuvem não consegue ler os dados.' : 'Os backups estão <b>sem cifrar</b>. Ligue o backup seguro neste computador (Sistema → Backup seguro): os próximos backups da nuvem passam a sair cifrados com a senha do backup.'}</p>
       <p><b>Voltar para este dia</b> troca os dados da nuvem pelos daquele backup (antes, a nuvem guarda uma cópia de como estava agora). Tudo o que foi lançado depois das 3h daquele dia se perde, em todos os aparelhos. Use só em caso de erro geral.</p>
       <div class="rolagem"><table><tr><th>Dia</th><th>O que é</th><th class="n">Tamanho</th><th></th></tr>${linhas || '<tr><td colspan="4" class="suave">Nenhum backup ainda (o primeiro é feito às 3h da manhã).</td></tr>'}</table></div></div>`;
 }
@@ -209,7 +209,7 @@ const MUITO = 200 * 1048576;
  * e-mail, mexeu na ficha pela internet e ligou o programa do PC. Filtros: período e pessoa (`de`, `ate`, `quem`); `antes` = mais velhos.
  */
 export async function telaAcessos(q = {}) {
-  const topo = '<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Acessos</h1>';
+  const topo = '<p class="suave"><a href="#/dados">← Sistema</a></p><h1>Acessos</h1>';
   if (!E.nuvem) return `${topo}<p class="suave">Só existe com os dados na nuvem.</p>`;
   if (!podeUsuario('admin')) return '<h1>Acesso só para administradores</h1>';
   const filtro = { de: q.de && /^\d{4}-\d{2}-\d{2}$/.test(q.de) ? q.de : '', ate: q.ate || '', email: q.quem || '', antes: q.antes || '' };

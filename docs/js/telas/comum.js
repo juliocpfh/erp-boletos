@@ -504,7 +504,7 @@ export async function apagarAnexos(lista, motivo) {
   }
   if (apagados.length) await alterar((db) => apagados.forEach((a) => R.registrar(db, login(), 'Exclusão', 'arquivos', null, `${motivo}: ${a.nome}`, null,
     a.contrato ? { contrato_id: a.contrato.id, imovel_id: a.contrato.imovel_id || null } : vinculoDoEscopo(a.escopo, a.id))));
-  if (falharam.length) aviso(`Não deu para apagar da pasta: ${falharam.join(', ')}. O arquivo pode estar aberto ou sendo sincronizado; o administrador apaga depois em Dados e backup ("Procurar arquivos sem lançamento").`, 'aviso');
+  if (falharam.length) aviso(`Não deu para apagar da pasta: ${falharam.join(', ')}. O arquivo pode estar aberto ou sendo sincronizado; o administrador apaga depois em Sistema ("Procurar arquivos sem lançamento").`, 'aviso');
   return apagados.length;
 }
 
@@ -776,7 +776,7 @@ function ancoraDoArquivo(escopo, rotulo) {
  * Confere se cada arquivo ligado a um lançamento (comprovantes, assinados, aditivos, cartas, apólices, fotos da vistoria)
  * está na pasta. O que sumiu é procurado pelo nome nas outras pastas (ex.: mudança de pasta que deu errado) e, se
  * achado, volta copiado para o lugar certo; o que não for achado fica em ``arquivosFaltando`` (alerta no Painel e
- * na página do inquilino, para anexar de novo). Ao abrir o Painel (uma vez) e pelo botão em Dados e backup.
+ * na página do inquilino, para anexar de novo). Ao abrir o Painel (uma vez) e pelo botão em Sistema.
  */
 export async function conferirArquivos() {
   if (!E.pasta) return { conferidos: 0, devolvidos: [], faltando: [] };

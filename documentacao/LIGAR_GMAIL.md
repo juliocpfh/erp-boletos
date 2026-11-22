@@ -2,7 +2,7 @@
 
 O sistema na nuvem (`erp.ankjck.com.br`) pode mandar e-mails (boleto, NF, recibos, avisos da ficha) direto pela conta Gmail da empresa, com o remetente `administracao@ankjck.com.br`. Enquanto isto não for feito, o envio fica desligado e a tela continua com "Copiar texto" e "Abrir no Gmail".
 
-**Desde 17/11/2026 é um botão:** em **Dados e backup → E-mail pelo Gmail**, o administrador clica em **Conectar o Gmail → escolhe a conta → Permitir**, como em qualquer site. Não precisa mais rodar nada no computador nem colar código no Cloudflare. Antes do primeiro clique, uma preparação de uns 30 minutos, uma vez só: o "aplicativo" no Google Cloud e dois segredos no Cloudflare (passos 1 a 4).
+**Desde 17/11/2026 é um botão:** em **Sistema → Comunicação E-mail → E-mail pelo Gmail**, o administrador clica em **Conectar o Gmail → escolhe a conta → Permitir**, como em qualquer site. Não precisa mais rodar nada no computador nem colar código no Cloudflare. Antes do primeiro clique, uma preparação de uns 30 minutos, uma vez só: o "aplicativo" no Google Cloud e dois segredos no Cloudflare (passos 1 a 4).
 
 Precisa: a conta Gmail que vai enviar, o painel do Cloudflare e o computador (Chrome). **Não cadastre cartão** no Google Cloud: o "teste gratuito"/faturamento que ele oferece não é preciso; a Gmail API é gratuita.
 
@@ -19,7 +19,7 @@ Precisa: a conta Gmail que vai enviar, o painel do Cloudflare e o computador (Ch
    - Não precisa mandar para verificação do Google: é só para a própria conta. Por isso, no passo 7 o Google vai mostrar "O Google não verificou este app": clique em **Avançado** → **Acessar ERP Imoveis (não seguro)**. É o seu próprio app.
 
 ## 3. Credencial "Aplicativo da Web"
-1. No sistema, abra **Dados e backup → E-mail pelo Gmail** e clique em **Copiar** ao lado do **Endereço de retorno**. Na nuvem da empresa ele é:
+1. No sistema, abra **Sistema → Comunicação E-mail → E-mail pelo Gmail** e clique em **Copiar** ao lado do **Endereço de retorno**. Na nuvem da empresa ele é:
    `https://erp.ankjck.com.br/api/email/google/retorno`
 2. No Google Cloud: APIs e serviços → **Credenciais** → **Criar credenciais** → **ID do cliente OAuth**.
 3. Tipo: **Aplicativo da Web** → nome `ERP Imoveis` → em **URIs de redirecionamento autorizados** → **Adicionar URI** → cole o endereço do item 1 (exatamente igual, sem barra no fim). "Origens JavaScript autorizadas" fica vazio. Criar.
@@ -53,9 +53,9 @@ Para os e-mails não caírem no spam: painel do Cloudflare → `ankjck.com.br` �
 - Veja também se há um TXT `_dmarc`: se estiver com `p=reject` ou `p=quarantine`, avise antes de ligar (ver "não confirmado" abaixo).
 
 ## 7. Conectar (o botão)
-1. No computador, no Chrome, entre no sistema como **administrador** → **Dados e backup** → caixa **E-mail pelo Gmail** → **Conectar o Gmail**.
+1. No computador, no Chrome, entre no sistema como **administrador** → **Sistema → Comunicação E-mail** → caixa **E-mail pelo Gmail** → **Conectar o Gmail**.
 2. O Google abre: escolha a **conta Gmail da empresa** → aviso do item 2.4 (**Avançado** → **Acessar ERP Imoveis**) → deixe marcada a permissão de **enviar e-mail em seu nome** → **Permitir**. O sistema só envia: não lê a caixa de entrada.
-3. Volta sozinho para Dados e backup com "Gmail conectado". A caixa mostra **Ligado: os e-mails saem pela conta …**.
+3. Volta sozinho para Comunicação E-mail com "Gmail conectado". A caixa mostra **Ligado: os e-mails saem pela conta …**.
 4. Teste: abra o e-mail de uma etapa (botão ✉ E-mail numa ficha ou contrato), ponha o seu próprio e-mail e clique em **Enviar agora**. Confira em **Enviados** do Gmail e na caixa de quem recebeu (remetente "Administradora", anexo junto).
 
 Termine em até 10 minutos e no mesmo navegador em que clicou (o pedido vale uma vez só, por segurança). **Trocar a conta do Gmail** faz o mesmo caminho e troca a conta. **Desconectar** apaga a autorização da nuvem e a retira também na conta do Google; o "Enviar agora" some até alguém conectar de novo.

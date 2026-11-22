@@ -13,7 +13,7 @@ import { botao, buscar, carregarParte, d, endereco, etiqueta, link, memoria, nao
 import { reciboHtml } from './documentos.js';
 import { cartaReajuste } from './reajustes.js';
 
-const DESLIGADA = '<div class="alerta info">A rotina <b>Arquivo impresso</b> está desligada. Para ligar: Dados e backup → Regras do sistema → "Arquivo impresso (pasta física de cada inquilino)".</div>';
+const DESLIGADA = '<div class="alerta info">A rotina <b>Arquivo impresso</b> está desligada. Para ligar: Sistema → Regras do sistema → "Arquivo impresso (pasta física de cada inquilino)".</div>';
 const SITUACAO_ITEM = { impresso: 'impresso', ja_tinha: 'já estava em papel', fora: 'fora da pasta' };
 
 /** Nomes dos arquivos soltos na pasta do inquilino (a lista é da nuvem ou do disco; sem pasta, nenhum). */
@@ -42,10 +42,10 @@ export async function conferirSoltosUmaVez() {
 const nomeImovel = (c) => (buscar('imoveis', c.imovel_id) || {}).nome || 'sem imóvel';
 
 // --------------------------------------------------------------------------
-// Lista de todos os inquilinos (Dados e backup → Arquivo impresso; link do alerta do Painel)
+// Lista de todos os inquilinos (Sistema → Arquivo impresso; link do alerta do Painel)
 // --------------------------------------------------------------------------
 export function telaArquivoImpresso(q = {}) {
-  const topo = '<p class="suave"><a href="#/dados">← Dados e backup</a></p><h1>Arquivo impresso</h1>';
+  const topo = '<p class="suave"><a href="#/dados">← Sistema</a></p><h1>Arquivo impresso</h1>';
   conferirSoltosUmaVez().catch(() => { /* fica para a próxima abertura */ });
   if (!AI.ligado()) return `${topo}${DESLIGADA}`;
   const hoje = C.hojeIso();

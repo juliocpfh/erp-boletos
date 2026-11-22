@@ -81,7 +81,7 @@ test('primeiros passos: aparecem no sistema quase vazio, somem com tudo feito, n
   assert.doesNotMatch(operador, /href="#\/novo\/emitentes"/);
   assert.match(operador, /href="#\/novo\/imoveis"/);
 
-  // "Já sei usar": esconde só para este login; Dados e backup traz de volta
+  // "Já sei usar": esconde só para este login; Sistema traz de volta
   assert.equal(AJ.caixaReabrirPassos(vazio(), 'admin'), '');
   AJ.esconderPassos('admin');
   assert.equal(caixa(vazio()), '');

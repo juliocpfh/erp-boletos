@@ -131,37 +131,37 @@ test('Conectar: só o administrador começa; o endereço do Google leva escopo d
 test('Volta do Google: state inválido, repetido, vencido ou de outra pessoa é recusado; cancelar não liga nada', async () => {
   W.esquecerPapeis(); G.esquecerToken();
   const c = await cenario();
-  assert.equal(await volta(c, '/api/email/google/retorno?state=inventado&code=x'), `${BASE}/#/dados?gmail=recusado`);
-  assert.equal(await volta(c, `/api/email/google/retorno?state=${'a'.repeat(43)}&code=x`), `${BASE}/#/dados?gmail=recusado`, 'state que o cofre não conhece');
+  assert.equal(await volta(c, '/api/email/google/retorno?state=inventado&code=x'), `${BASE}/#/sistema-email?gmail=recusado`);
+  assert.equal(await volta(c, `/api/email/google/retorno?state=${'a'.repeat(43)}&code=x`), `${BASE}/#/sistema-email?gmail=recusado`, 'state que o cofre não conhece');
   // de outra pessoa (outra administradora voltando com o state do dono): recusado e gasto
   const deOutro = c.google.permitir(await conectar(c));
-  assert.equal(await volta(c, deOutro, SOCIA), `${BASE}/#/dados?gmail=recusado`);
-  assert.equal(await volta(c, deOutro, DONO), `${BASE}/#/dados?gmail=recusado`, 'o state já foi gasto');
+  assert.equal(await volta(c, deOutro, SOCIA), `${BASE}/#/sistema-email?gmail=recusado`);
+  assert.equal(await volta(c, deOutro, DONO), `${BASE}/#/sistema-email?gmail=recusado`, 'o state já foi gasto');
   // vencido: 11 minutos depois
   const atrasado = c.google.permitir(await conectar(c));
   const relogio = c.cofre.cofre.relogio;
   c.cofre.cofre.relogio = () => new Date(Date.now() + 11 * 60000);
-  try { assert.equal(await volta(c, atrasado), `${BASE}/#/dados?gmail=recusado`); } finally { c.cofre.cofre.relogio = relogio; }
+  try { assert.equal(await volta(c, atrasado), `${BASE}/#/sistema-email?gmail=recusado`); } finally { c.cofre.cofre.relogio = relogio; }
   // cancelou na tela do Google
   const cancelado = new URL(await conectar(c)).searchParams.get('state');
-  assert.equal(await volta(c, `/api/email/google/retorno?state=${cancelado}&error=access_denied`), `${BASE}/#/dados?gmail=cancelado`);
+  assert.equal(await volta(c, `/api/email/google/retorno?state=${cancelado}&error=access_denied`), `${BASE}/#/sistema-email?gmail=cancelado`);
   assert.equal((await estado(c)).ligado, false);
   // certo: liga; repetir a mesma volta é recusado (uso único)
   const certo = c.google.permitir(await conectar(c));
-  assert.equal(await volta(c, certo), `${BASE}/#/dados?gmail=ligado`);
-  assert.equal(await volta(c, certo), `${BASE}/#/dados?gmail=recusado`);
+  assert.equal(await volta(c, certo), `${BASE}/#/sistema-email?gmail=ligado`);
+  assert.equal(await volta(c, certo), `${BASE}/#/sistema-email?gmail=recusado`);
   assert.equal(c.db.prepare('SELECT COUNT(*) AS n FROM gmail_estados').get().n, 0, 'nenhum pedido sobra');
   // o operador nem consegue gastar um state
   const doDono = c.google.permitir(await conectar(c));
   W.esquecerPapeis();
-  assert.equal(await volta(c, doDono, OPERADOR), `${BASE}/#/dados?gmail=recusado`);
+  assert.equal(await volta(c, doDono, OPERADOR), `${BASE}/#/sistema-email?gmail=recusado`);
 });
 
 test('Ligado: refresh token cifrado no cofre, nunca devolvido à tela; remetente = a conta; renova o access token sozinho', async () => {
   W.esquecerPapeis(); G.esquecerToken();
   const c = await cenario();
   assert.deepEqual(await estado(c), { ligado: false, remetente: null, origem: null, conta: null, cliente: true, retorno: `${BASE}/api/email/google/retorno` });
-  assert.equal(await volta(c, c.google.permitir(await conectar(c))), `${BASE}/#/dados?gmail=ligado`);
+  assert.equal(await volta(c, c.google.permitir(await conectar(c))), `${BASE}/#/sistema-email?gmail=ligado`);
   // a troca do código levou o verificador do PKCE e o segredo do cliente (do Worker para o Google)
   const troca = new URLSearchParams(c.google.pedidos.find((x) => String(x.body).includes('authorization_code')).body);
   assert.match(troca.get('code_verifier'), /^[A-Za-z0-9_-]{43}$/);
@@ -202,16 +202,16 @@ test('Desmarcou a permissão de enviar ou o Google não disse a conta: nada é g
   W.esquecerPapeis(); G.esquecerToken();
   const c = await cenario();
   c.google.escopo = 'openid email';
-  assert.equal(await volta(c, c.google.permitir(await conectar(c))), `${BASE}/#/dados?gmail=sem-permissao`);
+  assert.equal(await volta(c, c.google.permitir(await conectar(c))), `${BASE}/#/sistema-email?gmail=sem-permissao`);
   assert.deepEqual(c.google.revogados, [REFRESH]);
   assert.equal(c.db.prepare('SELECT COUNT(*) AS n FROM gmail_conta').get().n, 0);
   c.google.escopo = G.ESCOPO_ENVIO; c.google.idToken = idToken({ aud: 'outro-cliente' });
-  assert.equal(await volta(c, c.google.permitir(await conectar(c))), `${BASE}/#/dados?gmail=erro`);
+  assert.equal(await volta(c, c.google.permitir(await conectar(c))), `${BASE}/#/sistema-email?gmail=erro`);
   assert.equal(c.db.prepare('SELECT COUNT(*) AS n FROM gmail_conta').get().n, 0);
   // código que o Google não aceita (vencido)
   const url = await conectar(c);
   const st = new URL(url).searchParams.get('state');
-  assert.equal(await volta(c, `/api/email/google/retorno?state=${st}&code=codigo-falso`), `${BASE}/#/dados?gmail=erro`);
+  assert.equal(await volta(c, `/api/email/google/retorno?state=${st}&code=codigo-falso`), `${BASE}/#/sistema-email?gmail=erro`);
 });
 
 test('Desconectar: só o administrador; apaga do cofre, revoga no Google e o envio desliga', async () => {

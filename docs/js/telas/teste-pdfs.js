@@ -1,7 +1,7 @@
 // TELA TEMPORÁRIA (pedido do dono em 20/11/2026, item 1 de documentacao/PENDENCIAS_4000.md): "Teste dos PDFs" (#/teste-pdfs),
 // só para o administrador, com um botão por PDF que o sistema gera, agrupados por assunto, para o dono abrir cada um no
 // computador e no celular e anotar o que mudar. APAGAR DEPOIS DO TESTE: este arquivo, a rota 'teste-pdfs' (telas.js), a
-// entrada testePdfs de PARTES_ADIADAS (telas/comum.js), 'js/telas/teste-pdfs.js' em ADIADOS (sw.js) e o link em Dados e backup
+// entrada testePdfs de PARTES_ADIADAS (telas/comum.js), 'js/telas/teste-pdfs.js' em ADIADOS (sw.js) e o link em Sistema
 // (telas/admin.js). Nada aqui grava no banco: usa o primeiro registro que serve e diz qual é; sem registro, diz o que cadastrar.
 import { aviso, baixar, podeUsuario } from '../app.js';
 import * as C from '../calculos.js';
@@ -143,7 +143,7 @@ function itensCartasRelatorios() {
   out.push(['Declaração anual de aluguéis (IR)', ir ? `${esc(nomeContrato(ir.c))} · ano ${ir.ano}` : linhaFalta('um contrato com NF de aluguel emitida'), ir ? abrir(`#/imprimir/declaracao?contrato=${ir.c.id}&ano=${ir.ano}`) : '']);
   const mes = C.competenciaDe(C.hojeIso());
   out.push(['Resumo de gestão do mês', `mês ${compBr(mes)}`, `${botao('relatorioGestao', 'Baixar PDF', { mes })} ${link(`#/gestao?mes=${mes}`, 'Na tela Gestão', 'botao secundario pequeno')}`]);
-  out.push(['Todos os dados (planilha e PDF)', 'o banco inteiro', `${link('#/dados', 'Em Dados e backup', 'botao secundario pequeno')} <span class="suave">(botão "Baixar todos os dados em planilha e PDF"; ele anota a exportação no histórico)</span>`]);
+  out.push(['Todos os dados (planilha e PDF)', 'o banco inteiro', `${link('#/dados', 'Em Sistema', 'botao secundario pequeno')} <span class="suave">(botão "Baixar todos os dados em planilha e PDF"; ele anota a exportação no histórico)</span>`]);
   return out;
 }
 
@@ -162,7 +162,7 @@ export function telaTestePdfs() {
     return `<div class="cartao"><h2>${esc(titulo)}</h2><table><tr><th>PDF</th><th>Registro usado</th><th>Abrir</th></tr>
       ${linhas.map(([nome, usado, botoes]) => `<tr><td><b>${esc(nome)}</b></td><td>${usado}</td><td class="acoes">${botoes || ''}</td></tr>`).join('')}</table></div>`;
   }).join('');
-  return `<div class="cabecalho"><h1>Teste dos PDFs (página temporária)</h1><div class="acoes">${link('#/dados', 'Voltar a Dados e backup', 'botao secundario')}</div></div>
+  return `<div class="cabecalho"><h1>Teste dos PDFs (página temporária)</h1><div class="acoes">${link('#/dados', 'Voltar ao Sistema', 'botao secundario')}</div></div>
     <div class="alerta info">Abra cada PDF <b>no computador e no celular (Android)</b>, confira se sai certo e anote os textos a mudar. "Abrir" leva à página do documento, com <b>Imprimir</b> e <b>Baixar PDF</b>; o botão ao lado baixa o PDF do mesmo jeito que vai anexado no e-mail ou guardado na pasta. Esta página não grava nada (só o "Baixar PDF" do contrato e do termo das chaves marca, como sempre, a etapa "gerado" no roteiro da entrada, se ainda não estava). Ela será apagada depois do teste.</div>
     ${grupos}`;
 }

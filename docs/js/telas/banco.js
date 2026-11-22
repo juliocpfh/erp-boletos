@@ -20,7 +20,7 @@ const TITULO_AGUARDANDO = 'Aguardando as chaves de acesso do C6';
 /** Ação do banco com o banco ainda desligado: o que dizer a quem clicou. */
 /** Ação da ponte numa conta de outro banco (só extrato por arquivo). */
 const SO_ARQUIVO = 'Esta conta é de outro banco, que não fala com o sistema: o extrato entra só pelo arquivo OFX ou CSV (botão "Importar o extrato").';
-const BANCO_DESLIGADO = 'O banco ainda não está ligado ao sistema (faltam as chaves do C6). Peça ao administrador para ligar em Dados e backup → Banco (C6).';
+const BANCO_DESLIGADO = 'O banco ainda não está ligado ao sistema (faltam as chaves do C6). Peça ao administrador para ligar em Sistema → Banco → Banco (C6).';
 const config = () => d().config_banco || {};
 const contas = () => config().contas || [];
 /** Contas de outros bancos (sem a ponte): só recebem o extrato por arquivo OFX ou CSV (R.contasSoArquivo). */
@@ -60,18 +60,18 @@ const sugestaoDe = (m) => {
 };
 const centavosDoBanco = (x) => { try { return Z.centavosDoC6(x); } catch { return 0; } };
 
-/** Botão que fala com a ponte: desligado (com o motivo) enquanto o banco não está configurado em Dados e backup. */
+/** Botão que fala com a ponte: desligado (com o motivo) enquanto o banco não está configurado em Sistema → Banco. */
 const botaoPonte = (acao, texto, dados = {}, cls = 'secundario pequeno') => (bancoAtivo() ? botao(acao, texto, dados, cls)
   : botaoInativo(texto, R.motivoBancoInativo(d()) || TITULO_AGUARDANDO, cls));
 
 /** Estado só da tela (não vai para o banco de dados): saldos consultados e a conferência de boletos pagos. */
 const estado = { saldos: {}, conferencia: null, avisos: null, saudePonte: null, saudePonteEm: 0, saudePonteErro: '' };
 
-const avisoNaoConfigurado = () => `<div class="alerta aviso" id="banco-nao-configurado"><b>O banco ainda não está ligado.</b> As chaves de acesso do C6 são configuradas em <a href="#/dados?ir=banco">Dados e backup → Banco (C6)</a>.
+const avisoNaoConfigurado = () => `<div class="alerta aviso" id="banco-nao-configurado"><b>O banco ainda não está ligado.</b> As chaves de acesso do C6 são configuradas em <a href="#/sistema-banco?ir=banco">Sistema → Banco → Banco (C6)</a>.
   Até lá, os botões que falam com o banco ficam desligados; o que já foi importado continua aqui.</div>`;
 /** Conta de outro banco (sem a ponte): de onde vem o extrato e por que as entradas não se ligam sozinhas aos boletos. */
 const avisoContaArquivo = (a) => `<div class="alerta info" id="conta-arquivo"><b>Conta no ${esc(a.banco || 'outro banco')}: extrato por arquivo.</b> Este banco não fala com o sistema: baixe o extrato em OFX (ou CSV) no site ou no aplicativo do banco e importe aqui. O sistema confere o saldo do arquivo e não deixa entrar o mesmo lançamento duas vezes. O arquivo não traz o código do boleto: as entradas que parecem aluguel não se ligam sozinhas; vincule cada uma em "Dar destino".</div>`;
-const avisoPagamentosDesligados = () => `<div class="alerta aviso"><b>Os pagamentos pelo banco estão desligados.</b> O administrador liga em <a href="#/dados?ir=config-banco2">Dados e backup → Banco: conciliação e pagamentos</a>. Enquanto isso, as contas são pagas fora do sistema e só o extrato é conferido aqui.</div>`;
+const avisoPagamentosDesligados = () => `<div class="alerta aviso"><b>Os pagamentos pelo banco estão desligados.</b> O administrador liga em <a href="#/sistema-banco?ir=config-banco2">Sistema → Banco → Banco: conciliação e pagamentos</a>. Enquanto isso, as contas são pagas fora do sistema e só o extrato é conferido aqui.</div>`;
 
 // --------------------------------------------------------------------------
 // Tela #/banco
@@ -83,7 +83,7 @@ export function telaBanco(rota) {
   if (!contasVistas.length) {
     return `<h1>Banco</h1>${avisoNaoConfigurado()}
       <div class="cartao"><h2>O que esta tela faz</h2><p>${AJUDA_BANCO}</p>
-      <p class="acoes">${link('#/dados', 'Ir para Dados e backup', 'botao')} ${link('#/banco/pagamentos', 'Pagamentos pelo banco')}</p></div>`;
+      <p class="acoes">${podeUsuario('admin') ? link('#/sistema-banco', 'Configurar o banco', 'botao') : ''} ${link('#/banco/pagamentos', 'Pagamentos pelo banco')}</p></div>`;
   }
   const conta = contasVistas.includes(rota.q.conta) ? rota.q.conta : config().conta_padrao_id && contasVistas.includes(config().conta_padrao_id) ? config().conta_padrao_id : contasVistas[0];
   const mes = /^\d{4}-\d{2}$/.test(rota.q.mes || '') ? rota.q.mes : C.competenciaDe(C.hojeIso());
@@ -269,7 +269,7 @@ function caixaSaudeBanco() {
     // conta de outro banco: não tem certificado nem entrada no banco (o extrato vem por arquivo); sem a ponte informada neste
     // computador a consulta nem é feita (BANCO.pontePronta): diz o que falta em vez de "não respondeu"
     const cert = c.arquivo ? '<span class="suave">extrato por arquivo (outro banco)</span>'
-      : !p ? `<span class="suave">certificado e entrada no banco: ${bancoAtivo() && !BANCO.ponteLocal().configurada ? 'informe o endereço e a senha da ponte neste computador em <a href="#/dados?ir=banco">Dados e backup → Banco (C6)</a>' : !bancoAtivo() ? 'o banco ainda não está ligado' : 'a ponte ainda não respondeu'}</span>`
+      : !p ? `<span class="suave">certificado e entrada no banco: ${bancoAtivo() && !BANCO.ponteLocal().configurada ? 'informe o endereço e a senha da ponte neste computador em <a href="#/sistema-banco?ir=banco">Sistema → Banco → Banco (C6)</a>' : !bancoAtivo() ? 'o banco ainda não está ligado' : 'a ponte ainda não respondeu'}</span>`
       : p.simulado ? etiqueta('ponte em modo simulado', 'aviso')
         : `${p.certificado_valido_ate ? `certificado válido até ${dataBr(p.certificado_valido_ate)}${p.certificado_dias !== null && p.certificado_dias <= 30 ? ` ${etiqueta(p.certificado_dias < 0 ? 'vencido' : `vence em ${p.certificado_dias} dia(s)`, 'perigo')}` : ''}` : p.certificado === 'faltando' ? etiqueta('falta o certificado', 'perigo') : 'certificado: sem data'}
           · última entrada no banco ${p.token === 'falhou' ? `${etiqueta('falhou', 'perigo')} <span class="suave">${esc(p.erro_token || '')}</span>` : p.ultimo_token_em ? C.dataHoraBr(p.ultimo_token_em) : 'ainda não feita'}`;
@@ -409,7 +409,7 @@ async function guardarComprovante(x, tabela, nomeBase, blob, origem, { avisar = 
   const arquivo = () => new File([blob], `${base}.pdf`, { type: 'application/pdf' });
   const p = Z.escopoDoComprovante(d(), x);
   const c = config().copiar_para_contador !== false ? Z.escopoContador(d(), x) : null;
-  if (!p && !c) throw new C.ErroUsuario('Não há pasta para guardar: a movimentação não tem imóvel e a conta não está ligada a uma empresa (Dados e backup → Banco (C6)).');
+  if (!p && !c) throw new C.ErroUsuario('Não há pasta para guardar: a movimentação não tem imóvel e a conta não está ligada a uma empresa (Sistema → Banco → Banco (C6)).');
   const comprovante = p ? await S.salvarArquivo(await pastaDoEscopo(p.escopo, p.id), arquivo()) : null;
   const contador = c ? await S.salvarArquivo(await pastaDoEscopo(c.escopo, c.id), arquivo()) : null;
   // registrarComprovante copia o nome para a conta lançada e para o irmão (pagamento ↔ movimentação; as duas pontas da transferência)
@@ -662,7 +662,7 @@ export function caixaBancoImovel(i) {
 }
 
 // --------------------------------------------------------------------------
-// Caixa de configuração (Dados e backup): extrato, comprovantes e pagamentos (só administrador)
+// Caixa de configuração (Sistema → Banco): extrato, comprovantes e pagamentos (só administrador)
 // --------------------------------------------------------------------------
 export function caixaConfigBanco2() {
   if (!podeUsuario('admin')) return '';
@@ -1064,7 +1064,7 @@ export const ACOES_BANCO = {
   /** Painel de saúde: consulta a ponte agora (certificado, último token). */
   async conferirSaudeBanco() {
     if (!bancoAtivo()) throw new C.ErroUsuario(TITULO_AGUARDANDO);
-    if (!BANCO.ponteLocal().configurada) throw new C.ErroUsuario('Falta informar o endereço e a senha da ponte neste computador: o administrador preenche em Dados e backup → Banco (C6) (ficam só neste computador).');
+    if (!BANCO.ponteLocal().configurada) throw new C.ErroUsuario('Falta informar o endereço e a senha da ponte neste computador: o administrador preenche em Sistema → Banco → Banco (C6) (ficam só neste computador).');
     estado.saudePonteEm = Date.now();
     await conferirSaudePonte();
     if (estado.saudePonteErro) throw new C.ErroUsuario(`A ponte do banco não respondeu (${estado.saudePonteErro}). Confira se o computador da ponte está ligado e tente de novo.`);
@@ -1218,7 +1218,7 @@ export const ACOES_BANCO = {
   async enviarGrupoAprovacao({ conta, grupo }) {
     if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador envia pagamentos para aprovação.');
     if (!bancoAtivo()) throw new C.ErroUsuario(BANCO_DESLIGADO);
-    if (!config().permitir_pagamentos) throw new C.ErroUsuario('Os pagamentos pelo banco estão desligados em Dados e backup → Banco: conciliação e pagamentos.');
+    if (!config().permitir_pagamentos) throw new C.ErroUsuario('Os pagamentos pelo banco estão desligados em Sistema → Banco → Banco: conciliação e pagamentos.');
     const pags = pagamentosDoLote(grupo, conta);
     if (!pags.length) throw new C.ErroUsuario('Nenhum pagamento deste lote está pronto para enviar (prepare de novo).');
     const { items } = await P.itensDoGrupo(conta, grupo);

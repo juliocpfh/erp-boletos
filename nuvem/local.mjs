@@ -3,7 +3,7 @@
 //      PORTA=8787 EMAIL_TESTE=dono@exemplo.com.br NUVEM_DB=nuvem/.local/cofre.sqlite
 //      SIMULAR_GMAIL=1 → o envio de e-mail aparece ligado e só escreve aqui no console (nada vai ao Google);
 //      com GMAIL_CLIENT_ID e GMAIL_CLIENT_SECRET (credencial "Aplicativo da Web" com o retorno http://localhost:8787/api/email/google/retorno),
-//      o botão "Conectar o Gmail" (Dados e backup) liga de verdade e envia; GMAIL_REFRESH_TOKEN (jeito antigo) também vale.
+//      o botão "Conectar o Gmail" (Sistema → Comunicação E-mail) liga de verdade e envia; GMAIL_REFRESH_TOKEN (jeito antigo) também vale.
 // Os dados ficam em nuvem/.local/ (fora do git): o cofre em cofre.sqlite e os anexos e backups em arquivos/ (r2-disco.mjs).
 // ZERAR=1 apaga os dois antes de abrir (começa do zero, sem banco apontando para anexo que não existe).
 import fs from 'node:fs';

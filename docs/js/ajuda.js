@@ -104,7 +104,7 @@ export const AJUDA_TELAS = {
   banco: {
     titulo: 'Banco',
     serve: 'Traz o extrato da conta no banco (C6) para dentro do sistema e diz para onde foi cada entrada e saída: aluguel de qual boleto, conta de qual imóvel, imposto, reforma.',
-    primeiro: ['O administrador liga o banco em Dados e backup (caixa "Banco (C6)").',
+    primeiro: ['O administrador liga o banco em Sistema → Banco (caixa "Banco (C6)").',
       'Clique em "Buscar extrato" do mês (ou importe o arquivo OFX baixado no app do C6).',
       'Dê o destino de cada linha "sem destino": o sistema sugere e você confirma.'],
     exemplo: 'Entrada de R$ 1.800,00 em 10/12/2026 com o nome do inquilino: o sistema propõe ligar ao boleto de novembro desse inquilino; você confere e confirma o pagamento.',
@@ -126,8 +126,8 @@ export const AJUDA_TELAS = {
     exemplo: 'IPTU de 2026 de R$ 2.130,00 em 10 parcelas, a partir do boleto que vence em março: o inquilino paga R$ 213,00 por mês de março a dezembro. Em mês sem inquilino, a parcela é sua e aparece em "Guias suas a pagar".',
   },
   dados: {
-    titulo: 'Dados e backup',
-    serve: 'Mostra onde os dados estão guardados e as cópias de segurança. Daqui também se chega às Empresas, às Regras do sistema, ao Histórico de alterações e à configuração do banco.',
+    titulo: 'Sistema',
+    serve: 'Mostra onde os dados estão guardados e as cópias de segurança. Os botões do alto levam a Empresas, Banco, Comunicação E-mail, Modelos de documentos, LGPD, Regras do sistema e Histórico de alterações.',
     primeiro: ['Baixe o ZIP com todos os dados de vez em quando e guarde fora do computador (pen drive ou e-mail).',
       'Administrador: ligue o backup seguro neste computador.',
       'Confira as Regras do sistema (multa, juros, caução, reajuste) antes do primeiro boleto.'],
@@ -140,6 +140,38 @@ export const AJUDA_TELAS = {
       'Envie a logo: ela aparece nos documentos e no ícone do aplicativo.',
       'Tem duas empresas? Cadastre as duas; em cada imóvel você diz quanto da NF é de cada uma.'],
     exemplo: 'Imóvel dividido 50% e 50% entre duas empresas: a NF de um aluguel de R$ 2.000,00 sai em duas partes de R$ 1.000,00, uma para cada empresa.',
+  },
+  'sistema-banco': {
+    titulo: 'Banco (configuração)',
+    serve: 'Liga o sistema ao banco: a ponte e as contas do C6, qual empresa emite os boletos e as opções de conciliação e pagamentos. O extrato fica no menu Banco.',
+    primeiro: ['Com as chaves do C6, preencha o endereço e a senha da ponte e clique em "Testar conexão".',
+      'Cadastre uma conta para cada empresa e escolha qual emite os boletos.',
+      'Só ligue os pagamentos pelo banco se for usar, e ponha um limite por pagamento.'],
+    exemplo: 'Limite por pagamento de R$ 5.000,00: o sistema recusa preparar um pagamento de R$ 5.000,01.',
+  },
+  'sistema-email': {
+    titulo: 'Comunicação E-mail',
+    serve: 'Liga o Gmail da empresa e guarda os textos dos e-mails de cada etapa (ficha, entrada, cobrança, saída).',
+    primeiro: ['Administrador: clique em "Conectar o Gmail", escolha a conta da empresa e permita o envio.',
+      'Abra os modelos de e-mail e ajuste os textos que quiser.',
+      'Mande um e-mail de teste para você antes de mandar aos inquilinos.'],
+    exemplo: 'Com o Gmail conectado em 18/11/2026, o botão "Enviar agora" manda o lembrete do boleto de R$ 1.800,00 pela conta da empresa.',
+  },
+  'sistema-modelos': {
+    titulo: 'Modelos de documentos',
+    serve: 'Guarda os modelos dos documentos: contratos, termos aditivos e a planilha Excel da NF.',
+    primeiro: ['Confira o modelo de contrato antes de gerar o primeiro.',
+      'Confira os três tipos de termo aditivo (vencimento, troca de inquilino e novo valor).',
+      'Só envie um Excel próprio se a NF precisar de outro desenho.'],
+    exemplo: 'Modelo de contrato mudado em 22/11/2026: os contratos gerados daí em diante saem com o texto novo; os já assinados não mudam.',
+  },
+  lgpd: {
+    titulo: 'LGPD',
+    serve: 'Atende a lei de proteção de dados: mostra tudo o que o sistema guarda de uma pessoa e apaga o que já passou do prazo.',
+    primeiro: ['Quando alguém pedir os dados, procure pelo CPF em "Dados de uma pessoa" e baixe o arquivo.',
+      'De tempos em tempos, veja "Pessoas com mais de 10 anos do fim do contrato".',
+      'Confira bem antes de apagar: não tem volta pelo Histórico.'],
+    exemplo: 'Contrato que terminou em 30/11/2016: a partir de 30/11/2026 dá para apagar os dados dessa pessoa.',
   },
 };
 
@@ -237,7 +269,7 @@ export function passosIniciais(db, { hoje = C.hojeIso(), backupLigado = false } 
     { chave: 'boleto', feito: (db.cobrancas || []).length > 0, depois: 'contrato', href: `#/cobrancas?comp=${mesBoleto}`, botao: `Gerar o boleto de ${C.compBr(mesBoleto)}`,
       titulo: 'Primeiro boleto', texto: `Na tela Boletos, gere os boletos do aluguel de ${C.compBr(mesBoleto)}: o sistema calcula o valor de cada inquilino.` },
     { chave: 'backup', feito: zipBaixado(db) || !!backupLigado, href: '#/dados', botao: 'Fazer a cópia dos dados',
-      titulo: 'Cópia de segurança (backup)', texto: 'Baixe o ZIP com todos os dados (em Dados e backup) e guarde fora do computador, num pen drive ou no seu e-mail.' },
+      titulo: 'Cópia de segurança (backup)', texto: 'Baixe o ZIP com todos os dados (em Sistema) e guarde fora do computador, num pen drive ou no seu e-mail.' },
   ];
 }
 
@@ -282,19 +314,19 @@ export function caixaPrimeirosPassos(db, { quem = '', pode = true, admin = false
   };
   return `<div class="primeiros-passos" id="primeiros-passos">
     <div class="cabecalho"><h2>Primeiros passos <span class="suave">(${feitos} de ${passos.length} feitos)</span></h2>
-      <button type="button" class="secundario pequeno" data-esconder-passos="${esc(quem)}" title="Esconder esta caixa. Para ver de novo: Dados e backup">Já sei usar</button></div>
+      <button type="button" class="secundario pequeno" data-esconder-passos="${esc(quem)}" title="Esconder esta caixa. Para ver de novo: Sistema">Já sei usar</button></div>
     <p class="suave">Para começar a usar o sistema, siga os passos na ordem. Cada um fica marcado com ✓ sozinho quando estiver feito. Em cada tela, o botão <b>?</b> ao lado do título explica para que ela serve.</p>
     <ol class="lista-passos">${passos.map((p, i) => item(p, i + 1)).join('')}</ol></div>`;
 }
 
-/** Dados e backup: com os primeiros passos escondidos (e ainda por fazer), o botão que os traz de volta ao Painel. */
+/** Sistema: com os primeiros passos escondidos (e ainda por fazer), o botão que os traz de volta ao Painel. */
 export function caixaReabrirPassos(db, quem, opcoes = {}) {
   if (!passosEscondidos(quem) || !sistemaComecando(db) || !passosIniciais(db, opcoes).some((p) => !p.feito)) return '';
   return `<div class="cartao" id="reabrir-passos"><h2>Primeiros passos</h2><p>A lista dos primeiros passos (empresa, imóvel, contrato, boleto e backup) está escondida no Painel.</p>
     <p><button type="button" class="secundario pequeno" data-mostrar-passos="${esc(quem)}">Mostrar os primeiros passos no Painel</button></p></div>`;
 }
 
-/** Botões "Já sei usar" (Painel) e "Mostrar os primeiros passos" (Dados e backup). */
+/** Botões "Já sei usar" (Painel) e "Mostrar os primeiros passos" (Sistema). */
 function ligarPrimeirosPassos(raiz) {
   const esconder = raiz.querySelector('[data-esconder-passos]');
   if (esconder) {

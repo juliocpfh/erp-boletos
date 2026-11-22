@@ -1,6 +1,6 @@
-// Banco (C6): caixa de configuração em Dados e backup (ponte, senha, contas por empresa), botões "Emitir no C6" e a caixa
+// Banco (C6): caixa de configuração em Sistema → Banco (ponte, senha, contas por empresa), botões "Emitir no C6" e a caixa
 // do boleto emitido (linha digitável, Pix copia-e-cola, QR Code, avisos ao pagador, negativação, consultar e cancelar).
-// As ações ficam em telas/acoes.js. A conta que emite: padrão (ANK) ou escolhida boleto a boleto (opção em Empresas).
+// As ações ficam em telas/acoes.js. A conta que emite: padrão (ANK) ou escolhida boleto a boleto (opção em Sistema → Banco).
 import { podeUsuario } from '../app.js';
 import * as B from '../banco.js';
 import { dataBr, dataHoraBr, reais } from '../calculos.js';
@@ -111,7 +111,7 @@ export function caixaBancoC6(cb) {
   const qr = B.imagemQrPix(cb);
   const semPix = b.situacao === 'emitido' && !b.pix_copia_cola;
   return `<div class="cartao" id="banco-c6"><div class="cabecalho">${titulo}<div>${etiquetaBanco(cb)}${semPix ? ` ${etiqueta('sem Pix', 'aviso')}` : ''}</div></div>
-    ${semPix ? `<div class="alerta aviso"><b>O boleto saiu sem o Pix</b>${conta && conta.chave_pix ? ': a ponte não tem a chave Pix desta conta. O inquilino paga só pela linha digitável; para ter o QR Code, peça ao técnico para pôr a chave Pix da conta na ponte e emita de novo.' : ': a conta não tem chave Pix cadastrada (Dados e backup → Banco (C6)).'}</div>` : ''}
+    ${semPix ? `<div class="alerta aviso"><b>O boleto saiu sem o Pix</b>${conta && conta.chave_pix ? ': a ponte não tem a chave Pix desta conta. O inquilino paga só pela linha digitável; para ter o QR Code, peça ao técnico para pôr a chave Pix da conta na ponte e emita de novo.' : ': a conta não tem chave Pix cadastrada (Sistema → Banco → Banco (C6)).'}</div>` : ''}
     ${cb.data_pagamento && b.situacao === 'emitido' && !cb.pagamento_c6 && !R.aguardandoCredito(cb) ? `<div class="alerta perigo"><b>Pago aqui, mas ainda em aberto no C6.</b> O inquilino ainda consegue pagar este boleto de novo${b.negativacao && b.negativacao.pode_cancelar ? ' e a negativação agendada continua valendo' : ''}. Clique em "Consultar situação no banco" (se o banco já recebeu este pagamento, acerta sozinho); se o pagamento foi por fora (Pix direto, dinheiro), use "Cancelar no banco"${b.negativacao && b.negativacao.pode_cancelar ? ' e "Cancelar negativação"' : ''}.</div>` : ''}
     ${b.pagamentos_no_banco > 1 ? `<div class="alerta perigo"><b>O banco recebeu ${b.pagamentos_no_banco} pagamentos deste boleto</b>${b.valor_pago_total ? ` (${reais(b.valor_pago_total)} no total)` : ''}: o inquilino pagou mais de uma vez (ex.: Pix e código de barras). Registre só um aqui e devolva a diferença ao inquilino.</div>` : ''}
     ${R.aguardandoCredito(cb) ? '<div class="alerta info"><b>O inquilino pagou</b> e o banco ainda está confirmando o crédito. Consulte de novo mais tarde para registrar o pagamento aqui.</div>' : ''}
@@ -132,7 +132,7 @@ export function caixaBancoC6(cb) {
 }
 
 // --------------------------------------------------------------------------
-// Configuração (Dados e backup e Empresas, só administrador)
+// Configuração (Sistema → Banco, só administrador)
 // --------------------------------------------------------------------------
 const marcado = (v) => (v ? 'checked' : '');
 /** Nome em português de cada forma de desconto do banco (o valor gravado continua o nome do banco, mapa-c6.js). */
@@ -152,7 +152,7 @@ export function caixaContaDosBoletos() {
         <div class="ajuda">Ao emitir, o sistema pergunta sempre a conta, mesmo quando o imóvel tem uma só empresa (ela já vem marcada; senão, a padrão). Em "Emitir no C6 todos em aberto do mês", pergunta uma vez para o lote.</div></div>
       <div class="acoes" style="align-self:end"><button class="secundario">Salvar</button></div></form>
       <p class="suave">Com a empresa padrão, todos os boletos saem pela conta dela, mesmo quando o imóvel é dividido com outra empresa.</p>`
-    : '<p class="suave">Nenhuma conta bancária cadastrada ainda: cadastre as contas em <a href="#/dados?ir=banco">Dados e backup → Banco (C6)</a>.</p>'}</div>`;
+    : '<p class="suave">Nenhuma conta bancária cadastrada ainda: cadastre as contas em <a href="#/sistema-banco?ir=banco">Banco (C6)</a>, nesta página.</p>'}</div>`;
 }
 
 export function caixaConfigBanco() {
@@ -166,7 +166,7 @@ export function caixaConfigBanco() {
   const resumoNotif = (x) => { const canais = Object.entries(R.CANAIS_NOTIFICACAO).filter(([k]) => x.notificar[k]).map(([, [, r]]) => r); const quando = Object.entries(R.MOMENTOS_NOTIFICACAO).filter(([k]) => x.notificar[k]).map(([, [, r]]) => r); return canais.length && quando.length ? `${canais.join(' e ')}: ${quando.join(', ')}` : 'não avisa'; };
   return `<div class="cartao" id="banco"><div class="cabecalho"><h2>Banco (C6) — boleto com Pix</h2><div>${situacao}</div></div>
     <p>Emite os boletos (com QR Code Pix) direto na conta do C6, pelo botão <b>Emitir no C6</b> da tela Boletos. Como o banco exige certificado digital, o site fala com uma <b>ponte</b>: um programinha que o técnico instala no computador de quem emite. As chaves do banco ficam só na ponte, nunca aqui.</p>
-    <p class="suave">Até as chaves chegarem, a ponte pode rodar em <b>modo simulado</b>: os botões funcionam e devolvem boletos fictícios, para treinar. Qual empresa emite os boletos (${emissora ? `padrão ${esc(emissora.apelido)}` : 'a padrão'}, ou escolher um a um) se define em <a href="#/empresas?ir=conta-boletos">Empresas</a>.</p>
+    <p class="suave">Até as chaves chegarem, a ponte pode rodar em <b>modo simulado</b>: os botões funcionam e devolvem boletos fictícios, para treinar. Qual empresa emite os boletos (${emissora ? `padrão ${esc(emissora.apelido)}` : 'a padrão'}, ou escolher um a um) se define na caixa <a href="#/sistema-banco?ir=conta-boletos">Emissão de boletos no banco (C6)</a>, nesta página.</p>
     <form data-form="configBanco" class="formulario">
       <div><label>Endereço da ponte (neste computador)</label><input name="ponte_url" value="${esc(B.ponteLocal().configurada ? B.ponteLocal().ponte_url : '')}" placeholder="http://localhost:8765"><div class="ajuda">O técnico informa este endereço ao instalar a ponte</div></div>
       <div><label>Senha da ponte (neste computador)</label><input type="password" name="senha_ponte" value="${esc(B.ponteLocal().senha_ponte)}" autocomplete="off"><div class="ajuda">A senha combinada com o técnico ao instalar a ponte</div></div>

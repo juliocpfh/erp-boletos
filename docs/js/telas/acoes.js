@@ -344,13 +344,13 @@ async function escolherContaC6(cb, lote = '') {
   const sugerida = cb && R.contaSugerida(d(), cb);
   if (sugerida && !lote) return sugerida;
   const contas = R.configBanco(d()).contas;
-  if (!contas.length) throw new C.ErroUsuario('Nenhuma conta bancária cadastrada: configure em Dados e backup → Banco (C6).');
+  if (!contas.length) throw new C.ErroUsuario('Nenhuma conta bancária cadastrada: configure em Sistema → Banco → Banco (C6).');
   if (contas.length === 1) return contas[0];
   const marcada = cb ? R.contaPreMarcada(d(), cb) : R.contaEmissora(d());
   const resp = await janela({ titulo: 'Por qual empresa emitir o boleto?',
     html: `<p>${lote || `Boleto de <b>${esc(buscar('contratos', cb.contrato_id).inquilino_nome)}</b> (${esc(compBr(cb.competencia))}, ${esc(reais(R.totais(cb).a_pagar_sem_desconto))}).`} Escolha a conta do C6 que recebe:</p>
       ${contas.map((x) => `<p><label class="check-mini"><input type="radio" name="conta" value="${esc(x.id)}" ${marcada && marcada.id === x.id ? 'checked' : ''}> <b>${esc((buscar('emitentes', x.emitente_id) || {}).nome || x.apelido)}</b> · conta ${esc(x.apelido)}${x.ambiente === 'sandbox' ? ' (sandbox: teste)' : ''}</label></p>`).join('')}
-      <p class="suave">Para não perguntar, escolha "Sempre pela empresa padrão" em Empresas.</p>`,
+      <p class="suave">Para não perguntar, escolha "Sempre pela empresa padrão" em Sistema → Banco.</p>`,
     sim: 'Emitir', nao: 'Cancelar' });
   if (!resp) return null;
   return R.contaBanco(d(), String((resp.conta || [])[0] || ''));
@@ -1292,7 +1292,7 @@ export const ACOES = {
   },
 
   /** Arquivos que sobraram de lançamentos excluídos antes (comprovantes, fotos da vistoria, assinados, aditivos): lista e apaga. */
-  /** Dados e backup: quantos arquivos há na pasta dos anexos e quanto ocupam (na nuvem, numa ida; na pasta, percorrendo as pastas). */
+  /** Sistema: quantos arquivos há na pasta dos anexos e quanto ocupam (na nuvem, numa ida; na pasta, percorrendo as pastas). */
   async medirAnexos(_dados, el) {
     const status = statusDoBotao(el);
     let n = 0; let bytes = 0;
@@ -2367,7 +2367,7 @@ export const ACOES = {
   /** Faixa do topo (login da internet vencido): recarrega a página para entrar de novo; a fila do aparelho fica. */
   recarregarPagina() { location.reload(); },
 
-  /** Dados e backup: apaga as telas guardadas no aparelho (não os dados nem o que espera envio) e abre a versão nova. */
+  /** Sistema: apaga as telas guardadas no aparelho (não os dados nem o que espera envio) e abre a versão nova. */
   async atualizarSistema() {
     if (window.caches) for (const k of await caches.keys()) await caches.delete(k);
     for (const reg of (await navigator.serviceWorker?.getRegistrations?.()) || []) await reg.update().catch(() => {});
@@ -2377,8 +2377,8 @@ export const ACOES = {
   // ------------------------------------------------------------------------
   // Banco (C6): boleto com Pix pela ponte. A chamada ao banco fica fora do alterar(); o resultado é gravado depois.
   // ------------------------------------------------------------------------
-  /** Dados e backup: chama /saude da ponte e mostra o que falta (certificado, chaves, token, modo simulado). */
-  /** Dados e backup: apaga o endereço e a senha da ponte guardados neste navegador (nada muda no arquivo de dados). */
+  /** Sistema: chama /saude da ponte e mostra o que falta (certificado, chaves, token, modo simulado). */
+  /** Sistema: apaga o endereço e a senha da ponte guardados neste navegador (nada muda no arquivo de dados). */
   async esquecerPonteC6() {
     if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador altera a integração com o banco.');
     await BANCO.esquecerPonteLocal();
@@ -2510,7 +2510,7 @@ export const ACOES = {
     if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador negativa um pagador.');
     const cb = buscar('cobrancas', id);
     const conta = R.contaBanco(d(), cb.banco && cb.banco.conta_id);
-    if (!conta || !conta.negativacao.ativa) throw new C.ErroUsuario('A negativação está desligada nesta conta (Dados e backup → Banco (C6)).');
+    if (!conta || !conta.negativacao.ativa) throw new C.ErroUsuario('A negativação está desligada nesta conta (Sistema → Banco → Banco (C6)).');
     const c = buscar('contratos', cb.contrato_id);
     const resp = await janela({ titulo: '2ª confirmação: negativar no birô de crédito', forte: true,
       html: `<p>O banco vai incluir <b>${esc(c.inquilino_nome)}</b>${c.inquilino_cpf ? ` (${esc(c.inquilino_cpf)})` : ''} no birô de crédito se o boleto de <b>${esc(compBr(cb.competencia))}</b> (${esc(reais(cb.banco.valor))}, vencimento ${esc(dataBr(cb.vencimento))}) não for pago em até <b>${conta.negativacao.dias_atraso} dias de atraso</b>.</p>
@@ -2583,7 +2583,7 @@ export const ACOES = {
     } });
   },
 
-  /** Dados e backup: confere agora os arquivos dos lançamentos (devolve os que estavam em outra pasta; alerta os que sumiram). */
+  /** Sistema: confere agora os arquivos dos lançamentos (devolve os que estavam em outra pasta; alerta os que sumiram). */
   async conferirArquivos(_dados, el) {
     const status = statusDoBotao(el); // "Conferindo os arquivos…" já está embaixo do botão (data-status)
     // trocas de titular: o que ficou no contrato anterior (ex.: aplicação da garantia) passa ao novo antes de conferir
@@ -2593,7 +2593,7 @@ export const ACOES = {
   },
 
   /**
-   * Dados e backup (administrador): compacta as fotos e os PDFs escaneados que já estão no sistema (compactar.js), trocando
+   * Sistema (administrador): compacta as fotos e os PDFs escaneados que já estão no sistema (compactar.js), trocando
    * no lugar com o mesmo nome. PDF assinado fica como está; documento do link da ficha, só depois de conferido.
    */
   async compactarAnexos(_dados, el) {

@@ -103,7 +103,7 @@ export function contaSugeridaDoImovel(d, imovelId) {
 
 function exigirConta(d, contaId) {
   const c = contaBancaria(d, contaId);
-  if (!c) throw new Error(`Conta bancária "${contaId}" não está configurada em Dados e backup → Banco (C6).`);
+  if (!c) throw new Error(`Conta bancária "${contaId}" não está configurada em Sistema → Banco → Banco (C6).`);
   return c;
 }
 
@@ -1646,11 +1646,11 @@ export function itemC6(d, p) {
 
 function validarPagamento(d, dados) {
   const conf = cfg(d);
-  if (!conf.permitir_pagamentos) throw new Error('Os pagamentos pelo banco estão desligados em Dados e backup → Banco: conciliação e pagamentos.');
+  if (!conf.permitir_pagamentos) throw new Error('Os pagamentos pelo banco estão desligados em Sistema → Banco → Banco: conciliação e pagamentos.');
   exigirConta(d, dados.conta_id);
   if (!contasConfiguradas(d).some((c) => c.id === dados.conta_id)) throw new C.ErroUsuario('Esta conta é de outro banco (só extrato por arquivo): o pagamento pelo banco sai só por uma conta do C6.');
   if (!(Number(dados.valor) > 0)) throw new Error('Informe o valor a pagar.');
-  if (conf.limite_pagamento > 0 && dados.valor > conf.limite_pagamento) throw new C.ErroUsuario(`O valor (${C.reais(dados.valor)}) passa do limite por pagamento (${C.reais(conf.limite_pagamento)}) definido em Dados e backup → Banco: conciliação e pagamentos.`);
+  if (conf.limite_pagamento > 0 && dados.valor > conf.limite_pagamento) throw new C.ErroUsuario(`O valor (${C.reais(dados.valor)}) passa do limite por pagamento (${C.reais(conf.limite_pagamento)}) definido em Sistema → Banco → Banco: conciliação e pagamentos.`);
   if (dados.imovel_id && !buscar(d, 'imoveis', dados.imovel_id)) throw new Error('Imóvel não encontrado.');
   if (!['boleto', 'pix'].includes(dados.forma)) throw new Error('Escolha a forma: boleto (código de barras) ou Pix.');
   const content = conteudoDoPagamento(dados);
@@ -1764,7 +1764,7 @@ function efeitosDoPagamento(d, p, pagoEm, usuario) {
  */
 export function aprovarPagamento(d, pagId, aprovador) {
   const p = exigirPagamento(d, pagId);
-  if (!cfg(d).permitir_pagamentos) throw new Error('Os pagamentos pelo banco estão desligados em Dados e backup → Banco: conciliação e pagamentos.');
+  if (!cfg(d).permitir_pagamentos) throw new Error('Os pagamentos pelo banco estão desligados em Sistema → Banco → Banco: conciliação e pagamentos.');
   if (p.situacao !== 'rascunho') throw new Error(`Este pagamento está "${SITUACOES_PAGAMENTO[p.situacao]}" e não pode ser aprovado de novo.`);
   atualizar(d, 'pagamentos_banco', p.id, { situacao: 'aguardando_aprovacao', aprovado_por: aprovador, aprovado_em: new Date().toISOString() }, aprovador,
     `Pagamento de ${C.reais(p.valor)} a ${(p.beneficiario && p.beneficiario.nome) || p.tipo_conta} aprovado por ${aprovador}`);

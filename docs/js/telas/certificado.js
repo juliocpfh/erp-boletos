@@ -1,4 +1,4 @@
-// Janela "Anexar o certificado digital" (Dados e backup): acorda o programa deste computador e entrega o .pfx e a senha a ele.
+// Janela "Anexar o certificado digital" (Sistema → Empresas): acorda o programa deste computador e entrega o .pfx e a senha a ele.
 // Tela rara: carregada só no clique (PARTES_ADIADAS, comum.js). A janela é própria, fora de form[data-form], para o arquivo e
 // a senha não passarem pelo envio geral dos formulários.
 import { podeUsuario, voltarFecha } from '../app.js';

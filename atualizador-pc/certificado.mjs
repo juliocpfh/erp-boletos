@@ -1,5 +1,5 @@
 // Certificado digital A1 (e-CNPJ da ANK) no programa do PC e a rodada que assina a fila (pedido do dono de 21/11/2026; parte 4):
-// - pelo sistema (Dados e backup → Anexar o certificado digital, 22/11): certificado-local.mjs;
+// - pelo sistema (Sistema → Empresas → Anexar o certificado digital, 22/11): certificado-local.mjs;
 // - "--certificado" (reserva, sem o site): abre uma página só neste computador (127.0.0.1, como a de ligar) para escolher o arquivo .pfx e digitar a
 //   senha; o programa confere o certificado (razão social, CNPJ, validade) e guarda o arquivo e a senha cifrados pelo Windows
 //   (DPAPI: só esta conta deste computador abre), em certificado.json na pasta de configurações (fora do OneDrive e dos backups);
@@ -118,7 +118,7 @@ export function janelaDoCertificado({ env = process.env, guardar = guardarCertif
       try {
         const d = guardar({ pfx: String(corpo.pfx || ''), senha: String(corpo.senha || '') }, env);
         feito = true;
-        responder(200, { texto: `Pronto: certificado de ${d.nome}${d.cnpj ? `, CNPJ ${d.cnpj}` : ''}, válido até ${String(d.validade || '').split('-').reverse().join('/')}, instalado neste computador. Pode fechar esta página. Agora ligue a assinatura digital no sistema (Dados e backup → Regras do sistema).` });
+        responder(200, { texto: `Pronto: certificado de ${d.nome}${d.cnpj ? `, CNPJ ${d.cnpj}` : ''}, válido até ${String(d.validade || '').split('-').reverse().join('/')}, instalado neste computador. Pode fechar esta página. Agora ligue a assinatura digital no sistema (Sistema → Regras do sistema).` });
         setTimeout(() => servidor.close(), 200);
         return resolver(d);
       } catch (e) { return responder(400, { erro: e.message }); }

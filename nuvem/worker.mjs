@@ -593,11 +593,11 @@ async function conectarGmail(env, email, url) {
   return json(200, { url: urlDeAutorizacao(env, { state, desafio, retorno: enderecoDeRetorno(env, url) }) });
 }
 
-/** Avisos da volta (o site mostra o texto de cada um em Dados e backup; FORMATOS_PARAMETRO.gmail em calculos.js). */
+/** Avisos da volta (o site mostra o texto de cada um em Sistema → Comunicação E-mail; FORMATOS_PARAMETRO.gmail em calculos.js). */
 export const AVISOS_VOLTA_GMAIL = ['ligado', 'cancelado', 'recusado', 'sem-permissao', 'credencial', 'retorno', 'sem-rede', 'erro'];
 const voltarParaTela = (env, url, codigo) => new Response(null, {
   status: 303,
-  headers: { Location: `${String(env.ORIGEM || url.origin).trim().replace(/\/+$/, '')}/#/dados?gmail=${AVISOS_VOLTA_GMAIL.includes(codigo) ? codigo : 'erro'}`, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' },
+  headers: { Location: `${String(env.ORIGEM || url.origin).trim().replace(/\/+$/, '')}/#/sistema-email?gmail=${AVISOS_VOLTA_GMAIL.includes(codigo) ? codigo : 'erro'}`, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' },
 });
 
 /** A volta do Google: gasta o state (uma vez, do mesmo administrador, em 10 min), troca o código e guarda a autorização cifrada. */

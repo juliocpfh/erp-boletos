@@ -52,7 +52,7 @@ Para gerar o `.exe` na mão (Windows, com Node 24): `node tools/gerar-exe.mjs` �
 ## O que precisa ter (jeito antigo, com o Node)
 
 - [Node.js](https://nodejs.org) (versão 20 ou mais nova). Nada mais.
-- O backup seguro já ligado neste computador (Dados e backup → Backup seguro): a pasta escolhida tem o arquivo `chave-do-backup.json`.
+- O backup seguro já ligado neste computador (Sistema → Backup seguro): a pasta escolhida tem o arquivo `chave-do-backup.json`.
 - Na nuvem, a regra **Bypass** do caminho `/api/aparelho` no Cloudflare Access (uma vez só, feita pelo dono: passo a passo em `nuvem/README.md`, "Programa do PC"). Sem ela a página avisa: *"falta a regra Bypass"*.
 
 ## Passo a passo com o Node (computador novo; com o `.exe`, veja acima)
@@ -75,11 +75,11 @@ Além dos dados cifrados, o atualizador mantém na pasta do backup seguro a subp
 
 - Todo dia às 20h e ao entrar no Windows: dados, versão PC e arquivos.
 - **De hora em hora**: só os arquivos (`node atualizador.mjs --arquivos`, pela tarefa "Imoveis - copia dos arquivos (de hora em hora)", que roda escondida por `rodar-escondido.vbs`, sem janela preta; escondida, ela nunca abre a página de ligar: só registra o erro).
-- O sistema aberto neste computador também atualiza a cópia logo depois de anexar, apagar ou mover arquivos, e no botão **Atualizar a pasta agora** (Dados e backup → Backup seguro).
+- O sistema aberto neste computador também atualiza a cópia logo depois de anexar, apagar ou mover arquivos, e no botão **Atualizar a pasta agora** (Sistema → Backup seguro).
 
 ### Botão "Abrir a pasta no Explorer" (desde 17/11/2026, só com o `.exe`)
 
-Em Dados e backup → Backup seguro → "Cópia aberta dos arquivos" (só no computador com Windows; não aparece no celular) há o link **Abrir a pasta no Explorer** (`imoveis-pasta:abrir`) e o botão **Copiar o caminho**. O navegador não deixa um site abrir pastas do computador, então o link chama este programa por um endereço próprio, `imoveis-pasta:`:
+Em Sistema → Backup seguro → "Cópia aberta dos arquivos" (só no computador com Windows; não aparece no celular) há o link **Abrir a pasta no Explorer** (`imoveis-pasta:abrir`) e o botão **Copiar o caminho**. O navegador não deixa um site abrir pastas do computador, então o link chama este programa por um endereço próprio, `imoveis-pasta:`:
 
 - **Onde fica registrado:** `HKCU\Software\Classes\imoveis-pasta` (só para o usuário do Windows, sem pedir administrador), apontando para `wscript.exe "<pasta programa>\abrir-pasta.vbs"`, que roda `Administracao-de-Imoveis.exe --abrir-pasta` sem janela. O `.exe` registra ao instalar (dois cliques ou `--instalar`) e de novo em cada rodada (`--atualizar`, `--arquivos`, `--ligar`): quem já tinha o programa ganha o botão ao trocar o `.exe`. `--desinstalar` tira o registro. `--instalar --simular` mostra os comandos do `reg` sem mexer em nada. Pelo Node (jeito antigo) não há botão.
 - **Segurança:** o comando registrado não leva o endereço (sem `%1`), o `.vbs` não repassa argumento nenhum e `--abrir-pasta` ignora todo o resto: qualquer site que chame `imoveis-pasta:` só consegue abrir a pasta `Arquivos dos imoveis` deste computador (a do backup seguro guardada em `config.json`; sem a cópia ainda, a própria pasta do backup seguro). Nunca outro caminho, nunca outro comando. Sem o computador ligado, aparece uma janelinha dizendo para abrir o programa.
@@ -91,7 +91,7 @@ Em Dados e backup → Backup seguro → "Cópia aberta dos arquivos" (só no com
 Dois jeitos, os dois chegam ao mesmo `Administracao-de-Imoveis.exe --desinstalar`:
 
 1. **Configurações do Windows → Aplicativos → Aplicativos instalados → Administração de Imóveis → Desinstalar**, como qualquer programa. O `.exe` se registra ali ao instalar e de novo em cada rodada (como o botão da pasta), só para o usuário do Windows, sem administrador: `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\AdministracaoDeImoveis`, com `DisplayName` "Administração de Imóveis", `DisplayVersion` (a do `.exe`), `Publisher`, `DisplayIcon` (o `icone.ico` ao lado do `.exe`: casinha branca no quadrado azul, gravado em cada rodada; o `.exe` em si continua com o ícone do Node; desenho em `tools/gerar-icone-pc.mjs`, que gera `icone.mjs`), `InstallLocation` (a pasta `programa`), `EstimatedSize` (em KB), `NoModify`/`NoRepair` = 1 e `UninstallString` = `"<pasta programa>\Administracao-de-Imoveis.exe" --desinstalar` (o caminho tem espaço: vai entre aspas).
-2. **No sistema:** Dados e backup → Backup seguro → **Programa deste computador** → **Desinstalar o programa deste computador** (só no computador com Windows; não aparece no celular). O link `imoveis-desinstalar:confirmar` chama, pelo mesmo esquema do botão da pasta, `HKCU\Software\Classes\imoveis-desinstalar` → `wscript.exe "<pasta programa>\desinstalar.vbs"` → o `.exe` com `--desinstalar` e nada mais (sem `%1`, o `.vbs` não repassa argumento nenhum e `--desinstalar` com argumento a mais é recusado).
+2. **No sistema:** Sistema → Backup seguro → **Programa deste computador** → **Desinstalar o programa deste computador** (só no computador com Windows; não aparece no celular). O link `imoveis-desinstalar:confirmar` chama, pelo mesmo esquema do botão da pasta, `HKCU\Software\Classes\imoveis-desinstalar` → `wscript.exe "<pasta programa>\desinstalar.vbs"` → o `.exe` com `--desinstalar` e nada mais (sem `%1`, o `.vbs` não repassa argumento nenhum e `--desinstalar` com argumento a mais é recusado).
 
 **O que o `--desinstalar` faz:** primeiro pergunta numa janela do Windows (Sim/Não, com o Não marcado): *"Desinstalar Administração de Imóveis? As cópias e a pasta de arquivos continuam no computador. Para cortar o acesso deste computador ao sistema, use Usuários → Aparelhos ligados → Desligar."* Por isso nenhum site consegue desinstalar: só a pessoa, clicando em Sim. Com Sim: tira os três endereços (`imoveis-pasta:`, `imoveis-desinstalar:` e `imoveis-certificado:`), as três tarefas (pede administrador se o Windows exigir), a entrada em Aplicativos instalados e, por último, os arquivos do programa da pasta `programa` (o `.exe`, os `.vbs` e o `icone.ico`; a pasta sai se ficar vazia). O `.exe` em uso não se apaga sozinho: um PowerShell escondido espera o programa fechar e apaga. No fim, a janela "Pronto: programa desinstalado".
 
@@ -99,11 +99,11 @@ Dois jeitos, os dois chegam ao mesmo `Administracao-de-Imoveis.exe --desinstalar
 
 ## Assinatura digital com o certificado A1 da empresa (desde 21/11/2026, só com o `.exe`)
 
-- **Instalar pelo sistema (desde 22/11/2026, o jeito normal):** Dados e backup → Certificado digital da empresa → **Anexar o certificado digital**, no computador que vai assinar. O link `imoveis-certificado:abrir` (registrado como os outros botões, sem nada do endereço) roda `certificado.vbs` → o `.exe` escondido com `--certificado-sistema`, que escuta em `127.0.0.1:47631` por até 10 minutos parado. O site entrega o .pfx e a senha direto a ele (nada pela nuvem); o programa confere, guarda cifrado, cria a tarefa da assinatura e já assina o que estiver na fila. Só responde à origem exata do site em que o computador está ligado; 10 tentativas erradas fecham. O Chrome pergunta "Abrir…?" e se o site pode falar com este computador.
+- **Instalar pelo sistema (desde 22/11/2026, o jeito normal):** Sistema → Empresas → Certificado digital da empresa → **Anexar o certificado digital**, no computador que vai assinar. O link `imoveis-certificado:abrir` (registrado como os outros botões, sem nada do endereço) roda `certificado.vbs` → o `.exe` escondido com `--certificado-sistema`, que escuta em `127.0.0.1:47631` por até 10 minutos parado. O site entrega o .pfx e a senha direto a ele (nada pela nuvem); o programa confere, guarda cifrado, cria a tarefa da assinatura e já assina o que estiver na fila. Só responde à origem exata do site em que o computador está ligado; 10 tentativas erradas fecham. O Chrome pergunta "Abrir…?" e se o site pode falar com este computador.
 - **O que é recusado ao instalar (pelos dois jeitos):** senha errada, arquivo que não é .pfx ou sem a chave, certificado vencido ou que ainda não começou a valer, chave que não é RSA, certificado só para cifrar e qualquer um que falhe na **assinatura de prova**. A confiança na certificadora não é exigida aqui (quem confere é o validador do ITI ou o Adobe).
 - **Reserva, sem o site:** `Administracao-de-Imoveis.exe --certificado` abre uma página só neste computador (127.0.0.1): escolha o arquivo **.pfx** (e-CNPJ A1 da ANK) e digite a senha. O programa confere (razão social, CNPJ, validade; recusa senha errada e certificado vencido) e guarda o arquivo e a senha **cifrados pelo Windows** (DPAPI) em `certificado.json`, na pasta de configurações (`%LOCALAPPDATA%\Administracao de Imoveis`), fora do OneDrive e dos backups. Escolher outro troca o atual. Cria também a tarefa **"Imoveis - assinatura digital (a cada minuto)"** (sem janela).
 - **Assinar:** a tarefa roda `--assinar` a cada minuto: sem o certificado, sai na hora sem ir à internet; com ele, busca a fila da nuvem (`/api/aparelho/assinaturas`, `nuvem/assinaturas.mjs`), assina cada PDF (`assinar-pdf.mjs`: página final "Assinatura digital" e a assinatura ICP-Brasil feita pelo Windows) e devolve. Erro (ex.: certificado vencido) vai para o site, que o mostra na página do recibo e no Painel.
-- **No sistema:** ligue a regra "Assinatura digital dos recibos e termos" (Dados e backup → Regras do sistema). Desinstalar apaga a tarefa; o `certificado.json` fica (apague à mão, se quiser).
+- **No sistema:** ligue a regra "Assinatura digital dos recibos e termos" (Sistema → Regras do sistema). Desinstalar apaga a tarefa; o `certificado.json` fica (apague à mão, se quiser).
 
 ## Como saber se está funcionando
 
@@ -114,7 +114,7 @@ Dois jeitos, os dois chegam ao mesmo `Administracao-de-Imoveis.exe --desinstalar
 
 ## Quando o site cair
 
-Abra `programa/administracao-imoveis.html` (na pasta do backup seguro) com dois cliques, no Chrome ou no Edge. Em **Restaurar backup seguro**, escolha a cópia do dia em `copias-diarias/`, digite a senha do backup e mande abrir numa pasta: o sistema abre inteiro, com os dados daquela cópia, e você pode trabalhar. Quando o site voltar, em **Dados e backup → Substituir os dados da nuvem pelos de uma pasta** você manda o que fez para a nuvem.
+Abra `programa/administracao-imoveis.html` (na pasta do backup seguro) com dois cliques, no Chrome ou no Edge. Em **Restaurar backup seguro**, escolha a cópia do dia em `copias-diarias/`, digite a senha do backup e mande abrir numa pasta: o sistema abre inteiro, com os dados daquela cópia, e você pode trabalhar. Quando o site voltar, em **Sistema → Substituir os dados da nuvem pelos de uma pasta** você manda o que fez para a nuvem.
 
 ## Segurança
 
@@ -124,5 +124,5 @@ Abra `programa/administracao-imoveis.html` (na pasta do backup seguro) com dois 
 
 ## Falta (etapa 2 da proposta)
 
-- O `.exe` sem o Node está feito (acima). Falta dele: **assinatura** (certificado de assinatura de código: sem assinatura no computador do dono; comprar antes do primeiro cliente de fora, proposta, seção 8, item 11), ícone na Área de Trabalho e o link para baixar dentro do sistema (Dados e backup).
+- O `.exe` sem o Node está feito (acima). Falta dele: **assinatura** (certificado de assinatura de código: sem assinatura no computador do dono; comprar antes do primeiro cliente de fora, proposta, seção 8, item 11), ícone na Área de Trabalho e o link para baixar dentro do sistema (Sistema).
 - Com o login próprio (etapa 4), a página de ligar pede também o código de confirmação.
