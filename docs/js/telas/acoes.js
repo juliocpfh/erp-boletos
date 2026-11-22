@@ -28,7 +28,9 @@ import { alertasAbertos } from './comum.js';
 import { ACOES_PASTA } from './arquivo-impresso.js';
 import { ACOES_NOTIFICACOES } from './notificacoes.js';
 import { ACOES_COMUNICACOES } from './comunicacoes.js';
-import { documentoMontado, guardarCartaNaPasta, logoPng, MODELO_COMODOS, modelosNoBanco, pdfDaCarta, pdfDoDocumento, roteiroTexto } from './documentos.js';
+import { alvoDoRecibo, documentoMontado, guardarCartaNaPasta, logoPng, MODELO_COMODOS, modelosNoBanco, pdfDaCarta, pdfDoDocumento, pdfDoRecibo, roteiroTexto } from './documentos.js';
+import * as AS from '../assinatura.js';
+import * as REC from '../recibos.js';
 import { confirmarPagamentoBoleto } from './envios.js';
 import { siglaEmpresa } from './faturas.js';
 
@@ -1154,6 +1156,38 @@ export const ACOES = {
       await alterarApagandoAnexos((db) => { feito = R.desfazerAditivo(db, Number(id), login(), { excluirTermo: so !== 'arquivo' }); });
       aviso(`${so === 'arquivo' ? 'Arquivo apagado: o termo voltou a "aguardando assinatura".' : 'Termo aditivo excluído.'} ${feito}`.trim(), 'ok');
     }
+    await mostrar();
+  },
+
+  /** Assinatura digital (regra assinatura_digital): manda o recibo conferido para a fila; o programa do PC assina. */
+  async assinaturaPedir({ tipo, contrato, ficha, id, fiador }) {
+    const alvo = alvoDoRecibo({ contrato, ficha, id, fiador });
+    if (!alvo) throw new C.ErroUsuario('Ficha ou inquilino não encontrado.');
+    aviso('Montando o PDF para assinar…', 'info');
+    const r = await pdfDoRecibo(tipo, alvo);
+    await AS.pedirAssinatura(r.blob, { titulo: `${REC.TIPOS_RECIBO[tipo] || 'Documento'} · ${(alvo.ficha || alvo.contrato).inquilino_nome}`, chave: AS.chaveDoRecibo(tipo, alvo), nome: r.nome, contrato: alvo.contrato ? alvo.contrato.id : null });
+    aviso('Enviado para assinar: o programa do PC com o certificado assina em cerca de 1 minuto (se estiver ligado).', 'ok');
+    await mostrar();
+  },
+
+  /** Baixa o PDF assinado e guarda uma cópia na pasta do inquilino (ou da ficha). */
+  async assinaturaBaixar({ pedido, contrato, ficha }) {
+    const blob = await AS.baixarAssinado(pedido);
+    const alvo = alvoDoRecibo({ contrato, ficha });
+    const p = ((await AS.fila()).pedidos || []).find((x) => x.id === pedido) || {};
+    const nome = S.limparNome(String(p.nome || 'documento-assinado.pdf').replace(/\.pdf$/i, '')) + ' - assinado.pdf';
+    if (alvo) { try { await S.escreverTexto(await pastaDoEscopo(alvo.ficha ? 'ficha' : 'contrato', (alvo.ficha || alvo.contrato).id), nome, blob); } catch (e) { aviso(`O PDF foi baixado, mas não consegui guardar a cópia na pasta: ${e.message}`, 'aviso'); } }
+    baixar(blob, nome);
+  },
+
+  async assinaturaCancelar({ id }) {
+    if (!(await confirmar('Tirar este documento da fila de assinatura? Ele não será assinado.', { titulo: 'Tirar da fila', sim: 'Tirar', nao: 'Voltar' }))) return;
+    await AS.cancelarAssinatura(id);
+    await mostrar();
+  },
+
+  async assinaturaAtualizar() {
+    await AS.fila({ fresca: true });
     await mostrar();
   },
 

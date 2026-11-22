@@ -13,6 +13,7 @@ import { MODELOS_EMAIL, modeloEmail, montarEmail } from '../modelos-email.js';
 import * as R from '../regras.js';
 import { ACEITA_DOCUMENTOS, botao, buscar, d, etiqueta, link, naoEncontrado, opera, pastaDoEscopo } from './comum.js';
 import { pdfDoRecibo } from './documentos.js';
+import * as AS from '../assinatura.js';
 
 /** Endereço do Gmail para escrever: com o texto, enquanto couber no endereço (o navegador corta endereços muito longos). */
 const LIMITE_ENDERECO = 7000;
@@ -64,12 +65,24 @@ function listaProntos(prontos, ligado) {
     ${algum ? `<p><button type="button" class="secundario mini" data-baixar-prontos>Baixar os marcados</button> <span class="suave">${ligado ? 'Vão juntos no "Enviar agora".' : 'Para o Gmail: baixe e anexe por lá.'}</span></p>` : ''}</div>`;
 }
 
+/**
+ * O recibo do e-mail: com a assinatura digital ligada (regra assinatura_digital), só o PDF assinado pelo PC, baixado da fila
+ * (o mesmo documento da página do recibo, pela chave); ainda não assinado, o e-mail não vai. Desligada (ou na ficha, que a
+ * pessoa preenche), o PDF montado na hora, como antes.
+ */
+async function reciboParaEnviar(a, alvo) {
+  if (!R.regra('assinatura_digital') || AS.SEM_ASSINATURA_DA_EMPRESA.includes(a.recibo)) { const r = await pdfDoRecibo(a.recibo, alvo); return { nome: r.nome, blob: r.blob }; }
+  const p = AS.pedidoDe(await AS.fila({ fresca: true }), AS.chaveDoRecibo(a.recibo, alvo));
+  if (!p || p.situacao !== 'assinado') throw new C.ErroUsuario(`O ${a.rotulo} ainda não foi assinado digitalmente${p && p.situacao === 'erro' ? ` (${p.erro})` : p ? ' (está na fila do PC)' : ''}: abra o recibo e use "Enviar para assinar", ou desmarque esse anexo. Nada foi enviado.`);
+  return { nome: `${String(p.nome || 'documento.pdf').replace(/\.pdf$/i, '')} - assinado.pdf`, blob: await AS.baixarAssinado(p.id) };
+}
+
 /** Arquivos dos anexos marcados: o recibo vira PDF na hora; o comprovante é lido da pasta. [{ nome, blob }] */
 async function arquivosProntos(dlg, prontos, objeto) {
   const out = [];
   for (const el of dlg.querySelectorAll('[name=pronto]:checked')) {
     const a = prontos[Number(el.value)];
-    if (a.tipo === 'recibo') { const r = await pdfDoRecibo(a.recibo, a.alvo || objeto); out.push({ nome: r.nome, blob: r.blob }); }
+    if (a.tipo === 'recibo') out.push(await reciboParaEnviar(a, a.alvo || objeto));
     else if (a.tipo === 'boleto') {
       // boleto emitido no C6 (ex.: o do saldo da saída, 2026-11-20): o PDF vem pela ponte; o QR Code do Pix já está guardado
       const cb = buscar('cobrancas', a.id);
