@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-UiHW3gaXBfOYN2Mfz8Mwuz4oYaVHrr0g91sz/K4YUJA=' 'sha256-/bgO2fbvRoBEnpTkdNjA6pHyZCbBCTJNby567eBUD2s='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-UiHW3gaXBfOYN2Mfz8Mwuz4oYaVHrr0g91sz/K4YUJA=' 'sha256-IiarFkHS2BoP3W/ldNxFoHWzsrKuRm9Qi4ZHhcn0Dwg='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="fadf9b0377ca3afa">
+<meta name="fontes" content="2d5610474e7fa24e">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1323,7 +1323,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   // docs/js/config-regras.js
   function buscarRegras(termo) {
     const palavras = paraBusca(termo).split(/\s+/).filter(Boolean);
-    return DEFINICOES_REGRAS.filter((x) => {
+    return REGRAS_NA_TELA.filter((x) => {
       const texto3 = paraBusca([x.rotulo, x.explica, x.consequencia, x.lei, ...(x.opcoes || []).flat()].join(" "));
       return palavras.every((p2) => texto3.includes(p2));
     }).map((x) => x.chave);
@@ -1446,7 +1446,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     for (const [k, v] of Object.entries(j.regras)) if (POR_CHAVE.has(k)) out[k] = limparValorRegra(k, v);
     return out;
   }
-  var GRUPOS_REGRAS, LI, DEFINICOES_REGRAS, POR_CHAVE, definicaoRegra, paraBusca, PADRAO_SISTEMA, copia, mesmoValor, ErroRegra, regrasDe, emUso, REGRAS_POR_CONTRATO, podePorContrato, perfis, perfilDoContrato, valoresEmUso, FORMATO_ARQUIVO_REGRAS, arquivoDasRegras;
+  var GRUPOS_REGRAS, LI, DEFINICOES_REGRAS, POR_CHAVE, definicaoRegra, paraBusca, REGRAS_NA_TELA, PADRAO_SISTEMA, copia, mesmoValor, ErroRegra, regrasDe, emUso, REGRAS_POR_CONTRATO, podePorContrato, perfis, perfilDoContrato, valoresEmUso, FORMATO_ARQUIVO_REGRAS, arquivoDasRegras;
   var init_config_regras = __esm({
     "docs/js/config-regras.js"() {
       GRUPOS_REGRAS = [
@@ -1816,15 +1816,17 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           lei: "Sem lei: rotina. O documento assinado digitalmente não é mexido porque qualquer mudança no arquivo invalida a assinatura (MP 2.200-2/2001 e Lei 14.063/2020)."
         },
         // assinatura digital com o e-CNPJ A1 da ANK no programa do PC (pedido do dono de 2026-11-21): desligada até o certificado
-        // estar instalado no computador (parte 4); ligada, os recibos e termos só vão por e-mail depois de assinados
+        // estar instalado no computador (parte 4); ligada, os recibos e termos só vão por e-mail depois de assinados.
+        // `fora`: liga e desliga na caixa do certificado (Sistema → Empresas), não na tela das regras (pedido do dono de 2026-11-22)
         {
           chave: "assinatura_digital",
           grupo: "rotina",
+          fora: "certificado",
           rotulo: "Assinatura digital dos recibos e termos (certificado da empresa no PC)",
           tipo: "simnao",
           padrao: false,
           explica: 'Sim: em cada recibo, termo e notificação aparecem "Enviar para assinar" e, depois de assinado, "Baixar PDF assinado". O programa do PC, com o certificado digital A1 (e-CNPJ) da ANK instalado (Sistema → Empresas → Anexar o certificado digital), assina sozinho os documentos da fila: acrescenta uma página "Assinatura digital" no fim do PDF, com a assinatura ICP-Brasil. O e-mail da etapa só leva o recibo depois de assinado. Se o PC estiver desligado, os documentos esperam na fila e o Painel avisa para ligá-lo. A ficha cadastral (que a pessoa preenche) não passa por aqui. Ex.: recibo da garantia → Enviar para assinar → em cerca de 1 minuto, "Assinado digitalmente em 05/12/2026 às 10:32" → o e-mail leva o PDF assinado.',
-          consequencia: "Não (padrão até instalar o certificado no PC): os recibos e termos saem e vão por e-mail sem a assinatura digital da empresa, como antes; a empresa assina à mão ou pelo gov.br.",
+          consequencia: "Desligada (padrão até instalar o certificado no PC): os recibos e termos saem e vão por e-mail sem a assinatura digital da empresa, como antes; a empresa assina à mão ou pelo gov.br.",
           lei: 'A assinatura com certificado ICP-Brasil tem a mesma validade da assinatura de próprio punho (MP 2.200-2/2001, art. 10, § 1º) e é a "qualificada" da Lei 14.063/2020 (art. 4º, III). A empresa assina pelo seu administrador (Código Civil, art. 47); o e-CNPJ identifica a empresa e o responsável. Quitação é de quem recebe (Código Civil, arts. 319 e 320).'
         },
         // mutirão 3000 (venda 49, 2026-11-17): era obrigatória fixa no código; o padrão continua obrigatória
@@ -2145,6 +2147,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       POR_CHAVE = new Map(DEFINICOES_REGRAS.map((x) => [x.chave, x]));
       definicaoRegra = (chave) => POR_CHAVE.get(chave) || null;
       paraBusca = (t) => String(t ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+      REGRAS_NA_TELA = DEFINICOES_REGRAS.filter((x) => !x.fora);
       PADRAO_SISTEMA = Object.freeze(Object.fromEntries(DEFINICOES_REGRAS.map((x) => [x.chave, x.padrao])));
       copia = (v) => v && typeof v === "object" ? JSON.parse(JSON.stringify(v)) : v;
       mesmoValor = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
@@ -12548,9 +12551,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const limpos = {};
     for (const [k, v] of Object.entries(valores || {})) if (definicaoRegra(k)) limpos[k] = limparValorRegra(k, v);
     let mudou = 0;
-    const naNfAntes = regrasDe(d2).ressarcimento_na_nf;
+    const antes = regrasDe(d2);
+    const naNfAntes = antes.ressarcimento_na_nf;
     for (const def of DEFINICOES_REGRAS) {
-      const novo = def.chave in limpos ? limpos[def.chave] : def.padrao;
+      const novo = def.chave in limpos ? limpos[def.chave] : def.fora ? antes[def.chave] : def.padrao;
       const linha = d2.config_regras.find((r) => r.chave === def.chave);
       const padrao = mesmoValor(novo, def.padrao);
       if (linha && padrao) {
@@ -19447,7 +19451,7 @@ Lei Geral de Proteção de Dados (Lei 13.709/2018), art. 18: direito de acesso a
       <p class="suave" data-busca-resultado aria-live="polite"></p></div>
     <form data-form="regrasSistema">
       ${GRUPOS_REGRAS.map(([g, titulo2]) => `<div class="cartao" data-grupo-regras><h2>${esc(titulo2)}</h2>
-        ${DEFINICOES_REGRAS.filter((x) => x.grupo === g).map((x) => blocoRegra(x, regras, admin3)).join("")}</div>`).join("")}
+        ${REGRAS_NA_TELA.filter((x) => x.grupo === g).map((x) => blocoRegra(x, regras, admin3)).join("")}</div>`).join("")}
       ${admin3 ? '<p class="acoes barra-salvar"><button>Salvar as regras</button></p>' : ""}
     </form>`;
   }
@@ -23348,6 +23352,7 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
       aberta = false;
       form.reset();
       dlg.remove();
+      mostrar();
     });
     form.addEventListener("submit", async (ev) => {
       ev.preventDefault();
@@ -23361,8 +23366,19 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
         form.hidden = true;
         const tarefa = c.tarefa ? "<br>Este computador já pode assinar sozinho, a cada minuto." : "<br><b>Atenção:</b> o Windows não deixou criar a tarefa que assina sozinha. Avise o suporte com esta mensagem.";
         const semCnpj = c.cnpj ? "" : "<br><b>Atenção:</b> não achei CNPJ neste certificado. Confira se é o e-CNPJ da empresa (e não o e-CPF de uma pessoa).";
-        dizer(`Pronto: certificado de ${descricao(c)} guardado neste computador.${semCnpj}${tarefa}
-        <br>Confira se a regra <b>Assinatura digital dos recibos e termos</b> está em Sim (Regras do sistema).`, c.tarefa && c.cnpj ? "ok" : "aviso");
+        const ligar = regra("assinatura_digital") ? "<br>A assinatura digital já está ligada." : '<br><span data-falta-ligar>Falta ligar a assinatura digital: <button type="button" class="pequeno" data-ligar-assinatura>Ligar a assinatura digital agora</button></span>';
+        dizer(`Pronto: certificado de ${descricao(c)} guardado neste computador.${semCnpj}${tarefa}${ligar}`, c.tarefa && c.cnpj ? "ok" : "aviso");
+        const ligarAgora = estado2.querySelector("[data-ligar-assinatura]");
+        ligarAgora?.addEventListener("click", async () => {
+          ligarAgora.disabled = true;
+          try {
+            await ligarAssinatura(true);
+            estado2.querySelector("[data-falta-ligar]").replaceWith("Assinatura digital ligada: os recibos e termos passam a ir por e-mail só depois de assinados.");
+          } catch (erro) {
+            aviso(erro.message, "erro");
+            ligarAgora.disabled = false;
+          }
+        });
       } catch (e) {
         dizer(esc(e.message), "perigo");
         campos.disabled = false;
@@ -23397,6 +23413,10 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
       clearTimeout(mostrarAjuda);
     })();
   }
+  async function ligarAssinatura(liga) {
+    if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador liga e desliga a assinatura digital.");
+    await alterar((db) => mudarRegraSistema(db, "assinatura_digital", !!liga, login()));
+  }
   var DEMORA_AJUDA, INTERVALO, descricao, ACOES_CERTIFICADO;
   var init_certificado = __esm({
     "docs/js/telas/certificado.js"() {
@@ -23404,10 +23424,16 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
       init_calculos();
       init_certificado_pc();
       init_formularios();
+      init_regras();
       DEMORA_AJUDA = 8e3;
       INTERVALO = 1e3;
       descricao = (c) => `<b>${esc(c.nome)}</b>${c.cnpj ? `, CNPJ ${esc(c.cnpj)}` : ""}${c.validade ? `, válido até ${esc(dataBr(c.validade))}` : ""}`;
       ACOES_CERTIFICADO = {
+        async assinaturaDigital({ liga }) {
+          await ligarAssinatura(liga === "1");
+          aviso(liga === "1" ? "Assinatura digital ligada: os recibos e termos passam a ir por e-mail só depois de assinados pelo PC." : "Assinatura digital desligada: os recibos e termos voltam a sair sem a assinatura da empresa.", "ok");
+          await mostrar();
+        },
         async anexarCertificado() {
           if (!podeUsuario("admin")) throw new ErroUsuario("Só o administrador anexa o certificado da empresa.");
           const a = document.createElement("a");
@@ -31764,7 +31790,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
           "restaurarBackupNuvem",
           "esquecerNaoEnviado"
         ]] },
-        certificado: { importar: () => Promise.resolve().then(() => (init_certificado(), certificado_exports)), acoes: ["ACOES_CERTIFICADO", ["anexarCertificado"]] },
+        certificado: { importar: () => Promise.resolve().then(() => (init_certificado(), certificado_exports)), acoes: ["ACOES_CERTIFICADO", ["anexarCertificado", "assinaturaDigital"]] },
         // TEMPORÁRIA (20/11/2026): teste de todos os PDFs pelo dono; apagar depois do teste
         testePdfs: { importar: () => Promise.resolve().then(() => (init_teste_pdfs(), teste_pdfs_exports)), acoes: ["ACOES_TESTE_PDFS", ["testePdfRecibo", "testePdfCarta"]] }
       };
@@ -34515,7 +34541,16 @@ ${xref}
     <p>Anexe o certificado A1 (.pfx ou .p12) e digite a senha: o programa do PC guarda os dois cifrados e passa a assinar os recibos e termos sozinho.</p>
     ${aqui ? `<div class="acoes">${botao("anexarCertificado", "Anexar o certificado digital", {}, "")}</div>
       <p class="suave">Faça no computador que vai assinar, com o programa do PC instalado. O navegador pergunta se pode abrir o programa e falar com este computador: responda Abrir e Permitir. O arquivo e a senha não vão para a nuvem nem para os backups.</p>` : '<p class="suave">Abra esta tela no computador com Windows que vai assinar (o certificado fica guardado só nele).</p>'}
-    <p class="suave">Assinatura digital: <b>${regra("assinatura_digital") ? "ligada" : "desligada"}</b> (${link("#/regras", "Regras do sistema", "")}).</p></div>`;
+    ${ligaDesligaAssinatura()}</div>`;
+  }
+  function ligaDesligaAssinatura() {
+    const def = definicaoRegra("assinatura_digital");
+    const ligada = regra("assinatura_digital");
+    return `<div class="regra-sistema" id="assinatura-digital"><h3>Assinatura digital dos recibos e termos ${ligada ? etiqueta("ligada", "ok") : etiqueta("desligada", "neutra")}</h3>
+    <p>${esc(def.explica)}</p>
+    <div class="acoes">${ligada ? botao("assinaturaDigital", "Desligar a assinatura digital", { liga: "0" }, "secundario", "Desligar a assinatura digital? Os recibos e termos voltam a sair e a ir por e-mail sem a assinatura da empresa. Os que já foram assinados continuam assinados.") : botao("assinaturaDigital", "Ligar a assinatura digital", { liga: "1" }, "", "Ligar a assinatura digital? Os recibos e termos passam a ir por e-mail só depois de assinados pelo PC com o certificado. Se o PC estiver desligado, eles esperam na fila e o Painel avisa.")}</div>
+    <p class="suave"><b>Consequência:</b> ${esc(def.consequencia)}</p>
+    <p class="suave"><b>Lei:</b> ${esc(def.lei)}</p></div>`;
   }
   function caixaAbrirPasta(copia2) {
     if (!noComputador()) return "";
@@ -34770,6 +34805,7 @@ ${xref}
       init_cadastros();
       init_comum();
       init_icone();
+      init_config_regras();
       init_sistema();
       tamanho2 = (b) => b > 1048576 ? `${(b / 1048576).toFixed(1).replace(".", ",")} MB` : `${Math.max(1, Math.round(b / 1024))} KB`;
       FORM_RESTAURAR = `<form data-form="restaurarSeguro" class="formulario">
