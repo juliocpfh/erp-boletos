@@ -1,8 +1,9 @@
 // Documentos gerados: impressão, contrato por modelo, vistoria (e o modelo de vistoria), recibo de chaves, termo aditivo,
 // modelos de contrato, PDF/Word e logo.
 import { botaoEmail } from './emails.js';
-import { alterar, bibliotecasPdf, login, podeUsuario } from '../app.js';
+import { alterar, bibliotecasPdf, E, login, podeUsuario } from '../app.js';
 import * as S from '../armazenamento.js';
+import * as AS from '../assinatura.js';
 import * as C from '../calculos.js';
 import { dataBr } from '../calculos.js';
 import * as K from '../contratos.js';
@@ -64,7 +65,7 @@ export async function telaImprimir(rota) {
     const disp = REC.reciboDisponivel(d(), rota.q.tipo, alvo);
     if (!disp.ok) return `<p class="suave"><a href="${volta}">← Voltar</a></p><div class="alerta aviso">${esc(disp.motivo)}</div>`;
     const r = REC.montarRecibo(d(), rota.q.tipo, alvo);
-    return `<div class="impressao">${voltar({ seletor: '.impressao .carta', nome: S.limparNome(r.arquivo) })}${reciboHtml(r)}</div>`;
+    return `<div class="impressao">${voltar({ seletor: '.impressao .carta', nome: S.limparNome(r.arquivo) })}${await caixaAssinatura(rota.q.tipo, alvo)}${reciboHtml(r)}</div>`;
   }
   if (tipo === 'demonstrativos') {
     const ids = rota.q.ids ? new Set(rota.q.ids.split(',').map(Number)) : null;
@@ -320,6 +321,32 @@ export function alvoDoRecibo(q) {
   if (q.ficha) { const f = buscar('fichas', q.ficha); return f ? { ficha: f, ...(q.fiador ? { fiador: Number(q.fiador) } : {}) } : null; }
   const c = buscar('contratos', q.contrato);
   return c ? { contrato: c, ...(q.id ? { acordo: Number(q.id), id: Number(q.id) } : {}) } : null; // id: o acordo (termo do acordo) ou a notificação
+}
+
+/** E-mail da etapa que leva cada recibo (o "Enviar ao inquilino" da caixa da assinatura). */
+const EMAIL_DO_RECIBO = { reserva: 'ficha_envio', devolucao_reserva: 'ficha_devolucao', garantia: 'contrato_assinado', quitacao: 'saida_encerramento', notificacao: 'notificacao_envio' };
+
+/**
+ * Caixa da assinatura digital na página do recibo (regra `assinatura_digital`, pedido do dono de 2026-11-21): o "Baixar PDF"
+ * de cima é o da conferência (sem assinatura); aqui "Enviar para assinar", a situação na fila do PC e, assinado, "Baixar PDF
+ * assinado" e o e-mail da etapa (que passa a levar o assinado). Desligada (ou na ficha, que a pessoa preenche), nada aparece.
+ */
+async function caixaAssinatura(tipo, alvo) {
+  if (!R.regra('assinatura_digital') || AS.SEM_ASSINATURA_DA_EMPRESA.includes(tipo) || !opera()) return '';
+  if (!E.nuvem) return '<div class="alerta info nao-imprimir">Assinatura digital: só pelo sistema na internet (a fila fica na nuvem e o PC com o certificado assina).</div>';
+  const dados = { tipo, ...(alvo.ficha ? { ficha: alvo.ficha.id } : { contrato: alvo.contrato.id }), ...(alvo.id ? { id: alvo.id } : {}), ...(alvo.fiador ? { fiador: alvo.fiador } : {}) };
+  let fila = null;
+  try { fila = await AS.fila(); } catch (e) { return `<div class="alerta aviso nao-imprimir">Assinatura digital: ${esc(e.message)}</div>`; }
+  const p = AS.pedidoDe(fila, AS.chaveDoRecibo(tipo, alvo));
+  const s = AS.situacaoDoPedido(p, fila.pc);
+  const modelo = EMAIL_DO_RECIBO[tipo];
+  const alvoEmail = alvo.ficha ? { ficha: alvo.ficha.id } : { contrato: alvo.contrato.id, ...(tipo === 'notificacao' && alvo.id ? { notificacao: alvo.id } : {}) };
+  return `<div class="cartao nao-imprimir" style="margin:0 0 12px"><p><b>Assinatura digital da empresa</b> · <span class="etiqueta ${s.cor}">${esc(s.texto)}</span></p>
+    <p class="acoes">${p && p.situacao === 'assinado' ? `${botao('assinaturaBaixar', 'Baixar PDF assinado', { ...dados, pedido: p.id }, '')} ${modelo ? botaoEmail(modelo, alvoEmail, '✉ Enviar ao inquilino') : '<span class="suave">Para enviar: anexe o PDF assinado no e-mail.</span>'} ` : ''}
+      ${botao('assinaturaPedir', p ? 'Enviar de novo para assinar' : 'Enviar para assinar', dados, p && p.situacao === 'assinado' ? 'secundario pequeno' : '')}
+      ${p && p.situacao !== 'assinado' ? botao('assinaturaCancelar', 'Tirar da fila', { id: p.id }, 'secundario pequeno') : ''}
+      ${botao('assinaturaAtualizar', 'Atualizar', {}, 'secundario pequeno')}</p>
+    <p class="suave">Confira o documento abaixo (ou pelo "Baixar PDF", que sai sem a assinatura) antes de enviar para assinar. O programa do PC assina com o certificado da ANK e acrescenta a página "Assinatura digital" no fim. ${p && p.situacao === 'assinado' ? 'O e-mail da etapa leva o PDF assinado.' : 'O e-mail da etapa só leva este documento depois de assinado.'}</p></div>`;
 }
 
 /** Recibo ou termo (recibos.js) como carta: logo, empresa, título, texto, tabela de valores, local e data e as assinaturas. */

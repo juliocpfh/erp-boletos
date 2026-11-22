@@ -5,6 +5,7 @@
 //   envios (FORMULARIOS: envio de cada formulário) · acoes (ACOES: botões data-acao)
 import { aviso, E, podeUsuario } from './app.js';
 import * as S from './armazenamento.js';
+import * as AS from './assinatura.js';
 import { emailDeAcesso, PAPEIS, SENHA_MINIMA } from './auth.js';
 import * as C from './calculos.js';
 import { compBr, dataBr, reais } from './calculos.js';
@@ -64,6 +65,19 @@ const LINK_RESTAURAR = '<p class="suave" style="margin-top:10px">Administrador: 
 
 /** Primeiros passos do Painel (ajuda.js): só em sistema começando, para quem lança, até o "Já sei usar". */
 const primeirosPassos = () => AJ.caixaPrimeirosPassos(d(), { quem: E.usuario?.login || '', pode: opera(), admin: podeUsuario('admin'), backupLigado: !!(E.seguro && E.seguro.chave) });
+
+/**
+ * Aviso da fila da assinatura digital no alto do Painel (pedido do dono de 2026-11-21): documentos esperando com o PC do
+ * certificado desligado, ou com erro. A fila vem da nuvem: o aviso entra depois do desenho, sem segurar a tela.
+ */
+function preencherAvisoAssinaturas() {
+  if (!R.regra('assinatura_digital') || !E.nuvem) return;
+  AS.fila({ fresca: true }).then((f) => {
+    const el = document.getElementById('aviso-assinaturas');
+    const l = AS.avisoDaFila(f);
+    if (el && l.length) el.innerHTML = l.map((t) => `<div class="alerta aviso">✍ ${esc(t)}</div>`).join('');
+  }).catch(() => { /* sem internet: o aviso volta na próxima abertura */ });
+}
 
 export const TELAS = {
   _previaAlerta: (el, cor, enfase) => { el.className = classeEstilo('aviso', { cor, enfase }); },
@@ -269,6 +283,7 @@ export const TELAS = {
     // depois das heranças (que trazem comprovantes do contrato anterior), os nomes dos comprovantes
     trazerHerancasPendentes().catch((e) => aviso(`Contratos herdados: ${e.message}`, 'aviso'))
       .then(() => acertarNomesUmaVez()).catch((e) => aviso(`Nomes dos comprovantes: ${e.message}`, 'aviso'));
+    preencherAvisoAssinaturas();
     const hoje = C.hojeIso();
     // alertas adiados ("adiar 7 dias" / "já estou cuidando") ficam recolhidos no fim da caixa, com quem marcou
     const todosOsAlertas = alertasDaTela(hoje);
@@ -291,7 +306,7 @@ export const TELAS = {
     const porTipo = {};
     for (const a of alertas) porTipo[a.tipo] = (porTipo[a.tipo] || 0) + 1;
     const [tipoMais, qtdMais] = Object.entries(porTipo).sort((a, b) => b[1] - a[1])[0] || ['', 0];
-    return `${avisoPrimeiraLogo()}<div class="cabecalho"><h1>Painel</h1>${opera() ? `<div class="acoes">${link('#/cobrancas?filtro=abertos', 'Confirmar pagamento', 'botao')} ${link('#/cobrancas', 'Acompanhar boletos', 'botao secundario')}</div>` : ''}</div>
+    return `${avisoPrimeiraLogo()}<div id="aviso-assinaturas"></div><div class="cabecalho"><h1>Painel</h1>${opera() ? `<div class="acoes">${link('#/cobrancas?filtro=abertos', 'Confirmar pagamento', 'botao')} ${link('#/cobrancas', 'Acompanhar boletos', 'botao secundario')}</div>` : ''}</div>
       ${primeirosPassos()}
       <div class="numeros">
         ${n(d().imoveis.length, 'imóveis', '#/imoveis')}
