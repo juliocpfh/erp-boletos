@@ -1,10 +1,11 @@
 // Janela "Anexar o certificado digital" (Sistema → Empresas): acorda o programa deste computador e entrega o .pfx e a senha a ele.
 // Tela rara: carregada só no clique (PARTES_ADIADAS, comum.js). A janela é própria, fora de form[data-form], para o arquivo e
 // a senha não passarem pelo envio geral dos formulários.
-import { podeUsuario, voltarFecha } from '../app.js';
+import { alterar, aviso, login, mostrar, podeUsuario, voltarFecha } from '../app.js';
 import * as C from '../calculos.js';
 import * as CP from '../certificado-pc.js';
 import { esc } from '../formularios.js';
+import * as R from '../regras.js';
 
 const DEMORA_AJUDA = 8000; // ms sem resposta até mostrar o que fazer
 const INTERVALO = 1000;
@@ -40,7 +41,8 @@ function abrirJanela() {
 
   let aberta = true;
   dlg.querySelector('[data-fechar]').addEventListener('click', () => dlg.close());
-  dlg.addEventListener('close', () => { aberta = false; form.reset(); dlg.remove(); });
+  // ao fechar, a página se redesenha: a caixa mostra o certificado e a assinatura como ficaram
+  dlg.addEventListener('close', () => { aberta = false; form.reset(); dlg.remove(); mostrar(); });
 
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
@@ -55,8 +57,17 @@ function abrirJanela() {
       const tarefa = c.tarefa ? '<br>Este computador já pode assinar sozinho, a cada minuto.'
         : '<br><b>Atenção:</b> o Windows não deixou criar a tarefa que assina sozinha. Avise o suporte com esta mensagem.';
       const semCnpj = c.cnpj ? '' : '<br><b>Atenção:</b> não achei CNPJ neste certificado. Confira se é o e-CNPJ da empresa (e não o e-CPF de uma pessoa).';
-      dizer(`Pronto: certificado de ${descricao(c)} guardado neste computador.${semCnpj}${tarefa}
-        <br>Confira se a regra <b>Assinatura digital dos recibos e termos</b> está em Sim (Regras do sistema).`, c.tarefa && c.cnpj ? 'ok' : 'aviso');
+      const ligar = R.regra('assinatura_digital') ? '<br>A assinatura digital já está ligada.'
+        : '<br><span data-falta-ligar>Falta ligar a assinatura digital: <button type="button" class="pequeno" data-ligar-assinatura>Ligar a assinatura digital agora</button></span>';
+      dizer(`Pronto: certificado de ${descricao(c)} guardado neste computador.${semCnpj}${tarefa}${ligar}`, c.tarefa && c.cnpj ? 'ok' : 'aviso');
+      const ligarAgora = estado.querySelector('[data-ligar-assinatura]');
+      ligarAgora?.addEventListener('click', async () => {
+        ligarAgora.disabled = true;
+        try {
+          await ligarAssinatura(true);
+          estado.querySelector('[data-falta-ligar]').replaceWith('Assinatura digital ligada: os recibos e termos passam a ir por e-mail só depois de assinados.');
+        } catch (erro) { aviso(erro.message, 'erro'); ligarAgora.disabled = false; }
+      });
     } catch (e) {
       dizer(esc(e.message), 'perigo');
       campos.disabled = false;
@@ -90,7 +101,18 @@ function abrirJanela() {
   })();
 }
 
+/** Liga ou desliga a regra `assinatura_digital` (a mesma de antes, só que pela caixa do certificado). */
+async function ligarAssinatura(liga) {
+  if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador liga e desliga a assinatura digital.');
+  await alterar((db) => R.mudarRegraSistema(db, 'assinatura_digital', !!liga, login()));
+}
+
 export const ACOES_CERTIFICADO = {
+  async assinaturaDigital({ liga }) {
+    await ligarAssinatura(liga === '1');
+    aviso(liga === '1' ? 'Assinatura digital ligada: os recibos e termos passam a ir por e-mail só depois de assinados pelo PC.' : 'Assinatura digital desligada: os recibos e termos voltam a sair sem a assinatura da empresa.', 'ok');
+    await mostrar();
+  },
   async anexarCertificado() {
     if (!podeUsuario('admin')) throw new C.ErroUsuario('Só o administrador anexa o certificado da empresa.');
     // o endereço não leva nada: só acorda o programa (o Chrome pergunta "Abrir Administracao de Imoveis?")

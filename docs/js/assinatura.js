@@ -1,7 +1,7 @@
 // Assinatura digital, do lado do site (pedido do dono de 21/11/2026; parte 3 de 4): manda o PDF conferido para a fila da
 // nuvem (/api/assinaturas, nuvem/assinaturas.mjs), mostra a situação e baixa o assinado. Quem assina é o programa do PC, com o
 // certificado A1 e-CNPJ da ANK (atualizador-pc/assinar-pdf.mjs). Só existe na nuvem: no ?teste e na versão PC não há /api/.
-// Ligada pela regra `assinatura_digital` (Regras do sistema): desligada, nada muda (os e-mails levam o PDF sem assinatura).
+// Ligada pela regra `assinatura_digital` (o botão fica na caixa do certificado, Sistema → Empresas): desligada, nada muda (os e-mails levam o PDF sem assinatura).
 // Não importe nada de telas/.
 import * as C from './calculos.js';
 import { limiteDeTempo } from './nuvem.js';

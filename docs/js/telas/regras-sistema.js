@@ -171,7 +171,7 @@ export function telaRegras(q = {}) {
       <p class="suave" data-busca-resultado aria-live="polite"></p></div>
     <form data-form="regrasSistema">
       ${CR.GRUPOS_REGRAS.map(([g, titulo]) => `<div class="cartao" data-grupo-regras><h2>${esc(titulo)}</h2>
-        ${CR.DEFINICOES_REGRAS.filter((x) => x.grupo === g).map((x) => blocoRegra(x, regras, admin)).join('')}</div>`).join('')}
+        ${CR.REGRAS_NA_TELA.filter((x) => x.grupo === g).map((x) => blocoRegra(x, regras, admin)).join('')}</div>`).join('')}
       ${admin ? '<p class="acoes barra-salvar"><button>Salvar as regras</button></p>' : ''}
     </form>`;
 }

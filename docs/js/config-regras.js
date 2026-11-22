@@ -167,10 +167,11 @@ export const DEFINICOES_REGRAS = [
     consequencia: 'Não: os arquivos são guardados como chegaram (ocupam mais espaço e demoram mais para abrir no celular). Os que já foram compactados não voltam ao tamanho de antes.',
     lei: 'Sem lei: rotina. O documento assinado digitalmente não é mexido porque qualquer mudança no arquivo invalida a assinatura (MP 2.200-2/2001 e Lei 14.063/2020).' },
   // assinatura digital com o e-CNPJ A1 da ANK no programa do PC (pedido do dono de 2026-11-21): desligada até o certificado
-  // estar instalado no computador (parte 4); ligada, os recibos e termos só vão por e-mail depois de assinados
-  { chave: 'assinatura_digital', grupo: 'rotina', rotulo: 'Assinatura digital dos recibos e termos (certificado da empresa no PC)', tipo: 'simnao', padrao: false,
+  // estar instalado no computador (parte 4); ligada, os recibos e termos só vão por e-mail depois de assinados.
+  // `fora`: liga e desliga na caixa do certificado (Sistema → Empresas), não na tela das regras (pedido do dono de 2026-11-22)
+  { chave: 'assinatura_digital', grupo: 'rotina', fora: 'certificado', rotulo: 'Assinatura digital dos recibos e termos (certificado da empresa no PC)', tipo: 'simnao', padrao: false,
     explica: 'Sim: em cada recibo, termo e notificação aparecem "Enviar para assinar" e, depois de assinado, "Baixar PDF assinado". O programa do PC, com o certificado digital A1 (e-CNPJ) da ANK instalado (Sistema → Empresas → Anexar o certificado digital), assina sozinho os documentos da fila: acrescenta uma página "Assinatura digital" no fim do PDF, com a assinatura ICP-Brasil. O e-mail da etapa só leva o recibo depois de assinado. Se o PC estiver desligado, os documentos esperam na fila e o Painel avisa para ligá-lo. A ficha cadastral (que a pessoa preenche) não passa por aqui. Ex.: recibo da garantia → Enviar para assinar → em cerca de 1 minuto, "Assinado digitalmente em 05/12/2026 às 10:32" → o e-mail leva o PDF assinado.',
-    consequencia: 'Não (padrão até instalar o certificado no PC): os recibos e termos saem e vão por e-mail sem a assinatura digital da empresa, como antes; a empresa assina à mão ou pelo gov.br.',
+    consequencia: 'Desligada (padrão até instalar o certificado no PC): os recibos e termos saem e vão por e-mail sem a assinatura digital da empresa, como antes; a empresa assina à mão ou pelo gov.br.',
     lei: 'A assinatura com certificado ICP-Brasil tem a mesma validade da assinatura de próprio punho (MP 2.200-2/2001, art. 10, § 1º) e é a "qualificada" da Lei 14.063/2020 (art. 4º, III). A empresa assina pelo seu administrador (Código Civil, art. 47); o e-CNPJ identifica a empresa e o responsável. Quitação é de quem recebe (Código Civil, arts. 319 e 320).' },
   // mutirão 3000 (venda 49, 2026-11-17): era obrigatória fixa no código; o padrão continua obrigatória
   { chave: 'leitura_relogios_obrigatoria', grupo: 'rotina', rotulo: 'Leitura dos relógios (água, energia e gás) obrigatória na vistoria', tipo: 'simnao', padrao: true,
@@ -261,9 +262,12 @@ const paraBusca = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, ''
  * opções têm todas as palavras digitadas, sem ligar para acento nem maiúscula. Busca vazia: todas.
  * Ex.: "caucao reajuste" → as regras que falam da caução e do reajuste (como "A caução acompanha o reajuste").
  */
+/** As regras da tela Regras do sistema (as com `fora` ficam em outra tela, ex.: a assinatura digital, na caixa do certificado). */
+export const REGRAS_NA_TELA = DEFINICOES_REGRAS.filter((x) => !x.fora);
+
 export function buscarRegras(termo) {
   const palavras = paraBusca(termo).split(/\s+/).filter(Boolean);
-  return DEFINICOES_REGRAS.filter((x) => {
+  return REGRAS_NA_TELA.filter((x) => {
     const texto = paraBusca([x.rotulo, x.explica, x.consequencia, x.lei, ...(x.opcoes || []).flat()].join(' '));
     return palavras.every((p) => texto.includes(p));
   }).map((x) => x.chave);

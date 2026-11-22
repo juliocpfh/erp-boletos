@@ -122,8 +122,8 @@ test('tamanho dos dados: bytes do banco, tabelas com mais registros primeiro, hi
 });
 
 test('busca nas regras do sistema: pelo nome e pela explicação, sem acento nem maiúscula, todas as palavras', () => {
-  assert.equal(CR.buscarRegras('').length, CR.DEFINICOES_REGRAS.length);
-  assert.equal(CR.buscarRegras('   ').length, CR.DEFINICOES_REGRAS.length);
+  assert.equal(CR.buscarRegras('').length, CR.REGRAS_NA_TELA.length, 'vazia: todas as da tela (a assinatura digital fica na caixa do certificado)');
+  assert.equal(CR.buscarRegras('   ').length, CR.REGRAS_NA_TELA.length);
   const reajuste = CR.buscarRegras('REAJUSTE');
   assert.ok(reajuste.includes('reajuste_inicio'));
   assert.deepEqual(CR.buscarRegras('reajuste'), reajuste, 'maiúscula não importa');

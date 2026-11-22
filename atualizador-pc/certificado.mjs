@@ -118,7 +118,7 @@ export function janelaDoCertificado({ env = process.env, guardar = guardarCertif
       try {
         const d = guardar({ pfx: String(corpo.pfx || ''), senha: String(corpo.senha || '') }, env);
         feito = true;
-        responder(200, { texto: `Pronto: certificado de ${d.nome}${d.cnpj ? `, CNPJ ${d.cnpj}` : ''}, válido até ${String(d.validade || '').split('-').reverse().join('/')}, instalado neste computador. Pode fechar esta página. Agora ligue a assinatura digital no sistema (Sistema → Regras do sistema).` });
+        responder(200, { texto: `Pronto: certificado de ${d.nome}${d.cnpj ? `, CNPJ ${d.cnpj}` : ''}, válido até ${String(d.validade || '').split('-').reverse().join('/')}, instalado neste computador. Pode fechar esta página. Agora ligue a assinatura digital no sistema (Sistema → Empresas → Certificado digital da empresa).` });
         setTimeout(() => servidor.close(), 200);
         return resolver(d);
       } catch (e) { return responder(400, { erro: e.message }); }

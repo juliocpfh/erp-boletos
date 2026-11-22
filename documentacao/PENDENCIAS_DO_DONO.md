@@ -9,8 +9,8 @@ Tudo o que foi pedido até 21/11 está na `main` (PRs #335 a #355). O que **voc�
 1. [x] **Atualizar o Claude Code no PC** (feito em 22/11).
 2. [ ] **Assinatura digital com o certificado A1 da ANK** (PRs #352–#355, prontas; falta só a sua parte):
    1. [x] Programa do PC atualizado: se trocou sozinho em 22/11 (versão 15bdedb, com o botão do certificado). Não precisa baixar.
-   2. No sistema, nesse mesmo computador: Sistema → Empresas → Certificado digital da empresa → **Anexar o certificado digital** → Abrir e Permitir (perguntas do Chrome) → escolher o **.pfx** da ANK, digitar a senha → **Guardar neste computador**.
-   3. No sistema: Sistema → Regras do sistema → ligar **"Assinatura digital dos recibos e termos"**.
+   2. [x] No sistema, nesse mesmo computador: Sistema → Empresas → Certificado digital da empresa → **Anexar o certificado digital** → Abrir e Permitir (perguntas do Chrome) → escolher o **.pfx** da ANK, digitar a senha → **Guardar neste computador**.
+   3. Na mesma caixa (Sistema → Empresas → Certificado digital da empresa): **Ligar a assinatura digital**. (Certificado anexado pelo dono em 22/11.)
    4. Testar: abrir um recibo → **Enviar para assinar** → esperar cerca de 1 minuto → **Baixar PDF assinado** → conferir o arquivo em <https://validar.iti.gov.br> (e no Adobe). Mandar ao Claude qualquer mensagem de erro.
    5. Ainda sem o botão de assinar: carta de reajuste, termos aditivos e contrato (pedir ao Claude quando quiser).
 3. [ ] **Testar os PDFs** (computador e celular Android): Sistema → **Teste dos PDFs (temporário)**. Baixar um por um, ver se sai certo e anotar os textos a mudar. Depois o Claude apaga essa página (`PENDENCIAS_4000.md`, itens 1 e 6).
