@@ -1,5 +1,26 @@
 # O que ainda falta no sistema (e como fazer)
 
+## COMECE POR AQUI (atualizado em 22/11/2026)
+
+**Para o Claude:** na primeira mensagem de cada conversa, retome para o dono esta lista (o que ele precisa fazer), em português simples, antes de qualquer outra coisa.
+
+Tudo o que foi pedido até 21/11 está na `main` (PRs #335 a #355). O que **você** precisa fazer, na ordem:
+
+1. [ ] **Atualizar o Claude Code no PC** (você disse em 22/11).
+2. [ ] **Assinatura digital com o certificado A1 da ANK** (PRs #352–#355, prontas; falta só a sua parte):
+   1. Esperar o programa do PC se atualizar sozinho (às 20h ou ao entrar no Windows). Para não esperar: Prompt de Comando (tecla Windows, `cmd`, Enter) → `cd "%LOCALAPPDATA%\Administracao de Imoveis\programa"` → `Administracao-de-Imoveis.exe --atualizar`.
+   2. No mesmo lugar: `Administracao-de-Imoveis.exe --certificado` → na página que abre, escolher o arquivo **.pfx** da ANK e digitar a senha (só você digita; fica cifrado, só neste computador).
+   3. No sistema: Dados e backup → Regras do sistema → ligar **"Assinatura digital dos recibos e termos"**.
+   4. Testar: abrir um recibo → **Enviar para assinar** → esperar cerca de 1 minuto → **Baixar PDF assinado** → conferir o arquivo em <https://validar.iti.gov.br> (e no Adobe). Mandar ao Claude qualquer mensagem de erro.
+   5. Ainda sem o botão de assinar: carta de reajuste, termos aditivos e contrato (pedir ao Claude quando quiser).
+3. [ ] **Testar os PDFs** (computador e celular Android): Dados e backup → **Teste dos PDFs (temporário)**. Baixar um por um, ver se sai certo e anotar os textos a mudar. Depois o Claude apaga essa página (`PENDENCIAS_4000.md`, itens 1 e 6).
+4. [ ] **Conferir as mudanças de 21/11** (na `main`, testadas pelo Claude, falta você ver no dia a dia): troca de titular fecha 30/30 (#337); declaração do IR só do que cada um pagou (#336); comunicado de contatos vai também ao solidário e ao representante (#339); página do inquilino com as duas NFs (#340); "Novo pedido de reserva" (#338); botão "Ir" em Contas do imóvel (#341); PDF comprido no iPhone (#342); link da ficha mandado de novo continua valendo (#343); aviso de endereço com dado errado (#344); ajuste do boleto que entra na NF (#345); pago a mais "a devolver" e botão "Devolvi" (#346); termo aditivo pergunta "valeu?" ao apagar (#347); "Adiar ou mudar a data" da saída (#349); recibo da devolução da garantia (#351). Também: abrir a página de privacidade no endereço de verdade (item nuvem-012).
+5. [ ] **Taxas e cobranças extras (pesquisa de 21/11, resposta no chat):** a lei põe vistoria, contrato e análise de ficha no locador (Lei 8.245/91, arts. 22 VII e 43). Decidir se o Claude prepara o texto das cláusulas novas (despesas de cobrança, visita perdida, serviço extra pedido pelo inquilino) para o advogado conferir, ou se calcula antes quanto cada contrato custa para embutir no aluguel.
+6. [ ] **Pendências antigas que continuam** (detalhes abaixo): comunicado de contatos com um inquilino de teste (4b); conferências 4c a 4f; ficha pela internet com um conhecido (5); simular todas as etapas (5b); C6 quando liberar as chaves (7); **16/12/2026: CBS 2027**; termo de aceite da reserva (decidir percentual e prazos, item 6).
+7. [ ] **Limpeza das cópias de trabalho** (`PENDENCIAS_4000.md` item 7): só no fim, depois dos itens acima; o Claude pergunta antes de apagar.
+
+---
+
 Situação em 17/11/2026 (fim do dia). Tudo o que foi feito até hoje está no ar até a PR #308: mutirão 3000, botão "Conectar o Gmail" (#299), notificações ao inquilino (#300/#301), régua em Boletos (#302), abrir a pasta no Explorer (#303), ficha com registro de quem conferiu (#304), NF com aviso de texto cortado e Excel por empresa (#305), melhorias pequenas (#306: Hoje/Ontem, inadimplência por faixa, 2ª via com o valor do dia, status embaixo dos botões), sem ANK fixa e Internet "Não tem" no contrato novo (#307) e publicação pelo GitHub Actions (#308). Depois, aceitas em 17/11: #309 (Pix devolvido e baixa só pelo identificador), #310 (limpeza técnica e 2ª rodada de 16/11), #312 (programa do PC desinstalável), #313 (programa do PC se atualiza sozinho) e #314 (respostas do contador). Conferidos pelo dono em 17/11: o sistema no computador e no celular e o programa novo no PC. Depois: #315 e #316 (ícone da casinha no programa do PC) e #317 (página Inquilinos alinhada, conferida no celular em 17/11). **18/11: Gmail ligado** (envio pela conta da krasinski, remetente administracao@ankjck.com.br; teste chegou certo, fora do spam); PR #318 (página de privacidade exigida pelo Google).
 
 **18–19/11, na main e ainda não conferido pelo dono:** #319 (backup seguro da empresa: aviso em Dados e backup se nenhum computador fizer o backup em 3 dias), #320 (comunicado de contatos), #321 (e-mails de cada etapa mais curtos; rodapé de confidencialidade **não** será usado, decisão de 18/11), #322 (regras especiais por contrato), #323 (Solicitações e Notificações só em Inquilinos → Comunicações), #324 ("Nova solicitação de reserva": formulário curto, o resto a pessoa preenche pelo link), #325 (data de conclusão → "Concluída"; **conferido pelo dono em 19/11**) e #326 (filtro das solicitações pela situação, que estava quebrado). **Próximo (19/11):** o dono vai rodar uma busca geral de erros (links e ligações quebradas); pistas em `ROTINA_DE_MELHORIA.md`, "19/11".

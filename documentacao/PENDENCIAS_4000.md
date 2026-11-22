@@ -32,7 +32,9 @@ Decisão do dono: acontece de o inquilino precisar de mais dias para arrumar o i
 - Hoje (lote J, saida-007) desfazer ou adiar a saída só avisa a diferença (ex.: "faltam R$ 750,00") e não lança nada.
 - Antes de programar, confirme o exemplo com o dono: aluguel de R$ 3.000,00, saída de 10/12 adiada para 15/12, boleto de dezembro já pago com 10/30 = R$ 1.000,00 → falta R$ 500,00 (5/30), cobrado como e quando?
 
-## 4. [ ] Recibo/termo de devolução da garantia na troca de garantia
+## 4. [x] Recibo/termo de devolução da garantia na troca de garantia
+
+**Feito em 21/11 (PR #351):** recibo "devolucao_garantia" em `recibos.js` (também na troca de titular com garantia nova; sem saldo devolvido não há recibo), recibo assinado anexado em `devolucoes_garantia.termo_assinado`, na pasta física e na página de teste dos PDFs.
 
 Decisão do dono: quando a caução é trocada (ex.: por fiador) e devolvida, o sistema gera um **termo de devolução da garantia, que é um recibo**, com o **valor corrigido pela poupança e devolvido** (ex.: caução de R$ 3.150,00 trocada por fiador em 01/12/2026, devolvida corrigida). O dono anexa o **comprovante da devolução** e **a pessoa assina que recebeu** (anexar o termo assinado, como os outros recibos).
 - Tipo novo em `recibos.js` (com `reciboDisponivel`), rota `#/imprimir/recibo?tipo=…`, PDF `pdfDoRecibo`; dados da devolução em `devolucoes_garantia` (`troca_id`), movimentos em `trocas_garantia.devolucao_movimentos`.
@@ -65,6 +67,7 @@ Item que o dono mandar corrigir: uma PR para ele (ou para os pequenos juntos), c
 ## 6. [ ] Testes do dono (ele faz; anote o resultado aqui)
 
 - **Android:** o dono testa no celular dele: botões de 40 px, cartões das tabelas, teclado de números, "Baixar PDF" (deve sair igual ao do computador), visualizador de PDF, avisos presos no alto. Use a página do item 1 para os PDFs.
+- **Assinatura digital** (PRs #352–#355, 21/11): instalar o certificado A1 da ANK no programa do PC (`--certificado`), ligar a regra e conferir um PDF assinado no validar.iti.gov.br e no Adobe (passo a passo no topo de `PENDENCIAS_DO_DONO.md`).
 - Não testados por ninguém (ficam anotados): emissão no C6 do boleto do saldo do cálculo final (o `?teste` não tem as contas do C6), iPhone de verdade, páginas públicas da ficha e dos contatos no endereço de verdade.
 
 ## 7. [ ] Limpeza (só no fim, depois de os itens 1 a 6 serem vistos)
