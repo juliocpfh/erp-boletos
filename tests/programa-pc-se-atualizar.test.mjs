@@ -128,7 +128,7 @@ test('--atualizar: dados primeiro, depois o programa; falha do programa não mud
   assert.equal(await rodar(async () => ({ situacao: 'em dia', texto: 'x' }), false), 1, 'dados falharam: 1');
   ordem.length = 0;
   await P.executar(['--arquivos'], { env: { IMOVEIS_CONFIG: 'C:\\cfg' }, dizer: () => {}, garantir: () => 'x', atualizar: async () => true, programa: async () => { ordem.push('programa'); return {}; } });
-  assert.deepEqual(ordem, [], 'a de hora em hora (só arquivos) não mexe no programa');
+  assert.deepEqual(ordem, ['programa'], 'a de hora em hora também confere a versão nova (decisão do dono de 22/11/2026)');
 });
 
 test('o resultado vai para ultima-atualizacao.txt; o desinstalar leva também os arquivos da troca', async () => {
