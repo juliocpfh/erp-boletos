@@ -29,6 +29,17 @@ export function conferirEscolha(arquivo, senha) {
   if (!senha) throw new C.ErroUsuario('Digite a senha do certificado.');
 }
 
+/** Pede ao programa deste computador para apagar o certificado. Devolve { removido, tinha }. */
+export async function removerCertificado({ buscar = fetch } = {}) {
+  let r;
+  try {
+    r = await buscar(`${BASE}/remover`, { method: 'POST', cache: 'no-store', credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(30000), headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  } catch { throw new C.ErroUsuario('O programa do PC parou de responder. Feche esta janela e clique no botão de novo.'); }
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new C.ErroUsuario(d.erro || `O programa do PC não removeu o certificado (erro ${r.status}).`);
+  return d;
+}
+
 /** Entrega ao programa. Devolve { nome, cnpj, validade, tarefa }. */
 export async function entregarCertificado(arquivo, senha, { buscar = fetch } = {}) {
   conferirEscolha(arquivo, senha);

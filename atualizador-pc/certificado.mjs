@@ -37,8 +37,8 @@ export function resumoDoCertificado(env = process.env) {
   const arq = path.join(pastaConfig(env), ARQUIVO_CERTIFICADO);
   if (!fs.existsSync(arq)) return null;
   try {
-    const { nome, cnpj, validade, instalado_em: instalado } = JSON.parse(fs.readFileSync(arq, 'utf8'));
-    return { nome, cnpj, validade, instalado_em: instalado };
+    const { nome, cnpj, validade, emissor, instalado_em: instalado } = JSON.parse(fs.readFileSync(arq, 'utf8'));
+    return { nome, cnpj, validade, emissor, instalado_em: instalado };
   } catch { return null; } // arquivo estragado: é como não ter (instalar de novo conserta)
 }
 
@@ -136,6 +136,24 @@ export function janelaDoCertificado({ env = process.env, guardar = guardarCertif
 // ---------------------------------------------------------------------------
 // A rodada da assinatura
 // ---------------------------------------------------------------------------
+/**
+ * O que a caixa do certificado mostra (nome, CNPJ, validade, emissor, quando foi instalado e o computador), em base64 para ir
+ * num cabeçalho. Nunca o arquivo nem a senha. `cert` null = removido.
+ */
+export function resumoParaNuvem(cert, computador = '') {
+  const r = cert ? { computador, certificado: { nome: cert.nome, cnpj: cert.cnpj, validade: cert.validade, emissor: cert.emissor || '', instalado_em: cert.instalado_em } } : { computador, removido: true };
+  return Buffer.from(JSON.stringify(r), 'utf8').toString('base64');
+}
+
+/** Avisa a nuvem já (ex.: logo depois de remover), pela mesma consulta da fila. Erro de rede não atrapalha quem chamou. */
+export async function informarNuvem(ligacao, cert, { buscar = fetch, versao = '' } = {}) {
+  try {
+    const r = await buscar(`${ligacao.site}/api/aparelho/assinaturas`, { redirect: 'manual', signal: AbortSignal.timeout(TEMPO_NUVEM),
+      headers: { Authorization: `Bearer ${ligacao.cracha}`, 'X-Certificado-Resumo': resumoParaNuvem(cert, ligacao.computador || ''), ...(versao ? { 'X-Programa-Versao': versao } : {}) } });
+    return r.ok;
+  } catch { return false; }
+}
+
 /** Cabeçalho HTTP não aceita qualquer letra: "ADMINISTRAÇÃO" → "ADMINISTRACAO" (no PDF o nome sai com os acentos). */
 const semAcento = (t) => String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^ -~]/g, ' ');
 /**
@@ -150,7 +168,8 @@ export async function assinarFila(ligacao, cert, { buscar = fetch, assinar = ass
     if (r.status === 401) throw new Error('Este computador não está mais ligado ao sistema: ligue de novo (abra o programa com dois cliques).');
     return r;
   };
-  const lista = await pedir(base);
+  // a cada consulta vai junto o resumo do certificado: a caixa do certificado e o aviso de renovação vêm daí
+  const lista = await pedir(base, { headers: { 'X-Certificado-Resumo': resumoParaNuvem(cert, ligacao.computador || '') } });
   if (!lista.ok) throw new Error(`A nuvem não respondeu à fila de assinatura (${lista.status}).`);
   const { pendentes = [] } = await lista.json();
   const out = { assinados: 0, erros: [] };

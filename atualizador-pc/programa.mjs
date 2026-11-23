@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { ARQUIVO_REGISTRO, EXE, PASTA_COPIA, principal } from './atualizador.mjs';
 import { ICONE_ICO, NOME_ICONE } from './icone.mjs';
 import { receberDoSistema } from './certificado-local.mjs';
-import { assinarFila, janelaDoCertificado, lerCertificado, resumoDoCertificado } from './certificado.mjs';
+import { assinarFila, informarNuvem, janelaDoCertificado, lerCertificado, resumoDoCertificado } from './certificado.mjs';
 
 export { NOME_ICONE };import { ARQUIVO_CONFIG, lerLigacao, pastaConfig } from './ligar.mjs';
 import { NOME_NOVO, NOME_TRAVA, NOME_VELHO, seAtualizar } from './se-atualizar.mjs';
@@ -511,7 +511,7 @@ async function desinstalar({ env, dizer, simular, elevado, rodarReg, rodarTarefa
 export async function executar(args = [], { env = process.env, dizer = console.log, atualizar = principal, pausar = esperarEnter,
   garantir = garantirRegistro, rodarReg = reg, rodarTarefas = schtasks, abrir = abrirExplorer, perguntar = confirmarNoWindows,
   avisar = (texto, e) => janelaDoWindows(texto, { env: e }), apagarPasta = apagarPastaDoPrograma, elevar = rodarComoAdministrador,
-  programa = () => atualizarPrograma({ env }), lerLig = lerLigacao, lerCert = lerCertificado, assinarFilaFn = assinarFila, janelaCert = janelaDoCertificado, receberCert = receberDoSistema } = {}) {
+  programa = () => atualizarPrograma({ env }), lerLig = lerLigacao, lerCert = lerCertificado, assinarFilaFn = assinarFila, janelaCert = janelaDoCertificado, receberCert = receberDoSistema, informar = informarNuvem } = {}) {
   // o botão do sistema (imoveis-pasta:): abre só a pasta configurada; qualquer outro argumento (até o endereço) é ignorado
   if (args.includes('--abrir-pasta')) return abrirPasta({ env, abrir });
   const versao = EXE?.versao || '';
@@ -548,7 +548,11 @@ export async function executar(args = [], { env = process.env, dizer = console.l
       // chamado pelo botão do sistema, sem janela: quem conversa com a pessoa é o site
       let lig = null;
       try { lig = lerLig(env); } catch { /* crachá que não abre nesta conta do Windows: o site manda ligar de novo */ }
-      const r = await receberCert({ env, ligacao: lig, relerLigacao: () => lerLig(env), aoInstalar: () => !EXE || criarTarefaDaAssinatura(env, { rodar: rodarTarefas }) });
+      // a nuvem fica sabendo antes da resposta à tela: a caixa do certificado já mostra o certo quando a janela fecha
+      const r = await receberCert({ env, ligacao: lig, relerLigacao: () => lerLig(env),
+        aoInstalar: async (l) => { const tarefa = !EXE || criarTarefaDaAssinatura(env, { rodar: rodarTarefas }); if (l) await informar(l, resumoDoCertificado(env), { versao }); return tarefa; },
+        aoRemover: async (l) => { if (l) await informar(l, null, { versao }); } });
+      if (r.situacao === 'removido') return 0;
       if (r.situacao !== 'instalado') return 0;
       return await rodadaDeAssinatura({ env, dizer, lerLig, lerCert, assinar: assinarFilaFn, versao });
     }

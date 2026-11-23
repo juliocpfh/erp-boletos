@@ -72,10 +72,12 @@ const primeirosPassos = () => AJ.caixaPrimeirosPassos(d(), { quem: E.usuario?.lo
  * certificado desligado, ou com erro. A fila vem da nuvem: o aviso entra depois do desenho, sem segurar a tela.
  */
 function preencherAvisoAssinaturas() {
-  if (!R.regra('assinatura_digital') || !E.nuvem) return;
+  // a fila (ligada) e o aviso de renovação do certificado (para o administrador, mesmo com a assinatura desligada)
+  if (!E.nuvem || !(R.regra('assinatura_digital') || podeUsuario('admin'))) return;
   AS.fila({ fresca: true }).then((f) => {
     const el = document.getElementById('aviso-assinaturas');
-    const l = AS.avisoDaFila(f);
+    const s = AS.situacaoDoCertificado(f.pc);
+    const l = [...(R.regra('assinatura_digital') ? AS.avisoDaFila(f) : []), ...(s.aviso && podeUsuario('admin') ? [s.aviso] : [])];
     if (el && l.length) el.innerHTML = l.map((t) => `<div class="alerta aviso">✍ ${esc(t)}</div>`).join('');
   }).catch(() => { /* sem internet: o aviso volta na próxima abertura */ });
 }
