@@ -1,24 +1,29 @@
 # O que ainda falta no sistema (e como fazer)
 
-## COMECE POR AQUI (atualizado em 22/11/2026)
+## COMECE POR AQUI (atualizado em 22/11/2026, noite)
 
-**Para o Claude:** na primeira mensagem de cada conversa, retome para o dono esta lista (o que ele precisa fazer), em português simples, antes de qualquer outra coisa.
+**Para o Claude:** na primeira mensagem de cada conversa, retome para o dono esta lista (o que ele precisa fazer), em português simples, antes de qualquer outra coisa. O item 1 é a prioridade do dono: comece por ele.
 
-Tudo o que foi pedido até 21/11 está na `main` (PRs #335 a #355). O que **você** precisa fazer, na ordem:
+Tudo o que foi pedido até 22/11 está na `main` (PRs #335 a #361). O que **você** precisa fazer, na ordem:
 
-1. [x] **Atualizar o Claude Code no PC** (feito em 22/11).
-2. [ ] **Assinatura digital com o certificado A1 da ANK** (PRs #352–#355, prontas; falta só a sua parte):
-   1. [x] Programa do PC atualizado: se trocou sozinho em 22/11 (versão 15bdedb, com o botão do certificado). Não precisa baixar.
-   2. [x] No sistema, nesse mesmo computador: Sistema → Empresas → Certificado digital da empresa → **Anexar o certificado digital** → Abrir e Permitir (perguntas do Chrome) → escolher o **.pfx** da ANK, digitar a senha → **Guardar neste computador**.
-   3. Na mesma caixa (Sistema → Empresas → Certificado digital da empresa): **Ligar a assinatura digital**. (Certificado anexado pelo dono em 22/11.)
-   4. Testar: abrir um recibo → **Enviar para assinar** → esperar cerca de 1 minuto → **Baixar PDF assinado** → conferir o arquivo em <https://validar.iti.gov.br> (e no Adobe). Mandar ao Claude qualquer mensagem de erro.
+1. [ ] **PRIORIDADE: Termo de aceite da reserva** (pedido em 18/11; **nada programado ainda**, parado porque faltam 3 decisões suas). Hoje o sistema começa no "Novo pedido de reserva", com a reserva já combinada. A etapa de antes não existe: nas Fichas abertas, uma **mensagem para quem demonstrou interesse** com as condições do imóvel (endereço, aluguel, seguro e IPTU estimados, vencimento, garantia, requisitos e documentos) → **aceite pelo link** (código no e-mail, PDF do aceite) → **depósito da reserva** → pedido de reserva. Decidir (sugestão de 19/11, com reserva de R$ 500,00):
+   1. **Desistência:** em até 7 dias, devolve tudo (CDC art. 49); depois disso a empresa fica com 20% (devolve R$ 400,00, fica com R$ 100,00); ficha reprovada devolve tudo; documento falso, a empresa fica com tudo.
+   2. **Prazos:** documentos em 3 dias úteis; a reserva vale 10 dias; devolução em 5 dias úteis.
+   3. **Onde a reserva entra:** na caução (sugestão: descontar do 1º aluguel pode ser visto como aluguel adiantado) ou no 1º aluguel.
+
+   A pesquisa jurídica está no item 6 ("Termo de aceite da reserva" e "Termo da reserva"). Com as respostas, o Claude confirma com um exemplo em reais e programa a etapa inteira.
+2. [ ] **Assinatura digital** (certificado da ANK anexado em 22/11, válido até 02/01/2027):
+   1. O programa do PC ainda é a versão de 22/11 às 20h, que não mostra o certificado na caixa. Ele troca sozinho às 20h, ao entrar no Windows ou com `--atualizar`; depois disso, de hora em hora (#361). Aí Sistema → Empresas → Certificado digital da empresa mostra o anexado, a validade e os dias que faltam (#360).
+   2. Na mesma caixa: **Ligar a assinatura digital**.
+   3. Testar: abrir um recibo → **Enviar para assinar** → esperar cerca de 1 minuto → **Baixar PDF assinado** → conferir em <https://validar.iti.gov.br> (e no Adobe). Mandar ao Claude qualquer mensagem de erro.
+   4. **Renovar o certificado antes de 02/01/2027:** o aviso aparece na caixa e no Painel a partir de 03/12/2026.
    5. Ainda sem o botão de assinar: carta de reajuste, termos aditivos e contrato (pedir ao Claude quando quiser).
-3. [ ] **Testar os PDFs** (computador e celular Android): Sistema → **Teste dos PDFs (temporário)**. Baixar um por um, ver se sai certo e anotar os textos a mudar. Depois o Claude apaga essa página (`PENDENCIAS_4000.md`, itens 1 e 6).
-4. [ ] **Conferir as mudanças de 21/11** (na `main`, testadas pelo Claude, falta você ver no dia a dia): troca de titular fecha 30/30 (#337); declaração do IR só do que cada um pagou (#336); comunicado de contatos vai também ao solidário e ao representante (#339); página do inquilino com as duas NFs (#340); "Novo pedido de reserva" (#338); botão "Ir" em Contas do imóvel (#341); PDF comprido no iPhone (#342); link da ficha mandado de novo continua valendo (#343); aviso de endereço com dado errado (#344); ajuste do boleto que entra na NF (#345); pago a mais "a devolver" e botão "Devolvi" (#346); termo aditivo pergunta "valeu?" ao apagar (#347); "Adiar ou mudar a data" da saída (#349); recibo da devolução da garantia (#351). Também: abrir a página de privacidade no endereço de verdade (item nuvem-012).
-5. [ ] **Taxas e cobranças extras (pesquisa de 21/11, resposta no chat):** a lei põe vistoria, contrato e análise de ficha no locador (Lei 8.245/91, arts. 22 VII e 43). Decidir se o Claude prepara o texto das cláusulas novas (despesas de cobrança, visita perdida, serviço extra pedido pelo inquilino) para o advogado conferir, ou se calcula antes quanto cada contrato custa para embutir no aluguel.
-6. [ ] **Pendências antigas que continuam** (detalhes abaixo): comunicado de contatos com um inquilino de teste (4b); conferências 4c a 4f; ficha pela internet com um conhecido (5); simular todas as etapas (5b); C6 quando liberar as chaves (7); **16/12/2026: CBS 2027**; termo de aceite da reserva (decidir percentual e prazos, item 6).
-6b. [ ] **Páginas novas de Sistema (22/11):** "Dados e backup" virou **Sistema**; conferir no computador e no celular os botões Empresas (agora com o certificado), Banco, Comunicação E-mail, Modelos de documentos e LGPD.
-7. [ ] **Limpeza das cópias de trabalho** (`PENDENCIAS_4000.md` item 7): só no fim, depois dos itens acima; o Claude pergunta antes de apagar.
+3. [ ] **Conferir as páginas novas de Sistema** (#358, "Dados e backup" virou Sistema) no computador e no celular: Empresas (com o certificado), Banco, Comunicação E-mail, Modelos de documentos e LGPD.
+4. [ ] **Testar os PDFs** (computador e celular Android): Sistema → **Teste dos PDFs (temporário)**. Baixar um por um, ver se sai certo e anotar os textos a mudar. Depois o Claude apaga essa página (`PENDENCIAS_4000.md`, itens 1 e 6).
+5. [ ] **Conferir as mudanças de 21/11** (na `main`, testadas pelo Claude, falta você ver no dia a dia): troca de titular fecha 30/30 (#337); declaração do IR só do que cada um pagou (#336); comunicado de contatos vai também ao solidário e ao representante (#339); página do inquilino com as duas NFs (#340); "Novo pedido de reserva" (#338); botão "Ir" em Contas do imóvel (#341); PDF comprido no iPhone (#342); link da ficha mandado de novo continua valendo (#343); aviso de endereço com dado errado (#344); ajuste do boleto que entra na NF (#345); pago a mais "a devolver" e botão "Devolvi" (#346); termo aditivo pergunta "valeu?" ao apagar (#347); "Adiar ou mudar a data" da saída (#349); recibo da devolução da garantia (#351). Também: abrir a página de privacidade no endereço de verdade (item nuvem-012).
+6. [ ] **Taxas e cobranças extras (pesquisa de 21/11, resposta no chat):** a lei põe vistoria, contrato e análise de ficha no locador (Lei 8.245/91, arts. 22 VII e 43). Decidir se o Claude prepara o texto das cláusulas novas (despesas de cobrança, visita perdida, serviço extra pedido pelo inquilino) para o advogado conferir, ou se calcula antes quanto cada contrato custa para embutir no aluguel.
+7. [ ] **Pendências antigas que continuam** (detalhes abaixo): comunicado de contatos com um inquilino de teste (4b); conferências 4c a 4f; ficha pela internet com um conhecido (5); simular todas as etapas (5b); C6 quando liberar as chaves (7); **16/12/2026: CBS 2027**.
+8. [ ] **Limpeza das cópias de trabalho** (`PENDENCIAS_4000.md` item 7): só no fim, depois dos itens acima; o Claude pergunta antes de apagar.
 
 ---
 
