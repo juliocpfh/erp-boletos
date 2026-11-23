@@ -85,7 +85,10 @@ test('situação do certificado e aviso de renovação: 30 dias antes, no dia e 
   const hoje = new Date(2026, 10, 22, 21, 30).getTime(); // 22/11/2026 às 21h30 daqui
   const pc = (validade) => ({ computador: 'PC DA ANK', certificado: { nome: 'ANK TESTE', cnpj: '11.222.333/0001-81', validade, instalado_em: '2026-11-22T20:00:00.000Z' } });
   assert.equal(AS.situacaoDoCertificado(undefined, hoje).anexado, null);
-  assert.equal(AS.situacaoDoCertificado({ visto_em: 'x' }, hoje).anexado, null, 'programa antigo: não se sabe');
+  const antigo = AS.situacaoDoCertificado({ visto_em: 'x', computador: 'PC DA ANK' }, hoje);
+  assert.equal(antigo.anexado, null, 'programa antigo: não se sabe');
+  assert.match(antigo.texto, /programa do PC do computador PC DA ANK está desatualizado.*em até 1 hora/);
+  assert.match(AS.situacaoDoCertificado(undefined, hoje).texto, /Nenhum computador/);
   assert.equal(AS.situacaoDoCertificado({ certificado: null, computador: 'PC' }, hoje).anexado, false);
   const longe = AS.situacaoDoCertificado(pc('2027-11-22'), hoje);
   assert.equal(longe.cor, 'ok');

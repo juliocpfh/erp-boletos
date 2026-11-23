@@ -25,7 +25,9 @@ const diasAte = (iso, agora) => Math.round((Date.parse(`${iso}T12:00:00Z`) - Dat
  * Ex.: válido até 22/12/2026, hoje 22/11/2026 → anexado, aviso "vence em 22/12/2026 (faltam 30 dias): renove…".
  */
 export function situacaoDoCertificado(pc, agora = Date.now()) {
-  if (!pc || pc.certificado === undefined) return { anexado: null, texto: 'O programa do PC ainda não contou se há certificado anexado (ele conta a cada minuto quando tem um; o programa se atualiza sozinho).', cor: 'neutra', aviso: '' };
+  if (!pc) return { anexado: null, texto: 'Nenhum computador com o programa do PC olhou a fila de assinatura ainda. Anexe o certificado no computador que vai assinar.', cor: 'neutra', aviso: '' };
+  // o PC olha a fila (a tarefa de cada minuto roda) mas não conta o certificado: é o programa de antes de 22/11/2026
+  if (pc.certificado === undefined) return { anexado: null, texto: `O programa do PC${pc.computador ? ` do computador ${pc.computador}` : ''} está desatualizado e ainda não sabe mostrar o certificado aqui. Ele se atualiza sozinho em até 1 hora (ou ao reiniciar o computador); depois disso, o certificado aparece nesta caixa.`, cor: 'aviso', aviso: '' };
   const c = pc.certificado;
   if (!c) return { anexado: false, texto: `Nenhum certificado anexado${pc.computador ? ` (último computador: ${pc.computador})` : ''}.`, cor: 'neutra', aviso: '' };
   const dias = diasAte(c.validade, agora);

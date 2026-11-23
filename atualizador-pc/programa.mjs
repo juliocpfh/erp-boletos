@@ -2,7 +2,8 @@
 // dentro (Node "single executable application"). Faz, por argumento, tudo o que os .cmd e o .vbs desta pasta faziam:
 // instalar (copia o programa para %LOCALAPPDATA%\Administracao de Imoveis\programa, liga o computador com e-mail e senha, cria
 // as tarefas do Windows e roda a primeira atualização), ligar, atualizar, só os arquivos, desinstalar. Dois cliques = instalar.
-// Em --atualizar (20h e ao entrar no Windows) o próprio programa se atualiza sozinho pela release do GitHub (se-atualizar.mjs).
+// Em --atualizar (20h e ao entrar no Windows) e em --arquivos (de hora em hora) o próprio programa se atualiza sozinho pela
+// release do GitHub (se-atualizar.mjs).
 // Sem assinatura de código por enquanto (decisão do dono, proposta de licença, item 11): o Windows mostra o aviso azul uma vez.
 // A atualização em si é a de atualizador.mjs (`principal`); o crachá, o de ligar.mjs. Ajuda: Administracao-de-Imoveis.exe --ajuda
 import { spawn, spawnSync } from 'node:child_process';
@@ -58,7 +59,7 @@ export const TEXTO_PRONTO = 'Pronto: programa desinstalado.|As cópias na pasta 
 export const TAREFAS = [
   { nome: 'Imoveis - atualizador da versao PC', quando: ['/SC', 'DAILY', '/ST', '20:00'], args: '--atualizar', texto: 'todo dia às 20h: dados, versão PC, arquivos e o próprio programa' },
   { nome: 'Imoveis - atualizador da versao PC (ao entrar)', quando: ['/SC', 'ONLOGON', '/DELAY', '0002:00'], args: '--atualizar', texto: 'ao entrar no Windows: dados, versão PC, arquivos e o próprio programa' },
-  { nome: 'Imoveis - copia dos arquivos (de hora em hora)', quando: ['/SC', 'HOURLY'], args: '--arquivos', escondida: true, texto: 'de hora em hora, sem janela: só os arquivos' },
+  { nome: 'Imoveis - copia dos arquivos (de hora em hora)', quando: ['/SC', 'HOURLY'], args: '--arquivos', escondida: true, texto: 'de hora em hora, sem janela: os arquivos e o próprio programa' },
 ];
 /** Assinatura digital (2026-11-21): criada ao instalar o certificado, pelo sistema ou pelo --certificado (só quem instala o certificado precisa dela); sai ao desinstalar. */
 export const TAREFA_ASSINATURA = { nome: 'Imoveis - assinatura digital (a cada minuto)', quando: ['/SC', 'MINUTE', '/MO', '1'], args: '--assinar', escondida: true, texto: 'a cada minuto, sem janela: assina os documentos da fila' };
@@ -398,7 +399,7 @@ Uso:
   ${NOME_EXE} --ajuda         mostra este texto
   --simular                   junto de --instalar ou --desinstalar: só mostra o que faria, sem mexer em nada
 
-O programa se atualiza sozinho (às 20h e ao entrar no Windows): baixa a versão nova do GitHub, confere o arquivo e troca;
+O programa se atualiza sozinho (de hora em hora, às 20h e ao entrar no Windows): baixa a versão nova do GitHub, confere o arquivo e troca;
 a nova vale a partir da rodada seguinte. O resultado de cada atualização fica em ultima-atualizacao.txt, na pasta do
 backup seguro.`;
 
@@ -536,7 +537,13 @@ export async function executar(args = [], { env = process.env, dizer = console.l
       try { const p = await programa(); if (p.situacao !== 'pulado') dizer(`Programa do PC: ${p.texto}.`); } catch (e) { dizer(`Programa do PC: não deu para conferir a versão nova (${e.message}).`); }
       return ok ? 0 : 1;
     }
-    if (pedido === '--arquivos') { emDia(); return (await atualizar(['--arquivos'])) ? 0 : 1; }
+    if (pedido === '--arquivos') {
+      emDia();
+      const ok = await atualizar(['--arquivos']);
+      // também de hora em hora (pedido do dono de 22/11/2026): a versão nova chega em até 1 hora, sem esperar as 20h
+      try { await programa(); } catch { /* sem internet: tenta na próxima hora */ }
+      return ok ? 0 : 1;
+    }
     if (pedido === '--ligar') {
       emDia();
       const ok = await atualizar(['--ligar']);
