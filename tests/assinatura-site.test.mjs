@@ -80,3 +80,21 @@ test('assinatura digital fora da tela das regras: não aparece lá e salvar as r
   assert.equal(CR.regrasDe(d).assinatura_digital, false, 'desliga pelo botão');
   assert.ok(d.historico.some((h) => /Assinatura digital/.test(h.descricao)), 'fica no Histórico');
 });
+
+test('situação do certificado e aviso de renovação: 30 dias antes, no dia e depois de vencer', () => {
+  const hoje = new Date(2026, 10, 22, 21, 30).getTime(); // 22/11/2026 às 21h30 daqui
+  const pc = (validade) => ({ computador: 'PC DA ANK', certificado: { nome: 'ANK TESTE', cnpj: '11.222.333/0001-81', validade, instalado_em: '2026-11-22T20:00:00.000Z' } });
+  assert.equal(AS.situacaoDoCertificado(undefined, hoje).anexado, null);
+  assert.equal(AS.situacaoDoCertificado({ visto_em: 'x' }, hoje).anexado, null, 'programa antigo: não se sabe');
+  assert.equal(AS.situacaoDoCertificado({ certificado: null, computador: 'PC' }, hoje).anexado, false);
+  const longe = AS.situacaoDoCertificado(pc('2027-11-22'), hoje);
+  assert.equal(longe.cor, 'ok');
+  assert.equal(longe.aviso, '');
+  assert.match(longe.texto, /Anexado: ANK TESTE, CNPJ 11\.222\.333\/0001-81, válido até 22\/11\/2027 \(faltam 365 dias\), no computador PC DA ANK, desde 22\/11\/2026/);
+  assert.equal(AS.situacaoDoCertificado(pc('2026-12-23'), hoje).aviso, '', '31 dias: ainda sem aviso');
+  assert.match(AS.situacaoDoCertificado(pc('2026-12-22'), hoje).aviso, /vence em 22\/12\/2026 \(faltam 30 dias\): renove/);
+  assert.match(AS.situacaoDoCertificado(pc('2026-11-22'), hoje).texto, /vence hoje/);
+  const vencido = AS.situacaoDoCertificado(pc('2026-11-21'), hoje);
+  assert.equal(vencido.cor, 'perigo');
+  assert.match(vencido.aviso, /venceu em 21\/11\/2026: os documentos não são mais assinados/);
+});

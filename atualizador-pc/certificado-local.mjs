@@ -4,7 +4,7 @@
 // Segurança: só aceita o Host daqui e a origem exata do site em que o computador está ligado (um outro site pode até acordar o
 // programa, mas não lê nem grava nada), só JSON pequeno, poucas tentativas, e fecha depois de instalar ou de ficar parado.
 import http from 'node:http';
-import { guardarCertificado, MAX_PFX, resumoDoCertificado } from './certificado.mjs';
+import { apagarCertificado, guardarCertificado, MAX_PFX, resumoDoCertificado } from './certificado.mjs';
 import { SITE_PADRAO } from './ligar.mjs';
 
 /** A mesma de docs/js/certificado-pc.js (tests/certificado-local.test.mjs confere). */
@@ -14,12 +14,15 @@ export const TEMPO_PARADO = 10 * 60 * 1000;
 export const MAX_TENTATIVAS = 10;
 
 /**
- * Espera o site entregar o certificado. Devolve { situacao: 'instalado' | 'ocupado' | 'tempo' | 'tentativas' }.
+ * Espera o site entregar o certificado (ou pedir para remover). Devolve { situacao: 'instalado' | 'removido' | 'ocupado' | 'tempo' |
+ * 'tentativas', ligacao } (a ligação lida por último, para avisar a nuvem).
  * `ligacao`: o lerLigacao ou null;
- * `relerLigacao`: lido de novo enquanto não estiver ligado (a pessoa liga o computador e clica de novo); `aoInstalar`: cria a tarefa da assinatura e devolve se conseguiu.
+ * `relerLigacao`: lido de novo enquanto não estiver ligado (a pessoa liga o computador e clica de novo); `aoInstalar(lig)`: cria a
+ * tarefa da assinatura e avisa a nuvem, e devolve se a tarefa ficou criada; `aoRemover(lig)`: avisa a nuvem. Os dois rodam ANTES
+ * da resposta: quando a janela fecha, a caixa do certificado (que lê a nuvem) já mostra o certo.
  */
 export function receberDoSistema({ env = process.env, ligacao = null, relerLigacao = () => null, guardar = guardarCertificado, resumo = resumoDoCertificado,
-  aoInstalar = () => true, porta = PORTA, parado = TEMPO_PARADO, aoAbrir = () => {} } = {}) {
+  remover = apagarCertificado, aoInstalar = () => true, aoRemover = () => {}, porta = PORTA, parado = TEMPO_PARADO, aoAbrir = () => {} } = {}) {
   let lig = ligacao;
   const origemDoSite = () => {
     try { return new URL(lig?.site || SITE_PADRAO).origin; } catch { return new URL(SITE_PADRAO).origin; }
@@ -33,7 +36,7 @@ export function receberDoSistema({ env = process.env, ligacao = null, relerLigac
       clearTimeout(relogio);
       servidor.close();
       servidor.closeAllConnections();
-      resolver({ situacao });
+      resolver({ situacao, ligacao: lig });
     };
     const adiar = () => { clearTimeout(relogio); relogio = setTimeout(() => fechar('tempo'), parado); };
 
@@ -58,6 +61,15 @@ export function receberDoSistema({ env = process.env, ligacao = null, relerLigac
         let atual = null;
         try { atual = resumo(env); } catch { /* arquivo estragado: instalar de novo conserta */ }
         return responder(200, { programa: IDENTIDADE, ligado: !!lig, atual });
+      }
+      if (req.method === 'POST' && req.url === '/remover' && /^application\/json\b/.test(req.headers['content-type'] || '')) {
+        if (!lig) return responder(409, { erro: 'Este computador ainda não está ligado ao sistema.' });
+        let tinha = null;
+        try { tinha = resumo(env); } catch { /* estragado: remove assim mesmo */ }
+        try { remover(env); } catch (e) { return responder(500, { erro: `Não consegui remover o certificado deste computador (${e.code || e.message}).` }); }
+        acabou = true;
+        try { await aoRemover(lig); } catch { /* sem internet: a rodada seguinte conta */ }
+        return responder(200, { removido: true, tinha: !!tinha }, () => fechar('removido'));
       }
       if (req.method !== 'POST' || req.url !== '/instalar' || !/^application\/json\b/.test(req.headers['content-type'] || '')) return responder(404, { erro: 'Não encontrado.' });
       if (!lig) return responder(409, { erro: 'Este computador ainda não está ligado ao sistema: abra o programa do PC com dois cliques e entre com o e-mail e a senha.' });
@@ -86,7 +98,7 @@ export function receberDoSistema({ env = process.env, ligacao = null, relerLigac
       }
       acabou = true;
       let tarefa = false;
-      try { tarefa = !!aoInstalar(); } catch { /* o site avisa que a tarefa não ficou criada */ }
+      try { tarefa = !!(await aoInstalar(lig)); } catch { /* o site avisa que a tarefa não ficou criada */ }
       return responder(200, { ...dados, tarefa }, () => fechar('instalado'));
     });
 

@@ -11,6 +11,7 @@ import * as R from '../regras.js';
 import { CADASTROS } from './cadastros.js';
 import { botao, buscarComLimite, carregarParte, d, etiqueta, item, link, opera, ordenar, tabelaHistorico } from './comum.js';
 import { caixaIcone } from './icone.js';
+import * as AS from '../assinatura.js';
 import * as CR from '../config-regras.js';
 import { botoesDoSistema } from './sistema.js';
 
@@ -114,14 +115,31 @@ function caixaDesinstalarPrograma() {
  */
 function caixaCertificado() {
   if (!E.nuvem || !podeUsuario('admin')) return '';
+  preencherSituacaoCertificado();
   // pelo mouse, não pela largura: com zoom de 200% ou janela estreita o computador continua sendo computador
   const aqui = noWindows() && !window.matchMedia?.('(hover: none) and (pointer: coarse)').matches;
   return `<div class="cartao" id="certificado-digital"><h2>Certificado digital da empresa</h2>
     <p>Anexe o certificado A1 (.pfx ou .p12) e digite a senha: o programa do PC guarda os dois cifrados e passa a assinar os recibos e termos sozinho.</p>
-    ${aqui ? `<div class="acoes">${botao('anexarCertificado', 'Anexar o certificado digital', {}, '')}</div>
+    <div class="alerta neutra" data-situacao-certificado role="status">Conferindo o certificado anexado…</div>
+    ${aqui ? `<div class="acoes">${botao('anexarCertificado', 'Anexar ou trocar o certificado', {}, '')} ${botao('removerCertificado', 'Remover o certificado', {}, 'perigo pequeno')}</div>
       <p class="suave">Faça no computador que vai assinar, com o programa do PC instalado. O navegador pergunta se pode abrir o programa e falar com este computador: responda Abrir e Permitir. O arquivo e a senha não vão para a nuvem nem para os backups.</p>`
-    : '<p class="suave">Abra esta tela no computador com Windows que vai assinar (o certificado fica guardado só nele).</p>'}
+    : '<p class="suave">Para anexar, trocar ou remover, abra esta tela no computador com Windows que assina (o certificado fica guardado só nele).</p>'}
     ${ligaDesligaAssinatura()}</div>`;
+}
+
+/** Preenche a situação do certificado (a fila da nuvem sabe o que o programa do PC contou) depois que a caixa está na tela. */
+function preencherSituacaoCertificado() {
+  AS.fila({ fresca: true }).then((f) => AS.situacaoDoCertificado(f.pc), (e) => ({ texto: `Não deu para conferir agora: ${e.message}`, cor: 'aviso', aviso: '' })).then((s) => {
+    let tentativas = 0;
+    const colocar = () => {
+      const el = document.querySelector('[data-situacao-certificado]');
+      if (!el) { if ((tentativas += 1) < 20) setTimeout(colocar, 150); return; }
+      el.className = `alerta ${s.cor === 'neutra' ? 'info' : s.cor}`;
+      el.innerHTML = `${esc(s.texto)}${s.aviso ? `<br><b>${esc(s.aviso)}</b>` : ''}`;
+      el.dataset.anexado = String(s.anexado);
+    };
+    colocar();
+  });
 }
 
 /**

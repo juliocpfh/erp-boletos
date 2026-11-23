@@ -61,6 +61,27 @@ async function todos(env) {
   return out.sort((a, b) => String(b.pedido_em).localeCompare(String(a.pedido_em)));
 }
 
+/**
+ * Resumo do certificado que o programa do PC manda a cada consulta da fila (cabeçalho X-Certificado-Resumo: JSON em base64),
+ * para a caixa do certificado e o aviso de renovação (pedido do dono de 22/11/2026). Só o que aparece na tela: nome, CNPJ,
+ * validade, emissor, quando foi instalado e o computador. Nunca o arquivo nem a senha. Devolve undefined (sem cabeçalho ou
+ * inválido: fica o que estava), { certificado: null } (removido) ou { certificado: {...} }.
+ */
+export function lerResumoCertificado(cabecalho) {
+  const t = String(cabecalho || '');
+  if (!t || t.length > 2000 || !/^[A-Za-z0-9+/=]+$/.test(t)) return undefined;
+  let r;
+  try { r = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(t), (c) => c.charCodeAt(0)))); } catch { return undefined; }
+  if (!r || typeof r !== 'object') return undefined;
+  const computador = texto(r.computador, 60);
+  if (r.removido === true) return { computador, certificado: null };
+  const c = r.certificado;
+  const data = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? String(v) : null);
+  if (!c || typeof c !== 'object' || !data(c.validade) || !texto(c.nome, 160)) return undefined;
+  return { computador, certificado: { nome: texto(c.nome, 160), cnpj: /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(String(c.cnpj || '')) ? c.cnpj : '',
+    validade: data(c.validade), emissor: texto(c.emissor, 160), instalado_em: /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(String(c.instalado_em || '')) ? c.instalado_em : null } };
+}
+
 async function pcVisto(env) {
   const o = await env.DADOS.get(`${PASTA}/_pc.json`);
   return o ? JSON.parse(await o.text()) : null;
@@ -114,7 +135,12 @@ export async function atenderEquipeAssinaturas(request, env, rota, email, { exig
 export async function atenderAparelhoAssinaturas(request, env, rota, email, { computador = '' } = {}) {
   const m = request.method;
   if (rota === '' && m === 'GET') {
-    await env.DADOS.put(`${PASTA}/_pc.json`, JSON.stringify({ visto_em: new Date().toISOString(), por: email, computador: texto(computador, 60) }), { httpMetadata: { contentType: 'application/json' } });
+    const resumo = lerResumoCertificado(request.headers.get('X-Certificado-Resumo'));
+    const antes = await pcVisto(env);
+    // sem o resumo (programa antigo): fica o certificado que já se sabia
+    const certificado = resumo === undefined ? antes?.certificado : resumo.certificado;
+    await env.DADOS.put(`${PASTA}/_pc.json`, JSON.stringify({ visto_em: new Date().toISOString(), por: email, computador: resumo?.computador || texto(computador, 60) || antes?.computador || '',
+      ...(certificado !== undefined ? { certificado } : {}) }), { httpMetadata: { contentType: 'application/json' } });
     return json(200, { pendentes: (await todos(env)).filter((p) => p.situacao === 'pendente').map(({ id, titulo, nome, pedido_em, tamanho }) => ({ id, titulo, nome, pedido_em, tamanho })) });
   }
   const arq = rota.match(/^([a-z0-9]+)\.pdf$/);

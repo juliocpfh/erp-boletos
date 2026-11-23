@@ -13,6 +13,30 @@ export function configurarAssinatura(opcoes = {}) { Object.assign(cfg, opcoes); 
 /** Documentos que a pessoa preenche (a ficha): quem assina é ela, não a empresa. */
 export const SEM_ASSINATURA_DA_EMPRESA = ['ficha', 'ficha_fiador'];
 
+/** Dias antes do vencimento do certificado em que o aviso de renovação começa (na caixa do certificado e no Painel). */
+export const AVISO_CERTIFICADO_DIAS = 30;
+
+const diaDaqui = (agora) => { const d = new Date(agora); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+/** Dias do dia de hoje até `iso` (negativo = já passou). Ex.: hoje 22/11/2026, validade 22/12/2026 → 30. */
+const diasAte = (iso, agora) => Math.round((Date.parse(`${iso}T12:00:00Z`) - Date.parse(`${diaDaqui(agora)}T12:00:00Z`)) / 86400000);
+
+/**
+ * O certificado anexado, pelo que o programa do PC contou à nuvem (`pc` da fila). Devolve { anexado, texto, cor, aviso }.
+ * Ex.: válido até 22/12/2026, hoje 22/11/2026 → anexado, aviso "vence em 22/12/2026 (faltam 30 dias): renove…".
+ */
+export function situacaoDoCertificado(pc, agora = Date.now()) {
+  if (!pc || pc.certificado === undefined) return { anexado: null, texto: 'O programa do PC ainda não contou se há certificado anexado (ele conta a cada minuto quando tem um; o programa se atualiza sozinho).', cor: 'neutra', aviso: '' };
+  const c = pc.certificado;
+  if (!c) return { anexado: false, texto: `Nenhum certificado anexado${pc.computador ? ` (último computador: ${pc.computador})` : ''}.`, cor: 'neutra', aviso: '' };
+  const dias = diasAte(c.validade, agora);
+  const quem = `${c.nome}${c.cnpj ? `, CNPJ ${c.cnpj}` : ''}`;
+  const onde = `${pc.computador ? `no computador ${pc.computador}` : 'no programa do PC'}${c.instalado_em ? `, desde ${C.dataBr(c.instalado_em.slice(0, 10))}` : ''}`;
+  const validade = dias < 0 ? `venceu em ${C.dataBr(c.validade)}` : `válido até ${C.dataBr(c.validade)} (${dias === 0 ? 'vence hoje' : `faltam ${dias} ${dias === 1 ? 'dia' : 'dias'}`})`;
+  const aviso = dias < 0 ? `O certificado digital da empresa venceu em ${C.dataBr(c.validade)}: os documentos não são mais assinados. Renove com a certificadora e anexe o novo em Sistema → Empresas.`
+    : dias <= AVISO_CERTIFICADO_DIAS ? `O certificado digital da empresa vence em ${C.dataBr(c.validade)} (${dias === 0 ? 'hoje' : `faltam ${dias} ${dias === 1 ? 'dia' : 'dias'}`}): renove com a certificadora e anexe o novo em Sistema → Empresas.` : '';
+  return { anexado: true, texto: `Anexado: ${quem}, ${validade}, ${onde}.`, cor: dias < 0 ? 'perigo' : aviso ? 'aviso' : 'ok', aviso, nome: c.nome, validade: c.validade, dias };
+}
+
 /** O PC parou de olhar a fila há mais que isto: o aviso pede para ligar o computador (o programa olha a cada minuto). */
 export const PC_PARADO_MS = 10 * 60 * 1000;
 

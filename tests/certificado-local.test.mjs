@@ -73,7 +73,7 @@ test('só a origem exata do sistema e o Host deste computador: outro site não l
   assert.equal(pre.cab['access-control-allow-origin'], SITE);
   assert.equal(pre.cab['access-control-allow-private-network'], 'true');
   assert.equal((await instalar(porta)).status, 200);
-  assert.deepEqual(await fim, { situacao: 'instalado' });
+  assert.equal((await fim).situacao, 'instalado');
 });
 
 test('instala uma vez: devolve os dados sem a senha, cria a tarefa e fecha a porta', async () => {
@@ -99,7 +99,7 @@ test('tarefa recusada pelo Windows é avisada; computador não ligado não receb
   assert.equal((await pedir(b.porta, { cab })).dados.ligado, false);
   assert.equal((await instalar(b.porta, { cab })).status, 409);
   assert.equal(gravou, false);
-  assert.deepEqual(await b.fim, { situacao: 'tempo' });
+  assert.equal((await b.fim).situacao, 'tempo');
 });
 
 test('tentativas erradas têm limite; segundo clique não derruba quem já espera', async () => {
@@ -111,7 +111,7 @@ test('tentativas erradas têm limite; segundo clique não derruba quem já esper
     assert.equal(r.dados.acabou, i === CL.MAX_TENTATIVAS);
     assert.match(r.dados.erro, /senha do certificado não confere/);
   }
-  assert.deepEqual(await fim, { situacao: 'tentativas' });
+  assert.equal((await fim).situacao, 'tentativas');
 });
 
 test('site: o arquivo e a senha vão só para 127.0.0.1, sem cookie e sem seguir redirecionamento', async () => {
@@ -273,4 +273,78 @@ ${junto ? '[void]$col.Add((New-Object System.Security.Cryptography.X509Certifica
     const pfx = criar(junto);
     assert.equal(A.conferirCertificado(pfx, 'teste123').nome, 'ANK TESTE LTDA', `emissora junto: ${junto}`);
   }
+});
+
+// Situação do certificado na nuvem e remover (pedido do dono de 22/11/2026, noite).
+test('remover pelo site: só a origem do sistema, apaga o arquivo e fecha', async () => {
+  let removeu = 0;
+  const { porta, fim } = await abrir({ remover: () => { removeu += 1; } });
+  assert.equal((await pedir(porta, { metodo: 'POST', caminho: '/remover', corpo: '{}', cab: { 'Content-Type': 'application/json', Origin: 'https://outro.example' } })).status, 403);
+  assert.equal((await pedir(porta, { metodo: 'POST', caminho: '/remover', corpo: '{}', cab: { 'Content-Type': 'text/plain' } })).status, 404, 'só JSON');
+  assert.equal(removeu, 0);
+  const r = await pedir(porta, { metodo: 'POST', caminho: '/remover', corpo: '{}', cab: { 'Content-Type': 'application/json' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.dados.removido, true);
+  const f = await fim;
+  assert.equal(f.situacao, 'removido');
+  assert.deepEqual(f.ligacao, LIGACAO, 'devolve a ligação para avisar a nuvem');
+  assert.equal(removeu, 1);
+});
+
+test('--certificado-sistema: anexar e remover avisam a nuvem antes de responder à tela', async () => {
+  const avisos = [];
+  const env = temp();
+  fs.writeFileSync(path.join(env.IMOVEIS_CONFIG, CT.ARQUIVO_CERTIFICADO), JSON.stringify({ ...DADOS, emissor: 'AC TESTE' }));
+  const informar = async (lig, cert) => { avisos.push([lig, cert && cert.nome]); return true; };
+  // o programa de verdade (porta sorteada): a resposta só sai depois do aviso
+  for (const [caminho, corpo, esperado] of [['/instalar', JSON.stringify({ pfx: PFX, senha: 's' }), 'ANK TESTE LTDA'], ['/remover', '{}', null]]) {
+    avisos.length = 0;
+    let aberto;
+    const porta = new Promise((ok) => { aberto = ok; });
+    const rodando = P.executar(['--certificado-sistema'], { env, dizer: () => {}, lerLig: () => LIGACAO, lerCert: () => DADOS, informar,
+      assinarFilaFn: async () => ({ assinados: 0, erros: [] }),
+      receberCert: (op) => CL.receberDoSistema({ ...op, porta: 0, parado: 3000, guardar: () => DADOS, remover: () => {}, aoAbrir: aberto }) });
+    const p = await porta;
+    const r = await pedir(p, { metodo: 'POST', caminho, corpo, cab: { 'Content-Type': 'application/json' } });
+    assert.equal(r.status, 200, caminho);
+    assert.deepEqual(avisos, [[LIGACAO, esperado]], `${caminho}: avisou antes de responder`);
+    assert.equal(await rodando, 0);
+  }
+});
+
+test('resumo do certificado para a nuvem: só o que aparece na tela; a nuvem limpa o que vier errado', async () => {
+  const N = await import('../nuvem/assinaturas.mjs');
+  const cert = { ...DADOS, pfx: 'SEGREDO-DO-ARQUIVO', senha: 'SEGREDO-DA-SENHA', emissor: 'AC TESTE', instalado_em: '2026-11-22T20:00:00.000Z' };
+  const b64 = CT.resumoParaNuvem(cert, 'PC DA ANK');
+  assert.doesNotMatch(Buffer.from(b64, 'base64').toString(), /SEGREDO/, 'nunca o arquivo nem a senha');
+  assert.deepEqual(N.lerResumoCertificado(b64), { computador: 'PC DA ANK', certificado: { nome: 'ANK TESTE LTDA', cnpj: '11.222.333/0001-81', validade: '2099-01-01', emissor: 'AC TESTE', instalado_em: '2026-11-22T20:00:00.000Z' } });
+  assert.deepEqual(N.lerResumoCertificado(CT.resumoParaNuvem(null, 'PC')), { computador: 'PC', certificado: null }, 'removido');
+  const nome = 'ADMINISTRAÇÃO <b>X</b>';
+  assert.equal(N.lerResumoCertificado(CT.resumoParaNuvem({ ...cert, nome }, '')).certificado.nome, 'ADMINISTRAÇÃO  b X /b', 'sem < >');
+  for (const ruim of ['', 'nao-e-base64!', Buffer.from('{"certificado":{"nome":"X","validade":"amanha"}}').toString('base64'), 'A'.repeat(2001)]) assert.equal(N.lerResumoCertificado(ruim), undefined, ruim.slice(0, 20));
+  assert.equal(N.lerResumoCertificado(CT.resumoParaNuvem({ ...cert, cnpj: '123' }, '')).certificado.cnpj, '');
+});
+
+test('a nuvem guarda o resumo na consulta da fila e mantém o último quando o programa antigo não manda', async () => {
+  const N = await import('../nuvem/assinaturas.mjs');
+  const { r2Falso } = await import('./r2-falso.mjs');
+  const env = { DADOS: r2Falso() };
+  const consultar = (cab = {}) => N.atenderAparelhoAssinaturas(new Request('https://x/api/aparelho/assinaturas', { headers: cab }), env, '', 'dono@exemplo.com.br');
+  const pc = async () => (await (await N.atenderEquipeAssinaturas(new Request('https://x/api/assinaturas'), env, '', 'dono@exemplo.com.br', { exigir: async () => {}, conferirGravacao: () => {} })).json()).pc;
+  await consultar();
+  assert.equal((await pc()).certificado, undefined, 'programa antigo: não se sabe');
+  await consultar({ 'X-Certificado-Resumo': CT.resumoParaNuvem({ ...DADOS, instalado_em: '2026-11-22T20:00:00.000Z' }, 'PC DA ANK') });
+  assert.equal((await pc()).certificado.validade, '2099-01-01');
+  assert.equal((await pc()).computador, 'PC DA ANK');
+  await consultar();
+  assert.equal((await pc()).certificado.validade, '2099-01-01', 'sem o cabeçalho, fica o último');
+  await consultar({ 'X-Certificado-Resumo': CT.resumoParaNuvem(null, 'PC DA ANK') });
+  assert.equal((await pc()).certificado, null, 'removido');
+});
+
+test('a fila manda o resumo a cada consulta', async () => {
+  let cab = '';
+  const buscar = async (url, op) => { if (url.endsWith('/assinaturas')) { cab = new Headers(op.headers).get('X-Certificado-Resumo'); return Response.json({ pendentes: [] }); } return Response.json({}); };
+  await CT.assinarFila({ ...LIGACAO, computador: 'PC' }, { ...DADOS, pfx: PFX, senha: 's' }, { buscar });
+  assert.equal(JSON.parse(Buffer.from(cab, 'base64').toString()).certificado.nome, 'ANK TESTE LTDA');
 });
