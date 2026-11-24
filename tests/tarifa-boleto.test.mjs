@@ -32,7 +32,7 @@ test('modelos já gravados recebem a cláusula uma vez; termos aditivos não', (
   const d = R.bancoVazio();
   d.modelos_contrato = [{ id: 1, nome: 'Residencial', texto: antigo, padrao: 'Residencial' }];
   R.normalizar(d);
-  assert.equal((d.modelos_contrato[0].texto.match(/tarifa bancária de emissão do boleto/g) || []).length, 1);
+  assert.equal((d.modelos_contrato[0].texto.match(/O LOCATÁRIO reembolsará, junto com cada aluguel, a tarifa bancária/g) || []).length, 1);
 });
 
 test('o boleto cobra a tarifa do cadastro do contrato; o Novo contrato só traz a tarifa preenchida se a regra tiver valor', () => {

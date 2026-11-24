@@ -272,6 +272,28 @@ export function representacaoDoContrato(d, c, imovel = {}) {
   return out;
 }
 
+/**
+ * Exemplo de atraso do resumo: aluguel pago 10 dias depois, com a multa e os juros por dia (mês de 30 dias), pela mesma conta
+ * do boleto (`C.jurosAoDia`: os juros de um dia, sem os décimos de centavo, vezes os dias).
+ * Ex.: R$ 1.900,00, multa 2%, juros 1% ao mês → multa R$ 38,00, juros 10 × R$ 0,63 = R$ 6,30, total R$ 1.944,30.
+ */
+function exemploAtraso(aluguel, multaPct, jurosPct) {
+  if (!(aluguel > 0)) return '';
+  const multa = Math.round((aluguel * multaPct) / 100);
+  const juros = C.jurosAoDia(aluguel, jurosPct) * 10;
+  return `Exemplo: o aluguel de ${C.reais(aluguel)} pago 10 (dez) dias depois do vencimento fica em ${C.reais(aluguel)} + ${C.reais(multa)} de multa + ${C.reais(juros)} de juros = ${C.reais(aluguel + multa + juros)} (o exemplo usa só o aluguel; o que mais estiver no boleto entra na mesma conta).`;
+}
+
+/**
+ * Exemplo da multa da saída antes do fim (3 aluguéis, proporcional ao tempo que falta), saindo na metade do prazo.
+ * Ex.: R$ 1.900,00, contrato de 30 meses, faltando 15 → 3 × R$ 1.900,00 × 15/30 = R$ 2.850,00.
+ */
+function exemploSaida(aluguel, meses) {
+  if (!(aluguel > 0) || !(meses > 1)) return '';
+  const faltam = Math.floor(meses / 2);
+  return `Exemplo: saindo quando ainda faltam ${faltam} dos ${meses} meses, a multa é de 3 × ${C.reais(aluguel)} × ${faltam}/${meses} = ${C.reais(Math.round((3 * aluguel * faltam) / meses))} (a conta exata é feita pelos dias que faltam).`;
+}
+
 /** Fiadores do contrato que ainda valem na data (sem fim do vínculo antes dela e sem substituto). */
 const fiadoresNaData = (d, contratoId, data) => d.fiadores.filter((f) => f.contrato_id === contratoId && !f.substituido_por_id && (!f.data_saida || f.data_saida >= (data || C.hojeIso())));
 
@@ -339,6 +361,9 @@ export function dadosDoContrato(d, c, extra = {}) {
     deposito_uso: c.deposito_uso || '',
     cidade: imovel.cidade || dadoDaEmpresa(d, c, 'cidade_documentos'),
     data_assinatura: dataPorExtenso(extra.data || C.hojeIso()),
+    // resumo em perguntas e respostas (RESUMO_CONTRATO): exemplos com os valores do contrato
+    exemplo_atraso: exemploAtraso(aluguel, c.multa_percentual ?? 2, c.juros_mensal_percentual ?? 1),
+    exemplo_saida: exemploSaida(aluguel, Number(c.prazo_meses) || C.mesesDoPrazo(c.data_entrada || c.vigencia_inicio, c.vigencia_fim) || 0),
   };
   const condicoes = {
     fiador: temFiador, caucao: c.garantia_tipo === 'Caução', deposito: ['Depósito garantia', 'Fiador + depósito'].includes(c.garantia_tipo),
@@ -466,6 +491,7 @@ export function montarContrato(texto, dados) {
     const linha = parte.replace(/\s*\n\s*/g, ' ').trim();
     if (!linha) continue;
     if (linha === '[assinaturas]') blocos.push({ tipo: 'assinaturas', pessoas: dados.assinaturas });
+    else if (linha === '[nova página]') blocos.push({ tipo: 'nova_pagina' });
     else if (linha.startsWith('## ')) blocos.push({ tipo: 'secao', runs: negritos(linha.slice(3)) });
     else if (linha.startsWith('# ')) blocos.push({ tipo: 'titulo', runs: negritos(linha.slice(2)) });
     else if (linha.startsWith('> ')) blocos.push({ tipo: 'direita', runs: negritos(linha.slice(2)) });
@@ -480,7 +506,7 @@ const CAMPOS_EXTRAS = ['locadoras', 'locatarios', 'solidario', 'fiadores', 'fiad
   'indice', 'multa', 'juros', 'tarifa_boleto', 'fci_percentual', 'fci_indice', 'encargos_inquilino', 'encargos_inclusos', 'representacao', 'caucao_valor',
   'caucao_meses', 'caucao_meses_aluguel', 'deposito_valor', 'deposito_uso', 'cidade', 'data_assinatura', 'numero_aditivo', 'data_contrato',
   'dia_vencimento_anterior', 'dia_vencimento_novo', 'primeiro_vencimento', 'mes_referencia', 'data_troca', 'data_vespera', 'saintes', 'entrantes',
-  'aluguel_atual', 'garantia_anterior', 'garantia_depositada', 'garantia_corrigida'];
+  'aluguel_atual', 'garantia_anterior', 'garantia_depositada', 'garantia_corrigida', 'exemplo_atraso', 'exemplo_saida'];
 let camposConhecidos = null;
 /**
  * Avisos ao salvar um modelo: {campo} que não existe (sai "[campo?]" no contrato). Ex.: ["{locatario}"].
@@ -568,6 +594,7 @@ export function contratoHtml(blocos, { logo, rodape }) {
 
 function blocoHtml(b) {
   {
+    if (b.tipo === 'nova_pagina') return '<div class="ct-nova-pagina"></div>';
     if (b.tipo === 'titulo') return `<h1 class="ct-titulo">${runsHtml(b.runs)}</h1>`;
     if (b.tipo === 'secao') return `<h2 class="ct-secao">${runsHtml(b.runs)}</h2>`;
     if (b.tipo === 'direita') return `<p class="ct-direita">${runsHtml(b.runs)}</p>`;
@@ -642,7 +669,8 @@ export async function contratoDocx(JSZip, blocos, { logo, rodape, titulo }) {
     corpo.push(`<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/></w:pPr>${imagemX(1, 'rIdLogo', lado, lado * prop, { topo: LOGO.topoCm })}</w:p>`);
   }
   for (const b of blocos) {
-    if (b.tipo === 'titulo') corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: 'center', depois: 360, rPr: '<w:u w:val="single"/><w:sz w:val="26"/>' }).replace('<w:pPr>', '<w:pPr><w:keepNext/>'));
+    if (b.tipo === 'nova_pagina') corpo.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
+    else if (b.tipo === 'titulo') corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: 'center', depois: 360, rPr: '<w:u w:val="single"/><w:sz w:val="26"/>' }).replace('<w:pPr>', '<w:pPr><w:keepNext/>'));
     else if (b.tipo === 'secao') corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: 'center', antes: 240, depois: 160, rPr: '<w:u w:val="single"/>' }).replace('<w:pPr>', '<w:pPr><w:keepNext/>'));
     else if (b.tipo === 'direita') corpo.push(parX(b.runs, { alinhar: 'right', antes: 240, depois: 480 }));
     else if (b.tipo === 'subsecao') corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: 'left', antes: 200, depois: 60 }).replace('<w:pPr>', '<w:pPr><w:keepNext/>'));

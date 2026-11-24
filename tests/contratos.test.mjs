@@ -16,7 +16,7 @@ function base(extra = {}) {
     descricao_objeto: 'a casa nº 3', ...extra }, 'j');
   return { d, c };
 }
-const texto = (blocos) => blocos.map((b) => (b.runs ? b.runs.map((r) => r.t).join('') : b.url ? `[link ${b.url}]` : b.linhas ? '[tabela]' : `[${b.pessoas.map((p) => p.papel).join(', ')}]`)).join('\n');
+const texto = (blocos) => blocos.map((b) => (b.runs ? b.runs.map((r) => r.t).join('') : b.tipo === 'nova_pagina' ? '[nova página]' : b.url ? `[link ${b.url}]` : b.linhas ? '[tabela]' : `[${b.pessoas.map((p) => p.papel).join(', ')}]`)).join('\n');
 
 test('valores, números e datas por extenso', () => {
   assert.equal(K.valorComExtenso(350000), 'R$ 3.500,00 (três mil e quinhentos reais)');
