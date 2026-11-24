@@ -1826,6 +1826,54 @@ const CAMPOS_RECALCULO = ['dias_cobrados', 'dias_mes', 'aluguel_mensal', 'alugue
   'seguro_parcela', 'taxa_boleto', 'fci', 'ressarcimento', 'ressarcimento_descricao', 'ressarcimento_na_nf', 'carencia', 'multa_percentual', 'juros_mensal_percentual', 'situacao'];
 
 /**
+ * Campos que "Alterar valores" grava e os do recálculo que ficam junto com cada um (o rótulo da parcela acompanha o valor;
+ * aluguel, bonificação e FCI dependem um do outro). Pedido do dono de 24/11/2026: o seguro lançado depois não entrava no
+ * boleto alterado à mão. Desde então o boleto guarda ``campos_manuais`` e o recálculo muda só o resto.
+ * Ex.: IPTU digitado à mão em 11/2026 e seguro de R$ 30,00 lançado depois → o IPTU fica e o seguro entra.
+ */
+export const CAMPOS_MANUAIS = ['aluguel', 'desconto', 'iptu', 'seguro', 'taxa_boleto', 'fci', 'multa_percentual', 'juros_mensal_percentual'];
+const JUNTOS_DO_MANUAL = {
+  aluguel: ['aluguel', 'desconto', 'fci', 'dias_cobrados', 'dias_mes', 'aluguel_mensal'], desconto: ['aluguel', 'desconto', 'fci', 'dias_cobrados', 'dias_mes', 'aluguel_mensal'],
+  fci: ['fci'], iptu: ['iptu', 'iptu_parcela'], seguro: ['seguro', 'seguro_parcela'], taxa_boleto: ['taxa_boleto'],
+  multa_percentual: ['multa_percentual'], juros_mensal_percentual: ['juros_mensal_percentual'],
+};
+/** Campos que o recálculo pode mudar neste boleto; null: alterado à mão antes de 24/11/2026 (não se sabe o quê, fica como está). */
+export function camposDoRecalculo(cb) {
+  if (!cb.editado_manual) return CAMPOS_RECALCULO;
+  if (!Array.isArray(cb.campos_manuais)) return null;
+  const fora = new Set(cb.campos_manuais.flatMap((k) => JUNTOS_DO_MANUAL[k] || [k]));
+  return CAMPOS_RECALCULO.filter((k) => !fora.has(k));
+}
+
+/**
+ * Boleto em aberto alterado à mão antes de 24/11/2026 que não bate com o cadastro no IPTU ou no seguro (ex.: apólice lançada
+ * depois de alterar o boleto): [{ rotulo, cadastro, boleto }]. Vazio: bate, ou o recálculo já cuida dele.
+ */
+export function divergenciasDoManual(d, cb) {
+  if (!cb.editado_manual || camposDoRecalculo(cb) || cb.data_pagamento || emAcordo(cb) || ehBoletoAvulso(cb)) return [];
+  const c = buscar(d, 'contratos', cb.contrato_id);
+  const novo = c && montarCobranca(d, c, cb.competencia);
+  if (!novo) return [];
+  return [['iptu', 'IPTU'], ['seguro', 'Seguro obrigatório']].filter(([k]) => (novo[k] || 0) !== (cb[k] || 0))
+    .map(([k, rotulo]) => ({ campo: k, rotulo, cadastro: novo[k] || 0, boleto: cb[k] || 0 }));
+}
+
+export function alertasBoletosManuais(d) {
+  const lista = [];
+  for (const cb of d.cobrancas) {
+    if (!cb.editado_manual || cb.data_pagamento) continue;
+    const dif = divergenciasDoManual(d, cb);
+    if (!dif.length) continue;
+    const c = buscar(d, 'contratos', cb.contrato_id);
+    const i = buscar(d, 'imoveis', c.imovel_id);
+    lista.push({ nivel: 'aviso', tipo: 'A verificar', contrato_id: c.id, imovel: i ? i.nome : '', inquilino: c.inquilino_nome,
+      link: `#/cobranca/${cb.id}`, ancora: `boleto-${cb.id}`,
+      texto: `Boleto de ${C.compBr(cb.competencia)} foi alterado à mão e não bate com o cadastro: ${dif.map((x) => `${x.rotulo} ${C.reais(x.cadastro)} no cadastro e ${C.reais(x.boleto)} no boleto`).join('; ')}. Abra o boleto e use "Voltar a calcular pelo cadastro" (ou corrija em "Alterar valores").` });
+  }
+  return lista;
+}
+
+/**
  * Boleto do aluguel de um mês em que o inquilino não ocupou nenhum dia (depois da saída ou antes da entrada), em aberto.
  * Fim do vínculo na troca de titular não conta: esses boletos passam ao novo titular no dia da troca.
  */
@@ -1877,7 +1925,8 @@ export function alertasBoletosSemOcupacao(d) {
  */
 export function recalcularCobrancas(d, filtro, usuario) {
   const mudaram = new Set();
-  const abertos = (cb) => !cb.data_pagamento && !cb.editado_manual && !emAcordo(cb) && !ehBoletoAvulso(cb) && !cb.quitado_saida && !cb.quitado_devolucao;
+  // alterado à mão: só os campos que não foram digitados (``camposDoRecalculo``); antes de 24/11/2026, nada
+  const abertos = (cb) => !cb.data_pagamento && !!camposDoRecalculo(cb) && !emAcordo(cb) && !ehBoletoAvulso(cb) && !cb.quitado_saida && !cb.quitado_devolucao;
   const lista = d.cobrancas.filter((cb) => abertos(cb) && filtro(cb)).sort((a, b) => a.competencia.localeCompare(b.competencia));
   const contratos = new Map();
   for (const cb of lista) {
@@ -1892,7 +1941,7 @@ export function recalcularCobrancas(d, filtro, usuario) {
     }
     const novo = c && montarCobranca(d, c, cb.competencia);
     if (!novo) continue;
-    const dados = Object.fromEntries(CAMPOS_RECALCULO.map((k) => [k, novo[k]]));
+    const dados = Object.fromEntries(camposDoRecalculo(cb).map((k) => [k, novo[k]]));
     if (Object.keys(atualizar(d, 'cobrancas', cb.id, dados, usuario, `Boleto ${C.compBr(cb.competencia)} recalculado pelo cadastro`)).length) mudaram.add(cb.id);
   }
   // boleto excluído (nenhum dia ocupado) que tinha diferença antiga ou multa de notificação: elas voltaram a esperar um boleto
@@ -2602,26 +2651,91 @@ export function cancelarTrocaGarantia(d, trocaId, usuario) {
   excluir(d, 'trocas_garantia', t.id, usuario, texto);
 }
 
-/** Ajuste do mês no boleto: cobrança adicional (valor positivo) ou ressarcimento (negativo), com o motivo no histórico. */
-export function ajustarBoleto(d, cobrancaId, valor, motivo, usuario) {
-  const cb = buscar(d, 'cobrancas', cobrancaId);
+/**
+ * Ajustes do mês lançados à mão no boleto (``cobrancas.ajustes``: [{ id, valor, motivo }], valor + cobrança adicional,
+ * − ressarcimento). Pedido do dono de 24/11/2026: mais de um no mesmo boleto. O campo ``outros`` continua sendo o total
+ * (ajustes + multas de notificação + diferenças presas), e ``outros_descricao`` os textos, nessa ordem.
+ * Ex.: + R$ 80,00 (conserto da torneira), − R$ 150,00 (reforma do banheiro) e − R$ 30,00 (acerto da água) → outros = − R$ 100,00.
+ */
+const fixosDoBoleto = (cb) => [...(cb.multas_notificacao || []), ...(cb.diferencas_cobradas || [])];
+const somaValores = (l) => l.reduce((s, e) => s + (e.valor || 0), 0);
+export function ajustesDoBoleto(cb) {
+  if (Array.isArray(cb.ajustes)) return cb.ajustes;
+  // boleto de antes de 24/11/2026: um ajuste só, o que sobra do total depois das multas e diferenças
+  const fixos = fixosDoBoleto(cb);
+  const resto = (cb.outros || 0) - somaValores(fixos);
+  if (!resto || ehBoletoAvulso(cb)) return [];
+  const textos = new Set(fixos.map((e) => e.texto));
+  const motivo = String(cb.outros_descricao || '').split('; ').filter((x) => x && !textos.has(x)).join('; ');
+  return [{ id: 1, valor: resto, motivo }];
+}
+
+/** Partes do campo ``outros`` para o demonstrativo e a descrição do boleto: [{ texto, valor }] (cada ajuste, multa e diferença). */
+export function partesDosOutros(cb) {
+  if (!cb.outros && !(cb.ajustes || []).length) return [];
+  if (ehBoletoAvulso(cb)) return cb.outros ? [{ texto: cb.outros_descricao || '', valor: cb.outros }] : [];
+  const partes = [...ajustesDoBoleto(cb).map((a) => ({ texto: a.motivo, valor: a.valor })), ...fixosDoBoleto(cb).map((e) => ({ texto: e.texto, valor: e.valor }))];
+  // conta que não fecha (boleto alterado à mão em "Alterar valores"): uma linha só, com o total
+  return somaValores(partes) === (cb.outros || 0) ? partes.filter((p) => p.valor) : [{ texto: cb.outros_descricao || '', valor: cb.outros }];
+}
+
+function conferirAjustavel(cb) {
+  if (!cb) throw new C.ErroUsuario('Boleto não encontrado.');
   if (cb.data_pagamento) throw new Error('Este boleto já foi pago. Desfaça o pagamento antes de ajustar.');
   if (emAcordo(cb)) throw new C.ErroUsuario(MOTIVO_EM_ACORDO(cb, 'não pode ser ajustado'));
-  // a multa de notificação vai no mesmo campo: o ajuste que a tirasse deixaria a notificação apontando para cá (sai por "Retirar a multa")
-  const multas = (cb.multas_notificacao || []).filter((e) => !String(motivo || '').includes(e.texto));
-  if (multas.length) throw new C.ErroUsuario(`Este boleto tem a ${multas.map((e) => e.texto.toLocaleLowerCase('pt-BR')).join(' e a ')}: para tirá-la, use "Retirar a multa" na notificação; para ajustar o resto, mantenha esse texto no motivo e o valor dela no total.`);
-  // a diferença de um pagamento em parte antigo também fica presa ao boleto: sai só desfazendo aquele pagamento
-  const presas = (cb.diferencas_cobradas || []).filter((e) => !String(motivo || '').includes(e.texto));
-  if (presas.length) throw new C.ErroUsuario(`Este boleto cobra a ${presas.map((e) => `${e.texto.toLocaleLowerCase('pt-BR')} (${C.reais(e.valor)})`).join(' e a ')}: ela não sai pelo ajuste (só desfazendo aquele pagamento). Para ajustar o resto, mantenha esse texto no motivo e o valor dela no total.`);
-  const fixo = [...(cb.multas_notificacao || []), ...(cb.diferencas_cobradas || [])].reduce((s, e) => s + (e.valor || 0), 0);
-  if (fixo && valor < fixo) throw new C.ErroUsuario(`O ajuste tem de incluir ${C.reais(fixo)} da multa da notificação e/ou da diferença presas a este boleto: o valor digitado (${C.reais(valor)}) é menor.`);
-  const texto = valor ? `${valor < 0 ? 'Ressarcimento' : 'Cobrança adicional'} de ${C.reais(Math.abs(valor))} no boleto ${C.compBr(cb.competencia)}${motivo ? `: ${motivo}` : ''}`
-    : `Ajuste do boleto ${C.compBr(cb.competencia)} retirado`;
-  atualizar(d, 'cobrancas', cb.id, { outros: valor, outros_descricao: valor ? motivo : '' }, usuario, texto);
-  // o total do boleto mudou: a reserva acompanha (como ao gerar e recalcular)
+  if (ehBoletoAvulso(cb)) throw new C.ErroUsuario('Este boleto não é o do aluguel do mês: não recebe ajuste.');
+}
+
+/** Grava a lista de ajustes: ``outros`` = ajustes + multas + diferenças; o boleto não pode ficar negativo. */
+function gravarAjustes(d, cb, ajustes, usuario, texto) {
+  const fixos = fixosDoBoleto(cb);
+  const outros = somaValores(ajustes) + somaValores(fixos);
+  const sem = totais({ ...cb, outros: 0 }).total_sem_desconto;
+  if (sem + outros < 0) {
+    throw new C.ErroUsuario(`Os ressarcimentos (${C.reais(-somaValores(ajustes.filter((a) => a.valor < 0)))}) passam do boleto sem ajuste (${C.reais(sem)}): a sobra de ${C.reais(-(sem + outros))} não iria para lugar nenhum. Lance no máximo o valor do boleto aqui e o resto no boleto seguinte (ou devolva ao inquilino).`);
+  }
+  const descricao = [...ajustes.map((a) => a.motivo), ...fixos.map((e) => e.texto)].filter(Boolean).join('; ');
+  atualizar(d, 'cobrancas', cb.id, { ajustes, outros, outros_descricao: descricao }, usuario, texto);
   const contrato = buscar(d, 'contratos', cb.contrato_id);
-  if (contrato) realocarReserva(d, contrato, usuario);
+  if (contrato) realocarReserva(d, contrato, usuario); // o total do boleto mudou: a reserva acompanha
   return cb;
+}
+
+/** Acrescenta um ajuste ao boleto (valor + cobrança adicional, − ressarcimento). O motivo é obrigatório (fica no histórico). */
+export function adicionarAjuste(d, cobrancaId, valor, motivo, usuario) {
+  const cb = buscar(d, 'cobrancas', cobrancaId);
+  conferirAjustavel(cb);
+  const m = String(motivo || '').trim().replace(/;\s*/g, ', ');
+  if (!valor) throw new C.ErroUsuario('Informe o valor do ajuste.');
+  if (!m) throw new C.ErroUsuario('Informe o motivo do ajuste (fica no histórico).');
+  const atuais = ajustesDoBoleto(cb);
+  const id = atuais.reduce((x, a) => Math.max(x, a.id || 0), 0) + 1;
+  return gravarAjustes(d, cb, [...atuais, { id, valor, motivo: m }], usuario,
+    `${valor < 0 ? 'Ressarcimento' : 'Cobrança adicional'} de ${C.reais(Math.abs(valor))} no boleto ${C.compBr(cb.competencia)}: ${m}`);
+}
+
+/** Tira um ajuste do boleto (as multas de notificação e as diferenças presas continuam). */
+export function retirarAjuste(d, cobrancaId, ajusteId, usuario) {
+  const cb = buscar(d, 'cobrancas', cobrancaId);
+  conferirAjustavel(cb);
+  const atuais = ajustesDoBoleto(cb);
+  const a = atuais.find((x) => x.id === Number(ajusteId));
+  if (!a) throw new C.ErroUsuario('Este ajuste já foi retirado.');
+  return gravarAjustes(d, cb, atuais.filter((x) => x !== a), usuario,
+    `Ajuste do boleto ${C.compBr(cb.competencia)} retirado: ${a.valor < 0 ? 'ressarcimento' : 'cobrança adicional'} de ${C.reais(Math.abs(a.valor))} (${a.motivo})`);
+}
+
+/**
+ * Troca todos os ajustes do boleto por um só (valor 0: tira todos). Multas de notificação e diferenças presas ficam.
+ * Ex.: ``ajustarBoleto(d, id, -15000, 'Reforma do banheiro')`` → um ressarcimento de R$ 150,00.
+ */
+export function ajustarBoleto(d, cobrancaId, valor, motivo, usuario) {
+  const cb = buscar(d, 'cobrancas', cobrancaId);
+  conferirAjustavel(cb);
+  const m = String(motivo || '').trim().replace(/;\s*/g, ', ');
+  const texto = valor ? `${valor < 0 ? 'Ressarcimento' : 'Cobrança adicional'} de ${C.reais(Math.abs(valor))} no boleto ${C.compBr(cb.competencia)}${m ? `: ${m}` : ''}`
+    : `Ajuste do boleto ${C.compBr(cb.competencia)} retirado`;
+  return gravarAjustes(d, cb, valor ? [{ id: 1, valor, motivo: m }] : [], usuario, texto);
 }
 
 /**
@@ -5341,6 +5455,7 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
   const banco = alertaBanco(d, hoje);
   if (banco) lista.push(banco);
   lista.push(...alertasBoletosSemOcupacao(d));
+  lista.push(...alertasBoletosManuais(d));
   const pastas = AI.alertaPastas(d, hoje); // Arquivo impresso: um alerta só, com os números
   if (pastas) lista.push(pastas);
   for (const x of inadimplencia(d, hoje, { historico: false }).devedores) {
@@ -5476,7 +5591,8 @@ export function dadosBoleto(d, cb) {
   if (cb.fci) extras.push(`FCI ${rs(cb.fci)}`);
   const iTarifa = extras.length;
   if (cb.taxa_boleto) extras.push(`TARIFA COBRANÇA ${rs(cb.taxa_boleto)}`);
-  if (cb.outros) extras.push(`${(cb.outros_descricao || (cb.outros < 0 ? 'RESSARCIMENTO' : 'COBRANÇA ADICIONAL')).replace(/Multa por descumprimento da notificação de /g, 'Multa notif. ').toLocaleUpperCase('pt-BR')} ${cb.outros < 0 ? `-${rs(-cb.outros)}` : rs(cb.outros)}`);
+  // cada ajuste do mês, multa de notificação e diferença numa parte (desde 24/11/2026 o boleto pode ter vários ajustes)
+  for (const p of partesDosOutros(cb)) extras.push(`${(p.texto || (p.valor < 0 ? 'RESSARCIMENTO' : 'COBRANÇA ADICIONAL')).replace(/Multa por descumprimento da notificação de /g, 'Multa notif. ').toLocaleUpperCase('pt-BR')} ${p.valor < 0 ? `-${rs(-p.valor)}` : rs(p.valor)}`);
   if (cb.reserva_utilizada) extras.push(`RESERVA -${rs(cb.reserva_utilizada)}`);
   if (cb.ressarcimento) extras.push(`RESSARCIMENTO CONDOMÍNIO -${rs(cb.ressarcimento)}`);
   if (extras.length && !ehBoletoAvulso(cb)) linhas.push(extras.join(' '));

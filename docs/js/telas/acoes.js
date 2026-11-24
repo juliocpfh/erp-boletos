@@ -1365,9 +1365,10 @@ export const ACOES = {
     await mostrar();
   },
 
-  async tirarAjuste({ id }) {
+  async tirarAjuste({ id, ajuste }) {
     if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode alterar. Peça ao administrador, se precisar.');
-    await alterar((db) => R.ajustarBoleto(db, Number(id), 0, '', login()));
+    // um ajuste da lista (desde 24/11/2026); sem o número, tira todos (as multas e diferenças presas ficam)
+    await alterar((db) => (ajuste ? R.retirarAjuste(db, Number(id), Number(ajuste), login()) : R.ajustarBoleto(db, Number(id), 0, '', login())));
     await mostrar();
   },
 
@@ -1755,7 +1756,7 @@ export const ACOES = {
 
   async recalcularBoleto({ id }) {
     await alterar((db) => {
-      R.atualizar(db, 'cobrancas', Number(id), { editado_manual: false }, login(), 'Boleto volta a ser calculado pelo cadastro');
+      R.atualizar(db, 'cobrancas', Number(id), { editado_manual: false, campos_manuais: null }, login(), 'Boleto volta a ser calculado pelo cadastro');
       R.recalcularCobrancas(db, (cb) => cb.id === Number(id), login());
     });
     aviso('Boleto recalculado pelo cadastro.');

@@ -580,13 +580,11 @@ export const FORMULARIOS = {
     // "-30,00" em cobrança adicional virava +R$ 30,00 em silêncio: o sinal se escolhe no tipo
     if (String(f.get('valor') || '').trim().startsWith('-')) throw new C.ErroUsuario('Digite o valor sem o sinal de menos: para descontar, escolha "Ressarcimento (−)".');
     if (cb) {
-      const semAjuste = R.totais({ ...cb, outros: 0 });
-      // ressarcimento maior que o boleto: a sobra a favor do inquilino não vai para lugar nenhum (o boleto fica R$ 0,00)
-      if (ressarcimento && valor > semAjuste.total_sem_desconto) throw new C.ErroUsuario(`O ressarcimento (${reais(valor)}) é maior que o boleto sem ajuste (${reais(semAjuste.total_sem_desconto)}): a sobra de ${reais(valor - semAjuste.total_sem_desconto)} não iria para lugar nenhum. Lance no máximo o valor do boleto aqui e o resto no boleto seguinte (ou devolva ao inquilino).`);
       const aluguel = cb.aluguel_mensal || cb.aluguel || 0;
       if (!ressarcimento && aluguel && valor > 3 * aluguel && !(await confirmar(`A cobrança adicional de ${reais(valor)} é mais de 3 vezes o aluguel (${reais(aluguel)}). Confira o valor.`, { titulo: 'Valor muito acima do aluguel', sim: 'Está certo, salvar', forte: true }))) return;
     }
-    await alterar((db) => R.ajustarBoleto(db, Number(form.dataset.id), ressarcimento ? -valor : valor, motivo, login()));
+    // cada ajuste entra na lista do boleto (pode ter vários); ressarcimento maior que o boleto é recusado na regra
+    await alterar((db) => R.adicionarAjuste(db, Number(form.dataset.id), ressarcimento ? -valor : valor, motivo, login()));
     aviso('Ajuste salvo e registrado no histórico.');
     await mostrar();
   },
