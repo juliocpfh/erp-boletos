@@ -22,49 +22,56 @@
 
 ## O que precisa de decisão sua
 
-Responda com o número da pergunta e a sua escolha. Ao lado, a sugestão do Claude.
+Responda com o número da pergunta e a sua escolha. Ao lado, a sugestão do Claude. **Todas respondidas em 24/11**: a resposta e a PR estão em cada pergunta (registradas em `DECISOES.md`).
 
 **1. (FIC-03) Ficha reprovada com a reserva ainda por devolver: apagar os dados da pessoa?**
 Hoje, 3 meses depois da reprovação, o sistema apaga documentos, CPF, e-mail e telefone da pessoa, mesmo que os R$ 500,00 da reserva ainda não tenham sido devolvidos. Exemplo: ficha reprovada em 10/08/2026, reserva não devolvida; em 10/11/2026 os dados somem e fica difícil devolver o dinheiro.
 - (a) Esperar a devolução da reserva para apagar (os 3 meses contam a partir da devolução).
 - (b) Apagar mesmo assim, como hoje.
 - **Sugestão do Claude: (a).** Sem os dados, não há como fazer o Pix de volta.
+- **Resposta do dono (24/11):** (a): esperar a devolução da reserva; os 3 meses contam da devolução. **Feito na PR #394.**
 
 **2. (CON-04) Multa por saída antes do prazo, depois de troca de titular: contar o prazo desde o contrato original?**
 Contrato de 01/01/2026 a 01/07/2028 (30 meses), aluguel de R$ 2.000,00, multa de 3 aluguéis proporcional ao tempo que falta. Maria assume em 01/01/2027 (o prazo não recomeça) e sai em 01/01/2028, faltando 182 dias.
 - (a) Proporção pelo prazo do contrato original: R$ 6.000,00 × 182 ÷ 912 dias = **R$ 1.197,37**.
 - (b) Proporção pelo tempo desde a entrada da Maria, como o sistema sugere hoje: R$ 6.000,00 × 182 ÷ 547 = **R$ 1.996,34**.
 - **Sugestão do Claude: (a)**, porque é o que a cláusula diz e o prazo não recomeça na troca.
+- **Resposta do dono (24/11):** (a): prazo do contrato original (R$ 1.197,37 no exemplo), sem campo novo no termo da troca; quando a troca mexer no prazo, a equipe registra a Renovação, e vale a data nova. **Feito na PR #394.**
 
 **3. (CON-06) Carta do reajuste de dezembro: continuar pedindo a carta em janeiro?**
 Inquilino entrou em 05/12/2025. O reajuste de 12/2026 vai junto com o boleto que vence em 10/01/2027. Se a carta não foi enviada até 31/12, no dia 01/01/2027 o aviso e os botões "Gerar carta" e "Enviar por e-mail" somem (o sistema acha que é reajuste do ano passado).
 - Sim: a carta continua sendo pedida até o boleto de 10/01/2027 vencer.
 - Não: fica como hoje (carta só no ano do reajuste).
 - **Sugestão do Claude: Sim.**
+- **Resposta do dono (24/11):** Sim: a carta continua pedida até o boleto de 10/01/2027 vencer. A carta é comunicação impositiva da administradora, só para ciência: o inquilino não assina (conferido: em nenhum lugar o sistema pedia a assinatura dele). **Feito na PR #394.**
 
 **4. (CON-07) Termo do novo valor que "não valeu": a data de término volta?**
 Contrato até 10/07/2027. Registra-se a renovação até 10/01/2030 com novo valor de R$ 2.000,00 e anexa-se o termo. Depois o termo é apagado como "Não valeu". Hoje o novo valor sai, mas o contrato continua terminando em 10/01/2030.
 - (a) A data de término volta sozinha para 10/07/2027.
 - (b) A data fica, e o sistema avisa "confira a data de término em Editar contrato" (o aviso entra de qualquer jeito, no Lote 2).
 - **Sugestão do Claude: (a)**, quando o novo valor e a nova data vieram juntos na mesma renovação.
+- **Resposta do dono (24/11):** (a): a data de término volta sozinha (10/01/2030 → 10/07/2027). Renovações registradas antes de 24/11 não guardaram a data de antes: nelas fica só o aviso. **Feito na PR #394.**
 
 **5. (BOL-05) Boleto do saldo da saída pago com atraso: tem multa e juros?**
 Em 20/11 você decidiu que **tem** (e o sistema já cobra assim). Mas o papel do boleto diz "Após o vencimento: sem multa e juros". Exemplo: saldo de R$ 300,00 que vence 10/12 e é pago em 20/12: o sistema pede R$ 331,00 (multa de R$ 30,00 e juros de R$ 1,00), e o papel diz que não haveria.
 - (a) Confirma que tem multa e juros: corrige-se só o texto do papel.
 - (b) Mudou de ideia: tira-se a multa e os juros desse boleto.
 - **Sugestão do Claude: (a).**
+- **Resposta do dono (24/11):** (a): tem multa e juros; corrigido só o texto do papel. **Feito na PR #392.**
 
 **6. (BOL-06) NF do aluguel proporcional pago com atraso: como sai a linha?**
 Entrada em 15/11/2026, aluguel de R$ 2.000,00, boleto de 16/30 (R$ 1.066,67) pago com atraso: o total da NF é R$ 1.182,44 (aluguel + multa + juros). Hoje sai "quantidade 16/30, valor unitário R$ 2.217,08", e a decisão de 17/11 diz que o unitário é o mês inteiro (R$ 2.000,00).
 - (a) Sai "quantidade 1" e o valor unitário igual ao total, R$ 1.182,44.
 - (b) Sai "16/30" com unitário de R$ 2.000,00, e a multa e os juros em outra linha (dá mais trabalho; confirmar com o contador se pode).
 - **Sugestão do Claude: (a)**, mais simples e o total bate.
+- **Resposta do dono (24/11):** (a): quantidade 1 e valor unitário igual ao total (R$ 1.182,44); a NF do pagamento atrasado continua com a perda da bonificação, a multa e os juros (regra de 16/10, com o contador). **Feito na PR #394.** Em aberto: pago em dia, a linha sai "16/30 × R$ 1.800,00" (aluguel com bonificação), e não "× R$ 2.000,00"; esperando o dono.
 
 **7. (DOC-05) Lembretes da régua ("vence em 3 dias", "vence hoje", "em atraso"): levar o PDF do boleto feito à mão no banco?**
 Hoje esses lembretes só sabem anexar o boleto do C6 pela ponte. O boleto feito à mão (PDF anexado) sai sem anexo e sem linha digitável.
 - Sim: o lembrete leva de novo o PDF anexado.
 - Não: o lembrete vai só com o texto (o PDF já foi no "Enviar boleto por e-mail").
 - **Sugestão do Claude: Sim** (o inquilino costuma pedir o boleto de novo no dia do vencimento).
+- **Resposta do dono (24/11):** Sim: os lembretes levam o PDF do boleto feito à mão. **Feito na PR #392.**
 
 **8. (DOC-07) Os 8 documentos novos (prorrogação, troca de garantia, distrato etc.): registrar no contrato?**
 Hoje eles são gerados, mas não ficam registrados nem têm onde anexar a via assinada. A prorrogação assinada até 31/05/2029 vai para a pasta como arquivo solto, não muda a data de término e não conta no número do próximo termo aditivo.
@@ -72,6 +79,7 @@ Hoje eles são gerados, mas não ficam registrados nem têm onde anexar a via as
 - (b) Registrar e anexar, mas sem mudar nada sozinho.
 - (c) Deixar como está (são só modelos para imprimir).
 - **Sugestão do Claude: (b)** agora, e (a) depois que o advogado conferir os textos.
+- **Resposta do dono (24/11):** (a): cada documento fica registrado no contrato, com a via assinada; a prorrogação assinada muda a data de término. **Feito na PR #401.**
 
 **9. (REG-03 e BAN-02) Prazo para o boleto pago aparecer no extrato: dias úteis ou dias corridos? E o botão que usa 3 dias fixos?**
 A regra "a entrada casa com o boleto até 3 dias depois do vencimento" explica como dias corridos ("vence dia 10, entrou dia 13"), mas o sistema conta **dias úteis** a partir do último dia para pagar. Exemplo: boleto que vence no sábado 10/10/2026 (12/10 é feriado) é aceito como em dia até 16/10/2026, e não até 13/10. Além disso, o botão "É o pagamento do boleto" ignora a regra e usa sempre 3: com a regra em 6, para um boleto que vence em 10/08 e entra em 17/08, "Usar sugestão" aceita como pago em dia e "É o pagamento do boleto" recusa por "menor que o devido".
@@ -79,12 +87,14 @@ A regra "a entrada casa com o boleto até 3 dias depois do vencimento" explica c
 - (b) **Dias corridos** (como o texto diz): muda-se a conta, e o botão passa a usar o número da regra.
 - E o início da régua de cobrança por e-mail, que também usa os 3 dias fixos: segue a mesma regra? (Sim / Não)
 - **Sugestão do Claude: (a)**, e Sim para a régua.
+- **Resposta do dono (24/11):** (a): dias úteis (texto da regra corrigido) e o botão "É o pagamento do boleto" usa o número da regra (**PR #391**); a régua também usa a regra (sim). Depois, o dono pediu um prazo por tipo de contrato, pela regra especial (**PR #398**).
 
 **10. (BOL-08) Termo de troca do vencimento que "não valeu": os boletos alterados à mão voltam ao dia antigo?**
 Termo que troca o vencimento do dia 10 para o dia 20: todos os boletos em aberto passam para o dia 20. Se depois o termo é marcado como "não valeu", o contrato volta ao dia 10, mas os boletos alterados à mão (até aquele em que só o IPTU foi digitado) continuam no dia 20. Hoje isso é de propósito: um teste antigo exige que o boleto alterado à mão fique como está.
 - (a) Todos voltam ao dia 10, menos o boleto já emitido no banco.
 - (b) Fica como hoje: o boleto alterado à mão não muda, e a equipe acerta à mão.
 - **Sugestão do Claude: (a)**, porque o boleto foi para o dia 20 justamente por causa do termo que não valeu.
+- **Resposta do dono (24/11):** (a) modificada: TODOS os boletos voltam ao dia 10, também o alterado à mão e o já emitido no banco; o emitido no banco fica com alerta para a equipe cancelar no banco e emitir de novo. **Feito na PR #394.**
 
 ## Lotes de correção
 
@@ -134,14 +144,14 @@ Cada lote vira uma PR própria, a partir da `main`, com testes automáticos e te
 - **Gravidade:** Médio
 - **O que acontece:** saldo de R$ 300,00 que vence 10/12, pago em 20/12: o sistema pede R$ 331,00, e o papel enviado ao inquilino dizia que não haveria multa.
 - **Na correção:** depende da sua resposta (pergunta 5).
-- **Lote:** espera sua decisão (área da PR #379)
+- **Lote:** espera sua decisão (área da PR #379) → **respondida em 24/11, PR #392**
 - <small>Para o Claude: `docs/js/telas/cobrancas.js:312` e `:486`; regra em `regras.js:961` (`semMultaJuros`) e `:3381`; o CLAUDE.md também diz "sem multa" para o saldo. Prova: `bol/v5.mjs`.</small>
 
 #### BOL-06 — NF do mês incompleto pago com atraso: valor unitário maior que o aluguel
 - **Gravidade:** Leve
 - **O que acontece:** boleto de 16/30 (R$ 1.066,67) pago com atraso: a NF sai "16/30" com unitário de R$ 2.217,08, e o certo seria R$ 2.000,00.
 - **Na correção:** depende da sua resposta (pergunta 6).
-- **Lote:** espera sua decisão
+- **Lote:** espera sua decisão → **respondida em 24/11, PR #394**
 - <small>Para o Claude: `docs/js/fatura.js:86-95` (`quantidadeDaFatura`) e `regras.js:2289`. Prova: `bol/t2.mjs`.</small>
 
 #### BOL-07 — Aviso "PDF do boleto desatualizado" não percebe mudança do desconto ou da multa
@@ -155,7 +165,7 @@ Cada lote vira uma PR própria, a partir da `main`, com testes automáticos e te
 - **Gravidade:** Leve
 - **O que acontece:** termo de troca do dia 10 para o dia 20: todos os boletos em aberto vão para o dia 20. Se o termo é tirado ("não valeu"), o contrato volta ao dia 10, mas os boletos alterados à mão (até os em que só o IPTU foi digitado) ficam no dia 20.
 - **Na correção:** a mesma regra nos dois sentidos: todos voltam ao dia 10, menos o emitido no banco.
-- **Lote:** espera a sua decisão (pergunta 10): a correção muda um comportamento que hoje é de propósito
+- **Lote:** espera a sua decisão (pergunta 10): a correção muda um comportamento que hoje é de propósito → **respondida em 24/11, PR #394**
 - <small>Para o Claude: `docs/js/regras.js:3710` (pula `editado_manual`) × `:5286-5295` (só pula `emitidoNoBanco`). Prova só por leitura.</small>
 
 #### BOL-09 — Texto do botão "Recalcular boletos em aberto" ficou errado
@@ -192,7 +202,7 @@ Cada lote vira uma PR própria, a partir da `main`, com testes automáticos e te
 - **Gravidade:** Médio
 - **O que acontece:** o cálculo final sugere R$ 1.996,34 em vez de R$ 1.197,37 (exemplo na pergunta 2). É só sugestão; a pessoa pode mudar.
 - **Na correção:** depende da sua resposta (pergunta 2).
-- **Lote:** espera sua decisão
+- **Lote:** espera sua decisão → **respondida em 24/11, PR #394**
 - <small>Para o Claude: `docs/js/regras.js:2763-2770` (`multaSaidaAntecipada`, início = `c.data_entrada`); usar `cadeiaDeContratos(d, c).antes[0]`. Prova: `con/t2.mjs`.</small>
 
 #### CON-05 — Acordo desfeito depois do cálculo final: a dívida volta a ser cobrada em dobro
@@ -206,14 +216,14 @@ Cada lote vira uma PR própria, a partir da `main`, com testes automáticos e te
 - **Gravidade:** Médio
 - **O que acontece:** exemplo na pergunta 3.
 - **Na correção:** depende da sua resposta (pergunta 3).
-- **Lote:** espera sua decisão
+- **Lote:** espera sua decisão → **respondida em 24/11, PR #394**
 - <small>Para o Claude: `docs/js/regras.js:7373-7374` (`comCarta`); `telas/reajustes.js:16`. Prova: `con/t8.mjs`.</small>
 
 #### CON-07 — Termo do novo valor que "não valeu": a renovação some, mas o contrato continua prorrogado
 - **Gravidade:** Leve
 - **O que acontece:** exemplo na pergunta 4. A tela não avisa que a data de término continua (o "×" da renovação avisa; este caminho, não).
 - **Na correção:** no Lote 2 entra o aviso; voltar a data depende da sua resposta (pergunta 4).
-- **Lote:** 2 (o aviso) e espera sua decisão (a data)
+- **Lote:** 2 (o aviso) e espera sua decisão (a data) → **respondida em 24/11, PR #394**
 - <small>Para o Claude: `docs/js/regras.js:3694-3698` (`desfazerAditivo` → `excluirRenovacao`, `:2567-2584`); aviso existente em `telas/contrato.js:921`. Prova: `con/t5.mjs`.</small>
 
 #### CON-08 — Roteiro da saída diz "titularidade de volta ✓" sem protocolo nenhum
@@ -250,7 +260,7 @@ Cada lote vira uma PR própria, a partir da `main`, com testes automáticos e te
 - **Gravidade:** Médio
 - **O que acontece:** exemplo na pergunta 1.
 - **Na correção:** depende da sua resposta (pergunta 1).
-- **Lote:** espera sua decisão
+- **Lote:** espera sua decisão → **respondida em 24/11, PR #394**
 - <small>Para o Claude: `docs/js/regras.js:2996` (`dataApagarDocumentosFicha`) e `:3040` não olham `devolucaoPendente` (`:2993`); `telas/comum.js:744-747`.</small>
 
 #### FIC-04 — Excluir o contrato feito da ficha deixa a ficha presa ao contrato apagado
@@ -308,7 +318,7 @@ Cada lote vira uma PR própria, a partir da `main`, com testes automáticos e te
 - **Gravidade:** Médio
 - **O que acontece:** exemplo na pergunta 9.
 - **Na correção:** depende da sua resposta (pergunta 9).
-- **Lote:** espera sua decisão (junto com REG-03)
+- **Lote:** espera sua decisão (junto com REG-03) → **respondida em 24/11, PR #391 e #398**
 - <small>Para o Claude: `docs/js/conciliacao.js:938` e `:949` (`DIAS_COMPENSACAO_BOLETO`, `:690`, e `datasPossiveisDoPagamento`, `:697`) × `regra('tolerancia_boleto_dias')` (`:802`, `:900`); `telas/banco.js:1168`; também `regua-email.js:27`. Prova: `ban/t2.mjs`.</small>
 
 #### BAN-03 — "Desfazer pagamento" deixa a entrada do extrato sem destino, mas com o comprovante
@@ -396,7 +406,7 @@ Cada lote vira uma PR própria, a partir da `main`, com testes automáticos e te
 - **Gravidade:** Leve
 - **O que acontece:** exemplo na pergunta 7. A prévia diz "Sem anexo (boleto não emitido no banco)", embora o PDF esteja anexado.
 - **Na correção:** depende da sua resposta (pergunta 7).
-- **Lote:** espera sua decisão
+- **Lote:** espera sua decisão → **respondida em 24/11, PR #392**
 - <small>Para o Claude: `docs/js/modelos-email.js:282`, `:298`, `:314` (sem `boleto:anexado`); `email-dados.js:297`; `telas/regua.js:105` (`anexosDoItem` só `tipo === 'boleto'`).</small>
 
 #### DOC-06 — Régua: "Abrir no Gmail" tira o e-mail da lista mesmo se a aba não abrir
@@ -410,7 +420,7 @@ Cada lote vira uma PR própria, a partir da `main`, com testes automáticos e te
 - **Gravidade:** Leve (é melhoria, não defeito)
 - **O que acontece:** exemplo na pergunta 8.
 - **Na correção:** depende da sua resposta (pergunta 8).
-- **Lote:** espera sua decisão
+- **Lote:** espera sua decisão → **respondida em 24/11, PR #401**
 - <small>Para o Claude: `docs/js/telas/documentos.js:503-507` (`preenchidos` só na aba); `arquivo-impresso.js:82-84` e `:48-53`.</small>
 
 ### Regras do sistema (REG)
@@ -428,7 +438,7 @@ REG-01 é o mesmo erro que NUV-02 (veja acima).
 - **Gravidade:** Leve
 - **O que acontece:** exemplo na pergunta 9.
 - **Na correção:** depende da sua resposta (pergunta 9).
-- **Lote:** espera sua decisão (junto com BAN-02)
+- **Lote:** espera sua decisão (junto com BAN-02) → **respondida em 24/11, PR #391 e #398**
 - <small>Para o Claude: `docs/js/conciliacao.js:728` (`ultimoCreditoEmDia`, `somarDiasUteis`); texto em `config-regras.js:186-187`. Prova: `reg/t2.mjs`.</small>
 
 #### REG-04 — Regra "índice do FCI que vem preenchido" não preenche nada quando o % fica em branco
