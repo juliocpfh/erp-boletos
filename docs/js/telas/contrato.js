@@ -768,7 +768,7 @@ function caixaAditivos(c) {
   // troca de titular: só o termo da troca assinado faz o contrato passar (outro termo assinado não conta)
   const faltaTroca = ant && !R.aditivoDaTroca(d(), c);
   const ver = (a) => (a.texto ? link(`#/imprimir/aditivo?id=${a.id}`, 'Ver / PDF') : '');
-  return `<div class="cabecalho"><h3 id="aditivos">Termos aditivos</h3>${opera() ? link(`#/aditivo/novo?contrato=${c.id}`, 'Gerar termo aditivo') : ''}</div>
+  return `<div class="cabecalho"><h3 id="aditivos">Termos aditivos</h3>${opera() ? `${link(`#/aditivo/novo?contrato=${c.id}`, 'Gerar termo aditivo')} ${link(`#/documento-gerar?contrato=${c.id}`, 'Outros documentos', 'botao secundario')}` : ''}</div>
     ${faltaTroca ?`<div class="alerta perigo">Obrigatório: termo aditivo da troca de titular (${esc(ant.inquilino_nome)} → ${esc(c.inquilino_nome)}). ${aguardando.some((a) => a.tipo === K.TIPO_ADITIVO_TROCA) ? 'Colha as assinaturas e anexe o arquivo assinado.' : `Gere o termo em ${opera() ? link(`#/aditivo/novo?contrato=${c.id}&tipo=troca`, '"Gerar termo aditivo"', '') : '"Gerar termo aditivo"'} ou registre o arquivo já assinado.`}</div>` : ''}
     ${aguardando.length ? `<div class="alerta aviso"><b>Aguardando assinatura:</b> imprima ou baixe o PDF, colha as assinaturas e anexe o arquivo assinado.
       <div class="rolagem"><table>${aguardando.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td>

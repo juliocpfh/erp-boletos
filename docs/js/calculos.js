@@ -595,6 +595,7 @@ const FORMATOS_PARAMETRO = {
   tema: /^[a-z_]{1,30}$/, prazo: /^\d{1,2}$/, anterior: /^\d+$/, // nova notificação ao inquilino: modelo do texto, prazo em dias úteis e a que ela reitera
   ver: /^[a-z]{1,20}$/, chave: /^[cfsr]\d{1,10}$/, // Comunicações: a parte da tela (novo, modelos) e a pessoa do aceite (c|s|r<contrato>: inquilino, solidário, representante; f<fiador>)
   perfil: /^(\d+|novo)$/, regras: /^\d+$/, // Regras do sistema: a regra especial aberta; Novo contrato: preencher com uma regra especial
+  exemplo: /^1$/, // Modelos de documentos: o PDF de exemplo do modelo (pessoa fictícia)
   gmail: /^[a-z-]{1,20}$/, // Sistema → Comunicação E-mail: aviso da volta do Google ao conectar o Gmail (AVISOS_VOLTA_GMAIL de nuvem/worker.mjs)
 };
 

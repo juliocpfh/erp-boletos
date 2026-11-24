@@ -20,7 +20,8 @@ import { FORMULARIOS_COMUNICACOES } from './comunicacoes.js';
 import { CADASTROS, nomeComprovante } from './cadastros.js';
 import { apagarRascunhoVistoria } from './campos.js';
 import { acertarNomesDosComprovantes, adiados, alterarApagandoAnexos, buscar, cienciaDaTroca, d, memoria, pastaDoEscopo, registrarCiencia, salvarAssinado, SO_ADMIN_NUMERACAO, trazerHerancaAssinada } from './comum.js';
-import { modelosNoBanco, reduzirFoto } from './documentos.js';
+import { guardarCamposDoDocumento, modelosNoBanco, reduzirFoto } from './documentos.js';
+import { TIPOS_DOCUMENTO } from '../modelos-documentos.js';
 
 const REGISTRO_EXCLUIDO = 'Este registro foi excluído por outra pessoa; nada foi salvo.';
 
@@ -387,13 +388,31 @@ export const FORMULARIOS = {
     await mostrar();
   },
 
+  /** Outros documentos (modelos-documentos.js): os campos digitados ficam só nesta aba, até o PDF ou o Word. */
+  async gerarDocumento(form) {
+    const f = new FormData(form);
+    const modelo = String(f.get('modelo'));
+    const contrato = Number(f.get('contrato'));
+    const valores = {};
+    for (const [k, v] of f.entries()) if (!['modelo', 'contrato', 'data'].includes(k)) valores[k] = String(v).trim();
+    for (const [k, v] of Object.entries(valores)) if (v && form.querySelector(`[name="${k}"][data-dinheiro]`)) C.centavos(v); // valor no formato errado: avisa antes
+    guardarCamposDoDocumento(modelo, contrato, valores, String(f.get('data') || ''));
+    ir(`#/imprimir/documento?modelo=${modelo}&contrato=${contrato}`);
+  },
+
+  async escolherInquilinoDocumento(form) {
+    const f = new FormData(form);
+    if (!f.get('contrato')) throw new C.ErroUsuario('Escolha o inquilino.');
+    ir(`#/documento-gerar?modelo=${f.get('modelo')}&contrato=${f.get('contrato')}`);
+  },
+
   async modeloContrato(form) {
     const f = new FormData(form);
     const nome = String(f.get('nome') || '').trim();
     const texto = String(f.get('texto') || '');
     if (!nome || !texto.trim()) throw new C.ErroUsuario('Preencha o nome e o texto do modelo.');
     const id = Number(f.get('id') || 0);
-    const tipo = ['aditivo', 'aditivo_troca', 'aditivo_valor'].includes(f.get('tipo')) ? f.get('tipo') : 'contrato';
+    const tipo = ['aditivo', 'aditivo_troca', 'aditivo_valor'].includes(f.get('tipo')) || f.get('tipo') in TIPOS_DOCUMENTO ? f.get('tipo') : 'contrato';
     // campo com nome errado sairia escrito "[campo?]" no contrato: avisa antes de gravar
     const fora = K.camposDesconhecidosDoModelo(texto);
     if (fora.length && !(await confirmar(`Estes campos não existem e vão sair no contrato como "[nome?]":\n\n${fora.map((x) => `• ${x}`).join('\n')}\n\nConfira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assim mesmo?`,

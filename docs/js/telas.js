@@ -23,7 +23,7 @@ import { telaAceiteContatos, telaComunicacoes } from './telas/comunicacoes.js';
 import { calendarioDoPainel, SITUACOES_SOLICITACAO, telaBusca, telaInquilinos, telaIptu, telaSolicitacoes } from './telas/consultas.js';
 import { telaContrato, valorBonificado } from './telas/contrato.js';
 import { telaNotificacao, telaNotificacoes, telaNovaNotificacao } from './telas/notificacoes.js';
-import { guardarCartasAntigas, telaAditivo, telaGerarContrato, telaImprimir, telaModelo, telaModelos, telaModeloVistoria, telaVistoria } from './telas/documentos.js';
+import { guardarCartasAntigas, telaAditivo, telaGerarContrato, telaGerarDocumento, telaImprimir, telaModelo, telaModelos, telaModeloVistoria, telaVistoria } from './telas/documentos.js';
 import { telaFaturas } from './telas/faturas.js';
 import { alertaFichas, ligarFichaOnline, telaFicha } from './telas/fichas.js';
 import { alertaInformeIr, telaModeloEmail, telaModelosEmail } from './telas/emails.js';
@@ -467,6 +467,7 @@ export const TELAS = {
 
   pendencias: () => telaPendencias(),
   'modelo-contrato': (rota) => telaModelo(rota),
+  'documento-gerar': (rota) => telaGerarDocumento(rota),
   empresas: (rota) => levarAoEnderecoNovo('empresas', rota.q) || telaEmpresas(),
   'sistema-banco': () => telaSistemaBanco(),
   'sistema-email': (rota) => telaSistemaEmail(rota.q),

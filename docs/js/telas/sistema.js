@@ -45,7 +45,7 @@ export async function telaSistemaEmail(q = {}) {
     <div class="cartao" id="modelos-de-email"><h2>Modelos de e-mail</h2><p>Um e-mail para cada etapa da ficha, da entrada e da saída do inquilino, a régua de cobrança (lembretes antes e no dia do vencimento, boleto em atraso), as notificações ao inquilino, o novo valor do aluguel, os termos aditivos e o informe anual do Imposto de Renda (botão <b>✉ E-mail</b> em cada etapa).</p>${link('#/modelos-email', 'Ver e editar os modelos de e-mail')}</div>`;
 }
 
-/** Modelos de documentos: contrato, termos aditivos e o Excel da NF. */
+/** Modelos de documentos: contrato, termos aditivos, outros documentos da locação e o Excel da NF. */
 export async function telaSistemaModelos() {
   let modeloProprio = false;
   try {
@@ -55,6 +55,7 @@ export async function telaSistemaModelos() {
   return `${topo('Modelos de documentos')}
     <div class="cartao" id="modelos-de-contrato"><h2>Modelos de contrato</h2><p>Textos usados no botão <b>Gerar contrato</b> do inquilino (residencial, não residencial e os que você criar).</p>${link('#/modelos-contrato', 'Ver e editar os modelos de contrato')}</div>
     <div class="cartao" id="modelos-de-aditivo"><h2>Termos aditivos</h2><p>Textos usados no botão <b>Gerar termo aditivo</b> do inquilino: troca do vencimento, troca de inquilino e novo valor do aluguel.</p>${link('#/modelos-contrato?ir=modelos-aditivo', 'Ver e editar os termos aditivos')}</div>
+    <div class="cartao" id="outros-documentos"><h2>Outros documentos da locação</h2><p>Prorrogação do prazo, troca de garantia, distrato (rescisão amigável), aviso de desocupação do inquilino, notificação para desocupação, autorização de obra, declaração de pagamentos em dia e aviso ao fiador. Cada um tem o <b>Exemplo em PDF</b> para ler e ajustar o texto; para gerar, botão <b>Outros documentos</b> na página do inquilino.</p>${link('#/modelos-contrato?ir=modelos-outros', 'Ver e editar os outros documentos')}</div>
     <div class="cartao" id="modelo-excel"><h2>Modelo Excel da NF</h2>
       <p>${modeloProprio ? `${etiqueta('Modelo próprio', 'ok')} usando o arquivo enviado (${S.PASTA_MODELOS}/${S.MODELO_FATURA}).` : 'Usando o modelo padrão do sistema (uma NF por empresa, com os dados do cadastro de Empresas).'}</p>
       <p class="suave">Para trocar, envie um .xlsx com uma aba por empresa no mesmo desenho. Os dados são preenchidos nas mesmas células da planilha original (peça ao técnico se precisar do detalhe).</p>
