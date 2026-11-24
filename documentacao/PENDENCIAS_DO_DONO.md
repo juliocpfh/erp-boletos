@@ -10,7 +10,7 @@
 1. [ ] **Condomínio, taxas do proprietário (ressarcimento):** lançadas, mas não entraram nos boletos do mês.
 2. [ ] **Seguro obrigatório** lançado para entrar neste mês não entrou no boleto do inquilino.
 3. [ ] **Ajuste do mês em Boletos:** permitir **mais de um abatimento e mais de um ressarcimento** no mesmo boleto (hoje só um de cada).
-4. [ ] **Mandar o boleto feito à mão por e-mail** (enquanto a API do C6 não sai): em Boletos, anexar o PDF do boleto emitido no banco e enviar ao inquilino pelo Gmail um e-mail curto com o descritivo (como no boleto), o mês de competência, o vencimento e o boleto anexado. Hoje a equipe manda sempre esse e-mail por fora; agora quer mandar pelo sistema.
+4. [x] **Mandar o boleto feito à mão por e-mail** (enquanto a API do C6 não sai): em Boletos, anexar o PDF do boleto emitido no banco e enviar ao inquilino pelo Gmail um e-mail curto com o descritivo (como no boleto), o mês de competência, o vencimento e o boleto anexado. Hoje a equipe manda sempre esse e-mail por fora; agora quer mandar pelo sistema. **Feito em 24/11:** na página do boleto, caixa "Boleto emitido no banco (PDF)" (anexar, abrir, trocar, tirar) e botão "Enviar boleto por e-mail" (abre a janela para revisar; vai com o PDF anexado); a lista de Boletos mostra "📎 PDF do banco" e "✉ enviado em ...". **Para conferir:** anexar o PDF de um boleto de verdade e mandar a si mesmo primeiro.
 5. [ ] **Conferir tudo o que entra e sai do boleto** (aluguel, proporcional, IPTU, condomínio, seguro, ressarcimentos, abatimentos, multas da notificação, diferenças, caução, acordo, reserva, NF), com testes automáticos e de tela.
 
 ### B. Termo de aceite da reserva (decisões do dono em 24/11)
