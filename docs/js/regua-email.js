@@ -4,7 +4,7 @@
 // por boleto e etapa) e não volta. Nada aqui grava sozinho nem envia: a tela (telas/regua.js) mostra, o administrador autoriza.
 // Texto: modelos `cobranca_antes`, `cobranca_dia` e `cobranca_atraso` (modelos-email.js), preenchidos por email-dados.js.
 import * as C from './calculos.js';
-import { DIAS_COMPENSACAO_BOLETO } from './conciliacao.js';
+import { diasCompensacaoBoleto } from './conciliacao.js';
 import * as CR from './config-regras.js';
 import { regra } from './config-regras.js';
 import * as R from './regras.js';
@@ -20,11 +20,12 @@ export const modeloDaEtapa = (dias) => (dias < 0 ? 'cobranca_antes' : dias === 0
 export const nomeDaEtapa = (dias) => (dias < 0 ? `${-dias} dia(s) antes do vencimento` : dias === 0 ? 'no dia do vencimento' : `${dias} dia(s) de atraso`);
 
 /**
- * Primeiro dia em que a cobrança de atraso pode sair: passados os 3 dias úteis que o banco leva para creditar o boleto pago pelo
- * código de barras no último dia (decisão do dono, 16/11/2026: dentro desse prazo não é atraso). Ex.: vence qui 10/12/2026 →
- * o crédito pode chegar até ter 15/12 → a cobrança só aparece a partir de qua 16/12.
+ * Primeiro dia em que a cobrança de atraso pode sair: passados os dias úteis que o banco leva para creditar o boleto pago pelo
+ * código de barras no último dia (decisão do dono, 16/11/2026: dentro desse prazo não é atraso), o número da regra
+ * `tolerancia_boleto_dias` (decisão de 24/11/2026; padrão 3). Ex.: com 3, vence qui 10/12/2026 → o crédito pode chegar até
+ * ter 15/12 → a cobrança só aparece a partir de qua 16/12.
  */
-export const inicioDaCobranca = (cb) => C.somarDiasUteis(C.limitePagamento(cb.vencimento), DIAS_COMPENSACAO_BOLETO + 1);
+export const inicioDaCobranca = (cb) => C.somarDiasUteis(C.limitePagamento(cb.vencimento), diasCompensacaoBoleto(cb) + 1);
 
 /**
  * Dia em que o e-mail da etapa fica pronto. Antes: contado do vencimento (-3 → 07/12 para o vencimento de 10/12); no dia: o último
