@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-Bo8eXHggJXY4Kl+Xj3qSWI4mLs59nWjrZxcIqQvlGS8='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-hVE+tjc0qTJyYBEBtFd0hpDLRKEj298RWUR892ijHvc='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="97555d08cad8d70f">
+<meta name="fontes" content="dbb43d3b8dd254d0">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -2772,6 +2772,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         modelo: /^-?\d+$/,
         numero: /^\d+$/,
         ano: /^\d{4}$/,
+        cobranca: /^\d+$/,
+        acordo: /^\d+$/,
+        // registro da cobrança (passo, despesa e prova): o boleto ou o acordo de onde veio
         ficha: /^\d+$/,
         fiador: /^\d$/,
         custo: /^\d+$/,
@@ -5057,6 +5060,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     NOVOS_FIADORES_TROCA: () => NOVOS_FIADORES_TROCA,
     REFORMA: () => REFORMA,
     REGIMES_BENS: () => REGIMES_BENS,
+    REGISTRO_COBRANCA: () => REGISTRO_COBRANCA,
     RENDAS_FICHA: () => RENDAS_FICHA,
     RENOVACAO: () => RENOVACAO,
     RESSARCIMENTO: () => RESSARCIMENTO,
@@ -5339,7 +5343,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return `<div class="formulario${compacto ? " compacto" : ""}">${partes.join("")}</div>`;
   }
-  var ACEITA_DOCUMENTOS, esc, campo, atalhosData, DATAS_COM_ATALHO, secao, QUEBRA, DOCUMENTOS, PREENCHE_CEP, PREENCHE_CNPJ, CEP_DA_PESSOA, quando, GARANTIA_FIADOR, LIMITES, IMOVEL, SOLICITACAO, REFORMA, RESSARCIMENTO, CONTAS, SITUACOES_CONTA, SITUACOES_SEGURO, contaPadrao, INDICES_FCI, LEITURAS, LEITURA, GENEROS, ESTADOS_CIVIS, REGIMES_BENS, qualificacao, FIADOR, FORM_FIADOR, CAMPOS_FIADOR, vagasFiador, EXPANDIR_PARTE, fiadoresNoCadastro, SEM_COMPROVANTE, comprovante, GARANTIAS, PJ, rotuloPJ, CONTRATO, PARTES_DA_PESSOA, RENOMEAR_PARTE, FICHA_INICIO, RENDAS_FICHA, PF, CASADO, FICHA_RENDA, SO_NO_CONTRATO, CAMPOS_FIADOR_FICHA, FICHA_FIADORES, FICHA_FIM, CORRECAO, SEGURO, IPTU, TITULARIDADE, FORM_FIADOR_TROCA, CAMPOS_FIADOR_TROCA, NOVOS_FIADORES_TROCA, trocaGarantia, APLICACAO, DEPOSITO_GARANTIA, CORRECAO_GARANTIA, DEVOLUCAO_GARANTIA, RENOVACAO, ENCERRAMENTO, AVULSA, EMITENTE, USUARIO, COBRANCA, FMT_DINHEIRO, FMT_PCT2, mesmoValor2, chipDaLista;
+  var ACEITA_DOCUMENTOS, esc, campo, atalhosData, DATAS_COM_ATALHO, secao, QUEBRA, DOCUMENTOS, PREENCHE_CEP, PREENCHE_CNPJ, CEP_DA_PESSOA, quando, GARANTIA_FIADOR, LIMITES, IMOVEL, SOLICITACAO, REFORMA, REGISTRO_COBRANCA, RESSARCIMENTO, CONTAS, SITUACOES_CONTA, SITUACOES_SEGURO, contaPadrao, INDICES_FCI, LEITURAS, LEITURA, GENEROS, ESTADOS_CIVIS, REGIMES_BENS, qualificacao, FIADOR, FORM_FIADOR, CAMPOS_FIADOR, vagasFiador, EXPANDIR_PARTE, fiadoresNoCadastro, SEM_COMPROVANTE, comprovante, GARANTIAS, PJ, rotuloPJ, CONTRATO, PARTES_DA_PESSOA, RENOMEAR_PARTE, FICHA_INICIO, RENDAS_FICHA, PF, CASADO, FICHA_RENDA, SO_NO_CONTRATO, CAMPOS_FIADOR_FICHA, FICHA_FIADORES, FICHA_FIM, CORRECAO, SEGURO, IPTU, TITULARIDADE, FORM_FIADOR_TROCA, CAMPOS_FIADOR_TROCA, NOVOS_FIADORES_TROCA, trocaGarantia, APLICACAO, DEPOSITO_GARANTIA, CORRECAO_GARANTIA, DEVOLUCAO_GARANTIA, RENOVACAO, ENCERRAMENTO, AVULSA, EMITENTE, USUARIO, COBRANCA, FMT_DINHEIRO, FMT_PCT2, mesmoValor2, chipDaLista;
   var init_formularios = __esm({
     "docs/js/formularios.js"() {
       init_c6_comum();
@@ -5419,6 +5423,12 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         campo("fornecedor", "Fornecedor / prestador"),
         campo("documento", "Nota fiscal / recibo nº"),
         campo("observacoes", "Observações", "area")
+      ];
+      REGISTRO_COBRANCA = [
+        campo("data", "Data", "data", { obrig: true, ajuda: "Dia em que a carta saiu, o e-mail foi mandado, o protesto foi feito ou a despesa foi paga" }),
+        campo("tipo", "O que foi feito", "opcao", { obrig: true, opcoes: [], ajuda: "Ex.: Carta (registrada ou não), Protesto do boleto em cartório, Advogado contratado" }),
+        campo("valor", "Valor gasto", "dinheiro", { ajuda: "Quanto custou (ex.: carta registrada R$ 28,50; protesto R$ 45,00). Em branco se não teve custo. Fica só anotado: não é cobrado do inquilino" }),
+        campo("descricao", "Descrição", "area", { obrig: true, largo: true, max: 2e3, ajuda: "Ex.: carta com AR enviada ao endereço do imóvel cobrando os aluguéis de 09 e 10/2026; protesto do boleto de 10/2026 no 2º Tabelionato" })
       ];
       RESSARCIMENTO = [
         campo("competencia_condominio", "Mês do boleto do condomínio", "mes", { obrig: true }),
@@ -6041,6 +6051,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     TIPOS_ALERTA: () => TIPOS_ALERTA,
     TIPOS_ALERTA_DO_IMOVEL: () => TIPOS_ALERTA_DO_IMOVEL,
     TIPOS_DESPESA: () => TIPOS_DESPESA,
+    TIPOS_REGISTRO_COBRANCA: () => TIPOS_REGISTRO_COBRANCA,
     VAGAS_FIADOR_FICHA: () => VAGAS_FIADOR_FICHA,
     aCobrar: () => aCobrar,
     acertarGarantiaDepositada: () => acertarGarantiaDepositada,
@@ -6311,6 +6322,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     garantiaNova: () => garantiaNova,
     garantiaRecebida: () => garantiaRecebida,
     garantiasPorEmpresa: () => garantiasPorEmpresa,
+    gastoDaCobranca: () => gastoDaCobranca,
     geraNf: () => geraNf,
     gerarBoletoDoSaldo: () => gerarBoletoDoSaldo,
     gerarBoletosCaucao: () => gerarBoletosCaucao,
@@ -6469,6 +6481,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     refazerConferenciaDoLink: () => refazerConferenciaDoLink,
     referenciaEVencimento: () => referenciaEVencimento,
     referenciaExterna: () => referenciaExterna,
+    referenteDoRegistro: () => referenteDoRegistro,
     reformasDo: () => reformasDo,
     registrar: () => registrar,
     registrarAditivo: () => registrarAditivo,
@@ -6485,6 +6498,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     registrarNfExterna: () => registrarNfExterna,
     registrarPagamento: () => registrarPagamento,
     registrarRenovacao: () => registrarRenovacao,
+    registrosCobrancaDo: () => registrosCobrancaDo,
+    registrosDoBoleto: () => registrosDoBoleto,
     regra: () => regra,
     regrasDe: () => regrasDe,
     reguaCobranca: () => reguaCobranca,
@@ -6493,6 +6508,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     relogiosObrigatorios: () => relogiosObrigatorios,
     removerAnexo: () => removerAnexo,
     removerArquivoAditivo: () => removerArquivoAditivo,
+    removerArquivoDoRegistro: () => removerArquivoDoRegistro,
     removerComprovanteGarantia: () => removerComprovanteGarantia,
     removerDaLista: () => removerDaLista,
     renomearArquivoNoBanco: () => renomearArquivoNoBanco,
@@ -6637,6 +6653,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       negativacao: { ...CONTA_BANCO_PADRAO.negativacao, ...x && x.negativacao || {} }
     }));
     for (const cb of d2.cobrancas) if (cb.banco === void 0) cb.banco = null;
+    for (const x of d2.cobranca_registros) if (!Array.isArray(x.arquivos)) x.arquivos = x.arquivos ? [String(x.arquivos)] : [];
     if (!d2.config_banco.conta_padrao_id && d2.config_banco.contas.some((x) => x.id === "ank")) d2.config_banco.conta_padrao_id = "ank";
     for (const e of d2.emitentes) Object.assign(e, camposAntigosDaEmpresa(e));
     const contratoPorId = new Map(d2.contratos.map((c) => [c.id, c]));
@@ -10464,6 +10481,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       usa("contrato", n.contrato_id, n.comprovante_baixa);
     }
     for (const x of d2.cartas_reajuste || []) usa("aditivos", x.contrato_id, x.arquivo);
+    for (const x of d2.cobranca_registros || []) for (const nome of x.arquivos || []) usa("contrato", x.contrato_id, nome);
     for (const cb of d2.cobrancas || []) usa("contrato", pastaDoBoletoPdf(cb), cb.boleto_pdf);
     for (const v of d2.vistorias) for (const nome of Object.values(v.fotos || {})) usa("contrato", v.contrato_id, nome);
     for (const s of d2.seguros) for (const nome of [s.arquivo_apolice, ...s.outros_arquivos || []]) usa("seguro", s.contrato_id, nome);
@@ -10518,6 +10536,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       poe("contrato", n.contrato_id, n.comprovante_baixa, `comprovante da baixa da notificação de ${dataBr(n.data)}${n.resolvida_em ? ` (resolvida em ${dataBr(n.resolvida_em)})` : ""}`);
     }
     for (const cb of d2.cobrancas || []) poe("contrato", pastaDoBoletoPdf(cb), cb.boleto_pdf, `PDF do boleto emitido no banco (${compBr(cb.competencia)}, vence ${dataBr(cb.vencimento)})`);
+    for (const x of d2.cobranca_registros || []) for (const nome of x.arquivos || []) poe("contrato", x.contrato_id, nome, `prova da cobrança: ${String(x.tipo || "").toLowerCase()} de ${dataBr(x.data)}`);
     for (const x of d2.cartas_reajuste || []) poe("aditivos", x.contrato_id, x.arquivo, `carta de reajuste de ${compBr(x.competencia)} (enviada em ${dataBr(x.enviada_em)})`);
     for (const v of d2.vistorias) for (const nome of Object.values(v.fotos || {})) poe("contrato", v.contrato_id, nome, `foto da vistoria de ${String(v.tipo || "").toLowerCase()} (${dataBr(v.data)})`);
     for (const f of d2.fichas || []) {
@@ -13566,7 +13585,30 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return out;
   }
-  var TABELAS, SITUACOES, CONCESSIONARIAS_POR_UF, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, IMAGEM_FORA_DO_HISTORICO, semPeso, RESPOSTA_PESADA, FORMULARIOS_DA_TABELA, camposDinheiro, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, camposDaGravacao, CODIGO_DE, nomeCurto, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, aplicacaoBaixada, aplicacoesEmVigor, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehSaldoSaida, ehBoletoAvulso, semMultaJuros, emAcordo, MOTIVO_EM_ACORDO, quitadoNaSaida, aCobrar, boletosCaucaoDa, parcelasIrmasDoComplemento, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, IPTU_DIVISAO_NOVA_DESDE, dividirIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, CAMPOS_MANUAIS, JUNTOS_DO_MANUAL, totais, previstoNoPagamento, pagoAMaisDo, MOTIVO_PAGO_A_MENOS, textoDiferenca, diferencaPendente, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, fixosDoBoleto, somaValores, cobrancasEmAberto, nomeDebitoSaida, proximoBoletoAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, MODOS_FICHA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, DOCUMENTOS_RENDA, DICA_DOCUMENTOS, PJ2, casadoOuUniao, fichaComConjuge, PARTES_DOCUMENTOS_PF, separacaoTotal, documentosDoFiador, VAGAS_FIADOR_FICHA, fiadoresDaFicha, fichaAberta, fichaAbertaDoImovel, fichaSemContrato, devolucaoPendente, condicoesDaReservaAgora, condicoesDaReserva, valorDaReserva, retencaoDaReserva, devolverReservaAte, fichaSemDocumentos, dataApagarDocumentosFicha, FICHA_FICA, fichaFica, fichasComDadosVencidos, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraObrigatoria, relogiosObrigatorios, leituraDo, encerramentoDo, boletoDoSaldo, garantiaADevolverNaSaida, COMPROVANTE_SAIDA_DESDE, pastaDoBoletoPdf, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, titularidadeDevolvida, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, devolucoesDaTrocaDeTitular, devolucaoDaTrocaDeGarantia, garantiaDevolvidaNaTroca, devolucoesDeTrocaPendentes, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, companhiaCurtaDaConta, tamanhosVistos, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contasSoArquivo, contaSoArquivo, contasDoExtrato, contaBanco, limparId, contaPreMarcada, EMISSAO_EM_ANDAMENTO_MS, corta, encargosParaComparar, descontoLiberado, diasBaixaDaConta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, vencidosSemEmissao, boletosDoMesSemEmissao, solicitacoesDo, SITUACOES_NOTIFICACAO, MEIOS_NOTIFICACAO, NOTIFICACAO_ABERTA, notificacaoEmAberto, limiteNotificacao, notificacoesDo, numeroDaNotificacao, textoMultaNotificacao, multaSugerida, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, competenciaDoMesVencimento, mesVencimentoDaCompetencia, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DESTINOS_MOVIMENTACAO, contratoEncerrado, FAIXAS_ATRASO, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, mesDoPeriodoGuia, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, pagosAquiAbertosNoBanco, textoDeBusca, assinaturaLembrete, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, alvoDoAlerta, mesmoAlvo, desligamentosOrfaos, TIPOS_ALERTA_DO_IMOVEL, PRAZO_CONTESTAR_SAIDA, prazoContestarSaida, mudarRegraSistema, voltarRegrasAoPadrao, contratosDoPerfil;
+  function registrosDoBoleto(d2, cb) {
+    const a = acordoDoBoleto(cb);
+    return (d2.cobranca_registros || []).filter((x) => x.cobranca_id === cb.id || a && x.acordo_id === a).sort((x, y) => String(x.data || "").localeCompare(String(y.data || "")) || x.id - y.id);
+  }
+  function referenteDoRegistro(d2, r) {
+    if (r.cobranca_id) {
+      const cb = buscar(d2, "cobrancas", r.cobranca_id);
+      if (!cb) return "boleto (excluído depois)";
+      const qual = ehComplementoCaucao(cb) ? "complemento da caução" : ehParcelaAcordo(cb) ? `parcela ${cb.acordo_parcela || ""} do acordo`.replace("  ", " ") : compBr(cb.competencia);
+      return `boleto de ${qual} (vence ${dataBr(cb.vencimento)})`;
+    }
+    if (r.acordo_id) {
+      const a = buscar(d2, "acordos", r.acordo_id);
+      return a ? `acordo de ${dataBr(a.data)}${a.desfeito_em ? " (desfeito)" : ""}` : "acordo (excluído depois)";
+    }
+    return "cobrança em geral";
+  }
+  function removerArquivoDoRegistro(d2, id, nome, usuario) {
+    const r = buscar(d2, "cobranca_registros", id);
+    if (!r) throw new ErroUsuario("Este registro não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.");
+    if (!(r.arquivos || []).includes(nome)) throw new ErroUsuario("Este arquivo já foi tirado do registro.");
+    atualizar(d2, "cobranca_registros", r.id, { arquivos: r.arquivos.filter((x) => x !== nome) }, usuario, `Cobrança (${r.tipo} de ${dataBr(r.data)}): arquivo tirado: ${nome}`);
+  }
+  var TABELAS, SITUACOES, CONCESSIONARIAS_POR_UF, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, IMAGEM_FORA_DO_HISTORICO, semPeso, RESPOSTA_PESADA, FORMULARIOS_DA_TABELA, camposDinheiro, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, camposDaGravacao, CODIGO_DE, nomeCurto, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, aplicacaoBaixada, aplicacoesEmVigor, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehSaldoSaida, ehBoletoAvulso, semMultaJuros, emAcordo, MOTIVO_EM_ACORDO, quitadoNaSaida, aCobrar, boletosCaucaoDa, parcelasIrmasDoComplemento, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, IPTU_DIVISAO_NOVA_DESDE, dividirIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, CAMPOS_MANUAIS, JUNTOS_DO_MANUAL, totais, previstoNoPagamento, pagoAMaisDo, MOTIVO_PAGO_A_MENOS, textoDiferenca, diferencaPendente, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, fixosDoBoleto, somaValores, cobrancasEmAberto, nomeDebitoSaida, proximoBoletoAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, MODOS_FICHA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, DOCUMENTOS_RENDA, DICA_DOCUMENTOS, PJ2, casadoOuUniao, fichaComConjuge, PARTES_DOCUMENTOS_PF, separacaoTotal, documentosDoFiador, VAGAS_FIADOR_FICHA, fiadoresDaFicha, fichaAberta, fichaAbertaDoImovel, fichaSemContrato, devolucaoPendente, condicoesDaReservaAgora, condicoesDaReserva, valorDaReserva, retencaoDaReserva, devolverReservaAte, fichaSemDocumentos, dataApagarDocumentosFicha, FICHA_FICA, fichaFica, fichasComDadosVencidos, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraObrigatoria, relogiosObrigatorios, leituraDo, encerramentoDo, boletoDoSaldo, garantiaADevolverNaSaida, COMPROVANTE_SAIDA_DESDE, pastaDoBoletoPdf, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, titularidadeDevolvida, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, devolucoesDaTrocaDeTitular, devolucaoDaTrocaDeGarantia, garantiaDevolvidaNaTroca, devolucoesDeTrocaPendentes, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, companhiaCurtaDaConta, tamanhosVistos, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contasSoArquivo, contaSoArquivo, contasDoExtrato, contaBanco, limparId, contaPreMarcada, EMISSAO_EM_ANDAMENTO_MS, corta, encargosParaComparar, descontoLiberado, diasBaixaDaConta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, vencidosSemEmissao, boletosDoMesSemEmissao, solicitacoesDo, SITUACOES_NOTIFICACAO, MEIOS_NOTIFICACAO, NOTIFICACAO_ABERTA, notificacaoEmAberto, limiteNotificacao, notificacoesDo, numeroDaNotificacao, textoMultaNotificacao, multaSugerida, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, competenciaDoMesVencimento, mesVencimentoDaCompetencia, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DESTINOS_MOVIMENTACAO, contratoEncerrado, FAIXAS_ATRASO, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, mesDoPeriodoGuia, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, pagosAquiAbertosNoBanco, textoDeBusca, assinaturaLembrete, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, alvoDoAlerta, mesmoAlvo, desligamentosOrfaos, TIPOS_ALERTA_DO_IMOVEL, PRAZO_CONTESTAR_SAIDA, prazoContestarSaida, mudarRegraSistema, voltarRegrasAoPadrao, contratosDoPerfil, TIPOS_REGISTRO_COBRANCA, registrosCobrancaDo, acordoDoBoleto, gastoDaCobranca;
   var init_regras = __esm({
     "docs/js/regras.js"() {
       init_alertas();
@@ -13621,6 +13663,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         envios_email: "E-mail enviado",
         taxas_poupanca: "Taxas da poupança do Banco Central (um mês)",
         regua_emails: "E-mail da régua de cobrança (autorizado ou não)",
+        cobranca_registros: "Registro da cobrança (passo, despesa e prova)",
         movimentacoes_banco: "Movimentação bancária",
         pagamentos_banco: "Pagamento pelo banco",
         adiamentos_alerta: "Adiamento de alerta",
@@ -14266,6 +14309,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       mudarRegraSistema = (d2, chave, valor, usuario) => salvarRegrasSistema(d2, { ...escolhasDe(d2), [chave]: valor }, usuario, void 0, chave);
       voltarRegrasAoPadrao = (d2, usuario) => salvarRegrasSistema(d2, {}, usuario, "Regras do sistema (volta ao padrão)");
       contratosDoPerfil = (d2, id) => d2.contratos.filter((c) => Number(c.perfil_regras_id) === Number(id));
+      TIPOS_REGISTRO_COBRANCA = ["Carta", "E-mail", "WhatsApp / ligação", "Notificação", "Protesto", "Cartório", "Advogado", "Outro"];
+      registrosCobrancaDo = (d2, contratoId) => (d2.cobranca_registros || []).filter((x) => x.contrato_id === contratoId).sort((a, b) => String(a.data || "").localeCompare(String(b.data || "")) || a.id - b.id);
+      acordoDoBoleto = (cb) => cb && (cb.acordo_id || cb.acordo_parcela_de) || null;
+      gastoDaCobranca = (lista3) => lista3.reduce((s, x) => s + (Number(x.valor) || 0), 0);
     }
   });
 
@@ -29021,6 +29068,19 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       if (r && r[k.campo] && r[k.valor] !== dados[k.valor] && !arquivoEscolhido(form, k.campo)) dados[k.campo] = null;
     }
   }
+  function referentesDaCobranca(contratoId, r, q = {}) {
+    const hoje3 = hojeIso();
+    const atual = r ? r.cobranca_id : Number(q.cobranca) || null;
+    const acordoAtual = r ? r.acordo_id : Number(q.acordo) || null;
+    const maiuscula = (t) => t.charAt(0).toLocaleUpperCase("pt-BR") + t.slice(1);
+    const boletos = d().cobrancas.filter((cb) => cb.contrato_id === contratoId && (cb.id === atual || !cb.data_pagamento && vencido(cb.vencimento, hoje3))).sort((a, b) => String(b.vencimento).localeCompare(String(a.vencimento)));
+    const acordos = (d().acordos || []).filter((a) => a.contrato_id === contratoId || a.id === acordoAtual).sort((a, b) => String(b.data).localeCompare(String(a.data)));
+    return [
+      ["geral", "Cobrança em geral"],
+      ...boletos.map((cb) => [`b${cb.id}`, maiuscula(referenteDoRegistro(d(), { cobranca_id: cb.id }))]),
+      ...acordos.map((a) => [`a${a.id}`, maiuscula(referenteDoRegistro(d(), { acordo_id: a.id }))])
+    ];
+  }
   async function guardarComprovantes(lista3, dados, form, pasta) {
     for (const k of lista3) {
       const arq = arquivoEscolhido(form, k.campo);
@@ -29113,7 +29173,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       ${camposHtml(campos, valores, estado2 ? estado2.erros : {}, { compacto: !!cfg7.compacto })}${cfg7.extraHtml ? cfg7.extraHtml(registro, q) : ""}
       <p class="acoes" style="margin-top:16px"><button>Salvar</button><a class="botao secundario" href="${esc(cfg7.voltar(registro, q))}">Voltar</a></p></form>`;
   }
-  var comListas, COMPROVANTES_CONTRATO, COMPROVANTE_APLICACAO, comprovanteDoDeposito, COMPROVANTE_COMPLEMENTO, COMPROVANTES_FICHA, COMPROVANTE_DEVOLUCAO, arquivoEscolhido, nomeComprovante2, xAnexo, ANEXOS_COM_X, linkComprovante, fiadoresMudancas, inquilinosDaSolicitacao, fiadoresDaTroca2, avisoAditivo, guardarModeloAirbnb, imovelVago2, imoveisDaFicha, CONTATO_FICHA, CADASTROS;
+  var comListas, COMPROVANTES_CONTRATO, COMPROVANTE_APLICACAO, comprovanteDoDeposito, COMPROVANTE_COMPLEMENTO, COMPROVANTES_FICHA, COMPROVANTE_DEVOLUCAO, arquivoEscolhido, nomeComprovante2, AVISO_PROVAS_COBRANCA, xAnexo, ANEXOS_COM_X, linkComprovante, fiadoresMudancas, inquilinosDaSolicitacao, fiadoresDaTroca2, avisoAditivo, guardarModeloAirbnb, imovelVago2, imoveisDaFicha, CONTATO_FICHA, CADASTROS;
   var init_cadastros = __esm({
     "docs/js/telas/cadastros.js"() {
       init_app();
@@ -29148,6 +29208,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
         return el && el.files && el.files[0] || null;
       };
       nomeComprovante2 = (tipo, data2, arq) => `comprovante-${tipo}-${data2 || hojeIso()}${extensao(arq.name)}`;
+      AVISO_PROVAS_COBRANCA = "Só para guardar a prova da cobrança (para o advogado ou para a Justiça): o valor gasto fica anotado e não entra no boleto, na NF, no acordo nem no cálculo final da saída.";
       xAnexo = (acao, dados, confirmar2) => opera() ? botao(acao, "×", dados, "x-excluir", confirmar2).replace("<button ", '<button title="Apagar só o arquivo" ') : "";
       ANEXOS_COM_X = { contratos: ["comprovante_reserva", "termo_chaves_saida", "contra_vistoria"], correcoes_garantia: ["comprovante"], aplicacoes: ["comprovante"], depositos_garantia: ["comprovante"], devolucoes_garantia: ["comprovante", "termo_assinado"], encerramentos: ["comprovante", "termo_assinado"], acordos: ["termo_assinado"], notificacoes: ["arquivo_assinado", "comprovante_baixa"] };
       linkComprovante = (contratoId, nome, anexo = null) => nome && !(anexo && arquivoSumiu("contrato", contratoId, nome)) ? `<span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="contrato" data-id="${contratoId}" data-nome="${esc(nome)}" title="${esc(nome)}">📎 comprovante</a>${anexo && (ANEXOS_COM_X[anexo.tabela] || []).includes(anexo.campo) ? xAnexo("removerAnexo", { tabela: anexo.tabela, id: anexo.id, campo: anexo.campo }, `Apagar o comprovante "${nome}"? O lançamento continua e volta o aviso para anexar.`) : ""}</span>` : anexo && opera() ? `<label class="anexar-falta" title="${nome ? `O arquivo ${esc(nome)} sumiu da pasta: anexe de novo (PDF ou foto)` : "Sem comprovante: buscar no banco e anexar (PDF ou foto)"}">⚠ ${nome ? "arquivo sumiu: anexar de novo" : "anexar comprovante"}<input type="file" accept="${ACEITA_DOCUMENTOS}"
@@ -29775,6 +29836,59 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
         fiadores: {
           semFormulario: ['O fiador é incluído ou trocado na página do inquilino ("Trocar garantia ou fiador") ou no Editar contrato', "#/inquilinos", "Ver os inquilinos"],
           descricao: (dados) => `Fiador ${dados.nome}`
+        },
+        // registro da cobrança de um atraso (2026-11-24): passo ou despesa, com os comprovantes; só guarda a prova (não soma em nada)
+        cobranca_registros: {
+          titulo: (r, q) => `${r ? "Registro" : "Registrar passo ou despesa"} da cobrança - ${buscar2("contratos", r ? r.contrato_id : q.contrato).inquilino_nome}`,
+          campos: (r, q) => [
+            {
+              nome: "referente",
+              rotulo: "Referente a",
+              tipo: "opcao",
+              obrig: true,
+              virtual: true,
+              opcoes: referentesDaCobranca(r ? r.contrato_id : Number(q.contrato), r, q),
+              ajuda: 'O boleto vencido ou o acordo que está sendo cobrado. "Cobrança em geral" quando vale para vários meses'
+            },
+            ...REGISTRO_COBRANCA.map((c) => c.nome === "tipo" ? { ...c, opcoes: TIPOS_REGISTRO_COBRANCA } : c)
+          ],
+          valores: (r) => ({ ...r, referente: r.cobranca_id ? `b${r.cobranca_id}` : r.acordo_id ? `a${r.acordo_id}` : "geral" }),
+          padrao: (q) => ({ data: hojeIso(), referente: q.cobranca ? `b${q.cobranca}` : q.acordo ? `a${q.acordo}` : "geral" }),
+          fixos: (r, q) => r ? {} : { contrato_id: Number(q.contrato) },
+          aviso: () => AVISO_PROVAS_COBRANCA,
+          extraHtml: (r) => `<h3>Comprovantes</h3><div class="formulario"><div class="largo"><label>Anexar arquivos (pode escolher vários)</label>
+      <input type="file" name="arquivos_novos" multiple accept="${ACEITA_DOCUMENTOS}">
+      <small class="suave">PDF ou foto: a carta e o AR, o print do e-mail ou do WhatsApp, o recibo do cartório, o contrato e o recibo do advogado.${r && (r.arquivos || []).length ? ` Já anexados: ${r.arquivos.length} (para tirar um, use o × na lista da página do inquilino).` : ""}</small></div></div>`,
+          ajustar(dados, erros, r, form, q) {
+            const v = String(new FormData(form).get("referente") || "");
+            const contratoId = r ? r.contrato_id : Number(q.contrato);
+            dados.cobranca_id = /^b\d+$/.test(v) ? Number(v.slice(1)) : null;
+            dados.acordo_id = /^a\d+$/.test(v) ? Number(v.slice(1)) : null;
+            const cb = dados.cobranca_id && buscar2("cobrancas", dados.cobranca_id);
+            const a = dados.acordo_id && buscar2("acordos", dados.acordo_id);
+            if (dados.cobranca_id && !cb || dados.acordo_id && !a) erros.referente = 'Este boleto ou acordo não existe mais: escolha outro (ou "Cobrança em geral")';
+            dados.tipo = TIPOS_REGISTRO_COBRANCA.includes(dados.tipo) ? dados.tipo : "Outro";
+            if (!r && !contratoId) erros.referente = "Abra o registro pela página do inquilino ou do boleto";
+          },
+          async ajustarAsync(dados, erros, r, form, q) {
+            await confirmarAvisos([dataNoFuturo(dados.data, "A data do registro")].filter(Boolean));
+            const arqs = [...(form.querySelector("[name=arquivos_novos]") || {}).files || []];
+            dados.arquivos_novos = [];
+            if (!arqs.length) return;
+            const pasta = await pastaDoEscopo("contrato", r ? r.contrato_id : Number(q.contrato));
+            const tipo = paraNomeDeArquivo(String(dados.tipo || "outro").toLowerCase()) || "outro";
+            for (const arq of arqs) dados.arquivos_novos.push(await salvarArquivo(pasta, new File([arq], `cobranca-${tipo}-${dados.data}-${semAcentoArquivo(arq.name)}`)));
+          },
+          salvar(db, dados, q, r) {
+            const novos = dados.arquivos_novos || [];
+            delete dados.arquivos_novos;
+            const texto3 = `Cobrança: ${dados.tipo} de ${dataBr(dados.data)}${dados.valor ? ` (gasto ${reais(dados.valor)})` : ""}${novos.length ? ` · ${plural(novos.length, "arquivo")}` : ""}`;
+            if (!r) return inserir(db, "cobranca_registros", { ...dados, arquivos: novos }, login(), texto3);
+            const agora = buscar(db, "cobranca_registros", r.id);
+            atualizar(db, "cobranca_registros", r.id, { ...dados, arquivos: [...agora.arquivos || [], ...novos] }, login(), texto3);
+            return buscar(db, "cobranca_registros", r.id);
+          },
+          voltar: (r, q) => q && q.cobranca ? `#/cobranca/${q.cobranca}?ir=provas` : `#/contrato/${r ? r.contrato_id : q.contrato}?ir=provas-cobranca`
         },
         aplicacoes: {
           titulo: (r, q) => `Aplicação da garantia - ${buscar2("contratos", r ? r.contrato_id : q.contrato).inquilino_nome}`,
@@ -30420,6 +30534,138 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
           await alterar((db) => retirarMultaNotificacao(db, Number(id), login()));
           aviso("Multa retirada do boleto e da notificação.");
           await mostrar();
+        }
+      };
+    }
+  });
+
+  // docs/js/telas/cobranca-provas.js
+  function tabelaRegistros(lista3, comReferente, boletoId = null) {
+    if (!lista3.length) return '<p class="suave">Nenhum registro ainda.</p>';
+    return `<div class="rolagem"><table><tr><th>Data</th><th>O que foi feito</th>${comReferente ? "<th>Referente a</th>" : ""}<th>Descrição</th><th class="n">Gasto</th><th>Comprovantes</th><th></th></tr>
+    ${lista3.map((r) => `<tr><td class="nw">${dataBr(r.data)}</td><td>${esc(r.tipo)}</td>${comReferente ? `<td>${r.cobranca_id && buscar2("cobrancas", r.cobranca_id) ? link(`#/cobranca/${r.cobranca_id}?ir=provas`, esc(referenteDoRegistro(d(), r)), "") : esc(referenteDoRegistro(d(), r))}</td>` : ""}
+      <td class="pre">${esc(r.descricao || "")}</td><td class="n">${r.valor ? reais(r.valor) : "-"}</td><td>${comArquivos(r) || '<span class="suave">sem arquivo</span>'}</td>
+      <td class="n nw">${opera() ? `${link(`#/editar/cobranca_registros/${r.id}${boletoId ? `?cobranca=${boletoId}` : ""}`, "Editar")} ${botao("excluir", "×", { tabela: "cobranca_registros", id: r.id }, "x-excluir", `Excluir este registro da cobrança${(r.arquivos || []).length ? ` e ${plural(r.arquivos.length, "o arquivo", "os arquivos")} dele` : ""}?`)}` : ""}</td></tr>`).join("")}
+    </table></div>
+    ${gastoDaCobranca(lista3) ? `<p class="suave">Gasto anotado: <b>${reais(gastoDaCobranca(lista3))}</b> (não é cobrado do inquilino).</p>` : ""}`;
+  }
+  function caixaProvasBoleto(cb) {
+    const lista3 = registrosDoBoleto(d(), cb);
+    if (!mostraNoBoleto(cb, lista3)) return "";
+    const acordo = cb.acordo_id || cb.acordo_parcela_de;
+    const novo = (q, texto3, cls = "botao") => link(`#/novo/cobranca_registros?contrato=${cb.contrato_id}&${q}`, texto3, cls);
+    return `<div class="cartao nao-imprimir" id="provas"><div class="cabecalho"><h2>Cobrança: registros e provas</h2>${opera() ? `<span class="acoes">${novo(`cobranca=${cb.id}`, "+ Registrar passo ou despesa")}${acordo ? ` ${novo(`acordo=${acordo}`, "+ Registrar no acordo", "botao secundario")}` : ""}</span>` : ""}</div>
+    <p class="suave">${esc(AVISO_PROVAS_COBRANCA)} Todos os registros deste inquilino e o botão para baixar tudo junto ficam na ${link(`#/contrato/${cb.contrato_id}?ir=provas-cobranca`, "página do inquilino", "")}.</p>
+    ${tabelaRegistros(lista3, !!acordo, cb.id)}</div>`;
+  }
+  function caixaProvasContrato(c) {
+    const lista3 = registrosCobrancaDo(d(), c.id);
+    const hoje3 = hojeIso();
+    const temAtraso = d().cobrancas.some((cb) => cb.contrato_id === c.id && (!cb.data_pagamento && vencido(cb.vencimento, hoje3) || emAcordo(cb)));
+    if (!lista3.length && !temAtraso) return "";
+    return `<div class="cartao" id="provas-cobranca"><div class="cabecalho"><h2>Cobrança: registros e provas</h2><span class="acoes">${opera() ? link(`#/novo/cobranca_registros?contrato=${c.id}`, "+ Registrar passo ou despesa") : ""}
+      ${lista3.length ? botao("zipProvasCobranca", "⬇ Baixar tudo (ZIP para o advogado)", { contrato: c.id }, "secundario") : ""}</span></div>
+    <p class="suave">${esc(AVISO_PROVAS_COBRANCA)} O ZIP traz a lista em PDF (data, o que foi feito, valor, descrição) e todos os comprovantes.</p>
+    ${tabelaRegistros(lista3, true)}</div>`;
+  }
+  function pdfDasProvas(JsPDF, d2, c, lista3, nomesNoZip) {
+    const pdf = new JsPDF({ unit: "mm", format: "a4" });
+    const M = 14;
+    const L = 210 - 2 * M;
+    const FIM = 297 - 16;
+    let y = M;
+    const escrever = (texto3, { tam = 9, negrito = false, recuo = 0, depois = 0 } = {}) => {
+      pdf.setFont("helvetica", negrito ? "bold" : "normal");
+      pdf.setFontSize(tam);
+      const altura = tam * 0.45;
+      for (const linha of pdf.splitTextToSize(latino2(texto3), L - recuo)) {
+        if (y + altura > FIM) {
+          pdf.addPage();
+          y = M;
+        }
+        pdf.text(linha, M + recuo, y + altura * 0.8);
+        y += altura;
+      }
+      y += depois;
+    };
+    const i = buscar(d2, "imoveis", c.imovel_id);
+    escrever("Cobrança: registros e provas", { tam: 15, negrito: true, depois: 1.5 });
+    escrever(`Inquilino: ${c.inquilino_nome}${c.inquilino_cpf ? ` (${c.inquilino_cpf})` : ""}`, { tam: 10 });
+    if (i) escrever(`Imóvel: ${i.nome}${i.endereco ? ` · ${i.endereco}` : ""}`, { tam: 10 });
+    escrever(`Contrato: ${dataBr(c.data_entrada || c.vigencia_inicio)}${c.data_saida ? ` a ${dataBr(c.data_saida)}` : ""} · gerado em ${agoraBr()}`, { tam: 10, depois: 2 });
+    escrever(`${lista3.length} registro(s). Gasto anotado: ${reais(gastoDaCobranca(lista3))} (registrado como prova; não foi cobrado do inquilino). Os comprovantes estão na pasta "Comprovantes" deste ZIP.`, { depois: 4 });
+    lista3.forEach((r, n) => {
+      if (y + 20 > FIM) {
+        pdf.addPage();
+        y = M;
+      }
+      escrever(`${n + 1}. ${dataBr(r.data)} · ${r.tipo}${r.valor ? ` · gasto ${reais(r.valor)}` : ""}`, { tam: 10, negrito: true, depois: 0.5 });
+      escrever(`Referente a: ${referenteDoRegistro(d2, r)}`, { recuo: 4 });
+      if (r.descricao) escrever(r.descricao, { recuo: 4 });
+      const arqs = (r.arquivos || []).map((nome) => nomesNoZip.get(`${r.id}|${nome}`) || `${nome} (não encontrado na pasta)`);
+      escrever(arqs.length ? `Comprovantes: ${arqs.join("; ")}` : "Sem comprovante anexado.", { recuo: 4, depois: 3 });
+    });
+    const total = pdf.getNumberOfPages();
+    for (let p2 = 1; p2 <= total; p2 += 1) {
+      pdf.setPage(p2);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(7);
+      pdf.text(latino2(`${c.inquilino_nome} · página ${p2} de ${total}`), 210 - M, 297 - 8, { align: "right" });
+    }
+    return pdf.output("blob");
+  }
+  var comArquivos, mostraNoBoleto, latino2, ACOES_PROVAS;
+  var init_cobranca_provas = __esm({
+    "docs/js/telas/cobranca-provas.js"() {
+      init_app();
+      init_armazenamento();
+      init_calculos();
+      init_calculos();
+      init_formularios();
+      init_regras();
+      init_cadastros();
+      init_comum();
+      comArquivos = (r) => (r.arquivos || []).map((nome) => `<span class="nw"><a href="#" data-acao="abrirArquivo" data-escopo="contrato" data-id="${r.contrato_id}" data-nome="${esc(nome)}" title="${esc(nome)}">📎 ${esc(nome)}</a>${arquivoSumiu("contrato", r.contrato_id, nome) ? ' <span class="etiqueta aviso">sumiu da pasta</span>' : ""}${opera() ? ` ${botao("removerArquivoCobranca", "tirar", { id: r.id, nome }, "secundario mini", `Tirar o arquivo "${nome}" deste registro? Ele é apagado da pasta (o registro continua).`).replace("<button ", '<button title="Tirar só este arquivo" ')}` : ""}</span>`).join("<br>");
+      mostraNoBoleto = (cb, lista3) => lista3.length || emAcordo(cb) || ehParcelaAcordo(cb) || !cb.data_pagamento && vencido(cb.vencimento, hojeIso());
+      latino2 = (s) => String(s ?? "").replace(/[^\u0009\u000a -ÿ–—‘’“”•…]/g, "");
+      ACOES_PROVAS = {
+        async removerArquivoCobranca({ id, nome }) {
+          await alterarApagandoAnexos((db) => removerArquivoDoRegistro(db, Number(id), nome, login()));
+          aviso("Arquivo tirado do registro.");
+          await mostrar();
+        },
+        /** ZIP para o advogado: "Lista da cobranca.pdf" e a pasta "Comprovantes" (cada arquivo com o número do registro na frente). */
+        async zipProvasCobranca({ contrato }) {
+          const c = buscar2("contratos", contrato);
+          if (!c) throw new ErroUsuario("Este inquilino não existe mais. Atualize a página.");
+          const lista3 = registrosCobrancaDo(d(), c.id);
+          if (!lista3.length) throw new ErroUsuario("Nenhum registro da cobrança para baixar.");
+          const [JSZip, JsPDF] = await Promise.all([jsZip(), jsPdf()]);
+          const zip = new JSZip();
+          const nomes = /* @__PURE__ */ new Map();
+          const faltam = [];
+          let dir = null;
+          try {
+            dir = await pastaDoEscopo("contrato", c.id, false);
+          } catch {
+          }
+          for (const [n, r] of lista3.entries()) {
+            for (const nome of r.arquivos || []) {
+              try {
+                const conteudo = await lerConteudo(await dir.getFileHandle(nome));
+                const noZip = `Comprovantes/${String(n + 1).padStart(2, "0")} ${limparNome(nome)}`;
+                zip.file(noZip, conteudo);
+                nomes.set(`${r.id}|${nome}`, noZip);
+              } catch {
+                faltam.push(nome);
+              }
+            }
+          }
+          zip.file("Lista da cobranca.pdf", pdfDasProvas(JsPDF, d(), c, lista3, nomes));
+          const arquivo = limparNome(`Cobranca ${c.inquilino_nome} ${hojeIso()}.zip`);
+          baixar(await zip.generateAsync({ type: "blob" }), arquivo);
+          await alterar((db) => registrar(db, login(), "Exportação", "contratos", c.id, `Cobrança de ${c.inquilino_nome}: registros e provas baixados em ZIP (${lista3.length} registro(s), ${nomes.size} arquivo(s))`, null, {}, false));
+          aviso(`ZIP baixado: ${arquivo} (${plural(lista3.length, "registro")}, ${plural(nomes.size, "arquivo")}).${faltam.length ? ` Não achei na pasta: ${faltam.join(", ")}.` : ""}`, faltam.length ? "aviso" : "ok");
         }
       };
     }
@@ -31164,6 +31410,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     ${caixaRessarcimentos(c)}
     ${caixaSolicitacoes(c)}
     ${caixaNotificacoes(c)}
+    ${caixaProvasContrato(c)}
     ${caixaGarantia(c)}
     ${caixaSeguros(c)}
     ${caixaFci(c)}
@@ -31211,6 +31458,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       init_faturas();
       init_fichas();
       init_notificacoes2();
+      init_cobranca_provas();
       init_app();
       init_calculos();
       init_contratos();
@@ -31612,6 +31860,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
         ${segundaVia(d(), cb, hojeIso()) ? `<p class="acoes">${botao("segundaVia", "2ª via com o valor de hoje", { id: cb.id }, "secundario")}<span class="suave">Valor com multa e juros até hoje e o texto pronto para o inquilino (não emite boleto novo no banco).</span></p>` : ""}
         ${opera() && aCobrar(cb) ? formPagamento(cb) : ""}
         ${opera() ? `<p class="acoes" style="margin-top:10px">${botao("lembrete", vencido(cb.vencimento, hojeIso()) ? "Cobrar o inquilino (texto pronto)" : "Lembrar o inquilino (texto pronto)", { id: cb.id }, "secundario")}<span class="suave">E-mail, WhatsApp ou copiar; o texto muda se já venceu.</span></p>` : ""}`}</div>
+    ${caixaProvasBoleto(cb)}
     ${emAcordo(cb) ? "" : caixaBancoC6(cb)}
     ${emAcordo(cb) ? "" : caixaPdfBanco(cb)}
     ${emAcordo(cb) ? "" : caixaBoleto(cb)}
@@ -31636,6 +31885,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       init_emails();
       init_contrato();
       init_cadastros();
+      init_cobranca_provas();
       init_documentos();
       init_faturas();
       nomeI = (x) => x.i ? x.i.nome : "";
@@ -38707,6 +38957,7 @@ ${xref}
       init_comum();
       init_arquivo_impresso2();
       init_notificacoes2();
+      init_cobranca_provas();
       init_comunicacoes();
       init_documentos();
       init_assinatura();
@@ -40829,7 +41080,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           await mostrar();
         }
       };
-      Object.assign(ACOES, ACOES_BANCO, ACOES_FICHAS, ACOES_TERMO, ACOES_ICONE, ACOES_EMAILS, ACOES_PASTA, ACOES_NOTIFICACOES, ACOES_COMUNICACOES);
+      Object.assign(ACOES, ACOES_BANCO, ACOES_FICHAS, ACOES_TERMO, ACOES_ICONE, ACOES_EMAILS, ACOES_PASTA, ACOES_NOTIFICACOES, ACOES_COMUNICACOES, ACOES_PROVAS);
       Object.assign(ACOES, adiados("acoes"));
     }
   });
