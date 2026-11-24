@@ -115,7 +115,7 @@ export function telaFicha(id) {
         return `<div class="alerta aviso"><b>${dv.integral ? `Devolver a reserva de ${reais(f.reserva_valor)}` : `Devolver ${reais(dv.devolver)} da reserva de ${reais(f.reserva_valor)}`}${ate ? ` até ${dataBr(ate)}` : ''}.</b> ${dv.integral ? '' : `A empresa fica com ${reais(dv.reter)}: ${esc(dv.motivo)}. `}Depois de devolver, registre a data e o comprovante em "Editar".</div>`;
       })();
   const documentos = primeiro ? `<p>Os documentos da ficha foram para a pasta do inquilino: ${link(`#/contrato/${primeiro.id}?ir=arquivos`, esc(primeiro.inquilino_nome), '')}.</p>`
-    : f.documentos_apagados_em ? `<p class="suave">Os documentos pessoais foram apagados em ${dataBr(f.documentos_apagados_em)} (${R.regra('meses_documentos_ficha')} meses depois da decisão). Ficaram só os comprovantes da reserva e da devolução.</p>` : '';
+    : f.documentos_apagados_em ? `<p class="suave">Os documentos pessoais foram apagados em ${dataBr(f.documentos_apagados_em)} (${R.regra('meses_documentos_ficha')} meses depois da decisão ou da devolução da reserva). Ficaram só os comprovantes da reserva e da devolução.</p>` : '';
   return `<p class="suave"><a href="#/inquilinos?ir=fichas">← Inquilinos</a></p>
     <div class="cabecalho"><h1>Ficha: ${esc(f.inquilino_nome)}</h1><div class="acoes">
       ${opera() ? link(`#/editar/fichas/${f.id}`, 'Editar') : ''}
@@ -128,7 +128,8 @@ export function telaFicha(id) {
         <p class="suave">Para reprovar, escolha "Reprovada" na situação e escreva o motivo. Com reserva paga, registre a devolução (data e comprovante) quando devolver.</p>` : ''}
       ${botaoDesistencia(f)}
       ${devolucao}
-      ${apagarEm ? `<p class="suave">Os documentos pessoais desta ficha serão apagados em <b>${dataBr(apagarEm)}</b> (${R.regra('meses_documentos_ficha')} meses depois da decisão).</p>` : ''}</div>
+      ${apagarEm ? `<p class="suave">Os documentos pessoais desta ficha serão apagados em <b>${dataBr(apagarEm)}</b> (${R.regra('meses_documentos_ficha')} meses depois da ${R.inicioPrazoApagarFicha(f) === f.decisao_data ? 'decisão' : 'devolução da reserva'}).</p>`
+        : R.apagarFichaEsperaDevolucao(f) ? `<p class="suave">Os documentos e os dados pessoais desta ficha só serão apagados depois da devolução da reserva (${R.regra('meses_documentos_ficha')} meses depois dela): sem eles não há como devolver o dinheiro.</p>` : ''}</div>
     ${caixaTermoReserva(f)}
     ${caixaFichaOnline(f)}
     <div class="cartao"><h2>Imóveis de interesse</h2>

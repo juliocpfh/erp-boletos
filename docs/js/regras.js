@@ -2293,7 +2293,11 @@ export function baseDaFatura(d, tipo, registro) {
     // com o ajuste do mês na NF, o total não é só o aluguel: a linha sai como "1" (senão o valor unitário ficaria errado)
     const ajusteNf = C.ajusteNaNf(registro);
     const ajusteNaNf = !!ajusteNf;
-    const proporcional = !acordo && !ajusteNaNf && registro.dias_cobrados > 0 && registro.dias_cobrados < registro.dias_mes;
+    // pago com atraso (perda da bonificação, multa e juros na NF, regra de 16/10) ou com ressarcimento na NF: o total já não é
+    // dias × aluguel, e a linha sai "1 × total" (decisão do dono de 2026-11-24, BOL-06). Ex.: entrada em 15/11/2026, aluguel de
+    // R$ 2.000,00, 16/30 pago com atraso, total R$ 1.182,44 → "1 × R$ 1.182,44"; pago em dia continua "16/30 × R$ 2.000,00"
+    const comAcrescimos = registro.dias_atraso > 0 || registro.multa > 0 || registro.juros > 0 || (registro.ressarcimento_na_nf && registro.ressarcimento > 0);
+    const proporcional = !acordo && !ajusteNaNf && !comAcrescimos && registro.dias_cobrados > 0 && registro.dias_cobrados < registro.dias_mes;
     return {
       imovel, valor: registro.valor_nf, periodo_inicio: ini, periodo_fim: fim,
       ...(proporcional ? { dias: registro.dias_cobrados, dias_mes: registro.dias_mes } : {}),
@@ -2513,7 +2517,10 @@ export function desfazerNumeracao(d, aPartirDe, usuario, descricao = null) {
 export function registrarRenovacao(d, contratoId, dados, usuario) {
   const c = buscar(d, 'contratos', contratoId);
   exigirAditivoDaTroca(d, c);
-  const r = inserir(d, 'renovacoes', { contrato_id: c.id, ...dados }, usuario, dados.tipo);
+  // o prazo de antes fica guardado na renovação que o muda: o termo do novo valor que "não valeu" o devolve (CON-07, 2026-11-24)
+  const mudaPrazo = !!dados.nova_vigencia_fim || dados.tipo === 'Passou a prazo indeterminado';
+  const antes = mudaPrazo ? { vigencia_fim_anterior: c.vigencia_fim || null, prazo_meses_anterior: c.prazo_meses || null, prazo_tipo_anterior: c.prazo_tipo || null } : {};
+  const r = inserir(d, 'renovacoes', { contrato_id: c.id, ...dados, ...antes }, usuario, dados.tipo);
   const mud = {};
   if (dados.tipo === 'Passou a prazo indeterminado') mud.prazo_tipo = 'Indeterminado';
   if (dados.nova_vigencia_fim) {
@@ -2763,18 +2770,22 @@ export const cobrancasEmAberto = (d, contratoId) => d.cobrancas.filter((cb) => c
  * sugestão para o cálculo final (o operador inclui ou dispensa; a lei dispensa na transferência pelo empregador, art. 4º).
  * Proporção pelos dias que faltam do prazo; aluguel cheio vigente na saída. Sem prazo determinado, troca de titular ou saída
  * no fim: null. Ex.: aluguel R$ 2.000,00, contrato de 01/01/2026 a 01/07/2028 (30 meses), saída em 01/09/2027 (faltam 10)
- * → R$ 6.000,00 × 304/912 dias = R$ 2.000,00. Devolve { valor, aluguel, fim, restam, total }.
+ * → R$ 6.000,00 × 304/912 dias = R$ 2.000,00. Novo titular (troca de titular, decisão do dono de 2026-11-24, CON-04): o prazo
+ * não recomeça, a proporção é pelo prazo do contrato original (início do primeiro da cadeia, fim por `fimDoContrato`, que já
+ * vale a renovação do novo titular). Ex.: mesmo contrato, troca em 01/01/2027 e saída em 01/01/2028 → R$ 6.000,00 × 182/912 =
+ * R$ 1.197,37. Devolve { valor, aluguel, inicio, fim, restam, total, herdado }.
  */
 export function multaSaidaAntecipada(d, c) {
   if (!c || !c.data_saida || c.prazo_tipo === 'Indeterminado' || fimDeVinculo(d, c)) return null;
-  const inicio = c.data_entrada || c.vigencia_inicio;
+  const original = (c.contrato_anterior_id && cadeiaDeContratos(d, c).antes[0]) || c;
+  const inicio = original.data_entrada || original.vigencia_inicio || c.data_entrada || c.vigencia_inicio;
   const fim = fimDoContrato(d, c);
   if (!inicio || !fim || c.data_saida >= fim || c.data_saida < inicio) return null;
   const total = C.diasEntre(inicio, fim);
   const restam = C.diasEntre(c.data_saida, fim);
   const aluguel = aluguelAtual(d, c, c.data_saida);
   if (!(total > 0) || !(aluguel > 0)) return null;
-  return { valor: Math.round((3 * aluguel * restam) / total), aluguel, fim, restam, total };
+  return { valor: Math.round((3 * aluguel * restam) / total), aluguel, inicio, fim, restam, total, herdado: original !== c };
 }
 
 /** Nome do boleto na lista de débitos do cálculo final ("Aluguel 10/2026", "Parcela 2/3 do acordo (vence 10/12/2026)"). */
@@ -3080,8 +3091,21 @@ export function guardarAceiteReserva(d, fichaId, resposta, usuario) {
   return true;
 }
 
-/** Data em que os documentos da ficha reprovada (ou com desistência) são apagados (3 meses depois da decisão), ou null. */
-export const dataApagarDocumentosFicha = (f) => (fichaSemContrato(f) && f.decisao_data && !f.documentos_apagados_em ? C.somarMesesData(f.decisao_data, CR.regra('meses_documentos_ficha')) : null);
+/**
+ * Dia de onde contam os meses para apagar os dados da ficha reprovada (ou com desistência): a decisão ou, com reserva a devolver,
+ * a devolução (decisão do dono de 2026-11-24, FIC-03: sem os dados não há como fazer o Pix de volta). Reserva ainda por devolver:
+ * null (não apaga). Ex.: reprovada em 10/08/2026, reserva de R$ 500,00 devolvida em 05/10/2026 → conta de 05/10/2026.
+ */
+export const inicioPrazoApagarFicha = (f) => {
+  if (!fichaSemContrato(f) || !f.decisao_data || devolucaoPendente(f)) return null;
+  return f.devolucao_data && f.devolucao_data > f.decisao_data ? f.devolucao_data : f.decisao_data;
+};
+
+/** Ficha reprovada (ou com desistência) que espera a devolução da reserva para ter os dados apagados. */
+export const apagarFichaEsperaDevolucao = (f) => fichaSemContrato(f) && !!f.decisao_data && !f.dados_apagados_em && devolucaoPendente(f);
+
+/** Data em que os documentos da ficha reprovada (ou com desistência) são apagados (3 meses depois da decisão ou da devolução da reserva), ou null. */
+export const dataApagarDocumentosFicha = (f) => (inicioPrazoApagarFicha(f) && !f.documentos_apagados_em ? C.somarMesesData(inicioPrazoApagarFicha(f), CR.regra('meses_documentos_ficha')) : null);
 
 /**
  * Campos da ficha reprovada (ou com desistência) que ficam depois do prazo (LGPD: guardar só o necessário): o nome, as datas, a
@@ -3105,6 +3129,8 @@ export function apagarDadosPessoaisDaFicha(d, fichaId, usuario, hoje = C.hojeIso
   if (!fichaSemContrato(f)) throw new C.ErroUsuario('Só a ficha reprovada ou com desistência tem os dados pessoais apagados.');
   // reserva com parte retida: o termo aceito fica, como prova do combinado (LGPD, art. 16, I, e art. 7º, VI)
   const retida = f.devolucao_valor > 0 && f.devolucao_valor < (f.reserva_valor || 0);
+  // de onde contaram os meses (lido antes de apagar): a decisão ou a devolução da reserva (FIC-03)
+  const desde = inicioPrazoApagarFicha(f) && inicioPrazoApagarFicha(f) !== f.decisao_data ? 'devolução da reserva' : 'decisão';
   const saem = Object.keys(f).filter((k) => !fichaFica(k) && !(retida && k === 'aceite_reserva') && f[k] !== null && f[k] !== undefined && f[k] !== '');
   for (const k of saem) f[k] = null;
   f.dados_apagados_em = hoje;
@@ -3122,13 +3148,13 @@ export function apagarDadosPessoaisDaFicha(d, fichaId, usuario, hoje = C.hojeIso
     }
     return h;
   });
-  registrar(d, usuario, 'Alteração', 'fichas', f.id, `Ficha de ${f.inquilino_nome} (${f.situacao.toLocaleLowerCase('pt-BR')}): dados pessoais apagados (${CR.regra('meses_documentos_ficha')} meses depois da decisão; ficam o nome, as datas, a situação e a reserva)`, { campos_apagados: saem.length });
+  registrar(d, usuario, 'Alteração', 'fichas', f.id, `Ficha de ${f.inquilino_nome} (${f.situacao.toLocaleLowerCase('pt-BR')}): dados pessoais apagados (${CR.regra('meses_documentos_ficha')} meses depois da ${desde}; ficam o nome, as datas, a situação e a reserva)`, { campos_apagados: saem.length });
   return f;
 }
 
 /** Fichas reprovadas (ou com desistência) cujos documentos já saíram e os dados pessoais ainda não. */
-export const fichasComDadosVencidos = (d, hoje = C.hojeIso()) => (d.fichas || []).filter((f) => fichaSemContrato(f) && f.decisao_data && !f.dados_apagados_em
-  && C.somarMesesData(f.decisao_data, CR.regra('meses_documentos_ficha')) <= hoje && f.documentos_apagados_em);
+export const fichasComDadosVencidos = (d, hoje = C.hojeIso()) => (d.fichas || []).filter((f) => inicioPrazoApagarFicha(f) && !f.dados_apagados_em
+  && C.somarMesesData(inicioPrazoApagarFicha(f), CR.regra('meses_documentos_ficha')) <= hoje && f.documentos_apagados_em);
 
 /** Fichas reprovadas com os documentos para apagar hoje. */
 export const fichasComDocumentosVencidos = (d, hoje = C.hojeIso()) => (d.fichas || []).filter((f) => dataApagarDocumentosFicha(f) && dataApagarDocumentosFicha(f) <= hoje);
@@ -3801,11 +3827,31 @@ export function arquivoDocumento(d, contratoId, campo, arquivo, usuario) {
 }
 
 /**
+ * Depois de excluída a renovação (já sem o registro): volta o prazo gravado por ela (data de término, prazo em meses e tipo),
+ * se o contrato ainda está com o prazo dela e ela guardou o de antes. Devolve o texto para a tela (o que voltou, ou o aviso).
+ */
+function prazoDaRenovacaoDesfeita(d, c, ren, usuario) {
+  const indeterminado = ren.tipo === 'Passou a prazo indeterminado' && !ren.nova_vigencia_fim;
+  if (!ren.nova_vigencia_fim && !indeterminado) return '';
+  const guardou = Object.prototype.hasOwnProperty.call(ren, 'vigencia_fim_anterior') || Object.prototype.hasOwnProperty.call(ren, 'prazo_tipo_anterior');
+  const aindaDela = ren.nova_vigencia_fim ? c.vigencia_fim === ren.nova_vigencia_fim : c.prazo_tipo === 'Indeterminado';
+  if (!guardou || !aindaDela) {
+    return ren.nova_vigencia_fim ? ` A data de término do contrato continua ${C.dataBr(c.vigencia_fim || ren.nova_vigencia_fim)} (gravada com a renovação, que saiu junto): confira em "Editar contrato".`
+      : ' O contrato continua por prazo indeterminado (gravado com a renovação, que saiu junto): confira em "Editar contrato".';
+  }
+  const mud = { vigencia_fim: ren.vigencia_fim_anterior ?? null, prazo_meses: ren.prazo_meses_anterior ?? null, prazo_tipo: ren.prazo_tipo_anterior || 'Determinado' };
+  atualizar(d, 'contratos', c.id, mud, usuario, `${c.inquilino_nome}: ${mud.vigencia_fim ? `término do contrato volta a ${C.dataBr(mud.vigencia_fim)}` : 'o prazo do contrato volta ao de antes'} (termo aditivo do novo valor não valeu)`);
+  return mud.vigencia_fim ? ` A data de término do contrato volta a ${C.dataBr(mud.vigencia_fim)}, a de antes da renovação.` : ' O prazo do contrato volta ao de antes da renovação.';
+}
+
+/**
  * Termo aditivo anexado que NÃO valeu (arquivo errado ou sem a assinatura de todos; decisão do dono, 21/11/2026, saida-031):
  * tira o arquivo e desfaz o que ele mudou. O termo assinado por todos não passa por aqui: sai com aviso e a mudança continua.
- * - Vencimento (ex.: dia 10 → 15 desde 15/12): o cadastro volta ao dia 10 e os boletos em aberto desde dezembro também; os
- *   pagos ficam, e os emitidos no banco e os alterados à mão ficam como estão, anotados no Histórico.
- * - Novo valor: o novo valor negociado sai (a renovação que o criou é excluída) e os boletos em aberto voltam ao aluguel anterior.
+ * - Vencimento (ex.: dia 10 → 15 desde 15/12): o cadastro volta ao dia 10 e os boletos em aberto desde dezembro também, mesmo
+ *   os alterados à mão (os valores ficam) e os emitidos no banco (com aviso para cancelar e emitir de novo; decisão de 2026-11-24,
+ *   BOL-08); os pagos (também os que o banco já deu como pagos) ficam.
+ * - Novo valor: o novo valor negociado sai (a renovação que o criou é excluída) e os boletos em aberto voltam ao aluguel anterior;
+ *   a data de término gravada junto volta à de antes (CON-07).
  * - Troca de titular: o contrato volta a esperar o termo (o titular anterior continua cobrando); se a troca já foi completada
  *   (boletos e garantia passados ao novo), não dá para desfazer sozinho.
  * ``excluirTermo``: apaga também o termo (senão ele volta a "aguardando assinatura"). Devolve o texto do que foi desfeito.
@@ -3820,11 +3866,12 @@ export function desfazerAditivo(d, id, usuario, { excluirTermo = false } = {}) {
     : atualizar(d, 'aditivos', a.id, { arquivo: null, assinado_em: null, perdido_em: null, perdido_pendente: null }, usuario, `${c.inquilino_nome}: arquivo do termo aditivo de ${C.dataBr(a.data)} apagado (não valeu: volta a aguardar assinatura)`));
   if (a.tipo === TIPO_ADITIVO_VALOR && a.renovacao_id && buscar(d, 'renovacoes', a.renovacao_id)) {
     const ren = buscar(d, 'renovacoes', a.renovacao_id);
-    // o prazo gravado pela renovação não volta sozinho (como no "×" da renovação): avisa para conferir (CON-07)
-    const prazo = ren.nova_vigencia_fim ? ` A data de término do contrato continua ${C.dataBr(c.vigencia_fim || ren.nova_vigencia_fim)} (gravada com a renovação, que saiu junto): confira em "Editar contrato".`
-      : ren.tipo === 'Passou a prazo indeterminado' ? ' O contrato continua por prazo indeterminado (gravado com a renovação, que saiu junto): confira em "Editar contrato".' : '';
     atualizar(d, 'aditivos', a.id, { arquivo: null, assinado_em: null, perdido_em: null, perdido_pendente: null }, usuario, `${c.inquilino_nome}: termo aditivo do novo valor não valeu`);
     excluirRenovacao(d, a.renovacao_id, usuario); // exclui também o termo (agora sem assinatura)
+    // a data de término (ou o prazo indeterminado) gravada com a renovação volta à de antes (decisão do dono de 2026-11-24,
+    // CON-07). Ex.: contrato até 10/07/2027, renovado até 10/01/2030 com o novo valor, termo "não valeu" → volta a 10/07/2027.
+    // Renovação antiga (sem o prazo de antes guardado) ou prazo mudado depois por outro caminho: só avisa para conferir.
+    const prazo = prazoDaRenovacaoDesfeita(d, c, ren, usuario);
     recalcularCobrancas(d, (cb) => cb.contrato_id === c.id, usuario);
     marcarAditivos(d, c.id, usuario);
     return `O novo valor de ${C.reais(a.valor_novo)} saiu: o aluguel volta a ${C.reais(a.valor_anterior)} nos boletos em aberto.${prazo}`;
@@ -3834,18 +3881,25 @@ export function desfazerAditivo(d, id, usuario, { excluirTermo = false } = {}) {
   if (a.dia_novo && a.primeiro_vencimento && a.dia_anterior) {
     if (c.dia_vencimento === a.dia_novo) atualizar(d, 'contratos', c.id, { dia_vencimento: a.dia_anterior }, usuario, `${c.inquilino_nome}: vencimento volta ao dia ${a.dia_anterior} (termo aditivo não valeu)`);
     const mes = a.primeiro_vencimento.slice(0, 7);
+    // todos os boletos em aberto que foram para o dia novo voltam (decisão do dono de 2026-11-24, BOL-08): também os alterados
+    // à mão (só o vencimento muda; os valores digitados ficam) e o já emitido no banco, que fica com o aviso para cancelar no
+    // banco e emitir de novo (alertaReemitirNoBanco) até alguém resolver. O que o banco já deu como pago não se mexe.
     let n = 0;
+    const reemitir = [];
     for (const cb of d.cobrancas.filter((x) => x.contrato_id === c.id && !x.data_pagamento && !emAcordo(x) && !ehBoletoAvulso(x) && x.vencimento && x.vencimento.slice(0, 7) >= mes)) {
       const venc = `${cb.vencimento.slice(0, 7)}-${String(Math.min(a.dia_anterior, C.diasNoMes(cb.vencimento.slice(0, 7)))).padStart(2, '0')}`;
       if (venc === cb.vencimento) continue;
-      if (emitidoNoBanco(cb) || cb.editado_manual) {
-        registrar(d, usuario, 'Alteração', 'cobrancas', cb.id, `Boleto ${C.compBr(cb.competencia)} ${emitidoNoBanco(cb) ? 'emitido no banco' : 'alterado à mão'}: o vencimento continua ${C.dataBr(cb.vencimento)}; o termo aditivo não valeu e o dia volta a ${a.dia_anterior} (confira este boleto)`, null, { contrato_id: c.id, imovel_id: c.imovel_id });
+      if (cb.banco && cb.banco.situacao === 'pago') {
+        registrar(d, usuario, 'Alteração', 'cobrancas', cb.id, `Boleto ${C.compBr(cb.competencia)} já pago no banco: o vencimento continua ${C.dataBr(cb.vencimento)}; o termo aditivo não valeu e o dia volta a ${a.dia_anterior} (confira este boleto)`, null, { contrato_id: c.id, imovel_id: c.imovel_id });
         continue;
       }
-      atualizar(d, 'cobrancas', cb.id, { vencimento: venc }, usuario, `Boleto ${C.compBr(cb.competencia)}: vencimento ${C.dataBr(cb.vencimento)} → ${C.dataBr(venc)} (termo aditivo não valeu)`);
+      const noBanco = emitidoNoBanco(cb);
+      const marca = noBanco ? { reemitir_banco: { vencimento_banco: cb.banco.vencimento || cb.vencimento, vencimento: venc, motivo: `termo aditivo de troca do vencimento (dia ${a.dia_novo}) não valeu` } } : {};
+      atualizar(d, 'cobrancas', cb.id, { vencimento: venc, ...marca }, usuario, `Boleto ${C.compBr(cb.competencia)}${cb.editado_manual ? ' (alterado à mão: os valores ficam)' : ''}: vencimento ${C.dataBr(cb.vencimento)} → ${C.dataBr(venc)} (termo aditivo não valeu)${noBanco ? `; emitido no banco com vencimento ${C.dataBr(marca.reemitir_banco.vencimento_banco)}: cancele no banco e emita de novo` : ''}`);
+      if (noBanco) reemitir.push(`${C.compBr(cb.competencia)} (no banco vence ${C.dataBr(marca.reemitir_banco.vencimento_banco)}, agora ${C.dataBr(venc)})`);
       n += 1;
     }
-    return `O vencimento volta ao dia ${a.dia_anterior}${n ? ` (${n} boleto(s) em aberto ajustado(s))` : ''}.`;
+    return `O vencimento volta ao dia ${a.dia_anterior}${n ? ` (${n} boleto(s) em aberto ajustado(s))` : ''}.${reemitir.length ? ` Atenção: ${reemitir.length === 1 ? 'o boleto' : 'os boletos'} ${reemitir.join('; ')} ${reemitir.length === 1 ? 'já foi emitido' : 'já foram emitidos'} no banco: cancele no banco e emita de novo com o vencimento novo (o aviso fica na página do inquilino e no Painel até resolver).` : ''}`;
   }
   if (troca) {
     // o fim do vínculo gravado ao anexar o termo sai: o anterior volta a ser cobrado até um termo novo ser anexado (CON-02)
@@ -3964,6 +4018,7 @@ export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
     alertaRessarcimentoEmAcordo(d, contrato),
     alertaTermoAcordo(d, contrato),
     alertaNotificacoes(d, contrato, hoje),
+    alertaReemitirNoBanco(d, contrato),
   ].filter(Boolean);
 }
 
@@ -4005,6 +4060,22 @@ export function etapasDoAcordo(d, a) {
 }
 
 /** Acordo (não desfeito) ainda sem o termo assinado anexado: alerta até anexar. */
+/**
+ * Boleto emitido no banco cujo vencimento voltou no sistema (termo de troca do vencimento que não valeu, BOL-08): enquanto o
+ * banco continuar com o vencimento antigo, avisa para cancelar no banco e emitir de novo. Some sozinho quando o boleto é
+ * cancelado, emitido de novo, atualizado no banco ou pago. Ex.: "Boleto de 12/2026 de Maria Teste: emitido no banco com
+ * vencimento 20/12/2026. Cancele no banco e emita de novo com vencimento 10/12/2026".
+ */
+export const boletosParaReemitir = (d, c) => d.cobrancas.filter((cb) => cb.contrato_id === c.id && cb.reemitir_banco && !cb.data_pagamento
+  && cb.banco && cb.banco.situacao === 'emitido' && (cb.banco.vencimento || cb.reemitir_banco.vencimento_banco) === cb.reemitir_banco.vencimento_banco
+  && cb.reemitir_banco.vencimento_banco !== cb.vencimento);
+function alertaReemitirNoBanco(d, c) {
+  const l = boletosParaReemitir(d, c).sort((x, y) => String(x.vencimento).localeCompare(String(y.vencimento)));
+  if (!l.length) return null;
+  return { nivel: 'perigo', tipo: 'Banco', link: `#/cobranca/${l[0].id}`,
+    texto: `${l.map((cb) => `Boleto de ${C.compBr(cb.competencia)} de ${c.inquilino_nome}: emitido no banco com vencimento ${C.dataBr(cb.reemitir_banco.vencimento_banco)}. Cancele no banco e emita de novo com vencimento ${C.dataBr(cb.vencimento)}`).join('. ')} (${l[0].reemitir_banco.motivo || 'o vencimento mudou depois da emissão'}).` };
+}
+
 function alertaTermoAcordo(d, c) {
   const l = (d.acordos || []).filter((a) => a.contrato_id === c.id && !a.desfeito_em && !a.termo_assinado);
   if (!l.length) return null;
@@ -7707,7 +7778,7 @@ export const CARTA_COM_BOLETO_CORRIGIDO_DESDE = '2026-11';
 
 /**
  * Se a competência é a de um reajuste do contrato: { n, anos, competencia, corrigido, carta, comCarta, faltaCarta }.
- * Carta só nos reajustes do ano corrente (``comCarta``); os de anos anteriores pedem só a correção.
+ * Carta só nos reajustes do ano corrente ou cujo boleto ainda não venceu (``comCarta``); os anteriores pedem só a correção.
  * ``doContrato``: { correcoes, cartas } do contrato já separadas, quando vários anos são vistos de uma vez (``reajustesAbertos``).
  */
 export function reajusteNaCompetencia(d, c, comp, hoje = C.hojeIso(), doContrato = null) {
@@ -7724,7 +7795,10 @@ export function reajusteNaCompetencia(d, c, comp, hoje = C.hojeIso(), doContrato
     corrigido = corrigido || correcaoDoReajuste(d, a, comp);
     carta = carta || cartaDoReajuste(d, a, comp);
   }
-  const comCarta = comp.slice(0, 4) >= hoje.slice(0, 4);
+  // reajuste do fim do ano (decisão do dono de 2026-11-24, CON-06): a carta continua pedida até vencer o boleto que leva o
+  // reajuste. Ex.: reajuste de 12/2026, boleto que vence 10/01/2027 → a carta é pedida até 10/01/2027
+  const comCarta = comp.slice(0, 4) >= hoje.slice(0, 4)
+    || (comp >= C.somarMeses(C.competenciaDe(hoje), -3) && ((v) => !!v && !C.vencido(v, hoje))(vencimentoDoReajuste(d, c, comp)));
   return { n, anos: n, competencia: comp, corrigido, carta, comCarta, faltaCarta: comCarta && !carta && !(corrigido && corrigido.indice === 'Negociado') && (!corrigido || comp >= CARTA_COM_BOLETO_CORRIGIDO_DESDE) };
 }
 
