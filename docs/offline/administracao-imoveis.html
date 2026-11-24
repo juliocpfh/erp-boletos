@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-RNDcVwJnOim4q20MPdktvRqB8GQzlgS7TdL0BCwJkPY='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-7KL1iZ6HQF+rPb582370FI/poQUFDdHNMvlghajy+wg='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="a6f6417dc8c70e2c">
+<meta name="fontes" content="6b29598d42949cf7">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -2256,6 +2256,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     PRAZO_VISTORIA_ENTRADA: () => PRAZO_VISTORIA_ENTRADA,
     acumuladoDosMeses: () => acumuladoDosMeses,
     agoraBr: () => agoraBr,
+    ajusteNaNf: () => ajusteNaNf,
     aluguelProporcional: () => aluguelProporcional,
     aluguelVigente: () => aluguelVigente,
     aplicarCorrecao: () => aplicarCorrecao,
@@ -2653,8 +2654,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       valor_devido: pontual ? t.a_pagar_pontual : t.a_pagar_sem_desconto + multa + juros,
       // o ressarcimento só sai da NF quando a empresa decidiu assim (opção em Empresas); o ajuste do mês só entra quando
       // marcado no boleto (decisão do dono, 21/11/2026, mensal-009: ex.: TV vendida junto entra, vidro quebrado não)
-      valor_nf: valorNotaFiscal(cobranca.aluguel, cobranca.desconto, multa, juros, pontual) - (cobranca.ressarcimento_na_nf ? cobranca.ressarcimento || 0 : 0) + (cobranca.outros_na_nf ? cobranca.outros || 0 : 0)
+      valor_nf: valorNotaFiscal(cobranca.aluguel, cobranca.desconto, multa, juros, pontual) - (cobranca.ressarcimento_na_nf ? cobranca.ressarcimento || 0 : 0) + ajusteNaNf(cobranca)
     };
+  }
+  function ajusteNaNf(cobranca) {
+    if (!cobranca.outros_na_nf) return 0;
+    const fixos = [...cobranca.multas_notificacao || [], ...cobranca.diferencas_cobradas || []].reduce((s, e) => s + (e.valor || 0), 0);
+    return (cobranca.outros || 0) - fixos;
   }
   function dividir(total, percentuais) {
     const partes = percentuais.map((p2) => arred(total * p2 / 100));
@@ -7962,15 +7968,16 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       const i = buscar(d2, "imoveis", c.imovel_id);
       const motivo = c.data_saida && c.data_saida < `${cb.competencia}-01` ? `saída em ${dataBr(c.data_saida)}` : `entrada em ${dataBr(c.data_entrada)}`;
       const banco = emitidoNoBanco(cb);
+      const aMao = !banco && !!cb.boleto_pdf;
       lista3.push({
-        nivel: banco ? "perigo" : "aviso",
-        tipo: banco ? "Banco" : "A verificar",
+        nivel: banco || aMao ? "perigo" : "aviso",
+        tipo: banco || aMao ? "Banco" : "A verificar",
         contrato_id: c.id,
         imovel: i ? i.nome : "",
         inquilino: c.inquilino_nome,
         link: `#/cobranca/${cb.id}`,
         ancora: `boleto-${cb.id}`,
-        texto: banco ? `Boleto de ${compBr(cb.competencia)} está emitido no C6, mas não tem nenhum dia ocupado (${motivo}): cancele no banco e depois exclua o boleto.` : cb.editado_manual ? `Boleto de ${compBr(cb.competencia)} (alterado à mão) não tem nenhum dia ocupado (${motivo}): confira e exclua o boleto se não deve ser cobrado.` : `Boleto de ${compBr(cb.competencia)} não tem nenhum dia ocupado (${motivo}): exclua o boleto (ou recalcule os boletos em aberto do mês).`
+        texto: banco ? `Boleto de ${compBr(cb.competencia)} está emitido no C6, mas não tem nenhum dia ocupado (${motivo}): cancele no banco e depois exclua o boleto.` : aMao ? `Boleto de ${compBr(cb.competencia)} foi emitido à mão no banco (PDF anexado), mas não tem nenhum dia ocupado (${motivo}): cancele no banco e depois exclua o boleto.` : cb.editado_manual ? `Boleto de ${compBr(cb.competencia)} (alterado à mão) não tem nenhum dia ocupado (${motivo}): confira e exclua o boleto se não deve ser cobrado.` : `Boleto de ${compBr(cb.competencia)} não tem nenhum dia ocupado (${motivo}): exclua o boleto (ou recalcule os boletos em aberto do mês).`
       });
     }
     return lista3;
@@ -7984,7 +7991,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       const c = buscar(d2, "contratos", cb.contrato_id);
       if (c) contratos.set(c.id, c);
       if (boletoSemOcupacao(d2, cb, c)) {
-        if (!faturasDe(d2, "cobranca", cb.id, false).length && !emitidoNoBanco(cb)) {
+        if (!faturasDe(d2, "cobranca", cb.id, false).length && !emitidoNoBanco(cb) && !cb.boleto_pdf && !cb.editado_manual) {
           excluir(d2, "cobrancas", cb.id, usuario, `Boleto ${compBr(cb.competencia)} de ${c.inquilino_nome} excluído: nenhum dia ocupado no mês (${c.data_saida && c.data_saida < `${cb.competencia}-01` ? `saída em ${dataBr(c.data_saida)}` : `entrada em ${dataBr(c.data_entrada)}`})`);
           mudaram.add(cb.id);
         }
@@ -8203,7 +8210,15 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       ...cb && (cb.valor_a_mais || cb.valor_devolvido) ? { valor_a_mais: null, valor_devolvido: null } : {}
     }, usuario, "Pagamento desfeito");
     for (const m of (d2.movimentacoes_banco || []).filter((x) => x.cobranca_id === Number(cobrancaId))) {
-      atualizar(d2, "movimentacoes_banco", m.id, { cobranca_id: null, classificacao: null, imovel_id: null, classificada_em: null, classificada_por: null, ...m.pago_a_mais ? { pago_a_mais: false } : {} }, usuario, "Pagamento do boleto desfeito: movimentação volta a ficar sem destino");
+      atualizar(d2, "movimentacoes_banco", m.id, {
+        cobranca_id: null,
+        classificacao: null,
+        imovel_id: null,
+        classificada_em: null,
+        classificada_por: null,
+        ...m.comprovante || m.comprovante_contador || m.comprovante_origem || m.nome_arquivo ? { comprovante: null, comprovante_contador: null, comprovante_origem: null, nome_arquivo: null } : {},
+        ...m.pago_a_mais ? { pago_a_mais: false } : {}
+      }, usuario, "Pagamento do boleto desfeito: movimentação volta a ficar sem destino");
     }
   }
   function indiceFaturas(d2) {
@@ -8264,8 +8279,9 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       const acordo = ehParcelaAcordo(registro) && registro.acordo_periodo;
       const [ini, fim] = acordo || periodoServico(registro.competencia, contrato.data_entrada, contrato.data_saida);
       const ref = acordo ? `acordo${registro.acordo_parcela ? ` ${registro.acordo_parcela}` : ""} (${registro.acordo_referente})` : "";
-      const ajusteNaNf = !!(registro.outros_na_nf && registro.outros);
-      const proporcional = !acordo && !ajusteNaNf && registro.dias_cobrados > 0 && registro.dias_cobrados < registro.dias_mes;
+      const ajusteNf = ajusteNaNf(registro);
+      const ajusteNaNf2 = !!ajusteNf;
+      const proporcional = !acordo && !ajusteNaNf2 && registro.dias_cobrados > 0 && registro.dias_cobrados < registro.dias_mes;
       return {
         imovel,
         valor: registro.valor_nf,
@@ -8273,7 +8289,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         periodo_fim: fim,
         ...proporcional ? { dias: registro.dias_cobrados, dias_mes: registro.dias_mes } : {},
         descricao: `${contrato.inquilino_nome} · ${imovel.nome} · ${ref || compBr(registro.competencia)}`,
-        observacoes: registro.observacoes_nf || [ref ? `Parcela do ${ref}` : "", ajusteNaNf ? `Inclui ${registro.outros_descricao || "ajuste do mês"}: ${reais(registro.outros)}` : ""].filter(Boolean).join(". "),
+        observacoes: registro.observacoes_nf || [ref ? `Parcela do ${ref}` : "", ajusteNaNf2 ? `Inclui ${ajustesDoBoleto(registro).map((a) => a.motivo).filter(Boolean).join("; ") || "ajuste do mês"}: ${reais(ajusteNf)}` : ""].filter(Boolean).join(". "),
         tomador: {
           nome: contrato.inquilino_nome,
           documento: contrato.inquilino_cpf || "",
@@ -9264,13 +9280,21 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const quem = `${c ? c.inquilino_nome : "boleto"}: boleto de ${compBr(cb.competencia)}`;
     if (!arquivo) {
       if (!cb.boleto_pdf) throw new ErroUsuario("Este boleto não tem PDF anexado.");
-      return atualizar(d2, "cobrancas", cb.id, { boleto_pdf: null, boleto_pdf_contrato: null, boleto_pdf_valor: null, boleto_pdf_vencimento: null }, usuario, `${quem}, PDF do banco tirado (${cb.boleto_pdf})`);
+      return atualizar(d2, "cobrancas", cb.id, { boleto_pdf: null, boleto_pdf_contrato: null, boleto_pdf_valor: null, boleto_pdf_vencimento: null, boleto_pdf_pontual: null, boleto_pdf_multa: null, boleto_pdf_juros: null }, usuario, `${quem}, PDF do banco tirado (${cb.boleto_pdf})`);
     }
     return atualizar(
       d2,
       "cobrancas",
       cb.id,
-      { boleto_pdf: arquivo, boleto_pdf_contrato: cb.contrato_id, boleto_pdf_valor: totais(cb).a_pagar_sem_desconto, boleto_pdf_vencimento: cb.vencimento },
+      {
+        boleto_pdf: arquivo,
+        boleto_pdf_contrato: cb.contrato_id,
+        boleto_pdf_valor: totais(cb).a_pagar_sem_desconto,
+        boleto_pdf_vencimento: cb.vencimento,
+        boleto_pdf_pontual: totais(cb).a_pagar_pontual,
+        boleto_pdf_multa: cb.multa_percentual || 0,
+        boleto_pdf_juros: cb.juros_mensal_percentual || 0
+      },
       usuario,
       `${quem}, PDF do banco ${cb.boleto_pdf ? "trocado" : "anexado"} (${arquivo})`
     );
@@ -9281,6 +9305,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const valor = totais(cb).a_pagar_sem_desconto;
     if (valor !== cb.boleto_pdf_valor) dif.push(`o valor era ${reais(cb.boleto_pdf_valor)} e agora é ${reais(valor)}`);
     if (cb.boleto_pdf_vencimento && cb.boleto_pdf_vencimento !== cb.vencimento) dif.push(`o vencimento era ${dataBr(cb.boleto_pdf_vencimento)} e agora é ${dataBr(cb.vencimento)}`);
+    const pontual = totais(cb).a_pagar_pontual;
+    if (cb.boleto_pdf_pontual != null && valor === cb.boleto_pdf_valor && pontual !== cb.boleto_pdf_pontual) dif.push(`o valor até o vencimento era ${reais(cb.boleto_pdf_pontual)} e agora é ${reais(pontual)}`);
+    if (cb.boleto_pdf_multa != null && (cb.multa_percentual || 0) !== cb.boleto_pdf_multa) dif.push(`a multa era ${pct(cb.boleto_pdf_multa)} e agora é ${pct(cb.multa_percentual || 0)}`);
+    if (cb.boleto_pdf_juros != null && (cb.juros_mensal_percentual || 0) !== cb.boleto_pdf_juros) dif.push(`os juros eram ${pct(cb.boleto_pdf_juros)} ao mês e agora são ${pct(cb.juros_mensal_percentual || 0)}`);
     return dif.join("; ");
   }
   function registrarDepositoGarantia(d2, contratoId, qual, { data: data2, valor, arquivo }, usuario, hoje3 = hojeIso()) {
@@ -12656,7 +12684,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (!/^\d{4}-\d{2}-\d{2}$/.test(primeiro_vencimento || "") || primeiro_vencimento < hoje3) throw new Error("Informe o vencimento do primeiro boleto do acordo (hoje ou depois).");
     const original = lista3.reduce((s, cb) => s + totais(cb).a_pagar_sem_desconto, 0);
     const divida = lista3.reduce((s, cb) => s + liquidar(cb, hoje3).valor_devido, 0);
-    const foraDaNf = Math.min(total, lista3.reduce((s, cb) => s + totais(cb).a_pagar_sem_desconto - (cb.aluguel || 0) + (cb.ressarcimento_na_nf ? cb.ressarcimento || 0 : 0) - (cb.outros_na_nf ? cb.outros || 0 : 0), 0));
+    const foraDaNf = Math.min(total, lista3.reduce((s, cb) => s + totais(cb).a_pagar_sem_desconto - (cb.aluguel || 0) + (cb.ressarcimento_na_nf ? cb.ressarcimento || 0 : 0) - ajusteNaNf(cb), 0));
     if (total < n) throw new ErroUsuario(`Com ${n} parcelas, o total precisa ser de pelo menos ${reais(n)} (nenhuma parcela pode ficar com R$ 0,00).`);
     const valores = parcelas(total, n);
     const fora = parcelas(foraDaNf, n);
@@ -22389,7 +22417,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
     if (idExterno || nossoNumero) {
       const cb = abertos.find((x) => x.banco && (idExterno && x.banco.id_externo === idExterno || nossoNumero && x.banco.nosso_numero && String(x.banco.nosso_numero) === String(nossoNumero)));
       if (cb) {
-        const emDia = data2 > cb.vencimento && valor === totais(cb).a_pagar_pontual;
+        const emDia = data2 > cb.vencimento && data2 <= limitePagamento(cb.vencimento) && valor === totais(cb).a_pagar_pontual;
         const previsto = previstoNoPagamento(cb, data2, { pagouEmDia: emDia }).valor_devido;
         if (valor < previsto) return [];
         return [{ cobranca: cb, certeza: "exata", previsto, pagouEmDia: emDia }];
@@ -31186,13 +31214,13 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
   function formNfDivergente(cb, p2) {
     const r = previstoNoPagamento(cb, p2.data, p2);
     const dif = p2.valor - r.valor_devido;
-    const ress = (cb.ressarcimento_na_nf && cb.ressarcimento ? ` − ressarcimento ${reais(cb.ressarcimento)}` : "") + (cb.outros_na_nf && cb.outros ? ` + ajuste ${reais(cb.outros)}` : "");
+    const ress = (cb.ressarcimento_na_nf && cb.ressarcimento ? ` − ressarcimento ${reais(cb.ressarcimento)}` : "") + (ajusteNaNf(cb) ? ` ${ajusteNaNf(cb) > 0 ? "+" : "−"} ajuste ${reais(Math.abs(ajusteNaNf(cb)))}` : "");
     const conta = r.pontual ? `aluguel ${reais(cb.aluguel)} − desconto ${reais(cb.desconto)}${ress}` : `aluguel ${reais(cb.aluguel)} + multa ${reais(r.multa)} + juros ${reais(r.juros)}${ress} (${plural(r.dias_atraso, "dia")} de atraso, sem desconto)`;
     const aMais = dif > 0;
     return `<div class="alerta aviso"><b>Valor recebido diferente do previsto.</b> ${aMais ? `Pagou ${reais(dif)} a mais: confirmando com a NF no valor calculado, a diferença fica anotada como <b>a devolver ao inquilino</b>. Só altere a NF se o valor a mais fizer parte do aluguel.` : "Confira o cálculo e informe o valor da NF (cálculo manual)."} Nada foi salvo ainda.</div>
     <div class="grade">${item("Dinheiro entrou na conta em (data da NF)", dataBr(p2.data))}${item("Pagou em", dataBr(p2.pagouEmDia ? cb.vencimento : p2.dataPagou || p2.data))}
       ${item("Previsto", reais(r.valor_devido))}${item("Recebido", `<b>${reais(p2.valor)}</b>`)}${item("Diferença", `<b>${dif > 0 ? "+" : "−"}${reais(Math.abs(dif))}</b>`)}</div>
-    <p><b>Cálculo da NF:</b> ${conta} = <b>${reais(r.valor_nf)}</b>. IPTU, seguro, tarifa e FCI não entram${cb.outros_na_nf ? "" : ", nem o ajuste do mês"}.</p>
+    <p><b>Cálculo da NF:</b> ${conta} = <b>${reais(r.valor_nf)}</b>. IPTU, seguro, tarifa e FCI não entram${cb.outros_na_nf ? "" : ", nem o ajuste do mês"}${(cb.multas_notificacao || []).length || (cb.diferencas_cobradas || []).length ? " (a multa da notificação e a diferença antiga ficam sempre fora)" : ""}.</p>
     <form data-form="pagamentoNf" data-id="${cb.id}" class="formulario">
       <div class="largo"><label>Justificativa da divergência${aMais ? " (opcional se a NF ficar no valor calculado)" : ""}</label><textarea name="justificativa" rows="2">${esc(p2.justificativa)}</textarea><div class="ajuda">Fica só no sistema (histórico do boleto)</div></div>
       <div><label>Valor da NF</label><input name="valor_nf" inputmode="decimal" data-dinheiro value="${dinheiroTexto(r.valor_nf)}" data-calculado="${dinheiroTexto(r.valor_nf)}" class="valor-calculado">
@@ -31278,7 +31306,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     ${caucoes.length && opera() ? `<div class="alerta aviso"><b>Complemento da caução</b> (aluguel corrigido) ainda sem boleto: gere na tela Reajustes, em "Caução a completar" (boleto separado, sem tarifa e sem NF).
       ${caucoes.map((x) => `<div class="acoes" style="margin-top:6px">${esc(x.contrato.inquilino_nome)}: caução de ${reais(x.atual)} para ${reais(x.necessaria)}
         ${link(`#/reajustes?contrato=${x.contrato.id}`, `Completar ${reais(x.complemento)} em Reajustes`, "botao pequeno")}</div>`).join("")}</div>` : ""}
-    ${opera() && lista3.some((x) => !x.cb.data_pagamento) ? `<p class="acoes">${botao("recalcularMes", `Recalcular boletos em aberto de ${compBr(comp)} pelo cadastro`, { comp }, "secundario pequeno", "Recalcular os boletos em aberto deste mês com os valores atuais do cadastro? Boletos alterados à mão não mudam.")}</p>` : ""}
+    ${opera() && lista3.some((x) => !x.cb.data_pagamento) ? `<p class="acoes">${botao("recalcularMes", `Recalcular boletos em aberto de ${compBr(comp)} pelo cadastro`, { comp }, "secundario pequeno", "Recalcular os boletos em aberto deste mês com os valores atuais do cadastro? Nos boletos alterados à mão, os valores digitados ficam; o resto é recalculado.")}</p>` : ""}
     ${pend.length && opera() ? `<div class="alerta info">${plural(pend.length, "pagamento", "pagamentos")} de ${compBr(comp)} aguardando número de NF. ${link("#/faturas", "Numerar na tela NF", "botao pequeno")}</div>` : ""}
     ${opera() ? caixaBaixaLote(lista3, hoje3) : ""}
     ${lista3.length ? `<p class="acoes">${botoesMesC6(comp)}</p>` : ""}
@@ -31513,7 +31541,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     return `<div class="nao-imprimir"><p class="suave"><a href="${esc(volta ? volta.url : `#/cobrancas?comp=${cb.competencia}`)}">← ${esc(volta ? volta.titulo : `Boletos de ${compBr(cb.competencia)}`)}</a> · <a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a></p>
     <div class="cabecalho"><h1>Boleto ${ehComplementoCaucao(cb) ? "do complemento da caução" : ehSaldoSaida(cb) ? "do saldo da saída" : ehParcelaAcordo(cb) ? `do acordo ${esc(cb.acordo_parcela || "")}` : compBr(cb.competencia)} ${situacaoBoleto(cb, hojeIso())}</h1><div class="acoes">
       <button class="secundario" data-acao="imprimir">Imprimir demonstrativo</button>${botao("baixarPdfTela", "Baixar PDF", { seletor: ".demonstrativo", nome: nomeArquivoDoc(ehComplementoCaucao(cb) ? "Demonstrativo complemento caução" : "Demonstrativo boleto", c, cb.competencia) }, "secundario")}
-      ${opera() && !cb.data_pagamento && !emAcordo(cb) && !ehParcelaAcordo(cb) ? `${ehComplementoCaucao(cb) || ehSaldoSaida(cb) ? "" : link(`#/editar/cobrancas/${cb.id}`, "Alterar valores", "botao secundario")} ${botao("excluir", "Excluir", { tabela: "cobrancas", id: cb.id }, "perigo", irmas.length ? `Excluir este boleto? ${plural(irmas.length, "A outra parcela", "As outras parcelas")} do complemento da caução em aberto ${irmas.length === 1 ? "sai junto" : "saem juntas"} e o complemento volta a "Caução a completar" (tela Reajustes), para gerar de novo.` : "Excluir este boleto?")}` : ""}</div></div>
+      ${opera() && !cb.data_pagamento && !emAcordo(cb) && !ehParcelaAcordo(cb) ? `${ehComplementoCaucao(cb) || ehSaldoSaida(cb) ? "" : link(`#/editar/cobrancas/${cb.id}`, "Alterar valores", "botao secundario")} ${botao("excluir", "Excluir", { tabela: "cobrancas", id: cb.id }, "perigo", cb.boleto_pdf ? "Este boleto foi emitido à mão no banco (PDF anexado) e continua valendo lá: cancele no banco antes. Excluir o boleto do sistema (o PDF sai junto)?" : irmas.length ? `Excluir este boleto? ${plural(irmas.length, "A outra parcela", "As outras parcelas")} do complemento da caução em aberto ${irmas.length === 1 ? "sai junto" : "saem juntas"} e o complemento volta a "Caução a completar" (tela Reajustes), para gerar de novo.` : "Excluir este boleto?")}` : ""}</div></div>
     ${cb.editado_manual && !cb.data_pagamento ? `<div class="alerta ${divergenciasDoManual(d(), cb).length ? "aviso" : "info"}">${avisoDoManual(cb)} ${opera() ? botao("recalcularBoleto", "Voltar a calcular pelo cadastro", { id: cb.id }, "secundario pequeno", "Recalcular este boleto pelo cadastro? Os valores digitados à mão serão substituídos (o ajuste do mês fica).") : ""}</div>` : ""}</div>
     ${geraNf(c) ? "" : `<div class="alerta controle nao-imprimir"><b>Boleto de controle.</b> Este inquilino ${AVISO_CONTROLE}</div>`}
     ${caixaAcordo(cb)}
@@ -37343,11 +37371,13 @@ ${xref}
     const nomeConta2 = (id) => apelidoDaConta(d(), id);
     const sugestao = (m) => {
       try {
-        return sugerirDestino(d(), m, indiceDaTela(d()));
+        return sugestaoDe(m);
       } catch {
         return null;
       }
     };
+    const textoSugestao = (s) => !s ? "" : s.manual ? "pode ser o pagamento de um boleto: vincular manualmente" : !s.classificacao ? "" : s.semIdentificacao ? s.motivo || "sem identificação: vincular manualmente" : `parece: ${CLASSIFICACOES[s.classificacao] || s.classificacao}`;
+    const usaSugestao = (s) => !!(s && s.classificacao && !s.manual && !s.semIdentificacao && !s.soAviso);
     return `${topoFinanceiro("financeiro")}
     <div class="cabecalho"><h2>Movimento de ${compBr(mes)}</h2>
       <div class="acoes"><a class="botao secundario" href="#/financeiro?mes=${somarMeses(mes, -1)}">← ${compBr(somarMeses(mes, -1))}</a>
@@ -37364,7 +37394,7 @@ ${xref}
       const s = sugestao(m);
       return `<tr><td class="nw">${dataBr(m.data)}<br><span class="suave">${m.tipo === "entrada" ? "entrada" : "saída"}</span></td><td>${esc(nomeConta2(m.conta_id))}</td><td>${esc(m.titulo || "")} ${esc(m.descricao || "")}</td>
           <td class="n nw ${m.tipo === "saida" ? "texto-aviso" : ""}">${m.tipo === "saida" ? "- " : ""}${reais(m.valor)}</td>
-          <td>${s && s.classificacao ? `<span class="suave">parece: ${esc(CLASSIFICACOES[s.classificacao] || s.classificacao)}</span><br>` : ""}${opera() ? `${s && s.classificacao ? `${botao("usarSugestao", "Usar sugestão", { id: m.id })} ` : ""}${botao("darDestino", "Dar destino", { id: m.id })}` : ""}</td></tr>`;
+          <td>${textoSugestao(s) ? `<span class="${s.manual || s.semIdentificacao ? "texto-aviso" : "suave"}">${esc(textoSugestao(s))}</span><br>` : ""}${opera() ? `${usaSugestao(s) ? `${botao("usarSugestao", "Usar sugestão", { id: m.id })} ` : ""}${botao("darDestino", "Dar destino", { id: m.id })}` : ""}</td></tr>`;
     }).join("")}</table></div>` : `<p class="suave">${movs2.length ? "Todas as movimentações do mês têm destino. ✓" : `Nenhuma movimentação do banco em ${compBr(mes)} (busque o extrato na tela <a href="#/banco?mes=${mes}">Banco</a>).`}</p>`}
       <p class="suave">Cada destino lança no lugar certo: aluguel no boleto, Airbnb dividido entre os imóveis vagos, conta do imóvel nos custos, reforma no imóvel, IPTU na parcela, imposto na guia. Tudo aparece nos resultados. Extrato completo e comprovantes: <a href="#/banco?mes=${mes}">tela Banco</a>.</p></div>
     <div class="cartao"><div class="cabecalho"><h2>NF do Airbnb de ${compBr(mesAir)}</h2>${air.numerada ? etiqueta(`NF nº ${numeroFatura(air.numerada)}`, "ok") : air.nf ? etiqueta(air.divergente ? "soma mudou: gere de novo" : "aguardando número", air.divergente ? "aviso" : "info") : air.total ? etiqueta("a gerar", "aviso") : ""}</div>
@@ -39773,7 +39803,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
           await confirmarPagamentoBoleto(cb.id, f);
         },
         async estornar({ id }) {
-          await alterar((db) => estornarPagamento(db, Number(id), login()));
+          await alterarApagandoAnexos((db) => estornarPagamento(db, Number(id), login()));
           aviso("Pagamento desfeito.");
           await mostrar();
         },
@@ -41355,6 +41385,7 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
           memoria.pagamentoDivergente = null;
           const aMais = p2.valor > r.valor_devido && valorNf === r.valor_nf ? p2.valor - r.valor_devido : 0;
           aviso(aMais ? `Pagamento confirmado. Recebido ${reais(p2.valor)}; NF de ${reais(valorNf)}. Ficaram ${reais(aMais)} anotados para devolver ao inquilino. Data da NF: ${dataBr(p2.data)}.` : `Pagamento confirmado com valor diferente do previsto. Recebido ${reais(p2.valor)}; NF de ${reais(valorNf)} (calculada ${reais(r.valor_nf)}). Data da NF: ${dataBr(p2.data)}.`, "aviso");
+          await mostrar();
         },
         /** Pago a mais devolvido por fora do extrato (outra conta, dinheiro): anota a devolução no boleto (mensal-009). */
         async devolvidoAMao(form) {
