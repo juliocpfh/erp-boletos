@@ -139,3 +139,28 @@ test('"Desfazer pagamento" do boleto de Maria depois do "não valeu": o boleto d
     assert.deepEqual(doMes(d, '2026-12'), [['João Souza', joao]]);
   }
 });
+
+// Defeito 2 da PR #393, decisão do dono de 24/11/2026 (opção a): mês do novo titular em acordo e termo "não valeu" → o acordo dele
+// vale para o mês e o anterior não ganha boleto do mês (nem sozinho, nem por "Gerar boletos").
+for (const [entrada, total, joao] of [['2026-12-01', 180000, []], ['2026-12-15', 96000, [['João Souza', 84000]]]]) {
+  test(`troca em ${entrada.slice(8)}/12 com o mês de Maria em acordo e termo "não valeu": vale o acordo e João não é cobrado pelo mês`, () => {
+    const { d, c } = base();
+    const { n, ad } = troca(d, c, entrada);
+    R.gerarCobrancas(d, '2026-12', 'j');
+    const dela = d.cobrancas.find((x) => x.contrato_id === n.id && x.competencia === '2026-12');
+    const { parcelas } = R.fazerAcordo(d, { contrato_id: n.id, ids: [dela.id], total, parcelas: 2, primeiro_vencimento: '2027-02-10' }, 'j', '2027-01-20');
+    assert.equal(parcelas.reduce((s, p) => s + R.totais(p).a_pagar_sem_desconto, 0), total, 'acordo em 2 parcelas que somam o mês de Maria');
+    const msg = R.desfazerAditivo(d, ad.id, 'j', { excluirTermo: false });
+    assert.match(msg, /12\/2026: o boleto de Maria Lima está em acordo e o acordo vale para o mês; João Souza não é cobrado por ele/);
+    assert.ok(R.buscar(d, 'cobrancas', dela.id), 'o boleto em acordo fica');
+    assert.ok(parcelas.every((p) => R.buscar(d, 'cobrancas', p.id)), 'as parcelas do acordo ficam');
+    const deJoao = () => doMes(d, '2026-12').filter(([nome]) => nome === 'João Souza');
+    assert.deepEqual(deJoao(), joao);
+    R.gerarCobrancas(d, '2026-12', 'j');
+    R.recalcularCobrancas(d, () => true, 'j');
+    assert.deepEqual(deJoao(), joao, '"Gerar boletos" e o recálculo não cobram o mês de João');
+    assert.ok(R.mesCobertoPorAcordoDoNovo(d, R.buscar(d, 'contratos', c.id), '2026-12'));
+    assert.equal(R.mesCobertoPorAcordoDoNovo(d, R.buscar(d, 'contratos', c.id), '2027-01'), null, 'janeiro não está em acordo');
+    assert.ok(d.historico.some((h) => /em acordo: o termo da troca de titular não valeu, mas o acordo de Maria Lima vale para este mês/.test(h.descricao || '')));
+  });
+}

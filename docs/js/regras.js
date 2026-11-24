@@ -1739,7 +1739,26 @@ function seguroProporcionalNoMes(d, c, comp) {
   return (entradaNoMes && !c.contrato_anterior_id) || (saidaNoMes && !continuadoPor(d, c));
 }
 
+/**
+ * Termo da troca de titular que não valeu com o mês do novo titular em acordo (decisão do dono de 24/11/2026, opção (a)): o acordo
+ * do novo vale para aquele mês e o anterior não é cobrado por ele (só pelos dias até a véspera da troca, como se a troca valesse).
+ * Devolve o contrato do novo titular cujo acordo cobre ``comp`` (ou null). Ex.: troca de João para Maria em 01/12, Maria fez acordo
+ * de dezembro em 2 × R$ 900,00 e o termo "não valeu" → João sem boleto em dezembro; troca em 15/12 → João fica em 14/30 (R$ 840,00).
+ */
+export function mesCobertoPorAcordoDoNovo(d, c, comp) {
+  if (!c || !comp) return null;
+  for (const n of d.contratos) {
+    if (n.contrato_anterior_id !== c.id || !trocaAguardaAditivo(d, n)) continue;
+    const cb = boletoDoMes(d, n.id, comp);
+    if (cb && emAcordo(cb)) return n;
+  }
+  return null;
+}
+
 export function montarCobranca(d, contrato, comp) {
+  // mês coberto pelo acordo do novo titular (termo da troca que não valeu): o anterior paga só até a véspera da troca
+  const cobertoPor = !contrato.data_saida || contrato.data_saida >= `${comp}-01` ? mesCobertoPorAcordoDoNovo(d, contrato, comp) : null;
+  if (cobertoPor) contrato = { ...contrato, data_saida: C.somarDias(cobertoPor.data_entrada || cobertoPor.vigencia_inicio, -1) };
   const dias = C.diasOcupados(comp, contrato.data_entrada, contrato.data_saida);
   if (dias === 0 || trocaAguardaAditivo(d, contrato)) return null;
   const diasMes = C.diasNoMes(comp);
@@ -3949,8 +3968,10 @@ function tirarBoletosDoNovoTitular(d, n, a, usuario) {
   const anotar = (cb, texto) => registrar(d, usuario, 'Alteração', 'cobrancas', cb.id, texto, null, { contrato_id: n.id, imovel_id: n.imovel_id });
   for (const cb of doNovo) {
     if (emAcordo(cb)) {
+      // decisão do dono de 24/11/2026 (opção a): o acordo do novo vale para o mês; o anterior não é cobrado por ele
+      // (mesCobertoPorAcordoDoNovo, em montarCobranca e na lista de Boletos)
       acordos.push(C.compBr(cb.competencia));
-      anotar(cb, `Boleto ${C.compBr(cb.competencia)} de ${n.inquilino_nome} em acordo: fica como está, mas o termo da troca de titular não valeu (confira este boleto)`);
+      anotar(cb, `Boleto ${C.compBr(cb.competencia)} de ${n.inquilino_nome} em acordo: o termo da troca de titular não valeu, mas o acordo de ${n.inquilino_nome} vale para este mês; ${quem} não é cobrado por ele (só pelos dias até a véspera da troca)`);
       continue;
     }
     if (cb.data_pagamento) {
@@ -3987,7 +4008,7 @@ function tirarBoletosDoNovoTitular(d, n, a, usuario) {
     cobrarDoAnterior.length ? `${quem} volta a ser cobrado pelo mês cheio (${lista(cobrarDoAnterior.map(C.compBr))}).` : '',
     pagos.length ? `${n.inquilino_nome} já tinha pago ${lista(pagos.map((x) => `${C.compBr(x.cb.competencia)} (${C.reais(x.devolver)})`))}: o valor fica "a devolver" a ${n.inquilino_nome} (no boleto de ${n.inquilino_nome}, botão "Devolvi" depois de devolver). A NF desse pagamento saiu em nome de ${n.inquilino_nome}: confira com o contador.` : '',
     noBanco.length ? `Atenção: ${noBanco.length === 1 ? 'o boleto' : 'os boletos'} de ${n.inquilino_nome} ${lista(noBanco)} ${noBanco.length === 1 ? 'está emitido' : 'estão emitidos'} no banco: cancele no banco e depois exclua aqui, senão o mês fica cobrado dos dois.` : '',
-    acordos.length ? `Atenção: ${acordos.length === 1 ? 'o boleto' : 'os boletos'} de ${n.inquilino_nome} ${lista(acordos)} ${acordos.length === 1 ? 'está' : 'estão'} em acordo e ${acordos.length === 1 ? 'ficou' : 'ficaram'} como ${acordos.length === 1 ? 'estava' : 'estavam'}: confira.` : '',
+    acordos.length ? `${lista(acordos)}: o boleto de ${n.inquilino_nome} está em acordo e o acordo vale para o mês; ${quem} não é cobrado por ${acordos.length === 1 ? 'ele' : 'eles'} (só pelos dias até a véspera da troca).` : '',
   ].filter(Boolean).map((t) => ` ${t}`).join('');
 }
 
