@@ -48,7 +48,7 @@ export const DEFINICOES_REGRAS = [
       ['dias_reais', 'Pelos dias reais do mês', 'Entrada em 15/02/2027, aluguel R$ 2.000,00: 14 dias de 28 = R$ 1.000,00. Legal: não há lei sobre a conta.'],
     ],
     explica: 'Como se calcula o aluguel dos dias ocupados no mês de entrada e no de saída.',
-    consequencia: 'Vale para os boletos gerados ou recalculados daqui em diante; boleto pago, alterado à mão ou emitido no banco não muda. O IPTU e o FCI do mês continuam pelos dias reais.',
+    consequencia: 'Vale para os boletos gerados ou recalculados daqui em diante; boleto pago, alterado à mão ou emitido no banco não muda. O seguro do mês acompanha o aluguel (desde 24/11/2026); o IPTU e o FCI do mês continuam pelos dias reais.',
     lei: 'Sem lei específica: vale o combinado no contrato (' + LI + ', art. 17).' },
   { chave: 'ressarcimento_na_nf', grupo: 'aluguel', rotulo: 'Ressarcimento de condomínio sai do valor da NF', tipo: 'simnao', padrao: false,
     explica: 'Taxas do proprietário pagas pelo inquilino no condomínio (fundo de obras etc.) voltam para ele no boleto do aluguel. Não (padrão): a NF sai com o aluguel cheio e o ressarcimento conta como gasto do imóvel nos Resultados. Sim: a NF fica com o aluguel menos a taxa e ela não conta de novo como gasto. Ex.: aluguel R$ 1.215,00 e fundo de obras R$ 150,00 → NF de R$ 1.215,00 (não) ou de R$ 1.065,00 (sim).',

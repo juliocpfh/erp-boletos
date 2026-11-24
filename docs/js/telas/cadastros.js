@@ -206,6 +206,20 @@ export function contasDoImovel(i) {
   return { ...(String(i.gas_relogio || '').trim() ? {} : { conta_gas: nao }), ...(String(i.administradora_nome || '').trim() ? {} : { conta_condominio: nao }) };
 }
 
+/**
+ * Aviso dos créditos do inquilino no cálculo final e na devolução da garantia: os ressarcimentos do condomínio sem boleto onde
+ * abater (decisões do dono de 24/11/2026). Ex.: " Crédito do inquilino: R$ 50,00 (Fundo de obras, condomínio 11/2026): já vem em
+ * Créditos e soma ao valor devolvido." Na edição de uma devolução já feita, lembra os que ficaram de fora.
+ */
+function avisoCreditos(c, r) {
+  const cred = R.creditosDaSaida(d(), c);
+  const fora = r ? cred.itens.filter((x) => !(r.ressarcimentos_creditados || []).includes(x.ressarcimento.id)) : cred.itens;
+  if (!fora.length) return '';
+  const lista = fora.map((x) => `${reais(x.valor)} (${x.ressarcimento.descricao}, condomínio ${compBr(x.ressarcimento.competencia_condominio)})`).join('; ');
+  return r ? ` Crédito do inquilino ainda fora desta conta: ${lista}. Para somar, ponha o valor em "Créditos" e copie na descrição a linha: ${fora.map((x) => `"${x.texto}"`).join('; ')}.`
+    : ` Crédito do inquilino: ${lista}. É taxa do proprietário paga pelo inquilino no condomínio, sem boleto onde abater: já vem em "Créditos" e soma ao valor devolvido (mantenha a linha na descrição).`;
+}
+
 export const CADASTROS = {
   imoveis: {
     titulo: (r) => (r ? 'Editar imóvel' : 'Novo imóvel'),
@@ -238,10 +252,16 @@ export const CADASTROS = {
       if (r && dados.data_pagamento && r.data_pagamento && dados.data_pagamento !== r.data_pagamento
         && dados.competencia_abatimento === R.competenciaDoAbatimento(c, r.data_pagamento)) dados.competencia_abatimento = null;
       if (!dados.competencia_abatimento && dados.data_pagamento) dados.competencia_abatimento = R.competenciaDoAbatimento(c, dados.data_pagamento);
-      // mês sem boleto deste contrato (depois da saída ou da troca de titular): o ressarcimento não abateria em lugar nenhum
+      // mês antes da entrada: não abateria em lugar nenhum. Depois da saída ou da troca de titular (o boleto passou ao novo) vira
+      // crédito de quem pagou, no cálculo final ou na devolução da garantia (decisões do dono de 24/11/2026; ``conferirRessarcimento`` avisa)
       const sem = R.semBoletoNoMes(d(), c, dados.competencia_abatimento);
-      if (sem) {
-        erros.competencia_abatimento = `Não há onde abater: ${R.textoSemBoleto(sem, dados.competencia_abatimento)}. ${sem.motivo === 'troca' ? `Lance o ressarcimento no contrato de ${sem.novo.inquilino_nome}, ou escolha` : 'Escolha'} um boleto em aberto deste contrato${sem.motivo === 'saida' ? ' (ou devolva ao inquilino)' : ''}`;
+      if (sem && sem.motivo === 'entrada') {
+        erros.competencia_abatimento = `Não há onde abater: ${R.textoSemBoleto(sem, dados.competencia_abatimento)}. Escolha um boleto deste contrato`;
+      }
+      // crédito já acertado no cálculo final ou na devolução: o valor e o mês ficam como estão (o cálculo feito não muda sozinho)
+      if (r && R.ressarcimentosEmCredito(d(), c).some((x) => x.id === r.id) && R.situacaoDoCredito(d(), c, r) === 'incluido'
+        && (dados.valor !== r.valor || dados.competencia_abatimento !== r.competencia_abatimento)) {
+        erros.valor = `Este ressarcimento já entrou como crédito no ${R.acertoDoCredito(d(), c).tipo === 'saida' ? 'cálculo final da saída' : 'acerto da devolução da garantia'}: não dá para mudar o valor nem o mês. Lance a diferença como um novo ressarcimento`;
       }
       const cb = R.boletoDoMes(d(), c.id, dados.competencia_abatimento);
       if (cb && cb.data_pagamento && (!r || r.competencia_abatimento !== dados.competencia_abatimento)) {
@@ -843,20 +863,23 @@ export const CADASTROS = {
       if (t) return { data: C.hojeIso(), garantia_valor: t.valor_anterior };
       // débitos pelo valor do dia (vencido com multa e juros; acordo só pelas parcelas; sem o complemento da caução)
       const deb = R.debitosDaSaida(d(), c, C.hojeIso());
+      // ressarcimento do condomínio cujo boleto passou ao novo titular: fica com quem pagou (decisão do dono de 24/11/2026)
+      const cred = R.creditosDaSaida(d(), c);
       return { data: C.hojeIso(), garantia_valor: R.garantiaRecebida(d(), c), debitos: deb.total || null,
-        debitos_descricao: deb.itens.map((x) => x.texto).join('\n') };
+        debitos_descricao: deb.itens.map((x) => x.texto).join('\n'), creditos: cred.total || null, creditos_descricao: cred.itens.map((x) => x.texto).join('\n') };
     },
     aviso: (r, q) => {
       const c = buscar('contratos', r ? r.contrato_id : q.contrato);
       const n = R.continuadoPor(d(), c);
       const t = buscar('trocas_garantia', r ? r.troca_id : q.troca);
       if (t) return `Garantia trocada em ${dataBr(t.data)} (${t.tipo_anterior} → ${t.tipo_novo}): ${t.tipo_anterior === 'Caução' ? 'a caução' : 'o depósito'} de ${reais(t.valor_anterior)} é devolvid${t.tipo_anterior === 'Caução' ? 'a' : 'o'} a ${c.inquilino_nome}, corrigid${t.tipo_anterior === 'Caução' ? 'a' : 'o'} pela poupança (o índice vem do Banco Central, pelo aniversário de cada depósito: confira e corrija se precisar). Devolva pela conta em que foi aplicada.`;
-      return `${n ? n.inquilino_nome : 'O novo titular'} assumiu o contrato com garantia nova: a garantia de ${c.inquilino_nome} é devolvida a ${c.inquilino_nome}, corrigida pela poupança (o índice vem do Banco Central, pelo aniversário de cada depósito: confira e corrija se precisar), descontados os débitos até a véspera da troca. Devolva pela conta em que foi aplicada.`;
+      return `${n ? n.inquilino_nome : 'O novo titular'} assumiu o contrato com garantia nova: a garantia de ${c.inquilino_nome} é devolvida a ${c.inquilino_nome}, corrigida pela poupança (o índice vem do Banco Central, pelo aniversário de cada depósito: confira e corrija se precisar), descontados os débitos até a véspera da troca. Devolva pela conta em que foi aplicada.${avisoCreditos(c, r)}`;
     },
     voltar: (r, q) => `#/contrato/${r ? r.contrato_id : q.contrato}?ir=garantia`,
     descricao: (dados) => `Garantia devolvida: ${reais(dados.garantia_valor)}`,
     ajustar(dados, erros, r, form) {
-      for (const k of ['indice_percentual', 'debitos']) if (!dados[k]) dados[k] = 0;
+      for (const k of ['indice_percentual', 'debitos', 'creditos']) if (!dados[k]) dados[k] = 0;
+      if (dados.creditos < 0) erros.creditos = 'Informe um valor positivo (débito vai em "Débitos")';
       return conferirComprovantes(COMPROVANTE_DEVOLUCAO, dados, r, form);
     },
     ajustarAsync: (dados, erros, r, form, q) => guardarComprovantes(COMPROVANTE_DEVOLUCAO, dados, form, () => pastaDoEscopo('contrato', r ? r.contrato_id : Number(q.contrato))),
@@ -973,6 +996,7 @@ export const CADASTROS = {
     padrao: (q) => {
       const c = buscar('contratos', q.contrato);
       const deb = R.debitosDaSaida(d(), c, C.hojeIso());
+      const cred = R.creditosDaSaida(d(), c);
       const lt = R.leituraDo(d(), c.id, 'Saída do inquilino') || {};
       // B5: os reparos da vistoria de saída, com o valor de cada um (com FCI, o fundo paga os danos primeiro)
       const v = resultadoVistoriaSaida(d(), c);
@@ -984,6 +1008,8 @@ export const CADASTROS = {
         leitura_agua: lt.agua || '', leitura_energia: lt.energia || '', leitura_gas: lt.gas || '', garantia_valor: R.garantiaRecebida(d(), c),
         debitos: deb.total + (comFci ? 0 : v.totalReparos),
         debitos_descricao: [...deb.itens.map((x) => x.texto), ...reparos].join('\n'),
+        // ressarcimento do condomínio pago depois da saída: crédito no cálculo final (decisão do dono de 24/11/2026)
+        creditos: cred.total || null, creditos_descricao: cred.itens.map((x) => x.texto).join('\n'),
       };
     },
     aviso: (r, q) => {
@@ -998,7 +1024,7 @@ export const CADASTROS = {
       const multa = m ? ` Saída antes do fim do contrato (${dataBr(m.fim)}): multa sugerida de ${reais(m.valor)} (3 aluguéis de ${reais(m.aluguel)}, proporcional aos ${m.restam} de ${m.total} dias que faltavam; confira a cláusula no contrato assinado). Ela não entra sozinha: para cobrar, some aos débitos e escreva "Multa pela saída antecipada" na descrição; para dispensar (ex.: transferência pelo empregador, Lei 8.245/91, art. 4º), deixe de fora e anote o motivo na descrição.` : '';
       const compSaida = c.data_saida ? C.competenciaDe(c.data_saida) : null;
       const semBoleto = compSaida && !R.boletoDoMes(d(), c.id, compSaida) ? ` Atenção: o boleto de ${compBr(compSaida)} (último mês, proporcional) ainda não foi gerado: gere antes, senão o aluguel desse mês fica fora dos débitos.` : '';
-      return `Saída em ${dataBr(c.data_saida)} (mude em "Saída do inquilino").${multa}${semBoleto}${semDeposito} ${vistoria} A leitura dos relógios é a da vistoria de saída: vem preenchida e, se mudar aqui, muda lá também. Confira o boleto do último mês (proporcional aos dias). A garantia é corrigida pela poupança: o índice vem do Banco Central, pelo aniversário de cada depósito (confira e corrija se precisar).`;
+      return `Saída em ${dataBr(c.data_saida)} (mude em "Saída do inquilino").${multa}${semBoleto}${semDeposito}${avisoCreditos(c, r)} ${vistoria} A leitura dos relógios é a da vistoria de saída: vem preenchida e, se mudar aqui, muda lá também. Confira o boleto do último mês (proporcional aos dias). A garantia é corrigida pela poupança: o índice vem do Banco Central, pelo aniversário de cada depósito (confira e corrija se precisar).`;
     },
     // os débitos vêm dos boletos que já existem: sem o boleto do mês da saída, o último aluguel ficava fora do cálculo
     // (ex.: saída em 20/10/2026 e o boleto de 10/2026 ainda não gerado → débitos R$ 0,00 e a caução devolvida inteira)
@@ -1013,7 +1039,8 @@ export const CADASTROS = {
     ajustar(dados, erros, r, form, q) {
       const c = buscar('contratos', q.contrato);
       if (!c.data_saida) throw new C.ErroUsuario('Informe antes a data de saída, em "Saída do inquilino".');
-      for (const k of ['garantia_valor', 'indice_percentual', 'debitos', 'fci_credito', 'fci_danos']) if (!dados[k]) dados[k] = 0;
+      for (const k of ['garantia_valor', 'indice_percentual', 'debitos', 'fci_credito', 'fci_danos', 'creditos']) if (!dados[k]) dados[k] = 0;
+      if (dados.creditos < 0) erros.creditos = 'Informe um valor positivo (débito vai em "Débitos")';
       for (const k of R.relogiosObrigatorios(c)) if (!dados[`leitura_${k}`]) erros[`leitura_${k}`] = 'Informe a leitura na saída';
       dados.vistoria_saida = resultadoVistoriaSaida(d(), c).texto;
     },

@@ -299,8 +299,13 @@ const TABELAS_EXCLUSAO = {
     },
   },
   ressarcimentos: {
-    checar: (db, r) => ((R.boletoDoMes(db, r.contrato_id, r.competencia_abatimento) || {}).data_pagamento
-      ? 'Este ressarcimento já foi abatido num boleto pago. Desfaça o pagamento antes.' : null),
+    checar: (db, r) => {
+      if ((R.boletoDoMes(db, r.contrato_id, r.competencia_abatimento) || {}).data_pagamento) return 'Este ressarcimento já foi abatido num boleto pago. Desfaça o pagamento antes.';
+      // crédito já acertado no cálculo final ou na devolução da garantia (24/11/2026): sai de lá antes
+      const c = R.buscar(db, 'contratos', r.contrato_id);
+      return c && R.ressarcimentosEmCredito(db, c).some((x) => x.id === r.id) && R.situacaoDoCredito(db, c, r) === 'incluido'
+        ? `Este ressarcimento já entrou como crédito no ${R.acertoDoCredito(db, c).tipo === 'saida' ? 'cálculo final da saída' : 'acerto da devolução da garantia'}: desfaça ou edite aquele cálculo antes.` : null;
+    },
     depois: (db, r) => R.aplicarRessarcimentos(db, R.buscar(db, 'contratos', r.contrato_id), r.competencia_abatimento, login()),
     voltar: (r) => `#/contrato/${r.contrato_id}?ir=ressarcimentos`,
   },

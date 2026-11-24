@@ -296,9 +296,20 @@ export function linhasDoAcerto(enc, { quitacao = false } = {}) {
   if (danosAlem > 0) tabela.push(['(-) Reparos além do FCI', C.reais(danosAlem)]);
   tabela.push([quitacao ? '(-) Débitos descontados' : '(-) Débitos', C.reais(enc.debitos || 0)]);
   for (const l of String(enc.debitos_descricao || '').split(/\n+/).map((x) => x.trim()).filter(Boolean)) tabela.push([`   ${l}`, '']);
+  linhasDosCreditos(enc, tabela);
   const saldo = quitacao ? (enc.saldo >= 0 ? '= Saldo devolvido ao locatário' : '= Saldo pago pelo locatário') : `= Saldo ${enc.saldo >= 0 ? 'a devolver' : 'a pagar'}`;
   tabela.push([saldo, C.reais(Math.abs(enc.saldo || 0))]);
   return tabela;
+}
+
+/**
+ * Créditos do locatário no acerto (ressarcimento do condomínio sem boleto onde abater, decisões do dono de 24/11/2026): somam ao
+ * saldo. Ex.: "(+) Créditos do locatário R$ 50,00" e, abaixo, "Ressarcimento do condomínio: Fundo de obras (…): R$ 50,00".
+ */
+function linhasDosCreditos(x, tabela) {
+  if (!(x.creditos > 0)) return;
+  tabela.push(['(+) Créditos do locatário', C.reais(x.creditos)]);
+  for (const l of String(x.creditos_descricao || '').split(/\n+/).map((y) => y.trim()).filter(Boolean)) tabela.push([`   ${l}`, '']);
 }
 
 /**
@@ -329,12 +340,13 @@ function reciboDevolucaoGarantia(d, c, dev, base, { empresa, e, quem, endereco, 
     tabela.push(['(-) Débitos descontados', C.reais(dev.debitos)]);
     for (const l of String(dev.debitos_descricao || '').split(/\n+/).map((x) => x.trim()).filter(Boolean)) tabela.push([`   ${l}`, '']);
   }
+  linhasDosCreditos(dev, tabela);
   tabela.push(['= Valor devolvido', C.reais(dev.saldo)]);
   return {
     ...base, titulo: `RECIBO DE DEVOLUÇÃO ${caucao ? 'DA CAUÇÃO' : 'DO DEPÓSITO DE GARANTIA'}`, data: dev.data || base.data,
     paragrafos: [
       `Recebi de ${empresa}${e.cnpj ? `, CNPJ ${e.cnpj}` : ''}, em ${C.dataBr(dev.data)}, a importância de ${K.valorComExtenso(dev.saldo)}, referente à devolução da ${nome} do contrato de locação do imóvel situado na ${endereco}, ${motivo}, conforme o comprovante bancário anexo.`,
-      `${caucao ? 'O valor foi corrigido pelos rendimentos da caderneta de poupança, que são do locatário (Lei 8.245/91, artigo 38, § 2º)' : 'O valor foi corrigido'}${dev.debitos > 0 ? ', e descontados apenas os débitos discriminados abaixo:' : ', sem débitos a descontar:'}`,
+      `${caucao ? 'O valor foi corrigido pelos rendimentos da caderneta de poupança, que são do locatário (Lei 8.245/91, artigo 38, § 2º)' : 'O valor foi corrigido'}${dev.debitos > 0 ? `, e descontados apenas os débitos${dev.creditos > 0 ? ' e somados os créditos' : ''} discriminados abaixo:` : dev.creditos > 0 ? ', sem débitos a descontar, e somados os créditos discriminados abaixo:' : ', sem débitos a descontar:'}`,
     ],
     tabela,
     depois: [

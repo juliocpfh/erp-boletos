@@ -555,6 +555,9 @@ export const DEVOLUCAO_GARANTIA = [
   campo('indice_percentual', 'Correção da garantia: índice da poupança no período (%)', 'pct', { autoMsg: true, ajuda: 'Vem do Banco Central, pelo aniversário de cada depósito (confira com o extrato da poupança). Em branco: sem correção' }),
   campo('debitos', 'Débitos do inquilino a descontar', 'dinheiro', { ajuda: 'Aluguéis e encargos até a véspera da troca em aberto, reparos etc.' }),
   campo('debitos_descricao', 'Descrição dos débitos', 'area'),
+  // créditos do inquilino (decisões do dono de 24/11/2026): ressarcimento do condomínio sem boleto onde abater
+  campo('creditos', 'Créditos do inquilino a devolver', 'dinheiro', { ajuda: 'Taxas do proprietário que o inquilino pagou no condomínio e não têm boleto onde abater (pagas depois da saída, ou cujo boleto passou ao novo titular). Somam ao valor devolvido' }),
+  campo('creditos_descricao', 'Descrição dos créditos', 'area'),
   comprovante('comprovante', 'Comprovante da devolução', { ajuda: `PDF ou foto da transferência. ${SEM_COMPROVANTE}` }),
   campo('observacoes', 'Observações', 'area'),
 ];
@@ -581,6 +584,9 @@ export const ENCERRAMENTO = [
   campo('indice_percentual', 'Correção da garantia: índice da poupança no período (%)', 'pct', { autoMsg: true, ajuda: 'Vem do Banco Central, pelo aniversário de cada depósito (confira com o extrato da poupança)' }),
   campo('debitos', 'Débitos do inquilino a descontar', 'dinheiro', { ajuda: 'Aluguéis e encargos em aberto, reparos da vistoria etc.' }),
   campo('debitos_descricao', 'Descrição dos débitos', 'area'),
+  // créditos do inquilino (decisões do dono de 24/11/2026): ressarcimento do condomínio sem boleto onde abater
+  campo('creditos', 'Créditos do inquilino a devolver', 'dinheiro', { ajuda: 'Taxas do proprietário que o inquilino pagou no condomínio e não têm boleto onde abater (pagas depois da saída, ou cujo boleto passou ao novo titular). Somam ao valor devolvido' }),
+  campo('creditos_descricao', 'Descrição dos créditos', 'area'),
   campo('fci_credito', 'FCI corrigido: crédito do inquilino', 'dinheiro', { ajuda: 'Vem do saldo corrigido do FCI (use "Calcular atualização" na página do inquilino antes)' }),
   campo('fci_danos', 'Reparos de danos pagos com o FCI', 'dinheiro', { ajuda: 'Só danos apurados na vistoria de saída (nunca aluguel ou contas). O que passar do FCI vira débito; o que sobrar do FCI volta ao inquilino' }),
   campo('observacoes', 'Observações', 'area', { ajuda: 'Se o inquilino contestar a vistoria de saída, anote aqui' }),
