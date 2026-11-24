@@ -195,7 +195,7 @@ export const CAMPOS_GARANTIA_HERDADA = ['garantia_tipo', 'caucao_meses', 'caucao
 
 /** Valores e boleto e reserva que vêm iguais do contrato anterior na troca de titular (travados no formulário). */
 export const CAMPOS_VALORES_HERDADOS = ['aluguel_inicial', 'aluguel_bonificado', 'desconto_pontualidade_percentual', 'bonificacao', 'dia_vencimento', 'cobranca_mes_seguinte',
-  'taxa_boleto', 'fci_percentual', 'fci_indice', 'multa_percentual', 'juros_mensal_percentual', 'reserva_valor', 'reserva_data', 'reserva_competencia', 'comprovante_reserva'];
+  'taxa_boleto', 'nao_cobrar_tarifa', 'fci_percentual', 'fci_indice', 'multa_percentual', 'juros_mensal_percentual', 'reserva_valor', 'reserva_data', 'reserva_competencia', 'comprovante_reserva'];
 
 /** Trava campos do formulário (só leitura, em cinza); ``valores`` (já no formato da tela) troca o que estiver escrito. */
 function travarCampos(form, nomes, valores = {}) {

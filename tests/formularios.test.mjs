@@ -69,7 +69,7 @@ test('valores do contrato: aluguel, vencimento, bonificado e %, as duas caixas j
   const ini = F.CONTRATO.findIndex((c) => c.secao === 'Valores e boleto');
   const fim = F.CONTRATO.findIndex((c, k) => k > ini && c.secao);
   const ordem = F.CONTRATO.slice(ini + 1, fim).map((c) => c.nome || (c.quebra ? '|' : ''));
-  assert.deepEqual(ordem, ['aluguel_inicial', 'dia_vencimento', 'aluguel_bonificado', 'desconto_pontualidade_percentual', 'cobranca_mes_seguinte', 'bonificacao', '|', 'taxa_boleto', 'multa_percentual', 'juros_mensal_percentual']);
+  assert.deepEqual(ordem, ['aluguel_inicial', 'dia_vencimento', 'aluguel_bonificado', 'desconto_pontualidade_percentual', 'cobranca_mes_seguinte', 'bonificacao', '|', 'taxa_boleto', 'multa_percentual', 'juros_mensal_percentual', 'nao_cobrar_tarifa']);
   const html = F.camposHtml(F.CONTRATO.slice(ini + 1, fim), {});
   assert.match(html, /name="cobranca_mes_seguinte"[^]*?<div class="[^"]*colado[^"]*"[^>]*><label class="check"><input type="checkbox" name="bonificacao"[^]*?<\/div><\/div><div class="quebra">/, 'bonificação dentro da mesma célula');
 });

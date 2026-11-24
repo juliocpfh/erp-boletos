@@ -13,6 +13,9 @@ const UNIDADES = ['zero', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'set
 const DEZENAS = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
 const CENTENAS = ['', 'cento', 'duzentos', 'trezentos', 'quatrocentos', 'quinhentos', 'seiscentos', 'setecentos', 'oitocentos', 'novecentos'];
 
+/** Tarifa do boleto do contrato para o texto do contrato (a mesma conta de ``R.tarifaDoContrato``: próprio, senão a regra `tarifa_padrao`). */
+const tarifaDoTexto = (c) => (c.nao_cobrar_tarifa ? 0 : c.taxa_boleto > 0 ? c.taxa_boleto : Math.max(0, regra('tarifa_padrao', c) || 0));
+
 function ate999(n) {
   if (n === 100) return 'cem';
   const c = Math.floor(n / 100);
@@ -349,7 +352,7 @@ export function dadosDoContrato(d, c, extra = {}) {
     multa: percentualComExtenso(c.multa_percentual ?? 2),
     juros: percentualComExtenso(c.juros_mensal_percentual ?? 1),
     // tarifa do boleto (cláusula de volta em 24/11/2026; tirada em 2026-10-20): o valor de hoje, do cadastro do contrato
-    tarifa_boleto: c.taxa_boleto > 0 ? valorComExtenso(c.taxa_boleto) : '',
+    tarifa_boleto: tarifaDoTexto(c) > 0 ? valorComExtenso(tarifaDoTexto(c)) : '',
     fci_percentual: percentualComExtenso(c.fci_percentual || 0),
     fci_indice: textoIndice(c.fci_indice),
     encargos_inquilino: lista([...inquilinoPaga, 'telefone', 'dedetização', 'limpeza de calhas']),
@@ -372,7 +375,7 @@ export function dadosDoContrato(d, c, extra = {}) {
     solidario: !!c.solidario_nome, pj, residencial: c.finalidade !== 'Não residencial', nao_residencial: c.finalidade === 'Não residencial',
     bonificacao: pctBonif > 0, iptu_inquilino: inquilinoPaga.includes('IPTU'), seguro_inquilino: inquilinoPaga.includes('seguro incêndio'),
     seguro_incluso: inclusos.includes('seguro incêndio'),
-    tem_incluso: inclusos.length > 0, tarifa_boleto: c.taxa_boleto > 0, fci: c.fci_percentual > 0, area_comum: !!imovel.area_comum, imovel_fiador: !!campos.fiadores_imoveis,
+    tem_incluso: inclusos.length > 0, tarifa_boleto: tarifaDoTexto(c) > 0, fci: c.fci_percentual > 0, area_comum: !!imovel.area_comum, imovel_fiador: !!campos.fiadores_imoveis,
     varios_fiadores: fiadores.length > 1, varias_locadoras: locadoras.length > 1,
     indeterminado: c.prazo_tipo === 'Indeterminado',
     // residencial com menos de 30 meses: depois do prazo, a retomada só nos casos do art. 47 (sem "a qualquer tempo")
