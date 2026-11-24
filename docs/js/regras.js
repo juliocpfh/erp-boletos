@@ -3849,10 +3849,48 @@ export function desfazerAditivo(d, id, usuario, { excluirTermo = false } = {}) {
   }
   if (troca) {
     // o fim do vínculo gravado ao anexar o termo sai: o anterior volta a ser cobrado até um termo novo ser anexado (CON-02)
-    if (!aditivoDaTroca(d, c)) soltarSaidaDoAnterior(d, c, usuario, 'o termo da troca de titular não valeu');
-    return `Sem o termo assinado, a troca de titular volta a esperar por ele: ${contratoHerdado(d, c) ? contratoHerdado(d, c).inquilino_nome : 'o titular anterior'} continua no contrato.`;
+    const anterior = contratoHerdado(d, c);
+    if (aditivoDaTroca(d, c)) return `Sem este termo, a troca de titular continua valendo pelo outro termo assinado: ${c.inquilino_nome} continua no contrato.`;
+    soltarSaidaDoAnterior(d, c, usuario, 'o termo da troca de titular não valeu');
+    const boletos = tirarBoletosDoNovoTitular(d, c, anterior, usuario);
+    return `Sem o termo assinado, a troca de titular volta a esperar por ele: ${anterior ? anterior.inquilino_nome : 'o titular anterior'} continua no contrato.${boletos}`;
   }
   return '';
+}
+
+/**
+ * Termo da troca de titular que não valeu: o boleto do novo titular só existe depois do termo assinado (decisão do dono de
+ * 24/11/2026). Os do novo ainda não pagos nem emitidos no banco saem; no mês deles o anterior volta a ser cobrado pelo mês cheio
+ * (o boleto dele é recalculado em ``soltarSaidaDoAnterior`` ou gerado aqui, se o mês já tinha boleto só do novo). Pago, emitido
+ * no banco ou em acordo: fica, anotado no Histórico, e o texto devolvido avisa (o mês pode estar cobrado dos dois).
+ * Ex.: troca em 15/12, boletos de dezembro gerados (anterior 14/30, novo 16/30 = R$ 960,00) e termo apagado → o do novo sai e o
+ * do anterior volta a R$ 1.800,00. Troca em 01/12 → o boleto de dezembro do novo sai e o anterior ganha o de dezembro, cheio.
+ */
+function tirarBoletosDoNovoTitular(d, n, a, usuario) {
+  const doNovo = d.cobrancas.filter((cb) => cb.contrato_id === n.id && !ehBoletoAvulso(cb)).sort((x, y) => x.competencia.localeCompare(y.competencia));
+  if (!doNovo.length) return '';
+  const tirados = [];
+  const ficam = [];
+  for (const cb of doNovo) {
+    const motivo = cb.data_pagamento ? `pago em ${C.dataBr(cb.data_pagamento)}` : emitidoNoBanco(cb) ? 'emitido no banco' : emAcordo(cb) ? 'em acordo' : '';
+    if (motivo) {
+      ficam.push(`${C.compBr(cb.competencia)} (${motivo})`);
+      registrar(d, usuario, 'Alteração', 'cobrancas', cb.id, `Boleto ${C.compBr(cb.competencia)} de ${n.inquilino_nome} ${motivo}: fica, mas o termo da troca de titular não valeu e ${a ? a.inquilino_nome : 'o titular anterior'} volta a ser cobrado neste mês (confira este boleto)`, null, { contrato_id: n.id, imovel_id: n.imovel_id });
+      continue;
+    }
+    excluir(d, 'cobrancas', cb.id, usuario, `Boleto ${C.compBr(cb.competencia)} de ${n.inquilino_nome} excluído: o termo da troca de titular não valeu (o boleto do novo titular só existe com o termo assinado)`);
+    tirados.push(cb.competencia);
+  }
+  if (a) {
+    // mês que só tinha o boleto do novo (troca no dia 1º): o anterior passa a ter o dele, como teria se o termo não existisse
+    for (const comp of tirados) {
+      if (boletoDoMes(d, a.id, comp) || a.ativo === false || !a.imovel_id) continue;
+      const dados = montarCobranca(d, a, comp);
+      if (dados) inserir(d, 'cobrancas', dados, usuario, `Boleto ${C.compBr(comp)} gerado para ${a.inquilino_nome} (o termo da troca de titular não valeu)`);
+    }
+    if (tirados.length) { aplicarDiferencasPendentes(d, a.id, usuario); sincronizarMultas(d, a.id, usuario); realocarReserva(d, a, usuario); }
+  }
+  return `${tirados.length ? ` ${tirados.length === 1 ? 'O boleto' : 'Os boletos'} de ${n.inquilino_nome} (${tirados.map(C.compBr).join(', ')}) ${tirados.length === 1 ? 'saiu' : 'saíram'} e ${a ? a.inquilino_nome : 'o titular anterior'} volta a ser cobrado pelo mês cheio.` : ''}${ficam.length ? ` Atenção: ${ficam.length === 1 ? 'o boleto' : 'os boletos'} de ${n.inquilino_nome} ${ficam.join(', ')} ${ficam.length === 1 ? 'ficou' : 'ficaram'}: confira, porque o mês pode estar cobrado dos dois.` : ''}`;
 }
 
 /** Termo aditivo assinado: apaga só o arquivo; o termo volta a "aguardando assinatura". */

@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-JJRxhs2A76j0+Fr8oiNxahUaaxbAsE7kZAvVrkRG8YQ='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-jdkFih6VisicKnSJOp+Kvexf30jgtlB/ivc0cES/3LA='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="180961afe887a7ac">
+<meta name="fontes" content="89f9f644d08709cc">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -9518,10 +9518,42 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       return `O vencimento volta ao dia ${a.dia_anterior}${n ? ` (${n} boleto(s) em aberto ajustado(s))` : ""}.`;
     }
     if (troca) {
-      if (!aditivoDaTroca(d2, c)) soltarSaidaDoAnterior(d2, c, usuario, "o termo da troca de titular não valeu");
-      return `Sem o termo assinado, a troca de titular volta a esperar por ele: ${contratoHerdado(d2, c) ? contratoHerdado(d2, c).inquilino_nome : "o titular anterior"} continua no contrato.`;
+      const anterior = contratoHerdado(d2, c);
+      if (aditivoDaTroca(d2, c)) return `Sem este termo, a troca de titular continua valendo pelo outro termo assinado: ${c.inquilino_nome} continua no contrato.`;
+      soltarSaidaDoAnterior(d2, c, usuario, "o termo da troca de titular não valeu");
+      const boletos = tirarBoletosDoNovoTitular(d2, c, anterior, usuario);
+      return `Sem o termo assinado, a troca de titular volta a esperar por ele: ${anterior ? anterior.inquilino_nome : "o titular anterior"} continua no contrato.${boletos}`;
     }
     return "";
+  }
+  function tirarBoletosDoNovoTitular(d2, n, a, usuario) {
+    const doNovo = d2.cobrancas.filter((cb) => cb.contrato_id === n.id && !ehBoletoAvulso(cb)).sort((x, y) => x.competencia.localeCompare(y.competencia));
+    if (!doNovo.length) return "";
+    const tirados = [];
+    const ficam = [];
+    for (const cb of doNovo) {
+      const motivo = cb.data_pagamento ? `pago em ${dataBr(cb.data_pagamento)}` : emitidoNoBanco(cb) ? "emitido no banco" : emAcordo(cb) ? "em acordo" : "";
+      if (motivo) {
+        ficam.push(`${compBr(cb.competencia)} (${motivo})`);
+        registrar(d2, usuario, "Alteração", "cobrancas", cb.id, `Boleto ${compBr(cb.competencia)} de ${n.inquilino_nome} ${motivo}: fica, mas o termo da troca de titular não valeu e ${a ? a.inquilino_nome : "o titular anterior"} volta a ser cobrado neste mês (confira este boleto)`, null, { contrato_id: n.id, imovel_id: n.imovel_id });
+        continue;
+      }
+      excluir(d2, "cobrancas", cb.id, usuario, `Boleto ${compBr(cb.competencia)} de ${n.inquilino_nome} excluído: o termo da troca de titular não valeu (o boleto do novo titular só existe com o termo assinado)`);
+      tirados.push(cb.competencia);
+    }
+    if (a) {
+      for (const comp of tirados) {
+        if (boletoDoMes(d2, a.id, comp) || a.ativo === false || !a.imovel_id) continue;
+        const dados = montarCobranca(d2, a, comp);
+        if (dados) inserir(d2, "cobrancas", dados, usuario, `Boleto ${compBr(comp)} gerado para ${a.inquilino_nome} (o termo da troca de titular não valeu)`);
+      }
+      if (tirados.length) {
+        aplicarDiferencasPendentes(d2, a.id, usuario);
+        sincronizarMultas(d2, a.id, usuario);
+        realocarReserva(d2, a, usuario);
+      }
+    }
+    return `${tirados.length ? ` ${tirados.length === 1 ? "O boleto" : "Os boletos"} de ${n.inquilino_nome} (${tirados.map(compBr).join(", ")}) ${tirados.length === 1 ? "saiu" : "saíram"} e ${a ? a.inquilino_nome : "o titular anterior"} volta a ser cobrado pelo mês cheio.` : ""}${ficam.length ? ` Atenção: ${ficam.length === 1 ? "o boleto" : "os boletos"} de ${n.inquilino_nome} ${ficam.join(", ")} ${ficam.length === 1 ? "ficou" : "ficaram"}: confira, porque o mês pode estar cobrado dos dois.` : ""}`;
   }
   function removerArquivoAditivo(d2, id, usuario) {
     const a = buscar(d2, "aditivos", id);
