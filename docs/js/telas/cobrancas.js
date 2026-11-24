@@ -179,7 +179,8 @@ export function telaCobrancas(comp, ordemPedida = 'vencimento', filtroPedido = '
   // espera o termo assinado não gera boleto de propósito e tem aviso próprio
   const semBoleto = d().contratos.filter((c) => c.ativo !== false && c.imovel_id && C.diasOcupados(comp, c.data_entrada, c.data_saida) > 0 && !doMes.some((x) => x.c.id === c.id && !R.ehBoletoAvulso(x.cb)));
   const aguardaTermo = semBoleto.filter((c) => R.trocaAguardaAditivo(d(), c));
-  // termo da troca que não valeu com o mês do novo em acordo (decisão do dono de 24/11/2026): o acordo cobre o mês do anterior
+  // termo da troca que não valeu com um acordo do novo que não foi cancelado sozinho (tem boletos de fora da troca): até a equipe
+  // decidir, o acordo cobre o mês do anterior (sem "Gerar boletos" cobrando o mês dos dois)
   const cobertos = semBoleto.filter((c) => !R.trocaAguardaAditivo(d(), c)).map((c) => [c, R.mesCobertoPorAcordoDoNovo(d(), c, comp)]).filter(([, n]) => n);
   const faltando = semBoleto.filter((c) => !R.trocaAguardaAditivo(d(), c) && !cobertos.some(([x]) => x === c));
   const caucoes = R.complementosCaucaoPendentes(d(), comp);
@@ -200,7 +201,7 @@ export function telaCobrancas(comp, ordemPedida = 'vencimento', filtroPedido = '
     <p class="suave">O mês de referência é o mês do aluguel (o boleto do aluguel de novembro vence em dezembro). Ao receber, clique em "Confirmar pagamento" na linha e informe a data. Depois, numere as NFs: a numeração segue a ordem das datas de pagamento.</p>
     ${filtros}
     ${reajustes.size ? `<div class="alerta aviso"><b>Reajuste</b> ${reajustes.size} inquilino(s) têm o aluguel de ${compBr(comp)} corrigido: envie a carta de reajuste junto com o boleto deste mês (botão "Gerar carta" na linha).${semCorrecao ? ` <b>${semCorrecao} ainda sem a correção aplicada</b>: informe o índice e aplique a correção (os boletos em aberto são recalculados).` : ''} ${link('#/reajustes', 'Ver reajustes')}</div>` : ''}
-    ${cobertos.length ? `<div class="alerta info">${cobertos.map(([c, n]) => `${esc(c.inquilino_nome)}: sem boleto em ${compBr(comp)}. O termo da troca para ${esc(n.inquilino_nome)} não valeu, mas o acordo de ${esc(n.inquilino_nome)} cobre este mês.`).join(' ')}</div>` : ''}
+    ${cobertos.length ? `<div class="alerta info">${cobertos.map(([c, n]) => `${esc(c.inquilino_nome)}: sem boleto em ${compBr(comp)}. O termo da troca para ${esc(n.inquilino_nome)} não valeu, mas o acordo de ${esc(n.inquilino_nome)} (que também tem boletos de fora da troca) cobre este mês: desfaça o acordo para cobrar ${esc(c.inquilino_nome)}.`).join(' ')}</div>` : ''}
     ${faltando.length && opera() ? `<div class="alerta aviso">${C.plural(faltando.length, 'contrato', 'contratos')} ainda sem boleto neste mês: ${faltando.map((c) => esc(c.inquilino_nome)).join(', ')}. ${botao('gerarCobrancas', `Gerar boletos de ${compBr(comp)}`, { comp }, 'pequeno')}</div>` : ''}
     ${aguardaTermo.length && opera() ? `<div class="alerta aviso">${aguardaTermo.map((c) => `${link(`#/contrato/${c.id}?ir=aditivos`, esc(c.inquilino_nome))}: falta anexar o termo da troca de titular assinado para gerar o boleto (até lá, o contrato é de ${esc((R.contratoHerdado(d(), c) || {}).inquilino_nome || 'quem sai')}).`).join('<br>')}</div>` : ''}
     ${caucoes.length && opera() ? `<div class="alerta aviso"><b>Complemento da caução</b> (aluguel corrigido) ainda sem boleto: gere na tela Reajustes, em "Caução a completar" (boleto separado, sem tarifa e sem NF).
