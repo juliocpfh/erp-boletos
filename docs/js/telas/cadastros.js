@@ -247,6 +247,8 @@ export const CADASTROS = {
     ajustar(dados, erros, r, form, q) {
       const c = buscar('contratos', r ? r.contrato_id : q.contrato);
       if (dados.valor !== null && dados.valor <= 0) erros.valor = 'Informe o valor';
+      // mês que não existe (ex.: 13/2026, digitado onde o navegador não tem o seletor de mês): sem boleto, virava crédito
+      for (const k of ['competencia_condominio', 'competencia_abatimento']) if (dados[k] && !C.competenciaValida(dados[k], '')) erros[k] = 'Informe um mês válido (ex.: 12/2026)';
       // data do pagamento mudada na edição e o mês do abatimento era o calculado pela data antiga: acompanha a data nova
       // (conferência de 24/11/2026). Ex.: pago em 05/11 (boleto de 11/2026) corrigido para 05/12 → boleto de 12/2026
       if (r && dados.data_pagamento && r.data_pagamento && dados.data_pagamento !== r.data_pagamento

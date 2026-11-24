@@ -7109,10 +7109,6 @@ export function aplicarRessarcimentos(d, contrato, comp, usuario) {
 }
 
 /**
- * Ressarcimento marcado para um boleto que está em acordo e não foi abatido nele: pede para escolher outro mês.
- * Ex.: boleto de 10/2026 em acordo e ressarcimento de R$ 50,00 lançado depois para 10/2026 → aviso para passar ao próximo boleto em aberto.
- */
-/**
  * Depois da saída ou da troca de titular (o boleto do mês passou ao novo), o ressarcimento é crédito de quem pagou, no cálculo
  * final ou na devolução da garantia (decisões do dono de 24/11/2026; antes era só um aviso): avisa só o que ficou sem acertar
  * (cálculo feito sem o crédito, ou troca sem garantia em dinheiro a devolver). Com o cálculo por fazer, ele já vem preenchido.
@@ -7120,10 +7116,10 @@ export function aplicarRessarcimentos(d, contrato, comp, usuario) {
 export function alertaCreditoRessarcimento(d, c) {
   for (const r of ressarcimentosEmCredito(d, c)) {
     const sit = situacaoDoCredito(d, c, r);
-    const onde = acertoDoCredito(d, c).tipo === 'saida' ? 'cálculo final da saída' : 'devolução da garantia (troca de titular)';
+    const saida = acertoDoCredito(d, c).tipo === 'saida';
     if (sit === 'fora') {
       return { nivel: 'aviso', tipo: 'Condomínio', ancora: 'ressarcimentos',
-        texto: `Ressarcimento de ${C.reais(r.valor)} (${r.descricao}) é crédito de ${c.inquilino_nome}, mas a ${onde} foi feita sem ele. ${onde.startsWith('cálculo') ? 'Desfaça e refaça o cálculo final' : 'Edite a devolução da garantia e some o crédito'}, ou devolva o valor à parte.` };
+        texto: `Ressarcimento de ${C.reais(r.valor)} (${r.descricao}) é crédito de ${c.inquilino_nome}, mas ${saida ? 'o cálculo final da saída foi feito' : 'a devolução da garantia (troca de titular) foi feita'} sem ele. ${saida ? 'Desfaça e refaça o cálculo final' : 'Edite a devolução da garantia e some o crédito'}, ou devolva o valor à parte.` };
     }
     if (sit === 'a_parte') {
       return { nivel: 'aviso', tipo: 'Condomínio', ancora: 'ressarcimentos',
@@ -7133,6 +7129,10 @@ export function alertaCreditoRessarcimento(d, c) {
   return null;
 }
 
+/**
+ * Ressarcimento marcado para um boleto que está em acordo e não foi abatido nele: pede para escolher outro mês.
+ * Ex.: boleto de 10/2026 em acordo e ressarcimento de R$ 50,00 lançado depois para 10/2026 → aviso para passar ao próximo boleto em aberto.
+ */
 export function alertaRessarcimentoEmAcordo(d, c) {
   const credito = alertaCreditoRessarcimento(d, c);
   if (credito) return credito;

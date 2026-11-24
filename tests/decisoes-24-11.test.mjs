@@ -118,8 +118,8 @@ test('2. cálculo final feito antes do ressarcimento: avisa que o crédito ficou
   R.encerrarContrato(d, c.id, { data_saida: '2026-11-20', leitura_agua: '100', leitura_energia: '200', garantia_valor: 0, indice_percentual: 0, debitos: 0, fci_credito: 0, fci_danos: 0 }, 'j', '2026-11-25');
   const r = lancar(d, c, { data_pagamento: '2026-12-05' });
   assert.equal(R.situacaoDoCredito(d, c, r), 'fora');
-  assert.match(R.alertaCreditoRessarcimento(d, c).texto, /cálculo final da saída foi feita sem ele. Desfaça e refaça o cálculo final/);
-  assert.ok(R.alertasDoInquilino(d, c, '2026-12-10').some((a) => /foi feita sem ele/.test(a.texto)));
+  assert.match(R.alertaCreditoRessarcimento(d, c).texto, /o cálculo final da saída foi feito sem ele. Desfaça e refaça o cálculo final/);
+  assert.ok(R.alertasDoInquilino(d, c, '2026-12-10').some((a) => /foi feit[oa] sem ele/.test(a.texto)));
 });
 
 // ------------------------------------------------------------------ 4. seguro proporcional

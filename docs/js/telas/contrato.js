@@ -466,7 +466,6 @@ function linhaIncluso(c) {
 }
 
 /** Histórico de solicitações do inquilino (pequenos reparos e pedidos). */
-/** Taxas do proprietário pagas pelo inquilino no condomínio: o que já foi ressarcido e o botão para lançar. */
 /**
  * Etiqueta do ressarcimento sem boleto deste contrato no mês: depois da saída ou da troca de titular é crédito de quem pagou
  * (decisões do dono de 24/11/2026), no cálculo final ou na devolução da garantia.
@@ -482,6 +481,7 @@ function etiquetaSemBoleto(c, x) {
     : sit === 'fora' ? etiqueta(`crédito fora ${saida ? 'do cálculo final' : 'da devolução da garantia'}: acerte`, 'aviso') : etiqueta('crédito: devolver à parte', 'aviso');
 }
 
+/** Taxas do proprietário pagas pelo inquilino no condomínio: o que já foi ressarcido e o botão para lançar. */
 function caixaRessarcimentos(c) {
   const lista = R.ressarcimentosDo(d(), c.id);
   if (!R.inquilinoPagaCondominio(c) && !lista.length) return '';
