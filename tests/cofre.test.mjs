@@ -439,3 +439,52 @@ test('usuários: o e-mail de acesso (ou o login) de um não pode ser o de outro 
   assert.equal(c.aplicar(lote([{ op: 'alterar', tabela: 'usuarios', id: 4, campos: { email: { antes: undefined, depois: 'livre@exemplo.com.br' } } }]), DONO).ok, true);
   assert.equal(c.aplicar(lote([{ op: 'inserir', tabela: 'usuarios', id: 9, dados: { id: 9, login: 'maria', email: 'maria@exemplo.com.br', papel: 'operador', ativo: true } }]), DONO).ok, true);
 });
+
+// 24/11: dois aparelhos com versões diferentes do site atualizam sozinhos o mesmo modelo de contrato (normalizar,
+// ATUALIZACOES_MODELO); sem edição à mão não é conflito e fica o texto mais novo. Conflito só com edição à mão dos dois lados.
+test('modelo de contrato atualizado sozinho por versões diferentes do site não vira conflito; fica o mais novo', async () => {
+  const { ATUALIZACOES_MODELO: U, atualizarTextoModelo } = await import('../docs/js/modelos-contrato.js');
+  const [tarifaAntiga, tarifaNova] = U.at(-3); const [fimAntigo, fimNovo] = U.at(-1);
+  const T0 = `**CLÁUSULA 1** – Texto de exemplo.\n\n${tarifaAntiga}\n\n${fimAntigo}`;
+  const velho = T0.split(tarifaAntiga).join(tarifaNova); // versão anterior do site: ainda sem a última troca
+  const novo = atualizarTextoModelo(T0); // versão de hoje: as duas trocas
+  assert.notEqual(velho, novo); assert.ok(novo.includes(fimNovo) && velho.includes(fimAntigo));
+  const comModelo = () => { const c = novoCofre(); c.importar({ ...bancoExemplo(), modelos_contrato: [{ id: 1, nome: 'Residencial', texto: T0 }] }, DONO); return c; };
+  const texto = (c) => c.tudo().modelos_contrato.find((m) => m.id === 1).texto;
+  const mudar = (c, antes, depois, quem = DONO, aparelho = 'pc') => c.aplicar(lote([{ op: 'alterar', tabela: 'modelos_contrato', id: 1, campos: { texto: { antes, depois } } }], aparelho), quem);
+
+  // o aparelho velho grava primeiro, o novo depois (o caso de 24/11): fica o novo, sem conflito
+  let c = comModelo();
+  assert.deepEqual(mudar(c, T0, velho, DONO, 'celular').conflitos, []);
+  assert.deepEqual(mudar(c, T0, novo, SOCIO).conflitos, []);
+  assert.equal(texto(c), novo);
+  assert.equal(c.conflitosAbertos().length, 0);
+
+  // o novo grava primeiro e o velho depois: o mais novo continua
+  c = comModelo();
+  mudar(c, T0, novo, SOCIO);
+  assert.deepEqual(mudar(c, T0, velho, DONO, 'celular').conflitos, []);
+  assert.equal(texto(c), novo);
+
+  // edição à mão num aparelho e atualização sozinha no outro: fica a edição, com as atualizações de hoje
+  c = comModelo();
+  const editado = T0.replace('Texto de exemplo.', 'Texto de exemplo, alterado pelo dono.');
+  mudar(c, T0, editado, DONO, 'celular');
+  assert.deepEqual(mudar(c, T0, novo, SOCIO).conflitos, []);
+  assert.ok(texto(c).includes('alterado pelo dono') && texto(c).includes(fimNovo) && texto(c).includes(tarifaNova));
+  c = comModelo();
+  mudar(c, T0, velho, SOCIO);
+  assert.deepEqual(mudar(c, T0, editado, DONO, 'celular').conflitos, [], 'a nuvem só tinha a atualização sozinha');
+  assert.ok(texto(c).includes('alterado pelo dono') && texto(c).includes(fimNovo));
+
+  // edição à mão nos dois aparelhos: continua sendo conflito (fica o já gravado até o administrador escolher)
+  c = comModelo();
+  mudar(c, T0, editado, DONO, 'celular');
+  const outra = T0.replace('Texto de exemplo.', 'Texto de exemplo, outra versão.');
+  assert.equal(mudar(c, T0, outra, SOCIO).conflitos.length, 1);
+  assert.equal(texto(c), editado);
+  // com o conflito aberto, a atualização sozinha de outro aparelho não vira mais uma proposta
+  assert.deepEqual(mudar(c, T0, novo, DONO, 'tablet').conflitos, []);
+  assert.equal(c.conflitosAbertos().length, 1);
+  assert.equal(texto(c), editado);
+});

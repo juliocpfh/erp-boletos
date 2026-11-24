@@ -650,3 +650,35 @@ export function atualizarTextoModelo(texto) {
   for (const [antigo, novo, feito] of ATUALIZACOES_MODELO) if (t.includes(antigo) && !t.includes(feito || novo)) t = t.split(antigo).join(novo);
   return t;
 }
+
+/**
+ * Texto de um modelo gravado depois de todas as atualizações automáticas (os mesmos passos e na mesma ordem que normalizar()
+ * fazia, um a um, até 24/11; nenhum foi tirado). `m` = { tipo, texto }. O texto editado à mão fica como está.
+ * Também na nuvem (nuvem/cofre.mjs): dois aparelhos com versões diferentes do site atualizam o mesmo modelo sozinhos e,
+ * sem ninguém ter editado, isso não é conflito (24/11).
+ */
+export function textoAtualizadoDoModelo(m) {
+  let texto = m?.texto;
+  if (!texto || typeof texto !== 'string') return texto;
+  const tipo = m.tipo;
+  const trocar = (t) => { const novo = atualizarTextoModelo(t); return novo !== t.replace(/\r\n/g, '\n') ? novo : t; };
+  // cláusulas do FCI (só saem com o FCI ativado) entram nos modelos de contrato já gravados, antes da renovação
+  if (!tipo && !texto.includes('[se fci]') && texto.includes('## RENOVAÇÃO DO CONTRATO')) {
+    texto = texto.replace('## RENOVAÇÃO DO CONTRATO', `${CLAUSULAS_FCI}\n\n## RENOVAÇÃO DO CONTRATO`);
+  }
+  // revisão jurídica de 2026-11-12 e seguintes: troca só o texto antigo que continua igual
+  if (!tipo) texto = trocar(texto);
+  // termo de troca de inquilino: a garantia nova (a de quem sai é devolvida); o texto da garantia que continua fica no [senão]
+  if (tipo === 'aditivo_troca' && !texto.includes('[se garantia_nova]')) {
+    const t = texto.replace(/\r\n/g, '\n');
+    const ini = t.indexOf('## DA GARANTIA\n');
+    const fim = t.indexOf('\n\n## ', ini + 1);
+    if (ini >= 0 && fim >= 0) {
+      const corpo = ini + '## DA GARANTIA\n'.length;
+      texto = `${t.slice(0, corpo)}\n[se garantia_nova]${GARANTIA_NOVA_TROCA}[senão]${t.slice(corpo, fim).trim()}[fim]${t.slice(fim)}`;
+    }
+  }
+  // termo de troca de inquilino (2026-11-13): contas de consumo trocadas pela empresa
+  if (tipo === 'aditivo_troca') texto = trocar(texto);
+  return texto;
+}
