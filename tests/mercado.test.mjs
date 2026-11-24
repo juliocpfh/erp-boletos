@@ -11,19 +11,20 @@ import { resumosGerados, textosGerados } from './mercado-fixo.mjs';
 
 /** Resumo de cada texto gerado pelo cenário ANK/JCK com o código de ANTES da mudança (2026-11-16). */
 const ANTES = {
-  'contrato:Residencial:Maria Souza': '83cb26abd78667d9',
-  'contrato:Não residencial (comercial):Maria Souza': '9703a3201ecf0346',
+  'contrato:Residencial:Maria Souza': 'cacdf38c56495cfa', // 24/11: + resumo em perguntas e respostas (#374) + tarifa do boleto (#376): só esses trechos mudam
+  'contrato:Não residencial (comercial):Maria Souza': 'b47c975a0d744f63', // 24/11: + resumo em perguntas e respostas (#374) + tarifa do boleto (#376): só esses trechos mudam
   'locadoras:Maria Souza': 'c85480966d9c7b25',
   'representacao:Maria Souza': '264e192c61a07b4d',
   'cidade:Maria Souza': '377621052857a5ab',
-  'contrato:Residencial:João Teste': '00f1c530414bb1c5',
-  'contrato:Não residencial (comercial):João Teste': 'e948a11aa950da86',
+  'contrato:Residencial:João Teste': 'ace9c1b6ecb39cdc', // 24/11: + resumo em perguntas e respostas (#374) + tarifa do boleto (#376): só esses trechos mudam
+  'contrato:Não residencial (comercial):João Teste': 'a3bb7aeb5b05bd23', // 24/11: + resumo em perguntas e respostas (#374) + tarifa do boleto (#376): só esses trechos mudam
   'locadoras:João Teste': 'c85480966d9c7b25',
   'representacao:João Teste': '661b724dffaa2bb9',
   'cidade:João Teste': '377621052857a5ab',
   'email:ficha_envio': '16fae713ae62ca56',
   'email:ficha_aprovada': '911d169532402033', // mutirão 19/11 (lote E): sem "[preencher: valor_deposito]" na ficha
-  'email:ficha_reprovada': '2ec4bc83fa516ae8',
+  'email:ficha_reprovada': '3bd5488e99758edc', // 2026-11-24: devolução em 5 dias úteis (antes 24 horas úteis)
+  'email:ficha_termo_reserva': '26fb26c7150256f5', // 2026-11-24: termo de aceite da reserva (novo)
   'email:ficha_devolucao': 'dede29cb5e188ee0',
   'email:contrato_assinar': 'c82dc0dcc10b4fe2',
   'email:contrato_assinado': '65654954ba3d9470', // mutirão 19/11 (lote E): "falta o depósito" sem a caução registrada
@@ -41,6 +42,7 @@ const ANTES = {
   'recibo:reserva:João Teste': '5816468f00fd38ad',
   'recibo:devolucao_chaves:João Teste': '354c41db31cdeb74',
   'recibo:ficha:ficha': 'c1fb1b26d3b7215f',
+  'recibo:termo_reserva:ficha': '3f9a3f0623886a01', // 2026-11-24 (novo)
   lembrete: '8efce35480e4a45e',
   conta_emissora: '30804615d55e104f',
 };

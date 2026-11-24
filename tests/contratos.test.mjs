@@ -16,7 +16,7 @@ function base(extra = {}) {
     descricao_objeto: 'a casa nº 3', ...extra }, 'j');
   return { d, c };
 }
-const texto = (blocos) => blocos.map((b) => (b.runs ? b.runs.map((r) => r.t).join('') : b.url ? `[link ${b.url}]` : b.linhas ? '[tabela]' : `[${b.pessoas.map((p) => p.papel).join(', ')}]`)).join('\n');
+const texto = (blocos) => blocos.map((b) => (b.runs ? b.runs.map((r) => r.t).join('') : b.tipo === 'nova_pagina' ? '[nova página]' : b.url ? `[link ${b.url}]` : b.linhas ? '[tabela]' : `[${b.pessoas.map((p) => p.papel).join(', ')}]`)).join('\n');
 
 test('valores, números e datas por extenso', () => {
   assert.equal(K.valorComExtenso(350000), 'R$ 3.500,00 (três mil e quinhentos reais)');
@@ -165,11 +165,13 @@ test('marca-d\'água: fundo repetido na tela e logo fixa para a impressão', () 
   assert.match(K.contratoHtml([{ tipo: 'par', runs: [{ t: 'x' }] }], { logo: 'data:image/png;base64,AAAA', rodape: [] }), /ct-marcas/);
 });
 
-test('caução pelas condições do contrato (sem valor gravado nem data) e sem tarifa de cobrança', () => {
+test('caução pelas condições do contrato (sem valor gravado nem data) e tarifa do boleto com o valor do contrato (de volta em 24/11)', () => {
   const { d, c } = base({ caucao_valor: null, taxa_boleto: 350 });
   const t = texto(K.montarContrato(K.modelosDe(d).find((m) => m.nome === 'Residencial').texto, K.dadosDoContrato(d, c, { data: '2026-09-01' })));
   assert.match(t, /o valor de R\$ 9\.450,00 \(nove mil quatrocentos e cinquenta reais\), equivalente a 3 \(três\) meses de aluguel/, '3 × R$ 3.150,00 bonificado');
-  assert.doesNotMatch(t, /tarifa de cobrança/);
+  assert.match(t, /O LOCATÁRIO reembolsará, junto com cada aluguel, a tarifa bancária de emissão do boleto, hoje de R\$ 3,50 \(três reais e cinquenta centavos\), pelo valor cobrado pelo banco\./);
+  const sem = texto(K.montarContrato(K.modelosDe(d).find((m) => m.nome === 'Residencial').texto, K.dadosDoContrato(d, { ...c, taxa_boleto: 0 })));
+  assert.match(sem, /reembolsará, junto com cada aluguel, a tarifa bancária de emissão do boleto, pelo valor cobrado pelo banco\./, 'sem valor no cadastro: a cláusula fica, sem o valor');
   const x = R.completarCaucao({ garantia_tipo: 'Caução', caucao_meses: 3, aluguel_inicial: 200000, desconto_pontualidade_percentual: 10, vigencia_inicio: '2026-11-01' });
   assert.equal(x.caucao_valor, 540000);
   assert.equal(x.caucao_data, '2026-11-01', 'data prevista = data do contrato');

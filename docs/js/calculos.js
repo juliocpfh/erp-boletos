@@ -509,8 +509,20 @@ export function liquidar(cobranca, pagamento) {
     // o ressarcimento só sai da NF quando a empresa decidiu assim (opção em Empresas); o ajuste do mês só entra quando
     // marcado no boleto (decisão do dono, 21/11/2026, mensal-009: ex.: TV vendida junto entra, vidro quebrado não)
     valor_nf: valorNotaFiscal(cobranca.aluguel, cobranca.desconto, multa, juros, pontual) - (cobranca.ressarcimento_na_nf ? cobranca.ressarcimento || 0 : 0)
-      + (cobranca.outros_na_nf ? cobranca.outros || 0 : 0),
+      + ajusteNaNf(cobranca),
   };
+}
+
+/**
+ * Parte do ``outros`` do boleto que entra na NF quando "O ajuste entra na NF" está marcado: só os ajustes do mês. A multa de
+ * notificação (``multas_notificacao``, decisão de 17/11/2026) e a diferença de pagamento antigo presa ao boleto
+ * (``diferencas_cobradas``) somam em ``outros``, mas ficam sempre fora da NF. Ex.: ajuste + R$ 100,00 (TV vendida junto) e multa
+ * de R$ 1.500,00 → outros R$ 1.600,00, na NF só R$ 100,00.
+ */
+export function ajusteNaNf(cobranca) {
+  if (!cobranca.outros_na_nf) return 0;
+  const fixos = [...(cobranca.multas_notificacao || []), ...(cobranca.diferencas_cobradas || [])].reduce((s, e) => s + (e.valor || 0), 0);
+  return (cobranca.outros || 0) - fixos;
 }
 
 /** Divide um valor pelos percentuais; a sobra de centavos fica com a última parte. */

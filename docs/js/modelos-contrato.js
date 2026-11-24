@@ -69,6 +69,14 @@ Os signatários que contratam nas qualidades indicadas neste contrato têm entre
 const PRAZO_ANTIGO = "**Parágrafo único** – Findo o prazo acima, se o LOCATÁRIO continuar na posse do imóvel sem que seja assinado novo contrato, a locação passará a vigorar por prazo indeterminado, podendo {l:a LOCADORA|as LOCADORAS} rescindi-la a qualquer tempo, mediante notificação por escrito ao LOCATÁRIO, que ficará obrigado a desocupar o imóvel no prazo de 30 (trinta) dias, a contar do recebimento da notificação, continuando em vigor as demais cláusulas e condições do presente contrato.";
 const PRAZO_PARAGRAFO = `[se retomada_livre]${PRAZO_ANTIGO}[senão]**Parágrafo único** – Findo o prazo acima, se o LOCATÁRIO continuar na posse do imóvel por mais de 30 (trinta) dias sem oposição {l:da LOCADORA|das LOCADORAS}, a locação prorroga-se por prazo indeterminado, mantidas as demais cláusulas e condições do presente contrato, e o imóvel só poderá ser retomado nas hipóteses do art. 47 da Lei nº 8.245/91.[fim]`;
 
+/**
+ * Tarifa do boleto (pedido do dono em 24/11/2026; desfaz a retirada de 2026-10-20): o inquilino reembolsa a tarifa bancária
+ * de emissão do boleto, com o valor de hoje tirado do contrato (`taxa_boleto`); sem valor no contrato, a cláusula fica sem o "hoje de".
+ * Modelos gravados recebem por ATUALIZACOES_MODELO, antes do parágrafo das despesas cobradas a qualquer tempo.
+ */
+export const TARIFA_BOLETO = '**Parágrafo** – O LOCATÁRIO reembolsará, junto com cada aluguel, a tarifa bancária de emissão do boleto[se tarifa_boleto], hoje de {tarifa_boleto}[fim], pelo valor cobrado pelo banco.';
+const DESPESAS_A_QUALQUER_TEMPO = '**Parágrafo** – As despesas de responsabilidade do LOCATÁRIO poderão ser cobradas a qualquer tempo';
+
 /** Despesas extraordinárias do condomínio são da locadora (A20; Lei 8.245/91, art. 22, X e parágrafo único). */
 export const EXTRAORDINARIAS = '[se condominio]**Parágrafo** – As despesas extraordinárias de condomínio, como obras de reforma ou acréscimo à estrutura do prédio, pintura das fachadas e áreas externas, indenizações trabalhistas anteriores ao início da locação, equipamentos de segurança, lazer e esporte e a constituição do fundo de reserva, são de responsabilidade {l:da LOCADORA|das LOCADORAS} (Lei nº 8.245/91, art. 22, X).[fim]\n\n';
 
@@ -89,6 +97,8 @@ ${PRAZO_PARAGRAFO}[fim]
 [se tem_incluso]**Parágrafo** – Tarifas e taxas adicionais além das contas incluídas, como contratações adicionais, serviços solicitados unilateralmente, multas aplicadas pelo condomínio e pelo poder público e a responsabilidade civil e criminal perante o condomínio e terceiros, são de responsabilidade do LOCATÁRIO, que se obriga a ter consumo responsável de energia elétrica, água e gás e a comunicar imediatamente qualquer vazamento.[fim]
 
 ${EXTRAORDINARIAS}[se iptu_inquilino]**Parágrafo** – Fica estabelecido entre as partes que o Imposto Predial e Territorial Urbano (IPTU) correrá por conta do LOCATÁRIO e será cobrado junto com o vencimento do aluguel[se seguro_inquilino], bem como o seguro incêndio do imóvel[fim].[fim]
+
+${TARIFA_BOLETO}
 
 **Parágrafo** – As despesas de responsabilidade do LOCATÁRIO poderão ser cobradas a qualquer tempo, mesmo após a rescisão do contrato e a restituição do imóvel, quando forem detectadas despesas, reparações de danos, multas, contas em atraso, execuções judiciais ou extrajudiciais e tudo o mais concernente ao período em que o imóvel foi ocupado pelo LOCATÁRIO.`;
 
@@ -227,6 +237,100 @@ export const CONVITE_SAIDA = "O LOCATÁRIO será convidado por escrito, por e-ma
 /** Negativação nos dois modelos, depois do aviso do próprio órgão (A18; CDC, art. 43, § 2º; Súmula 359 do STJ). */
 export const NEGATIVACAO = '**CLÁUSULA #** – Em caso de atraso no pagamento de aluguéis e encargos, {l:a LOCADORA poderá|as LOCADORAS poderão} incluir o nome do LOCATÁRIO[se fiador] e {f:do FIADOR|dos FIADORES}[fim] nos órgãos de proteção ao crédito (SERASA, SCPC e similares), depois do aviso prévio feito pelo próprio órgão.';
 
+/** Fim dos contratos (antes do resumo): só nos contratos, não nos termos aditivos. */
+const FECHO_CONTRATO = 'herdeiros e sucessores a qualquer título.\n\n> {cidade}, {data_assinatura}.\n\n[assinaturas]';
+
+/** Tarifa do boleto no resumo (24/11): sempre, como a cláusula (TARIFA_BOLETO); o valor de hoje só com a tarifa no cadastro. */
+const TARIFA_RESUMO = ' O LOCATÁRIO também paga, junto com cada aluguel, a tarifa bancária de emissão do boleto[se tarifa_boleto], hoje de {tarifa_boleto}[fim], pelo valor cobrado pelo banco.';
+/** Frase do resumo antes de a tarifa ir sempre ao contrato (só com valor): os modelos gravados trocam por TARIFA_RESUMO. */
+const TARIFA_RESUMO_ANTIGA = '[se tarifa_boleto] O LOCATÁRIO também paga, junto com cada aluguel, a tarifa bancária de emissão do boleto, hoje de {tarifa_boleto}.[fim]';
+
+/**
+ * Resumo do contrato em perguntas e respostas (pedido do dono em 24/11/2026; sem a pergunta dos animais e com o vencimento em dia não útil como regra dos bancos, decisões do mesmo dia): última página dos contratos, em linguagem simples,
+ * com os valores do próprio contrato ({campo} e [se x]), para quem lê (ou passa o contrato numa ferramenta de busca ou de IA) achar
+ * as respostas sem voltar com dúvidas que o contrato já responde. Texto visível e normal, sem instrução escondida. Não substitui
+ * as cláusulas (a última resposta diz isso). Pode ser reaproveitado em outro documento com os dados do contrato (dadosDoContrato).
+ */
+export const RESUMO_CONTRATO = `[nova página]
+
+## RESUMO DO CONTRATO EM PERGUNTAS E RESPOSTAS
+
+Este resumo explica, em palavras simples, os pontos que mais geram dúvida. Ele faz parte do contrato acima e usa os mesmos valores e datas; se houver qualquer diferença, valem as cláusulas do contrato.
+
+**1. Qual é o valor do aluguel e quando vence?**
+
+[se bonificacao]O aluguel é de {aluguel_cheio}. Pagando até o vencimento, há bonificação de {bonificacao_percentual} e o valor fica em {aluguel_bonificado}.[senão]O aluguel é de {aluguel_cheio}.[fim] Ele vence todo dia {dia_vencimento} de cada mês e é pago por boleto bancário, enviado por e-mail.[se iptu_inquilino] O IPTU vem no mesmo boleto[se seguro_inquilino], assim como o seguro contra incêndio[fim].[fim]${TARIFA_RESUMO} Pela regra dos bancos (não é uma cláusula deste contrato), o boleto que vence em sábado, domingo ou feriado pode ser pago no dia útil seguinte, sem multa.
+
+**2. O que acontece se eu pagar atrasado?**
+
+[se bonificacao]Perde-se a bonificação e paga-se o aluguel cheio, com[senão]Paga-se o valor com[fim] multa de {multa} e juros de {juros} ao mês, contados por dia de atraso. {exemplo_atraso} Se for preciso cobrar, entram também as despesas da cobrança e os honorários do advogado. Depois do aviso feito pelo próprio órgão, o nome do LOCATÁRIO[se fiador] e {f:do FIADOR|dos FIADORES}[fim] pode ir para os cadastros de proteção ao crédito (SERASA, SCPC e similares).
+
+**3. Quando o aluguel é reajustado e por qual índice?**
+
+A cada 12 (doze) meses, sempre sobre o último valor corrigido, pela variação acumulada no período d{indice}. Se o índice do período for negativo, o aluguel continua o mesmo (não diminui).[se caucao] A caução acompanha o reajuste: a diferença é paga junto, para a caução continuar equivalente a {caucao_meses_aluguel} de aluguel.[fim]
+
+**4. Quanto tempo dura o contrato?**
+
+[se indeterminado]A locação é por prazo indeterminado, a partir de {data_inicio}. Qualquer das partes pode encerrá-la avisando a outra por escrito com 30 (trinta) dias de antecedência.[senão]O prazo é de {prazo_meses} meses, de {data_inicio} a {data_fim}. Se o LOCATÁRIO continuar no imóvel depois disso sem um contrato novo, a locação continua por prazo indeterminado, com as mesmas regras.[fim]
+
+**5. Posso sair antes do fim do contrato?**
+
+Pode. É preciso avisar por escrito, por e-mail, com 30 (trinta) dias de antecedência. Sem esse aviso, paga-se o valor de 1 (um) mês de aluguel e encargos.[se não indeterminado] Saindo antes de {data_fim}, há também a multa de 3 (três) meses de aluguel, proporcional ao tempo que falta para terminar o contrato. {exemplo_saida} A lei dispensa essa multa quando o LOCATÁRIO é transferido pelo empregador para outra cidade e avisa com 30 (trinta) dias de antecedência (Lei nº 8.245/91, art. 4º).[fim]
+
+**6. Quem paga as contas e os impostos do imóvel?**
+
+Ficam com o LOCATÁRIO: {encargos_inquilino}.[se tem_incluso] Já estão incluídos no aluguel, por conta {l:da LOCADORA|das LOCADORAS}: {encargos_inclusos}.[fim][se seguro_incluso] O seguro contra incêndio é contratado {l:pela LOCADORA|pelas LOCADORAS} e já está no aluguel.[fim][se condominio] As despesas extraordinárias do condomínio (obras na estrutura do prédio, pintura das fachadas, fundo de reserva e outras da mesma natureza) são {l:da LOCADORA|das LOCADORAS}.[fim] Contas e impostos do período da locação que chegarem depois da saída continuam sendo do LOCATÁRIO.
+
+**7. Quem cuida dos consertos do imóvel?**
+
+O LOCATÁRIO cuida da conservação do dia a dia: limpeza, torneiras, pias, ralos, vasos sanitários, iluminação, trincos, vidros, calhas e telhado, piso e pintura, para devolver tudo como recebeu. As obras que afetam a segurança do imóvel (como a estrutura) são {l:da LOCADORA|das LOCADORAS}.
+
+**8. Posso fazer reformas ou mudanças no imóvel?**
+
+Só com autorização por escrito {l:da LOCADORA|das LOCADORAS}. Sem ela, a multa é de 3 (três) meses de aluguel. Mesmo autorizadas, as melhorias ficam no imóvel, sem direito a indenização ou a reter o imóvel por causa delas.
+
+**9. Posso sublocar, emprestar ou passar o contrato para outra pessoa?**
+
+Não, a não ser com o consentimento por escrito {l:da LOCADORA|das LOCADORAS}. Isso vale para todo o imóvel ou só para uma parte dele.
+
+**10. Qual é a garantia do contrato e como ela é devolvida?**
+
+[se caucao]A garantia é uma caução de {caucao_valor}, depositada em caderneta de poupança. Ao fim da locação, depois da entrega das chaves e da vistoria de saída, ela é devolvida com os rendimentos da poupança, descontados os aluguéis, as contas e os reparos que estiverem em aberto.[fim][se deposito]A garantia é um depósito de {deposito_valor}. Ao fim da locação, ele paga os débitos, danos e reparos que estiverem em aberto, e o que sobrar é devolvido ao LOCATÁRIO.[fim][se fiador][se deposito] Além do depósito, há a fiança[senão]A garantia é a fiança[fim]: {f:o FIADOR responde|os FIADORES respondem} junto com o LOCATÁRIO por todas as obrigações do contrato, até a entrega das chaves.[fim][se seguro_fianca]A garantia é um seguro fiança locatícia, contratado pelo LOCATÁRIO e mantido em vigor durante toda a locação.[fim][se sem_garantia]Este contrato não tem garantia.[fim]
+
+**11. Como é a entrega das chaves e a vistoria de saída?**
+
+Depois do aviso de saída, o LOCATÁRIO devolve o imóvel vazio, limpo e como recebeu, conforme a vistoria de entrada, e entrega os comprovantes das últimas contas pagas (água, luz, condomínio, IPTU e outras que forem dele). O aluguel e os encargos são devidos até o dia da devolução das chaves. A vistoria de saída é feita em até [se residencial]72 (setenta e duas)[senão]48 (quarenta e oito)[fim] horas úteis, com fotos e vídeo; o LOCATÁRIO é convidado por e-mail e pode acompanhá-la, mas ela acontece mesmo sem ele. O relatório é enviado por e-mail, e o LOCATÁRIO tem 5 (cinco) dias úteis para contestar por escrito.
+
+**12. O que pode ser cobrado na saída?**
+
+Os reparos necessários para o imóvel voltar ao estado da vistoria de entrada, como pintura, limpeza e consertos, com base em orçamento ou nota do serviço. O desgaste natural do uso não é cobrado. Também entram os aluguéis e as contas em aberto e, quando for o caso, as multas das perguntas 2, 5 e 8.[se caucao] Esses valores são descontados da caução; se ela não bastar, a diferença é cobrada.[fim][se deposito] Esses valores são descontados do depósito; se ele não bastar, a diferença é cobrada.[fim][se fci] O Fundo de Conservação do Imóvel (FCI) paga primeiro os reparos, e o que sobrar dele é devolvido corrigido.[fim]
+
+**13. A empresa pode entrar no imóvel?**
+
+Pode vistoriar o imóvel com agendamento prévio. Se o imóvel for colocado à venda, o LOCATÁRIO tem preferência para comprar nas mesmas condições e deve permitir as visitas dos interessados, pelo menos 2 (duas) horas por dia, entre 8h e 20h.
+
+**14. Como recebo os avisos sobre o contrato?**
+
+Por e-mail ou por carta com aviso de recebimento, que valem como entregues. Por isso, avise sempre que mudar de endereço, de e-mail ou de telefone.
+
+**15. Este resumo substitui o contrato?**
+
+Não. Ele só ajuda a entender o contrato. Em caso de dúvida ou de diferença, valem as cláusulas do contrato e a Lei nº 8.245/91 (Lei do Inquilinato).`;
+
+/**
+ * Resumo gravado com a primeira versão (#374, 24/11): tinha a pergunta 10 dos animais (as seguintes iam até a 16) e o dia não útil
+ * sem dizer que é regra dos bancos. Os modelos gravados trocam pelo texto de hoje (ATUALIZACOES_MODELO); a troca é do trecho inteiro,
+ * da pergunta 10 até o fim, para a numeração nunca ficar pela metade (trecho editado à mão fica como está).
+ */
+const DIA_NAO_UTIL_ANTIGO = ' Se o vencimento cair em sábado, domingo ou feriado, o pagamento pode ser feito no dia útil seguinte, sem multa.';
+const DIA_NAO_UTIL = ' Pela regra dos bancos (não é uma cláusula deste contrato), o boleto que vence em sábado, domingo ou feriado pode ser pago no dia útil seguinte, sem multa.';
+const RESUMO_FIM = RESUMO_CONTRATO.slice(RESUMO_CONTRATO.indexOf('**10. Qual é a garantia do contrato'));
+const RESUMO_FIM_COM_ANIMAIS = `**10. Posso ter animais de estimação?**
+
+O contrato não proíbe. O LOCATÁRIO responde pelos danos que os animais causarem ao imóvel e deve respeitar as regras do condomínio, quando houver.
+
+${RESUMO_FIM.replace(/^\*\*(1[0-5])\./gm, (_, n) => `**${Number(n) + 1}.`)}`;
+
 const FINAIS = (extra) => `## DISPOSIÇÕES FINAIS
 
 ${REPRESENTACAO}
@@ -249,7 +353,9 @@ E por assim estarem justos e contratados, e após terem os contratantes lido e e
 
 > {cidade}, {data_assinatura}.
 
-[assinaturas]`;
+[assinaturas]
+
+${RESUMO_CONTRATO}`;
 
 const CONDOMINIO = `[se nao_residencial]**CLÁUSULA #** – O LOCATÁRIO se obriga a cumprir as determinações do condomínio a que o imóvel pertence e seu regimento interno, principalmente no que se refere à manutenção da ordem e respeito ao condomínio, suas coisas e condôminos, ao silêncio após os horários determinados, à utilização de áreas comuns e privativas, aos horários de mudança e ao tratamento com os funcionários do condomínio, respondendo pelas despesas e danos causados por si e por outros sob sua responsabilidade.[fim]`;
 
@@ -500,6 +606,8 @@ export const ATUALIZACOES_MODELO = [
   ['honorários de advogado de 25% (vinte e cinco por cento) sobre o valor da ação', 'honorários de advogado de 20% (vinte por cento) sobre o valor da ação'],
   ['a multa proporcional de 10% (dez por cento) sobre o tempo restante do contrato', 'a multa de 3 (três) meses de aluguel, proporcional ao tempo restante do contrato'],
   [ENDERECO_PARAGRAFO, `${ENDERECO_PARAGRAFO}\n\n${LGPD}`, 'DOS DADOS PESSOAIS'],
+  // tarifa do boleto de volta ao contrato (24/11/2026): antes do parágrafo das despesas cobradas a qualquer tempo
+  [DESPESAS_A_QUALQUER_TEMPO, `${TARIFA_BOLETO}\n\n${DESPESAS_A_QUALQUER_TEMPO}`, 'O LOCATÁRIO reembolsará, junto com cada aluguel, a tarifa bancária'], // marca só da cláusula (o resumo também fala da tarifa)
   // revisão de 2026-11-13 (respostas do dono no artefato da revisão jurídica)
   [VISTORIA_ENTRADA_1211, VISTORIA_ENTRADA],
   [`${PRAZO_ANTIGO}[fim]`, `${PRAZO_PARAGRAFO}[fim]`, '[se retomada_livre]'],
@@ -527,6 +635,13 @@ export const ATUALIZACOES_MODELO = [
   ["**CLÁUSULA #** – O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES} aceitam[senão] aceita[fim] como válidas todas as comunicações", `${NEGATIVACAO}\n\n**CLÁUSULA #** – O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES} aceitam[senão] aceita[fim] como válidas todas as comunicações`, 'depois do aviso prévio feito pelo próprio órgão'],
   ['Contrato de Locação {finalidade} do imóvel {objeto},', 'Contrato de Locação {finalidade} que tem por objeto {objeto},'],
   [" úteis para providenciar a vistoria do imóvel. O aluguel e os encargos", ` úteis para providenciar a vistoria do imóvel. ${CONVITE_SAIDA} O aluguel e os encargos`, 'convidado por escrito, por e-mail, a acompanhar a vistoria'],
+  // resumo em perguntas e respostas na última página (24/11/2026): só nos contratos, onde o fecho continua igual
+  [FECHO_CONTRATO, `${FECHO_CONTRATO}\n\n${RESUMO_CONTRATO}`, 'RESUMO DO CONTRATO EM PERGUNTAS E RESPOSTAS'],
+  // resumo gravado antes da tarifa ir sempre ao contrato (24/11): a frase da tarifa passa a sair sempre
+  [TARIFA_RESUMO_ANTIGA, TARIFA_RESUMO],
+  // resumo sem a pergunta dos animais e com o dia não útil como regra dos bancos (decisões do dono, 24/11)
+  [`${DIA_NAO_UTIL_ANTIGO}\n\n**2. O que acontece se eu pagar atrasado?**`, `${DIA_NAO_UTIL}\n\n**2. O que acontece se eu pagar atrasado?**`],
+  [RESUMO_FIM_COM_ANIMAIS, RESUMO_FIM],
 ];
 
 /** Aplica ATUALIZACOES_MODELO num texto de contrato (o 3º item, quando há, é o sinal de que a troca já foi feita). */

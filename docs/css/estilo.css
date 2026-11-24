@@ -401,6 +401,8 @@ table.compacta td, table.compacta th { padding: 3px 6px; font-size: 13px; }
 .contrato .ct-pagina > * > tr > td { display: block; }
 .contrato .ct-espaco-rodape { height: 0; }
 /* assinaturas: todas juntas (de preferência numa página), um conjunto por linha; conjunto de uma pessoa, centralizado */
+/* [nova página] do modelo: a impressão e o PDF começam uma folha nova (ex.: o resumo em perguntas e respostas) */
+.ct-nova-pagina { break-before: page; page-break-before: always; height: 0; margin: 0; }
 .ct-assinaturas { margin-top: calc(24px + 1.55em); /* uma linha a mais antes das 1ªs assinaturas: cabe a assinatura gov.br */ break-inside: avoid; page-break-inside: avoid; }
 .ct-grupo-assina { display: grid; grid-template-columns: 1fr 1fr; gap: 64px 40px; /* entre linhas do mesmo conjunto, o mesmo espaço de assinatura que entre conjuntos */ margin-bottom: 64px; break-inside: avoid; page-break-inside: avoid; }
 .contrato .ct-titulo, .contrato .ct-secao, .contrato .ct-subsecao { break-after: avoid; page-break-after: avoid; }

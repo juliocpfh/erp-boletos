@@ -143,15 +143,16 @@ test('texto do boleto no formato do banco', () => {
   const cb = d.cobrancas[0];
   cb.iptu = 9100;
   const b = R.dadosBoleto(d, cb);
-  assert.equal(b.descricao, 'ALUGUEL RS3.644,45\nCOM BONF. RS3.280,00\nIPTU RS91,00 SEGURO3/4 RS56,25 TARIFA COBRANÇA RS8,50');
+  assert.equal(b.descricao, 'ALUGUEL 3.644,45\nCOM BONF. 3.280,00\nIPTU 91,00 SEGURO3/4 56,25 TARIFA COBRANÇA 8,50');
   // descrição longa (limite de 100 do C6): a tarifa encurta só o necessário para caber
   cb.iptu = 0; cb.outros = 5000;
-  const tarifa = (motivo) => { cb.outros_descricao = motivo; const t = R.dadosBoleto(d, cb).descricao; assert.ok(t.length <= 100 || motivo.length > 20); return / (TAR[A-ZÇ. ]*?) RS8,50 /.exec(t)[1]; };
-  assert.equal(tarifa('REPARO PIA'), 'TARIFA COBRANÇA');
-  assert.equal(tarifa('REPARO DA PIA'), 'TAR. COBRANÇA');
-  assert.equal(tarifa('REPARO DO PORTAO'), 'TAR. COBR.');
-  assert.equal(tarifa('REPARO DA GARAGEM'), 'TARIFA');
-  assert.equal(tarifa('REPARO DO PORTAO DA GARAGEM'), 'TARIFA'); // nem assim cabe: fica a mais curta
+  const tarifa = (motivo) => { cb.outros_descricao = motivo; const t = R.dadosBoleto(d, cb).descricao; assert.ok(t.length <= 100 || motivo.length > 30); return / (TAR[A-ZÇ. ]*?) 8,50 /.exec(t)[1]; };
+  // sem o "RS" (decisão de 24/11/2026) cabem 10 letras a mais: os motivos são mais compridos que antes
+  assert.equal(tarifa('REPARO DA PIA COZINHA'), 'TARIFA COBRANÇA');
+  assert.equal(tarifa('REPARO DA PIA DO BANHO'), 'TAR. COBRANÇA');
+  assert.equal(tarifa('TROCA DO PORTAO DA GARAGEM'), 'TAR. COBR.');
+  assert.equal(tarifa('TROCA DO PORTAO E DA GARAGEM'), 'TARIFA');
+  assert.equal(tarifa('TROCA DO PORTAO E DA GARAGEM DO FUNDO'), 'TARIFA'); // nem assim cabe: fica a mais curta
   cb.iptu = 9100; cb.outros = 0; cb.outros_descricao = '';
   assert.equal(b.valor, 380020);
   assert.equal(b.desconto, 36445);
@@ -284,10 +285,10 @@ test('ajuste do mês no boleto: adicional ou ressarcimento, com histórico e na 
   const antes = R.totais(cb).a_pagar_pontual;
   R.ajustarBoleto(d, cb.id, -15000, 'Reforma do banheiro', 'julio');
   assert.equal(R.totais(cb).a_pagar_pontual, antes - 15000);
-  assert.match(R.dadosBoleto(d, cb).descricao, /REFORMA DO BANHEIRO -RS150,00/);
+  assert.match(R.dadosBoleto(d, cb).descricao, /REFORMA DO BANHEIRO -150,00/);
   assert.match(d.historico.at(-1).descricao, /Ressarcimento de R\$\s?150,00 no boleto 07\/2026: Reforma do banheiro/);
   R.ajustarBoleto(d, cb.id, 5000, 'Conserto', 'julio');
-  assert.match(R.dadosBoleto(d, cb).descricao, /CONSERTO RS50,00/);
+  assert.match(R.dadosBoleto(d, cb).descricao, /CONSERTO 50,00/);
   R.registrarPagamento(d, cb.id, '2026-08-05', null, 'julio');
   assert.throws(() => R.ajustarBoleto(d, cb.id, 0, '', 'julio'));
 });
@@ -852,8 +853,8 @@ test('ressarcimento de taxa do condomínio: abate no boleto do mês seguinte ao 
   const t = R.totais(cb);
   assert.equal(cb.ressarcimento, 15000);
   assert.equal(t.a_pagar_pontual, 135000 - 13500 + 10000 + 350 - 15000);
-  // 102 letras por extenso: o ressarcimento encurta para caber nas 100 do C6 (conferência de 24/11/2026)
-  assert.match(R.dadosBoleto(d, cb).descricao, /RESSARC\. CONDOMÍNIO -RS150,00$/);
+  // 101 letras por extenso (sem o "RS"): só a tarifa encurta e o ressarcimento fica inteiro (conferência de 24/11/2026)
+  assert.match(R.dadosBoleto(d, cb).descricao, /TAR\. COBRANÇA 3,50 RESSARCIMENTO CONDOMÍNIO -150,00$/);
   // NF com o aluguel cheio; o ressarcimento conta como gasto
   R.registrarPagamento(d, cb.id, '2026-09-10', null, 'julio', { pagouEmDia: true });
   assert.equal(cb.valor_nf, 135000 - 13500);
@@ -1075,7 +1076,7 @@ test('reajuste com caução: boleto separado do complemento, sem tarifa e sem NF
   assert.equal(cb.vencimento, '2026-04-10');
   assert.equal(cb.taxa_boleto, 0);
   assert.equal(R.totais(cb).a_pagar_pontual, 27000);
-  assert.match(R.dadosBoleto(d, cb).descricao, /COMPLEMENTO DA CAUÇÃO RS270,00/);
+  assert.match(R.dadosBoleto(d, cb).descricao, /COMPLEMENTO DA CAUÇÃO 270,00/);
   assert.throws(() => R.gerarBoletosCaucao(d, c.id, 'julio'), /já foi gerado/);
   // o boleto do aluguel do mês continua sendo gerado normalmente
   assert.deepEqual(R.gerarCobrancas(d, '2026-03', 'julio'), { geradas: 1, existentes: 0 });

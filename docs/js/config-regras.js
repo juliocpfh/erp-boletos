@@ -9,6 +9,7 @@ export const GRUPOS_REGRAS = [
   ['aluguel', 'Aluguel e cobrança'],
   ['garantia', 'Garantia e FCI'],
   ['contrato', 'Novo contrato (valores que vêm preenchidos)'],
+  ['reserva', 'Reserva e termo de aceite'],
   ['rotina', 'Régua de cobrança e prazos de rotina'],
 ];
 
@@ -136,6 +137,28 @@ export const DEFINICOES_REGRAS = [
       ['Incluso no aluguel', 'Incluso no aluguel', 'O locador paga, como diz a lei quando o contrato não fala nada. Legal.']],
     // sem "Não tem" (decisão do dono de 2026-11-20: o seguro contra incêndio sempre existe); escolha antiga "Não tem" volta ao padrão
     explica: 'Quem paga o seguro obrigatório nos contratos novos (o seguro sempre existe).', consequencia: 'Só muda o que vem preenchido.', lei: LI + ', art. 22, VIII.' },
+
+  // ------------------------------------------------------------------ reserva (termo de aceite, decisões do dono de 2026-11-24)
+  { chave: 'reserva_retencao_pct', grupo: 'reserva', rotulo: 'Desistência depois do depósito: a empresa fica com (%) da reserva', tipo: 'pct', padrao: 100, min: 0, max: 100,
+    explica: 'Vale para quem aceitou o termo da reserva e desistiu depois do depósito (passado o prazo de devolução total, abaixo, se houver), ou teve alguma informação ou documento que não correspondeu à realidade na conferência. 100% (padrão, decisão do dono de 24/11/2026): a reserva fica com a empresa, como sinal de arrependimento (arras penitenciais). Ex.: reserva de R$ 500,00 → fica R$ 500,00, nada é devolvido; com 40% → fica R$ 200,00 e devolve R$ 300,00. Ficha reprovada: devolve tudo. O termo avisa em destaque, antes do aceite e do pagamento, que a reserva não volta. O termo guarda o % do dia do aceite: mudar aqui não muda os termos já aceitos.',
+    consequencia: 'Muda o % dos termos aceitos daqui em diante. Risco: o juiz pode reduzir a retenção que achar excessiva (Código Civil, art. 413) ou considerar abusiva a perda total do que foi pago (CDC, art. 51, IV); em decisões sobre reserva e sinal, os juízes costumam aceitar de 10% a 25%. O aviso claro antes do pagamento, guardado no aceite, é a principal proteção.',
+    lei: 'Código Civil, arts. 418 e 420 (arras penitenciais: quem dá o sinal e desiste perde o sinal) e 413 (o juiz reduz a penalidade excessiva); Código de Defesa do Consumidor, art. 51, IV (cláusula que tira do consumidor vantagem demais).' },
+  { chave: 'reserva_dias_arrependimento', grupo: 'reserva', rotulo: 'Dias para desistir com devolução total (contados do depósito)', tipo: 'inteiro', padrao: 0, min: 0, max: 60,
+    explica: '0 (padrão, decisão do dono de 24/11/2026): não há prazo de devolução total; depois do depósito vale o % acima. Ex.: com 7, depósito em 10/12/2026 → desistência até 17/12/2026 devolve tudo; em 18/12/2026, vale o % acima.',
+    consequencia: 'O prazo de 7 dias do Código do Consumidor (art. 49) é para compra feita fora do estabelecimento (internet, telefone). Aqui o interessado vê o imóvel pessoalmente antes de reservar, por isso o padrão é 0. Há decisões isoladas que aplicam o art. 49 à reserva feita ou aceita pela internet; com 7 dias aqui, esse risco some. Muda o prazo dos termos aceitos daqui em diante.',
+    lei: 'Código de Defesa do Consumidor, art. 49 (direito de arrependimento de 7 dias na compra fora do estabelecimento).' },
+  { chave: 'reserva_dias_uteis_documentos', grupo: 'reserva', rotulo: 'Prazo para mandar os documentos depois do depósito (dias úteis)', tipo: 'inteiro', padrao: 3, min: 1, max: 15,
+    explica: 'O termo avisa: sem os documentos neste prazo, a reserva é cancelada e conta como desistência (com o padrão, a reserva fica com a empresa; decisão do dono de 24/11/2026). Passado o prazo sem os documentos marcados na ficha, o Painel avisa a equipe. Ex.: depósito na quinta, 10/12/2026, e 3 dias úteis → documentos até terça, 15/12/2026.',
+    consequencia: 'Muda o prazo dos termos aceitos daqui em diante e o aviso do Painel. A desistência não é registrada sozinha: a equipe registra em "Desistiu antes de assinar". Se alguém reclamar do prazo curto, o recuo combinado pelo dono é dar 7 dias (aqui ou em "Dias para desistir com devolução total").',
+    lei: 'Sem lei específica: é o combinado no termo (Código Civil, art. 421).' },
+  { chave: 'reserva_dias_validade', grupo: 'reserva', rotulo: 'A reserva segura o imóvel por (dias) depois do depósito', tipo: 'inteiro', padrao: 7, min: 1, max: 60,
+    explica: 'Enquanto a ficha é analisada, o imóvel fica reservado para a pessoa. Passado o prazo sem decisão, o Painel avisa. Ex.: depósito em 10/12/2026 e 7 dias → reservado até 17/12/2026.',
+    consequencia: 'Muda o prazo dos termos aceitos daqui em diante e o aviso do Painel.',
+    lei: 'Sem lei específica: é o combinado no termo (Código Civil, art. 421).' },
+  { chave: 'reserva_dias_uteis_devolucao', grupo: 'reserva', rotulo: 'Prazo para devolver a reserva (dias úteis)', tipo: 'inteiro', padrao: 5, min: 1, max: 30,
+    explica: 'Contado da reprovação ou da desistência. Ex.: ficha reprovada na segunda, 14/12/2026, e 5 dias úteis → devolver até segunda, 21/12/2026. O Painel avisa quando o prazo passa.',
+    consequencia: 'Muda o prazo dos termos aceitos daqui em diante, o e-mail da ficha reprovada e o aviso do Painel.',
+    lei: 'Código de Defesa do Consumidor, art. 49, parágrafo único (devolução imediata no arrependimento); Código Civil, art. 418.' },
 
   // ------------------------------------------------------------------ rotina
   { chave: 'regua_cobranca', grupo: 'rotina', rotulo: 'Régua de cobrança', tipo: 'regua',
@@ -424,6 +447,16 @@ export function regra(chave, x) {
 
 /** Todos os valores de uma regra em uso (sistema e cada regra especial), ex.: para a janela da régua de cobrança. */
 export const valoresEmUso = (chave) => [regra(chave), ...[...perfis.values()].filter((p) => chave in p).map((p) => p[chave])];
+
+/**
+ * Regras especiais do banco ``d`` em que ``chave`` difere das regras do sistema: [{ id, nome, valor }], para os textos de tela que
+ * mostram o valor do sistema. Ex.: sistema com 5 dias e "Regra especial A" com 10 → [{ id: 1, nome: 'Regra especial A', valor: 10 }].
+ */
+export function especiaisDiferentes(d, chave) {
+  if (!REGRAS_POR_CONTRATO.has(chave)) return [];
+  return (d && Array.isArray(d.perfis_regras) ? d.perfis_regras : []).map((x) => ({ id: x.id, nome: x.nome, v: perfis.get(x.id) }))
+    .filter((x) => x.v && chave in x.v && !mesmoValor(x.v[chave], regra(chave))).map((x) => ({ id: x.id, nome: x.nome, valor: x.v[chave] }));
+}
 
 /** Feriados da cidade num ano: datas "AAAA-MM-DD" (os "MM-DD" valem todo ano). */
 export function feriadosLocais(ano) {

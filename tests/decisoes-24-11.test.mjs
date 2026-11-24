@@ -138,7 +138,7 @@ test('4. seguro no mês da saída: proporcional aos dias, como o aluguel (R$ 30,
   const nov = R.boletoDoMes(d, c.id, '2026-11');
   assert.deepEqual([nov.dias_cobrados, nov.dias_mes, nov.aluguel, nov.seguro], [15, 30, 100000, 1500]);
   assert.match(nov.seguro_parcela, /parc\. 9\/12 proporcional 15\/30 dias de R\$\s?30,00/);
-  assert.match(R.dadosBoleto(d, nov).descricao, /SEGURO9\/12 RS15,00/);
+  assert.match(R.dadosBoleto(d, nov).descricao, /SEGURO9\/12 15,00/);
   // saída mudada depois de gerar o boleto: o recálculo acompanha (20/30 = R$ 20,00); saída no último dia = parcela inteira
   // (teste trazido da PR #378)
   R.atualizar(d, 'contratos', c.id, { data_saida: '2026-11-20' }, 'j');

@@ -222,12 +222,16 @@ export async function pdfDoDocumento(el, rodape = [], { margemLado = 0, alturaMa
   // o link das fotos continua clicável no PDF (área do link na folha certa)
   const links = [...el.querySelectorAll('.ct-link a')].map((a) => { const x = a.getBoundingClientRect(); return { url: a.href, x: x.left - caixa.left, y: x.top - topo, w: x.width, h: x.height }; });
   const cortes = cortesDoDocumento(el, topo);
+  // [nova página] do modelo (ex.: o resumo em perguntas e respostas): a folha termina ali
+  const quebras = [...el.querySelectorAll('.ct-nova-pagina')].map((x) => x.getBoundingClientRect().top - topo);
   const marca = await marcaDaguaPdf(el.querySelector('.ct-marca'));
   const opcoes = { scale: ESCALA_PDF, backgroundColor: '#ffffff', onclone: (doc) => {
     // a marca-d'água da tela repete a cada altura de A4, mas as folhas do PDF são cortadas entre os blocos: sai da imagem
     // e entra por cima de cada folha, sempre no centro (como na impressão e no Word)
     doc.querySelectorAll('.ct-rodape, .ct-marcas').forEach((x) => x.remove());
-    doc.querySelectorAll('.contrato').forEach((x) => { x.style.border = '0'; x.style.boxShadow = 'none'; });
+    // borda transparente, não tirada: sem ela o documento ficava 2 px mais largo, as linhas quebravam diferente e o texto
+    // andava até ~25 px no fim, fora dos cortes medidos na tela (o [nova página] do resumo saía uma linha depois)
+    doc.querySelectorAll('.contrato').forEach((x) => { x.style.borderColor = 'transparent'; x.style.boxShadow = 'none'; });
   } };
   const largura = 210 - 2 * margemLado;
   const pxMm = el.offsetWidth / largura;
@@ -244,6 +248,8 @@ export async function pdfDoDocumento(el, rodape = [], { margemLado = 0, alturaMa
     let fim = ini + alturaFolha + (fatias.length ? 0 : (margemTopo - topoDa(0)) * pxMm);
     if (fim >= total) fim = total;
     else fim = cortes.filter((y) => y > ini + alturaFolha * 0.4 && y <= fim).pop() || fim;
+    const quebra = quebras.find((y) => y > ini + 2 && y < fim);
+    if (quebra !== undefined) fim = quebra;
     fatias.push([ini, fim]);
     ini = fim;
   }
@@ -392,7 +398,7 @@ export function alvoDoRecibo(q) {
 }
 
 /** E-mail da etapa que leva cada recibo (o "Enviar ao inquilino" da caixa da assinatura). */
-const EMAIL_DO_RECIBO = { reserva: 'ficha_envio', devolucao_reserva: 'ficha_devolucao', garantia: 'contrato_assinado', quitacao: 'saida_encerramento', notificacao: 'notificacao_envio' };
+const EMAIL_DO_RECIBO = { termo_reserva: 'ficha_termo_reserva', reserva: 'ficha_envio', devolucao_reserva: 'ficha_devolucao', garantia: 'contrato_assinado', quitacao: 'saida_encerramento', notificacao: 'notificacao_envio' };
 
 /**
  * Caixa da assinatura digital na página do recibo (regra `assinatura_digital`, pedido do dono de 2026-11-21): o "Baixar PDF"
@@ -420,7 +426,9 @@ async function caixaAssinatura(tipo, alvo) {
 /** Recibo ou termo (recibos.js) como carta: logo, empresa, título, texto, tabela de valores, local e data e as assinaturas. */
 export function reciboHtml(r) {
   const e = r.emitente;
-  const par = (t) => `<p${/^\d\. /.test(t) ? ' style="margin-left:12px"' : ''}>${esc(t)}</p>`;
+  // aviso em destaque (termo da reserva: "ATENÇÃO, LEIA ANTES DE ACEITAR E DE PAGAR"): negrito e moldura
+  const par = (t) => (/^ATENÇÃO/.test(t) ? `<p style="font-weight:bold;border:2px solid #000;padding:8px 10px">${esc(t)}</p>`
+    : `<p${/^\d\. /.test(t) ? ' style="margin-left:12px"' : ''}>${esc(t)}</p>`);
   const linha = ([a, b]) => (b === null ? `<tr><th colspan="2" style="text-align:left">${esc(a)}</th></tr>`
     // texto (proposta) à esquerda e quebrando; valor em reais à direita
     : `<tr><td style="width:34%;white-space:normal">${esc(a).replace(/^ {3}/, '&nbsp;&nbsp;&nbsp;')}</td><td style="white-space:normal${/^R\$ [\d.,]+$/.test(b) ? ';text-align:right' : ''}">${esc(b)}</td></tr>`);
@@ -433,6 +441,7 @@ export function reciboHtml(r) {
     ${r.paragrafos.map(par).join('')}
     ${r.tabela.length ? `<table class="carta-tabela" style="width:100%">${r.tabela.map(linha).join('')}</table>` : ''}
     ${r.depois.map(par).join('')}
+    ${r.imagem && /^data:image\/png;base64,/.test(r.imagem.src) ? `<p>${esc(r.imagem.rotulo)}<br><img src="${esc(r.imagem.src)}" alt="Assinatura" style="max-width:320px;border-bottom:1px solid #999"></p>` : ''}
     <p class="carta-data">${esc(r.cidade)}, ${K.dataPorExtenso(r.data, { zero: false })}.</p>
     ${r.assinaturas.map((a, k) => `<p style="margin-top:48px;text-align:center"${k === daEmpresa ? ' data-assina-empresa' : ''}><span class="assina-linha">_______________________________________</span><br><b>${esc(a.nome)}</b>${a.linha ? `<br>${esc(a.linha)}` : ''}</p>`).join('')}</div>`;
 }
@@ -522,7 +531,10 @@ function documentoPorModelo(q) {
   const c = buscar('contratos', q.contrato);
   if (!c || !(tipo in TIPOS_DOCUMENTO)) return null;
   const p = preenchidos.get(`${modelo.id}:${c.id}`) || {};
-  const dados = K.dadosDoDocumento(d(), c, tipo, p.valores || {}, { data: p.data || C.hojeIso() });
+  // o fim do contrato com a renovação e a troca de titular (contrato por prazo indeterminado: sem data, o texto muda);
+  // sem o prazo em meses (dados antigos), a data de término gravada; indeterminado desde o início não usa o prazo que sobrou
+  const fim = c.prazo_tipo === 'Indeterminado' ? (c.vigencia_fim || null) : (R.fimDoContrato(d(), c) || c.vigencia_fim || null);
+  const dados = K.dadosDoDocumento(d(), c, tipo, p.valores || {}, { data: p.data || C.hojeIso(), fim });
   return { c, modelo, blocos: K.montarContrato(modelo.texto, dados), rodape: dados.rodape, nome: modelo.nome, semCampos: !p.valores,
     arquivo: nomeArquivoDoc(TIPOS_DOCUMENTO[tipo].nome.replace(/\s*\(.*\)$/, ''), c, String(p.data || C.hojeIso()).slice(0, 10)) };
 }
@@ -532,7 +544,8 @@ function valoresSugeridos(tipo, c) {
   const hoje = C.hojeIso();
   const db = d();
   const v = {};
-  if (tipo.startsWith('aditivo_')) v.numero_aditivo = String((db.aditivos || []).filter((a) => a.contrato_id === c.id).length + 1);
+  // a mesma conta dos termos de "Gerar termo aditivo": a cadeia de contratos (troca de titular) e o maior número já usado
+  if (tipo.startsWith('aditivo_')) v.numero_aditivo = String(R.proximoNumeroAditivo(db, c));
   if (['aviso_desocupacao', 'notificacao_desocupacao'].includes(tipo)) v[tipo === 'aviso_desocupacao' ? 'data_saida_prevista' : 'data_limite'] = C.somarDias(hoje, 30);
   if (tipo === 'aditivo_prazo') {
     const ini = c.vigencia_fim && c.vigencia_fim >= hoje ? C.somarDias(c.vigencia_fim, 1) : hoje;
@@ -842,7 +855,14 @@ export function telaAditivo(rota) {
   if (!c) return naoEncontrado('Inquilino não encontrado', '#/inquilinos', 'Ver os inquilinos');
   if (a && a.arquivo) return `<div class="alerta info">Este termo aditivo já foi assinado e não pode mais ser alterado. <a href="#/contrato/${c.id}?ir=aditivos">Voltar</a></div>`;
   if (!opera()) return '<h1>Sem permissão para gerar termos aditivos</h1>';
-  const tipo = a ? (a.tipo === K.TIPO_ADITIVO_TROCA ? 'troca' : 'vencimento') : rota.q.tipo;
+  // só o termo da troca do vencimento e o da troca de titular se editam aqui; os outros (ex.: o do novo valor, feito pela
+  // renovação, ou um registrado à mão) não: um endereço guardado mostra o aviso em vez do formulário errado
+  const tipo = a ? (a.tipo === K.TIPO_ADITIVO_TROCA ? 'troca' : a.tipo !== K.TIPO_ADITIVO_VALOR && a.primeiro_vencimento ? 'vencimento' : 'outro') : rota.q.tipo;
+  if (tipo === 'outro') {
+    return `<p class="suave"><a href="#/contrato/${c.id}?ir=aditivos">← ${esc(c.inquilino_nome)}</a></p><h1>Termo aditivo nº ${esc(a.numero || 1)}</h1>
+      <div class="alerta info">${a.tipo === K.TIPO_ADITIVO_VALOR ? 'Este termo é gerado pelo novo valor do aluguel e não se edita aqui.' : 'Este termo aditivo não se edita aqui.'}
+        ${a.texto ? link(`#/imprimir/aditivo?id=${a.id}`, 'Ver o termo / PDF') : ''} ${link(`#/contrato/${c.id}?ir=aditivos`, 'Voltar aos termos aditivos')}</div>`;
+  }
   if (tipo === 'troca') return telaAditivoTroca(c, a);
   if (tipo !== 'vencimento') return escolherAditivo(c);
   const hoje = C.hojeIso();

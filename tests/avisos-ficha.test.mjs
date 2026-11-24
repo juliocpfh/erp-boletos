@@ -59,7 +59,8 @@ test('textos de cada etapa: pessoa e equipe; o link não vai no e-mail', () => {
   assert.match(enviou.pessoa.texto, /^Olá, Maria!/);
   assert.match(enviou.equipe.titulo, /^Maria Souza mandou os dados$/);
   assert.equal(textosDoAviso({ ...r, respostas: [{}, {}] }, 'enviou').pessoa, null, 'reenvio: só a equipe');
-  assert.equal(textosDoAviso(registro({ arquivos: [{}, {}] }), 'documento').equipe, null, 'só o primeiro documento avisa');
+  // a cada documento (decisão do dono de 2026-11-24; antes só o primeiro avisava)
+  assert.match(textosDoAviso(registro({ arquivos: [{}, {}] }), 'documento', 'RG').equipe.titulo, /mandou um documento/);
   const falta = textosDoAviso(registro({ faltando: ['Comprovante de residência'] }), 'falta');
   assert.match(falta.pessoa.texto, /- Comprovante de residência\n\nAbra o mesmo link/);
   assert.doesNotMatch(falta.pessoa.texto, /https?:/);
