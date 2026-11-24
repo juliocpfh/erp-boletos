@@ -443,7 +443,7 @@ export function diasComerciais(comp, entrada, saida, { continuacao = false } = {
 }
 
 export function calcularCobranca({ competencia, aluguelMensal, entrada, saida, descontoPercentual = 0, iptu = 0,
-  seguro = 0, taxaBoleto = 0, outros = 0, reservaDisponivel = 0, contrato = null }) {
+  seguro = 0, seguroProporcional = false, taxaBoleto = 0, outros = 0, reservaDisponivel = 0, contrato = null }) {
   const diasReais = diasOcupados(competencia, entrada, saida);
   // regra `proporcional`: mês comercial de 30 dias (padrão desde 17/11/2026, `diasComerciais`) ou dias reais do mês (14/28)
   const comercial = regra('proporcional', contrato) === 'mes_30' && diasReais < diasNoMes(competencia);
@@ -451,7 +451,9 @@ export function calcularCobranca({ competencia, aluguelMensal, entrada, saida, d
   const diasMes = comercial ? 30 : diasNoMes(competencia);
   const aluguel = aluguelProporcional(aluguelMensal, dias, diasMes);
   const desconto = descontoPorPercentual(aluguel, descontoPercentual);
-  const itens = { aluguel, desconto, iptu, seguro, taxa_boleto: taxaBoleto, outros };
+  // seguro no mês da entrada e no da saída: pelos mesmos dias do aluguel (decisão do dono de 24/11/2026; 15/30 de R$ 30,00 = R$ 15,00)
+  const seguroDoMes = seguroProporcional ? aluguelProporcional(seguro, dias, diasMes) : seguro;
+  const itens = { aluguel, desconto, iptu, seguro: seguroDoMes, taxa_boleto: taxaBoleto, outros };
   return {
     competencia, dias_cobrados: dias, dias_mes: diasMes, aluguel_mensal: aluguelMensal, ...itens,
     ...totaisCobranca(itens, reservaDisponivel, contrato),

@@ -196,8 +196,13 @@ export function conferirLeitura(dados, r, q) {
 export function conferirRessarcimento(dados, r, q) {
   const cid = r ? r.contrato_id : Number(q.contrato);
   const igual = d().ressarcimentos.find((x) => x.contrato_id === cid && (!r || x.id !== r.id) && x.competencia_condominio === dados.competencia_condominio && x.valor === dados.valor);
+  // sem boleto deste contrato no mês (depois da saída ou da troca de titular): vira crédito de quem pagou (decisões de 24/11/2026)
+  const c = d().contratos.find((x) => x.id === cid);
+  const sem = c && dados.competencia_abatimento && !R.boletoDoMes(d(), c.id, dados.competencia_abatimento) ? R.semBoletoNoMes(d(), c, dados.competencia_abatimento) : null;
+  const credito = sem && sem.motivo !== 'entrada'
+    ? `Não há boleto de ${c.inquilino_nome} para abater: ${R.textoSemBoleto(sem, dados.competencia_abatimento)}. O valor fica com ${c.inquilino_nome} e entra como crédito ${R.acertoDoCredito(d(), c).tipo === 'saida' ? 'no cálculo final da saída' : 'na devolução da garantia da troca de titular'}${sem.motivo === 'troca' ? ` (o boleto de ${sem.novo.inquilino_nome} é cobrado cheio)` : ''}.` : '';
   return [dataNoFuturo(dados.data_pagamento, 'A data do pagamento'), dataMuitoAntiga(dados.data_pagamento, 'A data do pagamento'),
-    igual ? `Já há ressarcimento de ${reais(igual.valor)} do condomínio de ${compBr(igual.competencia_condominio)} (${igual.descricao}). Não está repetido?` : ''].filter(Boolean);
+    igual ? `Já há ressarcimento de ${reais(igual.valor)} do condomínio de ${compBr(igual.competencia_condominio)} (${igual.descricao}). Não está repetido?` : '', credito].filter(Boolean);
 }
 
 /** Avisos da NF avulsa: data no futuro, outra NF avulsa com a mesma data e o mesmo valor. */

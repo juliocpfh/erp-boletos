@@ -308,10 +308,10 @@ export function demonstrativo(cb) {
     <div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>
     <p><b>Inquilino:</b> ${esc(c.inquilino_nome)}${c.inquilino_cpf ? ` · ${rotuloDocumento(c.inquilino_cpf)} ${esc(c.inquilino_cpf)}` : ''}${c.inquilino_telefone ? ` · ${esc(c.inquilino_telefone)}` : ''}</p>
     <table><tr><th>Descrição</th><th class="n">Valor</th></tr>
-      ${e && (e.garantia_corrigida || e.garantia_valor || 0) - (e.debitos || 0) === e.saldo ? `${linha('Garantia corrigida', reais(e.garantia_corrigida || e.garantia_valor || 0))}${linha('(-) Débitos do cálculo final', `- ${reais(e.debitos || 0)}`)}` : ''}
+      ${e && (e.garantia_corrigida || e.garantia_valor || 0) - (e.debitos || 0) + (e.creditos || 0) === e.saldo ? `${linha('Garantia corrigida', reais(e.garantia_corrigida || e.garantia_valor || 0))}${linha('(-) Débitos do cálculo final', `- ${reais(e.debitos || 0)}`)}${e.creditos ? linha('(+) Créditos do inquilino', reais(e.creditos)) : ''}` : ''}
       <tr class="total"><td>Saldo a pagar até ${dataBr(cb.vencimento)}${prazoNaoUtil(cb)}</td><td class="n maior">${reais(t.a_pagar_pontual)}</td></tr>
       <tr><td colspan="2" class="suave">Após o vencimento: sem multa e juros.</td></tr></table>
-    ${e && e.debitos_descricao ? `<p class="pre suave">${esc(e.debitos_descricao)}</p>` : ''}
+    ${e && e.debitos_descricao ? `<p class="pre suave">${esc(e.debitos_descricao)}</p>` : ''}${e && e.creditos_descricao ? `<p class="pre suave">${esc(e.creditos_descricao)}</p>` : ''}
     ${cb.data_pagamento ? `<p><b>Pago em ${dataBr(cb.data_pagamento)}</b>${cb.dias_atraso ? ` com ${C.plural(cb.dias_atraso, 'dia')} de atraso` : ''} · recebido ${reais(cb.valor_pago)}</p>` : ''}</div>`;
   }
   if (R.ehParcelaAcordo(cb)) {

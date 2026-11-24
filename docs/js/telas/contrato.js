@@ -195,15 +195,16 @@ function caixaGarantia(c) {
     const quem = `<a href="#/contrato/${seguinte.id}?ir=garantia">${esc(seguinte.inquilino_nome)}</a>`;
     if (dev) {
       // reparte o que volta de fato (corrigida − débitos), não a garantia corrigida inteira
-      const contas = R.devolucaoPorRecebedor(d(), c, Math.max(dev.saldo || 0, 0));
+      // o crédito do ressarcimento (24/11/2026) é pago pela empresa, não sai das contas da garantia
+      const contas = R.devolucaoPorRecebedor(d(), c, Math.max((dev.saldo || 0) - (dev.creditos || 0), 0));
       html += `${subtitulo('Devolução da garantia (troca de titular)', '', `${seguinte.inquilino_nome} assumiu o contrato com garantia própria`)}
-        <table class="compacta"><tr><td class="nw">${dataBr(dev.data)}</td><td>${reais(dev.garantia_valor)} + poupança ${pct(dev.indice_percentual || 0)} = ${reais(dev.garantia_corrigida)}${dev.debitos ? ` − débitos ${reais(dev.debitos)}` : ''}</td>
+        <table class="compacta"><tr><td class="nw">${dataBr(dev.data)}</td><td>${reais(dev.garantia_valor)} + poupança ${pct(dev.indice_percentual || 0)} = ${reais(dev.garantia_corrigida)}${dev.debitos ? ` − débitos ${reais(dev.debitos)}` : ''}${dev.creditos ? ` + créditos ${reais(dev.creditos)}` : ''}</td>
           <td class="n nw"><b>${dev.saldo >= 0 ? 'devolvido' : 'a cobrar'} ${reais(Math.abs(dev.saldo))}</b></td>
           <td>${dev.saldo > 0 || dev.comprovante ? linkComprovante(c.id, dev.comprovante, { tabela: 'devolucoes_garantia', id: dev.id, campo: 'comprovante', tipo: 'devolucao-garantia', data: dev.data }) : ''}</td>
           <td class="n nw">${editar(`#/editar/devolucoes_garantia/${dev.id}`)} ${excluir('devolucoes_garantia', dev.id, 'Excluir o registro da devolução? O comprovante também é apagado e volta o alerta "Devolver garantia".')}</td></tr></table>
         ${reciboDevolucaoHtml(c, dev)}
         ${contas.length > 1 ? `<p class="suave">Sai de onde foi aplicada: ${contas.map((x) => `${esc(x.nome)} ${reais(x.valor)}`).join('; ')}.</p>` : ''}
-        ${dev.debitos_descricao ? `<p class="pre suave">${esc(dev.debitos_descricao)}</p>` : ''}${dev.observacoes ? `<p class="pre suave">${esc(dev.observacoes)}</p>` : ''}`;
+        ${dev.debitos_descricao ? `<p class="pre suave">${esc(dev.debitos_descricao)}</p>` : ''}${dev.creditos_descricao ? `<p class="pre suave">${esc(dev.creditos_descricao)}</p>` : ''}${dev.observacoes ? `<p class="pre suave">${esc(dev.observacoes)}</p>` : ''}`;
     } else if (pend) {
       html += `<div class="alerta aviso"><b>Devolver a garantia:</b> ${quem} assumiu o contrato em ${dataBr(seguinte.data_entrada)} com garantia nova. Devolva ${R.temCaucao(c) ? 'a caução' : 'o depósito'} de ${reais(pend.valor)} a ${esc(c.inquilino_nome)}
         (com a correção da poupança, descontados os débitos até ${dataBr(C.somarDias(seguinte.data_entrada, -1))}) e registre aqui. ${opera() ? link(`#/novo/devolucoes_garantia?contrato=${c.id}`, 'Registrar devolução', 'botao mini') : ''}</div>`;
@@ -266,12 +267,12 @@ function caixaGarantia(c) {
     const dev = R.devolucaoDaTrocaDeGarantia(d(), t.id);
     if (dev) {
       html += `${subtitulo(`Devolução da garantia (troca de ${dataBr(t.data)})`, '', `${t.tipo_anterior} → ${t.tipo_novo}`)}
-        <table class="compacta"><tr><td class="nw">${dataBr(dev.data)}</td><td>${reais(dev.garantia_valor)} + poupança ${pct(dev.indice_percentual || 0)} = ${reais(dev.garantia_corrigida)}${dev.debitos ? ` − débitos ${reais(dev.debitos)}` : ''}</td>
+        <table class="compacta"><tr><td class="nw">${dataBr(dev.data)}</td><td>${reais(dev.garantia_valor)} + poupança ${pct(dev.indice_percentual || 0)} = ${reais(dev.garantia_corrigida)}${dev.debitos ? ` − débitos ${reais(dev.debitos)}` : ''}${dev.creditos ? ` + créditos ${reais(dev.creditos)}` : ''}</td>
           <td class="n nw"><b>${dev.saldo >= 0 ? 'devolvido' : 'a cobrar'} ${reais(Math.abs(dev.saldo))}</b></td>
           <td>${dev.saldo > 0 || dev.comprovante ? linkComprovante(c.id, dev.comprovante, { tabela: 'devolucoes_garantia', id: dev.id, campo: 'comprovante', tipo: 'devolucao-garantia', data: dev.data }) : ''}</td>
           <td class="n nw">${editar(`#/editar/devolucoes_garantia/${dev.id}`)} ${excluir('devolucoes_garantia', dev.id, 'Excluir o registro da devolução? O comprovante também é apagado e volta o alerta "Devolver garantia".')}</td></tr></table>
         ${reciboDevolucaoHtml(c, dev)}
-        ${dev.debitos_descricao ? `<p class="pre suave">${esc(dev.debitos_descricao)}</p>` : ''}${dev.observacoes ? `<p class="pre suave">${esc(dev.observacoes)}</p>` : ''}`;
+        ${dev.debitos_descricao ? `<p class="pre suave">${esc(dev.debitos_descricao)}</p>` : ''}${dev.creditos_descricao ? `<p class="pre suave">${esc(dev.creditos_descricao)}</p>` : ''}${dev.observacoes ? `<p class="pre suave">${esc(dev.observacoes)}</p>` : ''}`;
     } else if (t.valor_anterior > 0) {
       html += `<div class="alerta aviso"><b>Devolver a garantia:</b> na troca de ${dataBr(t.data)} (${esc(t.tipo_anterior)} → ${esc(t.tipo_novo)}), ${t.tipo_anterior === 'Caução' ? 'a caução' : 'o depósito'} de ${reais(t.valor_anterior)} volta a ${esc(c.inquilino_nome)},
         com a correção da poupança. Devolva e registre aqui. ${opera() ? link(`#/novo/devolucoes_garantia?contrato=${c.id}&troca=${t.id}`, 'Registrar devolução', 'botao mini') : ''}</div>`;
@@ -388,12 +389,13 @@ function caixaSaida(c) {
     <div class="grade">
     ${item('Garantia a devolver', reais(e.garantia_valor))}${item('Correção (poupança)', `${pct(e.indice_percentual || 0)} → ${reais(e.garantia_corrigida)}`)}
     ${item('Débitos descontados', reais(e.debitos))}
+    ${e.creditos ? item('Créditos do inquilino (ressarcimento do condomínio)', reais(e.creditos)) : ''}
     ${e.fci_credito ? `${item('💰 FCI corrigido (crédito do inquilino)', reais(e.fci_credito))}${item('Reparos de danos pagos com o FCI', reais(e.fci_usado || 0))}${item('FCI a devolver', reais(e.fci_devolver || 0))}` : ''}
     ${item(e.saldo >= 0 ? 'Saldo a devolver ao inquilino' : 'Saldo a cobrar do inquilino', `<span class="maior">${reais(Math.abs(e.saldo))}</span>`)}
     ${item('Vistoria de saída', (() => { const v = K.resultadoVistoriaSaida(d(), c); return `${esc(K.textoVistoriaSaida(d(), c, e))}${v.vistoria ? ` · ${link(`#/imprimir/vistoria?id=${v.vistoria.id}`, `vistoria de ${dataBr(v.vistoria.data)}`)}` : ''}`; })())}</div>
     ${e.fci_danos > (e.fci_usado || 0) ? `<p class="suave">Os reparos passaram do FCI em ${reais(e.fci_danos - e.fci_usado)}: a diferença entrou como débito.</p>` : ''}
     ${(() => { const dev = R.devolucaoPorRecebedor(d(), c, R.garantiaADevolverNaSaida(e)); return dev.length ? `<h3>Devolução da garantia: sai de onde foi depositada</h3><table>${dev.map((x) => `<tr><td>Devolver pela ${x.pessoa ? 'conta de ' : ''}${esc(x.nome)}${x.pessoa ? ` ${etiqueta('outra pessoa', 'info')}` : ''}</td><td class="n">${reais(x.valor)}</td></tr>`).join('')}</table>` : ''; })()}
-    ${e.debitos_descricao ? `<p class="pre">${esc(e.debitos_descricao)}</p>` : ''}${e.observacoes ? `<p class="pre">${esc(e.observacoes)}</p>` : ''}
+    ${e.debitos_descricao ? `<p class="pre">${esc(e.debitos_descricao)}</p>` : ''}${e.creditos_descricao ? `<p class="pre">${esc(e.creditos_descricao)}</p>` : ''}${e.creditos && R.devolucaoPorRecebedor(d(), c, R.garantiaADevolverNaSaida(e)).length ? `<p class="suave">Os créditos (${reais(e.creditos)}) são pagos pela empresa, à parte das contas da garantia.</p>` : ''}${e.observacoes ? `<p class="pre">${esc(e.observacoes)}</p>` : ''}
     ${e.saldo !== 0 && e.garantia_devolvida_em ? `<p>${e.saldo > 0 ? 'Comprovante da devolução do saldo' : 'Comprovante do pagamento do saldo'}: ${linkComprovante(c.id, e.comprovante, { tabela: 'encerramentos', id: e.id, campo: 'comprovante', tipo: e.saldo > 0 ? 'devolucao-saldo' : 'pagamento-saldo', data: e.garantia_devolvida_em })}</p>` : ''}
     ${linkRecibo('quitacao', c, 'Termo de entrega do imóvel, acerto final e quitação (assinam a locadora e o inquilino)')}
     <p>Termo de quitação assinado por todos: ${linkComprovante(c.id, e.termo_assinado, { tabela: 'encerramentos', id: e.id, campo: 'termo_assinado', tipo: 'termo-quitacao-assinado', data: e.garantia_devolvida_em || e.data_saida })} <span class="suave">(anexe o termo assinado pelo inquilino e por nós: vai junto no e-mail do encerramento)</span></p>
@@ -465,6 +467,21 @@ function linhaIncluso(c) {
 }
 
 /** Histórico de solicitações do inquilino (pequenos reparos e pedidos). */
+/**
+ * Etiqueta do ressarcimento sem boleto deste contrato no mês: depois da saída ou da troca de titular é crédito de quem pagou
+ * (decisões do dono de 24/11/2026), no cálculo final ou na devolução da garantia.
+ */
+function etiquetaSemBoleto(c, x) {
+  const sem = R.semBoletoNoMes(d(), c, x.competencia_abatimento);
+  if (!sem) return etiqueta('entra quando o boleto for gerado', 'neutra');
+  if (sem.motivo === 'entrada') return etiqueta('sem boleto neste mês: não abatido', 'aviso');
+  const saida = R.acertoDoCredito(d(), c).tipo === 'saida';
+  const onde = saida ? 'no cálculo final' : 'na devolução da garantia';
+  const sit = R.situacaoDoCredito(d(), c, x);
+  return sit === 'incluido' ? etiqueta(`crédito ${onde}`, 'ok') : sit === 'a_incluir' ? etiqueta(`crédito: entra ${onde}`, 'info')
+    : sit === 'fora' ? etiqueta(`crédito fora ${saida ? 'do cálculo final' : 'da devolução da garantia'}: acerte`, 'aviso') : etiqueta('crédito: devolver à parte', 'aviso');
+}
+
 /** Taxas do proprietário pagas pelo inquilino no condomínio: o que já foi ressarcido e o botão para lançar. */
 function caixaRessarcimentos(c) {
   const lista = R.ressarcimentosDo(d(), c.id);
@@ -477,7 +494,7 @@ function caixaRessarcimentos(c) {
     : R.inquilinoPagaCondominio(c) ? `<p class="suave">Conferido até ${c.condominio_conferido_ate ? compBr(c.condominio_conferido_ate) : '-'}.</p>` : ''}
     ${lista.length ? `<div class="rolagem"><table><tr><th>Condomínio de</th><th>Taxa</th><th class="n">Valor</th><th>Pago pelo inquilino em</th><th>Abatido no boleto (referência e vencimento)</th><th></th></tr>
       ${lista.map((x) => { const cb = R.boletoDoMes(d(), c.id, x.competencia_abatimento); return `<tr><td>${compBr(x.competencia_condominio)}</td><td>${esc(x.descricao)}</td><td class="n">${reais(x.valor)}</td><td>${dataBr(x.data_pagamento)}</td>
-        <td>${compBr(x.competencia_abatimento)} <span class="suave">(vence ${dataBr(cb ? cb.vencimento : R.vencimentoDoContrato(d(), c, x.competencia_abatimento))})</span> ${cb ? (cb.data_pagamento ? etiqueta('abatido', 'ok') : R.emAcordo(cb) ? etiqueta('em acordo: não abatido', 'aviso') : etiqueta('no boleto em aberto', 'info')) : R.semBoletoNoMes(d(), c, x.competencia_abatimento) ? etiqueta('sem boleto neste mês: não abatido', 'aviso') : etiqueta('entra quando o boleto for gerado', 'neutra')}</td>
+        <td>${compBr(x.competencia_abatimento)} <span class="suave">(vence ${dataBr(cb ? cb.vencimento : R.vencimentoDoContrato(d(), c, x.competencia_abatimento))})</span> ${cb ? (cb.data_pagamento ? etiqueta('abatido', 'ok') : R.emAcordo(cb) ? etiqueta('em acordo: não abatido', 'aviso') : etiqueta('no boleto em aberto', 'info')) : etiquetaSemBoleto(c, x)}</td>
         <td class="n nw">${opera() && !(cb && cb.data_pagamento) ? `${link(`#/editar/ressarcimentos/${x.id}`, 'Editar')} ${botao('excluir', '×', { tabela: 'ressarcimentos', id: x.id }, 'x-excluir', 'Excluir este ressarcimento?')}` : ''}</td></tr>`; }).join('')}</table></div>` : ''}</div>`;
 }
 
