@@ -34,7 +34,7 @@ Código em `docs/` (é também a pasta publicada pelo GitHub Pages: não ponha d
 - O usuário é o dono do negócio, fala português e não é programador: respostas **sempre em português** (nunca em inglês, nem resumos ou tabelas), curtas, sem jargão, com exemplos de datas e valores.
 - Antes de mudar uma regra de negócio, confirme o entendimento com um exemplo numérico.
 - PR só quando o usuário pedir. A versão PC (`docs/offline/`) é gerada pelo GitHub a cada merge na `main` (`.github/workflows/versao-pc.yml`): não a gere nem a envie nas PRs. Commits em português (título + tópicos `- `).
-- Teste no navegador o que mudou na tela (Playwright, se disponível, no modo `?teste`) e diga o resultado.
+- Teste no navegador o que mudou na tela (Playwright, se disponível, no modo `?teste`) e diga o resultado. Nenhuma PR sem teste de tela **e** teste de links quebrados nas telas alteradas (pedido do dono, 24/11), descritos na PR.
 - Sessões em paralelo só quando o dono pedir (24/11). Cada uma tem PR própria a partir da `main`, testa tela por tela antes da PR e, antes do commit, faz `git fetch` e confere `git diff --stat origin/main` (os worktrees dividem as refs). O dono responde só à conversa principal, que repassa. Sessão que terminou o trabalho e os testes é **fechada** (arquivada e a pasta de trabalho apagada) para não deixar pontas soltas.
 
 ## Armadilhas já vistas

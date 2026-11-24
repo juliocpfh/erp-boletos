@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-jdkFih6VisicKnSJOp+Kvexf30jgtlB/ivc0cES/3LA='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-gSuHg/ezJrljzCt/ryPjxiO+bzeWB14esqBKlRY6CpE='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="89f9f644d08709cc">
+<meta name="fontes" content="3495ced99f178568">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1835,7 +1835,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           padrao: [-3, 0, 3, 10],
           min: -30,
           max: 60,
-          explica: 'Dias em relação ao vencimento do boleto, separados por vírgula: número negativo é antes, 0 é no dia, positivo é depois. Ex.: "-3, 0, 3, 10" → boleto que vence em 10/12: lembrete em 07/12, "vence hoje" em 10/12 e cobrança de atraso em 13/12 e 20/12. O e-mail fica em "E-mails da régua" (botão no alto da tela Boletos) esperando a sua autorização: nada é enviado sozinho. A cobrança de atraso só aparece passados 3 dias úteis do último dia para pagar, o prazo que o banco leva para creditar o boleto (quem pagou no dia não recebe cobrança). Em branco: nenhum e-mail é preparado.',
+          explica: 'Dias em relação ao vencimento do boleto, separados por vírgula: número negativo é antes, 0 é no dia, positivo é depois. Ex.: "-3, 0, 3, 10" → boleto que vence em 10/12: lembrete em 07/12, "vence hoje" em 10/12 e cobrança de atraso em 16/12 (com o padrão de 3 dias úteis do banco: antes disso não sai) e 20/12. O e-mail fica em "E-mails da régua" (botão no alto da tela Boletos) esperando a sua autorização: nada é enviado sozinho. A cobrança de atraso só aparece passados os dias úteis da regra "Extrato: entrada casa com o boleto até quantos dias úteis depois do último dia para pagar" (padrão 3), contados do último dia para pagar: o prazo que o banco leva para creditar o boleto (quem pagou no dia não recebe cobrança). Em branco: nenhum e-mail é preparado.',
           consequencia: 'Só muda quando o e-mail aparece na lista. Boleto pago, em acordo ou de contrato encerrado sai da lista sozinho; e-mail já enviado ou marcado "Não enviar" não volta.',
           lei: "CDC, art. 42 (cobrança sem constranger nem ameaçar); LGPD, art. 7º, V (dados usados para cumprir o contrato)."
         },
@@ -1935,13 +1935,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         {
           chave: "tolerancia_boleto_dias",
           grupo: "rotina",
-          rotulo: "Extrato: entrada casa com o boleto até quantos dias depois do vencimento",
+          rotulo: "Extrato: entrada casa com o boleto até quantos dias úteis depois do último dia para pagar",
           tipo: "inteiro",
           padrao: 3,
           min: 0,
           max: 30,
-          explica: "Entrada com o valor em dia até tantos dias depois do vencimento ainda conta como em dia. Ex.: 3 → vence dia 10, entrou dia 13.",
-          consequencia: "Mais dias: mais pagamentos atrasados pelo valor em dia contam como em dia. Só muda as contas e o aviso: nada é registrado sem a sua confirmação, e sem o código do boleto nada é ligado sozinho.",
+          explica: 'São os dias úteis que o banco leva para creditar o boleto pago pelo código de barras. A conta começa no último dia para pagar (o vencimento; se cair em sábado, domingo ou feriado, o próximo dia útil) e anda só em dias úteis. Entrada com o valor em dia creditada dentro desse prazo conta como paga em dia. Ex.: 3 → boleto que vence no sábado 10/10/2026 (12/10 é feriado): o último dia para pagar é terça 13/10 e a entrada até sexta 16/10/2026 ainda conta como em dia. Vale igual na sugestão do extrato, no botão "É o pagamento do boleto" e no primeiro dia da cobrança de atraso por e-mail (régua).',
+          consequencia: "Mais dias: mais pagamentos atrasados pelo valor em dia contam como em dia, e o e-mail de cobrança de atraso demora mais para ficar pronto. Menos dias: boleto pago no último dia e creditado depois do prazo é tratado como atrasado (com multa e juros). Pix não usa este prazo: entra na hora. Só muda as contas e o aviso: nada é registrado sem a sua confirmação, e sem o código do boleto nada é ligado sozinho.",
           lei: "Sem lei: rotina."
         },
         {
@@ -22584,11 +22584,11 @@ ${DICA_DOCUMENTOS}`].join("\n");
     const nome = nomeSemAcento(m.replace(/\{(\w+)\}/g, (_, k) => tokens[k] ?? "")).slice(0, 120).trim();
     return `${nome || "comprovante"}${extensao2 || ""}`;
   }
-  function datasPossiveisDoPagamento(credito, pix = false) {
+  function datasPossiveisDoPagamento(credito, pix = false, dias = diasCompensacaoBoleto()) {
     const out = [credito];
     if (pix) return out;
     let x = credito;
-    for (let i = 0; i < DIAS_COMPENSACAO_BOLETO; i += 1) {
+    for (let i = 0; i < dias; i += 1) {
       x = diaUtilAteh(somarDias(x, -1));
       out.push(x);
     }
@@ -22619,7 +22619,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
         if (emAberto(cb)) {
           const pontual = ib ? ib.pontual.get(cb) : totais(cb).a_pagar_pontual;
           const noPrazo = valor === pontual && data2 <= (pix ? limitePagamento(cb.vencimento) : ultimoCreditoEmDia(cb, false, dias));
-          const minimo = Math.min(...(pix ? [data2] : datasPossiveisDoPagamento(data2)).map((x) => previstoNoPagamento(cb, data2, { dataPagou: x }).valor_devido));
+          const minimo = Math.min(...(pix ? [data2] : datasPossiveisDoPagamento(data2, false, dias)).map((x) => previstoNoPagamento(cb, data2, { dataPagou: x }).valor_devido));
           if (!noPrazo && valor < minimo) return [];
           return [{ cobranca: cb, certeza: "exata", previsto: noPrazo ? pontual : previstoNoPagamento(cb, data2).valor_devido, pagouEmDia: noPrazo && data2 > cb.vencimento, peloId: true }];
         }
@@ -22644,7 +22644,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
     const lista3 = [];
     const limite = somarDias(data2, regra("dias_antecipacao_banco"));
     const exato = pix || pagouConhecido;
-    const datas = exato ? [data2] : datasPossiveisDoPagamento(data2);
+    const datas = exato ? [data2] : datasPossiveisDoPagamento(data2, false, dias);
     for (const cb of abertos) {
       if (cb.vencimento > limite) continue;
       const pontual = ib ? ib.pontual.get(cb) : totais(cb).a_pagar_pontual;
@@ -22783,6 +22783,20 @@ ${DICA_DOCUMENTOS}`].join("\n");
     }
     return out;
   }
+  function devidoNoCredito(cb, valor, credito, { pix = false, pagou = null, pagouEmDia = null } = {}) {
+    const pontual = totais(cb).a_pagar_pontual;
+    const limite = limitePagamento(cb.vencimento);
+    const dias = diasCompensacaoBoleto(cb);
+    const emDia = pagouEmDia !== null ? pagouEmDia : pagou ? credito > cb.vencimento && pagou <= limite : !pix && credito > cb.vencimento && valor === pontual && credito <= ultimoCreditoEmDia(cb, false, dias);
+    let dataPagou = !emDia && pagou && pagou < credito ? pagou : null;
+    if (!emDia && !pagou && !pix && credito > limite) {
+      const dia = datasPossiveisDoPagamento(credito, false, dias).slice(1).find((x) => x > limite && previstoNoPagamento(cb, credito, { dataPagou: x }).valor_devido === valor);
+      if (dia) dataPagou = dia;
+    }
+    const previsto = previstoNoPagamento(cb, credito, { pagouEmDia: emDia, dataPagou });
+    const minimo = !emDia && !pagou && !pix ? Math.min(previsto.valor_devido, ...datasPossiveisDoPagamento(credito, false, dias).map((x) => previstoNoPagamento(cb, credito, { dataPagou: x }).valor_devido)) : previsto.valor_devido;
+    return { emDia, dataPagou, previsto, minimo };
+  }
   function confirmarPagamentoPeloBanco(d2, cobrancaId, origem, usuario, { pagouEmDia = null, valorNf = null, justificativa = "", pagou: pagouInformado = null, diferencaNoProximo = false } = {}) {
     const cb = buscar(d2, "cobrancas", cobrancaId);
     if (!cb) throw new Error("Boleto não encontrado.");
@@ -22795,17 +22809,8 @@ ${DICA_DOCUMENTOS}`].join("\n");
     const valor = mov2 ? mov2.valor : centavosDoC6(origem.amount);
     const credito = mov2 ? mov2.data : dataDe(origem.credit_date || origem.payment_date);
     const pagou = mov2 ? pagouInformado ? dataDe(pagouInformado) : null : dataDe(origem.payment_date || origem.credit_date);
-    const pontual = totais(cb).a_pagar_pontual;
-    const limite = limitePagamento(cb.vencimento);
     const pix = mov2 ? ehPix(mov2) : ehPix(origem);
-    const emDia = pagouEmDia !== null ? pagouEmDia : pagou ? credito > cb.vencimento && pagou <= limite : !pix && credito > cb.vencimento && valor === pontual && credito <= ultimoCreditoEmDia(cb, false, DIAS_COMPENSACAO_BOLETO);
-    let dataPagou = !emDia && pagou && pagou < credito ? pagou : null;
-    if (!emDia && !pagou && !pix && credito > limite) {
-      const dia = datasPossiveisDoPagamento(credito).slice(1).find((x) => x > limite && previstoNoPagamento(cb, credito, { dataPagou: x }).valor_devido === valor);
-      if (dia) dataPagou = dia;
-    }
-    const previsto = previstoNoPagamento(cb, credito, { pagouEmDia: emDia, dataPagou });
-    const minimo = !emDia && !pagou && !pix ? Math.min(previsto.valor_devido, ...datasPossiveisDoPagamento(credito).map((x) => previstoNoPagamento(cb, credito, { dataPagou: x }).valor_devido)) : previsto.valor_devido;
+    const { emDia, dataPagou, previsto, minimo } = devidoNoCredito(cb, valor, credito, { pix, pagou, pagouEmDia });
     if (diferencaNoProximo || valor < minimo || ehComplementoCaucao(cb)) conferirValorRecebido(cb, valor, ehComplementoCaucao(cb) ? previsto.valor_devido : minimo, { extrato: !!mov2 });
     if (valor !== previsto.valor_devido && valorNf === null) {
       return { divergente: true, previsto: previsto.valor_devido, recebido: valor, cobranca: cb, pagouEmDia: emDia, dataPagou: dataPagou || pagou || credito };
@@ -23711,7 +23716,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
     if (m.observacoes) partes.push(m.observacoes);
     return partes.join(" · ");
   }
-  var CLASSIFICACOES, SO_SAIDA, SO_ENTRADA, destinoServe, SITUACOES_PAGAMENTO, SITUACAO_C6, TRANSICOES, cfg5, hoje2, dataDe, centavosDoC6, reaisParaC6, contasConfiguradas, empresaDaConta, contaDaEmpresa, fonteDe, maiusculaSemAcento, descricaoComparavel, referenciaNoBanco, soDoCsv, CAMPOS_DESTINO, dataOfx, marca, nomeColuna, COLUNAS_CSV, nomesProcurados, pagosNoBancoSemRegistro, DIAS_AGUARDANDO_CREDITO, nomeSemAcento, nomePadraoComprovante, emAberto, semDigitos, ligavel, pagoEntre, ehPix, DIAS_COMPENSACAO_BOLETO, idNormal, idUtil, ultimoCreditoEmDia, semIdentificacao, PALAVRAS, textoDaMov, despesasLigadasAoExtrato, podeSerPonta, indiceGuardado, classificacaoDaOrigem, ehDevolucao, idsDePix, DIAS_BUSCA_DEVOLUCAO, quemDoBoleto, pagamentoCitado, carimbo, codigoDeBarras, conteudoComparavel, mesmoConteudo, pagamentosAtivos, ENVIADO_C6, DESTINO_CURTO;
+  var CLASSIFICACOES, SO_SAIDA, SO_ENTRADA, destinoServe, SITUACOES_PAGAMENTO, SITUACAO_C6, TRANSICOES, cfg5, hoje2, dataDe, centavosDoC6, reaisParaC6, contasConfiguradas, empresaDaConta, contaDaEmpresa, fonteDe, maiusculaSemAcento, descricaoComparavel, referenciaNoBanco, soDoCsv, CAMPOS_DESTINO, dataOfx, marca, nomeColuna, COLUNAS_CSV, nomesProcurados, pagosNoBancoSemRegistro, DIAS_AGUARDANDO_CREDITO, nomeSemAcento, nomePadraoComprovante, emAberto, semDigitos, ligavel, pagoEntre, ehPix, diasCompensacaoBoleto, idNormal, idUtil, ultimoCreditoEmDia, semIdentificacao, PALAVRAS, textoDaMov, despesasLigadasAoExtrato, podeSerPonta, indiceGuardado, classificacaoDaOrigem, ehDevolucao, idsDePix, DIAS_BUSCA_DEVOLUCAO, quemDoBoleto, pagamentoCitado, carimbo, codigoDeBarras, conteudoComparavel, mesmoConteudo, pagamentosAtivos, ENVIADO_C6, DESTINO_CURTO;
   var init_conciliacao = __esm({
     "docs/js/conciliacao.js"() {
       init_c6_comum();
@@ -23832,7 +23837,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
       ligavel = (cb, movId = null) => !!cb.data_pagamento && (!cb.movimentacao_id || cb.movimentacao_id === movId);
       pagoEntre = (cb, de, ate) => [cb.data_pagamento, cb.data_pagou].some((x) => x && x >= de && x <= ate);
       ehPix = (x) => !!x && /\bPIX\b|_PIX_|^PIX/.test(maiusculaSemAcento(`${x.categoria_banco || ""} ${x.payment_type || ""} ${x.descricao || ""} ${x.titulo || ""}`).trim());
-      DIAS_COMPENSACAO_BOLETO = 3;
+      diasCompensacaoBoleto = (x = null) => regra("tolerancia_boleto_dias", x);
       idNormal = (t) => {
         const x = String(t ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
         return /^\d+$/.test(x) ? x.replace(/^0+/, "") : x;
@@ -23966,7 +23971,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
       DIAS_ENTRADA_ANTES = 45;
       modeloDaEtapa = (dias) => dias < 0 ? "cobranca_antes" : dias === 0 ? "cobranca_dia" : "cobranca_atraso";
       nomeDaEtapa = (dias) => dias < 0 ? `${-dias} dia(s) antes do vencimento` : dias === 0 ? "no dia do vencimento" : `${dias} dia(s) de atraso`;
-      inicioDaCobranca = (cb) => somarDiasUteis(limitePagamento(cb.vencimento), DIAS_COMPENSACAO_BOLETO + 1);
+      inicioDaCobranca = (cb) => somarDiasUteis(limitePagamento(cb.vencimento), diasCompensacaoBoleto(cb) + 1);
       decisaoDe = (d2, cobrancaId, dias) => (d2.regua_emails || []).find((x) => x.cobranca_id === cobrancaId && x.dias === dias) || null;
       SITUACOES_REGUA = { enviado: "Enviado pelo sistema", gmail: "Aberto no Gmail (enviado à mão)", recusado: "Não enviar" };
       itemDaFila = (d2, chave, hoje3 = hojeIso()) => filaRegua(d2, hoje3).find((x) => x.chave === chave) || null;
@@ -24010,13 +24015,14 @@ ${DICA_DOCUMENTOS}`].join("\n");
     const gmail = ligada && admin() ? await emailLigado() : false;
     const envio = ligada && gmail;
     const dias = regra("regua_email_dias") || [];
+    const tolerancia = regra("tolerancia_boleto_dias");
     const especiais = especiaisDiferentes(db, "regua_email_dias").map((x) => `${esc(x.nome)}: ${(x.valor || []).length ? esc(x.valor.map(nomeDaEtapa).join("; ")) : "nenhum dia"}`);
     const estado2 = !ligada ? 'O envio direto está <b>desligado</b> (Regras do sistema → "Régua de cobrança: botão Autorizar e enviar"): abra cada e-mail no Gmail ou copie o texto.' : !gmail ? "O envio direto está ligado, mas o Gmail da empresa não está ligado nesta nuvem (ou você está sem internet): por enquanto, abra no Gmail ou copie o texto." : 'Marque os e-mails que quer mandar e clique em "Enviar os selecionados": o sistema mostra a lista final e pede a sua confirmação.';
     const recentes = decididosRecentes(db, hoje3);
     return `<h1>E-mails da régua</h1><div class="abas"><a href="#/cobrancas">← Boletos</a></div>
     <div class="cabecalho"><h2>E-mails da régua de cobrança: aguardando sua autorização</h2>${link("#/modelos-email", "Textos dos e-mails")}</div>
     <p class="suave">O sistema prepara os e-mails ${dias.length ? `de cada boleto em aberto: ${esc(dias.map(nomeDaEtapa).join("; "))}` : `(nenhum dia escolhido nas Regras do sistema: nada é preparado${especiais.length ? " para os contratos que as seguem" : ""})`}.${especiais.length ? ` Contratos com regra especial: ${especiais.join(" · ")}.` : ""} <b>Nada é enviado sozinho.</b>
-      Boleto pago, em acordo ou de contrato encerrado sai da lista. A cobrança de atraso só aparece passados 3 dias úteis do último dia para pagar (o banco leva até 3 dias úteis para creditar o boleto). E-mail enviado ou marcado "Não enviar" não volta.${admin() ? "" : " Só o administrador autoriza."}</p>
+      Boleto pago, em acordo ou de contrato encerrado sai da lista. A cobrança de atraso só aparece passados ${tolerancia} dia(s) úteis do último dia para pagar (o prazo que o banco leva para creditar o boleto: regra "Extrato: entrada casa com o boleto até quantos dias úteis depois do último dia para pagar"). E-mail enviado ou marcado "Não enviar" não volta.${admin() ? "" : " Só o administrador autoriza."}</p>
     <div class="alerta ${envio ? "info" : "aviso"}">${estado2}</div>
     <div class="cartao rolagem regua"><table>
       <tr><th>${admin() && envio && fila2.some((x) => x.para) ? '<input type="checkbox" data-marcar-todas="regua" title="Marcar todos">' : ""}</th><th>Imóvel / inquilino</th><th>Boleto</th><th>Etapa</th><th class="n">Valor hoje</th><th>Para</th><th>Prévia do e-mail</th><th></th></tr>
@@ -35627,7 +35633,7 @@ ${xref}
     const cs = d().contratos.filter((c) => !imovelId || c.imovel_id === imovelId).map((c) => c.id);
     const ligaveis = d().cobrancas.filter((cb) => cs.includes(cb.contrato_id) && cb.data_pagamento && !cb.movimentacao_id && cb.valor_pago === m.valor && cb.data_pagamento <= m.data && cb.data_pagamento >= somarDias(m.data, -5)).map((cb) => ({ cb, previsto: cb.valor_pago, jaPago: true }));
     const deNovo = d().cobrancas.filter((cb) => cs.includes(cb.contrato_id) && cb.data_pagamento && cb.movimentacao_id && cb.data_pagamento <= m.data && cb.data_pagamento >= somarDias(m.data, -60)).sort((a, b) => String(b.data_pagamento).localeCompare(String(a.data_pagamento))).map((cb) => ({ cb, previsto: cb.valor_pago, aMais: true }));
-    return [...ligaveis, ...d().cobrancas.filter((cb) => cs.includes(cb.contrato_id) && aCobrar(cb)).map((cb) => ({ cb, previsto: previstoNoPagamento(cb, m.data).valor_devido })).sort((a, b) => (a.previsto === m.valor ? -1 : b.previsto === m.valor ? 1 : 0) || String(b.cb.vencimento).localeCompare(String(a.cb.vencimento))), ...deNovo].slice(0, 40);
+    return [...ligaveis, ...d().cobrancas.filter((cb) => cs.includes(cb.contrato_id) && aCobrar(cb)).map((cb) => ({ cb, previsto: devidoNoCredito(cb, m.valor, m.data, { pix: ehPix(m) }).previsto.valor_devido })).sort((a, b) => (a.previsto === m.valor ? -1 : b.previsto === m.valor ? 1 : 0) || String(b.cb.vencimento).localeCompare(String(a.cb.vencimento))), ...deNovo].slice(0, 40);
   }
   function boletosParaDevolver(imovelId, m) {
     const cs = new Set(d().contratos.filter((c) => !imovelId || c.imovel_id === imovelId).map((c) => c.id));
@@ -36190,14 +36196,15 @@ ${xref}
           if (!cb) throw new ErroUsuario("Este boleto não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.");
           if (cb.data_pagamento) throw new ErroUsuario("Este boleto já está pago: nada a fazer.");
           const c = buscar2("contratos", cb.contrato_id);
-          const previsto = previstoNoPagamento(cb, m.data).valor_devido;
+          const conta = devidoNoCredito(cb, m.valor, m.data, { pix: ehPix(m) });
+          const previsto = conta.previsto.valor_devido;
           const r = await janela({
             titulo: "Confirmar o pagamento do boleto",
             sim: "Confirmar pagamento",
             forte: previsto !== m.valor,
             html: `<p>Boleto de <b>${compBr(cb.competencia)}</b> de <b>${esc(c ? c.inquilino_nome : "")}</b>, vencimento ${dataBr(cb.vencimento)}.</p>
-        <p>Recebido <b>${reais(m.valor)}</b> em <b>${dataBr(m.data)}</b> · previsto para esta data: <b>${reais(previsto)}</b>
-        ${previsto === m.valor ? etiqueta("bate certinho", "ok") : m.valor < previsto ? `${etiqueta("valor menor que o devido", "perigo")}<br><span class="suave">Não existe pagamento em parte: se o valor menor se confirmar, o pagamento é recusado, o boleto continua em aberto e o dinheiro fica sem destino (para quitar, faça um acordo).</span>` : `${etiqueta("valor diferente", "aviso")}<br><span class="suave">Ao confirmar, o sistema pede a justificativa e o valor da NF na página do boleto.</span>`}</p>
+        <p>Recebido <b>${reais(m.valor)}</b> em <b>${dataBr(m.data)}</b> · previsto para esta data: <b>${reais(previsto)}</b>${conta.emDia ? " (em dia: crédito dentro do prazo do banco)" : ""}
+        ${previsto === m.valor ? etiqueta("bate certinho", "ok") : m.valor < conta.minimo ? `${etiqueta("valor menor que o devido", "perigo")}<br><span class="suave">Não existe pagamento em parte: se o valor menor se confirmar, o pagamento é recusado, o boleto continua em aberto e o dinheiro fica sem destino (para quitar, faça um acordo).</span>` : `${etiqueta("valor diferente", "aviso")}<br><span class="suave">Ao confirmar, o sistema pede a justificativa e o valor da NF na página do boleto.</span>`}</p>
         <p class="suave">O boleto fica "Pago" com a data em que o dinheiro entrou e esta movimentação fica ligada a ele.</p>`
           });
           if (!r) return;
@@ -38521,7 +38528,7 @@ ${xref}
 
 14. ALERTAS E AVISOS
 - Régua de cobrança (só aviso, nada é enviado sozinho): pelo boleto vencido mais antigo, a partir de 1 dia de atraso mandar o lembrete por e-mail, de 10 dias ligar para o inquilino, de 30 dias avaliar a negativação. Aparece no alerta de Inadimplência e na tela Inadimplência.
-- Régua de cobrança por e-mail (pedido do dono em 16/11/2026: nada é enviado sem a autorização dele): o sistema prepara o e-mail de cada boleto em aberto 3 dias antes do vencimento, no dia e com 3 e 10 dias de atraso (regra "Régua de cobrança: quando preparar o e-mail"), com o boleto do C6 e o QR Code do Pix anexados, e o põe na lista Boletos → E-mails da régua (botão no alto da tela Boletos), esperando o administrador. A cobrança de atraso só aparece passados 3 dias úteis do último dia para pagar (prazo do banco para creditar o boleto). Boleto pago, em acordo ou de contrato encerrado sai da lista; o que foi enviado ou marcado "Não enviar" não volta. Com a regra "botão Autorizar e enviar" desligada (padrão), cada e-mail é aberto no Gmail e mandado por lá; ligada, o administrador marca os e-mails (todos começam desmarcados) e clica em "Enviar os selecionados", que mostra a lista final e pede confirmação.
+- Régua de cobrança por e-mail (pedido do dono em 16/11/2026: nada é enviado sem a autorização dele): o sistema prepara o e-mail de cada boleto em aberto 3 dias antes do vencimento, no dia e com 3 e 10 dias de atraso (regra "Régua de cobrança: quando preparar o e-mail"), com o boleto do C6 e o QR Code do Pix anexados, e o põe na lista Boletos → E-mails da régua (botão no alto da tela Boletos), esperando o administrador. A cobrança de atraso só aparece passados os dias úteis da regra da tolerância do boleto (padrão 3) depois do último dia para pagar (prazo do banco para creditar o boleto). Boleto pago, em acordo ou de contrato encerrado sai da lista; o que foi enviado ou marcado "Não enviar" não volta. Com a regra "botão Autorizar e enviar" desligada (padrão), cada e-mail é aberto no Gmail e mandado por lá; ligada, o administrador marca os e-mails (todos começam desmarcados) e clica em "Enviar os selecionados", que mostra a lista final e pede confirmação.
 - Vigência do contrato no topo, em vermelho forte; reajuste logo abaixo, em laranja. Cor, prioridade e quanto tempo antes cada alerta com prazo aparece (fim do contrato e seguro 60 dias, fiador 60 dias, IPTU do proprietário 15 dias, reajuste e uso da reserva 1 mês) são editáveis pelo administrador.
 - Avisos antes de salvar: data de pagamento de mais de 90 dias atrás, datas no futuro, endereço sem número, telefone sem DDD, e-mail com erro, leitura menor que a anterior, IPTU ou seguro 30% fora do anterior, lançamento repetido.
 - Banco (C6): quando um campo passa do limite do banco (nome 40 caracteres, rua e número 40, e-mail 70 etc.), o sistema avisa em vez de cortar em silêncio.
