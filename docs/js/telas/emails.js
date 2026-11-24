@@ -6,7 +6,7 @@ import * as S from '../armazenamento.js';
 import * as BANCO from '../banco.js';
 import * as C from '../calculos.js';
 import { dataBr } from '../calculos.js';
-import { anexosProntos, dadosDoEmail, informesPendentes } from '../email-dados.js';
+import { anexosProntos, avisoBoletoPdfDesatualizado, dadosDoEmail, informesPendentes } from '../email-dados.js';
 import { esc } from '../formularios.js';
 import { desconectarGmail, emailLigado, enderecoParaConectar, enviarEmail, situacaoGmail } from '../gmail.js';
 import { MODELOS_EMAIL, modeloEmail, montarEmail } from '../modelos-email.js';
@@ -343,8 +343,8 @@ export const ACOES_EMAILS = {
     if (!cb) throw new C.ErroUsuario('Este boleto não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.');
     if (!cb.boleto_pdf) throw new C.ErroUsuario('Anexe antes o PDF do boleto emitido no banco (botão "Anexar o PDF do boleto", nesta página). O e-mail vai com ele.');
     if (arquivoSumiu('contrato', R.pastaDoBoletoPdf(cb), cb.boleto_pdf)) throw new C.ErroUsuario(`O PDF do boleto (${cb.boleto_pdf}) sumiu da pasta: anexe de novo antes de enviar.`);
-    const mudou = R.boletoPdfDesatualizado(cb);
-    if (mudou && !(await confirmar(`O boleto mudou depois que o PDF do banco foi anexado: ${mudou}. O PDF anexado pode estar com o valor antigo.
+    const mudou = avisoBoletoPdfDesatualizado(cb);
+    if (mudou && !(await confirmar(`${mudou}
 
 Emita de novo no banco e troque o PDF, ou abra o e-mail mesmo assim.`, { titulo: 'PDF do boleto desatualizado', sim: 'Abrir o e-mail mesmo assim', forte: true }))) return;
     await janelaEmail('boleto_envio', { contrato: cb.contrato_id, cobranca: cb.id });
