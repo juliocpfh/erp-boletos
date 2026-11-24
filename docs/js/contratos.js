@@ -272,13 +272,14 @@ export function representacaoDoContrato(d, c, imovel = {}) {
 }
 
 /**
- * Exemplo de atraso do resumo: aluguel pago 10 dias depois, com a multa e os juros por dia (mês de 30 dias), como no boleto.
- * Ex.: R$ 1.900,00, multa 2%, juros 1% ao mês → multa R$ 38,00, juros R$ 6,33, total R$ 1.944,33.
+ * Exemplo de atraso do resumo: aluguel pago 10 dias depois, com a multa e os juros por dia (mês de 30 dias), pela mesma conta
+ * do boleto (`C.jurosAoDia`: os juros de um dia, sem os décimos de centavo, vezes os dias).
+ * Ex.: R$ 1.900,00, multa 2%, juros 1% ao mês → multa R$ 38,00, juros 10 × R$ 0,63 = R$ 6,30, total R$ 1.944,30.
  */
 function exemploAtraso(aluguel, multaPct, jurosPct) {
   if (!(aluguel > 0)) return '';
   const multa = Math.round((aluguel * multaPct) / 100);
-  const juros = Math.round((aluguel * jurosPct * 10) / 3000);
+  const juros = C.jurosAoDia(aluguel, jurosPct) * 10;
   return `Exemplo: o aluguel de ${C.reais(aluguel)} pago 10 (dez) dias depois do vencimento fica em ${C.reais(aluguel)} + ${C.reais(multa)} de multa + ${C.reais(juros)} de juros = ${C.reais(aluguel + multa + juros)} (o exemplo usa só o aluguel; o que mais estiver no boleto entra na mesma conta).`;
 }
 

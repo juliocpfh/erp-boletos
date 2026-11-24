@@ -42,7 +42,7 @@ test('os valores vêm do contrato: aluguel, vencimento, multa e juros com exempl
   assert.match(r, /vence todo dia 10 \(dez\) de cada mês/);
   assert.match(r, /O IPTU vem no mesmo boleto, assim como o seguro contra incêndio\./);
   assert.match(r, /multa de 2% \(dois por cento\) e juros de 1% \(um por cento\) ao mês/);
-  assert.match(r, /R\$ 1\.900,00 \+ R\$ 38,00 de multa \+ R\$ 6,33 de juros = R\$ 1\.944,33/);
+  assert.match(r, /R\$ 1\.900,00 \+ R\$ 38,00 de multa \+ R\$ 6,30 de juros = R\$ 1\.944,30/);
   assert.match(r, /pela variação acumulada no período do IPCA/);
   assert.match(r, /caução continuar equivalente a 2 \(dois\) meses de aluguel/);
   assert.match(r, /de 01 de dezembro de 2026 a 31 de maio de 2029/);
@@ -57,6 +57,10 @@ test('variações: fiador, depósito, seguro fiança, sem garantia, prazo indete
     [{ garantia_tipo: 'Fiador' }, [/A garantia é a fiança: o FIADOR responde/, /o nome do LOCATÁRIO e do FIADOR pode ir/], [/caução/]],
     [{ garantia_tipo: 'Depósito garantia', deposito_valor: 380000 }, [/depósito de R\$ 3\.800,00/, /descontados do depósito/], [/caução/]],
     [{ garantia_tipo: 'Seguro fiança' }, [/seguro fiança locatícia/], []],
+    // fiador + depósito: as duas garantias, sem frase colada ("LOCATÁRIO.A garantia") nem "A garantia é" repetido
+    [{ garantia_tipo: 'Fiador + depósito', deposito_valor: 380000 }, [/depósito de R\$ 3\.800,00/, /devolvido ao LOCATÁRIO\. Além do depósito, há a fiança: o FIADOR responde/], [/LOCATÁRIO\.A /, /A garantia é a fiança/]],
+    // juros do exemplo pela conta do boleto (juros de um dia sem os décimos de centavo × 10): R$ 1,11 × 10 = R$ 11,10, não R$ 11,11
+    [{ aluguel_inicial: 333333, multa_percentual: 10 }, [/R\$ 3\.333,33 \+ R\$ 333,33 de multa \+ R\$ 11,10 de juros = R\$ 3\.677,76/], []],
     [{ garantia_tipo: 'Sem garantia' }, [/não tem garantia/], []],
     [{ prazo_tipo: 'Indeterminado' }, [/prazo indeterminado, a partir de 01 de dezembro de 2026/], [/multa de 3 \(três\) meses de aluguel, proporcional/]],
     [{ finalidade: 'Não residencial', atividade: 'escritório' }, [/48 \(quarenta e oito\) horas úteis/], [/72 \(setenta/]],
