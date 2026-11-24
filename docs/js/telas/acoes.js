@@ -8,6 +8,7 @@ import * as C from '../calculos.js';
 import { compBr, dataBr, reais } from '../calculos.js';
 import * as CP from '../compactar.js';
 import * as CPF from '../conferir-pdf.js';
+import * as DL from '../documentos-locacao.js';
 import * as Z from '../conciliacao.js';
 import * as K from '../contratos.js';
 import { avisosDeCorte, cortesDaFatura, encaixarFaturas, faturaExcel, faturaHtml } from '../fatura.js';
@@ -126,7 +127,7 @@ async function excelDoNumero(ExcelJS, modelo, numero) {
  */
 const EXCLUSAO_GRANDE = { contratos: true, imoveis: true, fichas: true };
 const NOMES_NA_EXCLUSAO = {
-  cobrancas: ['boleto', 'boletos'], vistorias: ['vistoria', 'vistorias'], aditivos: ['termo aditivo', 'termos aditivos'], fiadores: ['fiador', 'fiadores'],
+  cobrancas: ['boleto', 'boletos'], vistorias: ['vistoria', 'vistorias'], aditivos: ['termo aditivo', 'termos aditivos'], documentos_locacao: ['outro documento da locação', 'outros documentos da locação'], fiadores: ['fiador', 'fiadores'],
   seguros: ['apólice de seguro', 'apólices de seguro'], acordos: ['acordo', 'acordos'], cartas_reajuste: ['carta de reajuste', 'cartas de reajuste'],
   leituras: ['leitura dos relógios', 'leituras dos relógios'], iptus: ['IPTU', 'IPTUs'], despesas: ['conta ou despesa', 'contas e despesas'],
   reformas: ['reforma', 'reformas'], titularidades: ['registro de titularidade', 'registros de titularidade'], participacoes: ['participação de empresa', 'participações de empresas'],
@@ -292,6 +293,8 @@ const TABELAS_EXCLUSAO = {
     depois: (db, reg) => { R.liberarBoletosDaSaida(db, reg.id, login()); R.excluirBoletoDoSaldo(db, reg.id, login()); } },
   vistorias: { admin: true, voltar: (r) => `#/contrato/${r.contrato_id}?ir=documentos` },
   aditivos: { depois: (db, r) => R.marcarAditivos(db, r.contrato_id, login()), voltar: (r) => `#/contrato/${r.contrato_id}?ir=aditivos` },
+  // outros documentos da locação (2026-11-24, DOC-07): a via assinada sai junto (alterarApagandoAnexos)
+  documentos_locacao: { voltar: (r) => `#/contrato/${r.contrato_id}?ir=outros-documentos` },
   fiadores: { voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },
   // a devolução da troca de titular descontava boletos em aberto: eles voltam a ser cobrados
   devolucoes_garantia: { depois: (db, r) => R.liberarBoletosDaDevolucao(db, r.id, login()), voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },
@@ -1133,6 +1136,16 @@ export const ACOES = {
     await mostrar();
   },
 
+  /** Outro documento da locação (2026-11-24, DOC-07): tira a via assinada (o arquivo sai da pasta) e ele volta a aguardar a assinatura. */
+  async tirarArquivoDocumento({ id }) {
+    const x = buscar('documentos_locacao', id);
+    if (!x || !x.arquivo) throw new C.ErroUsuario('Arquivo não encontrado.');
+    if (!(await confirmar(`O arquivo "${x.arquivo}" sai da pasta e o documento volta a aguardar a assinatura.`, { titulo: 'Apagar a via assinada?', sim: 'Apagar', forte: true }))) return;
+    await alterarApagandoAnexos((db) => DL.tirarArquivoDocumento(db, Number(id), login()));
+    aviso('Arquivo apagado: o documento voltou a "aguardando assinatura".');
+    await mostrar();
+  },
+
   /** Termo aditivo gerado que não voltou assinado: vale como assinado, sem arquivo (quem não é administrador aguarda a análise). */
   async aditivoPerdido({ id }) {
     const a = buscar('aditivos', id);
@@ -1191,7 +1204,8 @@ export const ACOES = {
       aviso(so === 'arquivo' ? 'Arquivo apagado: o termo voltou a "aguardando assinatura". A mudança continua valendo.' : 'Termo aditivo excluído. A mudança continua valendo.');
     } else {
       let feito = '';
-      await alterarApagandoAnexos((db) => { feito = R.desfazerAditivo(db, Number(id), login(), { excluirTermo: so !== 'arquivo' }); });
+      // prorrogação do prazo (2026-11-24, DOC-07): a data de término volta à de antes do termo
+      await alterarApagandoAnexos((db) => { const prazo = DL.desfazerProrrogacao(db, Number(id), login()); feito = `${R.desfazerAditivo(db, Number(id), login(), { excluirTermo: so !== 'arquivo' })} ${prazo}`.trim(); });
       aviso(`${so === 'arquivo' ? 'Arquivo apagado: o termo voltou a "aguardando assinatura".' : 'Termo aditivo excluído.'} ${feito}`.trim(), 'ok');
     }
     await mostrar();
@@ -1840,6 +1854,10 @@ export const ACOES = {
   },
 
   async excluirRenovacao({ id }) {
+    // a renovação do termo de prorrogação assinado sai pelo termo (o "×" do arquivo, "não valeu"), para o termo não ficar
+    // assinado com a data de antes (2026-11-24, DOC-07)
+    const termo = DL.termoDaRenovacao(d(), buscar('renovacoes', id));
+    if (termo) throw new C.ErroUsuario(`Esta renovação veio do ${termo.numero || ''}º termo aditivo de prorrogação assinado. Para desfazer, apague o arquivo assinado do termo em "Termos aditivos" e responda que o termo não valeu: a data de término volta sozinha.`);
     await alterar((db) => {
       const r = R.buscar(db, 'renovacoes', id);
       R.excluirRenovacao(db, Number(id), login());

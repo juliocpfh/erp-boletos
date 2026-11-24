@@ -7,6 +7,7 @@ import * as AS from '../assinatura.js';
 import * as C from '../calculos.js';
 import { dataBr } from '../calculos.js';
 import * as K from '../contratos.js';
+import * as DL from '../documentos-locacao.js';
 import { avisosDeCorte, faturaHtml } from '../fatura.js';
 import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
@@ -37,12 +38,13 @@ export async function telaImprimir(rota) {
     const m = await documentoMontado(tipo, rota.q);
     if (!m) return naoEncontrado('Registro não encontrado', '#/inquilinos', 'Ver os inquilinos');
     const falta = m.exemplo ? [] : K.pendenciasDoContrato(d(), m.c);
-    const volta = m.exemplo ? '#/modelos-contrato' : tipo === 'documento' ? `#/documento-gerar?modelo=${m.modelo.id}&contrato=${m.c.id}`
+    const volta = m.exemplo ? '#/modelos-contrato' : m.volta ? m.volta : tipo === 'documento' ? `#/documento-gerar?modelo=${m.modelo.id}&contrato=${m.c.id}`
       : tipo === 'contrato' ? `#/contrato-gerar/${m.c.id}?modelo=${m.modelo.id}` : `#/contrato/${m.c.id}?ir=${tipo === 'aditivo' ? 'aditivos' : 'documentos'}`;
     return `<div class="impressao">
       <div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir</button>${botao('documentoPdf', 'Baixar PDF', {}, 'secundario')}${botao('documentoWord', 'Baixar Word', {}, 'secundario')}
         ${tipo === 'vistoria' && opera() ? link(`#/vistoria/${m.v.id}`, 'Editar a vistoria', 'botao secundario') : ''}
-        ${tipo === 'aditivo' && opera() && !m.a.arquivo && m.a.tipo !== K.TIPO_ADITIVO_VALOR ? link(`#/aditivo/${m.a.id}`, 'Editar o aditivo', 'botao secundario') : ''}
+        ${tipo === 'aditivo' && opera() && !m.a.arquivo && m.a.tipo !== K.TIPO_ADITIVO_VALOR ? link(m.a.documento ? `#/documento-gerar?modelo=${m.a.modelo_doc}&contrato=${m.c.id}` : `#/aditivo/${m.a.id}`, 'Editar o aditivo', 'botao secundario') : ''}
+        ${m.registro && !m.a && opera() && !m.registro.arquivo ? link(`#/documento-gerar?modelo=${m.registro.modelo_doc}&contrato=${m.c.id}`, 'Gerar de novo (mudar os campos)', 'botao secundario') : ''}
         <a class="botao secundario" href="${volta}">Voltar</a></div>
       ${m.exemplo ? `<div class="alerta info nao-imprimir"><b>Exemplo com dados fictícios</b> (Maria de Teste Souza, CPF de teste 529.982.247-25), para ler e ajustar o texto do modelo "${esc(m.modelo.nome)}". ${opera() ? link(`#/modelo-contrato/${m.modelo.id}`, 'Editar o texto do modelo', '') : ''}</div>` : ''}
       ${m.semCampos ? `<div class="alerta aviso nao-imprimir">Os campos deste documento saíram em branco (linha para preencher à mão). ${link(volta, 'Preencher os campos', '')}</div>` : ''}
@@ -499,6 +501,8 @@ export async function documentoMontado(tipo, q) {
     const a = buscar('aditivos', q.id);
     const c = a && buscar('contratos', a.contrato_id);
     if (!c || !a.texto) return null;
+    // prorrogação e troca de garantia geradas em "Outros documentos" (2026-11-24, DOC-07): o texto com os campos gravados
+    if (a.documento) return documentoRegistrado(a, c, 'aditivos');
     const dados = K.dadosDoAditivo(d(), c, a);
     return { c, a, blocos: K.montarContrato(a.texto, dados), rodape: dados.rodape, nome: 'Termo aditivo',
       arquivo: nomeArquivoDoc(`Termo aditivo ${a.numero || 1} ${a.tipo === K.TIPO_ADITIVO_TROCA ? 'troca de inquilino' : a.tipo === K.TIPO_ADITIVO_VALOR ? 'novo valor' : 'vencimento'}`, c, String(a.data || '').slice(0, 4)) };
@@ -529,6 +533,11 @@ const preenchidos = new Map();
  * CPF de teste, com a empresa do cadastro). Ex.: #/imprimir/documento?modelo=-6&exemplo=1 → distrato de exemplo.
  */
 function documentoPorModelo(q) {
+  if (q.id) {
+    const x = buscar('documentos_locacao', q.id);
+    const c = x && buscar('contratos', x.contrato_id);
+    return c ? documentoRegistrado(x, c, 'documentos_locacao') : null;
+  }
   const modelo = todosOsModelos().find((m) => String(m.id) === String(q.modelo));
   if (!modelo) return null;
   const tipo = K.tipoDoModelo(modelo);
@@ -543,10 +552,32 @@ function documentoPorModelo(q) {
   const p = preenchidos.get(`${modelo.id}:${c.id}`) || {};
   // o fim do contrato com a renovação e a troca de titular (contrato por prazo indeterminado: sem data, o texto muda);
   // sem o prazo em meses (dados antigos), a data de término gravada; indeterminado desde o início não usa o prazo que sobrou
-  const fim = c.prazo_tipo === 'Indeterminado' ? (c.vigencia_fim || null) : (R.fimDoContrato(d(), c) || c.vigencia_fim || null);
-  const dados = K.dadosDoDocumento(d(), c, tipo, p.valores || {}, { data: p.data || C.hojeIso(), fim });
+  const dados = K.dadosDoDocumento(d(), c, tipo, p.valores || {}, { data: p.data || C.hojeIso(), fim: fimParaDocumento(c) });
   return { c, modelo, blocos: K.montarContrato(modelo.texto, dados), rodape: dados.rodape, nome: modelo.nome, semCampos: !p.valores,
     arquivo: nomeArquivoDoc(TIPOS_DOCUMENTO[tipo].nome.replace(/\s*\(.*\)$/, ''), c, String(p.data || C.hojeIso()).slice(0, 10)) };
+}
+
+/** Modelo de "Outros documentos" pelo código (id negativo = padrão ainda não gravado). */
+export const modeloDocumento = (id) => todosOsModelos().find((m) => String(m.id) === String(id) && K.tipoDoModelo(m) in TIPOS_DOCUMENTO) || null;
+
+/**
+ * Fim do contrato usado no texto: com a renovação e a troca de titular (contrato por prazo indeterminado: sem data, o texto
+ * muda); sem o prazo em meses (dados antigos), a data de término gravada; indeterminado desde o início não usa o prazo que sobrou.
+ */
+export const fimParaDocumento = (c) => (c.prazo_tipo === 'Indeterminado' ? (c.vigencia_fim || null) : (R.fimDoContrato(d(), c) || c.vigencia_fim || null));
+
+/**
+ * Documento registrado no contrato (2026-11-24, DOC-07): o texto e os campos gravados ao gerar, com o fim do contrato daquele
+ * momento (a prorrogação assinada muda o fim, mas o termo impresso continua o mesmo). ``tabela``: 'aditivos' ou 'documentos_locacao'.
+ */
+function documentoRegistrado(x, c, tabela) {
+  const tipo = x.documento;
+  if (!(tipo in TIPOS_DOCUMENTO)) return null;
+  const dados = K.dadosDoDocumento(d(), c, tipo, x.campos || {}, { data: x.data, fim: x.fim ?? fimParaDocumento(c) });
+  const nome = TIPOS_DOCUMENTO[tipo].nome.replace(/\s*\(.*\)$/, '');
+  return { c, registro: x, ...(tabela === 'aditivos' ? { a: x } : {}), modelo: { id: x.modelo_doc, nome: TIPOS_DOCUMENTO[tipo].nome }, blocos: K.montarContrato(x.texto, dados), rodape: dados.rodape,
+    nome: TIPOS_DOCUMENTO[tipo].nome, volta: `#/contrato/${c.id}?ir=${tabela === 'aditivos' ? 'aditivos' : 'outros-documentos'}`,
+    arquivo: nomeArquivoDoc(tabela === 'aditivos' ? `${nome} ${x.numero || ''}`.trim() : nome, c, String(x.data || '').slice(0, 10)) };
 }
 
 /** Valores sugeridos ao abrir "Gerar documento" (o usuário confere e muda). Ex.: aviso de desocupação → hoje + 30 dias. */
@@ -611,7 +642,9 @@ export function telaGerarDocumento(rota) {
         <select name="contrato" required><option value="">Escolha o inquilino</option>${ativos.map((x) => `<option value="${x.id}">${esc(x.inquilino_nome)}${((i) => (i ? ` · ${esc(i.nome)}` : ''))(buscar('imoveis', x.imovel_id))}</option>`).join('')}</select>
         <button>Continuar</button></form></div>`;
   }
-  const guardado = preenchidos.get(`${modelo.id}:${c.id}`);
+  // termo aditivo já gerado e ainda sem assinatura: abre com os campos dele (gerar de novo o atualiza, com o mesmo número)
+  const pendente = DL.ehTermoAditivo(tipo) ? DL.termoAguardando(d(), c.id, tipo) : null;
+  const guardado = preenchidos.get(`${modelo.id}:${c.id}`) || (pendente ? { valores: pendente.campos || {}, data: pendente.data } : null);
   const v = (guardado && guardado.valores) || valoresSugeridos(tipo, c);
   const campo = ([k, rotulo, formato]) => `<div><label>${esc(rotulo)}</label>${formato === 'texto'
     ? `<textarea name="${k}" rows="2">${esc(v[k] || '')}</textarea>`
@@ -620,9 +653,11 @@ export function telaGerarDocumento(rota) {
   return `${topo}
     ${avisos.map((a) => `<div class="alerta aviso">${esc(a)}</div>`).join('')}
     <form class="cartao" data-form="gerarDocumento"><h2>${esc(modelo.nome)}</h2><p class="suave">${esc(def.explica)} Campo em branco sai como uma linha para preencher à mão.</p>
+      <p class="suave">${DL.ehTermoAditivo(tipo) ? `O termo fica registrado em "Termos aditivos" da página do inquilino, aguardando a assinatura${pendente ? ` (o ${pendente.numero || ''}º termo, gerado em ${dataBr(pendente.data)}, ainda sem assinatura, é atualizado)` : ''}${tipo === 'aditivo_prazo' ? '. Quando a via assinada for anexada, a data de término do contrato passa a ser a do "Fim do novo prazo"' : ''}.`
+        : 'O documento fica registrado na página do inquilino ("Outros documentos da locação"), onde se anexa a via assinada.'}</p>
       <input type="hidden" name="modelo" value="${esc(modelo.id)}"><input type="hidden" name="contrato" value="${c.id}">
       <div class="grade">${def.campos.map(campo).join('')}<div><label>Data do documento</label><input type="date" name="data" value="${esc((guardado && guardado.data) || C.hojeIso())}"></div></div>
-      <div class="acoes"><button>Ver o documento</button>${link(`#/modelo-contrato/${modelo.id}`, 'Editar o texto do modelo', 'botao secundario')}</div></form>`;
+      <div class="acoes"><button>Gerar o documento</button>${link(`#/modelo-contrato/${modelo.id}`, 'Editar o texto do modelo', 'botao secundario')}</div></form>`;
 }
 
 /** Guarda os campos digitados em "Gerar documento" (só nesta aba) para a página do documento. */
