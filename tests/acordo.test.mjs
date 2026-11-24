@@ -52,7 +52,7 @@ test('acordo: R$ 1.353,50 vencido há 40 dias vira 3 boletos de R$ 500,00; o ori
   R.gerarCobrancas(d, '2026-11', 'julio');
   assert.ok(R.boletoDoMes(d, c.id, '2026-11') && !R.ehParcelaAcordo(R.boletoDoMes(d, c.id, '2026-11')));
   // texto do boleto no banco e lembrete
-  assert.match(R.dadosBoleto(d, parcelas[0]).descricao, /^ACORDO 1\/3 RS500,00\nREF\. 07\/2026$/);
+  assert.match(R.dadosBoleto(d, parcelas[0]).descricao, /^ACORDO 1\/3 500,00\nREF\. 07\/2026$/);
   assert.match(R.textoLembrete(d, parcelas[0], '2026-12-01').texto, /parcela 1\/3 do acordo \(07\/2026\)/);
   // parcela paga em dia: NF com a parte do aluguel, período do aluguel de julho
   R.registrarPagamento(d, parcelas[0].id, '2026-12-10', null, 'julio');

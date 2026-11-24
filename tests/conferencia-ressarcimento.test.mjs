@@ -52,7 +52,7 @@ test('ressarcimento lançado antes de gerar o boleto entra quando o boleto é ge
   lancar(d, c, { descricao: 'Chamada extra (obra)', valor: 2000 });
   assert.equal(nov.ressarcimento, 7000, 'os dois no mesmo boleto');
   assert.match(nov.ressarcimento_descricao, /Fundo de obras.*; Chamada extra/);
-  assert.match(R.dadosBoleto(d, nov).descricao, /RESSARC.* -RS70,00/);
+  assert.match(R.dadosBoleto(d, nov).descricao, /RESSARC.* -70,00/);
 });
 
 test('ressarcimento continua no boleto depois do recálculo, do "Alterar valores" e de gerar outro mês', () => {

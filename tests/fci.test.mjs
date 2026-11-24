@@ -34,7 +34,7 @@ test('FCI no boleto: % do aluguel bonificado, proporcional aos dias, fora da NF,
   assert.equal(atraso.valor_nf, 200000 + 4000 + 660, 'NF sem o FCI');
   assert.equal(C.liquidar(out, '2026-11-05').valor_nf, 180000, 'em dia: NF = aluguel bonificado, sem o FCI');
   const b = R.dadosBoleto(d, out);
-  assert.match(b.descricao, /FCI RS90,00/);
+  assert.match(b.descricao, /FCI 90,00/);
   assert.equal(b.multa_valor, 4000);
   assert.equal(b.juros_ao_dia, 66);
 });
