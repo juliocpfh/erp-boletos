@@ -1767,7 +1767,8 @@ export const ACOES = {
   },
 
   async estornar({ id }) {
-    await alterar((db) => R.estornarPagamento(db, Number(id), login()));
+    // o comprovante da entrada do extrato ligada ao boleto sai junto (a entrada volta a ficar sem destino)
+    await alterarApagandoAnexos((db) => R.estornarPagamento(db, Number(id), login()));
     aviso('Pagamento desfeito.');
     await mostrar();
   },

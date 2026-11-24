@@ -753,7 +753,9 @@ function casarBoletos(d, valor, data, dias, { idExterno = null, nossoNumero = nu
   if (idExterno || nossoNumero) {
     const cb = abertos.find((x) => x.banco && ((idExterno && x.banco.id_externo === idExterno) || (nossoNumero && x.banco.nosso_numero && String(x.banco.nosso_numero) === String(nossoNumero))));
     if (cb) {
-      const emDia = data > cb.vencimento && valor === totais(cb).a_pagar_pontual;
+      // pagou depois do vencimento com o valor do desconto: em dia só até o limite (vencimento em dia não útil vale até o próximo
+      // dia útil). Depois disso o devido tem multa e juros e o valor menor não casa (decisões de 16/11 e 20/11/2026)
+      const emDia = data > cb.vencimento && data <= C.limitePagamento(cb.vencimento) && valor === totais(cb).a_pagar_pontual;
       const previsto = previstoNoPagamento(cb, data, { pagouEmDia: emDia }).valor_devido;
       if (valor < previsto) return []; // pagamento a menos: nunca casa (decisão de 2026-11-20)
       return [{ cobranca: cb, certeza: 'exata', previsto, pagouEmDia: emDia }];

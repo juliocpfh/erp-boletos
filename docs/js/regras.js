@@ -1883,8 +1883,9 @@ function boletoSemOcupacao(d, cb, c = buscar(d, 'contratos', cb.contrato_id)) {
 }
 
 /**
- * Alertas dos boletos em aberto de mês sem nenhum dia ocupado (``boletoSemOcupacao``) que ficaram: emitido no C6 (o banco
- * ainda cobra: cancele lá e depois exclua), alterado à mão (o recálculo não mexe) ou de antes desta conferência.
+ * Alertas dos boletos em aberto de mês sem nenhum dia ocupado (``boletoSemOcupacao``) que ficaram: emitido no C6 ou feito à
+ * mão no banco com o PDF anexado (o banco ainda cobra: cancele lá e depois exclua), alterado à mão (o recálculo não exclui) ou
+ * de antes desta conferência.
  */
 export function alertasBoletosSemOcupacao(d) {
   const lista = [];
@@ -1907,9 +1908,11 @@ export function alertasBoletosSemOcupacao(d) {
     const i = buscar(d, 'imoveis', c.imovel_id);
     const motivo = c.data_saida && c.data_saida < `${cb.competencia}-01` ? `saída em ${C.dataBr(c.data_saida)}` : `entrada em ${C.dataBr(c.data_entrada)}`;
     const banco = emitidoNoBanco(cb);
-    lista.push({ nivel: banco ? 'perigo' : 'aviso', tipo: banco ? 'Banco' : 'A verificar', contrato_id: c.id, imovel: i ? i.nome : '', inquilino: c.inquilino_nome,
+    const aMao = !banco && !!cb.boleto_pdf; // feito à mão no site do banco, com o PDF anexado (24/11/2026)
+    lista.push({ nivel: banco || aMao ? 'perigo' : 'aviso', tipo: banco || aMao ? 'Banco' : 'A verificar', contrato_id: c.id, imovel: i ? i.nome : '', inquilino: c.inquilino_nome,
       link: `#/cobranca/${cb.id}`, ancora: `boleto-${cb.id}`,
       texto: banco ? `Boleto de ${C.compBr(cb.competencia)} está emitido no C6, mas não tem nenhum dia ocupado (${motivo}): cancele no banco e depois exclua o boleto.`
+        : aMao ? `Boleto de ${C.compBr(cb.competencia)} foi emitido à mão no banco (PDF anexado), mas não tem nenhum dia ocupado (${motivo}): cancele no banco e depois exclua o boleto.`
         : cb.editado_manual ? `Boleto de ${C.compBr(cb.competencia)} (alterado à mão) não tem nenhum dia ocupado (${motivo}): confira e exclua o boleto se não deve ser cobrado.`
           : `Boleto de ${C.compBr(cb.competencia)} não tem nenhum dia ocupado (${motivo}): exclua o boleto (ou recalcule os boletos em aberto do mês).` });
   }
@@ -1918,10 +1921,11 @@ export function alertasBoletosSemOcupacao(d) {
 
 /**
  * Recalcula os boletos em aberto depois de mudar o contrato, o IPTU ou o seguro, para que o boleto sempre bata
- * com o cadastro. Boleto alterado à mão ("Alterar valores") fica como está (só a reserva dele pode mudar de mês).
- * Boleto de mês sem nenhum dia ocupado (ex.: dezembro gerado e saída em 15/11) é excluído, com histórico, se não tem NF e
- * não foi emitido no C6; emitido no C6, fica (o banco ainda cobra) e aparece nos alertas para cancelar no banco
- * (``alertasBoletosSemOcupacao``). Devolve quantos boletos mudaram.
+ * com o cadastro. Boleto alterado à mão ("Alterar valores"): os valores digitados ficam e o resto é recalculado
+ * (``camposDoRecalculo``; o alterado antes de 24/11/2026 fica todo como está, só a reserva dele pode mudar de mês).
+ * Boleto de mês sem nenhum dia ocupado (ex.: dezembro gerado e saída em 15/11) é excluído, com histórico, se não tem NF, não foi
+ * emitido no C6 nem feito à mão no banco (PDF anexado) e não foi alterado à mão; esses ficam e aparecem nos alertas
+ * (``alertasBoletosSemOcupacao``: cancelar no banco, ou conferir e excluir). Devolve quantos boletos mudaram.
  */
 export function recalcularCobrancas(d, filtro, usuario) {
   const mudaram = new Set();
@@ -1933,7 +1937,9 @@ export function recalcularCobrancas(d, filtro, usuario) {
     const c = buscar(d, 'contratos', cb.contrato_id);
     if (c) contratos.set(c.id, c);
     if (boletoSemOcupacao(d, cb, c)) {
-      if (!faturasDe(d, 'cobranca', cb.id, false).length && !emitidoNoBanco(cb)) {
+      // fica (com alerta): emitido no C6, feito à mão no banco com o PDF anexado (o banco ainda cobra e o inquilino pode ter o
+      // PDF) ou alterado à mão (o valor foi combinado: confira e exclua, como antes de 24/11/2026)
+      if (!faturasDe(d, 'cobranca', cb.id, false).length && !emitidoNoBanco(cb) && !cb.boleto_pdf && !cb.editado_manual) {
         excluir(d, 'cobrancas', cb.id, usuario, `Boleto ${C.compBr(cb.competencia)} de ${c.inquilino_nome} excluído: nenhum dia ocupado no mês (${c.data_saida && c.data_saida < `${cb.competencia}-01` ? `saída em ${C.dataBr(c.data_saida)}` : `entrada em ${C.dataBr(c.data_entrada)}`})`);
         mudaram.add(cb.id);
       }
@@ -2169,9 +2175,13 @@ export function estornarPagamento(d, cobrancaId, usuario) {
   atualizar(d, 'cobrancas', cobrancaId, { data_pagamento: null, data_pagou: null, valor_pago: null, dias_atraso: null, multa: null,
     juros: null, valor_nf: null, pagou_em_dia: false, situacao: 'Em aberto', nf_manual: false, divergencia: null, movimentacao_id: null, pagamento_c6: null,
     ...(cb && (cb.valor_a_mais || cb.valor_devolvido) ? { valor_a_mais: null, valor_devolvido: null } : {}) }, usuario, 'Pagamento desfeito');
-  // confirmado pelo extrato: a movimentação volta a "sem destino" (também a entrada a mais e a devolução ao inquilino ligadas a ele)
+  // confirmado pelo extrato: a movimentação volta a "sem destino" (também a entrada a mais e a devolução ao inquilino ligadas a ele).
+  // O comprovante sai junto, como no "Desfazer destino" (``desvincularMovimentacao``): a pasta dele vem do imóvel, que sai; a tela
+  // apaga o arquivo que ficou sem uso (alterarApagandoAnexos) e ele é guardado de novo ao dar o destino certo.
   for (const m of (d.movimentacoes_banco || []).filter((x) => x.cobranca_id === Number(cobrancaId))) {
-    atualizar(d, 'movimentacoes_banco', m.id, { cobranca_id: null, classificacao: null, imovel_id: null, classificada_em: null, classificada_por: null, ...(m.pago_a_mais ? { pago_a_mais: false } : {}) }, usuario, 'Pagamento do boleto desfeito: movimentação volta a ficar sem destino');
+    atualizar(d, 'movimentacoes_banco', m.id, { cobranca_id: null, classificacao: null, imovel_id: null, classificada_em: null, classificada_por: null,
+      ...(m.comprovante || m.comprovante_contador || m.comprovante_origem || m.nome_arquivo ? { comprovante: null, comprovante_contador: null, comprovante_origem: null, nome_arquivo: null } : {}),
+      ...(m.pago_a_mais ? { pago_a_mais: false } : {}) }, usuario, 'Pagamento do boleto desfeito: movimentação volta a ficar sem destino');
   }
 }
 
@@ -2285,13 +2295,14 @@ export function baseDaFatura(d, tipo, registro) {
     const ref = acordo ? `acordo${registro.acordo_parcela ? ` ${registro.acordo_parcela}` : ''} (${registro.acordo_referente})` : '';
     // mês incompleto (entrada ou saída): a NF mostra a quantidade em dias do mês (ex.: 16/30), não "1 mês"
     // com o ajuste do mês na NF, o total não é só o aluguel: a linha sai como "1" (senão o valor unitário ficaria errado)
-    const ajusteNaNf = !!(registro.outros_na_nf && registro.outros);
+    const ajusteNf = C.ajusteNaNf(registro);
+    const ajusteNaNf = !!ajusteNf;
     const proporcional = !acordo && !ajusteNaNf && registro.dias_cobrados > 0 && registro.dias_cobrados < registro.dias_mes;
     return {
       imovel, valor: registro.valor_nf, periodo_inicio: ini, periodo_fim: fim,
       ...(proporcional ? { dias: registro.dias_cobrados, dias_mes: registro.dias_mes } : {}),
       descricao: `${contrato.inquilino_nome} · ${imovel.nome} · ${ref || C.compBr(registro.competencia)}`,
-      observacoes: registro.observacoes_nf || [ref ? `Parcela do ${ref}` : '', ajusteNaNf ? `Inclui ${registro.outros_descricao || 'ajuste do mês'}: ${C.reais(registro.outros)}` : ''].filter(Boolean).join('. '),
+      observacoes: registro.observacoes_nf || [ref ? `Parcela do ${ref}` : '', ajusteNaNf ? `Inclui ${ajustesDoBoleto(registro).map((a) => a.motivo).filter(Boolean).join('; ') || 'ajuste do mês'}: ${C.reais(ajusteNf)}` : ''].filter(Boolean).join('. '),
       tomador: { nome: contrato.inquilino_nome, documento: contrato.inquilino_cpf || '',
         telefone: contrato.inquilino_telefone || '', endereco: enderecoCompleto(imovel) },
       partes: participacoesDo(d, imovel.id), origem: `no imóvel "${imovel.nome}"`,
@@ -3618,9 +3629,10 @@ export function anexarBoletoPdf(d, id, arquivo, usuario) {
   const quem = `${c ? c.inquilino_nome : 'boleto'}: boleto de ${C.compBr(cb.competencia)}`;
   if (!arquivo) {
     if (!cb.boleto_pdf) throw new C.ErroUsuario('Este boleto não tem PDF anexado.');
-    return atualizar(d, 'cobrancas', cb.id, { boleto_pdf: null, boleto_pdf_contrato: null, boleto_pdf_valor: null, boleto_pdf_vencimento: null }, usuario, `${quem}, PDF do banco tirado (${cb.boleto_pdf})`);
+    return atualizar(d, 'cobrancas', cb.id, { boleto_pdf: null, boleto_pdf_contrato: null, boleto_pdf_valor: null, boleto_pdf_vencimento: null, boleto_pdf_pontual: null, boleto_pdf_multa: null, boleto_pdf_juros: null }, usuario, `${quem}, PDF do banco tirado (${cb.boleto_pdf})`);
   }
-  return atualizar(d, 'cobrancas', cb.id, { boleto_pdf: arquivo, boleto_pdf_contrato: cb.contrato_id, boleto_pdf_valor: totais(cb).a_pagar_sem_desconto, boleto_pdf_vencimento: cb.vencimento },
+  return atualizar(d, 'cobrancas', cb.id, { boleto_pdf: arquivo, boleto_pdf_contrato: cb.contrato_id, boleto_pdf_valor: totais(cb).a_pagar_sem_desconto, boleto_pdf_vencimento: cb.vencimento,
+    boleto_pdf_pontual: totais(cb).a_pagar_pontual, boleto_pdf_multa: cb.multa_percentual || 0, boleto_pdf_juros: cb.juros_mensal_percentual || 0 },
     usuario, `${quem}, PDF do banco ${cb.boleto_pdf ? 'trocado' : 'anexado'} (${arquivo})`);
 }
 
@@ -3634,6 +3646,12 @@ export function boletoPdfDesatualizado(cb) {
   const valor = totais(cb).a_pagar_sem_desconto;
   if (valor !== cb.boleto_pdf_valor) dif.push(`o valor era ${C.reais(cb.boleto_pdf_valor)} e agora é ${C.reais(valor)}`);
   if (cb.boleto_pdf_vencimento && cb.boleto_pdf_vencimento !== cb.vencimento) dif.push(`o vencimento era ${C.dataBr(cb.boleto_pdf_vencimento)} e agora é ${C.dataBr(cb.vencimento)}`);
+  // bonificação, multa e juros (guardados desde 24/11/2026; anexo de antes não tem e não é conferido): o valor cheio pode
+  // continuar igual. Ex.: anexado com R$ 1.800,00 até o vencimento e a bonificação passou a R$ 100,00 → R$ 1.900,00
+  const pontual = totais(cb).a_pagar_pontual;
+  if (cb.boleto_pdf_pontual != null && valor === cb.boleto_pdf_valor && pontual !== cb.boleto_pdf_pontual) dif.push(`o valor até o vencimento era ${C.reais(cb.boleto_pdf_pontual)} e agora é ${C.reais(pontual)}`);
+  if (cb.boleto_pdf_multa != null && (cb.multa_percentual || 0) !== cb.boleto_pdf_multa) dif.push(`a multa era ${C.pct(cb.boleto_pdf_multa)} e agora é ${C.pct(cb.multa_percentual || 0)}`);
+  if (cb.boleto_pdf_juros != null && (cb.juros_mensal_percentual || 0) !== cb.boleto_pdf_juros) dif.push(`os juros eram ${C.pct(cb.boleto_pdf_juros)} ao mês e agora são ${C.pct(cb.juros_mensal_percentual || 0)}`);
   return dif.join('; ');
 }
 
@@ -7920,7 +7938,7 @@ export function previaAcordo(d, { contrato_id, ids, total, parcelas, primeiro_ve
   const divida = lista.reduce((s, cb) => s + C.liquidar(cb, hoje).valor_devido, 0);
   // o que separa o pago da NF no pagamento atrasado normal (``C.liquidar``): IPTU, seguro, tarifa e FCI ficam fora; a reserva
   // já abatida e o ressarcimento que não sai da NF entram (NF com o aluguel cheio): pode dar negativo (NF maior que o pago)
-  const foraDaNf = Math.min(total, lista.reduce((s, cb) => s + totais(cb).a_pagar_sem_desconto - (cb.aluguel || 0) + (cb.ressarcimento_na_nf ? cb.ressarcimento || 0 : 0) - (cb.outros_na_nf ? cb.outros || 0 : 0), 0));
+  const foraDaNf = Math.min(total, lista.reduce((s, cb) => s + totais(cb).a_pagar_sem_desconto - (cb.aluguel || 0) + (cb.ressarcimento_na_nf ? cb.ressarcimento || 0 : 0) - C.ajusteNaNf(cb), 0));
   if (total < n) throw new C.ErroUsuario(`Com ${n} parcelas, o total precisa ser de pelo menos ${C.reais(n)} (nenhuma parcela pode ficar com R$ 0,00).`);
   const valores = C.parcelas(total, n);
   const fora = C.parcelas(foraDaNf, n);
