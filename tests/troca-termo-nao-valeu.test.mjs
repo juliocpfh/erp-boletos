@@ -30,7 +30,7 @@ test('troca em 01/12, boletos de dezembro gerados e termo "não valeu": só Joã
   assert.deepEqual(doMes(d, '2026-12'), [['Maria Lima', 180000]], 'antes: dezembro é de Maria');
   const msg = R.desfazerAditivo(d, ad.id, 'j', { excluirTermo: false });
   assert.match(msg, /João Souza continua no contrato/);
-  assert.match(msg, /O boleto de Maria Lima \(12\/2026\) saiu e João Souza volta a ser cobrado pelo mês cheio/);
+  assert.match(msg, /O boleto de Maria Lima \(12\/2026\) saiu. João Souza volta a ser cobrado pelo mês cheio \(12\/2026\)/);
   assert.deepEqual(doMes(d, '2026-12'), [['João Souza', 180000]], 'antes da correção: Maria R$ 1.800,00 e João R$ 1.800,00');
   // gerar de novo não volta o boleto de Maria (sem o termo, a troca espera)
   R.gerarCobrancas(d, '2026-12', 'j');
@@ -47,20 +47,41 @@ test('troca em 15/12: o boleto de Maria (16/30) sai e o de João volta de 14/30 
   assert.deepEqual(doMes(d, '2026-12'), [['João Souza', 180000]], 'antes da correção: Maria R$ 960,00 e João R$ 1.800,00');
 });
 
-test('boleto do novo titular pago ou emitido no banco fica, com aviso; o em aberto sai', () => {
+test('boleto do novo titular já pago: João paga o mês cheio e o que Maria pagou fica "a devolver" (opção (a) do dono, 24/11)', () => {
   const { d, c } = base();
   const { ad } = troca(d, c, '2026-12-01');
   R.gerarCobrancas(d, '2026-12', 'j');
-  R.gerarCobrancas(d, '2027-01', 'j');
   const dez = d.cobrancas.find((x) => x.competencia === '2026-12');
-  const jan = d.cobrancas.find((x) => x.competencia === '2027-01');
   R.registrarPagamento(d, dez.id, '2027-01-08', null, 'j');
-  R.atualizar(d, 'cobrancas', jan.id, { banco: { situacao: 'emitido' } }, 'j');
+  const msg = R.desfazerAditivo(d, ad.id, 'j', { excluirTermo: false });
+  assert.match(msg, /João Souza volta a ser cobrado pelo mês cheio \(12\/2026\)/);
+  assert.match(msg, /Maria Lima já tinha pago 12\/2026 \(R\$\s?1\.800,00\): o valor fica "a devolver"/);
+  assert.deepEqual(doMes(d, '2026-12'), [['Maria Lima', 180000], ['João Souza', 180000]]);
+  const joao = R.boletoDoMes(d, c.id, '2026-12');
+  assert.equal(joao.data_pagamento, null, 'o boleto de João, cheio, em aberto');
+  // o pago de Maria fica inteiro a devolver; "Devolvi" zera
+  const pago = R.buscar(d, 'cobrancas', dez.id);
+  assert.equal(R.devidoDoPago(pago), 0);
+  assert.equal(R.pagoAMaisDo(pago), 180000);
+  R.marcarDevolvidoAMao(d, dez.id, '2027-01-10', 'j');
+  assert.equal(R.pagoAMaisDo(R.buscar(d, 'cobrancas', dez.id)), 0);
+  // gerar de novo não dobra o mês (João já tem o dele; Maria espera o termo)
+  R.gerarCobrancas(d, '2026-12', 'j');
+  assert.equal(d.cobrancas.filter((x) => x.competencia === '2026-12').length, 2);
+});
+
+test('boleto do novo emitido no banco e não pago: fica com aviso para cancelar no banco; o em aberto sai; João é cobrado', () => {
+  const { d, c } = base();
+  const { ad } = troca(d, c, '2026-12-15');
+  R.gerarCobrancas(d, '2027-01', 'j');
   R.gerarCobrancas(d, '2027-02', 'j');
+  const jan = d.cobrancas.find((x) => x.competencia === '2027-01' && x.contrato_id !== c.id);
+  R.atualizar(d, 'cobrancas', jan.id, { banco: { situacao: 'emitido' } }, 'j');
   const msg = R.desfazerAditivo(d, ad.id, 'j', { excluirTermo: false });
   assert.match(msg, /O boleto de Maria Lima \(02\/2027\) saiu/);
-  assert.match(msg, /Atenção: os boletos de Maria Lima 12\/2026 \(pago em 08\/01\/2027\), 01\/2027 \(emitido no banco\) ficaram: confira/);
-  assert.ok(R.buscar(d, 'cobrancas', dez.id) && R.buscar(d, 'cobrancas', jan.id), 'pago e emitido no banco não são apagados');
+  assert.match(msg, /o boleto de Maria Lima 01\/2027 está emitido no banco: cancele no banco e depois exclua aqui/);
+  assert.ok(R.buscar(d, 'cobrancas', jan.id), 'emitido no banco não é apagado');
+  assert.deepEqual(doMes(d, '2027-01').sort(), [['João Souza', 180000], ['Maria Lima', 180000]]);
   assert.deepEqual(doMes(d, '2027-02'), [['João Souza', 180000]]);
-  assert.ok(d.historico.some((h) => /Boleto 12\/2026 de Maria Lima pago em 08\/01\/2027: fica/.test(h.descricao || '')), 'anotado no Histórico');
+  assert.ok(d.historico.some((h) => /Boleto 01\/2027 de Maria Lima emitido no banco: .*Cancele este boleto no banco/.test(h.descricao || '')), 'anotado no Histórico');
 });
