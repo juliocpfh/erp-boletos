@@ -9011,7 +9011,8 @@ export function marcarVistoriaSaida(d, contratoId, data, hora, usuario, hoje = C
 }
 
 /**
- * Valor de cada reparo da vistoria de saída (B5), com o orçamento: ``lista`` [{ pendencia, valor (centavos, null = sem valor), orcamento }].
+ * Valor de cada reparo da vistoria de saída (B5), com o orçamento: ``lista`` [{ pendencia, valor (centavos, null = sem valor), orcamento,
+ * pintura (opcional: é reparo de pintura), orcamento_valor (opcional: orçamento inteiro da pintura, em centavos) }].
  * Só as pendências atuais da vistoria ficam guardadas. Ex.: porta riscada R$ 350,00 + pintura da sala R$ 700,00 = R$ 1.050,00.
  */
 export function valoresReparos(d, vistoriaId, lista, usuario) {
@@ -9023,8 +9024,12 @@ export function valoresReparos(d, vistoriaId, lista, usuario) {
   for (const x of lista) {
     if (!atuais.has(x.pendencia)) continue;
     if (x.valor !== null && !(Number.isInteger(x.valor) && x.valor >= 0)) throw new C.ErroUsuario(`Valor inválido em "${x.pendencia}".`);
-    if (x.valor === null && !String(x.orcamento || '').trim()) continue;
-    reparos[x.pendencia] = { valor: x.valor, orcamento: String(x.orcamento || '').trim() };
+    const ov = x.orcamento_valor === undefined ? null : x.orcamento_valor;
+    if (ov !== null && !(Number.isInteger(ov) && ov >= 0)) throw new C.ErroUsuario(`Orçamento inválido em "${x.pendencia}".`);
+    if (x.valor === null && !String(x.orcamento || '').trim() && ov === null) continue;
+    // pintura (24/11/2026): a marca e o orçamento inteiro ficam guardados para a sugestão (K.sugestaoPintura) ao reabrir
+    reparos[x.pendencia] = { valor: x.valor, orcamento: String(x.orcamento || '').trim(),
+      ...(x.pintura !== undefined ? { pintura: !!x.pintura } : {}), ...(ov !== null ? { orcamento_valor: ov } : {}) };
   }
   const total = Object.values(reparos).reduce((s, x) => s + (x.valor || 0), 0);
   atualizar(d, 'vistorias', v.id, { reparos }, usuario, `${c.inquilino_nome}: valores dos reparos da vistoria de saída (${C.reais(total)})`);

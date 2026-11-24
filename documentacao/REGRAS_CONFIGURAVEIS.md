@@ -51,6 +51,8 @@ não e o artigo da lei. O sistema avisa, mas não proíbe as escolhas do adminis
 
 ## C. Contrato e saída
 
+- **Pintura na saída: vida da pintura** (`pintura_vida_meses`, padrão 36 meses; 24/11/2026). Vistoria de entrada com "Pintura nova na entrada" = Sim → sugere o orçamento inteiro; Não → orçamento × (36 − meses de moradia) ÷ 36, mínimo zero (ex.: R$ 2.400,00, 12 meses → R$ 1.600,00); vistoria antiga sem a resposta → sem sugestão, com aviso. Só sugestão (janela dos reparos, `K.sugestaoPintura`); a equipe muda o valor. Lei 8.245/91, art. 23, III.
+
 | # | Regra | Hoje (exemplo) | Opções | Padrão recomendado e por quê | Aprovado? |
 |---|---|---|---|---|---|
 | C1 | Prazo padrão do contrato residencial | Em branco (digitado) | [E] meses padrão | 30 meses. LI art. 46: com 30 meses ou mais, no fim o locador pode retomar sem motivo; com menos, o contrato prorroga e só se retoma em casos da lei ou depois de 5 anos (art. 47) | |
