@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-JokDqs1V6m5GlouZ/2lBe9zISA8B4YYcx3q6vRVm+l8='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-epFnxBnmDgLOEfwLEPI6fv5sZjsGLudFC5YsODFNiBA='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="4096aec03f0c6761">
+<meta name="fontes" content="165bcba8c7e3d537">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -3466,6 +3466,33 @@ Sem o pagamento, o débito poderá ser cobrado do LOCATÁRIO e {f:do FIADOR|dos 
     for (const [antigo, novo, feito] of ATUALIZACOES_MODELO) if (t.includes(antigo) && !t.includes(feito || novo)) t = t.split(antigo).join(novo);
     return t;
   }
+  function textoAtualizadoDoModelo(m) {
+    let texto3 = m?.texto;
+    if (!texto3 || typeof texto3 !== "string") return texto3;
+    const tipo = m.tipo;
+    const trocar = (t) => {
+      const novo = atualizarTextoModelo(t);
+      return novo !== t.replace(/\r\n/g, "\n") ? novo : t;
+    };
+    if (!tipo && !texto3.includes("[se fci]") && texto3.includes("## RENOVAÇÃO DO CONTRATO")) {
+      texto3 = texto3.replace("## RENOVAÇÃO DO CONTRATO", `${CLAUSULAS_FCI}
+
+## RENOVAÇÃO DO CONTRATO`);
+    }
+    if (!tipo) texto3 = trocar(texto3);
+    if (tipo === "aditivo_troca" && !texto3.includes("[se garantia_nova]")) {
+      const t = texto3.replace(/\r\n/g, "\n");
+      const ini = t.indexOf("## DA GARANTIA\n");
+      const fim = t.indexOf("\n\n## ", ini + 1);
+      if (ini >= 0 && fim >= 0) {
+        const corpo = ini + "## DA GARANTIA\n".length;
+        texto3 = `${t.slice(0, corpo)}
+[se garantia_nova]${GARANTIA_NOVA_TROCA}[senão]${t.slice(corpo, fim).trim()}[fim]${t.slice(fim)}`;
+      }
+    }
+    if (tipo === "aditivo_troca") texto3 = trocar(texto3);
+    return texto3;
+  }
   var VISTORIA_ENTRADA, VISTORIA_ENTRADA_1211, SEM_AVISO, REPRESENTACAO, LGPD, PARTES, ITENS, PRAZO_ANTIGO, PRAZO_PARAGRAFO, TARIFA_BOLETO, DESPESAS_A_QUALQUER_TEMPO, EXTRAORDINARIAS, ALUGUEL, CONSERVACAO, CLAUSULAS_FCI, SEGURO_ANTIGO, SEGURO_INCENDIO, RESTITUICAO, MULTA, RESCISAO, GARANTIA, CONVITE_SAIDA, NEGATIVACAO, FECHO_CONTRATO, TARIFA_RESUMO, TARIFA_RESUMO_ANTIGA, RESUMO_CONTRATO, DIA_NAO_UTIL_ANTIGO, DIA_NAO_UTIL, RESUMO_FIM, RESUMO_FIM_COM_ANIMAIS, FINAIS, CONDOMINIO, ADITIVO_VENCIMENTO, ADITIVO_VALOR, ACERTO_POUPANCA, DEVOLUCAO_POUPANCA, ACERTO_CAUCAO_ANTIGO, ACERTO_DEPOSITO_ANTIGO, DEVOLUCAO_ANTIGA, GARANTIA_NOVA_TROCA, CONTAS_TROCA_ANTIGA, CONTAS_TROCA, ADITIVO_TROCA, MODELOS_PADRAO, ENDERECO_PARAGRAFO, ATUALIZACOES_MODELO;
   var init_modelos_contrato = __esm({
     "docs/js/modelos-contrato.js"() {
@@ -6741,30 +6768,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       if (c) s.imovel_id = c.imovel_id;
     }
     for (const m of d2.modelos_contrato || []) {
-      if (m.tipo || !m.texto || m.texto.includes("[se fci]") || !m.texto.includes("## RENOVAÇÃO DO CONTRATO")) continue;
-      m.texto = m.texto.replace("## RENOVAÇÃO DO CONTRATO", `${CLAUSULAS_FCI}
-
-## RENOVAÇÃO DO CONTRATO`);
-    }
-    for (const m of d2.modelos_contrato || []) {
-      if (m.tipo || !m.texto) continue;
-      const novo = atualizarTextoModelo(m.texto);
-      if (novo !== m.texto.replace(/\r\n/g, "\n")) m.texto = novo;
-    }
-    for (const m of d2.modelos_contrato || []) {
-      if (m.tipo !== "aditivo_troca" || !m.texto || m.texto.includes("[se garantia_nova]")) continue;
-      const t = m.texto.replace(/\r\n/g, "\n");
-      const ini = t.indexOf("## DA GARANTIA\n");
-      const fim = t.indexOf("\n\n## ", ini + 1);
-      if (ini < 0 || fim < 0) continue;
-      const corpo = ini + "## DA GARANTIA\n".length;
-      m.texto = `${t.slice(0, corpo)}
-[se garantia_nova]${GARANTIA_NOVA_TROCA}[senão]${t.slice(corpo, fim).trim()}[fim]${t.slice(fim)}`;
-    }
-    for (const m of d2.modelos_contrato || []) {
-      if (m.tipo !== "aditivo_troca" || !m.texto) continue;
-      const novo = atualizarTextoModelo(m.texto);
-      if (novo !== m.texto.replace(/\r\n/g, "\n")) m.texto = novo;
+      const novo = textoAtualizadoDoModelo(m);
+      if (novo !== m.texto) m.texto = novo;
     }
     for (const i of d2.imoveis) if (!i.uf && ufDoCep(i.cep)) i.uf = ufDoCep(i.cep);
     for (const c of d2.contratos) if (!c.imovel_id && !c.sem_imovel_desde) c.sem_imovel_desde = hojeIso();
