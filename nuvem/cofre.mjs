@@ -121,11 +121,11 @@ export const ACAO_APAGAR_PESSOA = 'Apagar pessoa (LGPD)';
 /**
  * Chaves de negócio que não repetem (dois aparelhos fazendo a mesma coisa antes de um ver o do outro, ou um deles sem internet):
  * registro novo com a mesma chave de um que já está na nuvem é recusado, e o lote inteiro volta (como código repetido; a tela
- * mostra em Conflitos). `so`: só os registros que contam (o boleto do complemento da caução e as parcelas de acordo não são o
- * aluguel do mês: boletoDoMes/ehBoletoAvulso de regras.js); `usa`: campos que `so` lê. Chave com campo vazio não conta.
+ * mostra em Conflitos). `so`: só os registros que contam (o boleto do complemento da caução, as parcelas de acordo e o boleto do
+ * saldo do cálculo final da saída não são o aluguel do mês: boletoDoMes/ehBoletoAvulso de regras.js); `usa`: campos que `so` lê. Chave com campo vazio não conta.
  */
 export const CHAVES_UNICAS = {
-  cobrancas: { campos: ['contrato_id', 'competencia'], usa: ['caucao_complemento', 'acordo_parcela_de'], so: (r) => !(Number(r.caucao_complemento) > 0) && !r.acordo_parcela_de, nome: 'O boleto do aluguel deste contrato neste mês' },
+  cobrancas: { campos: ['contrato_id', 'competencia'], usa: ['caucao_complemento', 'acordo_parcela_de', 'saldo_saida_de'], so: (r) => !(Number(r.caucao_complemento) > 0) && !r.acordo_parcela_de && !r.saldo_saida_de, nome: 'O boleto do aluguel deste contrato neste mês' },
   movimentacoes_banco: { campos: ['conta_id', 'id_externo'], nome: 'Este lançamento do extrato' },
   correcoes: { campos: ['contrato_id', 'data_vigencia'], nome: 'A correção do aluguel deste contrato nesta data' },
   encerramentos: { campos: ['contrato_id'], nome: 'O cálculo final da saída deste contrato' },
