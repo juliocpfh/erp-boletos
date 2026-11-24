@@ -53,7 +53,7 @@ const temComprovante = (x) => !!(x.comprovante || x.comprovante_contador);
  * Sugestão de destino da movimentação. Conta de outro banco (só arquivo): o arquivo não traz o código do boleto, então a entrada
  * que parece aluguel nunca liga sozinha nem vem marcada (decisão do dono em 2026-11-17): fica só o aviso "vincular manualmente".
  */
-const sugestaoDe = (m) => {
+export const sugestaoDe = (m) => {
   if (m.classificacao) return null;
   const s = Z.sugerirDestino(d(), m, Z.indiceDaTela(d()));
   return s && soArquivo(m.conta_id) && (s.classificacao === 'boleto' || (s.cobranca_id && s.classificacao !== 'devolucao_inquilino')) ? { manual: true } : s;
