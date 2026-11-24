@@ -14,6 +14,8 @@ Pedido do dono em 24/11: "parece que tem muitas coisas de boletos quebradas". Fo
 
 ## Por que um ressarcimento lançado pode não entrar no boleto
 
+**Causa achada nos seus dados (24/11):** foi a hipótese 2 abaixo, a confusão entre o mês de referência e o mês do vencimento. Na Ascot, os dois ressarcimentos do condomínio de 10/2026 foram gravados para "12/2026", pensando no boleto que vence em 05/12/2026; mas esse boleto é o de referência 11/2026, e "12/2026" mandou o valor para o boleto que vence em janeiro. O seguro da Casa 02 teve o mesmo problema. Os formulários do ressarcimento e do seguro vão passar a perguntar o **mês do vencimento**, como o IPTU já faz, mostrando ao lado "boleto de referência 11/2026, vence 05/12/2026". Essa mudança é feita pela sessão principal, numa PR própria, que também acerta os seus dados. Campos do contrato com a mesma confusão possível, ainda sem mudança: "Usar a reserva no aluguel de", "Carência a partir do aluguel de" e "O novo valor vale a partir do aluguel de" (renovação).
+
 O teste simples de antes (condomínio pago em 05/11, abatido no boleto de 11/2026) funcionava. Foram testadas as hipóteses uma a uma:
 
 1. **Mês do abatimento calculado errado:** não. Condomínio pago em 05/11/2026 → boleto do aluguel de **11/2026**, que vence em **10/12/2026**. Contrato com aluguel que vence no próprio mês → boleto de 12/2026, que também vence em 10/12/2026. O vencimento é o mesmo nos dois casos.
@@ -55,7 +57,7 @@ Exemplos com aluguel de R$ 2.000,00, bonificação de 10% e tarifa de R$ 3,50:
 
 ## O que não pôde ser testado
 
-- **Os dados reais** (o JSON do dono): a conferência usou dados fictícios. A causa exata do ressarcimento que faltou nos boletos reais não foi vista nos dados; as hipóteses 2, 4, 5, 7 e 8 explicam o sintoma.
+- **Os dados reais** (o JSON do dono): esta conferência usou dados fictícios. A causa nos seus dados foi vista pela sessão principal (mês do vencimento digitado como mês de referência, no topo desta seção).
 - **O C6 de verdade:** não se sabe se a tela do C6 (emissão à mão) corta a descrição em 100 letras como a API. O limite usado é o da API.
 - **O celular:** os testes de tela foram no navegador do computador.
 - **O Desfazer pela tela do Histórico:** testado pela regra (`reaplicarRessarcimentos`) e pelo código da tela, não clicando no Histórico.
