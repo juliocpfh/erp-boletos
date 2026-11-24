@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-JcolyBFaICY8tWqGaFP8cisbvShBEqoN7KfhcPjOriA='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-PntMo7z5e9g+wfBXWv2vobYMEbLLJT1CtoE2zaCe89g='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="e8da4efad6497809">
+<meta name="fontes" content="69fc43404237b49d">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -5525,7 +5525,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         campo("competencia_condominio", "Mês do boleto do condomínio", "mes", { obrig: true }),
         campo("descricao", "Taxa", "texto", { obrig: true, sugestoes: [], ajuda: "Escreva o nome da taxa: nas próximas vezes ele aparece para escolher, e dá para mudar" }),
         campo("valor", "Valor pago pelo inquilino", "dinheiro", { obrig: true }),
-        campo("data_pagamento", "Data em que o inquilino pagou o condomínio", "data", { obrig: true }),
+        // em branco: lançado antes do pagamento, "falta o comprovante"; o desconto só entra no boleto com a data (decisão do dono, 24/11/2026)
+        campo("data_pagamento", "Data em que o inquilino pagou o condomínio", "data", { ajuda: 'Em branco se o inquilino ainda não pagou ou não mandou o comprovante: o ressarcimento fica lançado como "falta o comprovante" e o desconto só entra no boleto do aluguel quando a data for posta' }),
         // o mês é o do aluguel (competência), como na lista de Boletos, e não o do vencimento (conferência de 24/11/2026)
         campo("competencia_abatimento", "Abater no boleto do aluguel de (mês do aluguel)", "mes", { ajuda: "O mês do aluguel, como aparece em Boletos (ex.: aluguel de 11/2026, que vence em 12/2026 quando o aluguel vence no mês seguinte). Em branco: o boleto que vence no mês seguinte ao pagamento do condomínio" })
       ];
@@ -6176,6 +6177,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     alertaDocumentosEntrada: () => alertaDocumentosEntrada,
     alertaReservaParada: () => alertaReservaParada,
     alertaRessarcimentoEmAcordo: () => alertaRessarcimentoEmAcordo,
+    alertaRessarcimentoSemComprovante: () => alertaRessarcimentoSemComprovante,
     alertaSeguroImovel: () => alertaSeguroImovel,
     alertaSeguroSemQuemPaga: () => alertaSeguroSemQuemPaga,
     alertaTitularidade: () => alertaTitularidade,
@@ -6254,6 +6256,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     cobrancasEmAberto: () => cobrancasEmAberto,
     competenciaDaParcela: () => competenciaDaParcela,
     competenciaDoAbatimento: () => competenciaDoAbatimento,
+    competenciaDoAbatimentoPrevisto: () => competenciaDoAbatimentoPrevisto,
     competenciaDoComprovante: () => competenciaDoComprovante,
     competenciaDoMesVencimento: () => competenciaDoMesVencimento,
     competenciaDoReajuste: () => competenciaDoReajuste,
@@ -6619,9 +6622,11 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     renomearReferencias: () => renomearReferencias,
     reservaParaCompetencia: () => reservaParaCompetencia,
     reservaParaMarcarAbatida: () => reservaParaMarcarAbatida,
+    ressarcimentoConfirmado: () => ressarcimentoConfirmado,
     ressarcimentosCreditados: () => ressarcimentosCreditados,
     ressarcimentosDo: () => ressarcimentosDo,
     ressarcimentosEmCredito: () => ressarcimentosEmCredito,
+    ressarcimentosSemComprovante: () => ressarcimentosSemComprovante,
     restaurarVersaoRegras: () => restaurarVersaoRegras,
     resultadosFinanceiros: () => resultadosFinanceiros,
     resumoDaHeranca: () => resumoDaHeranca,
@@ -9711,6 +9716,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       alertaCondominio(contrato, hoje3),
       alertaSeguroSemQuemPaga(contrato),
       alertaRessarcimentoEmAcordo(d2, contrato),
+      alertaRessarcimentoSemComprovante(d2, contrato),
       alertaTermoAcordo(d2, contrato),
       alertaNotificacoes(d2, contrato, hoje3),
       alertaReemitirNoBanco(d2, contrato)
@@ -12229,15 +12235,33 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const vence = somarMeses(competenciaDe(dataPagamento), 1);
     return c.cobranca_mes_seguinte !== false ? somarMeses(vence, -1) : vence;
   }
+  function competenciaDoAbatimentoPrevisto(c, compCondominio) {
+    return competenciaValida(compCondominio) ? competenciaDoAbatimento(c, `${somarMeses(compCondominio, 1)}-01`) : null;
+  }
+  function alertaRessarcimentoSemComprovante(d2, c) {
+    const lista3 = ressarcimentosSemComprovante(d2, c.id);
+    if (!lista3.length) return null;
+    const partes = lista3.map((r) => {
+      const cb = r.competencia_abatimento && boletoDoMes(d2, c.id, r.competencia_abatimento);
+      const onde = r.competencia_abatimento ? `boleto que vence em ${compBr(mesVencimentoDaCompetencia(c, r.competencia_abatimento))}` : "boleto do aluguel";
+      return `${r.descricao} ${reais(r.valor)} (condomínio de ${compBr(r.competencia_condominio)}): ${cb && (cb.data_pagamento || emAcordo(cb)) ? `o ${onde} saiu sem o desconto` : cb ? `o ${onde} está sem o desconto até a data ser posta` : `entra no ${onde} só com a data do pagamento`}`;
+    });
+    return {
+      nivel: "info",
+      tipo: "Condomínio",
+      ancora: "ressarcimentos",
+      texto: `Falta o comprovante do pagamento do condomínio: ${partes.join("; ")}. Quando o inquilino mandar, ponha a data do pagamento no ressarcimento (Editar).`
+    };
+  }
   function taxasNoBoleto(d2, cb) {
     if (!cb.ressarcimento) return [];
-    const lista3 = (d2.ressarcimentos || []).filter((r) => r.contrato_id === cb.contrato_id && r.competencia_abatimento === cb.competencia);
+    const lista3 = (d2.ressarcimentos || []).filter((r) => r.contrato_id === cb.contrato_id && r.competencia_abatimento === cb.competencia && ressarcimentoConfirmado(r));
     if (lista3.reduce((t, r) => t + r.valor, 0) !== cb.ressarcimento) return [];
     const meses = [...new Set(lista3.map((r) => r.competencia_condominio))].sort();
     return meses.map((mes) => ({ mes, itens: lista3.filter((r) => r.competencia_condominio === mes).map((r) => ({ descricao: r.descricao, valor: r.valor })).sort((a, b) => String(a.descricao).localeCompare(String(b.descricao), "pt-BR")) }));
   }
   function ressarcimentosNoBoleto(d2, contratoId, comp) {
-    const lista3 = (d2.ressarcimentos || []).filter((r) => r.contrato_id === contratoId && r.competencia_abatimento === comp);
+    const lista3 = (d2.ressarcimentos || []).filter((r) => r.contrato_id === contratoId && r.competencia_abatimento === comp && ressarcimentoConfirmado(r));
     return { valor: lista3.reduce((t, r) => t + r.valor, 0), descricao: lista3.map((r) => `${r.descricao} (condomínio ${compBr(r.competencia_condominio)})`).join("; ") };
   }
   function semBoletoNoMes(d2, c, comp) {
@@ -12254,7 +12278,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   }
   function ressarcimentosEmCredito(d2, c) {
     if (!c) return [];
-    return (d2.ressarcimentos || []).filter((r) => r.contrato_id === c.id && r.competencia_abatimento && !boletoDoMes(d2, c.id, r.competencia_abatimento)).filter((r) => {
+    return (d2.ressarcimentos || []).filter((r) => r.contrato_id === c.id && ressarcimentoConfirmado(r) && r.competencia_abatimento && !boletoDoMes(d2, c.id, r.competencia_abatimento)).filter((r) => {
       const s = semBoletoNoMes(d2, c, r.competencia_abatimento);
       return s && s.motivo !== "entrada";
     }).sort((a, b) => String(a.data_pagamento).localeCompare(String(b.data_pagamento)) || a.id - b.id);
@@ -12287,12 +12311,13 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     ];
     for (const comp of new Set(meses.filter(Boolean))) aplicarRessarcimentos(d2, c, comp, usuario);
   }
-  function condominioAConferir(c, hoje3 = hojeIso()) {
+  function condominioAConferir(c, hoje3 = hojeIso(), { ate = null } = {}) {
     if (!inquilinoPagaCondominio(c) || !contratoAtivo(c, hoje3)) return null;
     const ultimo = somarMeses(competenciaDe(hoje3), -1);
+    const limite = ate || ultimo;
     const inicio = competenciaDe(c.data_entrada || hoje3);
-    const proximo = c.condominio_conferido_ate ? somarMeses(c.condominio_conferido_ate, 1) : inicio > ultimo ? null : ultimo;
-    return proximo && proximo <= ultimo ? proximo : null;
+    const proximo = c.condominio_conferido_ate ? somarMeses(c.condominio_conferido_ate, 1) : inicio > ultimo ? inicio : ultimo;
+    return proximo && proximo <= limite ? proximo : null;
   }
   function alertaCondominio(c, hoje3 = hojeIso()) {
     const mes = condominioAConferir(c, hoje3);
@@ -12344,7 +12369,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   function alertaRessarcimentoEmAcordo(d2, c) {
     const credito = alertaCreditoRessarcimento(d2, c);
     if (credito) return credito;
-    const meses = [...new Set((d2.ressarcimentos || []).filter((r) => r.contrato_id === c.id).map((r) => r.competencia_abatimento))].sort();
+    const meses = [...new Set((d2.ressarcimentos || []).filter((r) => r.contrato_id === c.id && ressarcimentoConfirmado(r)).map((r) => r.competencia_abatimento))].sort();
     for (const comp of meses) {
       const cb = boletoDoMes(d2, c.id, comp);
       const sem = !cb && semBoletoNoMes(d2, c, comp);
@@ -12456,17 +12481,17 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         link: airPendente ? `#/financeiro?mes=${mes}` : `#/faturas?mes=${mes}`
       },
       (() => {
-        const conferir2 = ativos.filter((c) => {
-          const m = condominioAConferir(c, hoje3);
-          return m && m <= comp;
-        });
+        const conferir2 = ativos.filter((c) => condominioAConferir(c, hoje3, { ate: comp }));
+        const pagam = ativos.filter((c) => inquilinoPagaCondominio(c) && contratoAtivo(c, hoje3));
+        const ordem = [...conferir2, ...pagam.filter((c) => !conferir2.includes(c))];
         return {
           chave: "condominio",
-          titulo: `Conferir as taxas do condomínio de ${compBr(comp)} (ressarcimento ao inquilino)`,
+          titulo: `Conferir as taxas do condomínio de ${compBr(comp)} (boleto do condomínio que vence em ${compBr(mes)}; ressarcimento ao inquilino)`,
           pendentes: conferir2.length,
-          detalhe: conferir2.length ? `a conferir: ${conferir2.map((c) => c.inquilino_nome).join(", ")}` : "nada a conferir",
-          link: conferir2.length === 1 ? `#/contrato/${conferir2[0].id}?ir=ressarcimentos` : "#/inquilinos",
-          contratos: conferir2.length > 1 ? conferir2.map((c) => c.id) : []
+          aPartirDe: `${comp}-01`,
+          detalhe: conferir2.length ? `a conferir: ${conferir2.map((c) => c.inquilino_nome).join(", ")}` : pagam.length ? "nada a conferir" : "nenhum inquilino paga o condomínio",
+          link: ordem.length === 1 ? `#/contrato/${ordem[0].id}?ir=ressarcimentos` : null,
+          contratos: ordem.length > 1 ? ordem.map((c) => ({ id: c.id, conferir: conferir2.includes(c) })) : []
         };
       })(),
       {
@@ -13828,7 +13853,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (!(r.arquivos || []).includes(nome)) throw new ErroUsuario("Este arquivo já foi tirado do registro.");
     atualizar(d2, "cobranca_registros", r.id, { arquivos: r.arquivos.filter((x) => x !== nome) }, usuario, `Cobrança (${r.tipo} de ${dataBr(r.data)}): arquivo tirado: ${nome}`);
   }
-  var TABELAS, SITUACOES, CONCESSIONARIAS_POR_UF, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, IMAGEM_FORA_DO_HISTORICO, semPeso, RESPOSTA_PESADA, FORMULARIOS_DA_TABELA, camposDinheiro, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, camposDaGravacao, CODIGO_DE, nomeCurto, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, aplicacaoBaixada, aplicacoesEmVigor, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehSaldoSaida, ehBoletoAvulso, semMultaJuros, emAcordo, MOTIVO_EM_ACORDO, quitadoNaSaida, aCobrar, boletosCaucaoDa, parcelasIrmasDoComplemento, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, IPTU_DIVISAO_NOVA_DESDE, dividirIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, CAMPOS_MANUAIS, JUNTOS_DO_MANUAL, totais, previstoNoPagamento, pagoAMaisDo, MOTIVO_PAGO_A_MENOS, textoDiferenca, diferencaPendente, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, fixosDoBoleto, somaValores, cobrancasEmAberto, nomeDebitoSaida, proximoBoletoAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, MODOS_FICHA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, DOCUMENTOS_RENDA, DICA_DOCUMENTOS, PJ2, casadoOuUniao, fichaComConjuge, PARTES_DOCUMENTOS_PF, separacaoTotal, documentosDoFiador, VAGAS_FIADOR_FICHA, fiadoresDaFicha, fichaAberta, fichaAbertaDoImovel, fichaSemContrato, devolucaoPendente, condicoesDaReservaAgora, condicoesDaReserva, valorDaReserva, retencaoDaReserva, devolverReservaAte, fichaSemDocumentos, inicioPrazoApagarFicha, apagarFichaEsperaDevolucao, dataApagarDocumentosFicha, FICHA_FICA, fichaFica, fichasComDadosVencidos, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraObrigatoria, relogiosObrigatorios, leituraDo, encerramentoDo, boletoDoSaldo, garantiaADevolverNaSaida, COMPROVANTE_SAIDA_DESDE, pastaDoBoletoPdf, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, titularidadeDevolvida, boletosParaReemitir, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, devolucoesDaTrocaDeTitular, devolucaoDaTrocaDeGarantia, garantiaDevolvidaNaTroca, devolucoesDeTrocaPendentes, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, companhiaCurtaDaConta, tamanhosVistos, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contasSoArquivo, contaSoArquivo, contasDoExtrato, contaBanco, limparId, contaPreMarcada, EMISSAO_EM_ANDAMENTO_MS, corta, encargosParaComparar, descontoLiberado, diasBaixaDaConta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, vencidosSemEmissao, boletosDoMesSemEmissao, solicitacoesDo, SITUACOES_NOTIFICACAO, MEIOS_NOTIFICACAO, NOTIFICACAO_ABERTA, notificacaoEmAberto, limiteNotificacao, notificacoesDo, numeroDaNotificacao, textoMultaNotificacao, multaSugerida, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, competenciaDoMesVencimento, mesVencimentoDaCompetencia, textoCreditoRessarcimento, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DESTINOS_MOVIMENTACAO, contratoEncerrado, FAIXAS_ATRASO, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, mesDoPeriodoGuia, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, pagosAquiAbertosNoBanco, textoDeBusca, assinaturaLembrete, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, alvoDoAlerta, mesmoAlvo, desligamentosOrfaos, TIPOS_ALERTA_DO_IMOVEL, PRAZO_CONTESTAR_SAIDA, prazoContestarSaida, mudarRegraSistema, voltarRegrasAoPadrao, contratosDoPerfil, TIPOS_REGISTRO_COBRANCA, registrosCobrancaDo, acordoDoBoleto, gastoDaCobranca;
+  var TABELAS, SITUACOES, CONCESSIONARIAS_POR_UF, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, IMAGEM_FORA_DO_HISTORICO, semPeso, RESPOSTA_PESADA, FORMULARIOS_DA_TABELA, camposDinheiro, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, camposDaGravacao, CODIGO_DE, nomeCurto, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, aplicacaoBaixada, aplicacoesEmVigor, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehSaldoSaida, ehBoletoAvulso, semMultaJuros, emAcordo, MOTIVO_EM_ACORDO, quitadoNaSaida, aCobrar, boletosCaucaoDa, parcelasIrmasDoComplemento, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, IPTU_DIVISAO_NOVA_DESDE, dividirIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, CAMPOS_MANUAIS, JUNTOS_DO_MANUAL, totais, previstoNoPagamento, pagoAMaisDo, MOTIVO_PAGO_A_MENOS, textoDiferenca, diferencaPendente, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, fixosDoBoleto, somaValores, cobrancasEmAberto, nomeDebitoSaida, proximoBoletoAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, MODOS_FICHA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, DOCUMENTOS_RENDA, DICA_DOCUMENTOS, PJ2, casadoOuUniao, fichaComConjuge, PARTES_DOCUMENTOS_PF, separacaoTotal, documentosDoFiador, VAGAS_FIADOR_FICHA, fiadoresDaFicha, fichaAberta, fichaAbertaDoImovel, fichaSemContrato, devolucaoPendente, condicoesDaReservaAgora, condicoesDaReserva, valorDaReserva, retencaoDaReserva, devolverReservaAte, fichaSemDocumentos, inicioPrazoApagarFicha, apagarFichaEsperaDevolucao, dataApagarDocumentosFicha, FICHA_FICA, fichaFica, fichasComDadosVencidos, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraObrigatoria, relogiosObrigatorios, leituraDo, encerramentoDo, boletoDoSaldo, garantiaADevolverNaSaida, COMPROVANTE_SAIDA_DESDE, pastaDoBoletoPdf, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, titularidadeDevolvida, boletosParaReemitir, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, devolucoesDaTrocaDeTitular, devolucaoDaTrocaDeGarantia, garantiaDevolvidaNaTroca, devolucoesDeTrocaPendentes, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, companhiaCurtaDaConta, tamanhosVistos, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contasSoArquivo, contaSoArquivo, contasDoExtrato, contaBanco, limparId, contaPreMarcada, EMISSAO_EM_ANDAMENTO_MS, corta, encargosParaComparar, descontoLiberado, diasBaixaDaConta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, vencidosSemEmissao, boletosDoMesSemEmissao, solicitacoesDo, SITUACOES_NOTIFICACAO, MEIOS_NOTIFICACAO, NOTIFICACAO_ABERTA, notificacaoEmAberto, limiteNotificacao, notificacoesDo, numeroDaNotificacao, textoMultaNotificacao, multaSugerida, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, competenciaDoMesVencimento, mesVencimentoDaCompetencia, ressarcimentoConfirmado, ressarcimentosSemComprovante, textoCreditoRessarcimento, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DESTINOS_MOVIMENTACAO, contratoEncerrado, FAIXAS_ATRASO, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, mesDoPeriodoGuia, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, pagosAquiAbertosNoBanco, textoDeBusca, assinaturaLembrete, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, alvoDoAlerta, mesmoAlvo, desligamentosOrfaos, TIPOS_ALERTA_DO_IMOVEL, PRAZO_CONTESTAR_SAIDA, prazoContestarSaida, mudarRegraSistema, voltarRegrasAoPadrao, contratosDoPerfil, TIPOS_REGISTRO_COBRANCA, registrosCobrancaDo, acordoDoBoleto, gastoDaCobranca;
   var init_regras = __esm({
     "docs/js/regras.js"() {
       init_alertas();
@@ -14452,6 +14477,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       taxasCondominioUsadas = (d2) => [.../* @__PURE__ */ new Set([...d2.ressarcimentos.map((r) => r.descricao).filter(Boolean).sort((a, b) => a.localeCompare(b, "pt-BR")), ...TAXAS_CONDOMINIO])];
       competenciaDoMesVencimento = (c, mes) => mes ? c && c.cobranca_mes_seguinte === false ? mes : somarMeses(mes, -1) : null;
       mesVencimentoDaCompetencia = (c, comp) => comp ? c && c.cobranca_mes_seguinte === false ? comp : somarMeses(comp, 1) : null;
+      ressarcimentoConfirmado = (r) => !!(r && r.data_pagamento);
+      ressarcimentosSemComprovante = (d2, contratoId) => (d2.ressarcimentos || []).filter((r) => r.contrato_id === contratoId && !ressarcimentoConfirmado(r));
       textoCreditoRessarcimento = (r) => `Ressarcimento do condomínio: ${r.descricao} (condomínio ${compBr(r.competencia_condominio)}, pago em ${dataBr(r.data_pagamento)}): ${reais(r.valor)}`;
       MESES_FECHAMENTO_ATRASADO = 12;
       competenciaDoReajuste = (c, n) => {
@@ -29188,16 +29215,21 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     const c = campo2 && buscar2("contratos", marca2.dataset.contratoBoleto);
     if (!c) return;
     const pagamento = marca2.dataset.pagamento && form.querySelector(`[name="${marca2.dataset.pagamento}"]`);
+    const condominio = marca2.dataset.condominio && form.querySelector(`[name="${marca2.dataset.condominio}"]`);
     const mostrar2 = () => {
       let comp = competenciaValida(campo2.value) ? competenciaDoMesVencimento(c, campo2.value) : null;
       const emBranco = !campo2.value.trim() && pagamento && dataValida(pagamento.value);
       if (emBranco) comp = competenciaDoAbatimento(c, pagamento.value);
+      const semData = !campo2.value.trim() && pagamento && !pagamento.value.trim() && condominio && competenciaValida(condominio.value);
+      if (semData) comp = competenciaDoAbatimentoPrevisto(c, condominio.value);
       const t = comp ? textoBoletoDaCompetencia(d(), c, comp) : "";
-      mensagemAuto(campo2, t ? `${esc(emBranco ? `Em branco: ${t}` : t.charAt(0).toUpperCase() + t.slice(1))}.` : "");
+      const aviso2 = pagamento && !pagamento.value.trim() ? " O desconto só entra no boleto quando a data do pagamento do condomínio for posta." : "";
+      mensagemAuto(campo2, t ? `${esc(emBranco || semData ? `Em branco: ${t}` : t.charAt(0).toUpperCase() + t.slice(1))}.${esc(aviso2)}` : "");
     };
     campo2.addEventListener("input", mostrar2);
     campo2.addEventListener("change", mostrar2);
     if (pagamento) pagamento.addEventListener("change", mostrar2);
+    if (condominio) condominio.addEventListener("change", mostrar2);
     mostrar2();
   }
   function ligarCamposAutomaticos(raiz) {
@@ -29556,7 +29588,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
             ajuda: "O mês em que vence o boleto do aluguel (ex.: 12/2026 = o boleto que vence em dezembro). Em branco: o boleto que vence no mês seguinte ao pagamento do condomínio"
           } : c),
           valores: (r) => ({ ...r, vencimento_abatimento: mesVencimentoDaCompetencia(buscar2("contratos", r.contrato_id), r.competencia_abatimento) }),
-          extraHtml: (r, q) => `<span hidden data-contrato-boleto="${Number(r ? r.contrato_id : q.contrato)}" data-mes-boleto="vencimento_abatimento" data-pagamento="data_pagamento"></span>`,
+          extraHtml: (r, q) => `<span hidden data-contrato-boleto="${Number(r ? r.contrato_id : q.contrato)}" data-mes-boleto="vencimento_abatimento" data-pagamento="data_pagamento" data-condominio="competencia_condominio"></span>`,
           conferir: conferirRessarcimento,
           padrao: () => ({ competencia_condominio: competenciaDe(hojeIso()) }),
           fixos: (r, q) => r ? {} : { contrato_id: Number(q.contrato) },
@@ -29568,7 +29600,9 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
             if ("vencimento_abatimento" in dados) dados.competencia_abatimento = erros.vencimento_abatimento ? null : competenciaDoMesVencimento(c, dados.vencimento_abatimento);
             delete dados.vencimento_abatimento;
             if (r && dados.data_pagamento && r.data_pagamento && dados.data_pagamento !== r.data_pagamento && dados.competencia_abatimento === competenciaDoAbatimento(c, r.data_pagamento)) dados.competencia_abatimento = null;
+            if (r && dados.data_pagamento && !r.data_pagamento && dados.competencia_abatimento === competenciaDoAbatimentoPrevisto(c, r.competencia_condominio)) dados.competencia_abatimento = null;
             if (!dados.competencia_abatimento && dados.data_pagamento) dados.competencia_abatimento = competenciaDoAbatimento(c, dados.data_pagamento);
+            if (!dados.competencia_abatimento && !dados.data_pagamento) dados.competencia_abatimento = competenciaDoAbatimentoPrevisto(c, dados.competencia_condominio);
             const sem = semBoletoNoMes(d(), c, dados.competencia_abatimento);
             if (sem && sem.motivo === "entrada") {
               erros.vencimento_abatimento = `Não há onde abater: ${textoSemBoleto(sem, dados.competencia_abatimento)}. Escolha um boleto deste contrato`;
@@ -29577,13 +29611,14 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
               erros.valor = `Este ressarcimento já entrou como crédito no ${acertoDoCredito(d(), c).tipo === "saida" ? "cálculo final da saída" : "acerto da devolução da garantia"}: não dá para mudar o valor nem o mês. Lance a diferença como um novo ressarcimento`;
             }
             const cb = boletoDoMes(d(), c.id, dados.competencia_abatimento);
-            if (cb && cb.data_pagamento && (!r || r.competencia_abatimento !== dados.competencia_abatimento)) {
+            const confirmando = !!(r && !r.data_pagamento && dados.data_pagamento);
+            if (cb && cb.data_pagamento && (!r || confirmando || r.competencia_abatimento !== dados.competencia_abatimento) && (dados.data_pagamento || !r)) {
               erros.vencimento_abatimento = `O boleto que vence em ${compBr(mesVencimentoDaCompetencia(c, dados.competencia_abatimento))} (referência ${compBr(dados.competencia_abatimento)}) já foi pago. Escolha o próximo boleto em aberto`;
             }
-            if (cb && !cb.data_pagamento && emAcordo(cb) && (!r || r.competencia_abatimento !== dados.competencia_abatimento || dados.valor !== r.valor)) {
+            if (cb && !cb.data_pagamento && emAcordo(cb) && dados.data_pagamento && (!r || confirmando || r.competencia_abatimento !== dados.competencia_abatimento || dados.valor !== r.valor)) {
               erros.vencimento_abatimento = `O boleto que vence em ${compBr(mesVencimentoDaCompetencia(c, dados.competencia_abatimento))} (referência ${compBr(dados.competencia_abatimento)}) está em acordo (fica como estava no dia do acordo) e não recebe o ressarcimento. Escolha o próximo boleto em aberto`;
             }
-            if (cb && cb.data_pagamento && r && r.competencia_abatimento === dados.competencia_abatimento && dados.valor !== r.valor) {
+            if (cb && cb.data_pagamento && r && r.data_pagamento && r.competencia_abatimento === dados.competencia_abatimento && dados.valor !== r.valor) {
               erros.valor = `O boleto que vence em ${compBr(mesVencimentoDaCompetencia(c, dados.competencia_abatimento))} (referência ${compBr(dados.competencia_abatimento)}) já foi pago com ${reais(r.valor)}: não dá para mudar o valor. Lance a diferença como um novo ressarcimento, no próximo boleto em aberto`;
             }
           },
@@ -31386,14 +31421,18 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     const aConferir = condominioAConferir(c);
     return `<div class="cartao" id="ressarcimentos"><div class="cabecalho"><h2>Condomínio: taxas do proprietário (ressarcimento)</h2>
       ${opera() ? link(`#/novo/ressarcimentos?contrato=${c.id}`, "Lançar ressarcimento") : ""}</div>
-    <p class="suave">O inquilino paga o condomínio. Quando o boleto do condomínio trouxer taxas que são do proprietário (fundo de obras, fundo de reserva, chamadas extras de obra…), lance aqui: o valor é abatido no boleto do aluguel do mês seguinte ao pagamento${regra("ressarcimento_na_nf", c) ? " e também sai do valor da NF" : " e conta como gasto nos Resultados (a NF sai com o aluguel cheio)"}.</p>
-    ${aConferir ? `<div class="alerta info">Condomínio de ${compBr(aConferir)} ainda não conferido. ${opera() ? botao("condominioConferido", `Conferido: sem taxa do proprietário em ${compBr(aConferir)}`, { id: c.id, mes: aConferir }, "secundario pequeno") : ""}</div>` : inquilinoPagaCondominio(c) ? `<p class="suave">Conferido até ${c.condominio_conferido_ate ? compBr(c.condominio_conferido_ate) : "-"}.</p>` : ""}
+    <p class="suave">O inquilino paga o condomínio. Quando o boleto do condomínio trouxer taxas que são do proprietário (fundo de obras, fundo de reserva, chamadas extras de obra…), lance aqui (pode ser antes do pagamento: sem a data, fica "falta o comprovante" e o desconto só entra no boleto quando a data for posta): o valor é abatido no boleto do aluguel do mês seguinte ao pagamento${regra("ressarcimento_na_nf", c) ? " e também sai do valor da NF" : " e conta como gasto nos Resultados (a NF sai com o aluguel cheio)"}.</p>
+    ${aConferir ? `<div class="alerta info">Condomínio de ${compBr(aConferir)} ainda não conferido. ${opera() ? botao("condominioConferido", `Conferido: sem taxa do proprietário em ${compBr(aConferir)}`, { id: c.id, mes: aConferir }, "secundario pequeno") : ""}</div>` : inquilinoPagaCondominio(c) ? `<p class="suave">Conferido até ${c.condominio_conferido_ate ? compBr(c.condominio_conferido_ate) : "-"}.${(() => {
+      const mesHoje = competenciaDe(hojeIso());
+      const atual = condominioAConferir(c, hojeIso(), { ate: mesHoje });
+      return atual && opera() ? ` Se o boleto do condomínio de ${compBr(atual)} já chegou: ${link(`#/novo/ressarcimentos?contrato=${c.id}`, "lance a taxa do proprietário", "")} ou ${botao("condominioConferido", `Conferido: sem taxa do proprietário em ${compBr(atual)}`, { id: c.id, mes: atual }, "secundario pequeno")}` : "";
+    })()}</p>` : ""}
     ${lista3.length ? `<div class="rolagem"><table><tr><th>Condomínio de</th><th>Taxa</th><th class="n">Valor</th><th>Pago pelo inquilino em</th><th>Abatido no boleto (referência e vencimento)</th><th></th></tr>
       ${lista3.map((x) => {
       const cb = boletoDoMes(d(), c.id, x.competencia_abatimento);
-      return `<tr><td>${compBr(x.competencia_condominio)}</td><td>${esc(x.descricao)}</td><td class="n">${reais(x.valor)}</td><td>${dataBr(x.data_pagamento)}</td>
-        <td>${compBr(x.competencia_abatimento)} <span class="suave">(vence ${dataBr(cb ? cb.vencimento : vencimentoDoContrato(d(), c, x.competencia_abatimento))})</span> ${cb ? cb.data_pagamento ? etiqueta("abatido", "ok") : emAcordo(cb) ? etiqueta("em acordo: não abatido", "aviso") : etiqueta("no boleto em aberto", "info") : etiquetaSemBoleto(c, x)}</td>
-        <td class="n nw">${opera() && !(cb && cb.data_pagamento) ? `${link(`#/editar/ressarcimentos/${x.id}`, "Editar")} ${botao("excluir", "×", { tabela: "ressarcimentos", id: x.id }, "x-excluir", "Excluir este ressarcimento?")}` : ""}</td></tr>`;
+      return `<tr><td>${compBr(x.competencia_condominio)}</td><td>${esc(x.descricao)}</td><td class="n">${reais(x.valor)}</td><td>${x.data_pagamento ? dataBr(x.data_pagamento) : etiqueta("falta o comprovante", "aviso")}</td>
+        <td>${compBr(x.competencia_abatimento)} <span class="suave">(vence ${dataBr(cb ? cb.vencimento : vencimentoDoContrato(d(), c, x.competencia_abatimento))})</span> ${!ressarcimentoConfirmado(x) ? etiqueta(cb && (cb.data_pagamento || emAcordo(cb)) ? "saiu sem o desconto" : "entra com a data do pagamento", "aviso") : cb ? cb.data_pagamento ? etiqueta("abatido", "ok") : emAcordo(cb) ? etiqueta("em acordo: não abatido", "aviso") : etiqueta("no boleto em aberto", "info") : etiquetaSemBoleto(c, x)}</td>
+        <td class="n nw">${opera() && !(cb && cb.data_pagamento && ressarcimentoConfirmado(x)) ? `${link(`#/editar/ressarcimentos/${x.id}`, "Editar")} ${botao("excluir", "×", { tabela: "ressarcimentos", id: x.id }, "x-excluir", "Excluir este ressarcimento?")}` : ""}</td></tr>`;
     }).join("")}</table></div>` : ""}</div>`;
   }
   function caixaSolicitacoes(c) {
@@ -37675,12 +37714,13 @@ ${xref}
     <div class="cartao"><ol class="fechamento">${etapas.map((e) => `<li class="${e.feito ? "feito" : ""}">
       <div class="cabecalho"><div><b>${esc(e.titulo)}</b> ${e.feito ? etiqueta(e.marcado ? `marcado em ${dataBr(e.marcado.feito_em)}` : "feito", "ok") : e.prevista ? etiqueta(String(e.titulo).includes(dataBr(e.aPartirDe)) ? "previsto" : `previsto a partir de ${dataBr(e.aPartirDe)}`, "neutra") : etiqueta(plural(e.pendentes, "pendente", "pendentes"), "aviso")}
         <div class="suave">${esc(e.detalhe)}</div>
-        ${e.chave === "condominio" && e.contratos && e.contratos.length ? `<div class="acoes" style="margin-top:4px">${e.contratos.map((id) => {
-      const c = buscar2("contratos", id);
-      return c ? link(`#/contrato/${id}?ir=ressarcimentos`, `Conferir: ${esc(c.inquilino_nome)}`, "botao secundario pequeno") : "";
+        ${e.chave === "condominio" && e.contratos && e.contratos.length ? `<div class="acoes" style="margin-top:4px">${e.contratos.map((x) => {
+      const c = buscar2("contratos", x.id);
+      const i = c && buscar2("imoveis", c.imovel_id);
+      return c ? link(`#/contrato/${x.id}?ir=ressarcimentos`, `${x.conferir ? "Conferir" : "Ver"}: ${esc(c.inquilino_nome)}${i ? ` (${esc(i.nome)})` : ""}`, `botao ${x.conferir ? "" : "secundario "}pequeno`) : "";
     }).join(" ")}</div>` : ""}
         ${e.chave === "contas" && e.imoveis && e.imoveis.length ? `<div class="acoes" style="margin-top:4px">${e.imoveis.map((id) => link(`#/contas/${id}?comp=${esc(mes)}`, `Lançar: ${esc(buscar2("imoveis", id).nome)}`, "botao secundario pequeno")).join(" ")}</div>` : ""}</div>
-        <div class="acoes">${link(e.link, "Abrir", "botao pequeno")}
+        <div class="acoes">${e.link ? link(e.link, "Abrir", "botao pequeno") : ""}
           ${opera() ? e.marcado ? botao("etapaFechamento", "Desmarcar", { mes, etapa: e.chave, feito: "" }, "link-botao") : !e.feito ? botao("etapaFechamento", "Marcar como feito", { mes, etapa: e.chave, feito: "1" }, "secundario pequeno") : "" : ""}</div></div></li>`).join("")}</ol>
     <p class="suave">A partir do dia ${regra("dia_gerar_boletos")} geram-se os boletos de ${compBr(mes)} (mês de referência), que vencem em ${compBr(somarMeses(mes, 1))}; os que vencem em ${compBr(mes)} são os de ${compBr(somarMeses(mes, -1))}. As NFs de ${compBr(mes)} se numeram depois da virada do mês, com as avulsas e as do Airbnb já lançadas. No calendário do Painel: dia ${regra("dia_gerar_boletos")} (boletos), dia 1º (NFs do mês anterior) e o último dia com o que falta.</p></div>`;
   }
