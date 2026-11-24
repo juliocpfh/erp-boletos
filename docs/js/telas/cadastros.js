@@ -225,7 +225,14 @@ export const CADASTROS = {
   },
   ressarcimentos: {
     titulo: (r, q) => `Ressarcimento de condomínio - ${buscar('contratos', r ? r.contrato_id : q.contrato).inquilino_nome}`,
-    campos: () => F.RESSARCIMENTO.map((c) => (c.nome === 'descricao' ? { ...c, sugestoes: R.taxasCondominioUsadas(d()) } : c)),
+    // o mês do abatimento é perguntado pelo mês em que o boleto vence (dados reais de 24/11/2026: "12/2026" digitado para o
+    // boleto que vence em 05/12 ia para o boleto de referência 12/2026, que vence em janeiro); gravado continua a referência
+    campos: () => F.RESSARCIMENTO.map((c) => (c.nome === 'descricao' ? { ...c, sugestoes: R.taxasCondominioUsadas(d()) }
+      : c.nome === 'competencia_abatimento' ? { nome: 'vencimento_abatimento', rotulo: 'Abater no boleto que vence em (mês do vencimento)', tipo: 'mes', autoMsg: true,
+        ajuda: 'O mês em que vence o boleto do aluguel (ex.: 12/2026 = o boleto que vence em dezembro). Em branco: o boleto que vence no mês seguinte ao pagamento do condomínio' }
+        : c)),
+    valores: (r) => ({ ...r, vencimento_abatimento: R.mesVencimentoDaCompetencia(buscar('contratos', r.contrato_id), r.competencia_abatimento) }),
+    extraHtml: (r, q) => `<span hidden data-contrato-boleto="${Number(r ? r.contrato_id : q.contrato)}" data-mes-boleto="vencimento_abatimento" data-pagamento="data_pagamento"></span>`,
     conferir: conferirRessarcimento,
     padrao: () => ({ competencia_condominio: C.competenciaDe(C.hojeIso()) }),
     fixos: (r, q) => (r ? {} : { contrato_id: Number(q.contrato) }),
@@ -233,6 +240,9 @@ export const CADASTROS = {
     ajustar(dados, erros, r, form, q) {
       const c = buscar('contratos', r ? r.contrato_id : q.contrato);
       if (dados.valor !== null && dados.valor <= 0) erros.valor = 'Informe o valor';
+      // o formulário manda o mês do vencimento; quem chama sem ele (importação, testes antigos) manda a referência direto
+      if ('vencimento_abatimento' in dados) dados.competencia_abatimento = R.competenciaDoMesVencimento(c, dados.vencimento_abatimento);
+      delete dados.vencimento_abatimento;
       // data do pagamento mudada na edição e o mês do abatimento era o calculado pela data antiga: acompanha a data nova
       // (conferência de 24/11/2026). Ex.: pago em 05/11 (boleto de 11/2026) corrigido para 05/12 → boleto de 12/2026
       if (r && dados.data_pagamento && r.data_pagamento && dados.data_pagamento !== r.data_pagamento
@@ -241,21 +251,21 @@ export const CADASTROS = {
       // mês sem boleto deste contrato (depois da saída ou da troca de titular): o ressarcimento não abateria em lugar nenhum
       const sem = R.semBoletoNoMes(d(), c, dados.competencia_abatimento);
       if (sem) {
-        erros.competencia_abatimento = `Não há onde abater: ${R.textoSemBoleto(sem, dados.competencia_abatimento)}. ${sem.motivo === 'troca' ? `Lance o ressarcimento no contrato de ${sem.novo.inquilino_nome}, ou escolha` : 'Escolha'} um boleto em aberto deste contrato${sem.motivo === 'saida' ? ' (ou devolva ao inquilino)' : ''}`;
+        erros.vencimento_abatimento = `Não há onde abater: ${R.textoSemBoleto(sem, dados.competencia_abatimento)}. ${sem.motivo === 'troca' ? `Lance o ressarcimento no contrato de ${sem.novo.inquilino_nome}, ou escolha` : 'Escolha'} um boleto em aberto deste contrato${sem.motivo === 'saida' ? ' (ou devolva ao inquilino)' : ''}`;
       }
       const cb = R.boletoDoMes(d(), c.id, dados.competencia_abatimento);
       if (cb && cb.data_pagamento && (!r || r.competencia_abatimento !== dados.competencia_abatimento)) {
-        erros.competencia_abatimento = `O boleto de ${compBr(dados.competencia_abatimento)} já foi pago. Escolha o próximo boleto em aberto`;
+        erros.vencimento_abatimento = `O boleto que vence em ${compBr(R.mesVencimentoDaCompetencia(c, dados.competencia_abatimento))} (referência ${compBr(dados.competencia_abatimento)}) já foi pago. Escolha o próximo boleto em aberto`;
       }
       // boleto em acordo fica como estava no dia do acordo (aplicarRessarcimentos não mexe nele): o ressarcimento novo, de mês
       // trocado ou de valor mudado não seria abatido. Ex.: boleto de 10/2026 em acordo → escolha 11/2026
       if (cb && !cb.data_pagamento && R.emAcordo(cb) && (!r || r.competencia_abatimento !== dados.competencia_abatimento || dados.valor !== r.valor)) {
-        erros.competencia_abatimento = `O boleto de ${compBr(dados.competencia_abatimento)} está em acordo (fica como estava no dia do acordo) e não recebe o ressarcimento. Escolha o próximo boleto em aberto`;
+        erros.vencimento_abatimento = `O boleto que vence em ${compBr(R.mesVencimentoDaCompetencia(c, dados.competencia_abatimento))} (referência ${compBr(dados.competencia_abatimento)}) está em acordo (fica como estava no dia do acordo) e não recebe o ressarcimento. Escolha o próximo boleto em aberto`;
       }
       // boleto do abatimento já pago com este ressarcimento: mudar o valor não muda o boleto pago. Lance a diferença como
       // outro ressarcimento, no próximo boleto em aberto
       if (cb && cb.data_pagamento && r && r.competencia_abatimento === dados.competencia_abatimento && dados.valor !== r.valor) {
-        erros.valor = `O boleto de ${compBr(dados.competencia_abatimento)} já foi pago com ${reais(r.valor)}: não dá para mudar o valor. Lance a diferença como um novo ressarcimento, no próximo boleto em aberto`;
+        erros.valor = `O boleto que vence em ${compBr(R.mesVencimentoDaCompetencia(c, dados.competencia_abatimento))} (referência ${compBr(dados.competencia_abatimento)}) já foi pago com ${reais(r.valor)}: não dá para mudar o valor. Lance a diferença como um novo ressarcimento, no próximo boleto em aberto`;
       }
     },
     salvar(db, dados, q, r) {
@@ -684,16 +694,22 @@ export const CADASTROS = {
   },
   seguros: {
     titulo: (r, q) => { const c = buscar('contratos', r ? r.contrato_id : q.contrato); return `Seguro obrigatório - ${c.inquilino_nome}${buscar('imoveis', c.imovel_id) ? ` (${buscar('imoveis', c.imovel_id).nome})` : ''}`; },
-    campos: () => F.SEGURO,
+    // a 1ª parcela é perguntada pelo mês em que vence o boleto (dados reais de 24/11/2026: "12/2026" digitado para o boleto que
+    // vence em 05/12 ia para o de referência 12/2026, que vence em janeiro); gravada continua a referência (primeira_competencia)
+    campos: () => F.SEGURO.map((c) => (c.nome === 'primeira_competencia' ? { nome: 'vencimento_primeira_parcela', rotulo: 'Cobrar a 1ª parcela no boleto que vence em (mês do vencimento)',
+      tipo: 'mes', obrig: true, autoMsg: true, ajuda: 'O mês em que vence o boleto do aluguel (ex.: 12/2026 = o boleto que vence em dezembro). As demais parcelas seguem mês a mês' } : c)),
+    valores: (r) => ({ ...r, vencimento_primeira_parcela: R.mesVencimentoDaCompetencia(buscar('contratos', r.contrato_id), r.primeira_competencia) }),
     fixos: (r, q) => (r ? {} : { contrato_id: Number(q.contrato), imovel_id: buscar('contratos', q.contrato).imovel_id }),
     conferir: conferirSeguro,
     // arquivo da apólice: pode salvar sem (confirma e fica o alerta para anexar depois); outros arquivos opcionais
-    extraHtml: (r) => `<h3>Arquivos do seguro</h3><div class="formulario">
+    extraHtml: (r, q) => `<span hidden data-contrato-boleto="${Number(r ? r.contrato_id : q.contrato)}" data-mes-boleto="vencimento_primeira_parcela"></span><h3>Arquivos do seguro</h3><div class="formulario">
       <div><label>Arquivo da apólice</label><input type="file" name="arquivo_apolice" accept="${ACEITA_DOCUMENTOS}">
         ${r && r.arquivo_apolice ? F.arquivoGuardado('arquivo_apolice', r.arquivo_apolice) : '<small class="suave">PDF ou foto da apólice. Sem ele, o seguro é salvo e fica o alerta para anexar depois.</small>'}</div>
       <div><label>Outros arquivos (opcional)</label><input type="file" name="outros_arquivos" multiple accept="${ACEITA_DOCUMENTOS}">
         <small class="suave">Ex.: boleto do seguro, proposta, comprovante de pagamento.</small></div></div>`,
-    ajustar(dados, erros) {
+    ajustar(dados, erros, r, form, q) {
+      if ('vencimento_primeira_parcela' in dados) dados.primeira_competencia = R.competenciaDoMesVencimento(buscar('contratos', r ? r.contrato_id : q && q.contrato), dados.vencimento_primeira_parcela);
+      delete dados.vencimento_primeira_parcela;
       if (dados.vigencia_inicio && dados.vigencia_fim && dados.vigencia_fim <= dados.vigencia_inicio) erros.vigencia_fim = 'O fim da vigência precisa ser depois do início';
       // 0 parcelas: o seguro nunca entrava em boleto nenhum (no IPTU já era recusado)
       if (!(dados.num_parcelas >= 1)) erros.num_parcelas = 'Informe pelo menos 1 parcela';

@@ -167,3 +167,30 @@ test('mês antes da entrada também não tem boleto', () => {
   assert.equal(R.semBoletoNoMes(d, c, '2026-10').motivo, 'entrada');
   assert.equal(R.semBoletoNoMes(d, c, '2026-11'), null);
 });
+
+test('formulários perguntam o mês do vencimento: 12/2026 é o boleto de referência 11/2026, que vence em 05/12/2026', () => {
+  const { d, c } = base({ dia_vencimento: 5 });
+  // caso real de 24/11/2026: o dono digitou 12/2026 querendo o boleto que vence em 05/12 (referência 11/2026)
+  assert.equal(R.competenciaDoMesVencimento(c, '2026-12'), '2026-11');
+  assert.equal(R.mesVencimentoDaCompetencia(c, '2026-11'), '2026-12');
+  // aluguel que vence no próprio mês: o mês é o mesmo
+  const proprio = { ...c, cobranca_mes_seguinte: false };
+  assert.equal(R.competenciaDoMesVencimento(proprio, '2026-12'), '2026-12');
+  assert.equal(R.mesVencimentoDaCompetencia(proprio, '2026-12'), '2026-12');
+  assert.equal(R.competenciaDoMesVencimento(c, ''), null, 'em branco continua em branco');
+  // a frase ao lado do campo
+  assert.equal(R.textoBoletoDaCompetencia(d, c, '2026-11'), 'boleto de referência 11/2026, vence 05/12/2026 (ainda não gerado)');
+  R.gerarCobrancas(d, '2026-11', 'j');
+  assert.equal(R.textoBoletoDaCompetencia(d, c, '2026-11'), 'boleto de referência 11/2026, vence 05/12/2026');
+  // ida e volta: o registro gravado aparece no formulário pelo vencimento e volta igual
+  for (const comp of ['2026-01', '2026-11', '2026-12']) assert.equal(R.competenciaDoMesVencimento(c, R.mesVencimentoDaCompetencia(c, comp)), comp);
+});
+
+test('mês 13/2026 digitado (campo de texto, ex.: Firefox) é recusado, não vira outro mês', async () => {
+  const F = await import('../docs/js/formularios.js');
+  const campos = [{ nome: 'vencimento_abatimento', rotulo: 'Mês', tipo: 'mes' }];
+  const fd = (v) => { const f = new FormData(); f.append('vencimento_abatimento', v); return f; };
+  // antes, 13/2026 passava e, no aluguel que vence no mês seguinte, virava a referência 12/2026 (boleto que vence em janeiro)
+  for (const ruim of ['2026-13', '2026-00']) assert.equal(F.ler(campos, fd(ruim)).erros.vencimento_abatimento, 'Valor inválido', ruim);
+  assert.deepEqual(F.ler(campos, fd('2026-12')).dados, { vencimento_abatimento: '2026-12' });
+});

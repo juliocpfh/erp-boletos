@@ -635,7 +635,33 @@ function ligarPrazoPorFinalidade(raiz) {
   aplicar(); // finalidade que já veio da ficha ou da pessoa
 }
 
+/**
+ * Campo do mês em que vence o boleto (ressarcimento do condomínio, 1ª parcela do seguro): mostra ao lado o boleto de referência
+ * e o vencimento. Ex.: vencimento 12/2026, aluguel que vence no mês seguinte → "Boleto de referência 11/2026, vence 05/12/2026".
+ * Ressarcimento com o mês em branco: o boleto calculado pela data do pagamento do condomínio.
+ */
+function ligarMesDoBoleto(raiz) {
+  const marca = raiz.querySelector('[data-mes-boleto]');
+  const form = marca && marca.closest('form');
+  const campo = form && form.querySelector(`[name="${marca.dataset.mesBoleto}"]`);
+  const c = campo && buscar('contratos', marca.dataset.contratoBoleto);
+  if (!c) return;
+  const pagamento = marca.dataset.pagamento && form.querySelector(`[name="${marca.dataset.pagamento}"]`);
+  const mostrar = () => {
+    let comp = C.competenciaValida(campo.value) ? R.competenciaDoMesVencimento(c, campo.value) : null;
+    const emBranco = !campo.value.trim() && pagamento && C.dataValida(pagamento.value);
+    if (emBranco) comp = R.competenciaDoAbatimento(c, pagamento.value);
+    const t = comp ? R.textoBoletoDaCompetencia(d(), c, comp) : '';
+    mensagemAuto(campo, t ? `${esc(emBranco ? `Em branco: ${t}` : t.charAt(0).toUpperCase() + t.slice(1))}.` : '');
+  };
+  campo.addEventListener('input', mostrar);
+  campo.addEventListener('change', mostrar);
+  if (pagamento) pagamento.addEventListener('change', mostrar);
+  mostrar();
+}
+
 export function ligarCamposAutomaticos(raiz) {
+  ligarMesDoBoleto(raiz);
   ligarPrazoPorFinalidade(raiz);
   ligarPoupancaDoAditivo(raiz);
   ligarPoupancaDaGarantia(raiz);
