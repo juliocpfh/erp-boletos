@@ -2,6 +2,7 @@
 // Funções puras (rodam no Node, tests/emails.test.mjs). Valores em centavos viram "R$ 1.234,56"; datas viram "dd/mm/aaaa".
 import * as C from './calculos.js';
 import * as FO from './ficha-online.js';
+import * as TR from './termo-reserva.js';
 import * as K from './contratos.js';
 import { MODELOS_EMAIL } from './modelos-email.js';
 import * as NT from './notificacoes.js';
@@ -88,6 +89,41 @@ function linkDaFicha(f, pessoa, hoje) {
 }
 
 /**
+ * Campos do termo de aceite da reserva (2026-11-24): as condições do termo (as aceitas ou, sem aceite, as de agora), o link do
+ * aceite desta aba e o que fica numa desistência. Ex.: reserva combinada de R$ 500,00 com 40% → retencao "40%",
+ * retencao_valor "R$ 200,00", devolve_depois "R$ 300,00".
+ */
+function camposDoTermo(f, hoje) {
+  if (!f) return {};
+  const c = R.condicoesDaReserva(f);
+  const valor = R.valorDaReserva(f);
+  const reter = R.retencaoDaReserva(valor, c.retencao_pct);
+  const link = TR.urlDoAceite(f.id);
+  const pz = R.prazosDaReserva(f);
+  const dv = R.fichaSemContrato(f) ? R.devolucaoDaReserva(f) : null;
+  return {
+    reserva_combinada: valor ? C.reais(valor) : '', dias_validade: String(c.dias_validade), dias_documentos: String(c.dias_uteis_documentos),
+    dias_arrependimento: String(c.dias_arrependimento), dias_devolucao: String(c.dias_uteis_devolucao), retencao: C.pct(c.retencao_pct),
+    retencao_valor: C.reais(reter), devolve_depois: C.reais(valor - reter),
+    regra_desistencia: REC.regraDaDesistencia(c, valor), texto_conferencia: REC.TEXTO_CONFERENCIA, aviso_desistencia: REC.avisoDaDesistencia(c, valor),
+    requisitos: String(f.requisitos || '').split(/\n+/).map((x) => x.trim()).filter(Boolean).map((x) => `- ${x}`).join('\n'),
+    link_termo: link && String(link.vence_em).slice(0, 10) >= hoje ? link.url : '', link_termo_validade: link ? C.dataBr(String(link.vence_em).slice(0, 10)) : '',
+    aceite_data: f.aceite_reserva ? C.dataBr(String(f.aceite_reserva.em).slice(0, 10)) : '',
+    desistencia: f.aceite_reserva ? REC.textoDesistencia(f) : '',
+    prazo_documentos: f.aceite_reserva && pz ? C.dataBr(pz.documentos_ate) : '',
+    devolver_reserva: dv ? C.reais(dv.devolver) : '', reter_reserva: dv ? C.reais(dv.reter) : '',
+  };
+}
+const condicoesDoTermo = (f) => {
+  if (!f) return {};
+  const c = R.condicoesDaReserva(f);
+  const dv = R.fichaSemContrato(f) ? R.devolucaoDaReserva(f) : null;
+  return { retencao: R.retencaoDaReserva(R.valorDaReserva(f), c.retencao_pct) > 0, requisitos: !!String(f.requisitos || '').trim(), link_termo: !!TR.urlDoAceite(f.id),
+    termo_aceito: !!f.aceite_reserva, prazo_documentos: !!(f.aceite_reserva && R.prazosDaReserva(f)), retencao_aplicada: !!(dv && !dv.integral), devolve_algo: !!(dv && dv.devolver > 0),
+    aviso_desistencia: !!REC.avisoDaDesistencia(c, R.valorDaReserva(f)) };
+};
+
+/**
  * Campos do boleto para os e-mails da régua de cobrança (modelos com ``boleto``): põe em ``campos`` e devolve as condições.
  * O valor de hoje (multa e juros) é o do dia em que o e-mail é montado. Ex.: boleto de 11/2026 de R$ 1.350,00 (R$ 1.242,00 em dia)
  * vencido em 10/12/2026, em 16/12 → valor_hoje "R$ 1.380,29" (R$ 1.350,00 + multa R$ 27,00 + juros R$ 3,29), dias_atraso "6".
@@ -100,9 +136,9 @@ function camposDoBoleto(d, cb, campos, hoje) {
   Object.assign(campos, {
     boleto_referente: R.ehParcelaAcordo(cb) ? `da parcela ${cb.acordo_parcela || ''} do acordo`.replace(/ {2,}/g, ' ')
       : R.ehComplementoCaucao(cb) ? 'do complemento da caução' : R.ehSaldoSaida(cb) ? 'do saldo do acerto final' : `do aluguel de ${C.compBr(cb.competencia)}`,
-    // e-mail do boleto feito à mão no banco (2026-11-24): o mês de uso e o descritivo, o mesmo da descrição do boleto (lá "RS1.350,00",
-    // porque o banco não aceita o "$"; no e-mail, "R$ 1.350,00")
-    competencia_boleto: C.compBr(cb.competencia), descricao_boleto: R.dadosBoleto(d, cb).descricao.replace(/\bRS(?=\d)/g, 'R$ '),
+    // e-mail do boleto feito à mão no banco (2026-11-24): o mês de uso e o descritivo, o mesmo da descrição do boleto (lá "1.350,00",
+    // sem moeda, para caber nas 100 letras do banco; no e-mail, "R$ 1.350,00" e por extenso)
+    competencia_boleto: C.compBr(cb.competencia), descricao_boleto: R.dadosBoleto(d, cb, { moeda: 'R$ ' }).descricao,
     vencimento_boleto: C.dataBr(cb.vencimento), limite_pagamento: C.dataBr(limite),
     valor_em_dia: C.reais(t.a_pagar_pontual), valor_cheio: C.reais(t.a_pagar_sem_desconto),
     multa_pct: C.pct(cb.multa_percentual || 0), juros_pct: C.pct(cb.juros_mensal_percentual || 0),
@@ -200,6 +236,7 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
     link: linkDaFicha(f, 'interessado', hoje).url, link_validade: linkDaFicha(f, 'interessado', hoje).validade,
     link_fiador: fiadoresLink.length ? fiadoresLink[0].url : '', links_fiadores: linksFiadores,
     conta_deposito: K.dadoDaEmpresa(d, doImovel, 'conta_deposito'),
+    ...camposDoTermo(f, hoje),
   };
   const condicoes = {
     ...g, pj, bonificacao: desconto > 0, reserva: p.reserva_valor > 0, contas: contas.length > 0,
@@ -214,6 +251,7 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
     garantia_depositada: !!c && REC.reciboDisponivel(d, 'garantia', { contrato: c }).ok,
     varios_fiadores: !!f && R.fiadoresDaFicha(f).length > 1,
     devolucao: !!(f && f.devolucao_data),
+    ...condicoesDoTermo(f),
   };
   if (alvo.cobranca) Object.assign(condicoes, camposDoBoleto(d, alvo.cobranca, campos, hoje));
   const a = alvo.aditivo || null;

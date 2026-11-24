@@ -56,13 +56,15 @@ export async function telaRegua() {
   const gmail = ligada && admin() ? await emailLigado() : false;
   const envio = ligada && gmail;
   const dias = R.regra('regua_email_dias') || [];
+  // contratos numa regra especial com outros dias (a fila já os usa, filaRegua): o texto diz quais
+  const especiais = R.especiaisDiferentes(db, 'regua_email_dias').map((x) => `${esc(x.nome)}: ${(x.valor || []).length ? esc(x.valor.map(G.nomeDaEtapa).join('; ')) : 'nenhum dia'}`);
   const estado = !ligada ? 'O envio direto está <b>desligado</b> (Regras do sistema → "Régua de cobrança: botão Autorizar e enviar"): abra cada e-mail no Gmail ou copie o texto.'
     : !gmail ? 'O envio direto está ligado, mas o Gmail da empresa não está ligado nesta nuvem (ou você está sem internet): por enquanto, abra no Gmail ou copie o texto.'
       : 'Marque os e-mails que quer mandar e clique em "Enviar os selecionados": o sistema mostra a lista final e pede a sua confirmação.';
   const recentes = G.decididosRecentes(db, hoje);
   return `<h1>E-mails da régua</h1><div class="abas"><a href="#/cobrancas">← Boletos</a></div>
     <div class="cabecalho"><h2>E-mails da régua de cobrança: aguardando sua autorização</h2>${link('#/modelos-email', 'Textos dos e-mails')}</div>
-    <p class="suave">O sistema prepara os e-mails ${dias.length ? `de cada boleto em aberto: ${esc(dias.map(G.nomeDaEtapa).join('; '))}` : '(nenhum dia escolhido nas Regras do sistema: nada é preparado)'}. <b>Nada é enviado sozinho.</b>
+    <p class="suave">O sistema prepara os e-mails ${dias.length ? `de cada boleto em aberto: ${esc(dias.map(G.nomeDaEtapa).join('; '))}` : `(nenhum dia escolhido nas Regras do sistema: nada é preparado${especiais.length ? ' para os contratos que as seguem' : ''})`}.${especiais.length ? ` Contratos com regra especial: ${especiais.join(' · ')}.` : ''} <b>Nada é enviado sozinho.</b>
       Boleto pago, em acordo ou de contrato encerrado sai da lista. A cobrança de atraso só aparece passados 3 dias úteis do último dia para pagar (o banco leva até 3 dias úteis para creditar o boleto). E-mail enviado ou marcado "Não enviar" não volta.${admin() ? '' : ' Só o administrador autoriza.'}</p>
     <div class="alerta ${envio ? 'info' : 'aviso'}">${estado}</div>
     <div class="cartao rolagem regua"><table>

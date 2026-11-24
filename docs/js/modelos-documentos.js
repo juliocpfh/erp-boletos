@@ -158,7 +158,7 @@ O LOCATÁRIO declara estar ciente de que:
 
 2. a vistoria de saída será feita na entrega das chaves, com convite por escrito, por e-mail, para acompanhá-la, e os reparos necessários para o imóvel voltar ao estado da vistoria de entrada, ressalvado o desgaste natural do uso, serão descontados da garantia ou cobrados com base em orçamento ou nota do serviço;
 
-3. saindo antes do fim do prazo do contrato ({data_fim}), incide a multa prevista no contrato, proporcional ao tempo que falta (Lei nº 8.245/91, art. 4º); depois do fim do prazo, basta o aviso de 30 (trinta) dias, sem multa;
+3. [se data_fim]saindo antes do fim do prazo do contrato ({data_fim}), incide a multa prevista no contrato, proporcional ao tempo que falta (Lei nº 8.245/91, art. 4º); depois do fim do prazo, basta o aviso de 30 (trinta) dias, sem multa;[senão]a locação é por prazo indeterminado: basta o aviso de 30 (trinta) dias, sem multa (Lei nº 8.245/91, art. 6º);[fim]
 
 4. deve encerrar as contas de consumo que estejam em seu nome e entregar os comprovantes das últimas contas pagas.
 
@@ -172,7 +172,7 @@ O LOCATÁRIO declara estar ciente de que:
 
 Ao LOCATÁRIO: {locatarios}.[se solidario] Ao LOCATÁRIO SOLIDÁRIO: {solidario}.[fim][se fiador] {f:Ao FIADOR|Aos FIADORES}, para conhecimento: {fiadores}.[fim]
 
-{l:A LOCADORA|As LOCADORAS}, {locadoras}, no Contrato de Locação {finalidade} que tem por objeto {objeto}, firmado em {data_contrato}, cujo prazo terminou em {data_fim} e que continua por prazo indeterminado, {l:vem|vêm} comunicar que não {l:tem|têm} interesse em continuar a locação e, nos termos do [se nao_residencial]art. 57[senão]art. 46, § 2º[fim], da Lei nº 8.245/91, {l:concede|concedem} o prazo de 30 (trinta) dias para a desocupação do imóvel, até **{data_limite}**.
+{l:A LOCADORA|As LOCADORAS}, {locadoras}, no Contrato de Locação {finalidade} que tem por objeto {objeto}, firmado em {data_contrato}, [se data_fim]cujo prazo terminou em {data_fim} e que continua[senão]que vigora[fim] por prazo indeterminado, {l:vem|vêm} comunicar que não {l:tem|têm} interesse em continuar a locação e, nos termos do [se nao_residencial]art. 57[senão]art. 46, § 2º[fim], da Lei nº 8.245/91, {l:concede|concedem} o prazo de 30 (trinta) dias para a desocupação do imóvel, até **{data_limite}**.
 
 Até a entrega das chaves continuam devidos o aluguel e os encargos. A vistoria de saída será feita na entrega das chaves, com convite por escrito, por e-mail, para acompanhá-la.
 

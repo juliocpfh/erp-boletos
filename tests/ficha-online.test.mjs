@@ -67,5 +67,5 @@ test('trazer para a ficha: só os valores preenchidos, e as marcas dos documento
   // lembrete com o que falta
   const t = FO.textoWhatsapp(f, 'interessado', { url: 'https://ficha.ankjck.com.br/#x', vence_em: '2026-11-21T10:00:00Z' }, { lembrete: true, faltando: ['Comprovante de residência'] });
   assert.match(t, /^Olá, Maria! Passando para lembrar da sua ficha cadastral\. Falta: Comprovante de residência\. O link vale até 21\/11\/2026/);
-  assert.match(t, /a reserva é devolvida por inteiro/);
+  assert.match(t, /A reserva de R\$ 1\.000,00 é devolvida por inteiro/);
 });

@@ -61,3 +61,9 @@ Exemplos com aluguel de R$ 2.000,00, bonificação de 10% e tarifa de R$ 3,50:
 - **O C6 de verdade:** não se sabe se a tela do C6 (emissão à mão) corta a descrição em 100 letras como a API. O limite usado é o da API.
 - **O celular:** os testes de tela foram no navegador do computador.
 - **O Desfazer pela tela do Histórico:** testado pela regra (`reaplicarRessarcimentos`) e pelo código da tela, não clicando no Histórico.
+
+## Item 3 decidido: descrição sem o "RS" (24/11, decisão mais recente)
+
+O dono escolheu a opção (a): os valores da descrição do boleto saem **sem o "RS"** ("ALUGUEL 2.000,00" em vez de "ALUGUEL RS2.000,00"). O boleto com aluguel, bonificação, IPTU, seguro, tarifa e ressarcimento passa de 120 para **98 letras** e cabe nas 100 do campo da descrição do C6. O e-mail do boleto continua com "R$ 2.000,00", por extenso.
+
+Os boletos mais compridos (ele já escreveu 240 letras) cabem nas **instruções** do C6 (4 linhas de 80 letras), que o sistema monta com a descrição inteira. Antes cada linha era cortada seca na letra 80, o que podia partir um valor (ex.: "1.80" numa linha e "0,00" perdido). Agora a linha é quebrada entre palavras e o resto vai para a linha seguinte (`quebrarLinhas`). A descrição enviada ao C6, quando passa de 100 letras, também é cortada entre palavras. A tela continua avisando o que o banco corta.

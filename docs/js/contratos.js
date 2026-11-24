@@ -347,7 +347,8 @@ export function dadosDoContrato(d, c, extra = {}) {
     indice: textoIndice(c.indice_correcao),
     multa: percentualComExtenso(c.multa_percentual ?? 2),
     juros: percentualComExtenso(c.juros_mensal_percentual ?? 1),
-    tarifa_boleto: '', // a tarifa de cobrança não sai no contrato (pedido do usuário)
+    // tarifa do boleto (cláusula de volta em 24/11/2026; tirada em 2026-10-20): o valor de hoje, do cadastro do contrato
+    tarifa_boleto: c.taxa_boleto > 0 ? valorComExtenso(c.taxa_boleto) : '',
     fci_percentual: percentualComExtenso(c.fci_percentual || 0),
     fci_indice: textoIndice(c.fci_indice),
     encargos_inquilino: lista([...inquilinoPaga, 'telefone', 'dedetização', 'limpeza de calhas']),
@@ -370,7 +371,7 @@ export function dadosDoContrato(d, c, extra = {}) {
     solidario: !!c.solidario_nome, pj, residencial: c.finalidade !== 'Não residencial', nao_residencial: c.finalidade === 'Não residencial',
     bonificacao: pctBonif > 0, iptu_inquilino: inquilinoPaga.includes('IPTU'), seguro_inquilino: inquilinoPaga.includes('seguro incêndio'),
     seguro_incluso: inclusos.includes('seguro incêndio'),
-    tem_incluso: inclusos.length > 0, tarifa_boleto: false, fci: c.fci_percentual > 0, area_comum: !!imovel.area_comum, imovel_fiador: !!campos.fiadores_imoveis,
+    tem_incluso: inclusos.length > 0, tarifa_boleto: c.taxa_boleto > 0, fci: c.fci_percentual > 0, area_comum: !!imovel.area_comum, imovel_fiador: !!campos.fiadores_imoveis,
     varios_fiadores: fiadores.length > 1, varias_locadoras: locadoras.length > 1,
     indeterminado: c.prazo_tipo === 'Indeterminado',
     // residencial com menos de 30 meses: depois do prazo, a retomada só nos casos do art. 47 (sem "a qualquer tempo")
@@ -802,14 +803,18 @@ export const LINHA_EM_BRANCO = '____________________';
  * Outros documentos da locação (modelos-documentos.js): os dados do contrato e os campos do tipo, digitados ao gerar.
  * ``valores``: { campo: texto digitado } (data 'AAAA-MM-DD', dinheiro: número = centavos, texto digitado = reais, "500" ou "1.963,50", número). Campo em branco sai
  * como LINHA_EM_BRANCO; o dinheiro em branco fica vazio (a condição [se campo] não vale). ``data``: a data do documento.
- * Ex.: distrato com data_saida '2027-02-28' → {data_saida} = "28 de fevereiro de 2027".
+ * Ex.: distrato com data_saida '2027-02-28' → {data_saida} = "28 de fevereiro de 2027". ``fim``: o fim do contrato calculado
+ * pela tela (R.fimDoContrato: renovação e troca de titular; null = prazo indeterminado); sem ele, a data de término gravada.
  */
-export function dadosDoDocumento(d, c, tipo, valores = {}, { data, testemunhas = [] } = {}) {
+export function dadosDoDocumento(d, c, tipo, valores = {}, { data, testemunhas = [], fim } = {}) {
   const def = TIPOS_DOCUMENTO[tipo];
   const dados = dadosDoContrato(d, c, { data: data || C.hojeIso(), testemunhas });
   const fiadores = fiadoresNaData(d, c.id, data);
+  const termino = fim === undefined ? c.vigencia_fim : fim;
   Object.assign(dados.campos, {
     data_contrato: dataPorExtenso(c.vigencia_inicio || c.data_entrada),
+    // sem data de término (prazo indeterminado) fica vazio: o texto usa [se data_fim] (busca de 24/11, DOC-04)
+    data_fim: termino ? dataPorExtenso(termino) : '',
     fiadores_nomes: fiadores.map((f) => String(f.nome || '').toLocaleUpperCase('pt-BR')).join(', '),
   });
   for (const [chave, , formato] of (def ? def.campos : [])) {

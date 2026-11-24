@@ -67,7 +67,7 @@ test('e-mail do boleto: descritivo, mês de competência, vencimento, valor em d
   assert.match(e.texto, /Vencimento: 10\/12\/2026\n/);
   assert.match(e.texto, /Valor até o vencimento: R\$ 1\.242,00 \(com a bonificação\)/);
   assert.match(e.texto, /Valor depois do vencimento: R\$ 1\.350,00, mais multa de 2% e juros de 1% ao mês/);
-  assert.match(R.dadosBoleto(d, cb).descricao, /^ALUGUEL RS1\.350,00\nCOM BONF\. RS1\.242,00$/, 'no banco fica RS (sem o $)');
+  assert.match(R.dadosBoleto(d, cb).descricao, /^ALUGUEL 1\.350,00\nCOM BONF\. 1\.242,00$/, 'no banco, sem moeda (decisão de 24/11/2026: cabe nas 100 letras)');
   assert.match(e.texto, /DESCRITIVO\nALUGUEL R\$ 1\.350,00\nCOM BONF\. R\$ 1\.242,00\n/);
   assert.doesNotMatch(`${e.assunto}\n${e.texto}`, /\[preencher|\[se |\[fim\]|\{[a-z_]+\}/);
 });

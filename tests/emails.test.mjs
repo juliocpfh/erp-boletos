@@ -57,7 +57,7 @@ test('envio da ficha: depois da reserva, condições e documentos conforme pesso
   f.inquilino_tipo = 'Pessoa jurídica (empresa)';
   assert.match(texto(d, 'ficha_envio', { ficha: f }).texto, /Contrato social/);
   const rep = texto(d, 'ficha_reprovada', { ficha: f }).texto;
-  assert.match(rep, /devolvida em até 24 horas úteis/);
+  assert.match(rep, /devolvida em até 5 dias úteis/); // decisão de 2026-11-24 (regra reserva_dias_uteis_devolucao)
   assert.doesNotMatch(rep, /outro imóvel no seu perfil/);
 });
 

@@ -195,8 +195,15 @@ function juntarIdentificadores(d, x, m, usuario) {
   'Mesmo lançamento no arquivo do banco e no extrato pela API: identificadores juntados');
 }
 
-/** Identificador com que a ponte acha o lançamento no extrato (comprovante): o ``reference`` da API; só do OFX, a referência local (se houver) ou o FITID. */
-export const referenciaNoBanco = (m) => (['ofx', 'csv'].includes(fonteDe(m)) && m.local_reference ? m.local_reference : m.id_externo);
+/**
+ * Identificador com que a ponte acha o lançamento no extrato (comprovante): o ``reference`` da API; só do OFX, a referência local
+ * (se houver) ou o FITID. Linha que veio só do arquivo CSV, sem referência local: null (a chave "csv:data|valor|…" não existe no
+ * banco; a ponte não acharia). Depois que o mesmo mês é buscado pela ponte, a linha ganha o identificador da API (juntarIdentificadores).
+ */
+export const referenciaNoBanco = (m) => (['ofx', 'csv'].includes(fonteDe(m)) && m.local_reference ? m.local_reference : fonteDe(m) === 'csv' ? null : m.id_externo);
+
+/** Linha só do arquivo CSV que a ponte não tem como achar no banco (ver ``referenciaNoBanco``). */
+export const soDoCsv = (m) => !!m && fonteDe(m) === 'csv' && !referenciaNoBanco(m);
 
 const CAMPOS_DESTINO = { classificacao: null, imovel_id: null, despesa_id: null, cobranca_id: null, iptu_id: null, iptu_parcela: null, guia_imposto_id: null,
   pagamento_banco_id: null, par_movimentacao_id: null, reforma_id: null, nome_arquivo: null, comprovante: null, comprovante_contador: null, comprovante_origem: null,
@@ -753,7 +760,9 @@ function casarBoletos(d, valor, data, dias, { idExterno = null, nossoNumero = nu
   if (idExterno || nossoNumero) {
     const cb = abertos.find((x) => x.banco && ((idExterno && x.banco.id_externo === idExterno) || (nossoNumero && x.banco.nosso_numero && String(x.banco.nosso_numero) === String(nossoNumero))));
     if (cb) {
-      const emDia = data > cb.vencimento && valor === totais(cb).a_pagar_pontual;
+      // pagou depois do vencimento com o valor do desconto: em dia só até o limite (vencimento em dia não útil vale até o próximo
+      // dia útil). Depois disso o devido tem multa e juros e o valor menor não casa (decisões de 16/11 e 20/11/2026)
+      const emDia = data > cb.vencimento && data <= C.limitePagamento(cb.vencimento) && valor === totais(cb).a_pagar_pontual;
       const previsto = previstoNoPagamento(cb, data, { pagouEmDia: emDia }).valor_devido;
       if (valor < previsto) return []; // pagamento a menos: nunca casa (decisão de 2026-11-20)
       return [{ cobranca: cb, certeza: 'exata', previsto, pagouEmDia: emDia }];

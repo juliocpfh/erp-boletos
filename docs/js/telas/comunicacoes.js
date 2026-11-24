@@ -75,7 +75,7 @@ async function atualizarDaNuvem(comId, { forcar = false } = {}) {
 // Logo (reduzida uma vez por abertura): data URL PNG (ou JPEG, se a PNG passar do limite)
 // ---------------------------------------------------------------------------
 let logoGuardada = null; // { origem, url }
-async function logoReduzida() {
+export async function logoReduzida() {
   const origem = d().logo || '';
   if (!origem) return '';
   if (logoGuardada && logoGuardada.origem === origem) return logoGuardada.url;

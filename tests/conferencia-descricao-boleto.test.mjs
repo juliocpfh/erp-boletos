@@ -24,23 +24,36 @@ test('descrição curta fica por extenso e sem excesso', () => {
   const { d, c, cb } = base();
   ressarcir(d, c, 5000);
   const b = R.dadosBoleto(d, cb);
-  assert.equal(b.descricao, 'ALUGUEL RS2.000,00\nCOM BONF. RS1.800,00\nTARIFA COBRANÇA RS3,50 RESSARCIMENTO CONDOMÍNIO -RS50,00');
+  assert.equal(b.descricao, 'ALUGUEL 2.000,00\nCOM BONF. 1.800,00\nTARIFA COBRANÇA 3,50 RESSARCIMENTO CONDOMÍNIO -50,00');
   assert.equal(b.excesso, 0);
 });
 
-test('aluguel + IPTU + seguro + tarifa + ressarcimento: encurta a tarifa e o ressarcimento; o que ainda sobra é informado', () => {
+test('aluguel + IPTU + seguro + tarifa + ressarcimento: sem o "RS" e encurtando a tarifa e o ressarcimento, cabe nas 100 letras', () => {
   const { d, c, cb } = base();
   Object.assign(cb, { iptu: 12345, iptu_parcela: 'IPTU 2026 parc. 9/10', seguro: 3000, seguro_parcela: 'Seguro parc. 3/12' });
   ressarcir(d, c, 5000);
   const b = R.dadosBoleto(d, cb);
-  // antes: 120 letras, e o C6 cortava justamente o ressarcimento (que fica no fim), sem aviso na tela
-  assert.equal(b.descricao, 'ALUGUEL RS2.000,00\nCOM BONF. RS1.800,00\nIPTU RS123,45 SEGURO3/12 RS30,00 TARIFA RS3,50 RESSARC. COND. -RS50,00');
-  // ainda 110 letras: encurtar mais muda o formato (tirar o "RS", mudar a ordem): decisão do dono (relatório de 24/11)
-  assert.equal(b.excesso, 10);
-  // sem a tarifa, cabe
-  cb.taxa_boleto = 0;
-  assert.equal(R.dadosBoleto(d, cb).excesso, 0);
-  assert.match(R.dadosBoleto(d, cb).descricao, /RESSARC\. COND\. -RS50,00$/);
+  // antes: 120 letras com "RS", e o C6 cortava justamente o ressarcimento (que fica no fim). Decisão do dono de 24/11/2026:
+  // tirar o "RS" dos valores → 98 letras
+  assert.equal(b.descricao, 'ALUGUEL 2.000,00\nCOM BONF. 1.800,00\nIPTU 123,45 SEGURO3/12 30,00 TARIFA 3,50 RESSARC. COND. -50,00');
+  assert.equal(b.descricao.length, 98);
+  assert.equal(b.excesso, 0);
+  // o e-mail do boleto leva "R$" e por extenso (não precisa caber em 100 letras)
+  assert.equal(R.dadosBoleto(d, cb, { moeda: 'R$ ' }).descricao,
+    'ALUGUEL R$ 2.000,00\nCOM BONF. R$ 1.800,00\nIPTU R$ 123,45 SEGURO3/12 R$ 30,00 TARIFA COBRANÇA R$ 3,50 RESSARCIMENTO CONDOMÍNIO -R$ 50,00');
+});
+
+test('instruções do boleto no C6 (4 linhas de 80): quebra entre palavras, nunca no meio de um valor', () => {
+  const linha = 'IPTU 123,45 SEGURO3/12 30,00 TARIFA 3,50 CONSERTO DA TORNEIRA DA COZINHA 80,00 RESSARC. COND. -50,00';
+  // antes (slice de 80): "… COZINHA 80,00 RES" e o resto perdido; agora a linha acaba num espaço e o resto vai para a seguinte
+  assert.deepEqual(R.quebrarLinhas([linha], 80), ['IPTU 123,45 SEGURO3/12 30,00 TARIFA 3,50 CONSERTO DA TORNEIRA DA COZINHA 80,00', 'RESSARC. COND. -50,00']);
+  // valor que cairia na divisa (ex.: "1.800,00" entre a letra 78 e a 85) passa inteiro para a linha seguinte
+  const divisa = `${'X'.repeat(76)} 1.800,00 FIM`;
+  assert.deepEqual(R.quebrarLinhas([divisa], 80), ['X'.repeat(76), '1.800,00 FIM']);
+  for (const l of R.quebrarLinhas([linha, divisa, 'curta'], 80)) assert.ok(l.length <= 80);
+  // linhas vazias somem; palavra maior que a linha (raro) é cortada
+  assert.deepEqual(R.quebrarLinhas(['', '  ', 'A B'], 80), ['A B']);
+  assert.deepEqual(R.quebrarLinhas(['Y'.repeat(85)], 80), ['Y'.repeat(80), 'Y'.repeat(5)]);
 });
 
 test('com ajustes do mês de motivo comprido não cabe: o excesso é informado (a tela avisa o que o banco corta)', () => {

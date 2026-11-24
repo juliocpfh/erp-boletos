@@ -904,7 +904,8 @@ export function garantiaADepositar(d, c, qual, hoje = C.hojeIso()) {
   // depois de registrada: a caução atual (inicial + correções + depósitos para completar) contra a corrigida pelos reajustes
   const ultima = qual === 'caucao' ? correcoesCaucaoAtual(d, c).pop() : null;
   const combinado = registrada && ultima ? ultima.valor_novo : inicial;
-  const sugerida = qual === 'caucao' && correcoesDo(d, c.id).some((x) => x.data_vigencia <= hoje) ? caucaoSugerida(d, c, hoje) : null;
+  // a caução corrigida pelos reajustes só existe com a regra "A caução acompanha o reajuste" (do sistema ou a especial do contrato)
+  const sugerida = qual === 'caucao' && CR.regra('caucao_acompanha', c) && correcoesDo(d, c.id).some((x) => x.data_vigencia <= hoje) ? caucaoSugerida(d, c, hoje) : null;
   const corrigida = sugerida > combinado ? sugerida : null;
   // antes de registrada: o primeiro depósito é o da caução do contrato (ou da troca de garantia), sem os reajustes;
   // a diferença dos reajustes vem depois, como complemento (correção da caução, boleto ou depósito para completar)
@@ -1883,8 +1884,9 @@ function boletoSemOcupacao(d, cb, c = buscar(d, 'contratos', cb.contrato_id)) {
 }
 
 /**
- * Alertas dos boletos em aberto de mês sem nenhum dia ocupado (``boletoSemOcupacao``) que ficaram: emitido no C6 (o banco
- * ainda cobra: cancele lá e depois exclua), alterado à mão (o recálculo não mexe) ou de antes desta conferência.
+ * Alertas dos boletos em aberto de mês sem nenhum dia ocupado (``boletoSemOcupacao``) que ficaram: emitido no C6 ou feito à
+ * mão no banco com o PDF anexado (o banco ainda cobra: cancele lá e depois exclua), alterado à mão (o recálculo não exclui) ou
+ * de antes desta conferência.
  */
 export function alertasBoletosSemOcupacao(d) {
   const lista = [];
@@ -1907,9 +1909,11 @@ export function alertasBoletosSemOcupacao(d) {
     const i = buscar(d, 'imoveis', c.imovel_id);
     const motivo = c.data_saida && c.data_saida < `${cb.competencia}-01` ? `saída em ${C.dataBr(c.data_saida)}` : `entrada em ${C.dataBr(c.data_entrada)}`;
     const banco = emitidoNoBanco(cb);
-    lista.push({ nivel: banco ? 'perigo' : 'aviso', tipo: banco ? 'Banco' : 'A verificar', contrato_id: c.id, imovel: i ? i.nome : '', inquilino: c.inquilino_nome,
+    const aMao = !banco && !!cb.boleto_pdf; // feito à mão no site do banco, com o PDF anexado (24/11/2026)
+    lista.push({ nivel: banco || aMao ? 'perigo' : 'aviso', tipo: banco || aMao ? 'Banco' : 'A verificar', contrato_id: c.id, imovel: i ? i.nome : '', inquilino: c.inquilino_nome,
       link: `#/cobranca/${cb.id}`, ancora: `boleto-${cb.id}`,
       texto: banco ? `Boleto de ${C.compBr(cb.competencia)} está emitido no C6, mas não tem nenhum dia ocupado (${motivo}): cancele no banco e depois exclua o boleto.`
+        : aMao ? `Boleto de ${C.compBr(cb.competencia)} foi emitido à mão no banco (PDF anexado), mas não tem nenhum dia ocupado (${motivo}): cancele no banco e depois exclua o boleto.`
         : cb.editado_manual ? `Boleto de ${C.compBr(cb.competencia)} (alterado à mão) não tem nenhum dia ocupado (${motivo}): confira e exclua o boleto se não deve ser cobrado.`
           : `Boleto de ${C.compBr(cb.competencia)} não tem nenhum dia ocupado (${motivo}): exclua o boleto (ou recalcule os boletos em aberto do mês).` });
   }
@@ -1918,10 +1922,11 @@ export function alertasBoletosSemOcupacao(d) {
 
 /**
  * Recalcula os boletos em aberto depois de mudar o contrato, o IPTU ou o seguro, para que o boleto sempre bata
- * com o cadastro. Boleto alterado à mão ("Alterar valores") fica como está (só a reserva dele pode mudar de mês).
- * Boleto de mês sem nenhum dia ocupado (ex.: dezembro gerado e saída em 15/11) é excluído, com histórico, se não tem NF e
- * não foi emitido no C6; emitido no C6, fica (o banco ainda cobra) e aparece nos alertas para cancelar no banco
- * (``alertasBoletosSemOcupacao``). Devolve quantos boletos mudaram.
+ * com o cadastro. Boleto alterado à mão ("Alterar valores"): os valores digitados ficam e o resto é recalculado
+ * (``camposDoRecalculo``; o alterado antes de 24/11/2026 fica todo como está, só a reserva dele pode mudar de mês).
+ * Boleto de mês sem nenhum dia ocupado (ex.: dezembro gerado e saída em 15/11) é excluído, com histórico, se não tem NF, não foi
+ * emitido no C6 nem feito à mão no banco (PDF anexado) e não foi alterado à mão; esses ficam e aparecem nos alertas
+ * (``alertasBoletosSemOcupacao``: cancelar no banco, ou conferir e excluir). Devolve quantos boletos mudaram.
  */
 export function recalcularCobrancas(d, filtro, usuario) {
   const mudaram = new Set();
@@ -1933,7 +1938,9 @@ export function recalcularCobrancas(d, filtro, usuario) {
     const c = buscar(d, 'contratos', cb.contrato_id);
     if (c) contratos.set(c.id, c);
     if (boletoSemOcupacao(d, cb, c)) {
-      if (!faturasDe(d, 'cobranca', cb.id, false).length && !emitidoNoBanco(cb)) {
+      // fica (com alerta): emitido no C6, feito à mão no banco com o PDF anexado (o banco ainda cobra e o inquilino pode ter o
+      // PDF) ou alterado à mão (o valor foi combinado: confira e exclua, como antes de 24/11/2026)
+      if (!faturasDe(d, 'cobranca', cb.id, false).length && !emitidoNoBanco(cb) && !cb.boleto_pdf && !cb.editado_manual) {
         excluir(d, 'cobrancas', cb.id, usuario, `Boleto ${C.compBr(cb.competencia)} de ${c.inquilino_nome} excluído: nenhum dia ocupado no mês (${c.data_saida && c.data_saida < `${cb.competencia}-01` ? `saída em ${C.dataBr(c.data_saida)}` : `entrada em ${C.dataBr(c.data_entrada)}`})`);
         mudaram.add(cb.id);
       }
@@ -2169,9 +2176,13 @@ export function estornarPagamento(d, cobrancaId, usuario) {
   atualizar(d, 'cobrancas', cobrancaId, { data_pagamento: null, data_pagou: null, valor_pago: null, dias_atraso: null, multa: null,
     juros: null, valor_nf: null, pagou_em_dia: false, situacao: 'Em aberto', nf_manual: false, divergencia: null, movimentacao_id: null, pagamento_c6: null,
     ...(cb && (cb.valor_a_mais || cb.valor_devolvido) ? { valor_a_mais: null, valor_devolvido: null } : {}) }, usuario, 'Pagamento desfeito');
-  // confirmado pelo extrato: a movimentação volta a "sem destino" (também a entrada a mais e a devolução ao inquilino ligadas a ele)
+  // confirmado pelo extrato: a movimentação volta a "sem destino" (também a entrada a mais e a devolução ao inquilino ligadas a ele).
+  // O comprovante sai junto, como no "Desfazer destino" (``desvincularMovimentacao``): a pasta dele vem do imóvel, que sai; a tela
+  // apaga o arquivo que ficou sem uso (alterarApagandoAnexos) e ele é guardado de novo ao dar o destino certo.
   for (const m of (d.movimentacoes_banco || []).filter((x) => x.cobranca_id === Number(cobrancaId))) {
-    atualizar(d, 'movimentacoes_banco', m.id, { cobranca_id: null, classificacao: null, imovel_id: null, classificada_em: null, classificada_por: null, ...(m.pago_a_mais ? { pago_a_mais: false } : {}) }, usuario, 'Pagamento do boleto desfeito: movimentação volta a ficar sem destino');
+    atualizar(d, 'movimentacoes_banco', m.id, { cobranca_id: null, classificacao: null, imovel_id: null, classificada_em: null, classificada_por: null,
+      ...(m.comprovante || m.comprovante_contador || m.comprovante_origem || m.nome_arquivo ? { comprovante: null, comprovante_contador: null, comprovante_origem: null, nome_arquivo: null } : {}),
+      ...(m.pago_a_mais ? { pago_a_mais: false } : {}) }, usuario, 'Pagamento do boleto desfeito: movimentação volta a ficar sem destino');
   }
 }
 
@@ -2285,13 +2296,14 @@ export function baseDaFatura(d, tipo, registro) {
     const ref = acordo ? `acordo${registro.acordo_parcela ? ` ${registro.acordo_parcela}` : ''} (${registro.acordo_referente})` : '';
     // mês incompleto (entrada ou saída): a NF mostra a quantidade em dias do mês (ex.: 16/30), não "1 mês"
     // com o ajuste do mês na NF, o total não é só o aluguel: a linha sai como "1" (senão o valor unitário ficaria errado)
-    const ajusteNaNf = !!(registro.outros_na_nf && registro.outros);
+    const ajusteNf = C.ajusteNaNf(registro);
+    const ajusteNaNf = !!ajusteNf;
     const proporcional = !acordo && !ajusteNaNf && registro.dias_cobrados > 0 && registro.dias_cobrados < registro.dias_mes;
     return {
       imovel, valor: registro.valor_nf, periodo_inicio: ini, periodo_fim: fim,
       ...(proporcional ? { dias: registro.dias_cobrados, dias_mes: registro.dias_mes } : {}),
       descricao: `${contrato.inquilino_nome} · ${imovel.nome} · ${ref || C.compBr(registro.competencia)}`,
-      observacoes: registro.observacoes_nf || [ref ? `Parcela do ${ref}` : '', ajusteNaNf ? `Inclui ${registro.outros_descricao || 'ajuste do mês'}: ${C.reais(registro.outros)}` : ''].filter(Boolean).join('. '),
+      observacoes: registro.observacoes_nf || [ref ? `Parcela do ${ref}` : '', ajusteNaNf ? `Inclui ${ajustesDoBoleto(registro).map((a) => a.motivo).filter(Boolean).join('; ') || 'ajuste do mês'}: ${C.reais(ajusteNf)}` : ''].filter(Boolean).join('. '),
       tomador: { nome: contrato.inquilino_nome, documento: contrato.inquilino_cpf || '',
         telefone: contrato.inquilino_telefone || '', endereco: enderecoCompleto(imovel) },
       partes: participacoesDo(d, imovel.id), origem: `no imóvel "${imovel.nome}"`,
@@ -2991,7 +3003,85 @@ export const fichaAbertaDoImovel = (d, imovelId, excetoId = null) => (d.fichas |
 export const fichaSemContrato = (f) => f.situacao === 'Reprovada' || f.situacao === 'Desistiu';
 
 /** Reserva de ficha reprovada (ou com desistência) que ainda não teve a devolução registrada. */
-export const devolucaoPendente = (f) => fichaSemContrato(f) && f.reserva_valor > 0 && !f.devolucao_data;
+// com o termo aceito, a reserva retida por inteiro não fica "a devolver" (devolucaoDaReserva, mais abaixo)
+export const devolucaoPendente = (f) => fichaSemContrato(f) && f.reserva_valor > 0 && !f.devolucao_data && devolucaoDaReserva(f).devolver > 0;
+
+// --------------------------------------------------------------------------
+// Termo de aceite da reserva (decisões do dono de 2026-11-24): antes do depósito, o interessado lê as condições e aceita pelo
+// link (código no e-mail). O aceite guarda as condições do dia (`aceite_reserva.condicoes`): mudar as regras depois não muda
+// o que a pessoa aceitou. Reprovada: devolve tudo. Desistência até `dias_arrependimento` dias do depósito (padrão 0: nenhum):
+// devolve tudo; depois, a empresa fica com `retencao_pct` (padrão 100%, arras penitenciais, CC arts. 418 e 420; decisão do dono de
+// 2026-11-24). Informação ou documento que não corresponde à realidade na conferência conta como desistência
+// (`reprovada_conferencia`). A reserva é sempre abatida do 1º aluguel (competenciaReserva: em branco = mês de entrada).
+// --------------------------------------------------------------------------
+/** Condições da reserva pelas regras de agora (Sistema → Regras do sistema, grupo "Reserva e termo de aceite"). */
+export const condicoesDaReservaAgora = () => ({
+  retencao_pct: CR.regra('reserva_retencao_pct'), dias_arrependimento: CR.regra('reserva_dias_arrependimento'),
+  dias_uteis_documentos: CR.regra('reserva_dias_uteis_documentos'), dias_validade: CR.regra('reserva_dias_validade'),
+  dias_uteis_devolucao: CR.regra('reserva_dias_uteis_devolucao'),
+});
+/** Condições da ficha: as do termo aceito ou, sem aceite, as de agora. */
+export const condicoesDaReserva = (f) => ({ ...condicoesDaReservaAgora(), ...(((f && f.aceite_reserva) || {}).condicoes || {}) });
+/** Valor da reserva da ficha: o depositado ou, antes do depósito, o combinado no termo. */
+export const valorDaReserva = (f) => (f.reserva_valor > 0 ? f.reserva_valor : f.reserva_combinada > 0 ? f.reserva_combinada : 0);
+/** Quanto a empresa fica numa desistência depois do prazo. Ex.: R$ 500,00 com 40% → R$ 200,00. */
+export const retencaoDaReserva = (valor, pct) => Math.round((valor || 0) * (Number(pct) || 0) / 100);
+
+/**
+ * Prazos contados do depósito da reserva (null sem a data do depósito). Ex.: depósito na quinta, 10/12/2026 → documentos até
+ * 15/12/2026 (3 dias úteis) e reservado até 17/12/2026 (7 dias); desistência com tudo de volta até 17/12/2026 com 7 dias na regra,
+ * ou nenhuma (arrependimento_ate null) com 0 dias, o padrão.
+ */
+export function prazosDaReserva(f) {
+  if (!f || !/^\d{4}-\d{2}-\d{2}$/.test(String(f.reserva_data || ''))) return null;
+  const c = condicoesDaReserva(f);
+  return { documentos_ate: C.somarDiasUteis(f.reserva_data, c.dias_uteis_documentos), vale_ate: C.somarDias(f.reserva_data, c.dias_validade),
+    arrependimento_ate: c.dias_arrependimento > 0 ? C.somarDias(f.reserva_data, c.dias_arrependimento) : null };
+}
+
+/**
+ * Quanto devolver da reserva: { reserva, devolver, reter, integral, motivo }. ``data``: o dia da desistência (padrão: o da
+ * decisão; ficha ainda aberta: hoje, para mostrar "se desistir hoje"). Sem o termo aceito, devolve tudo (a pessoa não aceitou
+ * a retenção). Ex.: reserva de R$ 500,00 com 100% e 0 dias → desistência em qualquer dia depois do depósito: devolve R$ 0,00 e
+ * fica R$ 500,00; com 40% e 7 dias, depósito em 10/12/2026 e desistência em 20/12/2026 → devolve R$ 300,00, fica R$ 200,00.
+ */
+export function devolucaoDaReserva(f, { data = null, hoje = C.hojeIso() } = {}) {
+  const reserva = f && f.reserva_valor > 0 ? f.reserva_valor : 0;
+  const tudo = (motivo) => ({ reserva, devolver: reserva, reter: 0, integral: true, motivo });
+  if (!reserva) return { reserva: 0, devolver: 0, reter: 0, integral: true, motivo: 'sem reserva' };
+  if (!f.aceite_reserva) return tudo('sem o termo de aceite da reserva: devolve tudo');
+  if (f.situacao === 'Reprovada' && !f.reprovada_conferencia) return tudo('ficha não aprovada: devolve tudo');
+  const c = condicoesDaReserva(f);
+  const quando = data || (fichaSemContrato(f) ? f.decisao_data : null) || hoje;
+  const prazos = prazosDaReserva(f);
+  if (prazos && prazos.arrependimento_ate && quando <= prazos.arrependimento_ate) return tudo(`desistência em até ${c.dias_arrependimento} dias do depósito: devolve tudo`);
+  const reter = Math.min(retencaoDaReserva(reserva, c.retencao_pct), reserva);
+  const porque = f.situacao === 'Reprovada' ? 'informação ou documento que não correspondeu à realidade na conferência (conta como desistência)' : 'desistência';
+  const prazo = c.dias_arrependimento > 0 ? ` depois de ${c.dias_arrependimento} dias do depósito` : '';
+  return { reserva, devolver: reserva - reter, reter, integral: reter === 0,
+    motivo: `${porque}${prazo}: a empresa fica com ${reter >= reserva ? 'a reserva inteira' : C.pct(c.retencao_pct)} (${C.reais(reter)}), como no termo aceito em ${C.dataBr(String(f.aceite_reserva.em).slice(0, 10))}` };
+}
+
+/** Último dia para devolver a reserva (reprovada ou desistência): a decisão mais os dias úteis do termo. */
+export const devolverReservaAte = (f) => (fichaSemContrato(f) && f.decisao_data ? C.somarDiasUteis(f.decisao_data, condicoesDaReserva(f).dias_uteis_devolucao) : null);
+
+/** Ficha sem os documentos marcados como recebidos (pessoais, renda e residência). */
+export const fichaSemDocumentos = (f) => !(f.doc_pessoais && f.doc_renda && f.doc_residencia);
+
+/**
+ * Guarda na ficha o aceite que veio do link (nuvem/aceite-reserva.mjs). Só a primeira vez de cada aceite (pelo instante):
+ * devolve true se mudou.
+ */
+export function guardarAceiteReserva(d, fichaId, resposta, usuario) {
+  const f = buscar(d, 'fichas', fichaId);
+  if (!f || !resposta || !resposta.em) return false;
+  if (f.aceite_reserva && f.aceite_reserva.em === resposta.em) return false;
+  const campos = ['em', 'email', 'canal', 'ip', 'aparelho', 'assinatura', 'texto_aceito', 'texto_sha256', 'condicoes', 'reserva_valor', 'comprovante_em'];
+  const aceite = Object.fromEntries(campos.filter((k) => resposta[k] !== undefined && resposta[k] !== null && resposta[k] !== '').map((k) => [k, resposta[k]]));
+  atualizar(d, 'fichas', f.id, { aceite_reserva: aceite }, usuario,
+    `Ficha de ${f.inquilino_nome}: termo de aceite da reserva aceito pelo link em ${C.dataHoraBr(resposta.em)} (e-mail ${resposta.email} confirmado pelo código)`);
+  return true;
+}
 
 /** Data em que os documentos da ficha reprovada (ou com desistência) são apagados (3 meses depois da decisão), ou null. */
 export const dataApagarDocumentosFicha = (f) => (fichaSemContrato(f) && f.decisao_data && !f.documentos_apagados_em ? C.somarMesesData(f.decisao_data, CR.regra('meses_documentos_ficha')) : null);
@@ -3001,7 +3091,7 @@ export const dataApagarDocumentosFicha = (f) => (fichaSemContrato(f) && f.decisa
  * situação e o motivo, a proposta (valores do imóvel, não da pessoa), as ligações (ids) e o dinheiro da reserva com os comprovantes.
  */
 const FICHA_FICA = new Set(['id', 'inquilino_nome', 'inquilino_tipo', 'situacao', 'decisao_data', 'decisao_por', 'decisao_motivo', 'data_recebida',
-  'imoveis_ids', 'modo_imoveis', 'pasta', 'documentos_apagados_em', 'dados_apagados_em', 'historico_limpo_em', 'documentos_no_contrato', 'criado_em', 'criado_por', 'alterado_em', 'alterado_por',
+  'imoveis_ids', 'modo_imoveis', 'pasta', 'documentos_apagados_em', 'reprovada_conferencia', 'link_aceite', 'dados_apagados_em', 'historico_limpo_em', 'documentos_no_contrato', 'criado_em', 'criado_por', 'alterado_em', 'alterado_por',
   ...COMPROVANTES_DINHEIRO_FICHA, ...CAMPOS_PROPOSTA_FICHA]);
 const fichaFica = (k) => FICHA_FICA.has(k) || /^(reserva|devolucao)_/.test(k) || /_ids?$/.test(k);
 
@@ -3016,7 +3106,9 @@ export function apagarDadosPessoaisDaFicha(d, fichaId, usuario, hoje = C.hojeIso
   const f = buscar(d, 'fichas', fichaId);
   if (!f) throw new C.ErroUsuario('Ficha não encontrada.');
   if (!fichaSemContrato(f)) throw new C.ErroUsuario('Só a ficha reprovada ou com desistência tem os dados pessoais apagados.');
-  const saem = Object.keys(f).filter((k) => !fichaFica(k) && f[k] !== null && f[k] !== undefined && f[k] !== '');
+  // reserva com parte retida: o termo aceito fica, como prova do combinado (LGPD, art. 16, I, e art. 7º, VI)
+  const retida = f.devolucao_valor > 0 && f.devolucao_valor < (f.reserva_valor || 0);
+  const saem = Object.keys(f).filter((k) => !fichaFica(k) && !(retida && k === 'aceite_reserva') && f[k] !== null && f[k] !== undefined && f[k] !== '');
   for (const k of saem) f[k] = null;
   f.dados_apagados_em = hoje;
   // e-mails mandados para a pessoa: sai o endereço
@@ -3045,12 +3137,20 @@ export const fichasComDadosVencidos = (d, hoje = C.hojeIso()) => (d.fichas || []
 export const fichasComDocumentosVencidos = (d, hoje = C.hojeIso()) => (d.fichas || []).filter((f) => dataApagarDocumentosFicha(f) && dataApagarDocumentosFicha(f) <= hoje);
 
 /** O que falta fazer nas fichas, para o Painel: [{ ficha, texto }]. */
-export function pendenciasDasFichas(d) {
+export function pendenciasDasFichas(d, hoje = C.hojeIso()) {
   const out = [];
   for (const f of d.fichas || []) {
     if (f.situacao === 'Em análise') out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome} em análise desde ${C.dataBr(f.data_recebida)}` });
     else if (imoveisParaContrato(d, f).length) out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome} aprovada: falta fazer o contrato` });
-    if (devolucaoPendente(f)) out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome} ${f.situacao === 'Desistiu' ? 'com desistência' : 'reprovada'}: registrar a devolução da reserva de ${C.reais(f.reserva_valor)}` });
+    if (devolucaoPendente(f)) {
+      const dv = devolucaoDaReserva(f);
+      const ate = devolverReservaAte(f);
+      out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome} ${f.situacao === 'Desistiu' ? 'com desistência' : 'reprovada'}: registrar a devolução ${dv.integral ? `da reserva de ${C.reais(f.reserva_valor)}` : `de ${C.reais(dv.devolver)} da reserva de ${C.reais(f.reserva_valor)} (fica ${C.reais(dv.reter)}, como no termo)`}${ate ? (ate < hoje ? ` (o prazo era ${C.dataBr(ate)})` : ` até ${C.dataBr(ate)}`) : ''}` });
+    }
+    // termo aceito (2026-11-24): prazo dos documentos e validade da reserva, contados do depósito
+    const pz = f.situacao === 'Em análise' && f.aceite_reserva ? prazosDaReserva(f) : null;
+    if (pz && pz.documentos_ate < hoje && fichaSemDocumentos(f)) out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome}: o prazo dos documentos acabou em ${C.dataBr(pz.documentos_ate)} e eles não estão marcados como recebidos: pelo termo, conta como desistência (${devolucaoDaReserva(f, { data: hoje }).devolver ? `devolve ${C.reais(devolucaoDaReserva(f, { data: hoje }).devolver)}` : 'a reserva fica com a empresa'}); registre em "Desistiu antes de assinar"` });
+    else if (pz && pz.vale_ate < hoje) out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome}: a reserva segurava o imóvel até ${C.dataBr(pz.vale_ate)} (decida a ficha)` });
   }
   return out;
 }
@@ -3189,6 +3289,19 @@ export function desistirAntesDeAssinar(d, { fichaId = null, contratoId = null, d
   return buscar(d, 'fichas', f.id);
 }
 
+/**
+ * Contrato do novo titular com a troca já completada (boletos, fiadores, correções e garantia passaram do anterior para ele):
+ * excluir apagaria o que era do anterior, e o anterior ficaria com a saída na véspera da troca, sem ser cobrado. Barrado (busca
+ * de 24/11, CON-01): o mais seguro é corrigir o cadastro do novo titular. Antes de a troca se completar, a exclusão é livre e o
+ * anterior volta a ser cobrado (``soltarSaidaDoAnterior``). Devolve o texto do motivo ou null.
+ */
+export function motivoNaoExcluirHerdeiro(d, c) {
+  const a = contratoHerdado(d, c);
+  if (!a || !c.heranca_transferida) return null;
+  const quando = typeof c.heranca_transferida === 'string' && C.dataValida(c.heranca_transferida) ? ` em ${C.dataBr(c.heranca_transferida)}` : '';
+  return `A troca de titular já foi completada${quando}: o que era de ${a.inquilino_nome} (boletos, fiadores, correções do aluguel, garantia) passou para ${c.inquilino_nome}. Excluir este contrato apagaria esses registros e ${a.inquilino_nome} ficaria sem cobrança. Corrija o cadastro em "Editar contrato" em vez de excluir.`;
+}
+
 /** Tabelas com contrato_id que não saem com o contrato: NFs (barradas antes) e os dados do banco (não se desfazem). */
 const FICAM_SEM_O_CONTRATO = new Set(['contratos', 'faturas', 'movimentacoes_banco', 'pagamentos_banco']);
 
@@ -3200,6 +3313,10 @@ const FICAM_SEM_O_CONTRATO = new Set(['contratos', 'faturas', 'movimentacoes_ban
 export function excluirContrato(d, contratoId, usuario, descricao) {
   const c = buscar(d, 'contratos', contratoId);
   if (!c) return;
+  const barrado = motivoNaoExcluirHerdeiro(d, c);
+  if (barrado) throw new C.ErroUsuario(barrado);
+  // troca de titular que não vai acontecer: o anterior volta a ser cobrado (a saída na véspera da troca sai)
+  soltarSaidaDoAnterior(d, c, usuario, `o contrato de ${c.inquilino_nome}, novo titular, foi excluído`);
   // apólice que veio do contrato anterior (troca de titular) volta para ele, com o arquivo: não sai junto (item 17)
   for (const s of (d.seguros || []).filter((x) => x.contrato_id === c.id && x.herdado_de && buscar(d, 'contratos', x.herdado_de))) {
     atualizar(d, 'seguros', s.id, { contrato_id: s.herdado_de, herdado_de: null }, usuario, `Seguro volta para o contrato anterior (${c.inquilino_nome} excluído)`);
@@ -3534,9 +3651,10 @@ export function anexarBoletoPdf(d, id, arquivo, usuario) {
   const quem = `${c ? c.inquilino_nome : 'boleto'}: boleto de ${C.compBr(cb.competencia)}`;
   if (!arquivo) {
     if (!cb.boleto_pdf) throw new C.ErroUsuario('Este boleto não tem PDF anexado.');
-    return atualizar(d, 'cobrancas', cb.id, { boleto_pdf: null, boleto_pdf_contrato: null, boleto_pdf_valor: null, boleto_pdf_vencimento: null }, usuario, `${quem}, PDF do banco tirado (${cb.boleto_pdf})`);
+    return atualizar(d, 'cobrancas', cb.id, { boleto_pdf: null, boleto_pdf_contrato: null, boleto_pdf_valor: null, boleto_pdf_vencimento: null, boleto_pdf_pontual: null, boleto_pdf_multa: null, boleto_pdf_juros: null }, usuario, `${quem}, PDF do banco tirado (${cb.boleto_pdf})`);
   }
-  return atualizar(d, 'cobrancas', cb.id, { boleto_pdf: arquivo, boleto_pdf_contrato: cb.contrato_id, boleto_pdf_valor: totais(cb).a_pagar_sem_desconto, boleto_pdf_vencimento: cb.vencimento },
+  return atualizar(d, 'cobrancas', cb.id, { boleto_pdf: arquivo, boleto_pdf_contrato: cb.contrato_id, boleto_pdf_valor: totais(cb).a_pagar_sem_desconto, boleto_pdf_vencimento: cb.vencimento,
+    boleto_pdf_pontual: totais(cb).a_pagar_pontual, boleto_pdf_multa: cb.multa_percentual || 0, boleto_pdf_juros: cb.juros_mensal_percentual || 0 },
     usuario, `${quem}, PDF do banco ${cb.boleto_pdf ? 'trocado' : 'anexado'} (${arquivo})`);
 }
 
@@ -3550,6 +3668,12 @@ export function boletoPdfDesatualizado(cb) {
   const valor = totais(cb).a_pagar_sem_desconto;
   if (valor !== cb.boleto_pdf_valor) dif.push(`o valor era ${C.reais(cb.boleto_pdf_valor)} e agora é ${C.reais(valor)}`);
   if (cb.boleto_pdf_vencimento && cb.boleto_pdf_vencimento !== cb.vencimento) dif.push(`o vencimento era ${C.dataBr(cb.boleto_pdf_vencimento)} e agora é ${C.dataBr(cb.vencimento)}`);
+  // bonificação, multa e juros (guardados desde 24/11/2026; anexo de antes não tem e não é conferido): o valor cheio pode
+  // continuar igual. Ex.: anexado com R$ 1.800,00 até o vencimento e a bonificação passou a R$ 100,00 → R$ 1.900,00
+  const pontual = totais(cb).a_pagar_pontual;
+  if (cb.boleto_pdf_pontual != null && valor === cb.boleto_pdf_valor && pontual !== cb.boleto_pdf_pontual) dif.push(`o valor até o vencimento era ${C.reais(cb.boleto_pdf_pontual)} e agora é ${C.reais(pontual)}`);
+  if (cb.boleto_pdf_multa != null && (cb.multa_percentual || 0) !== cb.boleto_pdf_multa) dif.push(`a multa era ${C.pct(cb.boleto_pdf_multa)} e agora é ${C.pct(cb.multa_percentual || 0)}`);
+  if (cb.boleto_pdf_juros != null && (cb.juros_mensal_percentual || 0) !== cb.boleto_pdf_juros) dif.push(`os juros eram ${C.pct(cb.boleto_pdf_juros)} ao mês e agora são ${C.pct(cb.juros_mensal_percentual || 0)}`);
   return dif.join('; ');
 }
 
@@ -3696,11 +3820,15 @@ export function desfazerAditivo(d, id, usuario, { excluirTermo = false } = {}) {
   const tirar = () => (excluirTermo ? excluir(d, 'aditivos', a.id, usuario, `${c.inquilino_nome}: termo aditivo de ${C.dataBr(a.data)} excluído (não valeu: arquivo errado ou sem a assinatura de todos)`)
     : atualizar(d, 'aditivos', a.id, { arquivo: null, assinado_em: null, perdido_em: null, perdido_pendente: null }, usuario, `${c.inquilino_nome}: arquivo do termo aditivo de ${C.dataBr(a.data)} apagado (não valeu: volta a aguardar assinatura)`));
   if (a.tipo === TIPO_ADITIVO_VALOR && a.renovacao_id && buscar(d, 'renovacoes', a.renovacao_id)) {
+    const ren = buscar(d, 'renovacoes', a.renovacao_id);
+    // o prazo gravado pela renovação não volta sozinho (como no "×" da renovação): avisa para conferir (CON-07)
+    const prazo = ren.nova_vigencia_fim ? ` A data de término do contrato continua ${C.dataBr(c.vigencia_fim || ren.nova_vigencia_fim)} (gravada com a renovação, que saiu junto): confira em "Editar contrato".`
+      : ren.tipo === 'Passou a prazo indeterminado' ? ' O contrato continua por prazo indeterminado (gravado com a renovação, que saiu junto): confira em "Editar contrato".' : '';
     atualizar(d, 'aditivos', a.id, { arquivo: null, assinado_em: null, perdido_em: null, perdido_pendente: null }, usuario, `${c.inquilino_nome}: termo aditivo do novo valor não valeu`);
     excluirRenovacao(d, a.renovacao_id, usuario); // exclui também o termo (agora sem assinatura)
     recalcularCobrancas(d, (cb) => cb.contrato_id === c.id, usuario);
     marcarAditivos(d, c.id, usuario);
-    return `O novo valor de ${C.reais(a.valor_novo)} saiu: o aluguel volta a ${C.reais(a.valor_anterior)} nos boletos em aberto.`;
+    return `O novo valor de ${C.reais(a.valor_novo)} saiu: o aluguel volta a ${C.reais(a.valor_anterior)} nos boletos em aberto.${prazo}`;
   }
   tirar();
   marcarAditivos(d, c.id, usuario);
@@ -3720,7 +3848,11 @@ export function desfazerAditivo(d, id, usuario, { excluirTermo = false } = {}) {
     }
     return `O vencimento volta ao dia ${a.dia_anterior}${n ? ` (${n} boleto(s) em aberto ajustado(s))` : ''}.`;
   }
-  if (troca) return `Sem o termo assinado, a troca de titular volta a esperar por ele: ${contratoHerdado(d, c) ? contratoHerdado(d, c).inquilino_nome : 'o titular anterior'} continua no contrato.`;
+  if (troca) {
+    // o fim do vínculo gravado ao anexar o termo sai: o anterior volta a ser cobrado até um termo novo ser anexado (CON-02)
+    if (!aditivoDaTroca(d, c)) soltarSaidaDoAnterior(d, c, usuario, 'o termo da troca de titular não valeu');
+    return `Sem o termo assinado, a troca de titular volta a esperar por ele: ${contratoHerdado(d, c) ? contratoHerdado(d, c).inquilino_nome : 'o titular anterior'} continua no contrato.`;
+  }
   return '';
 }
 
@@ -3758,13 +3890,15 @@ function alertaFiador(d, c, hoje) {
  * Lembrete depois da saída do inquilino: pedir a volta da titularidade das contas (água, energia, gás) para o proprietário.
  * Some quando houver um protocolo "Volta para o proprietário" registrado a partir da data de saída.
  */
+/** Protocolo da volta das contas ao proprietário registrado para esta saída (do contrato, ou do imóvel desde a saída). */
+export const titularidadeDevolvida = (d, c) => d.titularidades.some((t) => t.imovel_id === c.imovel_id && t.tipo === 'Volta para o proprietário'
+  && (t.contrato_id === c.id || String(t.data || '') >= String(c.data_saida || '')));
+
 export function alertaTitularidade(d, c, hoje = C.hojeIso()) {
   // troca de titular: as contas passam para o novo titular (não voltam para o proprietário)
   if (fimDeVinculo(d, c)) return null;
   if (!c.data_saida || !c.imovel_id || c.data_saida > C.somarDias(hoje, CR.regra('titularidade_dias_antes')) || c.data_saida < C.somarDias(hoje, -CR.regra('titularidade_dias_depois'))) return null;
-  const feito = d.titularidades.some((t) => t.imovel_id === c.imovel_id && t.tipo === 'Volta para o proprietário'
-    && (t.contrato_id === c.id || String(t.data || '') >= c.data_saida));
-  if (feito) return null;
+  if (titularidadeDevolvida(d, c)) return null;
   return { nivel: 'aviso', tipo: 'Titularidade', ancora: 'titularidade',
     texto: `${c.data_saida <= hoje ? 'O inquilino saiu' : 'O inquilino sai'} em ${C.dataBr(c.data_saida)}: peça a mudança de titularidade das contas (água, energia, gás) de volta para o proprietário e registre o protocolo.` };
 }
@@ -3776,7 +3910,7 @@ export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
     contrato.verificar ? { nivel: 'aviso', tipo: 'A verificar', texto: contrato.verificar } : null,
     ag ? null : alertaReajuste(d, contrato, hoje),
     ag ? null : alertaCaucao(d, contrato),
-    ag ? null : alertaReservaParada(d, contrato) || alertas.alertaReserva(contrato.reserva_valor, saldoReserva(d, contrato), competenciaReserva(contrato), hoje),
+    ag ? null : alertaReservaParada(d, contrato) || (() => { const comp = competenciaReserva(contrato); const cb = comp && boletoDoMes(d, contrato.id, comp); return alertas.alertaReserva(contrato.reserva_valor, saldoReserva(d, contrato), comp, hoje, comp ? (cb ? cb.vencimento : vencimentoDoContrato(d, contrato, comp)) : null); })(),
     // fim do contrato só por ``fimDoContrato``; com a saída já informada não há renovação a negociar
     ag || contrato.prazo_tipo === 'Indeterminado' || contrato.data_saida ? null : alertas.alertaVigencia(fimDoContrato(d, contrato) || contrato.vigencia_fim, hoje, contrato),
     ag ? null : alertaFiador(d, contrato, hoje),
@@ -4541,6 +4675,23 @@ export function mudarGarantiaNaTroca(d, novoId, escolha, usuario) {
   return true;
 }
 
+/**
+ * A troca de titular não vai mais acontecer (o contrato do novo titular foi excluído, ou o termo da troca não valeu): o fim do
+ * vínculo que a troca gravou no anterior sai e ele volta a ser cobrado. Ex.: troca em 01/12/2026 → a saída de 30/11/2026 de
+ * João sai e o boleto de dezembro volta a ser dele. Só a saída que é a véspera da troca e sem cálculo final (saída de verdade fica).
+ * ``motivo``: o texto do Histórico. Devolve o contrato anterior quando mudou algo, senão null.
+ */
+export function soltarSaidaDoAnterior(d, n, usuario, motivo) {
+  const a = n && contratoHerdado(d, n);
+  const data = n && (n.data_entrada || n.vigencia_inicio);
+  if (!a || !data || a.data_saida !== C.somarDias(data, -1) || encerramentoDo(d, a.id)) return null;
+  // o anterior pode ter sido inativado pela saída: volta a ativo (a saída era só a da troca)
+  atualizar(d, 'contratos', a.id, { data_saida: null, ...(a.ativo === false ? { ativo: true } : {}) }, usuario,
+    `${a.inquilino_nome}: continua no contrato (${motivo}); o fim do vínculo em ${C.dataBr(a.data_saida)} saiu`);
+  recalcularCobrancas(d, (cb) => cb.contrato_id === a.id, usuario);
+  return a;
+}
+
 export function encerrarVinculoPorContinuacao(d, anteriorId, data, novoNome, usuario) {
   const a = buscar(d, 'contratos', anteriorId);
   if (!a || !data) return null;
@@ -5255,7 +5406,7 @@ export const aditivosAguardando = (d, contratoId) => d.aditivos.filter((a) => a.
  * Ex.: o contrato de Pedro tem o 1º termo (troca do vencimento); Lúcia assume → o termo da troca é o 2º. Um termo excluído
  * não faz repetir o número de outro (vale o maior já usado).
  */
-function proximoNumeroAditivo(d, c) {
+export function proximoNumeroAditivo(d, c) {
   const { antes, depois } = cadeiaDeContratos(d, c);
   const ids = new Set([c, ...antes, ...depois].map((x) => x.id));
   const l = d.aditivos.filter((a) => ids.has(a.contrato_id));
@@ -5275,6 +5426,18 @@ export function vencimentoDoContrato(d, c, comp) {
   const mesVenc = mesSeguinte ? C.somarMeses(comp, 1) : comp;
   const depois = aditivosDeVencimento(d, c.id).find((a) => a.primeiro_vencimento.slice(0, 7) > mesVenc);
   return C.vencimentoDaCompetencia(comp, depois ? depois.dia_anterior : c.dia_vencimento || 10, mesSeguinte);
+}
+
+/**
+ * Mês de referência e vencimento juntos, para os campos de mês que escolhem um boleto (pedido do dono de 24/11/2026: o mês
+ * de referência digitado como se fosse o do vencimento deixava a reserva, a carência e o novo valor no boleto errado).
+ * Ex.: aluguel que vence no mês seguinte, dia 10 → "Referência 11/2026 – vence 10/12/2026". O boleto já gerado manda no
+ * vencimento; sem ele, o do cadastro (``c`` pode ser o contrato ainda no formulário, sem id).
+ */
+export function referenciaEVencimento(d, c, comp) {
+  if (!c || !C.competenciaValida(comp, '')) return '';
+  const cb = c.id ? boletoDoMes(d, c.id, comp) : null;
+  return `Referência ${C.compBr(comp)} – vence ${C.dataBr(cb ? cb.vencimento : vencimentoDoContrato(d, c, comp))}`;
 }
 
 /**
@@ -5605,12 +5768,17 @@ export function salvarOrdemCaixas(d, pagina, grupo, visiveis, usuario) {
 // --------------------------------------------------------------------------
 // Boleto: textos para copiar no site do banco
 // --------------------------------------------------------------------------
-const rs = (c) => `RS${C.reais(c, false)}`;
 /** Tamanho máximo da descrição da cobrança no C6 (Bolepix). */
 export const LIMITE_DESCRICAO_BOLETO = 100;
 
-/** Valor, desconto, juros ao dia e descrição no formato usado nos boletos (ex.: "ALUGUEL RS3.644,45"). */
-export function dadosBoleto(d, cb) {
+/**
+ * Valor, desconto, juros ao dia e descrição no formato usado nos boletos (ex.: "ALUGUEL 3.644,45"). Decisão do dono de 24/11/2026:
+ * os valores vão sem o "RS" (o banco não aceita o "$"), para caber nas 100 letras da descrição do C6. ``moeda``: o que vai antes de
+ * cada valor (o e-mail do boleto usa "R$ " e não precisa caber em 100 letras: nada é encurtado).
+ */
+export function dadosBoleto(d, cb, { moeda = '' } = {}) {
+  const rs = (v) => `${moeda}${C.reais(v, false)}`;
+  const limite = moeda ? Infinity : LIMITE_DESCRICAO_BOLETO;
   const c = buscar(d, 'contratos', cb.contrato_id);
   const imovel = buscar(d, 'imoveis', c.imovel_id);
   const t = totais(cb);
@@ -5647,7 +5815,7 @@ export function dadosBoleto(d, cb) {
     ...(cb.ressarcimento ? ['RESSARC. CONDOMÍNIO', 'RESSARC. COND.'].map((x) => () => { extras[iRessarc] = `${x} -${rs(cb.ressarcimento)}`; }) : []),
   ];
   for (const passo of encurtar) {
-    if (ehBoletoAvulso(cb) || linhas.join('\n').length <= LIMITE_DESCRICAO_BOLETO) break;
+    if (ehBoletoAvulso(cb) || linhas.join('\n').length <= limite) break;
     passo();
     linhas[linhas.length - 1] = extras.join(' ');
   }
@@ -5661,8 +5829,28 @@ export function dadosBoleto(d, cb) {
     multa_valor: t.base_multa !== valor ? C.arred((t.base_multa * (cb.multa_percentual || 0)) / 100) : null,
     juros_ao_dia: C.jurosAoDia(t.base_multa, cb.juros_mensal_percentual), descricao: linhas.join('\n'),
     // letras a mais que o C6 corta no fim da descrição (0 = cabe)
-    excesso: Math.max(0, linhas.join('\n').length - LIMITE_DESCRICAO_BOLETO),
+    excesso: moeda ? 0 : Math.max(0, linhas.join('\n').length - LIMITE_DESCRICAO_BOLETO),
   };
+}
+
+/**
+ * Quebra os textos em linhas de até ``largura`` letras sem partir palavra nem valor (as instruções do boleto no C6: 4 linhas de 80).
+ * Antes o corte era seco (``slice``) e podia sair "RS1.80" numa linha e "0,00" perdido. Palavra maior que a linha (raro) é cortada.
+ * Ex.: linha de 95 letras → uma de até 80, terminando num espaço, e o resto na seguinte.
+ */
+export function quebrarLinhas(textos, largura) {
+  const out = [];
+  for (const t of textos) {
+    let resto = String(t || '').trim().replace(/\s+/g, ' ');
+    while (resto.length > largura) {
+      const corte = resto.lastIndexOf(' ', largura);
+      const ate = corte > 0 ? corte : largura;
+      out.push(resto.slice(0, ate).trim());
+      resto = resto.slice(ate).trim();
+    }
+    if (resto) out.push(resto);
+  }
+  return out;
 }
 
 // --------------------------------------------------------------------------
@@ -5992,14 +6180,16 @@ export function pedidoBoletoC6(d, cb, conta, referencia = referenciaExterna(cb))
   }
   if (endereco.zip_code.length !== 8) problemas.push(`O CEP tem ${endereco.zip_code.length} números e precisa ter 8 ("${endereco.zip_code}"): corrija ${ondeEndereco('zip_code')}`);
   if (problemas.length) throw new C.ErroUsuario(`O boleto de ${c.inquilino_nome} (${C.compBr(cb.competencia)}) não foi ao banco: ${problemas.join('; ')}. Ex.: "Avenida" → "Av.", "Professor" → "Prof.".`);
-  const instrucoes = [...String(conta.instrucoes || '').split('\n'), ...b.descricao.split('\n')].map((x) => x.trim().slice(0, L.instrucao)).filter(Boolean).slice(0, L.instrucoes);
+  // cada linha da instrução com até 80 letras, quebrada entre palavras (nunca no meio de um valor); até 4 linhas
+  const instrucoes = quebrarLinhas([...String(conta.instrucoes || '').split('\n'), ...b.descricao.split('\n')], L.instrucao).slice(0, L.instrucoes);
   const boleto = { [K.carteira]: carteiraDaConta(conta), [K.seu_numero]: String(cb.id).slice(-L.seu_numero) };
   if (instrucoes.length) boleto[K.instrucoes] = instrucoes;
   const pedido = {
     [K.referencia]: referencia,
     [K.valor]: centavosParaReais(b.valor),
     [K.vencimento]: b.vencimento,
-    [K.descricao]: b.descricao.replace(/\n/g, ' ').slice(0, L.descricao),
+    // acima de 100 letras (a tela avisa), corta entre palavras, nunca no meio de um valor
+    [K.descricao]: quebrarLinhas([b.descricao.replace(/\n/g, ' ')], L.descricao)[0] || '',
     // limites da API (nome, endereço, bairro e cidade 40, e-mail 70) conferidos acima, sem cortar; CEP com 8 dígitos, UF com 2 letras
     [K.pagador]: { [K.pagador_nome]: pagador.nome, [K.pagador_documento]: taxId,
       [K.pagador_endereco]: { [K.endereco_rua]: pagador.rua, [K.endereco_bairro]: pagador.bairro,
@@ -6981,10 +7171,41 @@ const TAXAS_CONDOMINIO = ['Fundo de obras', 'Constituição do fundo de reserva'
   'Pintura de fachada', 'Equipamento de segurança / incêndio', 'Decoração / paisagismo das áreas comuns', 'Indenização trabalhista anterior à locação'];
 export const taxasCondominioUsadas = (d) => [...new Set([...d.ressarcimentos.map((r) => r.descricao).filter(Boolean).sort((a, b) => a.localeCompare(b, 'pt-BR')), ...TAXAS_CONDOMINIO])];
 
+/**
+ * Mês de referência (competência, "aluguel de") do boleto que vence no mês ``mes`` ('AAAA-MM'), e o contrário. Os formulários
+ * perguntam o mês do vencimento, que é o que a equipe vê no boleto (dados reais de 24/11/2026: "12/2026" digitado para o boleto
+ * que vence em 05/12/2026 caía no boleto de referência 12/2026, que vence em janeiro). Ex.: vence no mês seguinte → vencimento
+ * em 12/2026 = referência 11/2026; vence no próprio mês → 12/2026 = 12/2026.
+ */
+export const competenciaDoMesVencimento = (c, mes) => (mes ? (c && c.cobranca_mes_seguinte === false ? mes : C.somarMeses(mes, -1)) : null);
+export const mesVencimentoDaCompetencia = (c, comp) => (comp ? (c && c.cobranca_mes_seguinte === false ? comp : C.somarMeses(comp, 1)) : null);
+
+/** Texto do boleto de uma competência: "boleto de referência 11/2026, vence 05/12/2026" (e se ainda não foi gerado). */
+export function textoBoletoDaCompetencia(d, c, comp) {
+  if (!c || !comp) return '';
+  const cb = boletoDoMes(d, c.id, comp);
+  const venc = cb ? cb.vencimento : vencimentoDoContrato(d, c, comp);
+  return `boleto de referência ${C.compBr(comp)}, vence ${C.dataBr(venc)}${cb ? (cb.data_pagamento ? ' (já pago)' : '') : ' (ainda não gerado)'}`;
+}
+
 /** Competência do boleto que vence no mês seguinte ao pagamento da taxa pelo inquilino. */
 export function competenciaDoAbatimento(c, dataPagamento) {
   const vence = C.somarMeses(C.competenciaDe(dataPagamento), 1);
   return c.cobranca_mes_seguinte !== false ? C.somarMeses(vence, -1) : vence;
+}
+
+/**
+ * Taxas do condomínio abatidas no boleto, agrupadas pelo mês do condomínio, para o demonstrativo (pedido do dono de 24/11/2026:
+ * uma linha por taxa, como na página do inquilino). Ex.: [{ mes: '2026-10', itens: [{ descricao: 'Extraordinárias', valor: 35318 },
+ * { descricao: 'Fundo de reserva', valor: 10092 }] }]. Vazio se o que está lançado não soma o que o boleto abate (boleto antigo).
+ */
+export function taxasNoBoleto(d, cb) {
+  if (!cb.ressarcimento) return [];
+  const lista = (d.ressarcimentos || []).filter((r) => r.contrato_id === cb.contrato_id && r.competencia_abatimento === cb.competencia);
+  if (lista.reduce((t, r) => t + r.valor, 0) !== cb.ressarcimento) return [];
+  const meses = [...new Set(lista.map((r) => r.competencia_condominio))].sort();
+  return meses.map((mes) => ({ mes, itens: lista.filter((r) => r.competencia_condominio === mes)
+    .map((r) => ({ descricao: r.descricao, valor: r.valor })).sort((a, b) => String(a.descricao).localeCompare(String(b.descricao), 'pt-BR')) }));
 }
 
 function ressarcimentosNoBoleto(d, contratoId, comp) {
@@ -7265,7 +7486,7 @@ export function eventosDoMes(d, mes, hoje = C.hojeIso()) {
       if (!no(venc)) continue;
       // em acordo (valem as parcelas) e carência (nada a pagar) ficam neutros, nunca "vencido"
       const [situacao, estado] = !cb ? ['neutra', 'previsto'] : situacaoNoCalendario(cb, hoje);
-      ev.push({ data: venc, tipo: 'Boleto', imovel_id: c.imovel_id, contrato_id: c.id, cobranca_id: cb ? cb.id : null,
+      ev.push({ data: venc, tipo: 'Boleto', imovel_id: c.imovel_id, contrato_id: c.id, cobranca_id: cb ? cb.id : null, competencia: comp,
         texto: `${c.inquilino_nome} · aluguel de ${C.compBr(comp)}${cb ? ` · ${C.reais(totais(cb).a_pagar_pontual)}` : ' · boleto ainda não gerado'}${geraNf(c) ? '' : ' · boleto de controle'}`,
         situacao, estado });
     }
@@ -7389,8 +7610,14 @@ export function reajusteNaCompetencia(d, c, comp, hoje = C.hojeIso(), doContrato
   const meses = C.mesesEntre(p, comp);
   if (meses <= 0 || meses % 12 !== 0) return null;
   const n = meses / 12;
-  const corrigido = correcaoDoReajuste(d, c, comp, doContrato ? doContrato.correcoes : undefined);
-  const carta = cartaDoReajuste(d, c, comp, doContrato ? doContrato.cartas : undefined);
+  let corrigido = correcaoDoReajuste(d, c, comp, doContrato ? doContrato.correcoes : undefined);
+  let carta = cartaDoReajuste(d, c, comp, doContrato ? doContrato.cartas : undefined);
+  // troca de titular no meio do mês do reajuste (ex.: reajuste de 03/2027 aplicado em João, Maria entra em 15/03/2027): a correção
+  // ficou no anterior e o aluguel herdado já é o corrigido; conta como feita aqui (senão o reajuste seria aplicado duas vezes, CON-03)
+  for (let a = contratoHerdado(d, c), voltas = 0; a && (!corrigido || !carta) && voltas < 10; a = contratoHerdado(d, a), voltas += 1) {
+    corrigido = corrigido || correcaoDoReajuste(d, a, comp);
+    carta = carta || cartaDoReajuste(d, a, comp);
+  }
   const comCarta = comp.slice(0, 4) >= hoje.slice(0, 4);
   return { n, anos: n, competencia: comp, corrigido, carta, comCarta, faltaCarta: comCarta && !carta && !(corrigido && corrigido.indice === 'Negociado') && (!corrigido || comp >= CARTA_COM_BOLETO_CORRIGIDO_DESDE) };
 }
@@ -7783,7 +8010,7 @@ export function previaAcordo(d, { contrato_id, ids, total, parcelas, primeiro_ve
   const divida = lista.reduce((s, cb) => s + C.liquidar(cb, hoje).valor_devido, 0);
   // o que separa o pago da NF no pagamento atrasado normal (``C.liquidar``): IPTU, seguro, tarifa e FCI ficam fora; a reserva
   // já abatida e o ressarcimento que não sai da NF entram (NF com o aluguel cheio): pode dar negativo (NF maior que o pago)
-  const foraDaNf = Math.min(total, lista.reduce((s, cb) => s + totais(cb).a_pagar_sem_desconto - (cb.aluguel || 0) + (cb.ressarcimento_na_nf ? cb.ressarcimento || 0 : 0) - (cb.outros_na_nf ? cb.outros || 0 : 0), 0));
+  const foraDaNf = Math.min(total, lista.reduce((s, cb) => s + totais(cb).a_pagar_sem_desconto - (cb.aluguel || 0) + (cb.ressarcimento_na_nf ? cb.ressarcimento || 0 : 0) - C.ajusteNaNf(cb), 0));
   if (total < n) throw new C.ErroUsuario(`Com ${n} parcelas, o total precisa ser de pelo menos ${C.reais(n)} (nenhuma parcela pode ficar com R$ 0,00).`);
   const valores = C.parcelas(total, n);
   const fora = C.parcelas(foraDaNf, n);
@@ -7851,6 +8078,10 @@ export function desfazerAcordo(d, acordoId, usuario, hoje = C.hojeIso()) {
   const parcelas = parcelasDoAcordo(d, a);
   if (parcelas.some((cb) => cb.data_pagamento)) throw new Error('Uma parcela do acordo já foi paga: desfaça o pagamento antes.');
   if (parcelas.some((cb) => emitidoNoBanco(cb))) throw new Error('Uma parcela do acordo foi emitida no C6: cancele no banco antes.');
+  // parcela descontada da garantia (cálculo final ou devolução na troca): a dívida já está acertada lá; desfazer o acordo a
+  // faria ser cobrada de novo (CON-05)
+  if (parcelas.some((cb) => cb.quitado_saida)) throw new C.ErroUsuario('Uma parcela do acordo já foi descontada da garantia no cálculo final da saída: desfaça antes o cálculo final.');
+  if (parcelas.some((cb) => cb.quitado_devolucao)) throw new C.ErroUsuario('Uma parcela do acordo já foi descontada na devolução da garantia (troca de titular): desfaça antes essa devolução.');
   for (const cb of parcelas) excluir(d, 'cobrancas', cb.id, usuario, `Boleto do acordo${cb.acordo_parcela ? ` ${cb.acordo_parcela}` : ''} excluído (acordo desfeito)`);
   for (const cb of origensDoAcordo(d, a)) atualizar(d, 'cobrancas', cb.id, { situacao: 'Em aberto', acordo_id: null }, usuario, `Boleto ${nomeNoAcordo(cb)} volta a ser cobrado (acordo desfeito)`);
   return atualizar(d, 'acordos', a.id, { desfeito_em: hoje }, usuario, `Acordo de ${C.dataBr(a.data)} desfeito`);
@@ -8498,11 +8729,13 @@ export function roteiroSaida(d, c, hoje = C.hojeIso()) {
   const saiu = c.data_saida <= hoje;
   const vist = vistoriasDo(d, c.id).find((v) => v.tipo === 'Saída') || null;
   const leitura = leituraDo(d, c.id, 'Saída do inquilino');
-  const titularidade = alertaTitularidade(d, c, hoje);
+  // o protocolo registrado (e não a falta do alerta, que some fora da janela de aviso: CON-08); sem imóvel, não há contas
+  const titularidade = !!c.imovel_id && !titularidadeDevolvida(d, c);
   // leitura opcional (regra desligada): a etapa fecha só com a titularidade
   const contasOk = !titularidade && (!!leitura || !leituraObrigatoria());
   const e = encerramentoDo(d, c.id);
-  const garantiaAntes = valorGarantia(d, c);
+  // o que foi de fato depositado (caução só combinada não tem o que devolver, como no cálculo final: CON-09)
+  const garantiaAntes = garantiaRecebida(d, c);
   const comp = C.competenciaDe(c.data_saida);
   const ultimo = boletoDoMes(d, c.id, comp);
   // o complemento da caução em aberto não segura a etapa do último boleto (é garantia, acerta-se no cálculo final)
@@ -8674,21 +8907,23 @@ export function declaracaoAnual(d, contratoId, ano) {
 // --------------------------------------------------------------------------
 // Regras do sistema escolhidas pelo administrador (definições e padrão em config-regras.js; tela em Sistema → Regras)
 // --------------------------------------------------------------------------
-export { regra, regrasDe, PADRAO_SISTEMA, DEFINICOES_REGRAS, GRUPOS_REGRAS } from './config-regras.js';
+export { regra, regrasDe, PADRAO_SISTEMA, DEFINICOES_REGRAS, GRUPOS_REGRAS, especiaisDiferentes } from './config-regras.js';
 
 /**
  * Grava as regras ``valores`` ({ chave: valor }; o que faltar volta ao padrão do sistema): uma linha em ``config_regras`` por
  * regra diferente do padrão, pelo histórico. Devolve quantas regras mudaram. Ex.: { multa_padrao: 2 } (o padrão) apaga a linha.
+ * A regra que fica em outra tela (`fora`, ex.: a assinatura digital) só muda por ``mudarRegraSistema`` dela mesma (``foraQueMuda``):
+ * salvar a tela, voltar a uma versão, carregar o arquivo ou voltar ao padrão a deixam como está, mesmo se vier nos valores.
  */
-export function salvarRegrasSistema(d, valores, usuario, motivo = 'Regras do sistema') {
+export function salvarRegrasSistema(d, valores, usuario, motivo = 'Regras do sistema', foraQueMuda = null) {
   const limpos = {};
   for (const [k, v] of Object.entries(valores || {})) if (CR.definicaoRegra(k)) limpos[k] = CR.limparValorRegra(k, v);
   let mudou = 0;
   const antes = CR.regrasDe(d);
   const naNfAntes = antes.ressarcimento_na_nf;
   for (const def of CR.DEFINICOES_REGRAS) {
-    // a que fica em outra tela (`fora`, ex.: a assinatura digital) não vem no formulário das regras: continua como está
-    const novo = def.chave in limpos ? limpos[def.chave] : def.fora ? antes[def.chave] : def.padrao;
+    // a que fica em outra tela (`fora`, ex.: a assinatura digital) continua como está, salvo pelo botão dela (foraQueMuda)
+    const novo = def.fora && def.chave !== foraQueMuda ? antes[def.chave] : def.chave in limpos ? limpos[def.chave] : def.padrao;
     const linha = d.config_regras.find((r) => r.chave === def.chave);
     const padrao = CR.mesmoValor(novo, def.padrao);
     if (linha && padrao) { excluir(d, 'config_regras', linha.id, usuario, `${motivo}: ${def.rotulo} volta ao padrão do sistema`); mudou += 1; }
@@ -8706,7 +8941,7 @@ export function salvarRegrasSistema(d, valores, usuario, motivo = 'Regras do sis
 }
 
 /** Muda uma regra só, mantendo as outras como estão. */
-export const mudarRegraSistema = (d, chave, valor, usuario) => salvarRegrasSistema(d, { ...CR.escolhasDe(d), [chave]: valor }, usuario);
+export const mudarRegraSistema = (d, chave, valor, usuario) => salvarRegrasSistema(d, { ...CR.escolhasDe(d), [chave]: valor }, usuario, undefined, chave);
 
 /** Volta todas as regras ao padrão do sistema (as regras do dono, no código). */
 export const voltarRegrasAoPadrao = (d, usuario) => salvarRegrasSistema(d, {}, usuario, 'Regras do sistema (volta ao padrão)');
@@ -8799,7 +9034,9 @@ export function padroesNovoContrato(perfil = null) {
   if (CR.perfilDe(ctx)) out.perfil_regras_id = CR.perfilDe(ctx);
   if (r('bonificacao_percentual_padrao') !== null && r('bonificacao_padrao')) out.desconto_pontualidade_percentual = r('bonificacao_percentual_padrao');
   if (r('tarifa_padrao') !== null) out.taxa_boleto = r('tarifa_padrao');
-  if (r('fci_percentual_padrao') !== null) { out.fci_percentual = r('fci_percentual_padrao'); if (r('fci_indice_padrao')) out.fci_indice = r('fci_indice_padrao'); }
+  if (r('fci_percentual_padrao') !== null) out.fci_percentual = r('fci_percentual_padrao');
+  // o índice vem preenchido mesmo com o % em branco (o campo só aparece quando o % é digitado; sem %, o cadastro o apaga)
+  if (r('fci_indice_padrao')) out.fci_indice = r('fci_indice_padrao');
   if (r('indice_padrao')) out.indice_correcao = r('indice_padrao');
   const prazo = prazoPadraoNovoContrato('Residencial', perfil);
   if (prazo !== null) out.prazo_meses = prazo;

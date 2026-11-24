@@ -175,6 +175,6 @@ test('demonstrativo do boleto: mostra cada parte e o total bate com o boleto', a
   const b = R.dadosBoleto(d, cb);
   assert.equal(b.valor, 200000 + 350 + 8000 - 5000);
   assert.equal(b.valor_com_desconto, b.valor - 20000);
-  assert.match(b.descricao, /CONSERTO RS80,00/);
-  assert.match(b.descricao, /RESSARC.* -RS50,00/);
+  assert.match(b.descricao, /CONSERTO 80,00/);
+  assert.match(b.descricao, /RESSARC.* -50,00/);
 });

@@ -197,12 +197,12 @@ test('comunicado: o texto do e-mail e do WhatsApp diz "ligue para" o telefone', 
   for (const t of [m.texto, m.whatsapp, m.aviso]) assert.match(t, /ligue para \{telefone_empresa\}/);
 });
 
-test('e-mail "ficha reprovada": com a reserva já devolvida diz a data; sem devolução, mantém o prazo de 24 horas úteis', () => {
+test('e-mail "ficha reprovada": com a reserva já devolvida diz a data; sem devolução, mantém o prazo de devolução (5 dias úteis desde 2026-11-24)', () => {
   const d = R.normalizar({});
   const base = { id: 1, inquilino_nome: 'Carlos Teste', imoveis_ids: [], reserva_valor: 100000, situacao: 'Reprovada' };
   const modelo = ME.modeloEmail(d, 'ficha_reprovada');
   const sem = ME.preencherEmail(modelo.texto, ED.dadosDoEmail(d, { ficha: base }));
-  assert.match(sem, /será devolvida em até 24 horas úteis/);
+  assert.match(sem, /será devolvida em até 5 dias úteis/);
   const com = ME.preencherEmail(modelo.texto, ED.dadosDoEmail(d, { ficha: { ...base, devolucao_data: '2026-11-18', devolucao_valor: 100000 } }));
   assert.match(com, /já foi devolvida em 18\/11\/2026/);
   assert.doesNotMatch(com, /será devolvida/);

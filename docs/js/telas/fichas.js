@@ -11,6 +11,7 @@ import * as REC from '../recibos.js';
 import * as R from '../regras.js';
 import { pdfDoRecibo } from './documentos.js';
 import { botaoEmail } from './emails.js';
+import { caixaTermoReserva, ligarTermoReserva } from './termo-reserva.js';
 import { botao, buscar, caixaArquivos, copiarDocumentosParaFicha, d, encerrarLinksDaFicha, etiqueta, item as itemGrade, link, naoEncontrado, nomePastaFicha, opera, PASTA_FICHAS, pastaDoEscopo, pastaFichaLivre } from './comum.js';
 
 const COR_SITUACAO = { 'Em análise': 'aviso', Aprovada: 'ok', Reprovada: 'neutra', Desistiu: 'neutra' };
@@ -23,6 +24,9 @@ function situacaoDaFicha(f) {
   if (R.imoveisParaContrato(d(), f).length) partes.push(etiqueta('falta o contrato', 'aviso'));
   else if (f.situacao === 'Aprovada' && Object.keys(R.contratosDaFicha(d(), f)).length) partes.push(etiqueta('virou contrato', 'ok'));
   if (R.devolucaoPendente(f)) partes.push(etiqueta('devolver a reserva', 'perigo'));
+  // termo de aceite da reserva (2026-11-24): o 1º passo, antes do depósito
+  if (f.situacao === 'Em análise' && !f.aceite_reserva && !(f.reserva_valor > 0)) partes.push(etiqueta(f.link_aceite ? 'esperando o aceite do termo' : 'falta o termo da reserva', 'aviso'));
+  else if (f.situacao === 'Em análise' && f.aceite_reserva && !(f.reserva_valor > 0)) partes.push(etiqueta('termo aceito · falta o depósito', 'info'));
   return partes.join(' ');
 }
 
@@ -32,10 +36,10 @@ export function caixaFichas() {
   const abertas = fichas.filter((f) => R.fichaAberta(d(), f) || R.devolucaoPendente(f));
   const encerradas = fichas.filter((f) => !abertas.includes(f));
   const linha = (f) => `<tr><td><a href="#/ficha/${f.id}"><b>${esc(f.inquilino_nome)}</b></a></td><td>${esc(nomesDosImoveis(f).join(', ') || '-')}${(f.imoveis_ids || []).length > 1 ? `<br><span class="suave">${esc(f.modo_imoveis === 'Todos juntos' ? 'todos juntos' : 'apenas um deles')}</span>` : ''}</td>
-    <td class="nw">${dataBr(f.data_recebida)}</td><td class="n nw">${f.reserva_valor ? reais(f.reserva_valor) : '-'}</td><td>${situacaoDaFicha(f)}</td></tr>`;
+    <td class="nw">${dataBr(f.data_recebida)}</td><td class="n nw">${f.reserva_valor ? reais(f.reserva_valor) : f.reserva_combinada ? `<span class="suave">${reais(f.reserva_combinada)} a depositar</span>` : '-'}</td><td>${situacaoDaFicha(f)}</td></tr>`;
   const tabela = (lista) => `<table><tr><th>Interessado</th><th>Imóvel(is)</th><th>Recebida em</th><th class="n">Reserva</th><th>Situação</th></tr>${lista.map(linha).join('')}</table>`;
   return `<div class="cartao rolagem" id="fichas"><div class="cabecalho"><h2>Fichas abertas (${abertas.length})</h2>${opera() ? link('#/novo/fichas', 'Novo pedido de reserva', 'botao secundario pequeno') : ''}</div>
-    <p class="suave">1º o pedido de reserva (imóvel, contato, proposta, o que está incluso e a reserva); depois o interessado preenche a ficha pelo link e manda os documentos. Aprovada, a ficha vira o contrato já preenchido.</p>
+    <p class="suave">1º o pedido de reserva (imóvel, contato, proposta, o que está incluso e a reserva combinada); depois a mensagem com as condições e o termo da reserva, que a pessoa aceita pelo link; então o depósito da reserva, a ficha e os documentos pelo link. Aprovada, a ficha vira o contrato já preenchido.</p>
     ${abertas.length ? tabela(abertas) : `<p class="suave">Nenhuma ficha aberta.${!fichas.length && opera() ? ' Quando alguém quiser alugar um imóvel vago, clique em "Novo pedido de reserva": você preenche o imóvel, o contato e a proposta; o resto a pessoa preenche pelo link da ficha.' : ''}</p>`}
     ${encerradas.length ? `<details id="fichas-encerradas"><summary class="suave">${encerradas.length} ficha(s) encerrada(s): aprovadas que viraram contrato, reprovadas e desistências (clique para ver)</summary>${tabela(encerradas)}</details>` : ''}</div>`;
 }
@@ -103,7 +107,13 @@ export function telaFicha(id) {
     : f.devolucao_data ? `<p>Reserva devolvida em <b>${dataBr(f.devolucao_data)}</b>: ${reais(f.devolucao_valor || f.reserva_valor)} ${f.comprovante_devolucao ? abrir(f.comprovante_devolucao, 'comprovante da devolução') : etiqueta('sem comprovante da devolução', 'aviso')}
         · ${link(`#/imprimir/recibo?tipo=devolucao_reserva&ficha=${f.id}`, '🧾 Termo de devolução e quitação', '')}</p>
         ${opera() ? `<p class="acoes">${botaoEmail('ficha_devolucao', { ficha: f.id }, '✉ E-mail: devolução da reserva')}</p>` : ''}`
-      : `<div class="alerta aviso"><b>Devolver a reserva de ${reais(f.reserva_valor)}.</b> Depois de devolver, registre a data e o comprovante em "Editar".</div>`;
+      : (() => {
+        const dv = R.devolucaoDaReserva(f);
+        const ate = R.devolverReservaAte(f);
+        // termo aceito com retenção de tudo (padrão de 24/11/2026): nada a devolver
+        if (dv.devolver === 0) return `<p>A reserva de <b>${reais(f.reserva_valor)}</b> fica com a empresa: ${esc(dv.motivo)}. Nada a devolver.</p>`;
+        return `<div class="alerta aviso"><b>${dv.integral ? `Devolver a reserva de ${reais(f.reserva_valor)}` : `Devolver ${reais(dv.devolver)} da reserva de ${reais(f.reserva_valor)}`}${ate ? ` até ${dataBr(ate)}` : ''}.</b> ${dv.integral ? '' : `A empresa fica com ${reais(dv.reter)}: ${esc(dv.motivo)}. `}Depois de devolver, registre a data e o comprovante em "Editar".</div>`;
+      })();
   const documentos = primeiro ? `<p>Os documentos da ficha foram para a pasta do inquilino: ${link(`#/contrato/${primeiro.id}?ir=arquivos`, esc(primeiro.inquilino_nome), '')}.</p>`
     : f.documentos_apagados_em ? `<p class="suave">Os documentos pessoais foram apagados em ${dataBr(f.documentos_apagados_em)} (${R.regra('meses_documentos_ficha')} meses depois da decisão). Ficaram só os comprovantes da reserva e da devolução.</p>` : '';
   return `<p class="suave"><a href="#/inquilinos?ir=fichas">← Inquilinos</a></p>
@@ -119,6 +129,7 @@ export function telaFicha(id) {
       ${botaoDesistencia(f)}
       ${devolucao}
       ${apagarEm ? `<p class="suave">Os documentos pessoais desta ficha serão apagados em <b>${dataBr(apagarEm)}</b> (${R.regra('meses_documentos_ficha')} meses depois da decisão).</p>` : ''}</div>
+    ${caixaTermoReserva(f)}
     ${caixaFichaOnline(f)}
     <div class="cartao"><h2>Imóveis de interesse</h2>
       <p>${(f.imoveis_ids || []).length > 1 ? `A ficha é para <b>${esc(f.modo_imoveis === 'Todos juntos' ? 'todos juntos' : 'apenas um dos imóveis')}</b>.` : ''}</p>
@@ -130,7 +141,7 @@ export function telaFicha(id) {
     <div class="cartao"><h2>Proposta</h2>${proposta ? `<div class="grade">${proposta}</div>` : '<p class="suave">Aluguel, vencimento, bonificação, garantia e o que está incluso ainda não preenchidos (em "Editar"). Eles vão no e-mail da ficha, no recibo da reserva e preenchidos para o contrato.</p>'}</div>
     <div class="cartao"><h2>Reserva</h2>${f.reserva_valor > 0 ? `<p>${reais(f.reserva_valor)}${f.reserva_data ? ` em ${dataBr(f.reserva_data)}` : ''} ${f.comprovante_reserva ? abrir(f.comprovante_reserva, 'comprovante') : primeiro ? '<span class="suave">(o comprovante foi para a pasta do inquilino)</span>' : etiqueta('sem comprovante', 'aviso')}
       ${REC.reciboDisponivel(d(), 'reserva', { ficha: f }).ok ? ` · ${link(`#/imprimir/recibo?tipo=reserva&ficha=${f.id}`, '🧾 Recibo da reserva', '')}` : ''}</p>
-      <p class="suave">O recibo e o comprovante vão anexos no e-mail de envio da ficha cadastral, com as condições propostas.</p>` : '<p class="suave">Sem reserva.</p>'}</div>
+      <p class="suave">O recibo e o comprovante vão anexos no e-mail de envio da ficha cadastral, com as condições propostas. Aprovada a ficha, a reserva é abatida do 1º aluguel.</p>` : f.reserva_combinada > 0 ? `<p>${reais(f.reserva_combinada)} combinada, ainda sem depósito registrado. <span class="suave">Quando chegar, registre o valor, a data e o comprovante em "Editar".</span></p>` : '<p class="suave">Sem reserva.</p>'}</div>
     <div class="cartao"><h2>Documentos</h2>
       ${fichasPdf ? `<p>${fichasPdf} <span class="suave">· com os dados já preenchidos, a lista de documentos e a declaração antes da assinatura (vão anexas no e-mail de envio da ficha)</span></p>` : ''}
       <p>${[sim(f.doc_ficha, 'Ficha cadastral'), sim(f.doc_pessoais, 'Documentos pessoais'), sim(f.doc_renda, 'Comprovante de renda'), sim(f.doc_residencia, 'Comprovante de residência')].join(' · ')}</p>
@@ -261,6 +272,7 @@ function caixaFichaOnline(f) {
 
 /** Depois de desenhar a página da ficha: busca na nuvem a situação de cada link (e o que foi mandado). */
 export async function ligarFichaOnline(raiz) {
+  ligarTermoReserva(raiz).catch((e) => console.warn('termo da reserva', e));
   const painel = raiz.querySelector('[data-alertas-ficha-online]');
   if (painel && E.nuvem) await avisosDoPainel(painel).catch(() => {});
   const caixa = raiz.querySelector('[data-ficha-online]');
@@ -297,7 +309,7 @@ function desenharLinksDaFicha(caixa, links, marcar) {
     if (!el) continue;
     const ultimo = (l.respostas || []).at(-1);
     el.innerHTML = `${etiqueta(TEXTO_SITUACAO_LINK[l.situacao] || l.situacao, COR_LINK[l.situacao] || 'neutra')}
-      <span class="suave">${ultimo ? ` · dados enviados em ${C.dataHoraBr(ultimo.em)}` : ''}${(l.arquivos || []).length ? ` · ${l.arquivos.length} arquivo(s)` : ''}${l.situacao === 'Encerrado' ? '' : Date.parse(l.vence_em) < Date.now() ? ` · link venceu em ${new Date(l.vence_em).toLocaleDateString('pt-BR')}` : ` · link até ${new Date(l.vence_em).toLocaleDateString('pt-BR')}`}</span>`;
+      <span class="suave">${ultimo ? ` · dados enviados em ${C.dataHoraBr(ultimo.em)}` : ''}${(l.arquivos || []).filter((a) => !a.apagado_em).length ? ` · ${l.arquivos.filter((a) => !a.apagado_em).length} arquivo(s)` : ''}${l.situacao === 'Encerrado' ? '' : Date.parse(l.vence_em) < Date.now() ? ` · link venceu em ${new Date(l.vence_em).toLocaleDateString('pt-BR')}` : ` · link até ${new Date(l.vence_em).toLocaleDateString('pt-BR')}`}</span>`;
   }
   caixa._links = links;
   const fichaAqui = buscar('fichas', Number(caixa.dataset.fichaOnline));
@@ -349,7 +361,7 @@ function blocoDoLink(f, l) {
   const trazido = ultimo && guardado.trazido_em === ultimo.em;
   const partes = [];
   if (l.situacao === 'Desistiu' && p === 'interessado' && !R.fichaSemContrato(f)) {
-    partes.push(`<div class="alerta perigo"><b>${esc(nome)} avisou pelo link, em ${C.dataHoraBr(l.desistiu_em)}, que não vai seguir com a análise.</b> Registre com "Desistiu antes de assinar"${f.reserva_valor > 0 ? ` e devolva a reserva de ${reais(f.reserva_valor)} por inteiro` : ''}.</div><p>${botaoDesistencia(f)}</p>`);
+    partes.push(`<div class="alerta perigo"><b>${esc(nome)} avisou pelo link, em ${C.dataHoraBr(l.desistiu_em)}, que não vai seguir com a análise.</b> Registre com "Desistiu antes de assinar"${f.reserva_valor > 0 ? (() => { const dv = R.devolucaoDaReserva(f, { data: String(l.desistiu_em || '').slice(0, 10) || null }); return dv.integral ? ` e devolva a reserva de ${reais(f.reserva_valor)} por inteiro` : dv.devolver === 0 ? ` (a reserva de ${reais(f.reserva_valor)} fica com a empresa: ${esc(dv.motivo)})` : ` e devolva ${reais(dv.devolver)} da reserva de ${reais(f.reserva_valor)} (${esc(dv.motivo)})`; })() : ''}.</div><p>${botaoDesistencia(f)}</p>`);
   }
   if (ultimo && !trazido) {
     const dif = diferencasDoEnvio(f, l);
@@ -357,12 +369,27 @@ function blocoDoLink(f, l) {
       ${dif.length ? `<table><tr><th>Campo</th><th>Na ficha</th><th>Enviado</th></tr>${dif.map((x) => `<tr><td>${esc(x.campo.rotulo)}</td><td>${valorDoCampo(x.campo, x.na_ficha)}</td><td><b>${valorDoCampo(x.campo, x.enviado)}</b></td></tr>`).join('')}</table>` : '<p class="suave">Os dados enviados já estão na ficha.</p>'}
       <p class="acoes">${botao('trazerRespostaFicha', dif.length ? 'Trazer para a ficha…' : 'Marcar como conferido…', { id: f.id, pessoa: p }, 'pequeno')}</p>`);
   } else if (ultimo) partes.push(`<p class="suave">Dados enviados em ${C.dataHoraBr(ultimo.em)} já trazidos para a ficha.</p>`);
-  if ((l.arquivos || []).length) {
+  // correções feitas pela pessoa (decisão do dono de 2026-11-24): cada envio guarda os campos que mudaram
+  const rotulo = (n) => ((l.formulario || []).find((c) => c.nome === n) || {}).rotulo || n;
+  const correcoes = (l.respostas || []).filter((x) => Array.isArray(x.mudou));
+  if (correcoes.length) partes.push(`<details><summary class="suave">${correcoes.length} correção(ões) dos dados pela pessoa</summary><ul style="padding-left:18px">${correcoes.map((x) => `<li>${C.dataHoraBr(x.em)}: ${x.mudou.length ? esc(x.mudou.map(rotulo).join(', ')) : 'mandou de novo, sem mudança'}</li>`).join('')}</ul></details>`);
+  const ativos = (l.arquivos || []).filter((a) => !a.apagado_em);
+  const apagados = (l.arquivos || []).filter((a) => a.apagado_em);
+  if (ativos.length) {
     partes.push(`<p><b>Documentos mandados pelo link</b> <span class="suave">(estão na pasta da ficha, abaixo; a conferência olha por dentro de cada arquivo)</span></p>
-      <ul style="padding-left:18px">${l.arquivos.map((a) => `<li data-conferir="${esc(a.arquivo)}" data-nome-pessoa="${esc(nome)}" data-documento="${esc(a.documento)}" data-pessoa="${esc(p)}">${esc(a.documento)}: <a href="#" data-acao="abrirArquivo" data-escopo="ficha" data-id="${f.id}" data-nome="${esc(a.arquivo)}">📎 ${esc(a.nome_original || a.arquivo)}</a> <span class="suave">${C.dataHoraBr(a.em)}</span> <span data-sinais class="suave">conferindo…</span></li>`).join('')}</ul>`);
+      <ul style="padding-left:18px">${ativos.map((a) => `<li data-conferir="${esc(a.arquivo)}" data-nome-pessoa="${esc(nome)}" data-documento="${esc(a.documento)}" data-pessoa="${esc(p)}">${esc(a.documento)}: <a href="#" data-acao="abrirArquivo" data-escopo="ficha" data-id="${f.id}" data-nome="${esc(a.arquivo)}">📎 ${esc(a.nome_original || a.arquivo)}</a> <span class="suave">${C.dataHoraBr(a.em)}</span> <span data-sinais class="suave">conferindo…</span></li>`).join('')}</ul>`);
+  }
+  if (apagados.length) {
+    const novo = (n) => (l.arquivos.find((x) => x.arquivo === n) || {}).nome_original || n;
+    partes.push(`<details><summary class="suave">${apagados.length} documento(s) trocado(s) ou apagado(s) pela pessoa</summary><ul style="padding-left:18px">${apagados.map((a) => `<li><s>${esc(a.documento)}: ${esc(a.nome_original || a.arquivo)}</s> <span class="suave">mandado em ${C.dataHoraBr(a.em)}, ${a.substituido_por ? `trocado por "${esc(novo(a.substituido_por))}"` : 'apagado'} em ${C.dataHoraBr(a.apagado_em)} (fica 30 dias na lixeira da nuvem)</span></li>`).join('')}</ul></details>`);
   }
   if (l.faltando && l.faltando.length && l.situacao === 'Falta documento') partes.push(`<p class="suave">Pedido à pessoa: ${esc(l.faltando.join('; '))}.</p>`);
   const ativo = !['Encerrado', 'Desistiu'].includes(l.situacao) && !R.fichaSemContrato(f) && !f.documentos_no_contrato;
+  if (ativo && (ultimo || (l.arquivos || []).length)) {
+    partes.push(l.conferido_em
+      ? `<p class="suave">${etiqueta('✓ conferido', 'ok')} em ${C.dataHoraBr(l.conferido_em)}: a pessoa não troca mais dados nem documentos (só manda documento novo). ${botao('liberarCorrecaoFicha', 'Deixar a pessoa corrigir', { id: f.id, pessoa: p }, 'secundario mini', `Deixar ${nome} trocar os dados e os documentos de novo pelo link?`)}</p>`
+      : '<p class="suave">Até vocês trazerem os dados para a ficha (ou marcarem como conferido), a pessoa pode corrigir os dados e trocar ou apagar o documento mandado por engano. Cada mudança avisa vocês e fica registrada.</p>');
+  }
   if (ativo) {
     partes.push(`<p class="acoes">${botao('pedirDocumentoFicha', 'Pedir o que falta', { id: f.id, pessoa: p })}
       ${botao('mandarAssinarFicha', 'Mandar a ficha para assinar', { id: f.id, pessoa: p }, 'secundario pequeno', `Gerar a ficha em PDF com os dados de agora e pedir a assinatura de ${nome} pelo link?`)}
@@ -548,13 +575,14 @@ function desenharAvisosDoPainel(el, links) {
     if (!f || l.situacao === 'Encerrado' || f.documentos_no_contrato) continue;
     const nome = esc(l.nome || FO.nomeDaPessoa(f, l.pessoa));
     const ir = `<a href="#/ficha/${f.id}">${nome}${l.pessoa === 'interessado' ? '' : ' (fiador)'}</a>`;
-    if (l.situacao === 'Desistiu' && !R.fichaSemContrato(f)) { linhas.push(`${ir} avisou pelo link que não vai seguir: registre a desistência${f.reserva_valor > 0 ? ` e devolva a reserva de ${reais(f.reserva_valor)}` : ''}`); continue; }
+    if (l.situacao === 'Desistiu' && !R.fichaSemContrato(f)) { linhas.push(`${ir} avisou pelo link que não vai seguir: registre a desistência${f.reserva_valor > 0 ? ' e a devolução da reserva' : ''}`); continue; }
     if (R.fichaSemContrato(f)) continue;
     const novo = !l.visto_em && (l.ultimo_envio || l.arquivos);
     const esperando = (!l.ultimo_envio && !l.arquivos) || ['Falta documento', 'Assinar'].includes(l.situacao);
     // o texto vem da novidade mais recente: a ficha assinada, um documento ou os dados
     const docMaisNovo = l.arquivos && (!l.ultimo_envio || (l.ultimo_arquivo && l.ultimo_arquivo > l.ultimo_envio));
-    if (novo) linhas.push(`${ir} ${l.situacao === 'Assinada' ? 'mandou a ficha assinada' : docMaisNovo ? 'mandou documentos pelo link' : 'mandou dados pelo link'}: conferir`);
+    const apagouPorUltimo = l.ultimo_apagado && l.ultimo_apagado >= (l.ultimo_arquivo || '') && l.ultimo_apagado >= (l.ultimo_envio || '');
+    if (novo || (!l.visto_em && apagouPorUltimo)) linhas.push(`${ir} ${apagouPorUltimo ? 'trocou ou apagou um documento pelo link' : l.situacao === 'Assinada' ? 'mandou a ficha assinada' : docMaisNovo ? 'mandou documentos pelo link' : 'mandou dados pelo link'}: conferir`);
     else if (esperando) {
       const vencido = Date.parse(l.vence_em) < agora;
       // conta desde a última coisa feita: o link, o pedido da equipe (falta documento, assinar) ou o lembrete
@@ -642,8 +670,16 @@ export const ACOES_FICHAS = {
       links[pessoa] = { ...(links[pessoa] || {}), trazido_em: ultimo.em };
       R.atualizar(db, 'fichas', f.id, { ...dados, links_ficha: links }, login(), `Dados enviados pelo link por ${FO.nomeDaPessoa(f, pessoa)} trazidos para a ficha`);
     });
-    FO.atualizarLinkNaNuvem({ ficha_id: f.id, pessoa, visto: true }).catch(() => {});
+    // conferido: a pessoa não troca mais o que mandou (decisão do dono de 2026-11-24); "Deixar a pessoa corrigir" volta atrás
+    FO.atualizarLinkNaNuvem({ ficha_id: f.id, pessoa, visto: true, conferido: true }).catch(() => {});
     aviso(`Dados de ${FO.nomeDaPessoa(f, pessoa)} trazidos para a ficha. Confira e, se estiver tudo certo, mande a ficha para assinar.`);
+    await mostrar();
+  },
+  /** A pessoa volta a poder corrigir os dados e trocar ou apagar documentos pelo link. */
+  async liberarCorrecaoFicha({ id, pessoa }) {
+    if (!opera()) throw new C.ErroUsuario('Seu usuário não pode mudar o link.');
+    await FO.atualizarLinkNaNuvem({ ficha_id: Number(id), pessoa, liberar: true });
+    aviso('Pronto: a pessoa pode corrigir de novo pelo link.');
     await mostrar();
   },
   /** Marca na nuvem o que falta (a pessoa vê no link) e abre a mensagem para avisar. */
@@ -758,12 +794,14 @@ export const ACOES_FICHAS = {
     const nome = f ? f.inquilino_nome : contratos[0].inquilino_nome;
     const reserva = (contratos.find((c) => c.reserva_valor > 0) || f || {}).reserva_valor || 0;
     const hoje = C.hojeIso();
+    // termo de aceite da reserva: depois do prazo de arrependimento, a empresa fica com a parte combinada (conta pela data de hoje)
+    const dv = f && f.aceite_reserva ? R.devolucaoDaReserva({ ...f, reserva_valor: reserva, situacao: 'Desistiu' }, { data: hoje }) : { integral: true, devolver: reserva };
     const lista = contratos.map((c) => `${esc(c.inquilino_nome)}${c.imovel_id ? ` · ${esc((buscar('imoveis', c.imovel_id) || {}).nome || '')}` : ''}`).join('; ');
     const resp = await janela({
       titulo: `Desistência de ${nome}`, sim: 'Confirmar a desistência', forte: contratos.length > 0,
       html: `<p>O interessado desistiu antes de assinar: nada segue em frente.</p><ul>
         ${contratos.length ? `<li>O contrato não assinado (${lista}) é <b>cancelado</b>: sai do sistema com os boletos ainda não pagos. Os arquivos da pasta do inquilino vão para a pasta da ficha.</li>` : ''}
-        <li>A ficha fica <b>"Desistiu"</b>${reserva ? ` e a reserva de <b>${reais(reserva)}</b> fica para <b>devolver por inteiro</b>. Depois de devolver, registre a data e o comprovante em "Editar": sai o termo de devolução e quitação` : ''}.</li>
+        <li>A ficha fica <b>"Desistiu"</b>${reserva ? (dv.devolver === 0 ? ` e a reserva de <b>${reais(reserva)}</b> <b>fica com a empresa</b> (${esc(dv.motivo)}): nada a devolver` : ` e a reserva de <b>${reais(reserva)}</b> fica para <b>${dv.integral ? 'devolver por inteiro' : `devolver ${reais(dv.devolver)}`}</b>${dv.integral ? '' : ` (${esc(dv.motivo)}; a data abaixo decide)`}. Depois de devolver, registre a data e o comprovante em "Editar": sai o termo de devolução e quitação`) : ''}.</li>
         <li>Os documentos pessoais são apagados ${R.regra('meses_documentos_ficha')} meses depois.</li></ul>
         <p><label>Data da desistência</label><input type="date" name="data" value="${hoje}" max="${hoje}" required></p>
         <p><label>Motivo (opcional)</label><textarea name="motivo" rows="2"></textarea></p>`,
@@ -780,7 +818,8 @@ export const ACOES_FICHAS = {
     await alterar((db) => { salva = R.desistirAntesDeAssinar(db, { ...pedido, arquivos: copia.nomes }, login()); });
     await copia.apagarOriginais();
     try { await encerrarLinksDaFicha(salva.id); } catch (e) { console.warn('encerrar os links da ficha', e); }
-    aviso(`Desistência registrada${contratos.length ? ' e contrato cancelado' : ''}.${reserva ? ` Devolva a reserva de ${reais(reserva)} e registre a devolução na ficha.` : ''}`);
+    const dvSalva = R.devolucaoDaReserva(salva);
+    aviso(`Desistência registrada${contratos.length ? ' e contrato cancelado' : ''}.${!reserva ? '' : dvSalva.devolver === 0 ? ` A reserva de ${reais(reserva)} fica com a empresa, como no termo: nada a devolver.` : ` Devolva ${dvSalva.integral ? `a reserva de ${reais(reserva)}` : `${reais(dvSalva.devolver)} da reserva de ${reais(reserva)} (a empresa fica com ${reais(dvSalva.reter)}, como no termo)`} e registre a devolução na ficha.`}`);
     ir(`#/ficha/${salva.id}`);
   },
   async decidirFicha({ id, situacao }) {

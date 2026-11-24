@@ -17,6 +17,7 @@ import * as R from '../regras.js';
 import { desfazerItens, dispensarAvisoSeguro } from './admin.js';
 import { ACOES_BANCO } from './banco.js';
 import { ACOES_FICHAS } from './fichas.js';
+import { ACOES_TERMO } from './termo-reserva.js';
 import { ACOES_EMAILS } from './emails.js';
 import { htmlSaude } from './banco-c6.js';
 import { ANEXOS_COM_X, CADASTROS, nomeComprovante } from './cadastros.js';
@@ -235,7 +236,8 @@ export function motivoNaoExcluirContrato(db, r) {
   // apagado e o comprovante da reserva sumia junto; a desistência devolve a reserva e os documentos à ficha
   const ficha = r.ficha_id && !r.doc_contrato_em ? R.buscar(db, 'fichas', r.ficha_id) : null;
   if (ficha && !R.fichaSemContrato(ficha)) return `Este contrato foi feito da ficha de ${ficha.inquilino_nome} e ainda não foi assinado. Para cancelar, use "Desistiu antes de assinar" na página da ficha: o contrato sai e a reserva e os documentos voltam para a ficha. Para corrigir um dado, use "Editar".`;
-  return null;
+  // novo titular com a troca completada: o que veio do anterior sairia junto (busca de 24/11, CON-01)
+  return R.motivoNaoExcluirHerdeiro(db, r);
 }
 
 /**
@@ -1229,13 +1231,6 @@ export const ACOES = {
     await mostrar();
   },
 
-  /** "×" no arquivo do termo aditivo: o termo volta a "aguardando assinatura". */
-  async removerArquivoAditivo({ id }) {
-    await alterarApagandoAnexos((db) => R.removerArquivoAditivo(db, Number(id), login()));
-    aviso('Arquivo apagado: o termo aditivo voltou a "aguardando assinatura".');
-    await mostrar();
-  },
-
   /** Rotina de entrada: etapa que não se aplica a este inquilino (ex.: sem reserva) ou volta a pendente. */
   async pularEtapaEntrada({ contrato, chave }) {
     await alterar((db) => R.marcarEtapaEntrada(db, Number(contrato), chave, { pular: true }, login()));
@@ -1781,7 +1776,8 @@ export const ACOES = {
   },
 
   async estornar({ id }) {
-    await alterar((db) => R.estornarPagamento(db, Number(id), login()));
+    // o comprovante da entrada do extrato ligada ao boleto sai junto (a entrada volta a ficar sem destino)
+    await alterarApagandoAnexos((db) => R.estornarPagamento(db, Number(id), login()));
     aviso('Pagamento desfeito.');
     await mostrar();
   },
@@ -2683,6 +2679,6 @@ export const ACOES = {
 };
 
 // Banco (extrato, comprovantes e pagamentos pelo C6): botões em telas/banco.js
-Object.assign(ACOES, ACOES_BANCO, ACOES_FICHAS, ACOES_ICONE, ACOES_EMAILS, ACOES_PASTA, ACOES_NOTIFICACOES, ACOES_COMUNICACOES);
+Object.assign(ACOES, ACOES_BANCO, ACOES_FICHAS, ACOES_TERMO, ACOES_ICONE, ACOES_EMAILS, ACOES_PASTA, ACOES_NOTIFICACOES, ACOES_COMUNICACOES);
 // telas raras (nuvem, regras do sistema, régua, dados de uma pessoa): carregadas no 1º clique (PARTES_ADIADAS, telas/comum.js)
 Object.assign(ACOES, adiados('acoes'));
