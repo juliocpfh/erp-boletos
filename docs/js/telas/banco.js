@@ -702,7 +702,7 @@ function boletosAbertos(imovelId, m) {
   const deNovo = d().cobrancas.filter((cb) => cs.includes(cb.contrato_id) && cb.data_pagamento && cb.movimentacao_id && cb.data_pagamento <= m.data && cb.data_pagamento >= C.somarDias(m.data, -60))
     .sort((a, b) => String(b.data_pagamento).localeCompare(String(a.data_pagamento))).map((cb) => ({ cb, previsto: cb.valor_pago, aMais: true }));
   return [...ligaveis, ...d().cobrancas.filter((cb) => cs.includes(cb.contrato_id) && R.aCobrar(cb))
-    .map((cb) => ({ cb, previsto: R.previstoNoPagamento(cb, m.data).valor_devido }))
+    .map((cb) => ({ cb, previsto: Z.devidoNoCredito(cb, m.valor, m.data, { pix: Z.ehPix(m) }).previsto.valor_devido }))
     .sort((a, b) => (a.previsto === m.valor ? -1 : b.previsto === m.valor ? 1 : 0) || String(b.cb.vencimento).localeCompare(String(a.cb.vencimento))), ...deNovo].slice(0, 40);
 }
 
@@ -1162,11 +1162,14 @@ export const ACOES_BANCO = {
     if (!cb) throw new C.ErroUsuario('Este boleto não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.');
     if (cb.data_pagamento) throw new C.ErroUsuario('Este boleto já está pago: nada a fazer.');
     const c = buscar('contratos', cb.contrato_id);
-    const previsto = R.previstoNoPagamento(cb, m.data).valor_devido;
+    // a mesma conta da confirmação (Z.confirmarPagamentoPeloBanco): boleto creditado dentro dos dias úteis da regra
+    // "tolerância do boleto" pelo valor em dia conta como em dia (decisão de 24/11/2026)
+    const conta = Z.devidoNoCredito(cb, m.valor, m.data, { pix: Z.ehPix(m) });
+    const previsto = conta.previsto.valor_devido;
     const r = await janela({ titulo: 'Confirmar o pagamento do boleto', sim: 'Confirmar pagamento', forte: previsto !== m.valor,
       html: `<p>Boleto de <b>${compBr(cb.competencia)}</b> de <b>${esc(c ? c.inquilino_nome : '')}</b>, vencimento ${dataBr(cb.vencimento)}.</p>
-        <p>Recebido <b>${reais(m.valor)}</b> em <b>${dataBr(m.data)}</b> · previsto para esta data: <b>${reais(previsto)}</b>
-        ${previsto === m.valor ? etiqueta('bate certinho', 'ok') : m.valor < previsto ? `${etiqueta('valor menor que o devido', 'perigo')}<br><span class="suave">Não existe pagamento em parte: se o valor menor se confirmar, o pagamento é recusado, o boleto continua em aberto e o dinheiro fica sem destino (para quitar, faça um acordo).</span>` : `${etiqueta('valor diferente', 'aviso')}<br><span class="suave">Ao confirmar, o sistema pede a justificativa e o valor da NF na página do boleto.</span>`}</p>
+        <p>Recebido <b>${reais(m.valor)}</b> em <b>${dataBr(m.data)}</b> · previsto para esta data: <b>${reais(previsto)}</b>${conta.emDia ? ' (em dia: crédito dentro do prazo do banco)' : ''}
+        ${previsto === m.valor ? etiqueta('bate certinho', 'ok') : m.valor < conta.minimo ? `${etiqueta('valor menor que o devido', 'perigo')}<br><span class="suave">Não existe pagamento em parte: se o valor menor se confirmar, o pagamento é recusado, o boleto continua em aberto e o dinheiro fica sem destino (para quitar, faça um acordo).</span>` : `${etiqueta('valor diferente', 'aviso')}<br><span class="suave">Ao confirmar, o sistema pede a justificativa e o valor da NF na página do boleto.</span>`}</p>
         <p class="suave">O boleto fica "Pago" com a data em que o dinheiro entrou e esta movimentação fica ligada a ele.</p>` });
     if (!r) return;
     // valor menor que o devido: a regra recusa (não existe pagamento em parte, 2026-11-20) e nada é gravado
