@@ -5632,12 +5632,19 @@ export function dadosBoleto(d, cb) {
   // cada ajuste do mês, multa de notificação e diferença numa parte (desde 24/11/2026 o boleto pode ter vários ajustes)
   for (const p of partesDosOutros(cb)) extras.push(`${(p.texto || (p.valor < 0 ? 'RESSARCIMENTO' : 'COBRANÇA ADICIONAL')).replace(/Multa por descumprimento da notificação de /g, 'Multa notif. ').toLocaleUpperCase('pt-BR')} ${p.valor < 0 ? `-${rs(-p.valor)}` : rs(p.valor)}`);
   if (cb.reserva_utilizada) extras.push(`RESERVA -${rs(cb.reserva_utilizada)}`);
+  const iRessarc = extras.length;
   if (cb.ressarcimento) extras.push(`RESSARCIMENTO CONDOMÍNIO -${rs(cb.ressarcimento)}`);
   if (extras.length && !ehBoletoAvulso(cb)) linhas.push(extras.join(' '));
-  // a tarifa encurta quando a descrição passa do limite do C6: "TARIFA COBRANÇA" → "TAR. COBRANÇA" → "TAR. COBR." → "TARIFA"
-  for (const curto of ['TAR. COBRANÇA', 'TAR. COBR.', 'TARIFA']) {
-    if (!cb.taxa_boleto || ehBoletoAvulso(cb) || linhas.join('\n').length <= LIMITE_DESCRICAO_BOLETO) break;
-    extras[iTarifa] = `${curto} ${rs(cb.taxa_boleto)}`;
+  // quando a descrição passa do limite do C6, encurta primeiro a tarifa ("TARIFA COBRANÇA" → "TAR. COBRANÇA" → "TAR. COBR." →
+  // "TARIFA") e depois o ressarcimento ("RESSARC. CONDOMÍNIO" → "RESSARC. COND."), que fica no fim e era o primeiro a ser
+  // cortado (conferência de 24/11/2026: aluguel, bonificação, IPTU, seguro, tarifa e ressarcimento davam 120 letras)
+  const encurtar = [
+    ...(cb.taxa_boleto ? ['TAR. COBRANÇA', 'TAR. COBR.', 'TARIFA'].map((x) => () => { extras[iTarifa] = `${x} ${rs(cb.taxa_boleto)}`; }) : []),
+    ...(cb.ressarcimento ? ['RESSARC. CONDOMÍNIO', 'RESSARC. COND.'].map((x) => () => { extras[iRessarc] = `${x} -${rs(cb.ressarcimento)}`; }) : []),
+  ];
+  for (const passo of encurtar) {
+    if (ehBoletoAvulso(cb) || linhas.join('\n').length <= LIMITE_DESCRICAO_BOLETO) break;
+    passo();
     linhas[linhas.length - 1] = extras.join(' ');
   }
   const valor = t.a_pagar_sem_desconto;
@@ -5649,6 +5656,8 @@ export function dadosBoleto(d, cb) {
     // com FCI, multa e juros são sobre o boleto sem o FCI: a multa vai em valor (R$), não em %
     multa_valor: t.base_multa !== valor ? C.arred((t.base_multa * (cb.multa_percentual || 0)) / 100) : null,
     juros_ao_dia: C.jurosAoDia(t.base_multa, cb.juros_mensal_percentual), descricao: linhas.join('\n'),
+    // letras a mais que o C6 corta no fim da descrição (0 = cabe)
+    excesso: Math.max(0, linhas.join('\n').length - LIMITE_DESCRICAO_BOLETO),
   };
 }
 
