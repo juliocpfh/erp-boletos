@@ -3287,6 +3287,19 @@ export function desistirAntesDeAssinar(d, { fichaId = null, contratoId = null, d
   return buscar(d, 'fichas', f.id);
 }
 
+/**
+ * Contrato do novo titular com a troca já completada (boletos, fiadores, correções e garantia passaram do anterior para ele):
+ * excluir apagaria o que era do anterior, e o anterior ficaria com a saída na véspera da troca, sem ser cobrado. Barrado (busca
+ * de 24/11, CON-01): o mais seguro é corrigir o cadastro do novo titular. Antes de a troca se completar, a exclusão é livre e o
+ * anterior volta a ser cobrado (``soltarSaidaDoAnterior``). Devolve o texto do motivo ou null.
+ */
+export function motivoNaoExcluirHerdeiro(d, c) {
+  const a = contratoHerdado(d, c);
+  if (!a || !c.heranca_transferida) return null;
+  const quando = typeof c.heranca_transferida === 'string' && C.dataValida(c.heranca_transferida) ? ` em ${C.dataBr(c.heranca_transferida)}` : '';
+  return `A troca de titular já foi completada${quando}: o que era de ${a.inquilino_nome} (boletos, fiadores, correções do aluguel, garantia) passou para ${c.inquilino_nome}. Excluir este contrato apagaria esses registros e ${a.inquilino_nome} ficaria sem cobrança. Corrija o cadastro em "Editar contrato" em vez de excluir.`;
+}
+
 /** Tabelas com contrato_id que não saem com o contrato: NFs (barradas antes) e os dados do banco (não se desfazem). */
 const FICAM_SEM_O_CONTRATO = new Set(['contratos', 'faturas', 'movimentacoes_banco', 'pagamentos_banco']);
 
@@ -3298,6 +3311,10 @@ const FICAM_SEM_O_CONTRATO = new Set(['contratos', 'faturas', 'movimentacoes_ban
 export function excluirContrato(d, contratoId, usuario, descricao) {
   const c = buscar(d, 'contratos', contratoId);
   if (!c) return;
+  const barrado = motivoNaoExcluirHerdeiro(d, c);
+  if (barrado) throw new C.ErroUsuario(barrado);
+  // troca de titular que não vai acontecer: o anterior volta a ser cobrado (a saída na véspera da troca sai)
+  soltarSaidaDoAnterior(d, c, usuario, `o contrato de ${c.inquilino_nome}, novo titular, foi excluído`);
   // apólice que veio do contrato anterior (troca de titular) volta para ele, com o arquivo: não sai junto (item 17)
   for (const s of (d.seguros || []).filter((x) => x.contrato_id === c.id && x.herdado_de && buscar(d, 'contratos', x.herdado_de))) {
     atualizar(d, 'seguros', s.id, { contrato_id: s.herdado_de, herdado_de: null }, usuario, `Seguro volta para o contrato anterior (${c.inquilino_nome} excluído)`);
@@ -3798,11 +3815,15 @@ export function desfazerAditivo(d, id, usuario, { excluirTermo = false } = {}) {
   const tirar = () => (excluirTermo ? excluir(d, 'aditivos', a.id, usuario, `${c.inquilino_nome}: termo aditivo de ${C.dataBr(a.data)} excluído (não valeu: arquivo errado ou sem a assinatura de todos)`)
     : atualizar(d, 'aditivos', a.id, { arquivo: null, assinado_em: null, perdido_em: null, perdido_pendente: null }, usuario, `${c.inquilino_nome}: arquivo do termo aditivo de ${C.dataBr(a.data)} apagado (não valeu: volta a aguardar assinatura)`));
   if (a.tipo === TIPO_ADITIVO_VALOR && a.renovacao_id && buscar(d, 'renovacoes', a.renovacao_id)) {
+    const ren = buscar(d, 'renovacoes', a.renovacao_id);
+    // o prazo gravado pela renovação não volta sozinho (como no "×" da renovação): avisa para conferir (CON-07)
+    const prazo = ren.nova_vigencia_fim ? ` A data de término do contrato continua ${C.dataBr(c.vigencia_fim || ren.nova_vigencia_fim)} (gravada com a renovação, que saiu junto): confira em "Editar contrato".`
+      : ren.tipo === 'Passou a prazo indeterminado' ? ' O contrato continua por prazo indeterminado (gravado com a renovação, que saiu junto): confira em "Editar contrato".' : '';
     atualizar(d, 'aditivos', a.id, { arquivo: null, assinado_em: null, perdido_em: null, perdido_pendente: null }, usuario, `${c.inquilino_nome}: termo aditivo do novo valor não valeu`);
     excluirRenovacao(d, a.renovacao_id, usuario); // exclui também o termo (agora sem assinatura)
     recalcularCobrancas(d, (cb) => cb.contrato_id === c.id, usuario);
     marcarAditivos(d, c.id, usuario);
-    return `O novo valor de ${C.reais(a.valor_novo)} saiu: o aluguel volta a ${C.reais(a.valor_anterior)} nos boletos em aberto.`;
+    return `O novo valor de ${C.reais(a.valor_novo)} saiu: o aluguel volta a ${C.reais(a.valor_anterior)} nos boletos em aberto.${prazo}`;
   }
   tirar();
   marcarAditivos(d, c.id, usuario);
@@ -3822,7 +3843,11 @@ export function desfazerAditivo(d, id, usuario, { excluirTermo = false } = {}) {
     }
     return `O vencimento volta ao dia ${a.dia_anterior}${n ? ` (${n} boleto(s) em aberto ajustado(s))` : ''}.`;
   }
-  if (troca) return `Sem o termo assinado, a troca de titular volta a esperar por ele: ${contratoHerdado(d, c) ? contratoHerdado(d, c).inquilino_nome : 'o titular anterior'} continua no contrato.`;
+  if (troca) {
+    // o fim do vínculo gravado ao anexar o termo sai: o anterior volta a ser cobrado até um termo novo ser anexado (CON-02)
+    if (!aditivoDaTroca(d, c)) soltarSaidaDoAnterior(d, c, usuario, 'o termo da troca de titular não valeu');
+    return `Sem o termo assinado, a troca de titular volta a esperar por ele: ${contratoHerdado(d, c) ? contratoHerdado(d, c).inquilino_nome : 'o titular anterior'} continua no contrato.`;
+  }
   return '';
 }
 
@@ -3860,13 +3885,15 @@ function alertaFiador(d, c, hoje) {
  * Lembrete depois da saída do inquilino: pedir a volta da titularidade das contas (água, energia, gás) para o proprietário.
  * Some quando houver um protocolo "Volta para o proprietário" registrado a partir da data de saída.
  */
+/** Protocolo da volta das contas ao proprietário registrado para esta saída (do contrato, ou do imóvel desde a saída). */
+export const titularidadeDevolvida = (d, c) => d.titularidades.some((t) => t.imovel_id === c.imovel_id && t.tipo === 'Volta para o proprietário'
+  && (t.contrato_id === c.id || String(t.data || '') >= String(c.data_saida || '')));
+
 export function alertaTitularidade(d, c, hoje = C.hojeIso()) {
   // troca de titular: as contas passam para o novo titular (não voltam para o proprietário)
   if (fimDeVinculo(d, c)) return null;
   if (!c.data_saida || !c.imovel_id || c.data_saida > C.somarDias(hoje, CR.regra('titularidade_dias_antes')) || c.data_saida < C.somarDias(hoje, -CR.regra('titularidade_dias_depois'))) return null;
-  const feito = d.titularidades.some((t) => t.imovel_id === c.imovel_id && t.tipo === 'Volta para o proprietário'
-    && (t.contrato_id === c.id || String(t.data || '') >= c.data_saida));
-  if (feito) return null;
+  if (titularidadeDevolvida(d, c)) return null;
   return { nivel: 'aviso', tipo: 'Titularidade', ancora: 'titularidade',
     texto: `${c.data_saida <= hoje ? 'O inquilino saiu' : 'O inquilino sai'} em ${C.dataBr(c.data_saida)}: peça a mudança de titularidade das contas (água, energia, gás) de volta para o proprietário e registre o protocolo.` };
 }
@@ -4643,6 +4670,23 @@ export function mudarGarantiaNaTroca(d, novoId, escolha, usuario) {
   return true;
 }
 
+/**
+ * A troca de titular não vai mais acontecer (o contrato do novo titular foi excluído, ou o termo da troca não valeu): o fim do
+ * vínculo que a troca gravou no anterior sai e ele volta a ser cobrado. Ex.: troca em 01/12/2026 → a saída de 30/11/2026 de
+ * João sai e o boleto de dezembro volta a ser dele. Só a saída que é a véspera da troca e sem cálculo final (saída de verdade fica).
+ * ``motivo``: o texto do Histórico. Devolve o contrato anterior quando mudou algo, senão null.
+ */
+export function soltarSaidaDoAnterior(d, n, usuario, motivo) {
+  const a = n && contratoHerdado(d, n);
+  const data = n && (n.data_entrada || n.vigencia_inicio);
+  if (!a || !data || a.data_saida !== C.somarDias(data, -1) || encerramentoDo(d, a.id)) return null;
+  // o anterior pode ter sido inativado pela saída: volta a ativo (a saída era só a da troca)
+  atualizar(d, 'contratos', a.id, { data_saida: null, ...(a.ativo === false ? { ativo: true } : {}) }, usuario,
+    `${a.inquilino_nome}: continua no contrato (${motivo}); o fim do vínculo em ${C.dataBr(a.data_saida)} saiu`);
+  recalcularCobrancas(d, (cb) => cb.contrato_id === a.id, usuario);
+  return a;
+}
+
 export function encerrarVinculoPorContinuacao(d, anteriorId, data, novoNome, usuario) {
   const a = buscar(d, 'contratos', anteriorId);
   if (!a || !data) return null;
@@ -5357,7 +5401,7 @@ export const aditivosAguardando = (d, contratoId) => d.aditivos.filter((a) => a.
  * Ex.: o contrato de Pedro tem o 1º termo (troca do vencimento); Lúcia assume → o termo da troca é o 2º. Um termo excluído
  * não faz repetir o número de outro (vale o maior já usado).
  */
-function proximoNumeroAditivo(d, c) {
+export function proximoNumeroAditivo(d, c) {
   const { antes, depois } = cadeiaDeContratos(d, c);
   const ids = new Set([c, ...antes, ...depois].map((x) => x.id));
   const l = d.aditivos.filter((a) => ids.has(a.contrato_id));
@@ -7544,8 +7588,14 @@ export function reajusteNaCompetencia(d, c, comp, hoje = C.hojeIso(), doContrato
   const meses = C.mesesEntre(p, comp);
   if (meses <= 0 || meses % 12 !== 0) return null;
   const n = meses / 12;
-  const corrigido = correcaoDoReajuste(d, c, comp, doContrato ? doContrato.correcoes : undefined);
-  const carta = cartaDoReajuste(d, c, comp, doContrato ? doContrato.cartas : undefined);
+  let corrigido = correcaoDoReajuste(d, c, comp, doContrato ? doContrato.correcoes : undefined);
+  let carta = cartaDoReajuste(d, c, comp, doContrato ? doContrato.cartas : undefined);
+  // troca de titular no meio do mês do reajuste (ex.: reajuste de 03/2027 aplicado em João, Maria entra em 15/03/2027): a correção
+  // ficou no anterior e o aluguel herdado já é o corrigido; conta como feita aqui (senão o reajuste seria aplicado duas vezes, CON-03)
+  for (let a = contratoHerdado(d, c), voltas = 0; a && (!corrigido || !carta) && voltas < 10; a = contratoHerdado(d, a), voltas += 1) {
+    corrigido = corrigido || correcaoDoReajuste(d, a, comp);
+    carta = carta || cartaDoReajuste(d, a, comp);
+  }
   const comCarta = comp.slice(0, 4) >= hoje.slice(0, 4);
   return { n, anos: n, competencia: comp, corrigido, carta, comCarta, faltaCarta: comCarta && !carta && !(corrigido && corrigido.indice === 'Negociado') && (!corrigido || comp >= CARTA_COM_BOLETO_CORRIGIDO_DESDE) };
 }
@@ -8006,6 +8056,10 @@ export function desfazerAcordo(d, acordoId, usuario, hoje = C.hojeIso()) {
   const parcelas = parcelasDoAcordo(d, a);
   if (parcelas.some((cb) => cb.data_pagamento)) throw new Error('Uma parcela do acordo já foi paga: desfaça o pagamento antes.');
   if (parcelas.some((cb) => emitidoNoBanco(cb))) throw new Error('Uma parcela do acordo foi emitida no C6: cancele no banco antes.');
+  // parcela descontada da garantia (cálculo final ou devolução na troca): a dívida já está acertada lá; desfazer o acordo a
+  // faria ser cobrada de novo (CON-05)
+  if (parcelas.some((cb) => cb.quitado_saida)) throw new C.ErroUsuario('Uma parcela do acordo já foi descontada da garantia no cálculo final da saída: desfaça antes o cálculo final.');
+  if (parcelas.some((cb) => cb.quitado_devolucao)) throw new C.ErroUsuario('Uma parcela do acordo já foi descontada na devolução da garantia (troca de titular): desfaça antes essa devolução.');
   for (const cb of parcelas) excluir(d, 'cobrancas', cb.id, usuario, `Boleto do acordo${cb.acordo_parcela ? ` ${cb.acordo_parcela}` : ''} excluído (acordo desfeito)`);
   for (const cb of origensDoAcordo(d, a)) atualizar(d, 'cobrancas', cb.id, { situacao: 'Em aberto', acordo_id: null }, usuario, `Boleto ${nomeNoAcordo(cb)} volta a ser cobrado (acordo desfeito)`);
   return atualizar(d, 'acordos', a.id, { desfeito_em: hoje }, usuario, `Acordo de ${C.dataBr(a.data)} desfeito`);
@@ -8653,11 +8707,13 @@ export function roteiroSaida(d, c, hoje = C.hojeIso()) {
   const saiu = c.data_saida <= hoje;
   const vist = vistoriasDo(d, c.id).find((v) => v.tipo === 'Saída') || null;
   const leitura = leituraDo(d, c.id, 'Saída do inquilino');
-  const titularidade = alertaTitularidade(d, c, hoje);
+  // o protocolo registrado (e não a falta do alerta, que some fora da janela de aviso: CON-08); sem imóvel, não há contas
+  const titularidade = !!c.imovel_id && !titularidadeDevolvida(d, c);
   // leitura opcional (regra desligada): a etapa fecha só com a titularidade
   const contasOk = !titularidade && (!!leitura || !leituraObrigatoria());
   const e = encerramentoDo(d, c.id);
-  const garantiaAntes = valorGarantia(d, c);
+  // o que foi de fato depositado (caução só combinada não tem o que devolver, como no cálculo final: CON-09)
+  const garantiaAntes = garantiaRecebida(d, c);
   const comp = C.competenciaDe(c.data_saida);
   const ultimo = boletoDoMes(d, c.id, comp);
   // o complemento da caução em aberto não segura a etapa do último boleto (é garantia, acerta-se no cálculo final)
