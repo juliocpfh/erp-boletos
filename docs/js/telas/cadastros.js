@@ -812,8 +812,9 @@ export const CADASTROS = {
       dados.tipo = R.TIPOS_REGISTRO_COBRANCA.includes(dados.tipo) ? dados.tipo : 'Outro';
       if (!r && !contratoId) erros.referente = 'Abra o registro pela página do inquilino ou do boleto';
     },
-    conferir: (dados) => [dataNoFuturo(dados.data, 'A data do registro')].filter(Boolean),
     async ajustarAsync(dados, erros, r, form, q) {
+      // a pergunta da data no futuro vem ANTES de gravar os arquivos: no "Voltar e corrigir" nada fica solto na pasta
+      await confirmarAvisos([dataNoFuturo(dados.data, 'A data do registro')].filter(Boolean));
       const arqs = [...((form.querySelector('[name=arquivos_novos]') || {}).files || [])];
       dados.arquivos_novos = [];
       if (!arqs.length) return;
