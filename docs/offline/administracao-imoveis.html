@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-OadjkI9pW17as/scIXZCgq1x4tqo138NTP0+RJJaK8E='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-SlQZwqLRS9fMdWvQuXxN+4VLgbmhVL4OD8DdyMZ9Jls='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="a6417c80e7c7394d">
+<meta name="fontes" content="1390529540570c1b">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1940,7 +1940,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           padrao: 3,
           min: 0,
           max: 30,
-          explica: 'São os dias úteis que o banco leva para creditar o boleto pago pelo código de barras. A conta começa no último dia para pagar (o vencimento; se cair em sábado, domingo ou feriado, o próximo dia útil) e anda só em dias úteis. Entrada com o valor em dia creditada dentro desse prazo conta como paga em dia. Ex.: 3 → boleto que vence no sábado 10/10/2026 (12/10 é feriado): o último dia para pagar é terça 13/10 e a entrada até sexta 16/10/2026 ainda conta como em dia. Vale igual na sugestão do extrato, no botão "É o pagamento do boleto" e no primeiro dia da cobrança de atraso por e-mail (régua).',
+          explica: 'São os dias úteis que o banco leva para creditar o boleto pago pelo código de barras. A conta começa no último dia para pagar (o vencimento; se cair em sábado, domingo ou feriado, o próximo dia útil) e anda só em dias úteis. Entrada com o valor em dia creditada dentro desse prazo conta como paga em dia. Ex.: 3 → boleto que vence no sábado 10/10/2026 (12/10 é feriado): o último dia para pagar é terça 13/10 e a entrada até sexta 16/10/2026 ainda conta como em dia. Vale igual na sugestão do extrato, no botão "É o pagamento do boleto" e no primeiro dia da cobrança de atraso por e-mail (régua). Pode ser outro número numa regra especial (ex.: contratos comerciais com 6 e os demais com o da empresa): cada boleto segue a regra do seu contrato.',
           consequencia: "Mais dias: mais pagamentos atrasados pelo valor em dia contam como em dia, e o e-mail de cobrança de atraso demora mais para ficar pronto. Menos dias: boleto pago no último dia e creditado depois do prazo é tratado como atrasado (com multa e juros). Pix não usa este prazo: entra na hora. Só muda as contas e o aviso: nada é registrado sem a sua confirmação, e sem o código do boleto nada é ligado sozinho.",
           lei: "Sem lei: rotina."
         },
@@ -2241,7 +2241,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         "antecedencia_vigencia",
         "antecedencia_fiador",
         "antecedencia_reajuste",
-        "dias_vermelho"
+        "dias_vermelho",
+        "tolerancia_boleto_dias"
+        // decisão de 24/11/2026: prazo do banco diferente por tipo de contrato
       ]);
       podePorContrato = (chave) => REGRAS_POR_CONTRATO.has(chave);
       perfis = /* @__PURE__ */ new Map();
@@ -20698,7 +20700,7 @@ Lei Geral de Proteção de Dados (Lei 13.709/2018), art. 18: direito de acesso a
     const contratos = p2 ? contratosDoPerfil(d(), p2.id).sort((a, b) => a.inquilino_nome.localeCompare(b.inquilino_nome, "pt-BR")) : [];
     const des = admin3 ? "" : " disabled";
     return `<p class="suave"><a href="#/regras">← Regras do sistema</a></p><h1>${p2 ? esc(p2.nome) : "Nova regra especial"}</h1>
-    <div class="alerta info">Mude só o que for diferente para os contratos desta regra. O que ficar igual às regras do sistema acompanha as do sistema, mesmo se elas mudarem depois. As regras da rotina da empresa (backup, banco, extrato, dia de gerar os boletos, anexos, ressarcimento na NF) valem para todos e não aparecem aqui.</div>
+    <div class="alerta info">Mude só o que for diferente para os contratos desta regra. O que ficar igual às regras do sistema acompanha as do sistema, mesmo se elas mudarem depois. As regras da rotina da empresa (backup, banco, as outras do extrato, dia de gerar os boletos, anexos, ressarcimento na NF) valem para todos e não aparecem aqui.</div>
     ${p2 ? `<div class="cartao"><h2>Contratos que seguem esta regra</h2>${contratos.length ? `<ul>${contratos.map((c) => `<li><a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a>${contratoAtivo(c) ? "" : ' <span class="suave">(encerrado)</span>'}</li>`).join("")}</ul>` : '<p class="suave">Nenhum ainda. Escolha a regra no cadastro do contrato (Editar → "Regras deste contrato").</p>'}</div>` : ""}
     <form data-form="perfilRegras" data-id="${p2 ? p2.id : ""}">
       <div class="cartao"><label>Nome<input name="nome" value="${esc(p2 ? p2.nome : "")}" placeholder="Ex.: Regra especial A, Regra 15 dias" maxlength="60" required${des}></label>
@@ -22674,8 +22676,8 @@ ${DICA_DOCUMENTOS}`].join("\n");
       if (cb) {
         if (emAberto(cb)) {
           const pontual = ib ? ib.pontual.get(cb) : totais(cb).a_pagar_pontual;
-          const noPrazo = valor === pontual && data2 <= (pix ? limitePagamento(cb.vencimento) : ultimoCreditoEmDia(cb, false, dias));
-          const minimo = Math.min(...(pix ? [data2] : datasPossiveisDoPagamento(data2, false, dias)).map((x) => previstoNoPagamento(cb, data2, { dataPagou: x }).valor_devido));
+          const noPrazo = valor === pontual && data2 <= (pix ? limitePagamento(cb.vencimento) : ultimoCreditoEmDia(cb, false, diasDo(cb, dias)));
+          const minimo = Math.min(...(pix ? [data2] : datasPossiveisDoPagamento(data2, false, diasDo(cb, dias))).map((x) => previstoNoPagamento(cb, data2, { dataPagou: x }).valor_devido));
           if (!noPrazo && valor < minimo) return [];
           return [{ cobranca: cb, certeza: "exata", previsto: noPrazo ? pontual : previstoNoPagamento(cb, data2).valor_devido, pagouEmDia: noPrazo && data2 > cb.vencimento, peloId: true }];
         }
@@ -22700,11 +22702,12 @@ ${DICA_DOCUMENTOS}`].join("\n");
     const lista3 = [];
     const limite = somarDias(data2, regra("dias_antecipacao_banco"));
     const exato = pix || pagouConhecido;
-    const datas = exato ? [data2] : datasPossiveisDoPagamento(data2, false, dias);
     for (const cb of abertos) {
       if (cb.vencimento > limite) continue;
       const pontual = ib ? ib.pontual.get(cb) : totais(cb).a_pagar_pontual;
-      const noPrazo = valor === pontual && data2 <= (exato ? limitePagamento(cb.vencimento) : ultimoCreditoEmDia(cb, false, dias));
+      const diasCb = diasDo(cb, dias);
+      const datas = exato ? [data2] : datasPossiveisDoPagamento(data2, false, diasCb);
+      const noPrazo = valor === pontual && data2 <= (exato ? limitePagamento(cb.vencimento) : ultimoCreditoEmDia(cb, false, diasCb));
       const comEncargos = !noPrazo && data2 > limitePagamento(cb.vencimento) && datas.some((x) => valor === previstoNoPagamento(cb, x).valor_devido);
       if (noPrazo || comEncargos) lista3.push({ cobranca: cb, certeza: "exata", previsto: noPrazo ? pontual : valor, pagouEmDia: noPrazo && data2 > cb.vencimento });
     }
@@ -22716,7 +22719,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
     return semIdentificacao(lista3);
   }
   function conciliarBoletos(d2, contaId, pagamentosC6, { dias = null } = {}) {
-    const tol = dias ?? regra("tolerancia_boleto_dias");
+    const tol = dias;
     const planos = [];
     for (const x of pagamentosC6 || []) {
       if (Array.isArray(x.payments)) x.payments.forEach((p2, i) => planos.push({ ...p2, external_reference_id: x.external_reference_id || null, status: x.status || null, vezes: x.payments.length, ordem: i }));
@@ -22829,7 +22832,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
     return confirmarPagamentoPeloBanco(d2, cb.id, origem, usuario, { pagouEmDia: pagouEmDia !== void 0 ? pagouEmDia : p2.pagouEmDia || null, pagou: p2.data_pagamento || null, valorNf, justificativa });
   }
   function conciliarMovimentacoes(d2, movs2, { dias = null, indice = null } = {}) {
-    const tol = dias ?? regra("tolerancia_boleto_dias");
+    const tol = dias;
     const out = [];
     for (const m of movs2 || []) {
       if (m.tipo !== "entrada" || m.classificacao || ehDevolucao(m)) continue;
@@ -23772,7 +23775,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
     if (m.observacoes) partes.push(m.observacoes);
     return partes.join(" · ");
   }
-  var CLASSIFICACOES, SO_SAIDA, SO_ENTRADA, destinoServe, SITUACOES_PAGAMENTO, SITUACAO_C6, TRANSICOES, cfg5, hoje2, dataDe, centavosDoC6, reaisParaC6, contasConfiguradas, empresaDaConta, contaDaEmpresa, fonteDe, maiusculaSemAcento, descricaoComparavel, referenciaNoBanco, soDoCsv, CAMPOS_DESTINO, dataOfx, marca, nomeColuna, COLUNAS_CSV, nomesProcurados, pagosNoBancoSemRegistro, DIAS_AGUARDANDO_CREDITO, nomeSemAcento, nomePadraoComprovante, emAberto, semDigitos, ligavel, pagoEntre, ehPix, diasCompensacaoBoleto, idNormal, idUtil, ultimoCreditoEmDia, semIdentificacao, PALAVRAS, textoDaMov, despesasLigadasAoExtrato, podeSerPonta, indiceGuardado, classificacaoDaOrigem, ehDevolucao, idsDePix, DIAS_BUSCA_DEVOLUCAO, quemDoBoleto, pagamentoCitado, carimbo, codigoDeBarras, conteudoComparavel, mesmoConteudo, pagamentosAtivos, ENVIADO_C6, DESTINO_CURTO;
+  var CLASSIFICACOES, SO_SAIDA, SO_ENTRADA, destinoServe, SITUACOES_PAGAMENTO, SITUACAO_C6, TRANSICOES, cfg5, hoje2, dataDe, centavosDoC6, reaisParaC6, contasConfiguradas, empresaDaConta, contaDaEmpresa, fonteDe, maiusculaSemAcento, descricaoComparavel, referenciaNoBanco, soDoCsv, CAMPOS_DESTINO, dataOfx, marca, nomeColuna, COLUNAS_CSV, nomesProcurados, pagosNoBancoSemRegistro, DIAS_AGUARDANDO_CREDITO, nomeSemAcento, nomePadraoComprovante, emAberto, semDigitos, ligavel, pagoEntre, ehPix, diasCompensacaoBoleto, idNormal, idUtil, ultimoCreditoEmDia, diasDo, semIdentificacao, PALAVRAS, textoDaMov, despesasLigadasAoExtrato, podeSerPonta, indiceGuardado, classificacaoDaOrigem, ehDevolucao, idsDePix, DIAS_BUSCA_DEVOLUCAO, quemDoBoleto, pagamentoCitado, carimbo, codigoDeBarras, conteudoComparavel, mesmoConteudo, pagamentosAtivos, ENVIADO_C6, DESTINO_CURTO;
   var init_conciliacao = __esm({
     "docs/js/conciliacao.js"() {
       init_c6_comum();
@@ -23900,6 +23903,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
       };
       idUtil = (x) => x.length >= 6 && /\d/.test(x);
       ultimoCreditoEmDia = (cb, pix, dias) => pix ? limitePagamento(cb.vencimento) : somarDiasUteis(limitePagamento(cb.vencimento), dias);
+      diasDo = (cb, dias) => dias ?? diasCompensacaoBoleto(cb);
       semIdentificacao = (lista3) => {
         for (const x of lista3) {
           x.certeza = "provavel";
@@ -24075,13 +24079,14 @@ ${DICA_DOCUMENTOS}`].join("\n");
     const envio = ligada && gmail;
     const dias = regra("regua_email_dias") || [];
     const tolerancia = regra("tolerancia_boleto_dias");
+    const tolEspeciais = especiaisDiferentes(db, "tolerancia_boleto_dias").map((x) => ` (na regra especial "${esc(x.nome)}": ${x.valor})`).join("");
     const especiais = especiaisDiferentes(db, "regua_email_dias").map((x) => `${esc(x.nome)}: ${(x.valor || []).length ? esc(x.valor.map(nomeDaEtapa).join("; ")) : "nenhum dia"}`);
     const estado2 = !ligada ? 'O envio direto está <b>desligado</b> (Regras do sistema → "Régua de cobrança: botão Autorizar e enviar"): abra cada e-mail no Gmail ou copie o texto.' : !gmail ? "O envio direto está ligado, mas o Gmail da empresa não está ligado nesta nuvem (ou você está sem internet): por enquanto, abra no Gmail ou copie o texto." : 'Marque os e-mails que quer mandar e clique em "Enviar os selecionados": o sistema mostra a lista final e pede a sua confirmação.';
     const recentes = decididosRecentes(db, hoje3);
     return `<h1>E-mails da régua</h1><div class="abas"><a href="#/cobrancas">← Boletos</a></div>
     <div class="cabecalho"><h2>E-mails da régua de cobrança: aguardando sua autorização</h2>${link("#/modelos-email", "Textos dos e-mails")}</div>
     <p class="suave">O sistema prepara os e-mails ${dias.length ? `de cada boleto em aberto: ${esc(dias.map(nomeDaEtapa).join("; "))}` : `(nenhum dia escolhido nas Regras do sistema: nada é preparado${especiais.length ? " para os contratos que as seguem" : ""})`}.${especiais.length ? ` Contratos com regra especial: ${especiais.join(" · ")}.` : ""} <b>Nada é enviado sozinho.</b>
-      Boleto pago, em acordo ou de contrato encerrado sai da lista. A cobrança de atraso só aparece passados ${tolerancia} dia(s) úteis do último dia para pagar (o prazo que o banco leva para creditar o boleto: regra "Extrato: entrada casa com o boleto até quantos dias úteis depois do último dia para pagar"). E-mail enviado ou marcado "Não enviar" não volta.${admin() ? "" : " Só o administrador autoriza."}</p>
+      Boleto pago, em acordo ou de contrato encerrado sai da lista. A cobrança de atraso só aparece passados ${tolerancia} dia(s) úteis${tolEspeciais} do último dia para pagar (o prazo que o banco leva para creditar o boleto: regra "Extrato: entrada casa com o boleto até quantos dias úteis depois do último dia para pagar"). E-mail enviado ou marcado "Não enviar" não volta.${admin() ? "" : " Só o administrador autoriza."}</p>
     <div class="alerta ${envio ? "info" : "aviso"}">${estado2}</div>
     <div class="cartao rolagem regua"><table>
       <tr><th>${admin() && envio && fila2.some((x) => x.para) ? '<input type="checkbox" data-marcar-todas="regua" title="Marcar todos">' : ""}</th><th>Imóvel / inquilino</th><th>Boleto</th><th>Etapa</th><th class="n">Valor hoje</th><th>Para</th><th>Prévia do e-mail</th><th></th></tr>
