@@ -3515,6 +3515,40 @@ export function anexarComprovante(d, tabela, id, campo, arquivo, usuario) {
   if (['comprovante_caucao', 'comprovante_deposito'].includes(campo) || tabela === 'depositos_garantia') sincronizarGarantiaHerdeiro(d, contratoId, usuario);
 }
 
+/** Pasta (contrato) em que está o PDF do boleto emitido no banco: a do contrato em que foi anexado. */
+export const pastaDoBoletoPdf = (cb) => cb.boleto_pdf_contrato || cb.contrato_id;
+
+/**
+ * PDF do boleto emitido à mão no banco (enquanto a API do C6 não sai, pedido do dono em 2026-11-24): anexa (ou troca) e guarda
+ * o valor e o vencimento do boleto naquele momento, para avisar se o boleto mudar depois (``boletoPdfDesatualizado``).
+ * Com ``arquivo`` null, tira o anexo (o arquivo é apagado por quem chama, alterarApagandoAnexos).
+ */
+export function anexarBoletoPdf(d, id, arquivo, usuario) {
+  const cb = buscar(d, 'cobrancas', id);
+  if (!cb) throw new C.ErroUsuario('Este boleto não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.');
+  const c = buscar(d, 'contratos', cb.contrato_id);
+  const quem = `${c ? c.inquilino_nome : 'boleto'}: boleto de ${C.compBr(cb.competencia)}`;
+  if (!arquivo) {
+    if (!cb.boleto_pdf) throw new C.ErroUsuario('Este boleto não tem PDF anexado.');
+    return atualizar(d, 'cobrancas', cb.id, { boleto_pdf: null, boleto_pdf_contrato: null, boleto_pdf_valor: null, boleto_pdf_vencimento: null }, usuario, `${quem}, PDF do banco tirado (${cb.boleto_pdf})`);
+  }
+  return atualizar(d, 'cobrancas', cb.id, { boleto_pdf: arquivo, boleto_pdf_contrato: cb.contrato_id, boleto_pdf_valor: totais(cb).a_pagar_sem_desconto, boleto_pdf_vencimento: cb.vencimento },
+    usuario, `${quem}, PDF do banco ${cb.boleto_pdf ? 'trocado' : 'anexado'} (${arquivo})`);
+}
+
+/**
+ * O boleto mudou depois de anexado o PDF do banco? Texto do que mudou ou ''. Ex.: anexado com R$ 2.500,00 e o ajuste do mês
+ * acrescentou R$ 100,00 → "o valor era R$ 2.500,00 e agora é R$ 2.600,00".
+ */
+export function boletoPdfDesatualizado(cb) {
+  if (!cb.boleto_pdf || cb.boleto_pdf_valor == null) return '';
+  const dif = [];
+  const valor = totais(cb).a_pagar_sem_desconto;
+  if (valor !== cb.boleto_pdf_valor) dif.push(`o valor era ${C.reais(cb.boleto_pdf_valor)} e agora é ${C.reais(valor)}`);
+  if (cb.boleto_pdf_vencimento && cb.boleto_pdf_vencimento !== cb.vencimento) dif.push(`o vencimento era ${C.dataBr(cb.boleto_pdf_vencimento)} e agora é ${C.dataBr(cb.vencimento)}`);
+  return dif.join('; ');
+}
+
 /** Caução e depósito de garantia: campos da data efetivamente paga e do comprovante. */
 export const GARANTIAS_DEPOSITADAS = {
   caucao: { nome: 'caução', pago: 'caucao_pago_em', comprovante: 'comprovante_caucao', arquivo: 'caucao' },
@@ -5049,6 +5083,8 @@ export function arquivosReferenciados(d) {
   // notificação ao inquilino (2026-11-17): a assinada e o comprovante da baixa (foto ou arquivo de que foi resolvido)
   for (const n of d.notificacoes || []) { usa('contrato', n.contrato_id, n.arquivo_assinado); usa('contrato', n.contrato_id, n.comprovante_baixa); }
   for (const x of d.cartas_reajuste || []) usa('aditivos', x.contrato_id, x.arquivo);
+  // PDF do boleto emitido à mão no banco (2026-11-24): na pasta do inquilino em que foi anexado (a troca de titular muda o contrato_id)
+  for (const cb of d.cobrancas || []) usa('contrato', pastaDoBoletoPdf(cb), cb.boleto_pdf);
   for (const v of d.vistorias) for (const nome of Object.values(v.fotos || {})) usa('contrato', v.contrato_id, nome);
   for (const s of d.seguros) for (const nome of [s.arquivo_apolice, ...(s.outros_arquivos || [])]) usa('seguro', s.contrato_id, nome);
   for (const f of d.fichas || []) for (const k of CAMPOS_ARQUIVO_FICHA) usa('ficha', f.id, f[k]);
@@ -5122,6 +5158,7 @@ export function rotulosDosArquivos(d) {
     poe('contrato', n.contrato_id, n.arquivo_assinado, `notificação de ${C.dataBr(n.data)} assinada (${n.assunto})`);
     poe('contrato', n.contrato_id, n.comprovante_baixa, `comprovante da baixa da notificação de ${C.dataBr(n.data)}${n.resolvida_em ? ` (resolvida em ${C.dataBr(n.resolvida_em)})` : ''}`);
   }
+  for (const cb of d.cobrancas || []) poe('contrato', pastaDoBoletoPdf(cb), cb.boleto_pdf, `PDF do boleto emitido no banco (${C.compBr(cb.competencia)}, vence ${C.dataBr(cb.vencimento)})`);
   for (const x of d.cartas_reajuste || []) poe('aditivos', x.contrato_id, x.arquivo, `carta de reajuste de ${C.compBr(x.competencia)} (enviada em ${C.dataBr(x.enviada_em)})`);
   for (const v of d.vistorias) for (const nome of Object.values(v.fotos || {})) poe('contrato', v.contrato_id, nome, `foto da vistoria de ${String(v.tipo || '').toLowerCase()} (${C.dataBr(v.data)})`);
   for (const f of d.fichas || []) {

@@ -92,13 +92,17 @@ function linkDaFicha(f, pessoa, hoje) {
  * O valor de hoje (multa e juros) é o do dia em que o e-mail é montado. Ex.: boleto de 11/2026 de R$ 1.350,00 (R$ 1.242,00 em dia)
  * vencido em 10/12/2026, em 16/12 → valor_hoje "R$ 1.380,29" (R$ 1.350,00 + multa R$ 27,00 + juros R$ 3,29), dias_atraso "6".
  */
-function camposDoBoleto(cb, campos, hoje) {
+function camposDoBoleto(d, cb, campos, hoje) {
   const t = R.totais(cb);
   const limite = C.limitePagamento(cb.vencimento);
   const r = C.liquidar(cb, hoje);
   const b = cb.banco && cb.banco.situacao !== 'cancelado' ? cb.banco : {};
   Object.assign(campos, {
-    boleto_referente: R.ehParcelaAcordo(cb) ? `da parcela ${cb.acordo_parcela || ''} do acordo`.replace(/ {2,}/g, ' ') : `do aluguel de ${C.compBr(cb.competencia)}`,
+    boleto_referente: R.ehParcelaAcordo(cb) ? `da parcela ${cb.acordo_parcela || ''} do acordo`.replace(/ {2,}/g, ' ')
+      : R.ehComplementoCaucao(cb) ? 'do complemento da caução' : R.ehSaldoSaida(cb) ? 'do saldo do acerto final' : `do aluguel de ${C.compBr(cb.competencia)}`,
+    // e-mail do boleto feito à mão no banco (2026-11-24): o mês de uso e o descritivo, o mesmo da descrição do boleto (lá "RS1.350,00",
+    // porque o banco não aceita o "$"; no e-mail, "R$ 1.350,00")
+    competencia_boleto: C.compBr(cb.competencia), descricao_boleto: R.dadosBoleto(d, cb).descricao.replace(/\bRS(?=\d)/g, 'R$ '),
     vencimento_boleto: C.dataBr(cb.vencimento), limite_pagamento: C.dataBr(limite),
     valor_em_dia: C.reais(t.a_pagar_pontual), valor_cheio: C.reais(t.a_pagar_sem_desconto),
     multa_pct: C.pct(cb.multa_percentual || 0), juros_pct: C.pct(cb.juros_mensal_percentual || 0),
@@ -106,7 +110,8 @@ function camposDoBoleto(cb, campos, hoje) {
     dias_atraso: String(r.dias_atraso), data_hoje: C.dataBr(hoje),
     pix: b.pix_copia_cola || '', linha_digitavel: b.linha_digitavel || '',
   });
-  return { nao_util: limite !== cb.vencimento, bonificacao_boleto: t.a_pagar_pontual < t.a_pagar_sem_desconto, pix: !!b.pix_copia_cola, linha_digitavel: !!b.linha_digitavel };
+  return { nao_util: limite !== cb.vencimento, bonificacao_boleto: t.a_pagar_pontual < t.a_pagar_sem_desconto, pix: !!b.pix_copia_cola, linha_digitavel: !!b.linha_digitavel,
+    multa_juros: !R.semMultaJuros(cb) };
 }
 
 /** Valor inicial de cada pergunta do modelo (o que se digita na hora): datas em 'AAAA-MM-DD'. */
@@ -210,7 +215,7 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
     varios_fiadores: !!f && R.fiadoresDaFicha(f).length > 1,
     devolucao: !!(f && f.devolucao_data),
   };
-  if (alvo.cobranca) Object.assign(condicoes, camposDoBoleto(alvo.cobranca, campos, hoje));
+  if (alvo.cobranca) Object.assign(condicoes, camposDoBoleto(d, alvo.cobranca, campos, hoje));
   const a = alvo.aditivo || null;
   if (a) Object.assign(campos, { aditivo_data: C.dataBr(a.data), aditivo_assunto: a.assunto || 'alteração do contrato' });
   // termo do novo valor negociado: os valores combinados (cheio, bonificado) e a data em que passam a valer
@@ -275,6 +280,12 @@ export function anexosProntos(d, modelo, alvo) {
         const disp = REC.reciboDisponivel(d, 'notificacao', alvo);
         out.push({ tipo: 'recibo', recibo: 'notificacao', rotulo: `${REC.TIPOS_RECIBO.notificacao} de ${C.dataBr(n.data)} (sem a assinatura: anexe a assinada na notificação)`, ok: disp.ok, motivo: disp.motivo || '', alvo });
       }
+      continue;
+    }
+    if (tipo === 'boleto' && qual === 'anexado') {
+      // PDF do boleto emitido à mão no banco, anexado na página do boleto (2026-11-24)
+      const cb = alvo.cobranca;
+      if (cb && cb.boleto_pdf) arquivo('contrato', R.pastaDoBoletoPdf(cb), cb.boleto_pdf, 'boleto emitido no banco');
       continue;
     }
     if (tipo === 'boleto') {
