@@ -6,13 +6,14 @@ import { alterar, aviso, confirmar, login, mostrar, podeUsuario } from '../app.j
 import * as BANCO from '../banco.js';
 import * as C from '../calculos.js';
 import { dataBr, reais } from '../calculos.js';
-import { anexosProntos, dadosDoEmail } from '../email-dados.js';
+import * as S from '../armazenamento.js';
+import { anexosProntos, avisoBoletoPdfDesatualizado, dadosDoEmail } from '../email-dados.js';
 import { esc } from '../formularios.js';
 import { emailLigado, enviarEmail } from '../gmail.js';
 import { modeloEmail, montarEmail } from '../modelos-email.js';
 import * as G from '../regua-email.js';
 import * as R from '../regras.js';
-import { botao, buscar, d, link } from './comum.js';
+import { botao, buscar, d, link, pastaDoEscopo } from './comum.js';
 
 const admin = () => podeUsuario('admin');
 const SO_ADMIN = 'Só o administrador autoriza os e-mails da régua de cobrança.';
@@ -22,7 +23,10 @@ const LIMITE_ENDERECO = 7000; // igual ao de telas/emails.js: o navegador corta 
 function emailDoItem(db, item) {
   const modelo = modeloEmail(db, item.modelo);
   const alvo = { contrato: item.contrato, cobranca: item.cobranca };
-  return { modelo, alvo, ...montarEmail(modelo, dadosDoEmail(db, alvo)), prontos: anexosProntos(db, modelo, alvo) };
+  const prontos = anexosProntos(db, modelo, alvo);
+  // PDF do boleto feito à mão no banco (DOC-05, 24/11/2026): se o boleto mudou depois de anexado, o mesmo aviso do "Enviar boleto por e-mail"
+  const pdfVelho = prontos.some((a) => a.tipo === 'arquivo') ? avisoBoletoPdfDesatualizado(item.cobranca) : '';
+  return { modelo, alvo, ...montarEmail(modelo, dadosDoEmail(db, alvo)), prontos, pdfVelho };
 }
 
 const nomeDo = (item) => `${item.imovel ? `${item.imovel.nome} · ` : ''}${item.contrato.inquilino_nome}`;
@@ -42,6 +46,7 @@ function linhaDaFila(db, item, envio) {
     <td>${item.para ? esc(item.para) : '<span class="suave">sem e-mail</span>'}</td>
     <td><details><summary>${esc(e.assunto)}</summary><pre class="previa-email" style="white-space:pre-wrap;font:inherit;margin:6px 0">${esc(e.texto)}</pre>
       ${anexos ? `<p class="suave">Anexos: ${esc(anexos)}</p>` : '<p class="suave">Sem anexo (boleto não emitido no banco).</p>'}</details>
+      ${e.pdfVelho ? `<div class="alerta aviso" style="margin:4px 0">${esc(e.pdfVelho)} Emita de novo no banco e troque o PDF (página do boleto) antes de mandar.</div>` : ''}
       ${item.avisos.map((a) => `<div class="alerta aviso" style="margin:4px 0">${esc(a)}</div>`).join('')}</td>
     <td class="nw">${admin() ? `${item.para ? `${botao('abrirReguaGmail', 'Abrir no Gmail', { chave: item.chave }, 'secundario mini')} ` : ''}${botao('copiarRegua', 'Copiar texto', { chave: item.chave }, 'secundario mini')}
       ${botao('recusarRegua', 'Não enviar', { chave: item.chave }, 'secundario mini', `Não enviar este e-mail para ${item.contrato.inquilino_nome} (${item.etapa})? Ele sai da lista e não volta.`)}` : ''}</td></tr>`;
@@ -100,11 +105,20 @@ async function pdfDoBoletoC6(cb) {
   return blob;
 }
 
-/** Arquivos dos anexos do e-mail: o PDF do boleto (ponte) e o QR Code do Pix (guardado no boleto). Devolve { arquivos, faltou }. */
+/**
+ * Arquivos dos anexos do e-mail: o PDF do boleto do C6 (ponte), o QR Code do Pix (guardado no boleto) e o PDF do boleto
+ * feito à mão no banco (``tipo: 'arquivo'``, lido da pasta, como em telas/emails.js; DOC-05). Devolve { arquivos, faltou }.
+ */
 async function anexosDoItem(item, prontos) {
   const arquivos = [];
   const faltou = [];
   for (const a of prontos) {
+    if (a.tipo === 'arquivo') {
+      let blob = null;
+      try { blob = await S.abrirArquivo(await pastaDoEscopo(a.escopo, Number(a.id)), a.nome); } catch { blob = null; }
+      if (blob) arquivos.push({ nome: a.nome, blob }); else faltou.push(a.rotulo);
+      continue;
+    }
     if (a.tipo !== 'boleto') continue;
     if (a.qual === 'pdf') {
       const blob = await pdfDoBoletoC6(item.cobranca);
@@ -152,6 +166,9 @@ export const ACOES_REGUA = {
   async abrirReguaGmail({ chave }) {
     const item = itemAtual(chave);
     const e = emailDoItem(d(), item);
+    if (e.pdfVelho && !(await confirmar(`${e.pdfVelho}
+
+Emita de novo no banco e troque o PDF, ou abra o e-mail mesmo assim.`, { titulo: 'PDF do boleto desatualizado', sim: 'Abrir o e-mail mesmo assim', forte: true }))) return;
     const comCorpo = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(item.para)}&su=${encodeURIComponent(e.assunto)}&body=${encodeURIComponent(e.texto)}`;
     const cabe = comCorpo.length <= LIMITE_ENDERECO;
     // sem 'noopener' no open (com ele o navegador devolve null sempre e não se sabe se a aba abriu); o opener sai à mão.
@@ -161,7 +178,7 @@ export const ACOES_REGUA = {
     try { aba.opener = null; } catch { /* outra origem */ }
     const copiado = cabe || await copiar(e.texto);
     await decidir(item, 'gmail', { para: item.para, assunto: e.assunto });
-    aviso(`${cabe ? 'Gmail aberto com o texto.' : copiado ? 'Gmail aberto; o texto é comprido e foi copiado: cole no corpo do e-mail.' : 'Gmail aberto: copie o texto da prévia e cole no corpo do e-mail.'}${e.prontos.length ? ' Anexe o boleto e o QR Code (página do boleto) antes de mandar.' : ''}`, cabe ? 'ok' : 'aviso');
+    aviso(`${cabe ? 'Gmail aberto com o texto.' : copiado ? 'Gmail aberto; o texto é comprido e foi copiado: cole no corpo do e-mail.' : 'Gmail aberto: copie o texto da prévia e cole no corpo do e-mail.'}${e.prontos.length ? ` Antes de mandar, anexe (está na página do boleto): ${e.prontos.map((a) => a.rotulo).join(' e ')}.` : ''}`, cabe ? 'ok' : 'aviso');
     await mostrar();
   },
   /**
@@ -176,7 +193,8 @@ export const ACOES_REGUA = {
     if (!chaves.length) throw new C.ErroUsuario('Marque pelo menos um e-mail na lista.');
     const itens = chaves.map((k) => G.itemDaFila(d(), k)).filter((x) => x && x.para);
     if (!itens.length) throw new C.ErroUsuario('Os e-mails marcados saíram da lista (pago, em acordo ou já decidido). Atualize a tela.');
-    const lista = itens.map((x) => `• ${nomeDo(x)}: boleto ${referente(x.cobranca)}, ${x.etapa}, ${reais(x.valor)} → ${x.para}`).join('\n');
+    // PDF do banco desatualizado (DOC-05): o mesmo aviso do "Enviar boleto por e-mail", na lista final
+    const lista = itens.map((x) => { const velho = emailDoItem(d(), x).pdfVelho; return `• ${nomeDo(x)}: boleto ${referente(x.cobranca)}, ${x.etapa}, ${reais(x.valor)} → ${x.para}${velho ? `\n   ATENÇÃO: ${velho}` : ''}`; }).join('\n');
     const fora = chaves.length - itens.length;
     if (!(await confirmar(`Vou enviar agora ${itens.length} e-mail(s) pelo Gmail da empresa:\n\n${lista}${fora ? `\n\n${fora} marcado(s) saíram da lista e não vão.` : ''}\n\nConfirma o envio?`, { titulo: 'Enviar os e-mails da régua', sim: `Enviar ${itens.length} e-mail(s)`, nao: 'Cancelar' }))) return;
     const enviados = [];
@@ -198,7 +216,7 @@ export const ACOES_REGUA = {
       }
     }
     aviso([`${enviados.length} e-mail(s) enviado(s); ficam em "Enviados" no Gmail.`,
-      semAnexo.length ? `Sem o PDF do boleto (a ponte do banco não respondeu neste computador; a linha digitável e o Pix foram no texto): ${semAnexo.join('; ')}.` : '',
+      semAnexo.length ? `Foram sem anexo (a ponte do banco não respondeu neste computador ou o PDF do boleto sumiu da pasta): ${semAnexo.join('; ')}.` : '',
       erros.length ? `Não enviados: ${erros.join('; ')}.` : ''].filter(Boolean).join(' '), erros.length ? 'erro' : semAnexo.length ? 'aviso' : 'ok');
     await mostrar();
   },
