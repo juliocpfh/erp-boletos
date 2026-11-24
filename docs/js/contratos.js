@@ -2,6 +2,7 @@
 // Saída: HTML (imprimir / salvar em PDF) e .docx (Word) com a logo de fundo, a logo na capa e o rodapé das empresas.
 import * as C from './calculos.js';
 import { MODELOS_PADRAO } from './modelos-contrato.js';
+import { TIPOS_DOCUMENTO } from './modelos-documentos.js';
 
 // --------------------------------------------------------------------------
 // Números, valores e datas por extenso
@@ -766,6 +767,64 @@ export function dadosDoAditivo(d, c, a) {
   dados.condicoes.mes_seguinte = mesSeguinte;
   return dados;
 }
+
+/** Linha para preencher à mão, no lugar do campo deixado em branco ao gerar o documento. */
+export const LINHA_EM_BRANCO = '____________________';
+
+/**
+ * Outros documentos da locação (modelos-documentos.js): os dados do contrato e os campos do tipo, digitados ao gerar.
+ * ``valores``: { campo: texto digitado } (data 'AAAA-MM-DD', dinheiro: número = centavos, texto digitado = reais, "500" ou "1.963,50", número). Campo em branco sai
+ * como LINHA_EM_BRANCO; o dinheiro em branco fica vazio (a condição [se campo] não vale). ``data``: a data do documento.
+ * Ex.: distrato com data_saida '2027-02-28' → {data_saida} = "28 de fevereiro de 2027".
+ */
+export function dadosDoDocumento(d, c, tipo, valores = {}, { data, testemunhas = [] } = {}) {
+  const def = TIPOS_DOCUMENTO[tipo];
+  const dados = dadosDoContrato(d, c, { data: data || C.hojeIso(), testemunhas });
+  const fiadores = fiadoresNaData(d, c.id, data);
+  Object.assign(dados.campos, {
+    data_contrato: dataPorExtenso(c.vigencia_inicio || c.data_entrada),
+    fiadores_nomes: fiadores.map((f) => String(f.nome || '').toLocaleUpperCase('pt-BR')).join(', '),
+  });
+  for (const [chave, , formato] of (def ? def.campos : [])) {
+    const v = String(valores[chave] ?? '').trim();
+    if (formato === 'dinheiro') {
+      // número = centavos (valor calculado pelo sistema); texto digitado = reais ("500" = R$ 500,00, como nos outros campos de valor)
+      const centavos = typeof valores[chave] === 'number' ? valores[chave] : (C.centavos(v) || 0);
+      dados.campos[chave] = centavos > 0 ? valorComExtenso(centavos) : '';
+    } else if (!v) dados.campos[chave] = LINHA_EM_BRANCO;
+    else if (formato === 'data') dados.campos[chave] = C.dataValida(v) ? dataPorExtenso(v) : LINHA_EM_BRANCO;
+    else if (formato === 'numero') dados.campos[chave] = chave === 'numero_aditivo' ? `${Number(v) || 1}º` : (Number(v) > 0 ? numeroComExtenso(Number(v)) : LINHA_EM_BRANCO);
+    else dados.campos[chave] = v;
+  }
+  if (def && def.assinam) {
+    const ordem = (a) => def.assinam.indexOf(a.papel);
+    dados.assinaturas = dados.assinaturas.filter((a) => ordem(a) >= 0 || /^TESTEMUNHA/.test(a.papel)).sort((a, b) => (ordem(a) < 0) - (ordem(b) < 0) || ordem(a) - ordem(b));
+  }
+  return dados;
+}
+
+/**
+ * Banco e contrato fictícios para o PDF de exemplo dos modelos (pessoa fictícia, CPF de teste 529.982.247-25; fiador com o
+ * CPF de teste 111.444.777-35). ``emitentes``: as empresas do banco (o exemplo sai com a locadora de verdade); sem elas, uma de exemplo.
+ */
+export function exemploDeDocumento(emitentes = []) {
+  const locadora = emitentes.length ? emitentes : [{ id: 1, nome: 'Empresa Exemplo', razao_social: 'EMPRESA LOCADORA EXEMPLO LTDA', cnpj: '11.222.333/0001-81',
+    endereco_sede: 'Rua do Exemplo, 100, Centro, Curitiba/PR', assina_documentos: true, uf_sede: 'PR', ativo: true, cidade_documentos: 'Curitiba' }];
+  const imovel = { id: 1, nome: 'Casa Exemplo', endereco: 'Rua das Flores, 120', complemento: 'Casa 3', bairro: 'Centro', cidade: 'Curitiba', uf: 'PR', cep: '80000-000' };
+  const c = { id: 1, imovel_id: 1, inquilino_nome: 'Maria de Teste Souza', inquilino_cpf: '529.982.247-25', inquilino_tipo: 'Pessoa física', inquilino_genero: 'Feminino',
+    inquilino_nacionalidade: 'brasileira', inquilino_estado_civil: 'Solteiro(a)', inquilino_profissao: 'professora', inquilino_rg: '12.345.678-9',
+    inquilino_endereco: 'Rua das Flores, 120, Casa 3, Centro, Curitiba/PR', finalidade: 'Residencial',
+    aluguel_inicial: 190000, desconto_pontualidade_percentual: 10, dia_vencimento: 10, data_entrada: '2023-11-15', vigencia_inicio: '2023-11-15',
+    vigencia_fim: '2026-05-14', prazo_meses: 30, prazo_tipo: 'Determinado', indice_correcao: 'IPCA', garantia_tipo: 'Fiador',
+    conta_agua: 'Por conta do inquilino', conta_energia: 'Por conta do inquilino', conta_iptu: 'Por conta do inquilino', conta_seguro: 'Por conta do inquilino', conta_condominio: 'Não tem' };
+  const fiador = { id: 1, contrato_id: 1, nome: 'José de Teste Lima', cpf: '111.444.777-35', genero: 'Masculino', nacionalidade: 'brasileiro', estado_civil: 'Solteiro(a)',
+    profissao: 'comerciante', endereco: 'Rua dos Pinheiros, 45, Batel, Curitiba/PR', imovel_garantia: 'casa da Rua dos Pinheiros, 45, matrícula nº 1.234 do 1º Registro de Imóveis de Curitiba' };
+  const d = { emitentes: locadora, participacoes: [], fiadores: [fiador], titularidades: [], listas: {}, imoveis: [imovel], contratos: [c] };
+  return { d, c };
+}
+
+/** Valores de exemplo dos campos de um tipo de documento (os do PDF de exemplo). */
+export const valoresDeExemplo = (tipo) => Object.fromEntries(((TIPOS_DOCUMENTO[tipo] || {}).campos || []).map(([k, , , ex]) => [k, ex]));
 
 export const TIPO_ADITIVO_TROCA = 'Troca de titular';
 /** Termo aditivo do novo valor negociado (renovação): o aceite do inquilino (e do fiador) é este termo assinado. */

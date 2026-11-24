@@ -1,5 +1,6 @@
 // Modelos padrão de contrato, montados a partir dos contratos da ANK/JCK (residencial e não residencial).
 // Linguagem: veja montarContrato em contratos.js. Os modelos podem ser copiados e editados na tela "Modelos de contrato".
+import { modelosDocumentos } from './modelos-documentos.js';
 
 /**
  * Trechos revisados em 2026-11-12 (documentacao/REVISAO_JURIDICA_CONTRATO.md). Os modelos já gravados recebem cada um
@@ -491,6 +492,8 @@ ${FINAIS('')}`,
     tipo: 'aditivo_valor',
     texto: ADITIVO_VALOR,
   },
+  // outros documentos da locação (24/11/2026, modelos-documentos.js): sempre no fim (o id negativo dos padrões é a posição)
+  ...modelosDocumentos(PARTES),
 ];
 
 const ENDERECO_PARAGRAFO = '**Parágrafo único** – As partes se obrigam a comunicar qualquer mudança de endereço, inclusive de endereço eletrônico.';

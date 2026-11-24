@@ -11,6 +11,7 @@ import { avisosDeCorte, faturaHtml } from '../fatura.js';
 import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
 import { MODELOS_PADRAO } from '../modelos-contrato.js';
+import { TIPOS_DOCUMENTO } from '../modelos-documentos.js';
 import * as REC from '../recibos.js';
 import * as R from '../regras.js';
 import { demonstrativo } from './cobrancas.js';
@@ -32,16 +33,19 @@ export async function telaImprimir(rota) {
       ${r && opera() ? `<div class="acoes nao-imprimir" style="margin-bottom:12px">${botoesReajuste(c, r, true)}</div>` : ''}
       ${carta}</div>`;
   }
-  if (['contrato', 'vistoria', 'chaves', 'aditivo'].includes(tipo)) {
+  if (['contrato', 'vistoria', 'chaves', 'aditivo', 'documento'].includes(tipo)) {
     const m = await documentoMontado(tipo, rota.q);
     if (!m) return naoEncontrado('Registro não encontrado', '#/inquilinos', 'Ver os inquilinos');
-    const falta = K.pendenciasDoContrato(d(), m.c);
-    const volta = tipo === 'contrato' ? `#/contrato-gerar/${m.c.id}?modelo=${m.modelo.id}` : `#/contrato/${m.c.id}?ir=${tipo === 'aditivo' ? 'aditivos' : 'documentos'}`;
+    const falta = m.exemplo ? [] : K.pendenciasDoContrato(d(), m.c);
+    const volta = m.exemplo ? '#/modelos-contrato' : tipo === 'documento' ? `#/documento-gerar?modelo=${m.modelo.id}&contrato=${m.c.id}`
+      : tipo === 'contrato' ? `#/contrato-gerar/${m.c.id}?modelo=${m.modelo.id}` : `#/contrato/${m.c.id}?ir=${tipo === 'aditivo' ? 'aditivos' : 'documentos'}`;
     return `<div class="impressao">
       <div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir</button>${botao('documentoPdf', 'Baixar PDF', {}, 'secundario')}${botao('documentoWord', 'Baixar Word', {}, 'secundario')}
         ${tipo === 'vistoria' && opera() ? link(`#/vistoria/${m.v.id}`, 'Editar a vistoria', 'botao secundario') : ''}
         ${tipo === 'aditivo' && opera() && !m.a.arquivo && m.a.tipo !== K.TIPO_ADITIVO_VALOR ? link(`#/aditivo/${m.a.id}`, 'Editar o aditivo', 'botao secundario') : ''}
         <a class="botao secundario" href="${volta}">Voltar</a></div>
+      ${m.exemplo ? `<div class="alerta info nao-imprimir"><b>Exemplo com dados fictícios</b> (Maria de Teste Souza, CPF de teste 529.982.247-25), para ler e ajustar o texto do modelo "${esc(m.modelo.nome)}". ${opera() ? link(`#/modelo-contrato/${m.modelo.id}`, 'Editar o texto do modelo', '') : ''}</div>` : ''}
+      ${m.semCampos ? `<div class="alerta aviso nao-imprimir">Os campos deste documento saíram em branco (linha para preencher à mão). ${link(volta, 'Preencher os campos', '')}</div>` : ''}
       ${falta.length ? `<div class="alerta aviso nao-imprimir"><b>Faltam dados no cadastro:</b> ${falta.map(esc).join('; ')}.</div>` : ''}
       ${tipo === 'vistoria' && m.semSituacao ? `<div class="alerta aviso nao-imprimir">${m.semSituacao} item(ns) do modelo ficaram sem situação e não saem no documento.</div>` : ''}
       ${tipo === 'chaves' && !m.temChaves ? `<div class="alerta aviso nao-imprimir">Sem a relação de chaves: o recibo sai com linhas em branco. Informe as chaves no imóvel (Editar) ou na vistoria de entrada.</div>` : ''}
@@ -480,10 +484,127 @@ export async function documentoMontado(tipo, q) {
     return { c, a, blocos: K.montarContrato(a.texto, dados), rodape: dados.rodape, nome: 'Termo aditivo',
       arquivo: nomeArquivoDoc(`Termo aditivo ${a.numero || 1} ${a.tipo === K.TIPO_ADITIVO_TROCA ? 'troca de inquilino' : a.tipo === K.TIPO_ADITIVO_VALOR ? 'novo valor' : 'vencimento'}`, c, String(a.data || '').slice(0, 4)) };
   }
+  if (tipo === 'documento') return documentoPorModelo(q);
   const c = buscar('contratos', q.contrato);
   if (!c) return null;
   const chaves = chavesDoContrato(c);
   return { c, temChaves: !!chaves.trim() || !!(buscar('imoveis', c.imovel_id) || {}).sem_chaves, ...K.reciboChavesBlocos(d(), c, chaves, q.data || ''), nome: 'Recibo de entrega das chaves', arquivo: nomeArquivoDoc('Recibo entrega chaves', c) };
+}
+
+// --------------------------------------------------------------------------
+// Outros documentos da locação feitos por modelo (modelos-documentos.js) e o exemplo de cada modelo
+// --------------------------------------------------------------------------
+/** Todos os modelos (contratos, termos aditivos e outros documentos), com os padrões ainda não gravados. */
+const todosOsModelos = () => Object.keys(TIPOS_MODELO).flatMap((t) => K.modelosDe(d(), t));
+/** Modelos que saem com os dados de exemplo (os termos aditivos de vencimento, troca e novo valor dependem do registro do termo). */
+export const temExemplo = (m) => { const t = K.tipoDoModelo(m); return t === 'contrato' || t in TIPOS_DOCUMENTO; };
+
+/**
+ * Campos digitados na tela "Gerar documento", guardados até o PDF ou o Word (só nesta aba; nada vai para o banco).
+ * Chave: "modelo:contrato". Sem eles (página recarregada), os campos saem como linha em branco.
+ */
+const preenchidos = new Map();
+
+/**
+ * Documento por modelo: ``q.modelo`` e ``q.contrato`` (com os campos digitados) ou ``q.exemplo`` (pessoa fictícia,
+ * CPF de teste, com a empresa do cadastro). Ex.: #/imprimir/documento?modelo=-6&exemplo=1 → distrato de exemplo.
+ */
+function documentoPorModelo(q) {
+  const modelo = todosOsModelos().find((m) => String(m.id) === String(q.modelo));
+  if (!modelo) return null;
+  const tipo = K.tipoDoModelo(modelo);
+  if (q.exemplo) {
+    if (!temExemplo(modelo)) return null;
+    const ex = K.exemploDeDocumento(d().emitentes.filter((e) => e.ativo !== false));
+    const dados = K.dadosDoDocumento(ex.d, ex.c, tipo, K.valoresDeExemplo(tipo), { data: C.hojeIso() });
+    return { c: ex.c, modelo, exemplo: true, blocos: K.montarContrato(modelo.texto, dados), rodape: dados.rodape, nome: modelo.nome, arquivo: S.limparNome(`Exemplo - ${modelo.nome}`) };
+  }
+  const c = buscar('contratos', q.contrato);
+  if (!c || !(tipo in TIPOS_DOCUMENTO)) return null;
+  const p = preenchidos.get(`${modelo.id}:${c.id}`) || {};
+  const dados = K.dadosDoDocumento(d(), c, tipo, p.valores || {}, { data: p.data || C.hojeIso() });
+  return { c, modelo, blocos: K.montarContrato(modelo.texto, dados), rodape: dados.rodape, nome: modelo.nome, semCampos: !p.valores,
+    arquivo: nomeArquivoDoc(TIPOS_DOCUMENTO[tipo].nome.replace(/\s*\(.*\)$/, ''), c, String(p.data || C.hojeIso()).slice(0, 10)) };
+}
+
+/** Valores sugeridos ao abrir "Gerar documento" (o usuário confere e muda). Ex.: aviso de desocupação → hoje + 30 dias. */
+function valoresSugeridos(tipo, c) {
+  const hoje = C.hojeIso();
+  const db = d();
+  const v = {};
+  if (tipo.startsWith('aditivo_')) v.numero_aditivo = String((db.aditivos || []).filter((a) => a.contrato_id === c.id).length + 1);
+  if (['aviso_desocupacao', 'notificacao_desocupacao'].includes(tipo)) v[tipo === 'aviso_desocupacao' ? 'data_saida_prevista' : 'data_limite'] = C.somarDias(hoje, 30);
+  if (tipo === 'aditivo_prazo') {
+    const ini = c.vigencia_fim && c.vigencia_fim >= hoje ? C.somarDias(c.vigencia_fim, 1) : hoje;
+    Object.assign(v, { novo_prazo_meses: String(c.prazo_meses || 30), nova_data_inicio: ini });
+    v.nova_data_fim = C.somarDias(C.fimDoPrazo(ini, Number(v.novo_prazo_meses)), -1);
+  }
+  if (tipo === 'aditivo_garantia') v.data_troca = hoje;
+  if (tipo === 'distrato') v.data_saida = C.somarDias(hoje, 30);
+  if (tipo === 'declaracao_pagamentos') Object.assign(v, { periodo_inicio: c.data_entrada || c.vigencia_inicio || '', periodo_fim: hoje });
+  if (tipo === 'aviso_fiador') {
+    const vencidos = db.cobrancas.filter((cb) => cb.contrato_id === c.id && R.aCobrar(cb) && C.vencido(cb.vencimento, hoje)).sort((a, b) => a.vencimento.localeCompare(b.vencimento));
+    if (vencidos.length) {
+      v.debitos = vencidos.map((cb) => `${R.ehBoletoAvulso(cb) ? 'boleto' : 'aluguel e encargos'} de ${K.mesPorExtenso(cb.competencia)}, vencido em ${dataBr(cb.vencimento)}`).join('; ');
+      v.valor_debito = C.reais(vencidos.reduce((s, cb) => s + (R.totais(cb).a_pagar_sem_desconto || 0), 0), false);
+    }
+    v.prazo_pagamento = C.somarDias(hoje, 10);
+  }
+  return v;
+}
+
+/** Avisos antes de gerar (o sistema avisa e não proíbe). */
+function avisosDoDocumento(tipo, c) {
+  const hoje = C.hojeIso();
+  const out = [];
+  const fiadores = d().fiadores.filter((f) => f.contrato_id === c.id && !f.substituido_por_id && (!f.data_saida || f.data_saida >= hoje));
+  if (tipo === 'aviso_fiador' && !fiadores.length) out.push('Este contrato não tem fiador: o aviso sai sem o nome do fiador.');
+  if (tipo === 'notificacao_desocupacao') {
+    if (c.vigencia_fim && c.vigencia_fim >= hoje) out.push(`O prazo do contrato vai até ${dataBr(c.vigencia_fim)}: antes disso, a empresa não pode pedir o imóvel de volta sem motivo (Lei 8.245/91, art. 4º).`);
+    if (c.finalidade !== 'Não residencial' && Number(c.prazo_meses) > 0 && Number(c.prazo_meses) < 30) out.push('Residencial com contrato de menos de 30 meses: depois do prazo, a retomada só cabe nos casos do art. 47 da Lei 8.245/91 (ex.: 5 anos de locação, uso próprio). Confirme com o advogado antes de mandar.');
+  }
+  if (tipo === 'declaracao_pagamentos' && d().cobrancas.some((cb) => cb.contrato_id === c.id && R.aCobrar(cb) && C.vencido(cb.vencimento, hoje))) out.push('Há boleto vencido em aberto deste inquilino: a declaração diz que não há débito vencido.');
+  return out;
+}
+
+/** "Gerar documento" (#/documento-gerar?contrato=&modelo=): escolhe o modelo e o inquilino e preenche os campos do tipo. */
+export function telaGerarDocumento(rota) {
+  const q = rota.q;
+  const outros = todosOsModelos().filter((m) => K.tipoDoModelo(m) in TIPOS_DOCUMENTO);
+  const modelo = outros.find((m) => String(m.id) === String(q.modelo));
+  const c = q.contrato ? buscar('contratos', q.contrato) : null;
+  const topo = `<p class="suave"><a href="${c ? `#/contrato/${c.id}?ir=aditivos` : '#/modelos-contrato?ir=modelos-outros'}">← Voltar</a></p><h1>Gerar documento${c ? `: ${esc(c.inquilino_nome)}` : ''}</h1>`;
+  if (!modelo) {
+    return `${topo}<div class="cartao"><h2>Qual documento?</h2><table><tr><th>Documento</th><th></th></tr>
+      ${outros.map((m) => `<tr><td><b>${esc(m.nome)}</b><div class="suave">${esc(TIPOS_DOCUMENTO[K.tipoDoModelo(m)].explica)}</div></td>
+        <td class="n nw">${link(`#/documento-gerar?modelo=${m.id}${c ? `&contrato=${c.id}` : ''}`, 'Escolher', 'botao pequeno')} ${link(`#/imprimir/documento?modelo=${m.id}&exemplo=1`, 'Ver exemplo', 'botao secundario pequeno')}</td></tr>`).join('')}</table></div>`;
+  }
+  const tipo = K.tipoDoModelo(modelo);
+  const def = TIPOS_DOCUMENTO[tipo];
+  if (!c) {
+    const ativos = ordenar(d().contratos.filter((x) => R.contratoAtivo(x)), 'inquilino_nome');
+    return `${topo}<div class="cartao"><h2>${esc(modelo.nome)}</h2><p>${esc(def.explica)}</p>
+      <form class="acoes" data-form="escolherInquilinoDocumento"><input type="hidden" name="modelo" value="${esc(modelo.id)}">
+        <select name="contrato" required><option value="">Escolha o inquilino</option>${ativos.map((x) => `<option value="${x.id}">${esc(x.inquilino_nome)}${((i) => (i ? ` · ${esc(i.nome)}` : ''))(buscar('imoveis', x.imovel_id))}</option>`).join('')}</select>
+        <button>Continuar</button></form></div>`;
+  }
+  const guardado = preenchidos.get(`${modelo.id}:${c.id}`);
+  const v = (guardado && guardado.valores) || valoresSugeridos(tipo, c);
+  const campo = ([k, rotulo, formato]) => `<div><label>${esc(rotulo)}</label>${formato === 'texto'
+    ? `<textarea name="${k}" rows="2">${esc(v[k] || '')}</textarea>`
+    : `<input name="${k}" ${formato === 'data' ? 'type="date"' : formato === 'dinheiro' ? 'inputmode="decimal" data-dinheiro' : 'inputmode="numeric"'} value="${esc(v[k] || '')}">`}</div>`;
+  const avisos = avisosDoDocumento(tipo, c);
+  return `${topo}
+    ${avisos.map((a) => `<div class="alerta aviso">${esc(a)}</div>`).join('')}
+    <form class="cartao" data-form="gerarDocumento"><h2>${esc(modelo.nome)}</h2><p class="suave">${esc(def.explica)} Campo em branco sai como uma linha para preencher à mão.</p>
+      <input type="hidden" name="modelo" value="${esc(modelo.id)}"><input type="hidden" name="contrato" value="${c.id}">
+      <div class="grade">${def.campos.map(campo).join('')}<div><label>Data do documento</label><input type="date" name="data" value="${esc((guardado && guardado.data) || C.hojeIso())}"></div></div>
+      <div class="acoes"><button>Ver o documento</button>${link(`#/modelo-contrato/${modelo.id}`, 'Editar o texto do modelo', 'botao secundario')}</div></form>`;
+}
+
+/** Guarda os campos digitados em "Gerar documento" (só nesta aba) para a página do documento. */
+export function guardarCamposDoDocumento(modeloId, contratoId, valores, data) {
+  preenchidos.set(`${modeloId}:${contratoId}`, { valores, data: C.dataValida(data) ? data : C.hojeIso() });
 }
 
 /** Chaves do contrato: as da vistoria de entrada; senão, as cadastradas no imóvel. */
@@ -833,18 +954,27 @@ const AJUDA_MODELO = `<details class="cartao"><summary><b>Como escrever um model
       Uma linha em branco separa os parágrafos. A linha <code>[assinaturas]</code> põe o quadro de assinaturas.</li>
   </ul></details>`;
 
-const TIPOS_MODELO = { contrato: 'Contratos', aditivo: 'Termos aditivos (troca do vencimento)', aditivo_troca: 'Termos aditivos (troca de inquilino)', aditivo_valor: 'Termos aditivos (novo valor do aluguel)' };
+const TIPOS_MODELO = { contrato: 'Contratos', aditivo: 'Termos aditivos (troca do vencimento)', aditivo_troca: 'Termos aditivos (troca de inquilino)', aditivo_valor: 'Termos aditivos (novo valor do aluguel)',
+  ...Object.fromEntries(Object.entries(TIPOS_DOCUMENTO).map(([t, x]) => [t, x.nome])) };
+/** Tipos com cartão próprio na página dos modelos (os outros documentos ficam juntos num cartão só). */
+const TIPOS_COM_CARTAO = ['contrato', 'aditivo', 'aditivo_troca', 'aditivo_valor'];
 const NOVO_MODELO = { contrato: 'Novo modelo de contrato', aditivo: 'Novo modelo de aditivo de vencimento', aditivo_troca: 'Novo modelo de aditivo de troca', aditivo_valor: 'Novo modelo de aditivo de novo valor' };
 
 export function telaModelos() {
   const linha = (m, tipo) => `<tr><td><b>${esc(m.nome)}</b>${m.id < 0 || m.padrao ? ` <span class="suave">(padrão)</span>` : ''}</td><td class="n nw">
       ${opera() ? `${link(`#/modelo-contrato/${m.id}`, 'Editar')} ${botao('copiarModelo', 'Copiar', { id: m.id })}` : ''}
       ${opera() && m.padrao && MODELOS_PADRAO.some((x) => x.nome === m.padrao) ? botao('restaurarModelo', 'Voltar ao texto padrão', { id: m.id }, 'secundario pequeno', `Trocar o texto de "${m.nome}" pelo texto padrão? As alterações feitas nele se perdem.`) : ''}
+      ${temExemplo(m) ? link(`#/imprimir/documento?modelo=${m.id}&exemplo=1`, 'Exemplo em PDF', 'botao secundario pequeno') : ''}
+      ${opera() && tipo in TIPOS_DOCUMENTO ? link(`#/documento-gerar?modelo=${m.id}`, 'Gerar para um inquilino', 'botao secundario pequeno') : ''}
       ${podeUsuario('admin') && m.id > 0 && K.modelosDe(d(), tipo).length > 1 ? botao('excluirModelo', '×', { id: m.id }, 'x-excluir', `Excluir o modelo "${m.nome}"?`) : ''}</td></tr>`;
+  const outros = Object.keys(TIPOS_DOCUMENTO).flatMap((tipo) => K.modelosDe(d(), tipo).map((m) => [m, tipo]));
   return `<p class="suave"><a href="#/sistema-modelos">← Modelos de documentos</a></p>
-    <h1>Modelos de contrato e termos aditivos</h1>
-    ${Object.entries(TIPOS_MODELO).map(([tipo, titulo]) => `<div class="cartao" id="modelos-${tipo}"><div class="cabecalho"><h2>${titulo}</h2>${opera() ? link(`#/modelo-contrato/novo${tipo === 'contrato' ? '' : `?tipo=${tipo}`}`, NOVO_MODELO[tipo], 'botao secundario pequeno') : ''}</div>
+    <h1>Modelos de contrato, termos aditivos e outros documentos</h1>
+    ${TIPOS_COM_CARTAO.map((tipo) => [tipo, TIPOS_MODELO[tipo]]).map(([tipo, titulo]) => `<div class="cartao" id="modelos-${tipo}"><div class="cabecalho"><h2>${titulo}</h2>${opera() ? link(`#/modelo-contrato/novo${tipo === 'contrato' ? '' : `?tipo=${tipo}`}`, NOVO_MODELO[tipo], 'botao secundario pequeno') : ''}</div>
       <table><tr><th>Modelo</th><th></th></tr>${K.modelosDe(d(), tipo).map((m) => linha(m, tipo)).join('')}</table></div>`).join('')}
+    <div class="cartao" id="modelos-outros"><h2>Outros documentos da locação</h2>
+      <p class="suave">Prorrogação do prazo, troca de garantia, distrato, avisos e declarações. Para gerar, use <b>Gerar para um inquilino</b> aqui ou <b>Outros documentos</b> na página do inquilino (em "Termos aditivos"). <b>Exemplo em PDF</b> mostra o texto com uma pessoa fictícia, para ler e ajustar. Para ter outra versão de um deles, use <b>Copiar</b>.</p>
+      <table><tr><th>Modelo</th><th></th></tr>${outros.map(([m, tipo]) => linha(m, tipo).replace('</b>', `</b><div class="suave">${esc(TIPOS_DOCUMENTO[tipo].explica)}</div>`)).join('')}</table></div>
     <p class="suave">Para gerar um contrato, abra o inquilino e clique em <b>Gerar contrato</b>; o termo aditivo, em <b>Gerar termo aditivo</b> (em "Termos aditivos"), escolhendo vencimento ou troca de inquilino.
       Edite à vontade: os modelos ficam guardados no banco de dados.</p>
     ${AJUDA_MODELO}`;
@@ -857,8 +987,11 @@ export function telaModelo(rota) {
   if (!m) return naoEncontrado('Modelo não encontrado', '#/modelos-contrato', 'Ver os modelos');
   const tipo = K.tipoDoModelo(m);
   const aditivo = tipo !== 'contrato';
+  const doc = TIPOS_DOCUMENTO[tipo];
   return `<p class="suave"><a href="#/modelos-contrato">← Modelos de contrato</a></p>
-    <h1>${m.id === '' ? `Novo modelo de ${aditivo ? 'termo aditivo' : 'contrato'}` : `Modelo: ${esc(m.nome)}`}</h1>
+    <h1>${m.id === '' ? `Novo modelo de ${doc ? esc(doc.nome.toLocaleLowerCase('pt-BR')) : aditivo ? 'termo aditivo' : 'contrato'}` : `Modelo: ${esc(m.nome)}`}</h1>
+    ${doc ? `<p class="suave">${esc(doc.explica)} Campos deste documento (digitados ao gerar): ${doc.campos.map(([k, r]) => `<code>{${k}}</code> (${esc(r.toLocaleLowerCase('pt-BR'))})`).join(', ')}; e também <code>{data_contrato}</code> e <code>{fiadores_nomes}</code>.</p>` : ''}
+    ${m.id !== '' && temExemplo(m) ? `<p>${link(`#/imprimir/documento?modelo=${m.id}&exemplo=1`, 'Ver o exemplo em PDF (texto salvo)', 'botao secundario pequeno')}</p>` : ''}
     <form class="cartao" data-form="modeloContrato">
       <input type="hidden" name="id" value="${esc(m.id)}"><input type="hidden" name="tipo" value="${esc(tipo)}">
       <p><label>Nome do modelo</label><input name="nome" value="${esc(m.nome)}" required></p>

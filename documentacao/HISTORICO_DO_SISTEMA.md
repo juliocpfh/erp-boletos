@@ -448,7 +448,7 @@ Documento de 24/11/2026 (pedido C5 de 24/11). Ele junta, por assunto, tudo o que
 Junta as listas dos sete assuntos, sem repetir. **Quem faz:** "Claude" (programa ou escreve), "Você" (confere, decide ou faz fora do sistema).
 
 ### 1. Urgente (dinheiro cobrado errado ou trabalho que a equipe faz por fora)
-1. [ ] **Claude:** confirmar e testar o **ressarcimento do condomínio no boleto** (pedido A1 de 24/11). ⚠ A PR #364 diz que um ressarcimento de R$ 45,00 entrou no teste, mas a sua lista ainda o dá como quebrado: precisa de teste próprio, com o seu caso.
+1. [ ] **Claude:** **ressarcimento do condomínio no boleto** (pedido A1 de 24/11): **explicado em 24/11**, a causa foi o mês de referência digitado no lugar do mês do vencimento; correção e testes na PR #373 (falta você conferir com o seu caso).
 2. [ ] **Claude:** **conferência completa do boleto** (pedido A5): aluguel, proporcional, IPTU, condomínio, seguro, ressarcimentos, abatimentos, multas, diferenças, caução, acordo, reserva e NF, com testes.
 3. [ ] **Claude:** **mandar pelo sistema o boleto feito à mão no banco** (pedido A4): anexar o PDF em Boletos e enviar pelo Gmail com o descritivo, o mês e o vencimento.
 4. [ ] **Você:** rever os **boletos em aberto alterados à mão antes de 24/11**: o sistema não sabe quais valores foram digitados e não os recalcula (ex.: seguro lançado depois não entra).
@@ -460,7 +460,9 @@ Junta as listas dos sete assuntos, sem repetir. **Quem faz:** "Claude" (programa
 8. [ ] **Você:** ligar a **verificação em duas etapas e a proteção da branch principal no GitHub** (`SEGURANCA.md`, bloco 2). Quem tomar a conta pode trocar o site.
 9. [ ] **Você + contador → Claude:** **CBS 2027** nos impostos a partir de 01/2027. O Senado decide até 15/12/2026; em 16/12 responder as 4 pendências e confirmar com um exemplo em reais.
 10. [ ] **Você:** **conferir o que mudou** (`CONFERIR_O_QUE_MUDOU.md`), começando pelas páginas de Sistema e pelos boletos.
-11. [ ] **Você:** decidir as **taxas extras** (`TAXAS_COBRAVEIS.md`); depois o Claude escreve as cláusulas para o advogado.
+11. [ ] **Você:** decidir as **taxas extras** (`TAXAS_COBRAVEIS.md`); depois o Claude escreve as cláusulas para o advogado. Já decidido em 24/11: tarifa do boleto **sempre cobrada** (o Claude volta a cláusula ao modelo de contrato), empresa é **locadora direta**, reserva fica 100% com a empresa na desistência (PR #372).
+11b. [ ] **Claude:** **honorários e despesas de cobrança** no sistema (sugestão em `TAXAS_COBRAVEIS.md`, item 6: regra do percentual, botão "Passar para cobrança", linhas no acordo e no cálculo final, despesas com comprovante), depois da resposta do dono.
+11c. [ ] **Claude (futuro):** o contrato dizer se a empresa aluga **como dona ou como procuradora de terceiro**, com modelo de contrato em nome do terceiro conforme a procuração.
 
 ### 3. Média
 12. [ ] **Claude:** **modelos de documentos em PDF** para você baixar e ajustar (pedido C2).
