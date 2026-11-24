@@ -197,6 +197,14 @@ export function descreverAcesso(rota) {
   if (r === 'apagar') return `Apagou uma pasta de arquivos (fica ${R.regra('dias_lixeira_anexos')} dias na lixeira; para recuperar: pasta "Apagados na nuvem" no computador do backup seguro)`;
   if (r === 'email/enviar') return 'Mandou um e-mail pela conta da empresa';
   if (r.startsWith('ficha-online/')) return `Ficha pela internet: ${metodo === 'GET' ? 'consultou' : 'mexeu em'} ${r.slice(13)}`;
+  if (r === 'assinaturas' || r.startsWith('assinaturas/')) {
+    const resto = r.slice(12);
+    if (metodo === 'POST' && r === 'assinaturas') return 'Assinatura digital: mandou um documento para a fila de assinatura';
+    if (metodo === 'PUT') return `Assinatura digital: devolveu o documento assinado (${resto.split('/')[0]})`;
+    if (metodo === 'POST') return `Assinatura digital: o programa do PC avisou erro ao assinar (${resto.split('/')[0]})`;
+    if (metodo === 'DELETE') return `Assinatura digital: tirou da fila o documento ${resto}`;
+    return `Assinatura digital: baixou o documento ${resto}`;
+  }
   return r;
 }
 const tamanho = (b) => (b === null || b === undefined ? '' : b >= 1048576 ? mb(b) : b >= 1024 ? `${Math.round(b / 1024)} KB` : `${b} B`);
@@ -283,7 +291,7 @@ export async function aparelhosLigadosHtml({ proprios = false } = {}) {
     <td class="n">${botao('desligarAparelho', 'Desligar', { id: a.id }, 'perigo pequeno', `Desligar o computador ${a.computador}? Ele para de baixar os dados na hora; para voltar, é preciso entrar de novo nele com e-mail e senha.`)}</td></tr>`).join('');
   return `<div class="cartao"><h2>Aparelhos ligados</h2>
     <p class="suave">${proprios ? 'Computadores que você ligou com o seu login. ' : ''}Computadores com o programa do PC (cópia diária dos dados, versão PC e cópia aberta dos arquivos). Cada um só <b>lê</b>, com o acesso de quem o ligou; se essa pessoa for bloqueada, o computador para também. Computador roubado ou de alguém que saiu: <b>Desligar</b>.
-      O programa se atualiza sozinho (todo dia às 20h e ao entrar no Windows); a coluna <b>Programa</b> mostra a versão que cada computador está usando.</p>
+      O programa se atualiza sozinho (de hora em hora, às 20h e ao entrar no Windows); a coluna <b>Programa</b> mostra a versão que cada computador está usando.</p>
     <table><tr><th>Computador</th><th>Ligado por</th><th>Quando</th><th>Última vez</th><th>Programa</th><th></th></tr>${linhas || '<tr><td colspan="6" class="suave">Nenhum computador ligado.</td></tr>'}</table></div>`;
 }
 

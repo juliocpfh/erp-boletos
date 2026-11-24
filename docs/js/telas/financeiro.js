@@ -7,7 +7,7 @@ import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
 import * as P from '../poupanca.js';
 import * as R from '../regras.js';
-import { caixaPagarPeloBanco } from './banco.js';
+import { caixaPagarPeloBanco, sugestaoDe } from './banco.js';
 import { linkComprovante } from './cadastros.js';
 import { botao, buscar, d, etiqueta, link, naoEncontrado, opera, ordenar, taxasDaPoupanca } from './comum.js';
 
@@ -52,7 +52,7 @@ export function telaInadimplencia() {
         <td class="n"><b>${x.diasMax}</b></td><td class="n">${reais(x.total)}</td><td class="n"><b>${reais(x.totalHoje)}</b></td>
         <td>${esc(x.passo)}${opera() ? `<br>${botao('lembrete', 'Cobrar', { id: x.boletos[0].cobranca.id }, 'secundario pequeno')} ${x.boletos.some((b) => !R.ehComplementoCaucao(b.cobranca)) ? botao('fazerAcordo', 'Fazer acordo', { contrato: x.contrato.id }, 'secundario pequeno') : ''}` : ''}</td></tr>`).join('')
       || '<tr><td colspan="6" class="suave">Nenhum boleto vencido em aberto. 🎉</td></tr>'}</table>
-      <p class="suave">A partir de ${R.regra('dias_vermelho')} dias de atraso em vermelho. "Hoje" é o que o banco cobraria se pagasse hoje (sem desconto, com multa e juros). Quem está aqui também aparece nos Alertas do Painel. Próximo passo (só aviso, nada é enviado sozinho): ${R.reguaCobranca().reverse().map((p) => `${p.dias} dia(s) de atraso: ${p.passo.toLocaleLowerCase('pt-BR')}`).join('; ')}. "Fazer acordo": os boletos vencidos viram boletos novos e saem desta lista; se um boleto do acordo atrasar, o inquilino volta. Contrato encerrado (inativo ou com a saída registrada) não entra: o que ficou devendo vai no cálculo final da saída e nos boletos em aberto.</p></div>
+      <p class="suave">A partir de ${R.regra('dias_vermelho')} dias de atraso em vermelho${R.especiaisDiferentes(d(), 'dias_vermelho').map((x) => ` (na regra especial "${esc(x.nome)}": ${x.valor} dias)`).join('')}. "Hoje" é o que o banco cobraria se pagasse hoje (sem desconto, com multa e juros). Quem está aqui também aparece nos Alertas do Painel. Próximo passo (só aviso, nada é enviado sozinho): ${R.reguaCobranca().reverse().map((p) => `${p.dias} dia(s) de atraso: ${p.passo.toLocaleLowerCase('pt-BR')}`).join('; ')}. "Fazer acordo": os boletos vencidos viram boletos novos e saem desta lista; se um boleto do acordo atrasar, o inquilino volta. Contrato encerrado (inativo ou com a saída registrada) não entra: o que ficou devendo vai no cálculo final da saída e nos boletos em aberto.</p></div>
     ${caixaAcordos(hoje)}
     <div class="cartao rolagem"><h2>Quem costuma atrasar (últimos 12 meses)</h2><table><tr><th>Imóvel / inquilino</th><th class="n">Pagos com atraso</th><th class="n">Atraso médio</th><th class="n">Maior atraso</th></tr>
       ${r.historico.map((x) => `<tr><td><a href="#/contrato/${x.contrato.id}"><b>${esc(imovelDe(x.contrato))}</b></a><br>${esc(x.contrato.inquilino_nome)}</td>
@@ -360,7 +360,12 @@ export function telaFinanceiro(q) {
   const air = R.airbnbDoMes(d(), mesAir);
   const impostos = R.impostosDoMes(d(), mes);
   const nomeConta = (id) => R.apelidoDaConta(d(), id); // as do C6 e as de outros bancos (ex.: "itau" → "Itaú")
-  const sugestao = (m) => { try { return Z.sugerirDestino(d(), m, Z.indiceDaTela(d())); } catch { return null; } };
+  // a mesma sugestão da tela Banco (``sugestaoDe``): conta de outro banco (só arquivo) e Pix sem identificação só avisam
+  // "vincular manualmente", sem "Usar sugestão" (decisão de 17/11/2026)
+  const sugestao = (m) => { try { return sugestaoDe(m); } catch { return null; } };
+  const textoSugestao = (s) => (!s ? '' : s.manual ? 'pode ser o pagamento de um boleto: vincular manualmente'
+    : !s.classificacao ? '' : s.semIdentificacao ? s.motivo || 'sem identificação: vincular manualmente' : `parece: ${Z.CLASSIFICACOES[s.classificacao] || s.classificacao}`);
+  const usaSugestao = (s) => !!(s && s.classificacao && !s.manual && !s.semIdentificacao && !s.soAviso);
   return `${topoFinanceiro('financeiro')}
     <div class="cabecalho"><h2>Movimento de ${compBr(mes)}</h2>
       <div class="acoes"><a class="botao secundario" href="#/financeiro?mes=${C.somarMeses(mes, -1)}">← ${compBr(C.somarMeses(mes, -1))}</a>
@@ -375,7 +380,7 @@ export function telaFinanceiro(q) {
       ${semDestino.length ? `<div class="rolagem"><table class="responsiva compacta"><tr><th>Data</th><th>Conta</th><th>Descrição no extrato</th><th class="n">Valor</th><th>Destino</th></tr>
         ${semDestino.map((m) => { const s = sugestao(m); return `<tr><td class="nw">${dataBr(m.data)}<br><span class="suave">${m.tipo === 'entrada' ? 'entrada' : 'saída'}</span></td><td>${esc(nomeConta(m.conta_id))}</td><td>${esc(m.titulo || '')} ${esc(m.descricao || '')}</td>
           <td class="n nw ${m.tipo === 'saida' ? 'texto-aviso' : ''}">${m.tipo === 'saida' ? '- ' : ''}${reais(m.valor)}</td>
-          <td>${s && s.classificacao ? `<span class="suave">parece: ${esc(Z.CLASSIFICACOES[s.classificacao] || s.classificacao)}</span><br>` : ''}${opera() ? `${s && s.classificacao ? `${botao('usarSugestao', 'Usar sugestão', { id: m.id })} ` : ''}${botao('darDestino', 'Dar destino', { id: m.id })}` : ''}</td></tr>`; }).join('')}</table></div>`
+          <td>${textoSugestao(s) ? `<span class="${s.manual || s.semIdentificacao ? 'texto-aviso' : 'suave'}">${esc(textoSugestao(s))}</span><br>` : ''}${opera() ? `${usaSugestao(s) ? `${botao('usarSugestao', 'Usar sugestão', { id: m.id })} ` : ''}${botao('darDestino', 'Dar destino', { id: m.id })}` : ''}</td></tr>`; }).join('')}</table></div>`
     : `<p class="suave">${movs.length ? 'Todas as movimentações do mês têm destino. ✓' : `Nenhuma movimentação do banco em ${compBr(mes)} (busque o extrato na tela <a href="#/banco?mes=${mes}">Banco</a>).`}</p>`}
       <p class="suave">Cada destino lança no lugar certo: aluguel no boleto, Airbnb dividido entre os imóveis vagos, conta do imóvel nos custos, reforma no imóvel, IPTU na parcela, imposto na guia. Tudo aparece nos resultados. Extrato completo e comprovantes: <a href="#/banco?mes=${mes}">tela Banco</a>.</p></div>
     <div class="cartao"><div class="cabecalho"><h2>NF do Airbnb de ${compBr(mesAir)}</h2>${air.numerada ? etiqueta(`NF nº ${R.numeroFatura(air.numerada)}`, 'ok') : air.nf ? etiqueta(air.divergente ? 'soma mudou: gere de novo' : 'aguardando número', air.divergente ? 'aviso' : 'info') : air.total ? etiqueta('a gerar', 'aviso') : ''}</div>

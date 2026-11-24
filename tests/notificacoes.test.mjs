@@ -153,7 +153,7 @@ test('multa: valor digitado vai ao próximo boleto do aluguel (fora da NF); reti
   const atraso = C.liquidar(cb, '2026-12-20');
   assert.ok(cb.multa_percentual > 0, 'boleto com multa de atraso');
   assert.equal(atraso.multa, Math.round(200000 * cb.multa_percentual / 100), 'multa de atraso sobre R$ 2.000,00');
-  assert.match(R.dadosBoleto(d, cb).descricao, /MULTA NOTIF\. 17\/11\/2026 RS1\.500,00|MULTA NOTIF\. 17\/11\/2026 R\$ ?1\.500,00/);
+  assert.match(R.dadosBoleto(d, cb).descricao, /MULTA NOTIF\. 17\/11\/2026 1\.500,00|MULTA NOTIF\. 17\/11\/2026 R\$ ?1\.500,00/);
   assert.ok(R.dadosBoleto(d, cb).descricao.length <= R.LIMITE_DESCRICAO_BOLETO);
   const comMulta = cb.outros;
   R.ajustarBoleto(d, cb.id, 0, '', 'j');

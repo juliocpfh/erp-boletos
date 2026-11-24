@@ -12,10 +12,17 @@
 //   para o registro; a chave em si não fica guardada), publico/fichas/<ficha>/<pessoa>.pdf; os documentos vão direto para a
 //   pasta da ficha (arquivos/Fichas em analise/<pasta>/), com nome dado aqui, e aparecem na caixa de arquivos da ficha.
 // - Os dados enviados nunca entram sozinhos na ficha: a equipe confere e traz (telas/fichas.js).
+// - Correção pela pessoa (decisão do dono de 2026-11-24): enquanto a equipe não marca o link como conferido (`conferido_em`,
+//   ao trazer os dados para a ficha), a pessoa envia os dados de novo (cada envio guarda os campos que mudaram) e troca ou
+//   apaga o documento mandado por engano (POST …/apagar; PUT …/arquivo com &troca=<arquivo>). O arquivo vai para a lixeira
+//   (30 dias, lixeira.mjs), e o
+//   registro fica no link (`apagado_em`, `substituido_por`) e nos eventos. A equipe é avisada a cada dado e a cada documento.
 // - Avisos a cada etapa (e-mail para a pessoa e para a equipe, celular da equipe): avisos-ficha.mjs e push.mjs.
 import { desinscrever, inscrever, publica, pushLigado, testarAparelho } from './push.mjs';
+import { paraLixeira } from './lixeira.mjs';
 // import circular de propósito (contatos-publico usa HSTS e hashDaChave daqui só dentro de funções)
 import { atenderContatosPublico, paginaDosContatos } from './contatos-publico.mjs';
+import { atenderAceitePublico, paginaDoAceite } from './aceite-reserva.mjs';
 
 export const PESSOAS = ['interessado', 'fiador1', 'fiador2'];
 export const SITUACOES_LINK = ['Aguardando', 'Respondida', 'Falta documento', 'Assinar', 'Assinada', 'Desistiu', 'Encerrado'];
@@ -27,6 +34,8 @@ export const DIAS_GUARDA = 90;
 const passou = (iso, dias) => Date.parse(iso) + dias * 86400000 < Date.now();
 export const MAX_DOCUMENTO = 10 * 1024 * 1024;
 export const MAX_ARQUIVOS = 40;
+/** Registros de arquivo por link, contando os apagados (o registro do que foi trocado fica). */
+export const MAX_REGISTROS_ARQUIVO = 80;
 export const MAX_ENVIOS = 20;
 const MAX_PDF = 5 * 1024 * 1024;
 const MAX_PEDIDO = 128 * 1024;
@@ -241,6 +250,18 @@ export function tipoDoArquivo(bytes) {
 }
 
 /** Nome do documento para o arquivo, sem acento. Ex.: "3 últimos holerites" → "3-ultimos-holerites". */
+/** Documentos que ainda estão na pasta (os trocados e apagados pela pessoa ficam só no registro). */
+export const ativos = (r) => (r.arquivos || []).filter((a) => !a.apagado_em);
+const cheio = (r) => ativos(r).length >= MAX_ARQUIVOS || (r.arquivos || []).length >= MAX_REGISTROS_ARQUIVO;
+export const CONFERIDO = 'A equipe já conferiu o que você mandou. Para corrigir alguma coisa, fale com quem enviou o link.';
+/** O documento do link pelo nome do arquivo (só os ainda na pasta). */
+function arquivoDoRegistro(r, nome) {
+  const n = String(nome || '');
+  const a = /^link-[a-z0-9-]{1,120}[.](pdf|jpg|png)$/.test(n) ? (r.arquivos || []).find((x) => x.arquivo === n && !x.apagado_em) : null;
+  if (!a) throw new ErroFicha(404, 'Documento não encontrado (talvez já trocado ou apagado). Atualize a página.');
+  return a;
+}
+
 export const nomeSimples = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'documento';
 
 // ---------------------------------------------------------------------------
@@ -263,7 +284,7 @@ export async function criarLink(request, env, email) {
   const valores = valoresValidos(formulario, p.valores);
   const ctx = p.contexto || {};
   const contexto = {
-    empresa: texto(ctx.empresa, 120), nome: texto(ctx.nome, 120), imovel: texto(ctx.imovel, 300), reserva: texto(ctx.reserva, 40),
+    empresa: texto(ctx.empresa, 120), nome: texto(ctx.nome, 120), imovel: texto(ctx.imovel, 300), reserva: texto(ctx.reserva, 40), devolucao: texto(ctx.devolucao, 400),
     de: texto(ctx.de, 120), tipo: texto(ctx.tipo, 40),
     proposta: (Array.isArray(ctx.proposta) ? ctx.proposta : []).slice(0, 15).map(([a, b]) => [texto(a, 80), texto(b, 300)]),
     documentos: lista(ctx.documentos),
@@ -366,7 +387,8 @@ export async function listarLinks(env, url) {
     }
     return ficha ? paraEquipe(reg) : {
       ficha_id: reg.ficha_id, pessoa: reg.pessoa, situacao: reg.situacao, atualizado_em: reg.atualizado_em, visto_em: reg.visto_em,
-      vence_em: reg.vence_em, criado_em: reg.criado_em, mudou_em: reg.mudou_em || null, ultimo_envio: (reg.respostas.at(-1) || {}).em || null, arquivos: reg.arquivos.length, ultimo_arquivo: (reg.arquivos.at(-1) || {}).em || null, desistiu_em: reg.desistiu_em,
+      vence_em: reg.vence_em, criado_em: reg.criado_em, mudou_em: reg.mudou_em || null, ultimo_envio: (reg.respostas.at(-1) || {}).em || null, arquivos: ativos(reg).length, ultimo_arquivo: (reg.arquivos.at(-1) || {}).em || null, desistiu_em: reg.desistiu_em,
+      ultimo_apagado: reg.arquivos.reduce((m, a) => (a.apagado_em && a.apagado_em > (m || '') ? a.apagado_em : m), null), conferido_em: reg.conferido_em || null,
       nome: reg.contexto.nome,
     };
   };
@@ -384,7 +406,11 @@ export async function listarLinks(env, url) {
   return json(200, { links: lista });
 }
 
-/** Equipe muda o link: { ficha_id, pessoa, situacao?, faltando?: [texto], visto?: true }. Falta documento e Assinar avisam a pessoa. */
+/**
+ * Equipe muda o link: { ficha_id, pessoa, situacao?, faltando?: [texto], visto?: true, conferido?: true, liberar?: true }.
+ * Falta documento e Assinar avisam a pessoa. ``conferido``: a equipe trouxe os dados para a ficha e a pessoa não troca mais
+ * nada (só manda documento novo); ``liberar``: a pessoa volta a poder corrigir.
+ */
 export async function atualizarLink(request, env, email, avisar = null) {
   const p = await lerJson(request);
   const fichaId = fichaIdValido(p.ficha_id);
@@ -400,6 +426,8 @@ export async function atualizarLink(request, env, email, avisar = null) {
     }
     if (p.faltando !== undefined) r.faltando = (Array.isArray(p.faltando) ? p.faltando : []).slice(0, 15).map((x) => texto(x, 300)).filter(Boolean);
     if (p.visto) r.visto_em = new Date().toISOString();
+    if (p.conferido === true && !r.conferido_em) { r.conferido_em = new Date().toISOString(); r.eventos.push({ em: r.conferido_em, texto: `conferido por ${email} (a pessoa não troca mais dados nem documentos)` }); }
+    if (p.liberar === true && r.conferido_em) { r.conferido_em = null; r.eventos.push({ em: new Date().toISOString(), texto: `liberado por ${email} para a pessoa corrigir` }); }
     r.eventos = r.eventos.slice(-50);
     mudou = antes !== JSON.stringify([r.situacao, r.faltando]);
   });
@@ -447,8 +475,9 @@ export async function lerFichaPublica(request, env) {
   return json(200, {
     pessoa: r.pessoa, contexto: r.contexto, formulario: r.formulario, valores: { ...r.valores_iniciais, ...(ultimo ? ultimo.valores : {}) },
     situacao: r.situacao, faltando: r.faltando, vence_em: r.vence_em, vencido: r.vence_em < new Date().toISOString(), pdf: !!r.pdf,
-    enviado_em: ultimo ? ultimo.em : null, desistiu_em: r.desistiu_em,
-    arquivos: r.arquivos.map((a) => ({ documento: a.documento, nome_original: a.nome_original, em: a.em, tamanho: a.tamanho })),
+    enviado_em: ultimo ? ultimo.em : null, desistiu_em: r.desistiu_em, envios: r.respostas.length, conferido_em: r.conferido_em || null,
+    arquivos: ativos(r).map((a) => ({ documento: a.documento, arquivo: a.arquivo, nome_original: a.nome_original, em: a.em, tamanho: a.tamanho })),
+    apagados: r.arquivos.filter((a) => a.apagado_em).length,
   });
 }
 
@@ -461,11 +490,17 @@ export async function enviarFichaPublica(request, env, avisar) {
   const falta = registro.formulario.filter((c) => c.obrig && (valores[c.nome] === null || valores[c.nome] === undefined)).map((c) => c.rotulo);
   if (falta.length) throw new ErroFicha(400, `Preencha: ${falta.join(', ')}.`);
   if (registro.respostas.length >= MAX_ENVIOS) throw new ErroFicha(429, 'Limite de envios deste link. Fale com quem enviou o link.');
+  if (registro.conferido_em) throw new ErroFicha(409, CONFERIDO);
   const em = new Date().toISOString();
   const novo = await mudarRegistro(env, fichaId, pessoa, (r) => {
     // conferido de novo com o registro de agora: dois envios ao mesmo tempo não passam do limite
     if (r.respostas.length >= MAX_ENVIOS) throw new ErroFicha(429, 'Limite de envios deste link. Fale com quem enviou o link.');
-    r.respostas.push({ em, valores, declaracao: true });
+    if (r.conferido_em) throw new ErroFicha(409, CONFERIDO);
+    // o que mudou desde o envio anterior (o registro do que foi trocado; no primeiro envio, nada)
+    const antes = r.respostas.at(-1);
+    const mudou = antes ? r.formulario.filter((c) => c.nome && String(antes.valores[c.nome] ?? '') !== String(valores[c.nome] ?? '')).map((c) => c.nome) : [];
+    r.respostas.push({ em, valores, declaracao: true, ...(antes ? { mudou } : {}) });
+    if (antes) r.eventos.push({ em, texto: mudou.length ? `dados corrigidos pelo link (${mudou.length} campo(s))` : 'dados enviados de novo, sem mudança' });
     if (['Aguardando', 'Falta documento'].includes(r.situacao)) r.situacao = 'Respondida';
     r.visto_em = null;
     r.eventos.push({ em, texto: 'dados enviados pelo link' });
@@ -481,7 +516,10 @@ export async function enviarFichaPublica(request, env, avisar) {
  */
 export async function receberArquivoPublico(request, env, url, avisar) {
   const { fichaId, pessoa, registro } = await registroDaChave(request, env, { gravar: true });
-  if (registro.arquivos.length >= MAX_ARQUIVOS) throw new ErroFicha(429, `Limite de ${MAX_ARQUIVOS} arquivos por link. Fale com quem enviou o link.`);
+  // troca de um documento mandado por engano: o anterior sai da pasta depois que o novo entra (só antes da conferência)
+  const troca = url.searchParams.get('troca') ? arquivoDoRegistro(registro, url.searchParams.get('troca')) : null;
+  if (troca && registro.conferido_em) throw new ErroFicha(409, CONFERIDO);
+  if (!troca && cheio(registro)) throw new ErroFicha(429, `Limite de ${MAX_ARQUIVOS} arquivos por link. Fale com quem enviou o link.`);
   const qual = String(url.searchParams.get('documento') || '');
   let documento;
   if (qual === 'assinada') documento = registro.pessoa === 'interessado' ? 'Ficha cadastral assinada' : 'Ficha do fiador assinada';
@@ -506,8 +544,16 @@ export async function receberArquivoPublico(request, env, url, avisar) {
   try {
     novo = await mudarRegistro(env, fichaId, pessoa, (r) => {
       // conferido de novo com o registro de agora: vários arquivos ao mesmo tempo não passam do limite
-      if (r.arquivos.length >= MAX_ARQUIVOS) throw new ErroFicha(429, `Limite de ${MAX_ARQUIVOS} arquivos por link. Fale com quem enviou o link.`);
-      r.arquivos.push({ documento, arquivo: nome.slice(nome.lastIndexOf('/') + 1), nome_original: texto(url.searchParams.get('nome'), 120), em, tamanho: corpo.byteLength, tipo: ext });
+      if (!troca && cheio(r)) throw new ErroFicha(429, `Limite de ${MAX_ARQUIVOS} arquivos por link. Fale com quem enviou o link.`);
+      const novoNome = nome.slice(nome.lastIndexOf('/') + 1);
+      r.arquivos.push({ documento, arquivo: novoNome, nome_original: texto(url.searchParams.get('nome'), 120), em, tamanho: corpo.byteLength, tipo: ext });
+      if (troca) {
+        if (r.conferido_em) throw new ErroFicha(409, CONFERIDO);
+        const velho = r.arquivos.find((a) => a.arquivo === troca.arquivo && !a.apagado_em);
+        if (!velho) throw new ErroFicha(409, 'Este documento já foi trocado ou apagado. Atualize a página.');
+        velho.apagado_em = em; velho.substituido_por = novoNome;
+        r.eventos.push({ em, texto: `documento trocado pelo link: ${velho.documento} (${velho.nome_original || velho.arquivo} → ${texto(url.searchParams.get('nome'), 120) || novoNome})` });
+      }
       if (qual === 'assinada') { r.situacao = 'Assinada'; r.eventos.push({ em, texto: 'ficha assinada enviada pelo link' }); }
       // o documento pedido chegou: sai do "Falta mandar"; zerada a lista, volta a "Respondida"
       if ((r.faltando || []).includes(documento)) {
@@ -522,8 +568,35 @@ export async function receberArquivoPublico(request, env, url, avisar) {
     try { await env.DADOS.delete(nome); } catch (e2) { console.error('arquivo do link sem registro', e2); }
     throw e;
   }
-  if (avisar) await avisar(env, novo, qual === 'assinada' ? 'assinou' : 'documento', documento);
-  return json(200, { ok: true, documento, situacao: novo.situacao, faltando: novo.faltando || [] });
+  if (troca) {
+    try { await paraLixeira(env.DADOS, `${registro.pasta}/${troca.arquivo}`, { por: `link da ficha (${pessoa}): trocado` }); } catch (e) { console.error('documento trocado que ficou na pasta', e); }
+  }
+  if (avisar) await avisar(env, novo, troca ? 'trocou' : qual === 'assinada' ? 'assinou' : 'documento', documento);
+  return json(200, { ok: true, documento, arquivo: nome.slice(nome.lastIndexOf('/') + 1), situacao: novo.situacao, faltando: novo.faltando || [] });
+}
+
+/**
+ * A pessoa apaga um documento mandado por engano: { arquivo }. Só antes da conferência da equipe. O arquivo sai da pasta da
+ * ficha; no link fica o registro (o que era, quando foi mandado e quando foi apagado). Ficha assinada apagada: volta a "Assinar".
+ */
+export async function apagarArquivoPublico(request, env, avisar) {
+  const { fichaId, pessoa, registro } = await registroDaChave(request, env, { gravar: true });
+  if (registro.conferido_em) throw new ErroFicha(409, CONFERIDO);
+  const alvo = arquivoDoRegistro(registro, (await lerJson(request, 4 * 1024)).arquivo);
+  const em = new Date().toISOString();
+  const novo = await mudarRegistro(env, fichaId, pessoa, (r) => {
+    if (r.conferido_em) throw new ErroFicha(409, CONFERIDO);
+    const a = r.arquivos.find((x) => x.arquivo === alvo.arquivo && !x.apagado_em);
+    if (!a) throw new ErroFicha(409, 'Este documento já foi trocado ou apagado. Atualize a página.');
+    a.apagado_em = em;
+    if (/assinada/.test(a.documento) && r.situacao === 'Assinada' && !ativos(r).some((x) => /assinada/.test(x.documento))) { r.situacao = 'Assinar'; r.mudou_em = em; }
+    r.visto_em = null;
+    r.eventos.push({ em, texto: `documento apagado pelo link: ${a.documento} (${a.nome_original || a.arquivo})` });
+    r.eventos = r.eventos.slice(-50);
+  });
+  try { await paraLixeira(env.DADOS, `${registro.pasta}/${alvo.arquivo}`, { por: `link da ficha (${pessoa}): apagado` }); } catch (e) { console.error('documento apagado que ficou na pasta', e); }
+  if (avisar) await avisar(env, novo, 'apagou', alvo.documento);
+  return json(200, { ok: true, situacao: novo.situacao });
 }
 
 /** "Não vou seguir com a análise": a equipe recebe o aviso e registra a desistência e a devolução da reserva no sistema. */
@@ -558,6 +631,7 @@ export async function atenderFicha(request, env, { avisar = null, caminho = null
     const m = request.method;
     if ((rota === '/' || rota === '' || rota === '/ficha') && m === 'GET') return paginaDaFicha();
     if (rota === '/contatos' && m === 'GET') return paginaDosContatos(); // comunicado com confirmação de contatos (contatos-publico.mjs)
+    if (rota === '/reserva' && m === 'GET') return paginaDoAceite(); // termo de aceite da reserva (aceite-reserva.mjs)
     if (rota === '/robots.txt') return new Response('User-agent: *\nDisallow: /\n', { headers: { 'Content-Type': 'text/plain' } });
     if (!rota.startsWith('/api/publico/')) return json(404, { erro: 'Não encontrado.' });
     if (m !== 'GET') {
@@ -568,9 +642,11 @@ export async function atenderFicha(request, env, { avisar = null, caminho = null
     }
     const r = rota.slice('/api/publico/'.length);
     if (r === 'contatos' || r.startsWith('contatos/')) return await atenderContatosPublico(request, env, r);
+    if (r === 'aceite' || r.startsWith('aceite/')) return await atenderAceitePublico(request, env, r);
     if (r === 'ficha' && m === 'GET') return await lerFichaPublica(request, env);
     if (r === 'ficha/enviar' && m === 'POST') return await enviarFichaPublica(request, env, avisar);
     if (r === 'ficha/arquivo' && m === 'PUT') return await receberArquivoPublico(request, env, url, avisar);
+    if (r === 'ficha/apagar' && m === 'POST') return await apagarArquivoPublico(request, env, avisar);
     if (r === 'ficha/desistir' && m === 'POST') return await desistirPublico(request, env, avisar);
     if (r === 'ficha/pdf' && m === 'GET') return await baixarPdfPublico(request, env);
     return json(404, { erro: 'Não encontrado.' });
@@ -679,6 +755,7 @@ button:disabled{opacity:.5}.aviso{border-left:4px solid var(--aviso);padding:8px
 .erro{color:var(--perigo);font-weight:600}table{width:100%;border-collapse:collapse}td{padding:6px 4px;border-bottom:1px solid var(--borda);vertical-align:top}
 td:first-child{color:var(--suave);width:38%}.doc{padding:10px 0;border-bottom:1px solid var(--borda)}.doc:last-child{border-bottom:0}
 .enviados{font-size:.9rem;color:var(--ok)}[hidden]{display:none!important}
+button.mini{padding:5px 10px;font-size:.85rem;margin:2px 4px 2px 6px}.enviado{margin:4px 0}
 </style></head><body><main id="app"><p class="suave">Carregando a ficha…</p></main>
 <script nonce="{{NONCE}}">
 (() => {
@@ -698,12 +775,13 @@ td:first-child{color:var(--suave);width:38%}.doc{padding:10px 0;border-bottom:1p
     return d;
   };
   let F = null;
+  let podeCorrigir = false; // até a equipe conferir, a pessoa troca dados e documentos (decisão do dono de 2026-11-24)
   const SITUACAO = {
     Aguardando: '', Respondida: '<div class="ok">Recebemos seus dados em {enviado}. Se precisar corrigir, altere abaixo e envie de novo.</div>',
     'Falta documento': '<div class="aviso"><b>Falta mandar:</b><ul>{faltando}</ul>Mande pelo campo do documento, mais abaixo.</div>',
     Assinar: '<div class="aviso"><b>Falta assinar a ficha.</b> Baixe a ficha em PDF, assine pelo gov.br (gratuito, em assinador.iti.br) ou à mão, e mande em "Ficha assinada", no fim da página.</div>',
     Assinada: '<div class="ok">Recebemos a ficha assinada. Obrigado! Avisaremos o resultado da análise.</div>',
-    Desistiu: '<div class="aviso">Você avisou em {desistiu} que não vai seguir com a análise. A reserva é devolvida por inteiro na conta de onde veio o depósito.</div>',
+    Desistiu: '<div class="aviso">Você avisou em {desistiu} que não vai seguir com a análise.{devolucao}</div>',
   };
 
   function campoHtml(c, v) {
@@ -772,8 +850,22 @@ td:first-child{color:var(--suave);width:38%}.doc{padding:10px 0;border-bottom:1p
   }
 
   let listaDesenhada = []; // a lista de documentos como está na tela (o campo "d3" é o 4º dela)
+  /** Um documento já mandado: o nome, a hora e, até a equipe conferir, os botões para trocar e apagar. */
+  function enviadoHtml(a) {
+    const botoes = podeCorrigir && a.arquivo ? '<button type="button" class="sec mini" data-trocar="' + esc(a.arquivo) + '">Trocar</button><button type="button" class="perigo mini" data-apagar="' + esc(a.arquivo) + '">Apagar</button>' : '';
+    return '<div class="enviado">✓ ' + esc(a.nome_original || 'arquivo') + ' (' + horaBr(a.em) + ')' + botoes + '</div>';
+  }
+  /** O que a pessoa já mandou e como corrigir. */
+  function resumoHtml() {
+    if (!F.enviado_em && !F.arquivos.length && !F.apagados) return '';
+    const dados = F.enviado_em ? 'Dados enviados em ' + horaBr(F.enviado_em) + (F.envios > 1 ? ' (mandados ' + F.envios + ' vezes)' : '') + '.' : 'Dados ainda não enviados.';
+    const docs = ' Documentos: ' + F.arquivos.length + ' arquivo(s)' + (F.apagados ? '; ' + F.apagados + ' trocado(s) ou apagado(s)' : '') + '.';
+    const como = F.conferido_em ? 'A equipe já conferiu em ' + dataBr(F.conferido_em) + ': para mudar algum dado ou documento, fale com quem enviou o link. Documento novo pode ser mandado normalmente.'
+      : 'Até a equipe conferir, você pode corrigir: mude os dados abaixo e envie de novo, ou troque e apague o documento mandado por engano. Tudo o que for trocado fica registrado.';
+    return '<div class="cartao"><h2>O que você já mandou</h2><p>' + esc(dados + docs) + '</p><p class="suave">' + esc(como) + '</p></div>';
+  }
   function documentosHtml() {
-    const enviados = (doc) => F.arquivos.filter((a) => a.documento === doc).map((a) => '✓ ' + esc(a.nome_original || 'arquivo') + ' (' + horaBr(a.em) + ')').join('<br>');
+    const enviados = (doc) => F.arquivos.filter((a) => a.documento === doc).map(enviadoHtml).join('');
     const linha = (doc, qual) => '<div class="doc"><div><b>' + esc(doc) + '</b></div><div class="enviados">' + enviados(doc) + '</div>'
       + '<input type="file" accept="application/pdf,image/jpeg,image/png" multiple data-documento="' + esc(qual) + '" aria-label="' + esc(doc) + '"><div class="suave" data-estado="' + esc(qual) + '"></div></div>';
     return '<div class="cartao"><h2>Documentos</h2><p class="suave">' + esc(F.contexto.dica) + ' PDF ou foto (JPG, PNG), até 10 MB cada. Pode mandar mais de um arquivo em cada item.</p>'
@@ -784,19 +876,23 @@ td:first-child{color:var(--suave);width:38%}.doc{padding:10px 0;border-bottom:1p
     const ctx = F.contexto;
     const fiador = F.pessoa !== 'interessado';
     const bloqueado = F.situacao === 'Desistiu' || F.vencido;
-    const modelo = F.situacao === 'Respondida' && !F.enviado_em ? '<div class="ok">Recebemos seus documentos. Obrigado!</div>' : (SITUACAO[F.situacao] || '');
-    const situacao = modelo.replace('{enviado}', horaBr(F.enviado_em)).replace('{desistiu}', dataBr(F.desistiu_em)).replace('{faltando}', F.faltando.map((x) => '<li>' + esc(x) + '</li>').join(''));
+    podeCorrigir = !bloqueado && !F.conferido_em;
+    const modelo = F.situacao === 'Respondida' && !F.enviado_em ? '<div class="ok">Recebemos seus documentos. Obrigado!</div>'
+      : F.situacao === 'Respondida' && F.conferido_em ? '<div class="ok">Recebemos seus dados em {enviado}. A equipe já conferiu: para corrigir alguma coisa, fale com quem enviou o link.</div>' : (SITUACAO[F.situacao] || '');
+    // desistência: a regra do termo aceito (ctx.devolucao, ex.: "a reserva de R$ 500,00 não é devolvida"); sem termo, devolve tudo
+    const devolucao = fiador ? '' : ctx.devolucao ? ' Como combinado: ' + ctx.devolucao.charAt(0).toLowerCase() + ctx.devolucao.slice(1) : ctx.reserva ? ' A reserva de ' + ctx.reserva + ' é devolvida por inteiro, na conta de onde veio o depósito.' : '';
+    const situacao = modelo.replace('{enviado}', horaBr(F.enviado_em)).replace('{desistiu}', dataBr(F.desistiu_em)).replace('{devolucao}', esc(devolucao)).replace('{faltando}', F.faltando.map((x) => '<li>' + esc(x) + '</li>').join(''));
     app.innerHTML = '<p class="suave">' + esc(ctx.empresa) + '</p><h1>' + (fiador ? 'Ficha do fiador' : 'Ficha cadastral') + '</h1>'
       + '<p>' + esc(ctx.nome ? 'Olá, ' + ctx.nome.split(' ')[0] + '! ' : '') + (fiador ? 'Você foi indicado como fiador' + (ctx.de ? ' de ' + esc(ctx.de) : '') + ' na locação do imóvel abaixo.' : 'Preencha seus dados e mande os documentos para a análise da locação.') + '</p>'
       + (F.vencido ? '<div class="aviso">O prazo deste link acabou em ' + dataBr(F.vence_em) + '. Peça um novo para quem enviou: o que você já mandou continua guardado.</div>' : '<p class="suave">Este link é só seu e vale até ' + dataBr(F.vence_em) + '.</p>')
-      + situacao + (mensagem ? '<div class="ok">' + mensagem + '</div>' : '')
+      + situacao + (mensagem ? '<div class="ok">' + mensagem + '</div>' : '') + resumoHtml()
       + '<div class="cartao"><h2>Imóvel</h2><p>' + esc(ctx.imovel) + '</p>' + (ctx.proposta.length ? '<table>' + ctx.proposta.map(([a, b]) => '<tr><td>' + esc(a) + '</td><td>' + esc(b) + '</td></tr>').join('') + '</table><p class="suave">Condições que dependem da aprovação da ficha.</p>' : '') + '</div>'
       + (F.pdf ? '<div class="cartao"><h2>Prefere imprimir?</h2><p class="suave">Baixe a ficha em PDF, preencha, assine (pelo gov.br ou à mão) e mande em "Ficha assinada", no fim da página.</p><button type="button" class="sec" id="baixar">Baixar a ficha em PDF</button></div>' : '')
-      + (bloqueado ? '' : '<form id="form" novalidate>' + formularioHtml() + documentosHtml()
-      + '<div class="cartao"><h2>Declaração</h2><label class="caixa"><input type="checkbox" id="declaracao"> Declaro que as informações e os documentos enviados são verdadeiros. Os documentos podem ser conferidos diretamente com a fonte (empregadores, cartórios, bancos e validadores oficiais), e apresentar documento, extrato, comprovante ou assinatura falsos é crime (Código Penal, artigos 171, 297, 298, 299 e 304), que pode ser comunicado à autoridade policial. Autorizo a consulta ' + (F.contexto.tipo === 'Pessoa jurídica (empresa)' ? 'do CNPJ da empresa e do CPF do representante' : 'do nome e do CPF') + ' em cadastros de crédito (como Serasa e SPC) e o uso destes dados para a análise desta locação e, se aprovada, para o contrato (Lei 13.709/2018).</label>'
-      + '<p class="erro" id="erro" hidden></p><button type="submit" id="enviar">Enviar meus dados</button></div>'
-      + '<div class="cartao"><h2>Ficha assinada</h2><p class="suave">Depois de conferirmos os dados, mande aqui a ficha assinada (pelo gov.br, em assinador.iti.br, ou à mão: foto ou PDF).</p>' + '<div class="enviados">' + F.arquivos.filter((a) => /assinada/.test(a.documento)).map((a) => '✓ ' + esc(a.nome_original || 'arquivo') + ' (' + horaBr(a.em) + ')').join('<br>') + '</div><input type="file" accept="application/pdf,image/jpeg,image/png" data-documento="assinada" aria-label="Ficha assinada"><div class="suave" data-estado="assinada"></div></div>'
-      + (fiador ? '' : '<div class="cartao"><h2>Não vai seguir?</h2><p class="suave">Se faltar algum documento ou você preferir não seguir com a análise, sem problema: é só avisar' + (ctx.reserva ? ' e a reserva de ' + esc(ctx.reserva) + ' é devolvida por inteiro, sem descontos' : '') + '.</p><button type="button" class="perigo" id="desistir">Não vou seguir com a análise</button></div>')
+      + (bloqueado ? '' : '<form id="form" novalidate><div id="dados">' + formularioHtml() + '</div>' + documentosHtml()
+      + (F.conferido_em ? '<div class="cartao"><p class="suave">Seus dados já foram conferidos pela equipe. Para corrigir alguma coisa, fale com quem enviou o link.</p></div>' : '<div class="cartao"><h2>Declaração</h2><label class="caixa"><input type="checkbox" id="declaracao"> Declaro que as informações e os documentos enviados são verdadeiros. Os documentos podem ser conferidos diretamente com a fonte (empregadores, cartórios, bancos e validadores oficiais), e apresentar documento, extrato, comprovante ou assinatura falsos é crime (Código Penal, artigos 171, 297, 298, 299 e 304), que pode ser comunicado à autoridade policial. Autorizo a consulta ' + (F.contexto.tipo === 'Pessoa jurídica (empresa)' ? 'do CNPJ da empresa e do CPF do representante' : 'do nome e do CPF') + ' em cadastros de crédito (como Serasa e SPC) e o uso destes dados para a análise desta locação e, se aprovada, para o contrato (Lei 13.709/2018).</label>'
+      + '<p class="erro" id="erro" hidden></p><button type="submit" id="enviar">Enviar meus dados</button></div>')
+      + '<div class="cartao"><h2>Ficha assinada</h2><p class="suave">Depois de conferirmos os dados, mande aqui a ficha assinada (pelo gov.br, em assinador.iti.br, ou à mão: foto ou PDF).</p>' + '<div class="enviados">' + F.arquivos.filter((a) => /assinada/.test(a.documento)).map(enviadoHtml).join('') + '</div><input type="file" accept="application/pdf,image/jpeg,image/png" data-documento="assinada" aria-label="Ficha assinada"><div class="suave" data-estado="assinada"></div></div>'
+      + (fiador ? '' : '<div class="cartao"><h2>Não vai seguir?</h2><p class="suave">' + (ctx.devolucao && /não é devolvida|devolvemos R/.test(ctx.devolucao) ? 'Se você preferir não seguir com a análise, avise por aqui' : 'Se faltar algum documento ou você preferir não seguir com a análise, sem problema: é só avisar') + (ctx.devolucao ? '. ' + esc(ctx.devolucao).replace(/[.]$/, '') : ctx.reserva ? ' e a reserva de ' + esc(ctx.reserva) + ' é devolvida por inteiro, sem descontos' : '') + '.</p><button type="button" class="perigo" id="desistir">Não vou seguir com a análise</button></div>')
       + '</form>')
       + '<p class="suave">Seus dados são tratados conforme a Lei Geral de Proteção de Dados (Lei 13.709/2018) e usados só para a análise desta locação.</p>';
     ligar();
@@ -814,6 +910,43 @@ td:first-child{color:var(--suave);width:38%}.doc{padding:10px 0;border-bottom:1p
       } catch (e) { alert(e.message); }
     };
     if (!form) return;
+    if (F.conferido_em) for (const el of document.querySelectorAll('#dados input, #dados select, #dados textarea')) el.disabled = true;
+    /** Desenha de novo sem perder a rolagem nem a declaração marcada. */
+    const redesenhar = () => {
+      const dec = document.getElementById('declaracao'); const marcada = !!(dec && dec.checked);
+      const y = window.scrollY; F.valores = { ...F.valores, ...valoresDoForm() };
+      desenhar(); const d2 = document.getElementById('declaracao'); if (d2) d2.checked = marcada; window.scrollTo(0, y);
+    };
+    for (const b of form.querySelectorAll('[data-apagar]')) b.addEventListener('click', async () => {
+      const a = F.arquivos.find((x) => x.arquivo === b.dataset.apagar);
+      if (!a || !confirm('Apagar "' + (a.nome_original || 'arquivo') + '" (' + a.documento + ')? Ele sai da ficha; fica só o registro de que foi apagado.')) return;
+      b.disabled = true;
+      try {
+        const r = await api('ficha/apagar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ arquivo: a.arquivo }) });
+        F.arquivos = F.arquivos.filter((x) => x.arquivo !== a.arquivo); F.apagados = (F.apagados || 0) + 1; if (r.situacao) F.situacao = r.situacao;
+        redesenhar();
+      } catch (e) { alert(e.message); b.disabled = false; }
+    });
+    for (const b of form.querySelectorAll('[data-trocar]')) b.addEventListener('click', () => {
+      const a = F.arquivos.find((x) => x.arquivo === b.dataset.trocar);
+      if (!a) return;
+      const escolher = Object.assign(document.createElement('input'), { type: 'file', accept: 'application/pdf,image/jpeg,image/png' });
+      escolher.addEventListener('change', async () => {
+        const arq = escolher.files[0];
+        if (!arq) return;
+        if (arq.size > 10 * 1024 * 1024) { alert(arq.name + ': passa de 10 MB.'); return; }
+        const documento = /assinada/.test(a.documento) ? 'assinada' : a.documento === 'Outro documento' ? 'outro' : a.documento;
+        b.disabled = true; b.textContent = 'Enviando…';
+        try {
+          const r = await api('ficha/arquivo?documento=' + encodeURIComponent(documento) + '&nome=' + encodeURIComponent(arq.name) + '&troca=' + encodeURIComponent(a.arquivo), { method: 'PUT', body: arq });
+          F.arquivos = F.arquivos.filter((x) => x.arquivo !== a.arquivo);
+          F.arquivos.push({ documento: r.documento, arquivo: r.arquivo, nome_original: arq.name, em: new Date().toISOString() }); F.apagados = (F.apagados || 0) + 1;
+          if (r.situacao) F.situacao = r.situacao;
+          redesenhar();
+        } catch (e) { alert(e.message); b.disabled = false; b.textContent = 'Trocar'; }
+      });
+      escolher.click();
+    });
     form.addEventListener('change', (ev) => {
       aplicarMostrar();
       // mudou o tipo de renda ou o estado civil: a lista de documentos muda junto
@@ -838,7 +971,7 @@ td:first-child{color:var(--suave);width:38%}.doc{padding:10px 0;border-bottom:1p
       try {
         const valores = valoresDoForm();
         const r = await api('ficha/enviar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ valores, declaracao: true }) });
-        F.valores = { ...F.valores, ...valores, ...(r.valores || {}) }; F.enviado_em = r.enviado_em; F.situacao = r.situacao;
+        F.valores = { ...F.valores, ...valores, ...(r.valores || {}) }; F.enviado_em = r.enviado_em; F.situacao = r.situacao; F.envios = (F.envios || 0) + 1;
         desenhar('Dados enviados. Obrigado! Se ainda faltar algum documento, mande pelos campos de documentos.');
         scrollTo(0, 0);
       } catch (e) { erro.textContent = e.message; erro.hidden = false; botao.disabled = false; botao.textContent = 'Enviar meus dados'; }
@@ -854,7 +987,7 @@ td:first-child{color:var(--suave);width:38%}.doc{padding:10px 0;border-bottom:1p
           estado.textContent = 'Enviando ' + arq.name + '…';
           try {
             const r = await api('ficha/arquivo?documento=' + encodeURIComponent(documento) + '&nome=' + encodeURIComponent(arq.name), { method: 'PUT', body: arq });
-            F.arquivos.push({ documento: r.documento, nome_original: arq.name, em: new Date().toISOString() });
+            F.arquivos.push({ documento: r.documento, arquivo: r.arquivo, nome_original: arq.name, em: new Date().toISOString() });
             if (r.situacao) F.situacao = r.situacao; else if (qual === 'assinada') F.situacao = 'Assinada';
             if (Array.isArray(r.faltando)) F.faltando = r.faltando;
             estado.textContent = '';
@@ -873,7 +1006,7 @@ td:first-child{color:var(--suave);width:38%}.doc{padding:10px 0;border-bottom:1p
     }
     const desistir = document.getElementById('desistir');
     if (desistir) desistir.onclick = async () => {
-      if (!confirm('Avisar que você não vai seguir com a análise?' + (F.contexto.reserva ? ' A reserva é devolvida por inteiro.' : ''))) return;
+      if (!confirm('Avisar que você não vai seguir com a análise?' + (F.contexto.devolucao ? ' ' + F.contexto.devolucao : F.contexto.reserva ? ' A reserva é devolvida por inteiro.' : ''))) return;
       try { await api('ficha/desistir', { method: 'POST' }); F.situacao = 'Desistiu'; F.desistiu_em = new Date().toISOString(); desenhar(); scrollTo(0, 0); } catch (e) { alert(e.message); }
     };
   }

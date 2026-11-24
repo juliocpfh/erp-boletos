@@ -23,14 +23,14 @@ function alvoDoRecibo(tipo) {
   const db = d();
   let motivo = '';
   const tenta = (alvo, usado) => { const r = REC.reciboDisponivel(db, tipo, alvo); if (r.ok) return { alvo, usado }; motivo = motivo || r.motivo; return null; };
-  if (['ficha', 'ficha_fiador', 'devolucao_reserva'].includes(tipo) || tipo === 'reserva') {
+  if (['ficha', 'ficha_fiador', 'devolucao_reserva', 'termo_reserva'].includes(tipo) || tipo === 'reserva') {
     for (const f of db.fichas || []) { const x = tenta({ ficha: f, ...(tipo === 'ficha_fiador' ? { fiador: 1 } : {}) }, nomeFicha(f)); if (x) return x; }
   }
   if (tipo === 'acordo') {
     for (const a of db.acordos || []) { const c = buscar('contratos', a.contrato_id); const x = c && tenta({ contrato: c, acordo: a.id, id: a.id }, `${nomeContrato(c)} · acordo nº ${a.id}`); if (x) return x; }
   } else if (tipo === 'notificacao') {
     for (const n of db.notificacoes || []) { const c = buscar('contratos', n.contrato_id); const x = c && tenta({ contrato: c, id: n.id }, `${nomeContrato(c)} · notificação nº ${n.id}`); if (x) return x; }
-  } else if (!['ficha', 'ficha_fiador', 'devolucao_reserva'].includes(tipo)) {
+  } else if (!['ficha', 'ficha_fiador', 'devolucao_reserva', 'termo_reserva'].includes(tipo)) {
     for (const c of db.contratos) { const x = tenta({ contrato: c }, nomeContrato(c)); if (x) return x; }
   }
   return { motivo: motivo || 'Nenhum registro no banco.' };
@@ -38,6 +38,7 @@ function alvoDoRecibo(tipo) {
 
 /** O que cadastrar para cada recibo, quando nenhum registro serve. */
 const FALTA_RECIBO = {
+  termo_reserva: 'uma ficha em análise com a reserva combinada (ou o termo já aceito)',
   reserva: 'uma ficha em análise (ou contrato) com o valor e a data da reserva',
   devolucao_reserva: 'uma ficha com reserva e a devolução registrada (data e comprovante)',
   garantia: 'um contrato com caução ou depósito em dinheiro já depositado',

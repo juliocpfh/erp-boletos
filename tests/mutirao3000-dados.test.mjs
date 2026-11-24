@@ -154,6 +154,14 @@ test('itens 5 a 8: extrato, reajuste, cálculo final, leitura e guia feitos em d
   }
   // o que não conta não é barrado: leitura de outro momento, boleto do complemento da caução, lançamento sem código do banco
   lote(DONO, [ins('cobrancas', 1, { contrato_id: 1, competencia: '2026-08' }), ins('cobrancas', 2, { contrato_id: 1, competencia: '2026-08', caucao_complemento: 5000 })]);
+  // boleto do saldo da saída e parcela de acordo no mesmo mês do aluguel (saída em 15/12, saldo vencendo em 01/2027 = competência 2026-12)
+  lote(DONO, [ins('cobrancas', 3, { contrato_id: 1, competencia: '2026-12' })]);
+  lote(SOCIA, [ins('cobrancas', 1003, { contrato_id: 1, competencia: '2026-12', saldo_saida_de: 5 }), ins('cobrancas', 1004, { contrato_id: 1, competencia: '2026-12', acordo_parcela_de: 7 })]);
+  assert.equal(c.tudo().cobrancas.filter((x) => x.competencia === '2026-12').length, 3);
+  // o saldo já na nuvem não barra o aluguel do mês, mas um 2º aluguel do mês continua barrado
+  lote(DONO, [ins('cobrancas', 4, { contrato_id: 1, competencia: '2027-01', saldo_saida_de: 5 })]);
+  lote(SOCIA, [ins('cobrancas', 1005, { contrato_id: 1, competencia: '2027-01' })]);
+  assert.throws(() => lote(DONO, [ins('cobrancas', 6, { contrato_id: 1, competencia: '2026-12' })]), (e) => e.status === 409);
   lote(DONO, [ins('leituras', 2, { contrato_id: 1, momento: 'Outra', agua: '1' }), ins('leituras', 3, { contrato_id: 1, momento: 'Outra', agua: '2' })]);
   lote(DONO, [ins('movimentacoes_banco', 2, { conta_id: 'ank', id_externo: '' }), ins('movimentacoes_banco', 3, { conta_id: 'ank', id_externo: '' })]);
   // excluído e feito de novo no mesmo lote: vale

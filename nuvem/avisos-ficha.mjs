@@ -3,7 +3,8 @@
 //   desistência, falta documento, a ficha está pronta para assinar. O link não vai no e-mail (o servidor não guarda a chave):
 //   o texto pede para abrir o mesmo link que a pessoa recebeu.
 // - para a equipe: e-mail na caixa da empresa (AVISOS_EQUIPE, ou o próprio remetente do Gmail) e aviso no celular
-//   (push.mjs), quando a pessoa manda os dados, o primeiro documento, a ficha assinada ou desiste.
+//   (push.mjs), a cada dado e a cada documento que a pessoa manda, troca ou apaga (decisão do dono de 2026-11-24), na ficha
+//   assinada e na desistência.
 // Sem o Gmail ligado, os e-mails não saem; sem as chaves VAPID, o aviso no celular não sai: o Painel continua avisando.
 import { contaGuardada, emailValido, enviarEmail, estadoEmail } from './gmail.mjs';
 import { avisarAparelhos } from './push.mjs';
@@ -25,7 +26,7 @@ export const AVISO_CELULAR = { titulo: 'Ficha pela internet', texto: 'Chegou nov
 
 /**
  * Textos dos avisos de um evento: { pessoa: { assunto, texto } | null, equipe: { titulo, texto } | null }.
- * Eventos: enviou, documento, assinou, desistiu (da pessoa); falta, assinar (da equipe, pelo sistema).
+ * Eventos: enviou, documento, trocou, apagou, assinou, desistiu (da pessoa); falta, assinar (da equipe, pelo sistema).
  */
 export function textosDoAviso(registro, evento, detalhe = '') {
   const c = registro.contexto || {};
@@ -39,16 +40,26 @@ export function textosDoAviso(registro, evento, detalhe = '') {
   const out = { pessoa: null, equipe: null };
   if (evento === 'enviou') {
     if ((registro.respostas || []).length === 1) out.pessoa = { assunto: `Recebemos ${qual}${imovel}`, texto: `${ola}\n\nRecebemos os seus dados. Agora conferimos tudo e, se faltar algo, avisamos. Se ainda faltar mandar algum documento, use o mesmo link.${fecho}` };
-    out.equipe = { titulo: `${quem} mandou os dados`, texto: `${quem} preencheu a ficha pela internet${imovel}. Confira e traga para a ficha.` };
+    const ultimo = (registro.respostas || []).at(-1) || {};
+    const campos = (ultimo.mudou || []).map((n) => ((registro.formulario || []).find((c) => c.nome === n) || {}).rotulo || n);
+    out.equipe = (registro.respostas || []).length > 1
+      ? { titulo: `${quem} corrigiu os dados`, texto: `${quem} mandou os dados de novo pelo link${imovel}${campos.length ? `. Mudou: ${campos.join(', ')}` : ', sem mudança'}. Confira e traga para a ficha.` }
+      : { titulo: `${quem} mandou os dados`, texto: `${quem} preencheu a ficha pela internet${imovel}. Confira e traga para a ficha.` };
   } else if (evento === 'documento') {
-    if ((registro.arquivos || []).length === 1) out.equipe = { titulo: `${quem} começou a mandar documentos`, texto: `Primeiro documento pelo link: ${detalhe}.` };
+    // a cada documento (pedido do dono, 2026-11-24): o primeiro diz que começou
+    const primeiroDoc = (registro.arquivos || []).length === 1;
+    out.equipe = { titulo: primeiroDoc ? `${quem} começou a mandar documentos` : `${quem} mandou um documento`, texto: `${primeiroDoc ? 'Primeiro documento' : 'Documento'} pelo link${imovel}: ${detalhe}.` };
+  } else if (evento === 'trocou') {
+    out.equipe = { titulo: `${quem} trocou um documento`, texto: `${quem} trocou pelo link${imovel} o documento "${detalhe}" (o anterior foi apagado; o registro fica no link). Confira o novo.` };
+  } else if (evento === 'apagou') {
+    out.equipe = { titulo: `${quem} apagou um documento`, texto: `${quem} apagou pelo link${imovel} o documento "${detalhe}", mandado por engano (o registro fica no link).` };
   } else if (evento === 'assinou') {
     // só a primeira ficha assinada avisa (mandar de novo não repete os e-mails)
     if ((registro.arquivos || []).filter((a) => /assinada/.test(a.documento)).length > 1) return out;
     out.pessoa = { assunto: `Recebemos ${qual} assinada${imovel}`, texto: `${ola}\n\nRecebemos a ficha assinada. Avisaremos o resultado da análise.${fecho}` };
     out.equipe = { titulo: `${quem} mandou a ficha assinada`, texto: `A ficha assinada chegou pelo link${imovel}. Confira a assinatura na página da ficha.` };
   } else if (evento === 'desistiu') {
-    out.pessoa = { assunto: `Recebemos seu aviso${imovel}`, texto: `${ola}\n\nRecebemos o seu aviso de que não vai seguir com a análise. Sem problema${c.reserva ? `: a reserva de ${c.reserva} é devolvida por inteiro, na conta de onde veio o depósito` : ''}.${fecho}` };
+    out.pessoa = { assunto: `Recebemos seu aviso${imovel}`, texto: `${ola}\n\nRecebemos o seu aviso de que não vai seguir com a análise. Sem problema${c.devolucao ? `. Como combinado: ${c.devolucao.replace(/[.]$/, '')}` : c.reserva ? `: a reserva de ${c.reserva} é devolvida por inteiro, na conta de onde veio o depósito` : ''}.${fecho}` };
     out.equipe = { titulo: `${quem} não vai seguir`, texto: `${quem} avisou pelo link que não vai seguir com a análise. Registre a desistência na ficha${c.reserva ? ` e devolva a reserva de ${c.reserva}` : ''}.` };
   } else if (evento === 'falta') {
     out.pessoa = { assunto: `Falta um documento: ${qual}${imovel}`, texto: `${ola}\n\nPara seguir com a análise, falta:\n${(registro.faltando || []).map((x) => `- ${x}`).join('\n')}\n\n${voltar} Lá aparece o que falta e o campo para mandar.${fecho}` };

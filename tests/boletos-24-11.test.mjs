@@ -25,9 +25,9 @@ test('ajuste do mês: vários abatimentos e cobranças no mesmo boleto, cada um 
   assert.equal(R.totais(cb).a_pagar_pontual, antes - 10000);
   assert.deepEqual(R.partesDosOutros(cb).map((p) => p.valor), [8000, -15000, -3000]);
   const desc = R.dadosBoleto(d, cb).descricao;
-  assert.match(desc, /CONSERTO DA TORNEIRA RS80,00/);
-  assert.match(desc, /REFORMA DO BANHEIRO -RS150,00/);
-  assert.match(desc, /ACERTO DA ÁGUA -RS30,00/);
+  assert.match(desc, /CONSERTO DA TORNEIRA 80,00/);
+  assert.match(desc, /REFORMA DO BANHEIRO -150,00/);
+  assert.match(desc, /ACERTO DA ÁGUA -30,00/);
   const [, reforma] = R.ajustesDoBoleto(cb);
   R.retirarAjuste(d, cb.id, reforma.id, 'j');
   assert.equal(cb.outros, 5000);
@@ -73,4 +73,17 @@ test('boleto alterado à mão antes de 24/11: fica como está, mas avisa que o s
   const a = R.alertasBoletosManuais(d);
   assert.equal(a.length, 1);
   assert.match(a[0].texto, /Seguro obrigatório R\$\s?30,00 no cadastro e R\$\s?0,00 no boleto/);
+});
+
+test('demonstrativo: cada taxa do condomínio numa linha, agrupada pelo mês do condomínio', () => {
+  const { d, c, cb } = base();
+  for (const [descricao, valor] of [['Fundo de reserva', 10092], ['Extraordinárias', 35318]]) {
+    R.inserir(d, 'ressarcimentos', { contrato_id: c.id, competencia_condominio: '2026-10', descricao, valor, data_pagamento: '2026-10-30', competencia_abatimento: '2026-11' }, 'j');
+  }
+  R.aplicarRessarcimentos(d, c, '2026-11', 'j');
+  assert.equal(cb.ressarcimento, 45410);
+  assert.deepEqual(R.taxasNoBoleto(d, cb), [{ mes: '2026-10', itens: [{ descricao: 'Extraordinárias', valor: 35318 }, { descricao: 'Fundo de reserva', valor: 10092 }] }]);
+  // boleto antigo, com o abatido diferente do lançado: fica a linha única de antes
+  cb.ressarcimento = 1000;
+  assert.deepEqual(R.taxasNoBoleto(d, cb), []);
 });

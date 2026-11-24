@@ -578,6 +578,7 @@ export const FORMULARIOS = {
     const aMais = p.valor > r.valor_devido && valorNf === r.valor_nf ? p.valor - r.valor_devido : 0;
     aviso(aMais ? `Pagamento confirmado. Recebido ${reais(p.valor)}; NF de ${reais(valorNf)}. Ficaram ${reais(aMais)} anotados para devolver ao inquilino. Data da NF: ${dataBr(p.data)}.`
       : `Pagamento confirmado com valor diferente do previsto. Recebido ${reais(p.valor)}; NF de ${reais(valorNf)} (calculada ${reais(r.valor_nf)}). Data da NF: ${dataBr(p.data)}.`, 'aviso');
+    await mostrar(); // a página do boleto passa a mostrar "Pago" (senão o quadro do valor diferente continuava na tela)
   },
 
   /** Pago a mais devolvido por fora do extrato (outra conta, dinheiro): anota a devolução no boleto (mensal-009). */

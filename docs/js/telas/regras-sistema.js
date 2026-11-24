@@ -149,7 +149,7 @@ export function telaRegras(q = {}) {
   if (q.perfil) return telaPerfilRegras(q.perfil);
   const admin = podeUsuario('admin');
   const regras = R.regrasDe(d());
-  const mudadas = CR.DEFINICOES_REGRAS.filter((x) => !CR.mesmoValor(regras[x.chave], x.padrao));
+  const mudadas = CR.REGRAS_NA_TELA.filter((x) => !CR.mesmoValor(regras[x.chave], x.padrao)); // a `fora` (assinatura digital) fica na sua caixa
   const versoes = [...(d().versoes_regras || [])].sort((a, b) => String(b.salvo_em).localeCompare(String(a.salvo_em)));
   return `<p class="suave"><a href="#/dados">← Sistema</a></p><h1>Regras do sistema</h1>
     <div class="alerta info">Cada regra mostra o que faz, a consequência de cada escolha e a lei. O <b>padrão do sistema</b> são as regras originais, gravadas no programa: elas valem enquanto nada for mudado e sempre dá para voltar a elas. O sistema avisa quando uma escolha tem risco legal, mas não proíbe.

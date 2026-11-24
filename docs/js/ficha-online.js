@@ -87,6 +87,8 @@ export function contextoDaFicha(d, f, pessoa) {
   return {
     empresa: e.razao_social || e.nome || '', nome: nomeDaPessoa(f, pessoa), imovel: imoveis.join(' ou '), tipo: f.inquilino_tipo || 'Pessoa física',
     reserva: !fiador && f.reserva_valor > 0 ? C.reais(f.reserva_valor) : '', de: fiador ? f.inquilino_nome : '',
+    // o que acontece com a reserva se a pessoa desistir (termo de aceite da reserva, 2026-11-24; sem termo: devolvida por inteiro)
+    devolucao: !fiador && f.reserva_valor > 0 ? REC.textoDesistencia(f) : '',
     proposta: fiador ? [] : REC.itensDaProposta(f),
     documentos: fiador ? R.documentosDoFiador(R.fiadorDaFicha(f, pessoa.slice(6))) : R.documentosDaFicha(f),
     // pessoa física: a página refaz a lista quando a pessoa escolhe o tipo de renda e o estado civil
@@ -115,7 +117,7 @@ export function textoWhatsapp(f, pessoa, link, { lembrete = false, faltando = []
   const validade = C.dataBr(String(link.vence_em).slice(0, 10));
   if (lembrete) {
     return `Olá${nome ? `, ${nome}` : ''}! Passando para lembrar ${qual}${faltando.length ? `. Falta: ${faltando.join('; ')}` : ''}. O link vale até ${validade}: ${link.url}
-Se preferir não seguir, é só avisar por lá${!fiador && f.reserva_valor > 0 ? ': a reserva é devolvida por inteiro' : ''}.`;
+Se preferir não seguir, é só avisar por lá${!fiador && f.reserva_valor > 0 ? `. ${REC.textoDesistencia(f)}` : ''}.`.replace(/\.\.$/, '.');
   }
   return `Olá${nome ? `, ${nome}` : ''}! Segue o link ${qual}, que vale até ${validade}: ${link.url}
 Pelo link você preenche os dados, manda os documentos e, depois, a ficha assinada (pelo gov.br ou à mão). Qualquer dúvida, é só responder.`;
@@ -153,7 +155,7 @@ export function dadosParaFicha(f, l) {
   const out = {};
   if (ultimo) for (const [k, v] of Object.entries(ultimo.valores || {})) if (campos.has(k) && v !== null && v !== undefined && v !== '') out[k] = v;
   if (l.pessoa === 'interessado') {
-    const docs = (l.arquivos || []).map((a) => a.documento);
+    const docs = (l.arquivos || []).filter((a) => !a.apagado_em).map((a) => a.documento);
     const renda = new Set([...Object.values(R.DOCUMENTOS_RENDA).flat(), ...R.PARTES_DOCUMENTOS_PF.renda_padrao, 'Faturamento dos 3 últimos meses (extratos bancários da empresa em PDF ou declaração do contador)']);
     if (docs.some((x) => /^Documento com foto/.test(x) || /^Contrato social|^Cartão do CNPJ/.test(x))) out.doc_pessoais = true;
     if (docs.some((x) => renda.has(x))) out.doc_renda = true;

@@ -28,7 +28,7 @@ const comListas = (campos) => campos.map((c) => (c.lista ? { ...c, opcoes: R.lis
 export function caixaReservaAbatida(c) {
   const usos = d().cobrancas.filter((x) => x.contrato_id === c.id && x.reserva_utilizada > 0);
   const ant = c.reserva_usada_anterior > 0 && R.contratoHerdado(d(), c);
-  const nosBoletos = [usos.length ? `Abatida nos boletos: ${usos.map((x) => `${compBr(x.competencia)} ${reais(x.reserva_utilizada)}${x.data_pagamento ? ' (pago)' : ''}`).join('; ')}.` : '',
+  const nosBoletos = [usos.length ? `Abatida nos boletos: ${usos.map((x) => `ref. ${compBr(x.competencia)} (vence ${dataBr(x.vencimento)}) ${reais(x.reserva_utilizada)}${x.data_pagamento ? ' (pago)' : ''}`).join('; ')}.` : '',
     ant ? `Já usada no contrato de ${esc(ant.inquilino_nome)}: ${reais(c.reserva_usada_anterior)}${R.mesesUsoReserva(d(), ant).length ? `, em ${R.mesesUsoReserva(d(), ant).map(compBr).join(', ')}` : ''}.` : ''].filter(Boolean).join(' ');
   if (c.reserva_abatida_valor > 0) {
     return `<div class="alerta ok"><b>Reserva já abatida</b> em ${compBr(c.reserva_abatida_comp)}: ${reais(c.reserva_abatida_valor)} (aluguel antigo, fora dos boletos do sistema).
@@ -38,7 +38,7 @@ export function caixaReservaAbatida(c) {
   const max = R.reservaParaMarcarAbatida(d(), c);
   return `${usos.length || ant ? `<p class="suave">${nosBoletos}</p>` : `<div class="alerta aviso"><b>Reserva ainda não abatida em nenhum boleto do sistema.</b> Se ela já foi abatida num aluguel antigo, marque abaixo o mês e o valor.</div>`}
     ${opera() ? `${max > 0 ? `<form data-form="reservaAbatida" class="acoes" style="margin-top:6px"><input type="hidden" name="contrato" value="${c.id}">
-        <label class="suave" style="margin:0">Abatida em</label><input type="month" name="competencia" value="${esc(R.competenciaReserva(c) || '')}" style="width:auto" required>
+        <label class="suave" style="margin:0" title="Mês de referência do aluguel antigo (não o do vencimento)">Abatida no aluguel de (referência)</label><input type="month" name="competencia" value="${esc(R.competenciaReserva(c) || '')}" style="width:auto" required>
         <label class="suave" style="margin:0">valor R$</label><input name="valor" value="${esc(C.reais(max, false))}" style="width:120px" inputmode="decimal" data-dinheiro required>
         <button class="secundario pequeno">Marcar como já abatida</button></form>` : ''}` : ''}`;
 }
@@ -244,7 +244,14 @@ export const CADASTROS = {
   },
   ressarcimentos: {
     titulo: (r, q) => `Ressarcimento de condomínio - ${buscar('contratos', r ? r.contrato_id : q.contrato).inquilino_nome}`,
-    campos: () => F.RESSARCIMENTO.map((c) => (c.nome === 'descricao' ? { ...c, sugestoes: R.taxasCondominioUsadas(d()) } : c)),
+    // o mês do abatimento é perguntado pelo mês em que o boleto vence (dados reais de 24/11/2026: "12/2026" digitado para o
+    // boleto que vence em 05/12 ia para o boleto de referência 12/2026, que vence em janeiro); gravado continua a referência
+    campos: () => F.RESSARCIMENTO.map((c) => (c.nome === 'descricao' ? { ...c, sugestoes: R.taxasCondominioUsadas(d()) }
+      : c.nome === 'competencia_abatimento' ? { nome: 'vencimento_abatimento', rotulo: 'Abater no boleto que vence em (mês do vencimento)', tipo: 'mes', autoMsg: true,
+        ajuda: 'O mês em que vence o boleto do aluguel (ex.: 12/2026 = o boleto que vence em dezembro). Em branco: o boleto que vence no mês seguinte ao pagamento do condomínio' }
+        : c)),
+    valores: (r) => ({ ...r, vencimento_abatimento: R.mesVencimentoDaCompetencia(buscar('contratos', r.contrato_id), r.competencia_abatimento) }),
+    extraHtml: (r, q) => `<span hidden data-contrato-boleto="${Number(r ? r.contrato_id : q.contrato)}" data-mes-boleto="vencimento_abatimento" data-pagamento="data_pagamento"></span>`,
     conferir: conferirRessarcimento,
     padrao: () => ({ competencia_condominio: C.competenciaDe(C.hojeIso()) }),
     fixos: (r, q) => (r ? {} : { contrato_id: Number(q.contrato) }),
@@ -252,6 +259,9 @@ export const CADASTROS = {
     ajustar(dados, erros, r, form, q) {
       const c = buscar('contratos', r ? r.contrato_id : q.contrato);
       if (dados.valor !== null && dados.valor <= 0) erros.valor = 'Informe o valor';
+      // o formulário manda o mês do vencimento; quem chama sem ele (importação, testes antigos) manda a referência direto
+      if ('vencimento_abatimento' in dados) dados.competencia_abatimento = R.competenciaDoMesVencimento(c, dados.vencimento_abatimento);
+      delete dados.vencimento_abatimento;
       // data do pagamento mudada na edição e o mês do abatimento era o calculado pela data antiga: acompanha a data nova
       // (conferência de 24/11/2026). Ex.: pago em 05/11 (boleto de 11/2026) corrigido para 05/12 → boleto de 12/2026
       if (r && dados.data_pagamento && r.data_pagamento && dados.data_pagamento !== r.data_pagamento
@@ -260,21 +270,21 @@ export const CADASTROS = {
       // mês sem boleto deste contrato (depois da saída ou da troca de titular): o ressarcimento não abateria em lugar nenhum
       const sem = R.semBoletoNoMes(d(), c, dados.competencia_abatimento);
       if (sem) {
-        erros.competencia_abatimento = `Não há onde abater: ${R.textoSemBoleto(sem, dados.competencia_abatimento)}. ${sem.motivo === 'troca' ? `Lance o ressarcimento no contrato de ${sem.novo.inquilino_nome}, ou escolha` : 'Escolha'} um boleto em aberto deste contrato${sem.motivo === 'saida' ? ' (ou devolva ao inquilino)' : ''}`;
+        erros.vencimento_abatimento = `Não há onde abater: ${R.textoSemBoleto(sem, dados.competencia_abatimento)}. ${sem.motivo === 'troca' ? `Lance o ressarcimento no contrato de ${sem.novo.inquilino_nome}, ou escolha` : 'Escolha'} um boleto em aberto deste contrato${sem.motivo === 'saida' ? ' (ou devolva ao inquilino)' : ''}`;
       }
       const cb = R.boletoDoMes(d(), c.id, dados.competencia_abatimento);
       if (cb && cb.data_pagamento && (!r || r.competencia_abatimento !== dados.competencia_abatimento)) {
-        erros.competencia_abatimento = `O boleto de ${compBr(dados.competencia_abatimento)} já foi pago. Escolha o próximo boleto em aberto`;
+        erros.vencimento_abatimento = `O boleto que vence em ${compBr(R.mesVencimentoDaCompetencia(c, dados.competencia_abatimento))} (referência ${compBr(dados.competencia_abatimento)}) já foi pago. Escolha o próximo boleto em aberto`;
       }
       // boleto em acordo fica como estava no dia do acordo (aplicarRessarcimentos não mexe nele): o ressarcimento novo, de mês
       // trocado ou de valor mudado não seria abatido. Ex.: boleto de 10/2026 em acordo → escolha 11/2026
       if (cb && !cb.data_pagamento && R.emAcordo(cb) && (!r || r.competencia_abatimento !== dados.competencia_abatimento || dados.valor !== r.valor)) {
-        erros.competencia_abatimento = `O boleto de ${compBr(dados.competencia_abatimento)} está em acordo (fica como estava no dia do acordo) e não recebe o ressarcimento. Escolha o próximo boleto em aberto`;
+        erros.vencimento_abatimento = `O boleto que vence em ${compBr(R.mesVencimentoDaCompetencia(c, dados.competencia_abatimento))} (referência ${compBr(dados.competencia_abatimento)}) está em acordo (fica como estava no dia do acordo) e não recebe o ressarcimento. Escolha o próximo boleto em aberto`;
       }
       // boleto do abatimento já pago com este ressarcimento: mudar o valor não muda o boleto pago. Lance a diferença como
       // outro ressarcimento, no próximo boleto em aberto
       if (cb && cb.data_pagamento && r && r.competencia_abatimento === dados.competencia_abatimento && dados.valor !== r.valor) {
-        erros.valor = `O boleto de ${compBr(dados.competencia_abatimento)} já foi pago com ${reais(r.valor)}: não dá para mudar o valor. Lance a diferença como um novo ressarcimento, no próximo boleto em aberto`;
+        erros.valor = `O boleto que vence em ${compBr(R.mesVencimentoDaCompetencia(c, dados.competencia_abatimento))} (referência ${compBr(dados.competencia_abatimento)}) já foi pago com ${reais(r.valor)}: não dá para mudar o valor. Lance a diferença como um novo ressarcimento, no próximo boleto em aberto`;
       }
     },
     salvar(db, dados, q, r) {
@@ -592,10 +602,14 @@ export const CADASTROS = {
     voltar: (r) => (r ? `#/ficha/${r.id}` : '#/inquilinos'),
     destino: (salvo) => `#/ficha/${salvo.id}`,
     descricao: (dados) => `Ficha de ${dados.inquilino_nome}`,
-    // o recibo da reserva promete devolução por inteiro: devolver só uma parte pede confirmação
-    conferir: (dados, r) => (R.fichaSemContrato(dados) && dados.devolucao_valor > 0 && dados.devolucao_valor < dados.reserva_valor
-      && (!r || r.devolucao_valor !== dados.devolucao_valor || r.reserva_valor !== dados.reserva_valor)
-      ? [`Devolução de ${reais(dados.devolucao_valor)} de uma reserva de ${reais(dados.reserva_valor)}: ficam ${reais(dados.reserva_valor - dados.devolucao_valor)} sem devolver. O recibo da reserva promete a devolução por inteiro; o alerta "devolver a reserva" some e o termo sai como devolução de parte.`] : []),
+    // devolver menos do que diz o termo de aceite (sem termo: a reserva inteira) pede confirmação
+    conferir: (dados, r) => {
+      if (!(R.fichaSemContrato(dados) && dados.devolucao_valor > 0 && dados.devolucao_valor < dados.reserva_valor)) return [];
+      if (r && r.devolucao_valor === dados.devolucao_valor && r.reserva_valor === dados.reserva_valor) return [];
+      const certo = R.devolucaoDaReserva({ ...r, ...dados });
+      if (dados.devolucao_valor === certo.devolver) return [];
+      return [`Devolução de ${reais(dados.devolucao_valor)} de uma reserva de ${reais(dados.reserva_valor)}: ficam ${reais(dados.reserva_valor - dados.devolucao_valor)} sem devolver. ${certo.integral ? 'Pelo termo (ou sem termo aceito), a reserva volta por inteiro' : `Pelo termo aceito, o certo é devolver ${reais(certo.devolver)}`}; o alerta "devolver a reserva" some e o termo de devolução sai como devolução de parte.`];
+    },
     ajustar(dados, erros, r, form) {
       const hoje = C.hojeIso();
       // pedido de reserva: começa em análise; o link da ficha vai pelo e-mail ou pelo WhatsApp
@@ -622,6 +636,7 @@ export const CADASTROS = {
       }
       if (comContrato.length && dados.situacao !== 'Aprovada') erros.situacao = dados.situacao === 'Desistiu' ? 'Esta ficha já virou contrato: use o botão "Desistiu antes de assinar" na página da ficha (ele cancela o contrato não assinado)' : 'Esta ficha já virou contrato: a situação fica "Aprovada"';
       // decisão: data (em branco: hoje) e quem decidiu; voltou para "Em análise": sem decisão
+      if (dados.situacao !== 'Reprovada') dados.reprovada_conferencia = null;
       if (dados.situacao === 'Em análise') { dados.decisao_data = null; dados.decisao_por = null; } else {
         dados.decisao_data = dados.decisao_data || hoje;
         dados.decisao_por = r && r.situacao === dados.situacao && r.decisao_por ? r.decisao_por : login();
@@ -641,13 +656,17 @@ export const CADASTROS = {
         erros.situacao = `A reserva de ${reais(r.reserva_valor || 0)} já foi devolvida${r.devolucao_data ? ` em ${dataBr(r.devolucao_data)}` : ''}${r.devolucao_valor ? ` (${reais(r.devolucao_valor)})` : ''}. Para reabrir a ficha, apague o valor da reserva (ela já foi devolvida; a devolução fica no Histórico). Se a pessoa fizer nova reserva, lance depois, com a data e o comprovante novos.`;
       }
       if (!R.fichaSemContrato(dados)) { dados.devolucao_data = null; dados.devolucao_valor = null; } else {
-        if (dados.devolucao_data && !dados.devolucao_valor) dados.devolucao_valor = dados.reserva_valor || null;
+        // em branco: o que diz o termo de aceite (a reserva inteira, ou menos a parte combinada na desistência depois do prazo)
+        const peloTermo = R.devolucaoDaReserva({ ...r, ...dados });
+        if (dados.devolucao_data && !dados.devolucao_valor && peloTermo.reserva > 0 && peloTermo.devolver === 0) erros.devolucao_valor = 'Pelo termo aceito, a reserva fica com a empresa: nada a devolver. Se devolveu mesmo assim, informe o valor devolvido';
+        else if (dados.devolucao_data && !dados.devolucao_valor) dados.devolucao_valor = peloTermo.devolver || dados.reserva_valor || null;
         if (dados.devolucao_valor > 0 && !dados.devolucao_data) erros.devolucao_data = 'Informe a data da devolução';
         else if (dados.devolucao_data && dados.devolucao_data > hoje) erros.devolucao_data = 'A devolução não pode ser numa data futura (registre depois de devolver)';
         else if (dados.devolucao_data && dados.reserva_data && dados.devolucao_data < dados.reserva_data) erros.devolucao_data = `A devolução não pode ser antes da reserva (${dataBr(dados.reserva_data)})`;
         if (dados.devolucao_valor > (dados.reserva_valor || 0)) erros.devolucao_valor = `A devolução não pode passar da reserva (${reais(dados.reserva_valor || 0)})`;
-        // devolução de só uma parte: o termo diz que a diferença "fica explicada nas observações da ficha"
-        else if (dados.devolucao_valor > 0 && dados.devolucao_valor < dados.reserva_valor && !String(dados.observacoes || '').trim()) {
+        // devolução de só uma parte: o termo diz que a diferença "fica explicada nas observações da ficha" (a parte retida
+        // pelo termo de aceite já sai explicada no termo de devolução)
+        else if (dados.devolucao_valor > 0 && dados.devolucao_valor < dados.reserva_valor && dados.devolucao_valor !== R.devolucaoDaReserva({ ...r, ...dados }).devolver && !String(dados.observacoes || '').trim()) {
           erros.observacoes = `Devolução de ${reais(dados.devolucao_valor)} de uma reserva de ${reais(dados.reserva_valor)}: explique a diferença nas observações (ela sai no termo de devolução)`;
         }
       }
@@ -694,16 +713,22 @@ export const CADASTROS = {
   },
   seguros: {
     titulo: (r, q) => { const c = buscar('contratos', r ? r.contrato_id : q.contrato); return `Seguro obrigatório - ${c.inquilino_nome}${buscar('imoveis', c.imovel_id) ? ` (${buscar('imoveis', c.imovel_id).nome})` : ''}`; },
-    campos: () => F.SEGURO,
+    // a 1ª parcela é perguntada pelo mês em que vence o boleto (dados reais de 24/11/2026: "12/2026" digitado para o boleto que
+    // vence em 05/12 ia para o de referência 12/2026, que vence em janeiro); gravada continua a referência (primeira_competencia)
+    campos: () => F.SEGURO.map((c) => (c.nome === 'primeira_competencia' ? { nome: 'vencimento_primeira_parcela', rotulo: 'Cobrar a 1ª parcela no boleto que vence em (mês do vencimento)',
+      tipo: 'mes', obrig: true, autoMsg: true, ajuda: 'O mês em que vence o boleto do aluguel (ex.: 12/2026 = o boleto que vence em dezembro). As demais parcelas seguem mês a mês' } : c)),
+    valores: (r) => ({ ...r, vencimento_primeira_parcela: R.mesVencimentoDaCompetencia(buscar('contratos', r.contrato_id), r.primeira_competencia) }),
     fixos: (r, q) => (r ? {} : { contrato_id: Number(q.contrato), imovel_id: buscar('contratos', q.contrato).imovel_id }),
     conferir: conferirSeguro,
     // arquivo da apólice: pode salvar sem (confirma e fica o alerta para anexar depois); outros arquivos opcionais
-    extraHtml: (r) => `<h3>Arquivos do seguro</h3><div class="formulario">
+    extraHtml: (r, q) => `<span hidden data-contrato-boleto="${Number(r ? r.contrato_id : q.contrato)}" data-mes-boleto="vencimento_primeira_parcela"></span><h3>Arquivos do seguro</h3><div class="formulario">
       <div><label>Arquivo da apólice</label><input type="file" name="arquivo_apolice" accept="${ACEITA_DOCUMENTOS}">
         ${r && r.arquivo_apolice ? F.arquivoGuardado('arquivo_apolice', r.arquivo_apolice) : '<small class="suave">PDF ou foto da apólice. Sem ele, o seguro é salvo e fica o alerta para anexar depois.</small>'}</div>
       <div><label>Outros arquivos (opcional)</label><input type="file" name="outros_arquivos" multiple accept="${ACEITA_DOCUMENTOS}">
         <small class="suave">Ex.: boleto do seguro, proposta, comprovante de pagamento.</small></div></div>`,
-    ajustar(dados, erros) {
+    ajustar(dados, erros, r, form, q) {
+      if ('vencimento_primeira_parcela' in dados) dados.primeira_competencia = R.competenciaDoMesVencimento(buscar('contratos', r ? r.contrato_id : q && q.contrato), dados.vencimento_primeira_parcela);
+      delete dados.vencimento_primeira_parcela;
       if (dados.vigencia_inicio && dados.vigencia_fim && dados.vigencia_fim <= dados.vigencia_inicio) erros.vigencia_fim = 'O fim da vigência precisa ser depois do início';
       // 0 parcelas: o seguro nunca entrava em boleto nenhum (no IPTU já era recusado)
       if (!(dados.num_parcelas >= 1)) erros.num_parcelas = 'Informe pelo menos 1 parcela';
@@ -1219,8 +1244,10 @@ function montarFormulario(cfg, tabela, registro, q, estado) {
   if (!estado) memoria.formularioAberto = registro ? { chave: `${tabela}:${registro.id}`, valores } : null;
   const base = cfg.base ? cfg.base(registro) : null;
   const avisoTexto = cfg.aviso ? cfg.aviso(registro, q) : '';
+  // contrato do formulário: os campos de mês de um boleto mostram o vencimento pelo cadastro dele (ligarMesesDoBoleto)
+  const contratoRef = Number(tabela === 'contratos' ? registro && registro.id : (registro && registro.contrato_id) || (q && q.contrato)) || '';
   return `<h1>${esc(cfg.titulo(registro, q))}</h1>${avisoTexto ? `<div class="alerta info">${esc(avisoTexto)}</div>` : ''}${cfg.topo ? cfg.topo(registro, q) : ''}
-    <form class="cartao" data-form="cadastro" ${base !== null && base !== undefined ? `data-base="${base}"` : ''}>
+    <form class="cartao" data-form="cadastro" ${base !== null && base !== undefined ? `data-base="${base}"` : ''}${contratoRef ? ` data-contrato-ref="${contratoRef}"` : ''}>
       ${F.camposHtml(campos, valores, estado ? estado.erros : {}, { compacto: !!cfg.compacto })}${cfg.extraHtml ? cfg.extraHtml(registro, q) : ''}
       <p class="acoes" style="margin-top:16px"><button>Salvar</button><a class="botao secundario" href="${esc(cfg.voltar(registro, q))}">Voltar</a></p></form>`;
 }

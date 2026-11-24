@@ -134,10 +134,13 @@ export function conferirSeguro(dados, r, q) {
   // parcelas cobradas no aluguel fora da vigência (ex.: 1ª cobrança em 01/2020 de uma apólice de 2026, ou 60 parcelas num ano)
   const mudou = ['primeira_competencia', 'num_parcelas', 'vigencia_inicio', 'vigencia_fim'].some((k) => !r || dados[k] !== r[k]);
   const pri = dados.primeira_competencia;
-  if (mudou && pri && ini && pri < ini.slice(0, 7)) out.push(`A 1ª parcela no aluguel de ${compBr(pri)} é antes do início da vigência (${dataBr(ini)}).`);
+  // o formulário pergunta o mês do vencimento do boleto: o aviso fala nele, com a referência entre parênteses
+  const c = buscar('contratos', cid);
+  const boleto = (comp) => `boleto que vence em ${compBr(R.mesVencimentoDaCompetencia(c, comp))} (referência ${compBr(comp)})`;
+  if (mudou && pri && ini && pri < ini.slice(0, 7)) out.push(`A 1ª parcela no ${boleto(pri)} é antes do início da vigência (${dataBr(ini)}).`);
   if (mudou && pri && fim && dados.num_parcelas >= 1) {
     const ultima = C.somarMeses(pri, dados.num_parcelas - 1);
-    if (ultima > fim.slice(0, 7)) out.push(`Em ${dados.num_parcelas} parcela(s) a partir de ${compBr(pri)}, a última fica no aluguel de ${compBr(ultima)}, depois do fim da vigência (${dataBr(fim)}).`);
+    if (ultima > fim.slice(0, 7)) out.push(`Em ${dados.num_parcelas} parcela(s), a última fica no ${boleto(ultima)}, depois do fim da vigência (${dataBr(fim)}).`);
   }
   return out;
 }

@@ -322,7 +322,7 @@ export const CONTRATO = [
   campo('reserva_valor', 'Valor da reserva', 'dinheiro'),
   campo('reserva_data', 'Data da reserva', 'data'),
   comprovante('comprovante_reserva', 'Comprovante da reserva', { ajuda: `PDF ou foto do comprovante da reserva. ${SEM_COMPROVANTE}` }),
-  campo('reserva_competencia', 'Usar a reserva no aluguel de', 'mes', { ajuda: 'Em branco: usa no primeiro aluguel' }),
+  campo('reserva_competencia', 'Usar a reserva no aluguel de (mês de referência)', 'mes', { autoMsg: true, ajuda: 'O mês do aluguel, não o do vencimento (ex.: aluguel de 11/2026 vence em 12/2026 quando vence no mês seguinte). Em branco: usa no primeiro aluguel' }),
   secao('O que está incluso no contrato'),
   campo('conta_iptu', 'IPTU', 'opcao', { obrig: true, padrao: 'Por conta do inquilino', opcoes: SITUACOES_CONTA, ajuda: 'Por conta do inquilino: as parcelas entram no boleto' }),
   campo('conta_seguro', 'Seguro contra incêndio (obrigatório)', 'opcao', { obrig: true, padrao: 'Por conta do inquilino', opcoes: SITUACOES_SEGURO, ajuda: 'Sempre existe (obrigatório por lei). Por conta do inquilino: as parcelas entram no boleto; incluso no aluguel: a locadora paga' }),
@@ -361,7 +361,7 @@ export const CONTRATO = [
   campo('data_base_correcao', 'Data-base da correção', 'data', { ajuda: 'O alerta de correção usa o aniversário desta data. Em branco: início do contrato' }),
   { secao: 'Carência de aluguel', recolher: 'Expanda para cadastrar carência' },
   campo('carencia_meses', 'Meses de carência', 'inteiro', { ajuda: 'Nestes meses o aluguel não é cobrado. Em branco: sem carência' }),
-  campo('carencia_inicio', 'Carência a partir do aluguel de', 'mes', { ajuda: 'Em branco: mês de entrada' }),
+  campo('carencia_inicio', 'Carência a partir do aluguel de (mês de referência)', 'mes', { autoMsg: true, ajuda: 'O mês do aluguel, não o do vencimento. Em branco: mês de entrada' }),
   campo('carencia_cobrar_iptu', 'Na carência, cobrar o IPTU', 'simnao'),
   campo('carencia_cobrar_seguro', 'Na carência, cobrar o seguro', 'simnao'),
   campo('carencia_cobrar_taxa', 'Na carência, cobrar a tarifa do boleto', 'simnao'),
@@ -391,9 +391,12 @@ export function camposDaPessoa(nomesDaPessoa) {
 export const FICHA_INICIO = [
   secao('Ficha'),
   campo('data_recebida', 'Ficha recebida em', 'data', { obrig: true }),
-  campo('situacao', 'Situação', 'opcao', { obrig: true, padrao: 'Em análise', opcoes: ['Em análise', 'Aprovada', 'Reprovada', 'Desistiu'], ajuda: 'Aprovada: na página da ficha aparece o botão para fazer o contrato. Desistiu: o interessado não segue e a reserva é devolvida por inteiro (com contrato já gerado, use o botão "Desistiu antes de assinar" na página da ficha)' }),
+  campo('situacao', 'Situação', 'opcao', { obrig: true, padrao: 'Em análise', opcoes: ['Em análise', 'Aprovada', 'Reprovada', 'Desistiu'], ajuda: 'Aprovada: na página da ficha aparece o botão para fazer o contrato. Desistiu: o interessado não segue e a reserva é devolvida conforme o termo de aceite (sem termo, por inteiro; com contrato já gerado, use o botão "Desistiu antes de assinar" na página da ficha)' }),
   campo('decisao_data', 'Data da decisão', 'data', { ...quando('situacao', 'Aprovada', 'Reprovada', 'Desistiu'), ajuda: 'Em branco: hoje' }),
   campo('decisao_motivo', 'Motivo / observação da decisão', 'area', { largo: true, linha: true, ...quando('situacao', 'Aprovada', 'Reprovada', 'Desistiu') }),
+  // termo de aceite da reserva (2026-11-24): informação ou documento que não corresponde à realidade conta como desistência
+  campo('reprovada_conferencia', 'Encerrada porque alguma informação ou documento não correspondeu à realidade na conferência', 'simnao', { ...quando('situacao', 'Reprovada'), largo: true,
+    ajuda: 'Ex.: renda diferente da declarada, emprego que a empresa não confirma, documento com dados alterados ou de outra pessoa. Conta como desistência: vale a regra do termo aceito (padrão: a reserva fica com a empresa). Desmarcado: a reserva volta por inteiro' }),
 ];
 
 /** Tipos de renda da ficha: cada um tem a sua lista de documentos (R.DOCUMENTOS_RENDA, regras.js). */
@@ -442,6 +445,7 @@ export const FICHA_FIM = [
   campo('bonificacao', 'Tem bonificação (desconto) por pontualidade', 'simnao', { padrao: true, colado: true }),
   campo('garantia_tipo', 'Tipo de garantia', 'opcao', { opcoes: GARANTIAS }),
   campo('prazo_meses', 'Prazo do contrato (meses)', 'inteiro', { ajuda: 'Ex.: 30. Vai no e-mail da ficha, no recibo da reserva e no contrato' }),
+  campo('requisitos', 'Requisitos para a aprovação (vão no termo da reserva)', 'area', { largo: true, ajuda: 'Opcional. Ex.: renda de pelo menos 3 vezes o aluguel; sem restrição no nome. A lista de documentos e a garantia já vão sozinhas' }),
   // o que está incluso (pedido do dono em 2026-11-13): sai no e-mail da ficha e no recibo da reserva, e vai para o contrato
   secao('O que está incluso (vai na proposta e no contrato)'),
   campo('conta_iptu', 'IPTU', 'opcao', { opcoes: SITUACOES_CONTA, padrao: SITUACOES_CONTA[0] }),
@@ -450,12 +454,13 @@ export const FICHA_FIM = [
   campo('seguro_estimado', 'Seguro por ano (estimado)', 'dinheiro', { ...quando('conta_seguro', 'Por conta do inquilino'), ajuda: 'Ex.: R$ 250,00, parcelado no boleto. Só informa: o valor certo vem da apólice' }),
   ...CONTAS.map(([nome, rotulo]) => campo(nome, rotulo, 'opcao', { opcoes: SITUACOES_CONTA, padrao: contaPadrao(nome) })),
   secao('Reserva'),
-  campo('reserva_valor', 'Valor da reserva', 'dinheiro'),
+  campo('reserva_combinada', 'Reserva combinada (vai no termo de aceite)', 'dinheiro', { ajuda: 'Ex.: R$ 500,00. É o valor que a pessoa aceita no termo antes de depositar. Depois do depósito, preencha o valor e a data abaixo' }),
+  campo('reserva_valor', 'Valor da reserva depositada', 'dinheiro'),
   campo('reserva_data', 'Data da reserva', 'data'),
   comprovante('comprovante_reserva', 'Comprovante da reserva', { ajuda: 'PDF ou foto do comprovante da reserva. Ao fazer o contrato, ele vai junto para a pasta do inquilino' }),
   { secao: 'Devolução da reserva (ficha reprovada ou desistência)', ...quando('situacao', 'Reprovada', 'Desistiu') },
   campo('devolucao_data', 'Reserva devolvida em', 'data', quando('situacao', 'Reprovada', 'Desistiu')),
-  campo('devolucao_valor', 'Valor devolvido', 'dinheiro', { ...quando('situacao', 'Reprovada', 'Desistiu'), ajuda: 'Em branco: o valor da reserva' }),
+  campo('devolucao_valor', 'Valor devolvido', 'dinheiro', { ...quando('situacao', 'Reprovada', 'Desistiu'), ajuda: 'Em branco: o valor do termo de aceite (a reserva inteira, ou menos a parte que fica com a empresa na desistência); sem termo, a reserva inteira' }),
   comprovante('comprovante_devolucao', 'Comprovante da devolução', { ...quando('situacao', 'Reprovada', 'Desistiu'), ajuda: 'PDF ou foto do comprovante da devolução' }),
   secao('Observações'),
   campo('observacoes', 'Observações da análise', 'area'),
@@ -579,7 +584,7 @@ export const RENOVACAO = [
   campo('novo_bonificado', 'Novo aluguel bonificado', 'dinheiro', { virtual: true, vinculo: 'desconto', ajuda: 'O valor que o inquilino paga em dia. Preencha dois dos três (cheio, bonificado, %): o terceiro é calculado' }),
   campo('novo_percentual', 'Bonificação (%)', 'pct', { vinculo: 'desconto', ajuda: 'Vem a bonificação atual do contrato' }),
   // decisão do dono (16/11/2026): o operador diz de qual aluguel em diante vale; os boletos em aberto desse mês em diante são refeitos
-  campo('vale_desde', 'O novo valor vale a partir do aluguel de', 'mes', { ajuda: 'Os boletos em aberto deste mês em diante são refeitos com o novo valor (os pagos e os de antes ficam como estão). Em branco: o mês da data acima, se for dia 1º, ou o mês seguinte' }),
+  campo('vale_desde', 'O novo valor vale a partir do aluguel de (mês de referência)', 'mes', { autoMsg: true, ajuda: 'O mês do aluguel, não o do vencimento. Os boletos em aberto deste mês em diante são refeitos com o novo valor (os pagos e os de antes ficam como estão). Em branco: o mês da data acima, se for dia 1º, ou o mês seguinte' }),
   campo('observacoes', 'Observações', 'area'),
 ];
 
@@ -637,7 +642,7 @@ export const EMITENTE = [
   campo('assinatura_email', 'Nome que assina os e-mails', 'texto', { ajuda: 'Vai depois de "Atenciosamente," no fim de todo e-mail. Ex.: Administradora' }),
   campo('email_contato', 'E-mail da administração', 'email', { ajuda: 'Vai embaixo do nome, no fim de todo e-mail. Ex.: contato@imobiliariaexemplo.com.br' }),
   campo('assinatura_mensagens', 'Assinatura dos lembretes de boleto', 'texto', { ajuda: 'Vai no fim do lembrete por e-mail ou WhatsApp. Ex.: Imobiliária Exemplo' }),
-  campo('conta_deposito', 'Conta para depósito da caução', 'area', { largo: true, ajuda: 'Titular, banco, agência, conta e Pix, como devem sair no e-mail do contrato para assinar. Sem ela, o e-mail mostra "[preencher: conta_deposito]"' }),
+  campo('conta_deposito', 'Conta para depósito da caução e da reserva', 'area', { largo: true, ajuda: 'Titular, banco, agência, conta e Pix, como devem sair no e-mail do contrato para assinar e no termo da reserva. Sem ela, o e-mail mostra "[preencher: conta_deposito]"' }),
 ];
 
 export const USUARIO = [
@@ -731,7 +736,8 @@ export function ler(campos, form, antigo = null) {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(bruto)) throw new Error();
         dados[c.nome] = bruto;
       } else if (c.tipo === 'mes') {
-        if (!/^\d{4}-\d{2}$/.test(bruto)) throw new Error();
+        // mês 13 ou 00 (navegador que mostra o campo como texto, ex.: Firefox) passava e virava outro mês na conta do vencimento
+        if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(bruto)) throw new Error();
         dados[c.nome] = bruto;
       } else if (c.tipo === 'url') {
         const u = /^https?:\/\//i.test(bruto) ? bruto : `https://${bruto}`;
