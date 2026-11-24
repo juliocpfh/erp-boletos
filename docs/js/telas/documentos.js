@@ -528,7 +528,8 @@ function documentoPorModelo(q) {
   const c = buscar('contratos', q.contrato);
   if (!c || !(tipo in TIPOS_DOCUMENTO)) return null;
   const p = preenchidos.get(`${modelo.id}:${c.id}`) || {};
-  const dados = K.dadosDoDocumento(d(), c, tipo, p.valores || {}, { data: p.data || C.hojeIso() });
+  // o fim do contrato com a renovação e a troca de titular (contrato por prazo indeterminado: sem data, o texto muda)
+  const dados = K.dadosDoDocumento(d(), c, tipo, p.valores || {}, { data: p.data || C.hojeIso(), fim: R.fimDoContrato(d(), c) });
   return { c, modelo, blocos: K.montarContrato(modelo.texto, dados), rodape: dados.rodape, nome: modelo.nome, semCampos: !p.valores,
     arquivo: nomeArquivoDoc(TIPOS_DOCUMENTO[tipo].nome.replace(/\s*\(.*\)$/, ''), c, String(p.data || C.hojeIso()).slice(0, 10)) };
 }
@@ -538,7 +539,8 @@ function valoresSugeridos(tipo, c) {
   const hoje = C.hojeIso();
   const db = d();
   const v = {};
-  if (tipo.startsWith('aditivo_')) v.numero_aditivo = String((db.aditivos || []).filter((a) => a.contrato_id === c.id).length + 1);
+  // a mesma conta dos termos de "Gerar termo aditivo": a cadeia de contratos (troca de titular) e o maior número já usado
+  if (tipo.startsWith('aditivo_')) v.numero_aditivo = String(R.proximoNumeroAditivo(db, c));
   if (['aviso_desocupacao', 'notificacao_desocupacao'].includes(tipo)) v[tipo === 'aviso_desocupacao' ? 'data_saida_prevista' : 'data_limite'] = C.somarDias(hoje, 30);
   if (tipo === 'aditivo_prazo') {
     const ini = c.vigencia_fim && c.vigencia_fim >= hoje ? C.somarDias(c.vigencia_fim, 1) : hoje;

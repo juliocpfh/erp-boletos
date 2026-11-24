@@ -802,14 +802,18 @@ export const LINHA_EM_BRANCO = '____________________';
  * Outros documentos da locação (modelos-documentos.js): os dados do contrato e os campos do tipo, digitados ao gerar.
  * ``valores``: { campo: texto digitado } (data 'AAAA-MM-DD', dinheiro: número = centavos, texto digitado = reais, "500" ou "1.963,50", número). Campo em branco sai
  * como LINHA_EM_BRANCO; o dinheiro em branco fica vazio (a condição [se campo] não vale). ``data``: a data do documento.
- * Ex.: distrato com data_saida '2027-02-28' → {data_saida} = "28 de fevereiro de 2027".
+ * Ex.: distrato com data_saida '2027-02-28' → {data_saida} = "28 de fevereiro de 2027". ``fim``: o fim do contrato calculado
+ * pela tela (R.fimDoContrato: renovação e troca de titular; null = prazo indeterminado); sem ele, a data de término gravada.
  */
-export function dadosDoDocumento(d, c, tipo, valores = {}, { data, testemunhas = [] } = {}) {
+export function dadosDoDocumento(d, c, tipo, valores = {}, { data, testemunhas = [], fim } = {}) {
   const def = TIPOS_DOCUMENTO[tipo];
   const dados = dadosDoContrato(d, c, { data: data || C.hojeIso(), testemunhas });
   const fiadores = fiadoresNaData(d, c.id, data);
+  const termino = fim === undefined ? c.vigencia_fim : fim;
   Object.assign(dados.campos, {
     data_contrato: dataPorExtenso(c.vigencia_inicio || c.data_entrada),
+    // sem data de término (prazo indeterminado) fica vazio: o texto usa [se data_fim] (busca de 24/11, DOC-04)
+    data_fim: termino ? dataPorExtenso(termino) : '',
     fiadores_nomes: fiadores.map((f) => String(f.nome || '').toLocaleUpperCase('pt-BR')).join(', '),
   });
   for (const [chave, , formato] of (def ? def.campos : [])) {

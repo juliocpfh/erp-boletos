@@ -442,7 +442,7 @@ function caixaAcordo(cb) {
   const lista = (l) => l.map((x) => `${link(`#/cobranca/${x.id}`, R.ehParcelaAcordo(x) && x.acordo_parcela_de === a.id ? (x.acordo_parcela || 'boleto') : compBr(x.competencia))} ${reais(R.totais(x).a_pagar_sem_desconto)} · vence ${dataBr(x.vencimento)}${x.data_pagamento ? ` · pago em ${dataBr(x.data_pagamento)}` : ''}`).join('<br>');
   // parcela dentro de um acordo mais novo: só desfaz depois dele (o texto diz qual)
   const depois = !a.desfeito_em && R.acordoPosterior(d(), a);
-  const podeDesfazer = opera() && !a.desfeito_em && !depois && !parcelas.some((x) => x.data_pagamento || R.emitidoNoBanco(x));
+  const podeDesfazer = opera() && !a.desfeito_em && !depois && !parcelas.some((x) => x.data_pagamento || R.emitidoNoBanco(x) || R.quitadoNaSaida(x));
   return `<div class="alerta info nao-imprimir"><b>Acordo de ${dataBr(a.data)}</b> com ${esc(R.buscar(d(), 'contratos', a.contrato_id).inquilino_nome)}: ${esc(a.referente)}
     (${reais(a.divida_na_data)} na data) em ${a.parcelas} boleto(s), total ${reais(a.valor_total)}.${a.observacoes ? ` <i>${esc(a.observacoes)}</i>` : ''}
     <br><b>Etapas do acordo:</b>${etapasAcordo(a)}

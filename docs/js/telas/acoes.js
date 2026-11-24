@@ -228,7 +228,8 @@ export function motivoNaoExcluirContrato(db, r) {
   if ((db.movimentacoes_banco || []).some((m) => m.cobranca_id && ids.has(m.cobranca_id))) return 'Este contrato tem boletos ligados ao extrato: desfaça o destino das movimentações na tela Banco antes.';
   const novo = R.continuadoPor(db, r);
   if (novo) return `Este contrato continua com ${novo.inquilino_nome} (troca de titular): exclua antes o contrato do novo titular.`;
-  return null;
+  // novo titular com a troca completada: o que veio do anterior sairia junto (busca de 24/11, CON-01)
+  return R.motivoNaoExcluirHerdeiro(db, r);
 }
 
 /**
