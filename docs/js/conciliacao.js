@@ -738,6 +738,9 @@ function boletosPorIdentificador(cobrancas) {
 /** Último dia em que o crédito ainda conta como pagamento em dia: o limite (vencimento ou próximo dia útil); boleto creditado depois, até mais ``dias`` dias úteis. */
 const ultimoCreditoEmDia = (cb, pix, dias) => (pix ? C.limitePagamento(cb.vencimento) : C.somarDiasUteis(C.limitePagamento(cb.vencimento), dias));
 
+/** Dias da tolerância para o boleto ``cb``: o número passado (``dias``) ou, sem ele, a regra do contrato do boleto (regra especial ou a da empresa). */
+const diasDo = (cb, dias) => (dias ?? diasCompensacaoBoleto(cb));
+
 function casarBoletos(d, valor, data, dias, { idExterno = null, nossoNumero = null, movId = null, dataCredito = null, indice = null, pix = false, pagouConhecido = false, ids = null } = {}) {
   // com o índice da tela (um por desenho), os boletos em aberto e os pagos por valor já estão separados, na mesma ordem
   const ib = indice && indice.boletos ? indice.boletos() : null;
@@ -749,10 +752,10 @@ function casarBoletos(d, valor, data, dias, { idExterno = null, nossoNumero = nu
     if (cb) {
       if (emAberto(cb)) {
         const pontual = ib ? ib.pontual.get(cb) : totais(cb).a_pagar_pontual;
-        const noPrazo = valor === pontual && data <= (pix ? C.limitePagamento(cb.vencimento) : ultimoCreditoEmDia(cb, false, dias));
+        const noPrazo = valor === pontual && data <= (pix ? C.limitePagamento(cb.vencimento) : ultimoCreditoEmDia(cb, false, diasDo(cb, dias)));
         // valor menor que o devido (mesmo no dia de pagamento mais favorável): não existe pagamento em parte (decisão de 2026-11-20),
         // nada é proposto e o dinheiro fica sem destino
-        const minimo = Math.min(...(pix ? [data] : datasPossiveisDoPagamento(data, false, dias)).map((x) => previstoNoPagamento(cb, data, { dataPagou: x }).valor_devido));
+        const minimo = Math.min(...(pix ? [data] : datasPossiveisDoPagamento(data, false, diasDo(cb, dias))).map((x) => previstoNoPagamento(cb, data, { dataPagou: x }).valor_devido));
         if (!noPrazo && valor < minimo) return [];
         return [{ cobranca: cb, certeza: 'exata', previsto: noPrazo ? pontual : previstoNoPagamento(cb, data).valor_devido, pagouEmDia: noPrazo && data > cb.vencimento, peloId: true }];
       }
@@ -782,11 +785,12 @@ function casarBoletos(d, valor, data, dias, { idExterno = null, nossoNumero = nu
   // com o dia do pagamento conhecido (listagem do banco) ou por Pix, "em dia" é até o limite; boleto só com a data do crédito, até
   // ``dias`` dias úteis depois (compensação). Pix pago depois do vencimento com o valor do desconto não é "em dia" (decisão de 16/11/2026).
   const exato = pix || pagouConhecido;
-  const datas = exato ? [data] : datasPossiveisDoPagamento(data, false, dias);
   for (const cb of abertos) {
     if (cb.vencimento > limite) continue;
     const pontual = ib ? ib.pontual.get(cb) : totais(cb).a_pagar_pontual;
-    const noPrazo = valor === pontual && data <= (exato ? C.limitePagamento(cb.vencimento) : ultimoCreditoEmDia(cb, false, dias));
+    const diasCb = diasDo(cb, dias); // cada boleto pela regra do seu contrato (regra especial, decisão de 24/11/2026)
+    const datas = exato ? [data] : datasPossiveisDoPagamento(data, false, diasCb);
+    const noPrazo = valor === pontual && data <= (exato ? C.limitePagamento(cb.vencimento) : ultimoCreditoEmDia(cb, false, diasCb));
     const comEncargos = !noPrazo && data > C.limitePagamento(cb.vencimento) && datas.some((x) => valor === previstoNoPagamento(cb, x).valor_devido);
     if (noPrazo || comEncargos) lista.push({ cobranca: cb, certeza: 'exata', previsto: noPrazo ? pontual : valor, pagouEmDia: noPrazo && data > cb.vencimento });
   }
@@ -812,7 +816,9 @@ const semIdentificacao = (lista) => { for (const x of lista) { x.certeza = 'prov
  * não aparece. A tela marca sozinha só o que ``prontoParaRegistrar`` aceita.
  */
 export function conciliarBoletos(d, contaId, pagamentosC6, { dias = null } = {}) {
-  const tol = dias ?? regra('tolerancia_boleto_dias'); // regra do sistema (antes, config_banco.tolerancia_dias)
+  // ``dias`` passado vale para todos; sem ele, cada boleto pela regra do seu contrato (`tolerancia_boleto_dias`, regra especial ou a da
+  // empresa; antes, config_banco.tolerancia_dias)
+  const tol = dias;
   const planos = [];
   for (const x of pagamentosC6 || []) {
     if (Array.isArray(x.payments)) x.payments.forEach((p, i) => planos.push({ ...p, external_reference_id: x.external_reference_id || null, status: x.status || null, vezes: x.payments.length, ordem: i }));
@@ -910,7 +916,7 @@ export function registrarPagamentoDoBanco(d, contaId, p, usuario, { pagouEmDia, 
 
 /** Entradas do extrato que parecem boletos (em aberto, ou já pagos à mão: jaPago): [{ movimentacao_id, cobranca_id, certeza, previsto, pagouEmDia, jaPago }] (sem gravar). */
 export function conciliarMovimentacoes(d, movs, { dias = null, indice = null } = {}) {
-  const tol = dias ?? regra('tolerancia_boleto_dias');
+  const tol = dias; // sem número: cada boleto pela regra do seu contrato
   const out = [];
   for (const m of movs || []) {
     if (m.tipo !== 'entrada' || m.classificacao || ehDevolucao(m)) continue;

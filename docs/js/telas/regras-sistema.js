@@ -132,7 +132,7 @@ export function telaPerfilRegras(id) {
   const contratos = p ? R.contratosDoPerfil(d(), p.id).sort((a, b) => a.inquilino_nome.localeCompare(b.inquilino_nome, 'pt-BR')) : [];
   const des = admin ? '' : ' disabled';
   return `<p class="suave"><a href="#/regras">← Regras do sistema</a></p><h1>${p ? esc(p.nome) : 'Nova regra especial'}</h1>
-    <div class="alerta info">Mude só o que for diferente para os contratos desta regra. O que ficar igual às regras do sistema acompanha as do sistema, mesmo se elas mudarem depois. As regras da rotina da empresa (backup, banco, extrato, dia de gerar os boletos, anexos, ressarcimento na NF) valem para todos e não aparecem aqui.</div>
+    <div class="alerta info">Mude só o que for diferente para os contratos desta regra. O que ficar igual às regras do sistema acompanha as do sistema, mesmo se elas mudarem depois. As regras da rotina da empresa (backup, banco, as outras do extrato, dia de gerar os boletos, anexos, ressarcimento na NF) valem para todos e não aparecem aqui.</div>
     ${p ? `<div class="cartao"><h2>Contratos que seguem esta regra</h2>${contratos.length ? `<ul>${contratos.map((c) => `<li><a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a>${R.contratoAtivo(c) ? '' : ' <span class="suave">(encerrado)</span>'}</li>`).join('')}</ul>` : '<p class="suave">Nenhum ainda. Escolha a regra no cadastro do contrato (Editar → "Regras deste contrato").</p>'}</div>` : ''}
     <form data-form="perfilRegras" data-id="${p ? p.id : ''}">
       <div class="cartao"><label>Nome<input name="nome" value="${esc(p ? p.nome : '')}" placeholder="Ex.: Regra especial A, Regra 15 dias" maxlength="60" required${des}></label>
