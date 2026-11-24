@@ -363,6 +363,25 @@ LINHA DIGITÁVEL
 [fim]
 Já pagou? Desconsidere e, se puder, responda com o comprovante.`,
   },
+  // Boleto feito à mão no banco (pedido do dono em 2026-11-24, enquanto a API do C6 não sai): botão "Enviar boleto por e-mail" na
+  // página do boleto (alvo { contrato, cobranca }); vai anexado o PDF do banco que a equipe anexou ali. Curto: o descritivo do boleto,
+  // o mês de competência, o vencimento e os valores em dia e depois do vencimento.
+  {
+    chave: 'boleto_envio', nome: 'Boleto do mês (PDF do banco)', etapa: 'Boletos', boleto: true,
+    assunto: 'Boleto {boleto_referente} ({imovel}) · vence em {vencimento_boleto}',
+    anexos: '', prontos: ['boleto:anexado'],
+    texto: `Olá, {nome}, tudo bem?
+
+Segue em anexo o boleto {boleto_referente} ({imovel}).
+
+Mês de competência: {competencia_boleto}
+Vencimento: {vencimento_boleto}[se nao_util] (não é dia útil: vale até {limite_pagamento})[fim]
+Valor até o vencimento: {valor_em_dia}[se bonificacao_boleto] (com a bonificação)[fim]
+Valor depois do vencimento: {valor_cheio}[se multa_juros], mais multa de {multa_pct} e juros de {juros_pct} ao mês[fim]
+
+DESCRITIVO
+{descricao_boleto}`,
+  },
   // Notificação ao inquilino (pedido do dono em 2026-11-17): ``notificacao``: o e-mail é de uma notificação (alvo { contrato,
   // notificacao }); vai anexada a notificação assinada (ou, sem ela, o PDF para assinar). O contrato aceita notificação por e-mail.
   {

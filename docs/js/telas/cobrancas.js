@@ -8,7 +8,8 @@ import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { filaRegua } from '../regua-email.js';
 import { botoesMesC6, caixaBancoC6, resumoBancoLinha } from './banco-c6.js';
-import { botao, buscar, d, endereco, etiqueta, item, link, memoria, multaJurosTexto, opera, situacao } from './comum.js';
+import { ACEITA_DOCUMENTOS, arquivoSumiu, botao, buscar, d, endereco, etiqueta, item, link, memoria, multaJurosTexto, opera, situacao } from './comum.js';
+import { ultimoEnvio } from './emails.js';
 import { AVISO_CONTROLE, seloControle, situacaoBoleto } from './contrato.js';
 import { linkComprovante } from './cadastros.js';
 import { nomeArquivoDoc } from './documentos.js';
@@ -227,6 +228,7 @@ function mesSemBoletos(comp, faltando) {
  */
 function tabelaBoletos(lista, hoje, ordem, url, opcoes = {}) {
   const { reajustes = new Map(), totalLinha = '' } = opcoes;
+  const envios = enviosDosBoletos();
   const comp = opcoes.mes || (lista.length ? lista[0].cb.competencia : C.competenciaDe(hoje)); // lista vazia: o mês da tela
   // botões de impressão em cima e embaixo da lista; no celular, só embaixo, e os "selecionados" numa barra presa no pé
   // da tela que aparece ao marcar um boleto (atualizarBarraLote, app.js)
@@ -251,7 +253,7 @@ function tabelaBoletos(lista, hoje, ordem, url, opcoes = {}) {
           ${reajustes.has(c.id) && !R.ehBoletoAvulso(cb) ? `<br>${etiqueta(reajustes.get(c.id).corrigido ? 'reajuste: mandar a carta com este boleto' : 'reajuste: falta aplicar a correção', reajustes.get(c.id).corrigido ? 'aviso' : 'perigo')} ${link(`#/imprimir/carta?contrato=${c.id}&comp=${esc(cb.competencia)}`, 'Gerar carta', 'botao pequeno')}` : ''}</td>
         <td>${dataBr(cb.vencimento)}
           ${!cb.data_pagamento ? `<br>${botao('copiar', 'Copiar texto do boleto', { texto: R.dadosBoleto(d(), cb).descricao })}` : ''}
-          ${resumoBancoLinha(cb) ? `<br>${resumoBancoLinha(cb)}` : ''}</td>
+          ${resumoBancoLinha(cb) ? `<br>${resumoBancoLinha(cb)}` : ''}${seloPdfEmail(cb, envios)}</td>
         <td class="n">${reais(t.a_pagar_pontual)}<span class="so-celular suave"> · após o vencimento ${reais(t.a_pagar_sem_desconto)}</span></td>
         <td class="n suave so-pc">${reais(t.a_pagar_sem_desconto)}<br>${R.semMultaJuros(cb) ? 'sem multa e juros' : `+ multa ${pct(cb.multa_percentual)}<br>+ juros ${pct(cb.juros_mensal_percentual)} a.m.`}</td>
         <td>${situacaoBoleto(cb, hoje)}${R.aCobrar(cb) && opera() ? `<br>${botao('pagarBoleto', 'Confirmar pagamento', { id: cb.id }, 'pequeno')}<br>${botao('lembrete', C.vencido(cb.vencimento, hoje) ? 'Cobrar' : 'Lembrete', { id: cb.id }, 'secundario pequeno')}` : ''}</td>
@@ -379,7 +381,50 @@ function caixaBoleto(cb) {
     ${b.desconto ? linha(`Desconto se pago até ${dataBr(b.vencimento)}`, `${reais(b.desconto)} (fica ${reais(b.valor_com_desconto)})`, num(b.desconto)) : ''}
     ${b.multa_valor !== null ? linha('Multa após o vencimento (em valor, R$)', `${reais(b.multa_valor)} (${pct(b.multa_percentual)} sem o FCI)`, num(b.multa_valor)) : linha('Multa após o vencimento', pct(b.multa_percentual), String(b.multa_percentual).replace('.', ','))}
     ${linha('Juros (mora) ao dia', reais(b.juros_ao_dia), num(b.juros_ao_dia))}</table>
-    <h3>Descrição</h3><div class="acoes"><pre class="descricao-boleto">${esc(b.descricao)}</pre>${botao('copiar', 'Copiar descrição', { texto: b.descricao }, '')}</div></div>`;
+    <h3>Descrição</h3><div class="acoes"><pre class="descricao-boleto">${esc(b.descricao)}</pre>${botao('copiar', 'Copiar descrição', { texto: b.descricao }, '')}</div>
+    ${b.excesso ? `<div class="alerta aviso">A descrição tem ${b.descricao.length} letras e o C6 aceita ${R.LIMITE_DESCRICAO_BOLETO}: o banco corta as últimas ${b.excesso} ("${esc(b.descricao.replace(/\n/g, ' ').slice(-b.excesso))}"). ${R.ajustesDoBoleto(cb).length ? 'Encurte o motivo dos ajustes do mês ou confira' : 'Confira'} a descrição no banco.</div>` : ''}</div>`;
+}
+
+/** Último e-mail do boleto (modelo boleto_envio) de cada boleto: Map id → { data, como }, montado uma vez por desenho da lista. */
+function enviosDosBoletos() {
+  const m = new Map();
+  for (const x of d().envios_email || []) {
+    if (x.chave !== 'boleto_envio' || !x.cobranca_id) continue;
+    const ja = m.get(x.cobranca_id);
+    // vale o mais novo; no mesmo dia, "enviado" vence "aberto no Gmail"
+    if (!ja || String(x.data) > String(ja.data) || (x.data === ja.data && x.como === 'enviado')) m.set(x.cobranca_id, x);
+  }
+  return m;
+}
+
+/** Na lista: o boleto tem o PDF do banco anexado? Já foi mandado por e-mail? */
+function seloPdfEmail(cb, envios) {
+  const e = envios.get(cb.id);
+  const pdf = cb.boleto_pdf ? etiqueta('📎 PDF do banco', R.boletoPdfDesatualizado(cb) ? 'aviso' : 'ok') : '';
+  const mail = e ? etiqueta(`✉ ${e.como === 'enviado' ? 'enviado' : 'aberto no Gmail'} em ${dataBr(e.data)}`, e.como === 'enviado' ? 'ok' : 'info') : '';
+  return pdf || mail ? `<br>${[pdf, mail].filter(Boolean).join(' ')}` : '';
+}
+
+/**
+ * Boleto emitido à mão no banco (pedido do dono em 2026-11-24, enquanto a API do C6 não sai): anexar o PDF que o banco gerou
+ * (abrir, trocar, tirar) e mandar ao inquilino por e-mail, com o descritivo, o mês, o vencimento e os valores.
+ */
+function caixaPdfBanco(cb) {
+  if (!cb.boleto_pdf && (cb.data_pagamento || !opera())) return '';
+  const pasta = R.pastaDoBoletoPdf(cb);
+  const sumiu = cb.boleto_pdf && arquivoSumiu('contrato', pasta, cb.boleto_pdf);
+  const mudou = R.boletoPdfDesatualizado(cb);
+  const escolher = (texto, classe = 'botao secundario') => (opera() ? `<label class="${classe}" style="cursor:pointer">${texto}<input type="file" hidden accept="${ACEITA_DOCUMENTOS}" data-acao-arquivo="anexarBoletoPdf" data-id="${cb.id}"></label>` : '');
+  const u = ultimoEnvio('boleto_envio', { contrato: cb.contrato_id, cobranca: cb.id });
+  const anexo = !cb.boleto_pdf ? `<p class="suave">Ainda sem o PDF. Emita o boleto no banco com os dados abaixo, baixe o PDF e anexe aqui.</p><p class="acoes">${escolher('📎 Anexar o PDF do boleto', 'botao')}</p>`
+    : sumiu ? `<p class="alerta aviso">O arquivo ${esc(cb.boleto_pdf)} sumiu da pasta: anexe de novo.</p><p class="acoes">${escolher('📎 Anexar de novo', 'botao')}</p>`
+    : `<p class="acoes"><a href="#" class="botao secundario" data-acao="abrirArquivo" data-escopo="contrato" data-id="${pasta}" data-nome="${esc(cb.boleto_pdf)}" title="${esc(cb.boleto_pdf)}">📎 Abrir o PDF do boleto</a>
+        ${escolher('Trocar o PDF')}
+        ${opera() ? botao('removerBoletoPdf', 'Tirar o PDF', { id: cb.id }, 'secundario', `Tirar o PDF "${cb.boleto_pdf}" deste boleto? O arquivo é apagado da pasta (o boleto continua).`) : ''}</p>
+      ${mudou ? `<p class="alerta aviso">O boleto mudou depois que o PDF foi anexado: ${esc(mudou)}. Emita de novo no banco e troque o PDF.</p>` : ''}`;
+  const envio = opera() && !cb.data_pagamento ? `<p class="acoes">${botao('enviarBoletoEmail', '✉ Enviar boleto por e-mail', { id: cb.id }, cb.boleto_pdf && !sumiu ? '' : 'secundario')}
+      ${u ? `<span class="suave">${u.como === 'enviado' ? 'Enviado' : 'Aberto no Gmail'} em ${dataBr(u.data)}${u.para ? ` para ${esc(u.para)}` : ''}</span>` : '<span class="suave">E-mail curto com o descritivo, o mês, o vencimento e os valores, com o PDF anexado.</span>'}</p>` : '';
+  return `<div class="cartao" id="pdf-banco"><h2>Boleto emitido no banco (PDF)</h2>${anexo}${envio}</div>`;
 }
 
 /** Etapas do acordo (registrado, termo assinado com o anexo, parcelas pagas). */
@@ -446,6 +491,7 @@ export function telaCobranca(cb) {
         ${opera() && R.aCobrar(cb) ? formPagamento(cb) : ''}
         ${opera() ? `<p class="acoes" style="margin-top:10px">${botao('lembrete', C.vencido(cb.vencimento, C.hojeIso()) ? 'Cobrar o inquilino (texto pronto)' : 'Lembrar o inquilino (texto pronto)', { id: cb.id }, 'secundario')}<span class="suave">E-mail, WhatsApp ou copiar; o texto muda se já venceu.</span></p>` : ''}`}</div>
     ${R.emAcordo(cb) ? '' : caixaBancoC6(cb)}
+    ${R.emAcordo(cb) ? '' : caixaPdfBanco(cb)}
     ${R.emAcordo(cb) ? '' : caixaBoleto(cb)}
     <div class="cartao rolagem"><h2>NFs</h2><table class="responsiva"><tr><th>Nº</th><th>Empresa</th><th>Emissão</th><th>Período</th><th class="n">%</th><th class="n">Valor</th><th>Situação</th></tr>
       ${fs.map((f) => `<tr><td>${R.numeroFatura(f.numero)}</td><td>${esc(buscar('emitentes', f.emitente_id).nome)}</td><td>${dataBr(f.emissao)}</td><td>${dataBr(f.periodo_inicio)} a ${dataBr(f.periodo_fim)}</td><td class="n">${pct(f.percentual)}</td><td class="n">${reais(f.valor)}</td><td>${etiqueta(f.situacao, f.situacao === 'Emitida' ? 'ok' : 'perigo')}</td></tr>`).join('')

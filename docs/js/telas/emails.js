@@ -11,7 +11,7 @@ import { esc } from '../formularios.js';
 import { desconectarGmail, emailLigado, enderecoParaConectar, enviarEmail, situacaoGmail } from '../gmail.js';
 import { MODELOS_EMAIL, modeloEmail, montarEmail } from '../modelos-email.js';
 import * as R from '../regras.js';
-import { ACEITA_DOCUMENTOS, botao, buscar, d, etiqueta, link, naoEncontrado, opera, pastaDoEscopo } from './comum.js';
+import { ACEITA_DOCUMENTOS, arquivoSumiu, botao, buscar, d, etiqueta, link, naoEncontrado, opera, pastaDoEscopo } from './comum.js';
 import { pdfDoRecibo } from './documentos.js';
 import * as AS from '../assinatura.js';
 
@@ -21,7 +21,7 @@ const LIMITE_ENDERECO = 7000;
 /** Último envio registrado deste e-mail para o contrato ou a ficha (ou null); com ``alvo.aditivo``, só o daquele termo aditivo. */
 export function ultimoEnvio(chave, alvo) {
   return (d().envios_email || []).filter((x) => x.chave === chave && ((alvo.contrato && x.contrato_id === Number(alvo.contrato)) || (alvo.ficha && x.ficha_id === Number(alvo.ficha)))
-    && (!alvo.aditivo || x.aditivo_id === Number(alvo.aditivo)) && (!alvo.notificacao || x.notificacao_id === Number(alvo.notificacao)))
+    && (!alvo.aditivo || x.aditivo_id === Number(alvo.aditivo)) && (!alvo.notificacao || x.notificacao_id === Number(alvo.notificacao)) && (!alvo.cobranca || x.cobranca_id === Number(alvo.cobranca)))
     .sort((a, b) => String(b.data).localeCompare(String(a.data)))[0] || null;
 }
 
@@ -38,13 +38,13 @@ export function botaoEmail(chave, alvo, texto = '✉ E-mail') {
  */
 const registrar = (chave, alvo, para, assunto, como, id = '') => alterar((db) => {
   const dados = { data: C.hojeIso(), chave, contrato_id: alvo.contrato ? Number(alvo.contrato) : null, ficha_id: alvo.ficha ? Number(alvo.ficha) : null, aditivo_id: alvo.aditivo ? Number(alvo.aditivo) : null,
-    ...(alvo.notificacao ? { notificacao_id: Number(alvo.notificacao) } : {}), para, assunto, como, gmail_id: id || null };
+    ...(alvo.notificacao ? { notificacao_id: Number(alvo.notificacao) } : {}), ...(alvo.cobranca ? { cobranca_id: Number(alvo.cobranca) } : {}), para, assunto, como, gmail_id: id || null };
   // notificação mandada pelo "Enviar agora": fica marcada como enviada por e-mail nesse dia (o prazo passa a correr)
   const n = como === 'enviado' && chave === 'notificacao_envio' && alvo.notificacao ? R.buscar(db, 'notificacoes', alvo.notificacao) : null;
   if (n && n.situacao === 'Rascunho') R.marcarNotificacaoEnviada(db, n.id, { data: dados.data, meio: 'E-mail' }, login());
   if (como !== 'enviado') {
     const ja = (db.envios_email || []).find((x) => x.como === como && x.data === dados.data && x.chave === chave && x.contrato_id === dados.contrato_id && x.ficha_id === dados.ficha_id && x.aditivo_id === dados.aditivo_id
-      && (x.notificacao_id || null) === (dados.notificacao_id || null));
+      && (x.notificacao_id || null) === (dados.notificacao_id || null) && (x.cobranca_id || null) === (dados.cobranca_id || null));
     if (ja) return ja;
     return R.inserir(db, 'envios_email', dados, login(), null, { historico: false });
   }
@@ -139,6 +139,10 @@ async function janelaEmail(chave, alvo) {
   if (alvo.notificacao) {
     objeto.notificacao = buscar('notificacoes', alvo.notificacao);
     if (!objeto.notificacao) throw new C.ErroUsuario('Esta notificação não existe mais (pode ter sido excluída). Atualize a página.');
+  }
+  if (alvo.cobranca) {
+    objeto.cobranca = buscar('cobrancas', alvo.cobranca);
+    if (!objeto.cobranca) throw new C.ErroUsuario('Este boleto não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.');
   }
   const inicio = dadosDoEmail(d(), objeto);
   const ligado = await emailLigado();
@@ -323,9 +327,26 @@ export const ACOES_EMAILS = {
     else { campo.select(); aviso('O navegador não deixou copiar: o endereço ficou selecionado, é só copiar.', 'info'); }
   },
 
-  async abrirEmail({ chave, contrato, ficha, aditivo, notificacao }) {
+  async abrirEmail({ chave, contrato, ficha, aditivo, notificacao, cobranca }) {
     if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode enviar e-mails. Peça ao administrador, se precisar.');
-    await janelaEmail(chave, contrato ? { contrato: Number(contrato), ...(aditivo ? { aditivo: Number(aditivo) } : {}), ...(notificacao ? { notificacao: Number(notificacao) } : {}) } : { ficha: Number(ficha) });
+    await janelaEmail(chave, contrato ? { contrato: Number(contrato), ...(aditivo ? { aditivo: Number(aditivo) } : {}), ...(notificacao ? { notificacao: Number(notificacao) } : {}), ...(cobranca ? { cobranca: Number(cobranca) } : {}) } : { ficha: Number(ficha) });
+  },
+
+  /**
+   * "Enviar boleto por e-mail" (página do boleto, 2026-11-24): abre a janela do e-mail com o PDF do banco anexado. Sem o PDF
+   * (ou com o arquivo sumido da pasta) só avisa; boleto que mudou depois de anexado o PDF pergunta antes.
+   */
+  async enviarBoletoEmail({ id }) {
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode enviar e-mails. Peça ao administrador, se precisar.');
+    const cb = buscar('cobrancas', id);
+    if (!cb) throw new C.ErroUsuario('Este boleto não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.');
+    if (!cb.boleto_pdf) throw new C.ErroUsuario('Anexe antes o PDF do boleto emitido no banco (botão "Anexar o PDF do boleto", nesta página). O e-mail vai com ele.');
+    if (arquivoSumiu('contrato', R.pastaDoBoletoPdf(cb), cb.boleto_pdf)) throw new C.ErroUsuario(`O PDF do boleto (${cb.boleto_pdf}) sumiu da pasta: anexe de novo antes de enviar.`);
+    const mudou = R.boletoPdfDesatualizado(cb);
+    if (mudou && !(await confirmar(`O boleto mudou depois que o PDF do banco foi anexado: ${mudou}. O PDF anexado pode estar com o valor antigo.
+
+Emita de novo no banco e troque o PDF, ou abra o e-mail mesmo assim.`, { titulo: 'PDF do boleto desatualizado', sim: 'Abrir o e-mail mesmo assim', forte: true }))) return;
+    await janelaEmail('boleto_envio', { contrato: cb.contrato_id, cobranca: cb.id });
   },
   async restaurarModeloEmail({ chave }) {
     const m = (d().modelos_email || []).find((x) => x.chave === chave);
@@ -366,7 +387,7 @@ const AJUDA = `<div class="cartao"><h2>Como escrever</h2>
   {data_chaves}, {data_limite_vistoria}, {data_saida}, {ano_saida}, {acerto}, {saldo}, {data_devolucao}, {informe}, {ano}, {conta_deposito} (conta para depósito da caução, do cadastro da empresa) e as respostas da janela ({prazo_assinatura}, {opcoes_entrega}, {data_aviso}, {data_vistoria}, {pendencias}).
   Na ficha: {inclusos}, {iptu_valor}, {seguro_valor}, {devolucao}, {devolucao_data}, {documentos_ficha}, {link}, {link_validade}, {link_fiador} (o do 1º fiador) e {links_fiadores} (uma linha para cada fiador com link).
   No termo aditivo: {aditivo_data}, {aditivo_assunto}, {valor_anterior}, {valor_novo}, {novo_inicio}, {novo_bonificado}. Na notificação: {notificacao_data}, {notificacao_numero}, {notificacao_assunto}, {notificacao_assunto_minusculo}, {prazo_notificacao}, {data_limite}.
-  Nos e-mails da régua de cobrança, também os do boleto: {boleto_referente}, {vencimento_boleto}, {limite_pagamento}, {valor_em_dia}, {valor_cheio}, {multa_pct}, {juros_pct}, {valor_hoje}, {multa_hoje}, {juros_hoje}, {dias_atraso}, {data_hoje}, {pix}, {linha_digitavel} (condições nao_util, bonificacao_boleto, pix, linha_digitavel).
+  Nos e-mails da régua de cobrança, também os do boleto: {boleto_referente}, {vencimento_boleto}, {limite_pagamento}, {valor_em_dia}, {valor_cheio}, {multa_pct}, {juros_pct}, {valor_hoje}, {multa_hoje}, {juros_hoje}, {dias_atraso}, {data_hoje}, {pix}, {linha_digitavel}, {competencia_boleto} (mês de competência) e {descricao_boleto} (o descritivo do boleto) (condições nao_util, bonificacao_boleto, pix, linha_digitavel, multa_juros).
   Com a 1ª letra maiúscula ({Nome}) sai com maiúscula; todo em maiúsculas ({NOME}), em maiúsculas.</p>
   <p><b>[se condição]</b> texto <b>[senão]</b> outro <b>[fim]</b>: pj, caucao, deposito, dinheiro (caução ou depósito), fiador, seguro_fianca, sem_garantia, tem_garantia, contas, iptu, seguro_incendio,
   bonificacao, reserva, saida_antecipada, devolver, cobrar, garantia_depositada (caução ou depósito já registrado), inclusos, iptu_valor, seguro_valor, link, link_fiador, varios_fiadores,

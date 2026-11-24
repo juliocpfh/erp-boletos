@@ -3598,6 +3598,40 @@ export function anexarComprovante(d, tabela, id, campo, arquivo, usuario) {
   if (['comprovante_caucao', 'comprovante_deposito'].includes(campo) || tabela === 'depositos_garantia') sincronizarGarantiaHerdeiro(d, contratoId, usuario);
 }
 
+/** Pasta (contrato) em que está o PDF do boleto emitido no banco: a do contrato em que foi anexado. */
+export const pastaDoBoletoPdf = (cb) => cb.boleto_pdf_contrato || cb.contrato_id;
+
+/**
+ * PDF do boleto emitido à mão no banco (enquanto a API do C6 não sai, pedido do dono em 2026-11-24): anexa (ou troca) e guarda
+ * o valor e o vencimento do boleto naquele momento, para avisar se o boleto mudar depois (``boletoPdfDesatualizado``).
+ * Com ``arquivo`` null, tira o anexo (o arquivo é apagado por quem chama, alterarApagandoAnexos).
+ */
+export function anexarBoletoPdf(d, id, arquivo, usuario) {
+  const cb = buscar(d, 'cobrancas', id);
+  if (!cb) throw new C.ErroUsuario('Este boleto não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.');
+  const c = buscar(d, 'contratos', cb.contrato_id);
+  const quem = `${c ? c.inquilino_nome : 'boleto'}: boleto de ${C.compBr(cb.competencia)}`;
+  if (!arquivo) {
+    if (!cb.boleto_pdf) throw new C.ErroUsuario('Este boleto não tem PDF anexado.');
+    return atualizar(d, 'cobrancas', cb.id, { boleto_pdf: null, boleto_pdf_contrato: null, boleto_pdf_valor: null, boleto_pdf_vencimento: null }, usuario, `${quem}, PDF do banco tirado (${cb.boleto_pdf})`);
+  }
+  return atualizar(d, 'cobrancas', cb.id, { boleto_pdf: arquivo, boleto_pdf_contrato: cb.contrato_id, boleto_pdf_valor: totais(cb).a_pagar_sem_desconto, boleto_pdf_vencimento: cb.vencimento },
+    usuario, `${quem}, PDF do banco ${cb.boleto_pdf ? 'trocado' : 'anexado'} (${arquivo})`);
+}
+
+/**
+ * O boleto mudou depois de anexado o PDF do banco? Texto do que mudou ou ''. Ex.: anexado com R$ 2.500,00 e o ajuste do mês
+ * acrescentou R$ 100,00 → "o valor era R$ 2.500,00 e agora é R$ 2.600,00".
+ */
+export function boletoPdfDesatualizado(cb) {
+  if (!cb.boleto_pdf || cb.boleto_pdf_valor == null) return '';
+  const dif = [];
+  const valor = totais(cb).a_pagar_sem_desconto;
+  if (valor !== cb.boleto_pdf_valor) dif.push(`o valor era ${C.reais(cb.boleto_pdf_valor)} e agora é ${C.reais(valor)}`);
+  if (cb.boleto_pdf_vencimento && cb.boleto_pdf_vencimento !== cb.vencimento) dif.push(`o vencimento era ${C.dataBr(cb.boleto_pdf_vencimento)} e agora é ${C.dataBr(cb.vencimento)}`);
+  return dif.join('; ');
+}
+
 /** Caução e depósito de garantia: campos da data efetivamente paga e do comprovante. */
 export const GARANTIAS_DEPOSITADAS = {
   caucao: { nome: 'caução', pago: 'caucao_pago_em', comprovante: 'comprovante_caucao', arquivo: 'caucao' },
@@ -3851,7 +3885,8 @@ function alertasDaSaidaContinuam(d, c, hoje) {
   return roteiroSaida(d, c, hoje).some((e) => e.chave !== 'arquivo' && !e.feito);
 }
 function alertasDepoisDaSaida(d, c, hoje) {
-  return [alertaComprovantes(d, c), alertaTermoAcordo(d, c), alertaNotificacoes(d, c, hoje)].filter(Boolean);
+  // o ressarcimento lançado para depois da saída ou da troca de titular continua avisando (não abateu em nenhum boleto)
+  return [alertaComprovantes(d, c), alertaTermoAcordo(d, c), alertaNotificacoes(d, c, hoje), alertaRessarcimentoEmAcordo(d, c)].filter(Boolean);
 }
 /** Alertas do inquilino (Painel e página dele): os do contrato ativo ou, depois da saída, os que ainda continuam. */
 export function alertasDoInquilino(d, c, hoje = C.hojeIso()) {
@@ -5131,6 +5166,8 @@ export function arquivosReferenciados(d) {
   // notificação ao inquilino (2026-11-17): a assinada e o comprovante da baixa (foto ou arquivo de que foi resolvido)
   for (const n of d.notificacoes || []) { usa('contrato', n.contrato_id, n.arquivo_assinado); usa('contrato', n.contrato_id, n.comprovante_baixa); }
   for (const x of d.cartas_reajuste || []) usa('aditivos', x.contrato_id, x.arquivo);
+  // PDF do boleto emitido à mão no banco (2026-11-24): na pasta do inquilino em que foi anexado (a troca de titular muda o contrato_id)
+  for (const cb of d.cobrancas || []) usa('contrato', pastaDoBoletoPdf(cb), cb.boleto_pdf);
   for (const v of d.vistorias) for (const nome of Object.values(v.fotos || {})) usa('contrato', v.contrato_id, nome);
   for (const s of d.seguros) for (const nome of [s.arquivo_apolice, ...(s.outros_arquivos || [])]) usa('seguro', s.contrato_id, nome);
   for (const f of d.fichas || []) for (const k of CAMPOS_ARQUIVO_FICHA) usa('ficha', f.id, f[k]);
@@ -5204,6 +5241,7 @@ export function rotulosDosArquivos(d) {
     poe('contrato', n.contrato_id, n.arquivo_assinado, `notificação de ${C.dataBr(n.data)} assinada (${n.assunto})`);
     poe('contrato', n.contrato_id, n.comprovante_baixa, `comprovante da baixa da notificação de ${C.dataBr(n.data)}${n.resolvida_em ? ` (resolvida em ${C.dataBr(n.resolvida_em)})` : ''}`);
   }
+  for (const cb of d.cobrancas || []) poe('contrato', pastaDoBoletoPdf(cb), cb.boleto_pdf, `PDF do boleto emitido no banco (${C.compBr(cb.competencia)}, vence ${C.dataBr(cb.vencimento)})`);
   for (const x of d.cartas_reajuste || []) poe('aditivos', x.contrato_id, x.arquivo, `carta de reajuste de ${C.compBr(x.competencia)} (enviada em ${C.dataBr(x.enviada_em)})`);
   for (const v of d.vistorias) for (const nome of Object.values(v.fotos || {})) poe('contrato', v.contrato_id, nome, `foto da vistoria de ${String(v.tipo || '').toLowerCase()} (${C.dataBr(v.data)})`);
   for (const f of d.fichas || []) {
@@ -5677,12 +5715,19 @@ export function dadosBoleto(d, cb) {
   // cada ajuste do mês, multa de notificação e diferença numa parte (desde 24/11/2026 o boleto pode ter vários ajustes)
   for (const p of partesDosOutros(cb)) extras.push(`${(p.texto || (p.valor < 0 ? 'RESSARCIMENTO' : 'COBRANÇA ADICIONAL')).replace(/Multa por descumprimento da notificação de /g, 'Multa notif. ').toLocaleUpperCase('pt-BR')} ${p.valor < 0 ? `-${rs(-p.valor)}` : rs(p.valor)}`);
   if (cb.reserva_utilizada) extras.push(`RESERVA -${rs(cb.reserva_utilizada)}`);
+  const iRessarc = extras.length;
   if (cb.ressarcimento) extras.push(`RESSARCIMENTO CONDOMÍNIO -${rs(cb.ressarcimento)}`);
   if (extras.length && !ehBoletoAvulso(cb)) linhas.push(extras.join(' '));
-  // a tarifa encurta quando a descrição passa do limite do C6: "TARIFA COBRANÇA" → "TAR. COBRANÇA" → "TAR. COBR." → "TARIFA"
-  for (const curto of ['TAR. COBRANÇA', 'TAR. COBR.', 'TARIFA']) {
-    if (!cb.taxa_boleto || ehBoletoAvulso(cb) || linhas.join('\n').length <= LIMITE_DESCRICAO_BOLETO) break;
-    extras[iTarifa] = `${curto} ${rs(cb.taxa_boleto)}`;
+  // quando a descrição passa do limite do C6, encurta primeiro a tarifa ("TARIFA COBRANÇA" → "TAR. COBRANÇA" → "TAR. COBR." →
+  // "TARIFA") e depois o ressarcimento ("RESSARC. CONDOMÍNIO" → "RESSARC. COND."), que fica no fim e era o primeiro a ser
+  // cortado (conferência de 24/11/2026: aluguel, bonificação, IPTU, seguro, tarifa e ressarcimento davam 120 letras)
+  const encurtar = [
+    ...(cb.taxa_boleto ? ['TAR. COBRANÇA', 'TAR. COBR.', 'TARIFA'].map((x) => () => { extras[iTarifa] = `${x} ${rs(cb.taxa_boleto)}`; }) : []),
+    ...(cb.ressarcimento ? ['RESSARC. CONDOMÍNIO', 'RESSARC. COND.'].map((x) => () => { extras[iRessarc] = `${x} -${rs(cb.ressarcimento)}`; }) : []),
+  ];
+  for (const passo of encurtar) {
+    if (ehBoletoAvulso(cb) || linhas.join('\n').length <= LIMITE_DESCRICAO_BOLETO) break;
+    passo();
     linhas[linhas.length - 1] = extras.join(' ');
   }
   const valor = t.a_pagar_sem_desconto;
@@ -5694,6 +5739,8 @@ export function dadosBoleto(d, cb) {
     // com FCI, multa e juros são sobre o boleto sem o FCI: a multa vai em valor (R$), não em %
     multa_valor: t.base_multa !== valor ? C.arred((t.base_multa * (cb.multa_percentual || 0)) / 100) : null,
     juros_ao_dia: C.jurosAoDia(t.base_multa, cb.juros_mensal_percentual), descricao: linhas.join('\n'),
+    // letras a mais que o C6 corta no fim da descrição (0 = cabe)
+    excesso: Math.max(0, linhas.join('\n').length - LIMITE_DESCRICAO_BOLETO),
   };
 }
 
@@ -7007,6 +7054,42 @@ function ressarcimentosNoBoleto(d, contratoId, comp) {
   return { valor: lista.reduce((t, r) => t + r.valor, 0), descricao: lista.map((r) => `${r.descricao} (condomínio ${C.compBr(r.competencia_condominio)})`).join('; ') };
 }
 
+/**
+ * Por que o contrato não terá boleto do aluguel no mês do abatimento (ressarcimento que não entraria em lugar nenhum), ou null.
+ * Conferência de 24/11/2026: o ressarcimento de um mês depois da saída, ou depois da troca de titular (o boleto do mês é do
+ * novo titular), ficava lançado e não abatia em nenhum boleto, sem aviso. Ex.: Maria sai em 20/11/2026 e o fundo de obras de
+ * R$ 50,00 pago em 05/12 cairia no boleto de 12/2026, que não existe.
+ * { motivo: 'troca' | 'saida' | 'entrada', data, novo? }
+ */
+export function semBoletoNoMes(d, c, comp) {
+  if (!c || !comp || boletoDoMes(d, c.id, comp)) return null;
+  if (C.diasOcupados(comp, c.data_entrada, c.data_saida) > 0) return null;
+  if (c.data_entrada && `${comp}-31` < c.data_entrada) return { motivo: 'entrada', data: c.data_entrada };
+  const novo = continuadoPor(d, c);
+  return novo ? { motivo: 'troca', data: novo.data_entrada || novo.vigencia_inicio, novo } : { motivo: 'saida', data: c.data_saida };
+}
+
+/** Texto do motivo de ``semBoletoNoMes`` (para o formulário e o alerta). */
+export function textoSemBoleto(s, comp) {
+  if (s.motivo === 'troca') return `o boleto de ${C.compBr(comp)} já é de ${s.novo.inquilino_nome} (troca de titular em ${C.dataBr(s.data)})`;
+  if (s.motivo === 'entrada') return `o contrato começa em ${C.dataBr(s.data)} e não tem boleto de ${C.compBr(comp)}`;
+  return `o contrato termina em ${C.dataBr(s.data)} e não tem boleto de ${C.compBr(comp)}`;
+}
+
+/**
+ * Depois do Desfazer de um ressarcimento pelo Histórico (valor, mês do abatimento), põe os boletos em aberto do contrato de
+ * novo de acordo com os ressarcimentos lançados: os meses que têm ressarcimento e os boletos que ainda mostram um.
+ * Conferência de 24/11/2026: o Desfazer voltava o ressarcimento e o boleto continuava com o valor de antes. Ex.: R$ 50,00
+ * mudado para R$ 80,00 e desfeito → o boleto de 11/2026 volta a abater R$ 50,00.
+ */
+export function reaplicarRessarcimentos(d, contratoId, usuario) {
+  const c = buscar(d, 'contratos', contratoId);
+  if (!c) return;
+  const meses = [...(d.ressarcimentos || []).filter((r) => r.contrato_id === c.id).map((r) => r.competencia_abatimento),
+    ...d.cobrancas.filter((cb) => cb.contrato_id === c.id && cb.ressarcimento && !cb.data_pagamento).map((cb) => cb.competencia)];
+  for (const comp of new Set(meses.filter(Boolean))) aplicarRessarcimentos(d, c, comp, usuario);
+}
+
 /** Mês de condomínio mais antigo ainda não conferido (para o alerta e o fechamento), ou null. */
 export function condominioAConferir(c, hoje = C.hojeIso()) {
   if (!inquilinoPagaCondominio(c) || !contratoAtivo(c, hoje)) return null;
@@ -7043,9 +7126,25 @@ export function aplicarRessarcimentos(d, contrato, comp, usuario) {
  * Ex.: boleto de 10/2026 em acordo e ressarcimento de R$ 50,00 lançado depois para 10/2026 → aviso para passar ao próximo boleto em aberto.
  */
 export function alertaRessarcimentoEmAcordo(d, c) {
+  // lançado no contrato anterior (troca de titular) para um mês que já é deste: aparece aqui, onde está o boleto
+  const anterior = contratoHerdado(d, c);
+  const mesesAnt = anterior ? [...new Set((d.ressarcimentos || []).filter((r) => r.contrato_id === anterior.id).map((r) => r.competencia_abatimento))].sort() : [];
+  for (const comp of mesesAnt) {
+    const sem = semBoletoNoMes(d, anterior, comp);
+    if (sem && sem.motivo === 'troca' && sem.novo.id === c.id) {
+      return { nivel: 'aviso', tipo: 'Condomínio', ancora: 'ressarcimentos',
+        texto: `Ressarcimento de ${C.reais(ressarcimentosNoBoleto(d, anterior.id, comp).valor)} lançado no contrato de ${anterior.inquilino_nome} para o boleto de ${C.compBr(comp)}, que é deste contrato (troca de titular): não foi abatido em nenhum boleto. Exclua lá e lance aqui, ou escolha lá um boleto em aberto de ${anterior.inquilino_nome}.` };
+    }
+  }
   const meses = [...new Set((d.ressarcimentos || []).filter((r) => r.contrato_id === c.id).map((r) => r.competencia_abatimento))].sort();
   for (const comp of meses) {
     const cb = boletoDoMes(d, c.id, comp);
+    // mês sem boleto deste contrato (depois da saída ou da troca de titular): o ressarcimento não abate em lugar nenhum
+    const sem = !cb && semBoletoNoMes(d, c, comp);
+    if (sem) {
+      return { nivel: 'aviso', tipo: 'Condomínio', ancora: 'ressarcimentos',
+        texto: `Ressarcimento de ${C.reais(ressarcimentosNoBoleto(d, c.id, comp).valor)} marcado para o boleto de ${C.compBr(comp)}, mas ${textoSemBoleto(sem, comp)}: não foi abatido em nenhum boleto. Em "Ressarcimentos", escolha um boleto em aberto deste contrato${sem.motivo === 'troca' ? ` ou exclua aqui e lance no contrato de ${sem.novo.inquilino_nome}` : ' ou devolva ao inquilino'}.` };
+    }
     // ressarcimento maior que o boleto: o boleto fica em R$ 0,00 e a sobra não passa sozinha ao próximo. Ex.: aluguel R$ 2.000,00
     // (R$ 1.800,00 em dia) e fundo de obras de R$ 2.500,00 → R$ 700,00 a lançar no próximo boleto
     if (cb && !cb.data_pagamento && !emAcordo(cb)) {

@@ -4,11 +4,13 @@
 
 **Para o Claude:** o dono pediu (24/11) que, com o limite de uso liberado, o trabalho siga sozinho: PR atrás de PR (uma de cada vez, a partir da `main`, sem empilhar), conferindo que uma não trava a outra, com **testes de tela e conferências antes de cada PR**.
 
+**Três documentos novos (24/11), também em PDF na pasta do projeto:** `HISTORICO_DO_SISTEMA.md` (o que foi feito, tirado e por quê, e **o que ainda falta, em ordem de prioridade**), `CONFERIR_O_QUE_MUDOU.md` (o que **você** confere, tela por tela, com caixas para marcar) e `TAXAS_COBRAVEIS.md` (o que pode ser cobrado do inquilino, com uma pergunta sim/não para cada taxa; o advogado deve conferir).
+
 ### A. Boletos quebrados (urgente)
 1. [ ] **Condomínio, taxas do proprietário (ressarcimento):** lançadas, mas não entraram nos boletos do mês.
 2. [ ] **Seguro obrigatório** lançado para entrar neste mês não entrou no boleto do inquilino.
 3. [ ] **Ajuste do mês em Boletos:** permitir **mais de um abatimento e mais de um ressarcimento** no mesmo boleto (hoje só um de cada).
-4. [ ] **Mandar o boleto feito à mão por e-mail** (enquanto a API do C6 não sai): em Boletos, anexar o PDF do boleto emitido no banco e enviar ao inquilino pelo Gmail um e-mail curto com o descritivo (como no boleto), o mês de competência, o vencimento e o boleto anexado. Hoje a equipe manda sempre esse e-mail por fora; agora quer mandar pelo sistema.
+4. [x] **Mandar o boleto feito à mão por e-mail** (enquanto a API do C6 não sai): em Boletos, anexar o PDF do boleto emitido no banco e enviar ao inquilino pelo Gmail um e-mail curto com o descritivo (como no boleto), o mês de competência, o vencimento e o boleto anexado. Hoje a equipe manda sempre esse e-mail por fora; agora quer mandar pelo sistema. **Feito em 24/11:** na página do boleto, caixa "Boleto emitido no banco (PDF)" (anexar, abrir, trocar, tirar) e botão "Enviar boleto por e-mail" (abre a janela para revisar; vai com o PDF anexado); a lista de Boletos mostra "📎 PDF do banco" e "✉ enviado em ...". **Para conferir:** anexar o PDF de um boleto de verdade e mandar a si mesmo primeiro.
 5. [ ] **Conferir tudo o que entra e sai do boleto** (aluguel, proporcional, IPTU, condomínio, seguro, ressarcimentos, abatimentos, multas da notificação, diferenças, caução, acordo, reserva, NF), com testes automáticos e de tela.
 
 ### B. Termo de aceite da reserva (decisões do dono em 24/11) — [x] programado em 24/11 (PR "Termo de aceite da reserva"); faltam as 2 confirmações abaixo e o teste do dono
@@ -29,9 +31,9 @@
 ### C. Outros pedidos de 24/11
 1. [ ] **Assinatura digital: melhorar o visual.** Funcionou (conferido no validar.iti.gov.br), mas o campo de assinatura do documento fica em branco e a última página só tem uma tarja azul. Fazer uma página de assinatura mais bonita e preencher o campo "assinatura" do documento com o selo.
 2. [ ] **Modelos de documentos (PDF):** criar os modelos que faltam para o dono baixar, ler e ajustar.
-3. [ ] **Lista do que conferir:** o dono não sabe o que mudou; montar a lista de tudo que ele precisa conferir de novo (tela por tela, o que fazer e o que deve aparecer).
-4. [ ] **Taxas e cobranças extras:** trazer a lista do que pode ser cobrado do inquilino (com a lei de cada uma) para o dono decidir.
-5. [ ] **Busca geral com vários agentes ao mesmo tempo:** erros, partes quebradas, regras que deixaram de ser usadas; comparar com a memória e a documentação o que foi feito e o que deixou de ser feito, **quando** e **por quê** (o que foi implementado, o que foi tirado e a decisão). Tudo em **PDF** e documentado. Depois, listar o que ainda falta e começar as correções.
+3. [x] **Lista do que conferir:** o dono não sabe o que mudou; montar a lista de tudo que ele precisa conferir de novo (tela por tela, o que fazer e o que deve aparecer). **Feito em 24/11:** `CONFERIR_O_QUE_MUDOU.md` (e o PDF de mesmo nome na pasta do projeto). **Falta o dono conferir** item por item.
+4. [x] **Taxas e cobranças extras:** trazer a lista do que pode ser cobrado do inquilino (com a lei de cada uma) para o dono decidir. **Feito em 24/11:** `TAXAS_COBRAVEIS.md` (e o PDF), com uma pergunta sim/não para cada taxa. **Falta o dono decidir**; depois o Claude escreve as cláusulas para o advogado conferir.
+5. [ ] **Busca geral com vários agentes ao mesmo tempo:** erros, partes quebradas, regras que deixaram de ser usadas; comparar com a memória e a documentação o que foi feito e o que deixou de ser feito, **quando** e **por quê** (o que foi implementado, o que foi tirado e a decisão). Tudo em **PDF** e documentado. Depois, listar o que ainda falta e começar as correções. **Parte feita em 24/11:** `HISTORICO_DO_SISTEMA.md` (e o PDF): o histórico por assunto (feito, tirado e por quê, pela metade) e a lista "O que ainda falta fazer" em ordem de prioridade. Falta a busca de erros e partes quebradas e começar as correções.
 6. [ ] **No fim:** arquivar, salvar e compactar código e documentação para facilitar a consulta de memória (índice de ponta a ponta).
 
 A simulação de todas as etapas (item 5b) fica para depois que o Claude fizer as etapas acima (decisão de 24/11).

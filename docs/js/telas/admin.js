@@ -254,6 +254,8 @@ function aplicarDesfazer(db, itens) {
     if (cfg && cfg.recalcular && r) recalculados += R.recalcularCobrancas(db, cfg.recalcular(r, db), login());
     // multa de notificação desfeita (ou refeita): sai do boleto em aberto ou volta para o próximo
     if (tabela === 'notificacoes' && r) recalculados += R.sincronizarMultas(db, r.contrato_id, login());
+    // ressarcimento de condomínio desfeito (valor ou mês do abatimento): os boletos em aberto acompanham
+    if (tabela === 'ressarcimentos' && r) R.reaplicarRessarcimentos(db, r.contrato_id, login());
   }
   return recalculados;
 }

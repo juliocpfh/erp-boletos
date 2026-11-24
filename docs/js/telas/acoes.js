@@ -979,6 +979,29 @@ export const ACOES = {
     await mostrar();
   },
 
+  /**
+   * PDF do boleto emitido à mão no banco (página do boleto, 2026-11-24): grava na pasta do inquilino (boleto-banco-<mês>.pdf) e
+   * liga ao boleto; trocar apaga o anterior. Sem o PDF, "Enviar boleto por e-mail" só avisa.
+   */
+  async anexarBoletoPdf({ id }, el) {
+    const arq = el.files[0];
+    const cb = buscar('cobrancas', id);
+    if (!arq) return;
+    if (!cb) throw new C.ErroUsuario('Este boleto não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.');
+    const nome = await S.salvarArquivo(await pastaDoEscopo('contrato', cb.contrato_id), new File([arq], `boleto-banco-${cb.competencia}${extensao(arq.name)}`));
+    const trocou = !!cb.boleto_pdf;
+    await alterarApagandoAnexos((db) => R.anexarBoletoPdf(db, cb.id, nome, login()));
+    aviso(trocou ? 'PDF do boleto trocado.' : 'PDF do boleto anexado. Agora dá para enviar por e-mail.');
+    await mostrar();
+  },
+
+  /** "×" do PDF do boleto do banco: tira o anexo e apaga o arquivo (o boleto continua). */
+  async removerBoletoPdf({ id }) {
+    await alterarApagandoAnexos((db) => R.anexarBoletoPdf(db, Number(id), null, login()));
+    aviso('PDF do boleto tirado.');
+    await mostrar();
+  },
+
   /** Histórico (administrador): desfaz uma alteração ou as marcadas, recalculando os boletos em aberto quando for o caso. */
   async desfazerAlteracao({ itens }) {
     await desfazerItens(String(itens).split(','));
@@ -2003,7 +2026,7 @@ export const ACOES = {
     const deMeses = meses.length === 1 ? `de ${compBr(meses[0])}` : meses.length ? `de ${meses.map(compBr).join(', ')}` : `de ${compBr(comp)}`;
     if (!(await confirmar(`Eles podem ser gerados de novo depois.`, { titulo: `Excluir ${ids.length} boleto(s) ${deMeses}?`, sim: 'Excluir boletos', forte: true }))) return;
     let excluidos = 0;
-    await alterar((db) => {
+    await alterarApagandoAnexos((db) => { // o PDF do boleto do banco anexado sai junto
       excluidos = 0;
       for (const id of ids) {
         const cb = R.buscar(db, 'cobrancas', id);

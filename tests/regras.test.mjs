@@ -851,7 +851,8 @@ test('ressarcimento de taxa do condomínio: abate no boleto do mês seguinte ao 
   const t = R.totais(cb);
   assert.equal(cb.ressarcimento, 15000);
   assert.equal(t.a_pagar_pontual, 135000 - 13500 + 10000 + 350 - 15000);
-  assert.match(R.dadosBoleto(d, cb).descricao, /RESSARCIMENTO CONDOMÍNIO -RS150,00/);
+  // 102 letras por extenso: o ressarcimento encurta para caber nas 100 do C6 (conferência de 24/11/2026)
+  assert.match(R.dadosBoleto(d, cb).descricao, /RESSARC\. CONDOMÍNIO -RS150,00$/);
   // NF com o aluguel cheio; o ressarcimento conta como gasto
   R.registrarPagamento(d, cb.id, '2026-09-10', null, 'julio', { pagouEmDia: true });
   assert.equal(cb.valor_nf, 135000 - 13500);
