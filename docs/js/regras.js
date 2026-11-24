@@ -7363,13 +7363,18 @@ export function reaplicarRessarcimentos(d, contratoId, usuario) {
   for (const comp of new Set(meses.filter(Boolean))) aplicarRessarcimentos(d, c, comp, usuario);
 }
 
-/** Mês de condomínio mais antigo ainda não conferido (para o alerta e o fechamento), ou null. */
-export function condominioAConferir(c, hoje = C.hojeIso()) {
+/**
+ * Mês de condomínio mais antigo ainda não conferido (para o alerta e o fechamento), ou null. O alerta só cobra o mês que
+ * acabou; ``ate`` deixa olhar até outro mês: o boleto do condomínio de um mês chega antes do fim dele (24/11/2026, dados
+ * reais: o do Ascot de 11/2026, que vence em 05/12, chegou em 24/11 e o fechamento de 12/2026 dizia "nada a conferir").
+ */
+export function condominioAConferir(c, hoje = C.hojeIso(), { ate = null } = {}) {
   if (!inquilinoPagaCondominio(c) || !contratoAtivo(c, hoje)) return null;
   const ultimo = C.somarMeses(C.competenciaDe(hoje), -1); // o mês que acabou: o inquilino já pagou o condomínio dele
+  const limite = ate || ultimo;
   const inicio = C.competenciaDe(c.data_entrada || hoje);
-  const proximo = c.condominio_conferido_ate ? C.somarMeses(c.condominio_conferido_ate, 1) : (inicio > ultimo ? null : ultimo);
-  return proximo && proximo <= ultimo ? proximo : null;
+  const proximo = c.condominio_conferido_ate ? C.somarMeses(c.condominio_conferido_ate, 1) : (inicio > ultimo ? inicio : ultimo);
+  return proximo && proximo <= limite ? proximo : null;
 }
 
 export function alertaCondominio(c, hoje = C.hojeIso()) {
@@ -7525,10 +7530,19 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso(), { pendentes = null 
       pendentes: nfs, aPartirDe: `${seguinte}-01`, detalhe: [airPendente ? `gerar a NF do Airbnb (${C.reais(air.total)}) em Financeiro` : '', nfs - airPendente ? `${nfs - airPendente} pagamento(s) aguardando número` : ''].filter(Boolean).join(' · ') || 'nada aguardando número',
       link: airPendente ? `#/financeiro?mes=${mes}` : `#/faturas?mes=${mes}` },
     (() => {
-      const conferir = ativos.filter((c) => { const m = condominioAConferir(c, hoje); return m && m <= comp; });
-      return { chave: 'condominio', titulo: `Conferir as taxas do condomínio de ${C.compBr(comp)} (ressarcimento ao inquilino)`, pendentes: conferir.length,
-        detalhe: conferir.length ? `a conferir: ${conferir.map((c) => c.inquilino_nome).join(', ')}` : 'nada a conferir', link: conferir.length === 1 ? `#/contrato/${conferir[0].id}?ir=ressarcimentos` : '#/inquilinos',
-        contratos: conferir.length > 1 ? conferir.map((c) => c.id) : [] }; // com mais de um, a tela põe um botão por inquilino
+      // o condomínio de ``comp`` (o boleto dele vence no começo de ``mes``) chega antes do fim de ``comp``: conta desde já,
+      // e não só depois que o mês acaba (24/11/2026, dados reais: Ascot de 11/2026, vence em 05/12, chegou em 24/11)
+      // (mês ainda por vir: a etapa fica prevista até o 1º dia dele, ``aPartirDe``)
+      const conferir = ativos.filter((c) => condominioAConferir(c, hoje, { ate: comp }));
+      // um botão por inquilino que paga o condomínio (o de cada imóvel), feito ou não: o "Abrir" leva sempre à caixa dos
+      // ressarcimentos do inquilino certo, e não à lista dos inquilinos (antes, com zero ou vários, abria #/inquilinos)
+      const pagam = ativos.filter((c) => inquilinoPagaCondominio(c) && contratoAtivo(c, hoje));
+      const ordem = [...conferir, ...pagam.filter((c) => !conferir.includes(c))];
+      return { chave: 'condominio', titulo: `Conferir as taxas do condomínio de ${C.compBr(comp)} (boleto do condomínio que vence em ${C.compBr(mes)}; ressarcimento ao inquilino)`, pendentes: conferir.length,
+        aPartirDe: `${comp}-01`,
+        detalhe: conferir.length ? `a conferir: ${conferir.map((c) => c.inquilino_nome).join(', ')}` : pagam.length ? 'nada a conferir' : 'nenhum inquilino paga o condomínio',
+        link: ordem.length === 1 ? `#/contrato/${ordem[0].id}?ir=ressarcimentos` : null,
+        contratos: ordem.length > 1 ? ordem.map((c) => ({ id: c.id, conferir: conferir.includes(c) })) : [] }; // com mais de um, a tela põe um botão por inquilino
     })(),
     { chave: 'contas', titulo: `Lançar as contas pagas por nós de ${C.compBr(mes)}`, pendentes: contas.length,
       detalhe: contas.length ? `sem lançamento: ${contas.map((i) => i.nome).join(', ')}` : comConta.length ? `${comConta.length} imóvel(is) com conta lançada` : 'nenhum imóvel com conta nossa', link: '#/resultados', imoveis: contas.map((i) => i.id) },

@@ -2839,3 +2839,45 @@ test('saida-031: termo aditivo que não valeu (arquivo errado ou sem assinatura 
   assert.ok(!R.buscar(d, 'aditivos', b.id));
   assert.equal(c.dia_vencimento, dia);
 });
+
+test('fechamento: o condomínio do mês corrente já pode ser conferido e o botão leva à página do inquilino certo (24/11/2026)', () => {
+  const { d, c } = base();
+  c.conta_condominio = 'Por conta do inquilino';
+  c.condominio_conferido_ate = '2026-10';
+  const hoje = '2026-11-24';
+  // Ascot: boleto do condomínio de 11/2026 vence em 05/12 e chegou em 24/11; o fechamento de 12/2026 dizia "nada a conferir"
+  let e = R.etapasFechamento(d, '2026-12', hoje).find((x) => x.chave === 'condominio');
+  assert.equal(e.pendentes, 1);
+  assert.equal(e.feito, false);
+  assert.equal(e.prevista, false);
+  assert.match(e.titulo, /condomínio de 11\/2026 \(boleto do condomínio que vence em 12\/2026/);
+  assert.equal(e.link, `#/contrato/${c.id}?ir=ressarcimentos`);
+  // o alerta do Painel continua só para o mês que acabou
+  assert.equal(R.alertaCondominio(c, hoje), null);
+  assert.equal(R.condominioAConferir(c, hoje, { ate: '2026-11' }), '2026-11');
+  // conferido: a etapa fica feita, e o botão continua levando ao inquilino (não à lista dos inquilinos)
+  R.marcarCondominioConferido(d, c.id, '2026-11', 'julio');
+  e = R.etapasFechamento(d, '2026-12', hoje).find((x) => x.chave === 'condominio');
+  assert.equal(e.pendentes, 0);
+  assert.equal(e.feito, true);
+  assert.equal(e.detalhe, 'nada a conferir');
+  assert.equal(e.link, `#/contrato/${c.id}?ir=ressarcimentos`);
+  // mês de depois (01/2027 = condomínio de 12/2026): previsto até 01/12
+  e = R.etapasFechamento(d, '2027-01', hoje).find((x) => x.chave === 'condominio');
+  assert.equal(e.prevista, true);
+  assert.equal(e.feito, false);
+  // os meses passados continuam como antes: 11/2026 (condomínio de 10/2026) pendente se não conferido
+  c.condominio_conferido_ate = '2026-09';
+  e = R.etapasFechamento(d, '2026-11', hoje).find((x) => x.chave === 'condominio');
+  assert.equal(e.pendentes, 1);
+  // contrato sem conferência anotada não cobra meses antigos (só o que acabou)
+  delete c.condominio_conferido_ate;
+  assert.equal(R.etapasFechamento(d, '2026-09', hoje).find((x) => x.chave === 'condominio').pendentes, 0);
+  // dois inquilinos que pagam condomínio: um botão para cada, sem "Abrir" para a lista
+  const c2 = R.inserir(d, 'contratos', { ...c, id: undefined, inquilino_nome: 'Fulano de Teste', condominio_conferido_ate: '2026-11' }, 'julio');
+  e = R.etapasFechamento(d, '2026-12', hoje).find((x) => x.chave === 'condominio');
+  assert.equal(e.link, null);
+  assert.deepEqual(e.contratos.map((x) => x.id).sort(), [c.id, c2.id].sort());
+  assert.equal(e.contratos.find((x) => x.id === c.id).conferir, true);
+  assert.equal(e.contratos.find((x) => x.id === c2.id).conferir, false);
+});

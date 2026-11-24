@@ -491,7 +491,13 @@ function caixaRessarcimentos(c) {
       ${opera() ? link(`#/novo/ressarcimentos?contrato=${c.id}`, 'Lançar ressarcimento') : ''}</div>
     <p class="suave">O inquilino paga o condomínio. Quando o boleto do condomínio trouxer taxas que são do proprietário (fundo de obras, fundo de reserva, chamadas extras de obra…), lance aqui: o valor é abatido no boleto do aluguel do mês seguinte ao pagamento${R.regra('ressarcimento_na_nf', c) ? ' e também sai do valor da NF' : ' e conta como gasto nos Resultados (a NF sai com o aluguel cheio)'}.</p>
     ${aConferir ? `<div class="alerta info">Condomínio de ${compBr(aConferir)} ainda não conferido. ${opera() ? botao('condominioConferido', `Conferido: sem taxa do proprietário em ${compBr(aConferir)}`, { id: c.id, mes: aConferir }, 'secundario pequeno') : ''}</div>`
-    : R.inquilinoPagaCondominio(c) ? `<p class="suave">Conferido até ${c.condominio_conferido_ate ? compBr(c.condominio_conferido_ate) : '-'}.</p>` : ''}
+    : R.inquilinoPagaCondominio(c) ? `<p class="suave">Conferido até ${c.condominio_conferido_ate ? compBr(c.condominio_conferido_ate) : '-'}.${(() => {
+      // o boleto do condomínio do mês corrente chega antes do fim do mês (ex.: o de 11/2026 vence em 05/12 e chega em 24/11):
+      // dá para conferir já, sem esperar o alerta do mês seguinte
+      const mesHoje = C.competenciaDe(C.hojeIso());
+      const atual = R.condominioAConferir(c, C.hojeIso(), { ate: mesHoje });
+      return atual && opera() ? ` Se o boleto do condomínio de ${compBr(atual)} já chegou: ${link(`#/novo/ressarcimentos?contrato=${c.id}`, 'lance a taxa do proprietário', '')} ou ${botao('condominioConferido', `Conferido: sem taxa do proprietário em ${compBr(atual)}`, { id: c.id, mes: atual }, 'secundario pequeno')}` : '';
+    })()}</p>` : ''}
     ${lista.length ? `<div class="rolagem"><table><tr><th>Condomínio de</th><th>Taxa</th><th class="n">Valor</th><th>Pago pelo inquilino em</th><th>Abatido no boleto (referência e vencimento)</th><th></th></tr>
       ${lista.map((x) => { const cb = R.boletoDoMes(d(), c.id, x.competencia_abatimento); return `<tr><td>${compBr(x.competencia_condominio)}</td><td>${esc(x.descricao)}</td><td class="n">${reais(x.valor)}</td><td>${dataBr(x.data_pagamento)}</td>
         <td>${compBr(x.competencia_abatimento)} <span class="suave">(vence ${dataBr(cb ? cb.vencimento : R.vencimentoDoContrato(d(), c, x.competencia_abatimento))})</span> ${cb ? (cb.data_pagamento ? etiqueta('abatido', 'ok') : R.emAcordo(cb) ? etiqueta('em acordo: não abatido', 'aviso') : etiqueta('no boleto em aberto', 'info')) : etiquetaSemBoleto(c, x)}</td>
