@@ -1216,13 +1216,6 @@ export const ACOES = {
     await mostrar();
   },
 
-  /** "×" no arquivo do termo aditivo: o termo volta a "aguardando assinatura". */
-  async removerArquivoAditivo({ id }) {
-    await alterarApagandoAnexos((db) => R.removerArquivoAditivo(db, Number(id), login()));
-    aviso('Arquivo apagado: o termo aditivo voltou a "aguardando assinatura".');
-    await mostrar();
-  },
-
   /** Rotina de entrada: etapa que não se aplica a este inquilino (ex.: sem reserva) ou volta a pendente. */
   async pularEtapaEntrada({ contrato, chave }) {
     await alterar((db) => R.marcarEtapaEntrada(db, Number(contrato), chave, { pular: true }, login()));

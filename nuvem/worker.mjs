@@ -193,11 +193,13 @@ let acessosJuntos = []; let juntosDesde = 0;
 export const esquecerAcessos = () => { acessosJuntos = []; juntosDesde = 0; };
 
 /**
- * O que entra no registro: arquivos (abrir, anexar, apagar), backups (lista e baixar), mover, apagar pasta, e-mail e ficha pela
- * internet. Devolve [rota anotada, importante] ou null. Abrir modelos e ícones e as listas de anexos (pedidas a cada tela) não entram.
+ * O que entra no registro: arquivos (abrir, anexar, apagar), backups (lista e baixar), mover, apagar pasta, e-mail, ficha pela
+ * internet e a fila da assinatura digital. Devolve [rota anotada, importante] ou null. Abrir modelos e ícones e as listas de anexos (pedidas a cada tela) não entram.
  */
 export function rotaDoRegistro(rota, metodo) {
   if (rota.startsWith('arquivos/')) return [`${metodo === 'GET' || metodo === 'HEAD' ? '' : `${metodo} `}${rota}`, metodo !== 'GET'];
+  // Fila da assinatura digital (baixar o recibo, devolver o assinado, mandar à fila, tirar dela); a consulta da fila (GET puro) não entra.
+  if (rota.startsWith('assinaturas/') || (rota === 'assinaturas' && metodo !== 'GET')) return [`${metodo === 'GET' ? '' : `${metodo} `}${rota}`, metodo !== 'GET'];
   if (rota.startsWith('backups/')) return [rota, true];
   if (/^lista(-tudo)?\/backups(\/|$)/.test(rota)) return [rota, false];
   if (rota === 'mover' || rota === 'apagar') return [rota, true];

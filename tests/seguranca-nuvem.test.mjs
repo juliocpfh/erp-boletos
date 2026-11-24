@@ -100,7 +100,9 @@ test('histórico de tabela que só o administrador muda (o Desfazer aplicaria o 
 
 test('faxina: excluídos (com CPF) e conflitos resolvidos saem depois do prazo', () => {
   const c = novo();
-  c.aplicar(lote([{ op: 'excluir', tabela: 'fichas', id: 7 }]), OPERADOR);
+  // excluir a ficha (com os documentos pessoais) é só do administrador, como na tela (telas/fichas.js)
+  assert.throws(() => c.aplicar(lote([{ op: 'excluir', tabela: 'fichas', id: 7 }]), OPERADOR), (e) => e.status === 403, 'operador não exclui ficha');
+  c.aplicar(lote([{ op: 'excluir', tabela: 'fichas', id: 7 }]), DONO);
   assert.equal(c.q('SELECT COUNT(*) AS n FROM excluidos')[0].n, 1);
   const antes = hora;
   hora = new Date(antes.getTime() + 10 * 86400000); c.limpar();

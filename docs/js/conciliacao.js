@@ -195,8 +195,15 @@ function juntarIdentificadores(d, x, m, usuario) {
   'Mesmo lançamento no arquivo do banco e no extrato pela API: identificadores juntados');
 }
 
-/** Identificador com que a ponte acha o lançamento no extrato (comprovante): o ``reference`` da API; só do OFX, a referência local (se houver) ou o FITID. */
-export const referenciaNoBanco = (m) => (['ofx', 'csv'].includes(fonteDe(m)) && m.local_reference ? m.local_reference : m.id_externo);
+/**
+ * Identificador com que a ponte acha o lançamento no extrato (comprovante): o ``reference`` da API; só do OFX, a referência local
+ * (se houver) ou o FITID. Linha que veio só do arquivo CSV, sem referência local: null (a chave "csv:data|valor|…" não existe no
+ * banco; a ponte não acharia). Depois que o mesmo mês é buscado pela ponte, a linha ganha o identificador da API (juntarIdentificadores).
+ */
+export const referenciaNoBanco = (m) => (['ofx', 'csv'].includes(fonteDe(m)) && m.local_reference ? m.local_reference : fonteDe(m) === 'csv' ? null : m.id_externo);
+
+/** Linha só do arquivo CSV que a ponte não tem como achar no banco (ver ``referenciaNoBanco``). */
+export const soDoCsv = (m) => !!m && fonteDe(m) === 'csv' && !referenciaNoBanco(m);
 
 const CAMPOS_DESTINO = { classificacao: null, imovel_id: null, despesa_id: null, cobranca_id: null, iptu_id: null, iptu_parcela: null, guia_imposto_id: null,
   pagamento_banco_id: null, par_movimentacao_id: null, reforma_id: null, nome_arquivo: null, comprovante: null, comprovante_contador: null, comprovante_origem: null,

@@ -381,9 +381,10 @@ function descreverPasta(p) {
 
 /** A ponte gera o comprovante a partir do lançamento do extrato: a movimentação tem a referência (Z.referenciaNoBanco); o pagamento, só se já foi confirmado pelo extrato. */
 function lancamentoDaPonte(x, tabela) {
-  if (tabela === 'pagamentos_banco') { const m = x.movimentacao_id ? movs().find((y) => y.id === x.movimentacao_id) : null; return m ? { conta: m.conta_id, referencia: Z.referenciaNoBanco(m), data: m.data } : null; }
+  // linha só do arquivo CSV (sem identificador do banco): a ponte não acha o lançamento; anexa-se o PDF do app
+  if (tabela === 'pagamentos_banco') { const m = x.movimentacao_id ? movs().find((y) => y.id === x.movimentacao_id) : null; return m && Z.referenciaNoBanco(m) ? { conta: m.conta_id, referencia: Z.referenciaNoBanco(m), data: m.data } : null; }
   // conta de outro banco: a ponte não tem como gerar o comprovante (anexa-se o PDF do banco)
-  return x.id_externo && !soArquivo(x.conta_id) ? { conta: x.conta_id, referencia: Z.referenciaNoBanco(x), data: x.data } : null;
+  return x.id_externo && !soArquivo(x.conta_id) && Z.referenciaNoBanco(x) ? { conta: x.conta_id, referencia: Z.referenciaNoBanco(x), data: x.data } : null;
 }
 
 function comprovanteHtml(x, tabela = 'movimentacoes_banco') {
@@ -431,7 +432,7 @@ async function janelaComprovante(x, tabela, { soManual = false, nomeFixo = null 
   const html = `<p>${esc(x.titulo || x.descricao || x.tipo_conta || '')} · ${dataBr(x.data || x.pago_em || x.data_pagamento)} · <b>${x.tipo ? valorHtml(x) : reais(x.valor)}</b></p>
     <p><label>Nome do arquivo</label><input name="nome" value="${esc(nomeFixo || x.nome_arquivo || Z.nomePadraoComprovante(d(), x).replace(/\.pdf$/i, ''))}" style="width:100%" ${nomeFixo ? 'readonly' : ''}><span class="suave">Sem acento; o ".pdf" é colocado sozinho.${nomeFixo ? ' O arquivo novo fica com o mesmo nome; o anterior é apagado.' : ''}</span></p>
     <p>Vai para: ${pastas.length ? pastas.map((t) => `<b>${esc(t)}</b>`).join(' e ') : '<span class="texto-aviso">nenhuma pasta (dê um imóvel à movimentação ou ligue a conta a uma empresa)</span>'}</p>
-    ${soManual ? '<input type="hidden" name="origem" value="manual">' : `<p><label><input type="radio" name="origem" value="ponte" ${ponteMarcada ? 'checked' : `disabled title="${pontePossivel ? TITULO_AGUARDANDO : 'Só para lançamentos do extrato'}"`}> Gerar o PDF pelo banco (ponte)</label>
+    ${soManual ? '<input type="hidden" name="origem" value="manual">' : `<p><label><input type="radio" name="origem" value="ponte" ${ponteMarcada ? 'checked' : `disabled title="${pontePossivel ? TITULO_AGUARDANDO : tabela === 'movimentacoes_banco' && Z.soDoCsv(x) ? 'Esta linha veio só do arquivo CSV: a ponte não acha o lançamento no banco. Busque o extrato do mês pela ponte ou anexe o PDF do app.' : 'Só para lançamentos do extrato'}"`}> Gerar o PDF pelo banco (ponte)</label>
       <label><input type="radio" name="origem" value="manual" ${ponteMarcada ? '' : 'checked'}> Anexar um PDF do computador</label></p>`}
     <p data-campo="arquivo" ${ponteMarcada ? 'hidden' : ''}><input type="file" name="arquivo" accept="application/pdf,.pdf"></p>`;
   const r = await janela({ titulo: nomeFixo ? 'Trocar o comprovante pelo PDF oficial do banco' : 'Nomear e guardar o comprovante', html, sim: 'Guardar', ligar(dlg) {
@@ -1133,8 +1134,12 @@ export const ACOES_BANCO = {
     if (!bancoAtivo()) throw new C.ErroUsuario(BANCO_DESLIGADO);
     const doMes = movs().filter((m) => m.conta_id === conta && String(m.data).slice(0, 7) === mes);
     const semDestino = doMes.filter((m) => !m.classificacao).length;
-    const faltam = doMes.filter((m) => precisaComprovante(m) && !comComprovante(m) && m.id_externo);
-    if (!faltam.length) { aviso(`Nenhum comprovante faltando em ${compBr(mes)}${semDestino ? `; ${semDestino} movimentação(ões) sem destino (dê o destino antes)` : ''}.`, 'info'); return; }
+    const semComp = doMes.filter((m) => precisaComprovante(m) && !comComprovante(m) && m.id_externo);
+    // linhas que vieram só do arquivo CSV: a ponte não as acha no banco (ficam de fora, com o aviso de como resolver)
+    const soCsv = semComp.filter((m) => Z.soDoCsv(m));
+    const faltam = semComp.filter((m) => !Z.soDoCsv(m));
+    const notaCsv = soCsv.length ? ` ${soCsv.length} linha(s) vieram só do arquivo CSV e ficaram de fora: a ponte não acha esses lançamentos no banco. Clique em "Buscar extrato de ${compBr(mes)} no banco" (as linhas ganham o identificador do banco e passam a funcionar) ou anexe o PDF do app em cada uma.` : '';
+    if (!faltam.length) { aviso(`Nenhum comprovante para gerar pela ponte em ${compBr(mes)}${semDestino ? `; ${semDestino} movimentação(ões) sem destino (dê o destino antes)` : ''}.${notaCsv}`, soCsv.length ? 'aviso' : 'info'); return; }
     aviso(`Gerando ${faltam.length} comprovante(s)…`, 'info');
     let gerados = 0;
     const falhas = [];
@@ -1147,7 +1152,7 @@ export const ACOES_BANCO = {
         falhas.push(`${dataBr(m.data)} ${reais(m.valor)}: ${e.message}`);
       }
     }
-    aviso(`${gerados} comprovante(s) gerado(s).${semDestino ? ` ${semDestino} sem destino (dê o destino antes).` : ''}${falhas.length ? ` ${falhas.length} falhou(aram): ${falhas.join(' · ')}` : ''}`, falhas.length ? 'aviso' : 'ok');
+    aviso(`${gerados} comprovante(s) gerado(s).${semDestino ? ` ${semDestino} sem destino (dê o destino antes).` : ''}${falhas.length ? ` ${falhas.length} falhou(aram): ${falhas.join(' · ')}` : ''}${notaCsv}`, falhas.length || soCsv.length ? 'aviso' : 'ok');
     await mostrar();
   },
 

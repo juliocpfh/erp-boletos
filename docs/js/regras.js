@@ -904,7 +904,8 @@ export function garantiaADepositar(d, c, qual, hoje = C.hojeIso()) {
   // depois de registrada: a caução atual (inicial + correções + depósitos para completar) contra a corrigida pelos reajustes
   const ultima = qual === 'caucao' ? correcoesCaucaoAtual(d, c).pop() : null;
   const combinado = registrada && ultima ? ultima.valor_novo : inicial;
-  const sugerida = qual === 'caucao' && correcoesDo(d, c.id).some((x) => x.data_vigencia <= hoje) ? caucaoSugerida(d, c, hoje) : null;
+  // a caução corrigida pelos reajustes só existe com a regra "A caução acompanha o reajuste" (do sistema ou a especial do contrato)
+  const sugerida = qual === 'caucao' && CR.regra('caucao_acompanha', c) && correcoesDo(d, c.id).some((x) => x.data_vigencia <= hoje) ? caucaoSugerida(d, c, hoje) : null;
   const corrigida = sugerida > combinado ? sugerida : null;
   // antes de registrada: o primeiro depósito é o da caução do contrato (ou da troca de garantia), sem os reajustes;
   // a diferença dos reajustes vem depois, como complemento (correção da caução, boleto ou depósito para completar)
@@ -7464,7 +7465,7 @@ export function eventosDoMes(d, mes, hoje = C.hojeIso()) {
       if (!no(venc)) continue;
       // em acordo (valem as parcelas) e carência (nada a pagar) ficam neutros, nunca "vencido"
       const [situacao, estado] = !cb ? ['neutra', 'previsto'] : situacaoNoCalendario(cb, hoje);
-      ev.push({ data: venc, tipo: 'Boleto', imovel_id: c.imovel_id, contrato_id: c.id, cobranca_id: cb ? cb.id : null,
+      ev.push({ data: venc, tipo: 'Boleto', imovel_id: c.imovel_id, contrato_id: c.id, cobranca_id: cb ? cb.id : null, competencia: comp,
         texto: `${c.inquilino_nome} · aluguel de ${C.compBr(comp)}${cb ? ` · ${C.reais(totais(cb).a_pagar_pontual)}` : ' · boleto ainda não gerado'}${geraNf(c) ? '' : ' · boleto de controle'}`,
         situacao, estado });
     }
@@ -8885,21 +8886,23 @@ export function declaracaoAnual(d, contratoId, ano) {
 // --------------------------------------------------------------------------
 // Regras do sistema escolhidas pelo administrador (definições e padrão em config-regras.js; tela em Sistema → Regras)
 // --------------------------------------------------------------------------
-export { regra, regrasDe, PADRAO_SISTEMA, DEFINICOES_REGRAS, GRUPOS_REGRAS } from './config-regras.js';
+export { regra, regrasDe, PADRAO_SISTEMA, DEFINICOES_REGRAS, GRUPOS_REGRAS, especiaisDiferentes } from './config-regras.js';
 
 /**
  * Grava as regras ``valores`` ({ chave: valor }; o que faltar volta ao padrão do sistema): uma linha em ``config_regras`` por
  * regra diferente do padrão, pelo histórico. Devolve quantas regras mudaram. Ex.: { multa_padrao: 2 } (o padrão) apaga a linha.
+ * A regra que fica em outra tela (`fora`, ex.: a assinatura digital) só muda por ``mudarRegraSistema`` dela mesma (``foraQueMuda``):
+ * salvar a tela, voltar a uma versão, carregar o arquivo ou voltar ao padrão a deixam como está, mesmo se vier nos valores.
  */
-export function salvarRegrasSistema(d, valores, usuario, motivo = 'Regras do sistema') {
+export function salvarRegrasSistema(d, valores, usuario, motivo = 'Regras do sistema', foraQueMuda = null) {
   const limpos = {};
   for (const [k, v] of Object.entries(valores || {})) if (CR.definicaoRegra(k)) limpos[k] = CR.limparValorRegra(k, v);
   let mudou = 0;
   const antes = CR.regrasDe(d);
   const naNfAntes = antes.ressarcimento_na_nf;
   for (const def of CR.DEFINICOES_REGRAS) {
-    // a que fica em outra tela (`fora`, ex.: a assinatura digital) não vem no formulário das regras: continua como está
-    const novo = def.chave in limpos ? limpos[def.chave] : def.fora ? antes[def.chave] : def.padrao;
+    // a que fica em outra tela (`fora`, ex.: a assinatura digital) continua como está, salvo pelo botão dela (foraQueMuda)
+    const novo = def.fora && def.chave !== foraQueMuda ? antes[def.chave] : def.chave in limpos ? limpos[def.chave] : def.padrao;
     const linha = d.config_regras.find((r) => r.chave === def.chave);
     const padrao = CR.mesmoValor(novo, def.padrao);
     if (linha && padrao) { excluir(d, 'config_regras', linha.id, usuario, `${motivo}: ${def.rotulo} volta ao padrão do sistema`); mudou += 1; }
@@ -8917,7 +8920,7 @@ export function salvarRegrasSistema(d, valores, usuario, motivo = 'Regras do sis
 }
 
 /** Muda uma regra só, mantendo as outras como estão. */
-export const mudarRegraSistema = (d, chave, valor, usuario) => salvarRegrasSistema(d, { ...CR.escolhasDe(d), [chave]: valor }, usuario);
+export const mudarRegraSistema = (d, chave, valor, usuario) => salvarRegrasSistema(d, { ...CR.escolhasDe(d), [chave]: valor }, usuario, undefined, chave);
 
 /** Volta todas as regras ao padrão do sistema (as regras do dono, no código). */
 export const voltarRegrasAoPadrao = (d, usuario) => salvarRegrasSistema(d, {}, usuario, 'Regras do sistema (volta ao padrão)');
@@ -9010,7 +9013,9 @@ export function padroesNovoContrato(perfil = null) {
   if (CR.perfilDe(ctx)) out.perfil_regras_id = CR.perfilDe(ctx);
   if (r('bonificacao_percentual_padrao') !== null && r('bonificacao_padrao')) out.desconto_pontualidade_percentual = r('bonificacao_percentual_padrao');
   if (r('tarifa_padrao') !== null) out.taxa_boleto = r('tarifa_padrao');
-  if (r('fci_percentual_padrao') !== null) { out.fci_percentual = r('fci_percentual_padrao'); if (r('fci_indice_padrao')) out.fci_indice = r('fci_indice_padrao'); }
+  if (r('fci_percentual_padrao') !== null) out.fci_percentual = r('fci_percentual_padrao');
+  // o índice vem preenchido mesmo com o % em branco (o campo só aparece quando o % é digitado; sem %, o cadastro o apaga)
+  if (r('fci_indice_padrao')) out.fci_indice = r('fci_indice_padrao');
   if (r('indice_padrao')) out.indice_correcao = r('indice_padrao');
   const prazo = prazoPadraoNovoContrato('Residencial', perfil);
   if (prazo !== null) out.prazo_meses = prazo;

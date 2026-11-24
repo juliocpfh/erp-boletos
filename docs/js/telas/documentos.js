@@ -855,7 +855,14 @@ export function telaAditivo(rota) {
   if (!c) return naoEncontrado('Inquilino não encontrado', '#/inquilinos', 'Ver os inquilinos');
   if (a && a.arquivo) return `<div class="alerta info">Este termo aditivo já foi assinado e não pode mais ser alterado. <a href="#/contrato/${c.id}?ir=aditivos">Voltar</a></div>`;
   if (!opera()) return '<h1>Sem permissão para gerar termos aditivos</h1>';
-  const tipo = a ? (a.tipo === K.TIPO_ADITIVO_TROCA ? 'troca' : 'vencimento') : rota.q.tipo;
+  // só o termo da troca do vencimento e o da troca de titular se editam aqui; os outros (ex.: o do novo valor, feito pela
+  // renovação, ou um registrado à mão) não: um endereço guardado mostra o aviso em vez do formulário errado
+  const tipo = a ? (a.tipo === K.TIPO_ADITIVO_TROCA ? 'troca' : a.tipo !== K.TIPO_ADITIVO_VALOR && a.primeiro_vencimento ? 'vencimento' : 'outro') : rota.q.tipo;
+  if (tipo === 'outro') {
+    return `<p class="suave"><a href="#/contrato/${c.id}?ir=aditivos">← ${esc(c.inquilino_nome)}</a></p><h1>Termo aditivo nº ${esc(a.numero || 1)}</h1>
+      <div class="alerta info">${a.tipo === K.TIPO_ADITIVO_VALOR ? 'Este termo é gerado pelo novo valor do aluguel e não se edita aqui.' : 'Este termo aditivo não se edita aqui.'}
+        ${a.texto ? link(`#/imprimir/aditivo?id=${a.id}`, 'Ver o termo / PDF') : ''} ${link(`#/contrato/${c.id}?ir=aditivos`, 'Voltar aos termos aditivos')}</div>`;
+  }
   if (tipo === 'troca') return telaAditivoTroca(c, a);
   if (tipo !== 'vencimento') return escolherAditivo(c);
   const hoje = C.hojeIso();
