@@ -59,7 +59,7 @@ export const TIPOS_DOCUMENTO = {
     explica: 'Avisa o fiador do débito do inquilino e pede a regularização no prazo. Só para contrato com fiador.',
     assinam: ['LOCADORA'],
     campos: [['debitos', 'Débitos em atraso', 'texto', 'aluguel e encargos de outubro de 2026, vencidos em 10/11/2026'],
-      ['valor_debito', 'Valor total em atraso', 'dinheiro', '196350'], ['prazo_pagamento', 'Pagar até', 'data', '2026-12-05']],
+      ['valor_debito', 'Valor total em atraso', 'dinheiro', '1.963,50'], ['prazo_pagamento', 'Pagar até', 'data', '2026-12-05']],
   },
 };
 

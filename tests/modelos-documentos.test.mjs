@@ -75,6 +75,8 @@ test('campo em branco sai como linha para preencher; dinheiro em branco tira o t
   assert.doesNotMatch(comMulta, /dispensam a multa/);
   const fiador = K.dadosDoDocumento(d, c, 'aviso_fiador', { valor_debito: 196350 }, { data: '2026-11-24' });
   assert.equal(fiador.campos.valor_debito, 'R$ 1.963,50 (mil novecentos e sessenta e três reais e cinquenta centavos)');
+  // digitado sem vírgula é reais, não centavos ("500" saía R$ 5,00)
+  assert.match(K.dadosDoDocumento(d, c, 'distrato', { multa_combinada: '500' }).campos.multa_combinada, /^R\$ 500,00 /);
   assert.equal(fiador.campos.fiadores_nomes, 'JOSÉ DE TESTE LIMA');
   assert.equal(K.dadosDoDocumento(d, c, 'aditivo_prazo', { numero_aditivo: '3' }).campos.numero_aditivo, '3º');
   assert.equal(K.dadosDoDocumento(d, c, 'aviso_desocupacao', { data_saida_prevista: '2026-02-31' }).campos.data_saida_prevista, K.LINHA_EM_BRANCO, 'data inválida vira linha');

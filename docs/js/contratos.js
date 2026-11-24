@@ -772,7 +772,7 @@ export const LINHA_EM_BRANCO = '____________________';
 
 /**
  * Outros documentos da locação (modelos-documentos.js): os dados do contrato e os campos do tipo, digitados ao gerar.
- * ``valores``: { campo: texto digitado } (data 'AAAA-MM-DD', dinheiro em centavos ou "1.963,50", número). Campo em branco sai
+ * ``valores``: { campo: texto digitado } (data 'AAAA-MM-DD', dinheiro: número = centavos, texto digitado = reais, "500" ou "1.963,50", número). Campo em branco sai
  * como LINHA_EM_BRANCO; o dinheiro em branco fica vazio (a condição [se campo] não vale). ``data``: a data do documento.
  * Ex.: distrato com data_saida '2027-02-28' → {data_saida} = "28 de fevereiro de 2027".
  */
@@ -787,7 +787,8 @@ export function dadosDoDocumento(d, c, tipo, valores = {}, { data, testemunhas =
   for (const [chave, , formato] of (def ? def.campos : [])) {
     const v = String(valores[chave] ?? '').trim();
     if (formato === 'dinheiro') {
-      const centavos = /^\d+$/.test(v) ? Number(v) : (C.centavos(v) || 0);
+      // número = centavos (valor calculado pelo sistema); texto digitado = reais ("500" = R$ 500,00, como nos outros campos de valor)
+      const centavos = typeof valores[chave] === 'number' ? valores[chave] : (C.centavos(v) || 0);
       dados.campos[chave] = centavos > 0 ? valorComExtenso(centavos) : '';
     } else if (!v) dados.campos[chave] = LINHA_EM_BRANCO;
     else if (formato === 'data') dados.campos[chave] = C.dataValida(v) ? dataPorExtenso(v) : LINHA_EM_BRANCO;

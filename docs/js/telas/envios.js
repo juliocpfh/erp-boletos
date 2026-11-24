@@ -395,7 +395,8 @@ export const FORMULARIOS = {
     const contrato = Number(f.get('contrato'));
     const valores = {};
     for (const [k, v] of f.entries()) if (!['modelo', 'contrato', 'data'].includes(k)) valores[k] = String(v).trim();
-    for (const [k, v] of Object.entries(valores)) if (v && form.querySelector(`[name="${k}"][data-dinheiro]`)) C.centavos(v); // valor no formato errado: avisa antes
+    // valor no formato errado ou negativo: avisa antes (o negativo saía como "sem valor": no distrato, multa dispensada)
+    for (const [k, v] of Object.entries(valores)) if (v && form.querySelector(`[name="${k}"][data-dinheiro]`) && C.centavos(v) < 0) throw new C.ErroUsuario(`Valor negativo: ${v}. Digite o valor sem o sinal de menos.`);
     guardarCamposDoDocumento(modelo, contrato, valores, String(f.get('data') || ''));
     ir(`#/imprimir/documento?modelo=${modelo}&contrato=${contrato}`);
   },
