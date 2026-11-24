@@ -379,7 +379,8 @@ function caixaBoleto(cb) {
     ${b.desconto ? linha(`Desconto se pago até ${dataBr(b.vencimento)}`, `${reais(b.desconto)} (fica ${reais(b.valor_com_desconto)})`, num(b.desconto)) : ''}
     ${b.multa_valor !== null ? linha('Multa após o vencimento (em valor, R$)', `${reais(b.multa_valor)} (${pct(b.multa_percentual)} sem o FCI)`, num(b.multa_valor)) : linha('Multa após o vencimento', pct(b.multa_percentual), String(b.multa_percentual).replace('.', ','))}
     ${linha('Juros (mora) ao dia', reais(b.juros_ao_dia), num(b.juros_ao_dia))}</table>
-    <h3>Descrição</h3><div class="acoes"><pre class="descricao-boleto">${esc(b.descricao)}</pre>${botao('copiar', 'Copiar descrição', { texto: b.descricao }, '')}</div></div>`;
+    <h3>Descrição</h3><div class="acoes"><pre class="descricao-boleto">${esc(b.descricao)}</pre>${botao('copiar', 'Copiar descrição', { texto: b.descricao }, '')}</div>
+    ${b.excesso ? `<div class="alerta aviso">A descrição tem ${b.descricao.length} letras e o C6 aceita ${R.LIMITE_DESCRICAO_BOLETO}: o banco corta as últimas ${b.excesso} ("${esc(b.descricao.replace(/\n/g, ' ').slice(-b.excesso))}"). ${R.ajustesDoBoleto(cb).length ? 'Encurte o motivo dos ajustes do mês ou confira' : 'Confira'} a descrição no banco.</div>` : ''}</div>`;
 }
 
 /** Etapas do acordo (registrado, termo assinado com o anexo, parcelas pagas). */
