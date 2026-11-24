@@ -153,7 +153,11 @@ export const ACOES_REGUA = {
     const e = emailDoItem(d(), item);
     const comCorpo = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(item.para)}&su=${encodeURIComponent(e.assunto)}&body=${encodeURIComponent(e.texto)}`;
     const cabe = comCorpo.length <= LIMITE_ENDERECO;
-    window.open(cabe ? comCorpo : `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(item.para)}&su=${encodeURIComponent(e.assunto)}`, '_blank', 'noopener');
+    // sem 'noopener' no open (com ele o navegador devolve null sempre e não se sabe se a aba abriu); o opener sai à mão.
+    // Aba bloqueada: o e-mail fica na lista (antes saía como "Aberto no Gmail" sem ter aberto; busca de 24/11, DOC-06)
+    const aba = window.open(cabe ? comCorpo : `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(item.para)}&su=${encodeURIComponent(e.assunto)}`, '_blank');
+    if (!aba) { aviso('O navegador bloqueou a aba do Gmail (bloqueador de janelas): permita janelas deste site e clique de novo, ou use "Copiar texto". O e-mail continua na lista.', 'aviso'); return; }
+    try { aba.opener = null; } catch { /* outra origem */ }
     const copiado = cabe || await copiar(e.texto);
     await decidir(item, 'gmail', { para: item.para, assunto: e.assunto });
     aviso(`${cabe ? 'Gmail aberto com o texto.' : copiado ? 'Gmail aberto; o texto é comprido e foi copiado: cole no corpo do e-mail.' : 'Gmail aberto: copie o texto da prévia e cole no corpo do e-mail.'}${e.prontos.length ? ' Anexe o boleto e o QR Code (página do boleto) antes de mandar.' : ''}`, cabe ? 'ok' : 'aviso');

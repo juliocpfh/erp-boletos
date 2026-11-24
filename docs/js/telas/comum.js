@@ -211,6 +211,20 @@ export const PASTA_SEM_IMOVEL = 'Sem imóvel';
 export const PASTA_FICHAS = 'Fichas em analise';
 /** Nome da pasta da ficha, escolhido ao criar e que não muda depois. Ex.: "Maria Souza (ficha 12-11-2026)". */
 export const nomePastaFicha = (f) => S.limparNome(`${f.inquilino_nome} (ficha ${dataBr(f.data_recebida || C.hojeIso()).replace(/\//g, '-')})`);
+/**
+ * Pasta de uma ficha nova que nenhuma outra ficha usa (busca de 24/11, FIC-06): duas fichas com o mesmo nome no mesmo dia
+ * dividiam a pasta (levar ao contrato ou excluir uma levava os arquivos da outra). Ex.: "Maria Souza (ficha 12-11-2026 2)".
+ */
+export function pastaFichaLivre(f, fichas = d().fichas || []) {
+  const usadas = new Set(fichas.filter(Boolean).map((x) => String(x.pasta || nomePastaFicha(x)).toLowerCase()));
+  const base = nomePastaFicha(f);
+  if (!usadas.has(base.toLowerCase())) return base;
+  const data = dataBr(f.data_recebida || C.hojeIso()).replace(/\//g, '-');
+  for (let n = 2; ; n += 1) {
+    const nome = S.limparNome(`${f.inquilino_nome} (ficha ${data} ${n})`);
+    if (!usadas.has(nome.toLowerCase())) return nome;
+  }
+}
 
 /** Pasta-mãe dos arquivos do inquilino (partes do caminho): "Imóvel/Inquilinos", ou "Sem imóvel". */
 export function pastaPaiContrato(c) {

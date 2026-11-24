@@ -12,7 +12,7 @@ import * as R from '../regras.js';
 import { pdfDoRecibo } from './documentos.js';
 import { botaoEmail } from './emails.js';
 import { caixaTermoReserva, ligarTermoReserva } from './termo-reserva.js';
-import { botao, buscar, caixaArquivos, copiarDocumentosParaFicha, d, encerrarLinksDaFicha, etiqueta, item as itemGrade, link, naoEncontrado, nomePastaFicha, opera, PASTA_FICHAS, pastaDoEscopo } from './comum.js';
+import { botao, buscar, caixaArquivos, copiarDocumentosParaFicha, d, encerrarLinksDaFicha, etiqueta, item as itemGrade, link, naoEncontrado, nomePastaFicha, opera, PASTA_FICHAS, pastaDoEscopo, pastaFichaLivre } from './comum.js';
 
 const COR_SITUACAO = { 'Em análise': 'aviso', Aprovada: 'ok', Reprovada: 'neutra', Desistiu: 'neutra' };
 
@@ -266,7 +266,7 @@ function caixaFichaOnline(f) {
   }).join('');
   return `<div class="cartao" data-ficha-online="${f.id}">${titulo}
     ${encerrada ? `<div class="alerta aviso">A ficha ${f.documentos_no_contrato ? 'já virou contrato' : `está "${esc(f.situacao)}"`}, mas ainda há link valendo: o que a pessoa mandar por ele cai na pasta da ficha. ${botao('encerrarLinksDaFicha', 'Encerrar os links', { id: f.id }, 'pequeno')}</div>` : ''}
-    <p class="suave">Cada pessoa recebe um link só dela, que vale ${7} dias: preenche os dados, manda os documentos e, depois, a ficha assinada (gov.br ou à mão). O que ela manda só entra na ficha quando vocês conferem. Por segurança, o link só aparece na hora em que é gerado: copie e mande na hora (o e-mail de envio da ficha, mandado logo depois, também leva o link). Para mandar de novo, o sistema gera outro e o anterior deixa de valer.</p>
+    <p class="suave">Cada pessoa recebe um link só dela, que vale ${7} dias: preenche os dados, manda os documentos e, depois, a ficha assinada (gov.br ou à mão). O que ela manda só entra na ficha quando vocês conferem. Por segurança, o link só aparece na hora em que é gerado: copie e mande na hora (o e-mail de envio da ficha, mandado logo depois, também leva o link). "Mandar de novo" gera outro endereço com a mesma validade, e o que a pessoa já tem continua valendo; "Gerar novo link" começa outro prazo de 7 dias, e o anterior deixa de valer.</p>
     <ul style="padding-left:18px">${linhas}</ul><div data-respostas-link></div><p class="suave" data-aviso-aparelho></p></div>`;
 }
 
@@ -809,7 +809,7 @@ export const ACOES_FICHAS = {
     if (!resp) return;
     const data = (resp.data || [])[0] || '';
     const motivo = (resp.motivo || [])[0] || '';
-    const pasta = f ? f.pasta || nomePastaFicha(f) : nomePastaFicha({ inquilino_nome: nome, data_recebida: contratos[0].reserva_data || data });
+    const pasta = f ? f.pasta || nomePastaFicha(f) : pastaFichaLivre({ inquilino_nome: nome, data_recebida: contratos[0].reserva_data || data });
     const pedido = { fichaId: f ? f.id : null, contratoId: contratos[0] ? contratos[0].id : null, data, motivo, pasta };
     // confere antes numa cópia (data, bloqueios): os arquivos só são copiados se a gravação vai passar
     R.desistirAntesDeAssinar(structuredClone(d()), pedido, login());

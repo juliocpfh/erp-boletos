@@ -182,8 +182,11 @@ async function confirmarExclusaoGrande(tabela, r) {
  * Por que o imóvel não pode ser excluído (texto) ou null. Além dos inquilinos, o que não sai junto com ele: ganhos do Airbnb,
  * NFs avulsas e o que está ligado ao extrato ou ao C6 (a movimentação ficaria apontando para um registro apagado). Item 18.
  */
-function motivoNaoExcluirImovel(db, r) {
+export function motivoNaoExcluirImovel(db, r) {
   if (db.contratos.some((c) => c.imovel_id === r.id)) return 'Este imóvel tem inquilinos. Exclua os contratos antes.';
+  // ficha aberta (em análise ou aprovada sem contrato) para o imóvel: ficava com "falta o contrato" para sempre (FIC-05)
+  const ficha = R.fichaAbertaDoImovel(db, r.id);
+  if (ficha) return `Este imóvel está na ficha de ${ficha.inquilino_nome}, ainda em aberto (${ficha.situacao}). Decida a ficha (reprovar ou "Desistiu") ou desmarque o imóvel nela antes.`;
   if ((db.ganhos_airbnb || []).some((g) => g.imovel_id === r.id)) return 'Este imóvel tem ganhos do Airbnb lançados. Exclua os ganhos antes.';
   if ((db.avulsas || []).some((a) => a.imovel_id === r.id)) return 'Este imóvel tem NFs avulsas. Exclua as NFs avulsas antes.';
   const doImovel = (t) => (db[t] || []).filter((x) => x.imovel_id === r.id);
@@ -230,6 +233,10 @@ export function motivoNaoExcluirContrato(db, r) {
   if ((db.movimentacoes_banco || []).some((m) => m.cobranca_id && ids.has(m.cobranca_id))) return 'Este contrato tem boletos ligados ao extrato: desfaça o destino das movimentações na tela Banco antes.';
   const novo = R.continuadoPor(db, r);
   if (novo) return `Este contrato continua com ${novo.inquilino_nome} (troca de titular): exclua antes o contrato do novo titular.`;
+  // feito de uma ficha aprovada e ainda não assinado (busca de 24/11, FIC-04): excluir deixava a ficha presa a um contrato
+  // apagado e o comprovante da reserva sumia junto; a desistência devolve a reserva e os documentos à ficha
+  const ficha = r.ficha_id && !r.doc_contrato_em ? R.buscar(db, 'fichas', r.ficha_id) : null;
+  if (ficha && !R.fichaSemContrato(ficha)) return `Este contrato foi feito da ficha de ${ficha.inquilino_nome} e ainda não foi assinado. Para cancelar, use "Desistiu antes de assinar" na página da ficha: o contrato sai e a reserva e os documentos voltam para a ficha. Para corrigir um dado, use "Editar".`;
   // novo titular com a troca completada: o que veio do anterior sairia junto (busca de 24/11, CON-01)
   return R.motivoNaoExcluirHerdeiro(db, r);
 }
@@ -1197,13 +1204,21 @@ export const ACOES = {
   },
 
   /** Baixa o PDF assinado e guarda uma cópia na pasta do inquilino (ou da ficha). */
-  async assinaturaBaixar({ pedido, contrato, ficha }) {
+  async assinaturaBaixar({ pedido, contrato, ficha, tipo, id }) {
     const blob = await AS.baixarAssinado(pedido);
-    const alvo = alvoDoRecibo({ contrato, ficha });
+    const alvo = alvoDoRecibo({ contrato, ficha, id });
     const p = ((await AS.fila()).pedidos || []).find((x) => x.id === pedido) || {};
     const nome = S.limparNome(String(p.nome || 'documento-assinado.pdf').replace(/\.pdf$/i, '')) + ' - assinado.pdf';
-    if (alvo) { try { await S.escreverTexto(await pastaDoEscopo(alvo.ficha ? 'ficha' : 'contrato', (alvo.ficha || alvo.contrato).id), nome, blob); } catch (e) { aviso(`O PDF foi baixado, mas não consegui guardar a cópia na pasta: ${e.message}`, 'aviso'); } }
+    let guardado = false;
+    if (alvo) { try { await S.escreverTexto(await pastaDoEscopo(alvo.ficha ? 'ficha' : 'contrato', (alvo.ficha || alvo.contrato).id), nome, blob); guardado = true; } catch (e) { aviso(`O PDF foi baixado, mas não consegui guardar a cópia na pasta: ${e.message}`, 'aviso'); } }
     baixar(blob, nome);
+    // notificação: a cópia assinada vira a "assinada" da notificação (etapa 2, pasta física, e-mail), como se anexada à mão;
+    // só o pedido desta notificação (pela chave) e de depois da última mudança do texto (ligarNotificacaoAssinada)
+    if (guardado && tipo === 'notificacao' && alvo.contrato && alvo.id && p.chave === AS.chaveDoRecibo('notificacao', alvo)) {
+      let ligou = false;
+      await alterar((db) => { ligou = R.ligarNotificacaoAssinada(db, alvo.id, nome, p.pedido_em, login()); });
+      if (ligou) { aviso('PDF assinado baixado e anexado na notificação como a assinada.'); await mostrar(); }
+    }
   },
 
   async assinaturaCancelar({ id }) {

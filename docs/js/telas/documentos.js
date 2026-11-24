@@ -401,6 +401,16 @@ export function alvoDoRecibo(q) {
 const EMAIL_DO_RECIBO = { termo_reserva: 'ficha_termo_reserva', reserva: 'ficha_envio', devolucao_reserva: 'ficha_devolucao', garantia: 'contrato_assinado', quitacao: 'saida_encerramento', notificacao: 'notificacao_envio' };
 
 /**
+ * Modelo do e-mail do "Enviar ao inquilino" do recibo, ou null. Os e-mails da ficha (``ficha_…``) só servem para o recibo
+ * tirado da ficha: o recibo da reserva tirado da página do inquilino (contrato) abria o "Envio de ficha cadastral", que pede a
+ * ficha assinada a quem já é inquilino (busca de 24/11, DOC-01). Ex.: ('reserva', { contrato }) → null.
+ */
+export function emailDoRecibo(tipo, alvo) {
+  const modelo = EMAIL_DO_RECIBO[tipo] || null;
+  return modelo && (alvo.ficha || !/^ficha_/.test(modelo)) ? modelo : null;
+}
+
+/**
  * Caixa da assinatura digital na página do recibo (regra `assinatura_digital`, pedido do dono de 2026-11-21): o "Baixar PDF"
  * de cima é o da conferência (sem assinatura); aqui "Enviar para assinar", a situação na fila do PC e, assinado, "Baixar PDF
  * assinado" e o e-mail da etapa (que passa a levar o assinado). Desligada (ou na ficha, que a pessoa preenche), nada aparece.
@@ -413,7 +423,7 @@ async function caixaAssinatura(tipo, alvo) {
   try { fila = await AS.fila(); } catch (e) { return `<div class="alerta aviso nao-imprimir">Assinatura digital: ${esc(e.message)}</div>`; }
   const p = AS.pedidoDe(fila, AS.chaveDoRecibo(tipo, alvo));
   const s = AS.situacaoDoPedido(p, fila.pc);
-  const modelo = EMAIL_DO_RECIBO[tipo];
+  const modelo = emailDoRecibo(tipo, alvo);
   const alvoEmail = alvo.ficha ? { ficha: alvo.ficha.id } : { contrato: alvo.contrato.id, ...(tipo === 'notificacao' && alvo.id ? { notificacao: alvo.id } : {}) };
   return `<div class="cartao nao-imprimir" style="margin:0 0 12px"><p><b>Assinatura digital da empresa</b> · <span class="etiqueta ${s.cor}">${esc(s.texto)}</span></p>
     <p class="acoes">${p && p.situacao === 'assinado' ? `${botao('assinaturaBaixar', 'Baixar PDF assinado', { ...dados, pedido: p.id }, '')} ${modelo ? botaoEmail(modelo, alvoEmail, '✉ Enviar ao inquilino') : '<span class="suave">Para enviar: anexe o PDF assinado no e-mail.</span>'} ` : ''}
