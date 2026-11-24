@@ -68,6 +68,14 @@ Os signatários que contratam nas qualidades indicadas neste contrato têm entre
 const PRAZO_ANTIGO = "**Parágrafo único** – Findo o prazo acima, se o LOCATÁRIO continuar na posse do imóvel sem que seja assinado novo contrato, a locação passará a vigorar por prazo indeterminado, podendo {l:a LOCADORA|as LOCADORAS} rescindi-la a qualquer tempo, mediante notificação por escrito ao LOCATÁRIO, que ficará obrigado a desocupar o imóvel no prazo de 30 (trinta) dias, a contar do recebimento da notificação, continuando em vigor as demais cláusulas e condições do presente contrato.";
 const PRAZO_PARAGRAFO = `[se retomada_livre]${PRAZO_ANTIGO}[senão]**Parágrafo único** – Findo o prazo acima, se o LOCATÁRIO continuar na posse do imóvel por mais de 30 (trinta) dias sem oposição {l:da LOCADORA|das LOCADORAS}, a locação prorroga-se por prazo indeterminado, mantidas as demais cláusulas e condições do presente contrato, e o imóvel só poderá ser retomado nas hipóteses do art. 47 da Lei nº 8.245/91.[fim]`;
 
+/**
+ * Tarifa do boleto (pedido do dono em 24/11/2026; desfaz a retirada de 2026-10-20): o inquilino reembolsa a tarifa bancária
+ * de emissão do boleto, com o valor de hoje tirado do contrato (`taxa_boleto`); sem valor no contrato, a cláusula fica sem o "hoje de".
+ * Modelos gravados recebem por ATUALIZACOES_MODELO, antes do parágrafo das despesas cobradas a qualquer tempo.
+ */
+export const TARIFA_BOLETO = '**Parágrafo** – O LOCATÁRIO reembolsará, junto com cada aluguel, a tarifa bancária de emissão do boleto[se tarifa_boleto], hoje de {tarifa_boleto}[fim], pelo valor cobrado pelo banco.';
+const DESPESAS_A_QUALQUER_TEMPO = '**Parágrafo** – As despesas de responsabilidade do LOCATÁRIO poderão ser cobradas a qualquer tempo';
+
 /** Despesas extraordinárias do condomínio são da locadora (A20; Lei 8.245/91, art. 22, X e parágrafo único). */
 export const EXTRAORDINARIAS = '[se condominio]**Parágrafo** – As despesas extraordinárias de condomínio, como obras de reforma ou acréscimo à estrutura do prédio, pintura das fachadas e áreas externas, indenizações trabalhistas anteriores ao início da locação, equipamentos de segurança, lazer e esporte e a constituição do fundo de reserva, são de responsabilidade {l:da LOCADORA|das LOCADORAS} (Lei nº 8.245/91, art. 22, X).[fim]\n\n';
 
@@ -88,6 +96,8 @@ ${PRAZO_PARAGRAFO}[fim]
 [se tem_incluso]**Parágrafo** – Tarifas e taxas adicionais além das contas incluídas, como contratações adicionais, serviços solicitados unilateralmente, multas aplicadas pelo condomínio e pelo poder público e a responsabilidade civil e criminal perante o condomínio e terceiros, são de responsabilidade do LOCATÁRIO, que se obriga a ter consumo responsável de energia elétrica, água e gás e a comunicar imediatamente qualquer vazamento.[fim]
 
 ${EXTRAORDINARIAS}[se iptu_inquilino]**Parágrafo** – Fica estabelecido entre as partes que o Imposto Predial e Territorial Urbano (IPTU) correrá por conta do LOCATÁRIO e será cobrado junto com o vencimento do aluguel[se seguro_inquilino], bem como o seguro incêndio do imóvel[fim].[fim]
+
+${TARIFA_BOLETO}
 
 **Parágrafo** – As despesas de responsabilidade do LOCATÁRIO poderão ser cobradas a qualquer tempo, mesmo após a rescisão do contrato e a restituição do imóvel, quando forem detectadas despesas, reparações de danos, multas, contas em atraso, execuções judiciais ou extrajudiciais e tudo o mais concernente ao período em que o imóvel foi ocupado pelo LOCATÁRIO.`;
 
@@ -497,6 +507,8 @@ export const ATUALIZACOES_MODELO = [
   ['honorários de advogado de 25% (vinte e cinco por cento) sobre o valor da ação', 'honorários de advogado de 20% (vinte por cento) sobre o valor da ação'],
   ['a multa proporcional de 10% (dez por cento) sobre o tempo restante do contrato', 'a multa de 3 (três) meses de aluguel, proporcional ao tempo restante do contrato'],
   [ENDERECO_PARAGRAFO, `${ENDERECO_PARAGRAFO}\n\n${LGPD}`, 'DOS DADOS PESSOAIS'],
+  // tarifa do boleto de volta ao contrato (24/11/2026): antes do parágrafo das despesas cobradas a qualquer tempo
+  [DESPESAS_A_QUALQUER_TEMPO, `${TARIFA_BOLETO}\n\n${DESPESAS_A_QUALQUER_TEMPO}`, 'tarifa bancária de emissão do boleto'],
   // revisão de 2026-11-13 (respostas do dono no artefato da revisão jurídica)
   [VISTORIA_ENTRADA_1211, VISTORIA_ENTRADA],
   [`${PRAZO_ANTIGO}[fim]`, `${PRAZO_PARAGRAFO}[fim]`, '[se retomada_livre]'],
