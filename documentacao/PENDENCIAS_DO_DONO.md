@@ -7,7 +7,7 @@
 **Três documentos novos (24/11), também em PDF na pasta do projeto:** `HISTORICO_DO_SISTEMA.md` (o que foi feito, tirado e por quê, e **o que ainda falta, em ordem de prioridade**), `CONFERIR_O_QUE_MUDOU.md` (o que **você** confere, tela por tela, com caixas para marcar) e `TAXAS_COBRAVEIS.md` (o que pode ser cobrado do inquilino, com uma pergunta sim/não para cada taxa; o advogado deve conferir).
 
 ### A. Boletos quebrados (urgente)
-1. [ ] **Condomínio, taxas do proprietário (ressarcimento):** lançadas, mas não entraram nos boletos do mês.
+1. [ ] **Condomínio, taxas do proprietário (ressarcimento):** lançadas, mas não entraram nos boletos do mês. **Explicado em 24/11:** a causa foi o mês de referência digitado no lugar do mês do vencimento (em dois imóveis); correção e testes na PR #373.
 2. [ ] **Seguro obrigatório** lançado para entrar neste mês não entrou no boleto do inquilino.
 3. [ ] **Ajuste do mês em Boletos:** permitir **mais de um abatimento e mais de um ressarcimento** no mesmo boleto (hoje só um de cada).
 4. [x] **Mandar o boleto feito à mão por e-mail** (enquanto a API do C6 não sai): em Boletos, anexar o PDF do boleto emitido no banco e enviar ao inquilino pelo Gmail um e-mail curto com o descritivo (como no boleto), o mês de competência, o vencimento e o boleto anexado. Hoje a equipe manda sempre esse e-mail por fora; agora quer mandar pelo sistema. **Feito em 24/11:** na página do boleto, caixa "Boleto emitido no banco (PDF)" (anexar, abrir, trocar, tirar) e botão "Enviar boleto por e-mail" (abre a janela para revisar; vai com o PDF anexado); a lista de Boletos mostra "📎 PDF do banco" e "✉ enviado em ...". **Para conferir:** anexar o PDF de um boleto de verdade e mandar a si mesmo primeiro.

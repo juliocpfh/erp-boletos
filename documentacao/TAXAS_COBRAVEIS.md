@@ -107,7 +107,9 @@ A resposta sobre várias taxas muda se a empresa é a **dona do imóvel** (locad
 **Sugestão:** não cobrar do inquilino.
 
 **Pergunta para o dono:** algum imóvel hoje é de outra pessoa (a empresa só administra)?
-- [ ] Sim  - [ ] Não
+- [ ] Sim  - [x] Não
+
+**Decisão do dono (24/11/2026):** **somos locador direto** (nenhum imóvel de terceiro hoje). Pedido para o futuro: o sistema perguntar, em cada contrato (ou imóvel), se a empresa aluga **como dona** ou **como procuradora de um terceiro**, e ter um **modelo de contrato em nome do terceiro**, assinado pela empresa com base na procuração dele (com os dados da procuração no contrato). Nesse caso a taxa de administração e a de intermediação ficam com o dono do imóvel, nunca com o inquilino.
 
 ## 6. Despesas de cobrança e honorários de advogado
 
@@ -130,6 +132,14 @@ A resposta sobre várias taxas muda se a empresa é a **dona do imóvel** (locad
 
 **Pergunta para o dono:** pôr no contrato os 10% da cobrança extrajudicial (só com advogado ou empresa de cobrança, depois de 30 dias)?
 - [ ] Sim  - [ ] Não
+
+**Onde pôr no sistema (sugestão de 24/11, pedido do dono):**
+1. **Regras do sistema** (Sistema → Regras do sistema), duas regras novas: "Honorários na cobrança fora da Justiça" (padrão 0%, sugestão 10%, só a partir de 30 dias de atraso) e "Honorários na cobrança judicial" (20%, como no contrato). Assim o percentual vem do contrato e pode ter regra especial por contrato.
+2. **Na página do boleto vencido:** botão **"Passar para cobrança"** (data e quem cobra: advogado ou empresa de cobrança). Só depois disso aparecem os honorários. Ex.: boleto de R$ 1.800,00 vencido em 10/01/2027, passado ao advogado em 15/02/2027 → multa R$ 36,00 + juros R$ 21,00 = R$ 1.857,00; honorários de 10% = R$ 185,70; total R$ 2.042,70.
+3. **No acordo de dívida** (Boletos → Acordo): linhas separadas "Honorários" e "Despesas de cobrança" somadas ao total do acordo e mostradas no termo de confissão de dívida (o sistema já monta o termo). É o lugar mais comum de cobrar, porque o inquilino assina concordando.
+4. **No cálculo final da saída:** as mesmas duas linhas entre os débitos da saída (descontadas da garantia ou cobradas no boleto do saldo).
+5. **Despesas de cobrança** (protesto, carta registrada, notificação em cartório, custas): lançadas uma a uma **com o comprovante anexado**, como a multa da notificação (fora da NF e sem multa e juros sobre elas), e levadas ao acordo, ao próximo boleto ou ao cálculo final.
+6. **Nunca** no boleto do mês automático nem na NF (honorários não são aluguel, e a NF é só do aluguel). E nada de honorários sem advogado ou empresa de cobrança de verdade.
 
 ## 7. Multa por atraso
 
@@ -333,7 +343,9 @@ Exemplos: troca de fechadura ou de segredo, cópia de chave, controle do portão
 
 ## 20. Taxa de reserva e desistência
 
-Ligado ao **termo de aceite da reserva** (prioridade do dono; decisões de 24/11 no item B de `PENDENCIAS_DO_DONO.md`: devolve tudo em 7 dias, depois fica com **40%**; reprovada devolve tudo; reserva **abatida do 1º aluguel**).
+Ligado ao **termo de aceite da reserva** (prioridade do dono; 1ª rodada de decisões de 24/11 no item B de `PENDENCIAS_DO_DONO.md`: devolve tudo em 7 dias, depois fica com **40%**; reprovada devolve tudo; reserva **abatida do 1º aluguel**).
+
+> **Atualização (24/11/2026, 2ª rodada):** o termo foi programado na PR #372 com a decisão final do dono: **desistência depois do depósito, a empresa fica com 100% da reserva** (sinal, Código Civil arts. 418 e 420), **sem prazo de devolução total** (padrão 0 dias); ficha reprovada devolve tudo; reserva sempre abatida do 1º aluguel; documentos em 3 dias úteis; reserva vale 7 dias; aviso em destaque antes de aceitar e de pagar ("se você desistir depois de depositar, você perde a reserva inteira"); "documento que não se confirma" conta como desistência, sem falar em "falso". Os 100% e os 0 dias são **regras configuráveis** (dá para voltar a 40% e 7 dias sem programar). O texto abaixo foi escrito antes dessa decisão: o risco de redução pelo juiz (art. 413) e o do CDC art. 49 ficam **maiores** com 100% e sem os 7 dias. Vale o advogado olhar esses dois pontos.
 
 **Pode ou não pode:** pode pedir um valor de reserva (sinal), mas com cuidado em dois pontos.
 
@@ -357,7 +369,7 @@ Ligado ao **termo de aceite da reserva** (prioridade do dono; decisões de 24/11
 **Perguntas para o dono:**
 
 Reduzir a retenção da desistência de 40% para 20% (ou 40% com o limite pelos dias de reserva)?
-- [ ] Sim  - [ ] Não
+- [ ] Sim  - [x] Não (decidido em 24/11: a empresa fica com 100%, PR #372; advogado deve conferir)
 
 Pedir ao advogado para conferir se abater a reserva do 1º aluguel pode ser visto como aluguel adiantado?
 - [ ] Sim  - [ ] Não
@@ -375,7 +387,9 @@ Pedir ao advogado para conferir se abater a reserva do 1º aluguel pode ser vist
 **Sugestão:** conferir quais contratos têm tarifa preenchida. Ou zerar, ou voltar com a cláusula: "O LOCATÁRIO reembolsará a tarifa bancária de emissão do boleto, hoje de R$ 3,50, pelo valor cobrado pelo banco."
 
 **Pergunta para o dono:** parar de cobrar a tarifa do boleto (em vez de voltar com a cláusula)?
-- [ ] Sim  - [ ] Não
+- [ ] Sim  - [x] Não
+
+**Decisão do dono (24/11/2026):** **sempre cobrar a tarifa**, e corrigir o modelo de contrato para trazer a cláusula de volta (desfaz a retirada de 20/10/2026). Sugestão de texto: "O LOCATÁRIO reembolsará, junto com cada aluguel, a tarifa bancária de emissão do boleto, hoje de R$ {tarifa}, pelo valor cobrado pelo banco." Os contratos já assinados sem a cláusula precisam de termo aditivo para a cobrança ter base (o advogado deve conferir).
 
 ## 22. Cheque ou Pix devolvido
 
@@ -402,7 +416,7 @@ Pedir ao advogado para conferir se abater a reserva do 1º aluguel pode ser vist
 2. Manter a análise de ficha sem cobrança? - [ ] Sim  - [ ] Não
 3. Manter as vistorias sem cobrança? - [ ] Sim  - [ ] Não
 4. Nunca cobrar corretagem do inquilino? - [ ] Sim  - [ ] Não
-5. Algum imóvel é de outra pessoa (a empresa só administra)? - [ ] Sim  - [ ] Não
+5. Algum imóvel é de outra pessoa (a empresa só administra)? - [ ] Sim  - [x] Não (24/11: somos locador direto)
 6. Pôr os 10% da cobrança extrajudicial (só com advogado ou empresa de cobrança, depois de 30 dias)? - [ ] Sim  - [ ] Não
 7. Manter a multa de 2% com a bonificação de 10%? - [ ] Sim  - [ ] Não
 8. Manter os juros de 1% ao mês? - [ ] Sim  - [ ] Não
@@ -417,9 +431,9 @@ Pedir ao advogado para conferir se abater a reserva do 1º aluguel pode ser vist
 17. Cobrar a pintura inteira (e não proporcional ao tempo)? - [ ] Sim  - [ ] Não
 18. Seguro e IPTU ficam como estão? - [ ] Sim  - [ ] Não
 19. Separar no condomínio o ordinário do extraordinário? - [ ] Sim  - [ ] Não
-20a. Reduzir a retenção da desistência da reserva de 40% para 20% (ou limitar pelos dias)? - [ ] Sim  - [ ] Não
+20a. Reduzir a retenção da desistência da reserva de 40% para 20% (ou limitar pelos dias)? - [ ] Sim  - [x] Não (24/11: fica com 100%, PR #372)
 20b. Advogado conferir se abater a reserva do 1º aluguel é aluguel adiantado? - [ ] Sim  - [ ] Não
-21. Parar de cobrar a tarifa do boleto (em vez de voltar com a cláusula)? - [ ] Sim  - [ ] Não
+21. Parar de cobrar a tarifa do boleto (em vez de voltar com a cláusula)? - [ ] Sim  - [x] Não (24/11: sempre cobrar; cláusula volta ao contrato)
 22. Cláusula do pagamento devolvido? - [ ] Sim  - [ ] Não
 
 ## Próximo passo
