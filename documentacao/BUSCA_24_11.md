@@ -12,7 +12,7 @@
 | **Médio** | 18 | tela, aviso ou conta errada que pode levar a pessoa a errar |
 | **Leve** | 29 | texto errado, botão que não ajuda, caso raro |
 
-- Os erros foram juntados em **4 lotes de correção** (uma PR para cada). **9 assuntos precisam de uma resposta sua** antes de corrigir (logo abaixo).
+- Os erros foram juntados em **4 lotes de correção** (uma PR para cada). **10 assuntos precisam de uma resposta sua** antes de corrigir (logo abaixo).
 
 **O que NÃO foi feito nesta busca:**
 - Não foi aberto o navegador de verdade para cada erro: as provas foram feitas com testes no computador (com pessoas e valores fictícios) e, em parte, só pela leitura do programa. O teste na tela fica para a hora de cada correção, como sempre.
@@ -80,17 +80,23 @@ A regra "a entrada casa com o boleto até 3 dias depois do vencimento" explica c
 - E o início da régua de cobrança por e-mail, que também usa os 3 dias fixos: segue a mesma regra? (Sim / Não)
 - **Sugestão do Claude: (a)**, e Sim para a régua.
 
+**10. (BOL-08) Termo de troca do vencimento que "não valeu": os boletos alterados à mão voltam ao dia antigo?**
+Termo que troca o vencimento do dia 10 para o dia 20: todos os boletos em aberto passam para o dia 20. Se depois o termo é marcado como "não valeu", o contrato volta ao dia 10, mas os boletos alterados à mão (até aquele em que só o IPTU foi digitado) continuam no dia 20. Hoje isso é de propósito: um teste antigo exige que o boleto alterado à mão fique como está.
+- (a) Todos voltam ao dia 10, menos o boleto já emitido no banco.
+- (b) Fica como hoje: o boleto alterado à mão não muda, e a equipe acerta à mão.
+- **Sugestão do Claude: (a)**, porque o boleto foi para o dia 20 justamente por causa do termo que não valeu.
+
 ## Lotes de correção
 
 Cada lote vira uma PR própria, a partir da `main`, com testes automáticos e teste na tela antes da PR.
 
 | Lote | Assunto | Erros | PR | Feito |
 |---|---|---|---|---|
-| 1 | Boletos, NF e banco | BOL-01, 02, 03, 04, 07, 09, BAN-01, 03, 04 (e BOL-08, se for simples) | | [ ] |
-| 2 | Contratos, troca, reajuste, acordo e saída | CON-01, 02, 03, 05, 07 (só o aviso), 08, 09, DOC-03, DOC-04 | | [ ] |
-| 3 | Fichas, comunicados, documentos e e-mails | FIC-01, 02, 04, 05, 06, 07, 08, 09, DOC-01, 02, 06 | | [ ] |
-| 4 | Nuvem, regras e telas | NUV-01, 02 (= REG-01), 03, 04, REG-02, 04, 05, 06, TEL-01, 02, 03, 04, BAN-05 | | [ ] |
-| — | Esperam a sua decisão | FIC-03, CON-04, CON-06, CON-07 (a data), BOL-05, BOL-06, DOC-05, DOC-07, REG-03 e BAN-02 | | [ ] |
+| 1 | Boletos, NF e banco | BOL-01, 02, 03, 04, 07, 09, BAN-01, 03, 04 (BOL-08 virou a pergunta 10) | #384 | [ ] |
+| 2 | Contratos, troca, reajuste, acordo e saída | CON-01, 02, 03, 05, 07 (só o aviso), 08, 09, DOC-03, DOC-04 | #385 | [ ] |
+| 3 | Fichas, comunicados, documentos e e-mails | FIC-01, 02, 04, 05, 06, 07, 08, 09, DOC-01, 02, 06 | #387 | [ ] |
+| 4 | Nuvem, regras e telas | NUV-01, 02 (= REG-01), 03, 04, REG-02, 04, 05, 06, TEL-01, 02, 03, 04, BAN-05 | #386 | [ ] |
+| — | Esperam a sua decisão | FIC-03, CON-04, CON-06, CON-07 (a data), BOL-05, BOL-06, DOC-05, DOC-07, REG-03, BAN-02 e BOL-08 | perguntas 1 a 10 | [ ] |
 
 ## Lista completa, por área
 
@@ -149,7 +155,7 @@ Cada lote vira uma PR própria, a partir da `main`, com testes automáticos e te
 - **Gravidade:** Leve
 - **O que acontece:** termo de troca do dia 10 para o dia 20: todos os boletos em aberto vão para o dia 20. Se o termo é tirado ("não valeu"), o contrato volta ao dia 10, mas os boletos alterados à mão (até os em que só o IPTU foi digitado) ficam no dia 20.
 - **Na correção:** a mesma regra nos dois sentidos: todos voltam ao dia 10, menos o emitido no banco.
-- **Lote:** 1, se for simples (área da PR #379)
+- **Lote:** espera a sua decisão (pergunta 10): a correção muda um comportamento que hoje é de propósito
 - <small>Para o Claude: `docs/js/regras.js:3710` (pula `editado_manual`) × `:5286-5295` (só pula `emitidoNoBanco`). Prova só por leitura.</small>
 
 #### BOL-09 — Texto do botão "Recalcular boletos em aberto" ficou errado
