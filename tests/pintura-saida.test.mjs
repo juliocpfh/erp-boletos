@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import * as C from '../docs/js/calculos.js';
 import * as K from '../docs/js/contratos.js';
 import { DEFINICOES_REGRAS } from '../docs/js/config-regras.js';
+import * as X from '../docs/js/exportar.js';
 
 const banco = (pintura, saida = '2026-01-09') => {
   const c = { id: 1, inquilino_nome: 'Fulano de Teste', imovel_id: 1, data_entrada: '2025-01-10', data_saida: saida };
@@ -56,4 +57,10 @@ test('regra configurável com padrão de 36 meses e a lei', () => {
 test('pendência de pintura já vem marcada', () => {
   assert.ok(K.ehPintura('Sala – Paredes e teto (pintura, manchas, fissuras, furos) (Marcas de uso)'));
   assert.ok(!K.ehPintura('Sala – Porta (Avaria: riscada)'));
+});
+
+test('Histórico e planilha: orçamento da pintura em reais, com nome em português', () => {
+  assert.equal(X.valorTexto('orcamento_valor', 240000), 'R$ 2.400,00');
+  assert.equal(X.rotuloCampo('orcamento_valor'), 'Orçamento inteiro da pintura');
+  assert.equal(X.rotuloCampo('pintura_nova', 'vistorias'), 'Pintura nova na entrada');
 });
