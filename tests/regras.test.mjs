@@ -2881,3 +2881,32 @@ test('fechamento: o condomínio do mês corrente já pode ser conferido e o bot�
   assert.equal(e.contratos.find((x) => x.id === c.id).conferir, true);
   assert.equal(e.contratos.find((x) => x.id === c2.id).conferir, false);
 });
+
+test('ressarcimento lançado sem a data do pagamento: falta o comprovante e o desconto só entra com a data (24/11/2026)', () => {
+  const { d, c } = base();
+  c.conta_condominio = 'Por conta do inquilino';
+  c.reserva_valor = 0;
+  // condomínio de 11/2026 vence em 05/12: o boleto previsto é o que vence em 01/2027 (referência 12/2026)
+  assert.equal(R.competenciaDoAbatimentoPrevisto(c, '2026-11'), '2026-12');
+  assert.equal(R.competenciaDoAbatimentoPrevisto(c, '2026-11'), R.competenciaDoAbatimento(c, '2026-12-05'));
+  R.gerarCobrancas(d, '2026-12', 'julio');
+  const r = R.inserir(d, 'ressarcimentos', { contrato_id: c.id, competencia_condominio: '2026-11', descricao: 'Fundo de obras', valor: 15000, competencia_abatimento: '2026-12' }, 'julio');
+  let cb = R.aplicarRessarcimentos(d, c, '2026-12', 'julio');
+  assert.equal(cb.ressarcimento, 0, 'sem a data, o boleto sai sem o desconto');
+  assert.match(R.alertaRessarcimentoSemComprovante(d, c).texto, /Falta o comprovante.*Fundo de obras R\$ 150,00 \(condomínio de 11\/2026\): o boleto que vence em 01\/2027 está sem o desconto/);
+  assert.deepEqual(R.taxasNoBoleto(d, cb), []);
+  // sem boleto ainda: não vira crédito na saída
+  assert.deepEqual(R.ressarcimentosEmCredito(d, c), []);
+  // comprovante chegou: a data posta faz o desconto entrar no boleto em aberto
+  R.atualizar(d, 'ressarcimentos', r.id, { data_pagamento: '2026-12-05' }, 'julio');
+  cb = R.aplicarRessarcimentos(d, c, '2026-12', 'julio');
+  assert.equal(cb.ressarcimento, 15000);
+  assert.equal(R.alertaRessarcimentoSemComprovante(d, c), null);
+  // a data apagada de novo: o desconto sai
+  R.atualizar(d, 'ressarcimentos', r.id, { data_pagamento: null }, 'julio');
+  cb = R.aplicarRessarcimentos(d, c, '2026-12', 'julio');
+  assert.equal(cb.ressarcimento, 0);
+  // boleto pago sem o comprovante: o aviso diz que saiu sem o desconto
+  R.registrarPagamento(d, cb.id, '2027-01-05', null, 'julio', { pagouEmDia: true });
+  assert.match(R.alertaRessarcimentoSemComprovante(d, c).texto, /saiu sem o desconto/);
+});

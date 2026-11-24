@@ -3962,6 +3962,7 @@ export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
     alertaCondominio(contrato, hoje),
     alertaSeguroSemQuemPaga(contrato),
     alertaRessarcimentoEmAcordo(d, contrato),
+    alertaRessarcimentoSemComprovante(d, contrato),
     alertaTermoAcordo(d, contrato),
     alertaNotificacoes(d, contrato, hoje),
   ].filter(Boolean);
@@ -7240,13 +7241,47 @@ export function competenciaDoAbatimento(c, dataPagamento) {
 }
 
 /**
+ * Ressarcimento lançado sem a data do pagamento (o inquilino ainda não mandou o comprovante): o boleto previsto é o do mês
+ * seguinte ao vencimento do boleto do condomínio, que vence no mês seguinte ao do condomínio. Ex.: condomínio de 11/2026
+ * (vence em 05/12) → boleto que vence em 01/2027 (referência 12/2026, quando o aluguel vence no mês seguinte).
+ */
+export function competenciaDoAbatimentoPrevisto(c, compCondominio) {
+  return C.competenciaValida(compCondominio) ? competenciaDoAbatimento(c, `${C.somarMeses(compCondominio, 1)}-01`) : null;
+}
+
+/**
+ * O desconto do ressarcimento só entra no boleto com o pagamento do condomínio confirmado (data do pagamento posta). Sem ela,
+ * o boleto sai sem o desconto, que entra quando a data for posta (com o boleto ainda em aberto). Decisão do dono, 24/11/2026.
+ */
+export const ressarcimentoConfirmado = (r) => !!(r && r.data_pagamento);
+
+/** Ressarcimentos lançados sem o comprovante do pagamento do condomínio. */
+export const ressarcimentosSemComprovante = (d, contratoId) => (d.ressarcimentos || []).filter((r) => r.contrato_id === contratoId && !ressarcimentoConfirmado(r));
+
+/**
+ * Aviso dos ressarcimentos sem o comprovante: o desconto ainda não entrou. Ex.: fundo de obras de R$ 150,00 do condomínio de
+ * 11/2026, sem data → "entra no boleto que vence em 01/2027 só com a data do pagamento"; boleto já pago → saiu sem ele.
+ */
+export function alertaRessarcimentoSemComprovante(d, c) {
+  const lista = ressarcimentosSemComprovante(d, c.id);
+  if (!lista.length) return null;
+  const partes = lista.map((r) => {
+    const cb = r.competencia_abatimento && boletoDoMes(d, c.id, r.competencia_abatimento);
+    const onde = r.competencia_abatimento ? `boleto que vence em ${C.compBr(mesVencimentoDaCompetencia(c, r.competencia_abatimento))}` : 'boleto do aluguel';
+    return `${r.descricao} ${C.reais(r.valor)} (condomínio de ${C.compBr(r.competencia_condominio)}): ${cb && (cb.data_pagamento || emAcordo(cb)) ? `o ${onde} saiu sem o desconto` : cb ? `o ${onde} está sem o desconto até a data ser posta` : `entra no ${onde} só com a data do pagamento`}`;
+  });
+  return { nivel: 'info', tipo: 'Condomínio', ancora: 'ressarcimentos',
+    texto: `Falta o comprovante do pagamento do condomínio: ${partes.join('; ')}. Quando o inquilino mandar, ponha a data do pagamento no ressarcimento (Editar).` };
+}
+
+/**
  * Taxas do condomínio abatidas no boleto, agrupadas pelo mês do condomínio, para o demonstrativo (pedido do dono de 24/11/2026:
  * uma linha por taxa, como na página do inquilino). Ex.: [{ mes: '2026-10', itens: [{ descricao: 'Extraordinárias', valor: 35318 },
  * { descricao: 'Fundo de reserva', valor: 10092 }] }]. Vazio se o que está lançado não soma o que o boleto abate (boleto antigo).
  */
 export function taxasNoBoleto(d, cb) {
   if (!cb.ressarcimento) return [];
-  const lista = (d.ressarcimentos || []).filter((r) => r.contrato_id === cb.contrato_id && r.competencia_abatimento === cb.competencia);
+  const lista = (d.ressarcimentos || []).filter((r) => r.contrato_id === cb.contrato_id && r.competencia_abatimento === cb.competencia && ressarcimentoConfirmado(r));
   if (lista.reduce((t, r) => t + r.valor, 0) !== cb.ressarcimento) return [];
   const meses = [...new Set(lista.map((r) => r.competencia_condominio))].sort();
   return meses.map((mes) => ({ mes, itens: lista.filter((r) => r.competencia_condominio === mes)
@@ -7254,7 +7289,8 @@ export function taxasNoBoleto(d, cb) {
 }
 
 function ressarcimentosNoBoleto(d, contratoId, comp) {
-  const lista = (d.ressarcimentos || []).filter((r) => r.contrato_id === contratoId && r.competencia_abatimento === comp);
+  // só com o pagamento do condomínio confirmado (``ressarcimentoConfirmado``)
+  const lista = (d.ressarcimentos || []).filter((r) => r.contrato_id === contratoId && r.competencia_abatimento === comp && ressarcimentoConfirmado(r));
   return { valor: lista.reduce((t, r) => t + r.valor, 0), descricao: lista.map((r) => `${r.descricao} (condomínio ${C.compBr(r.competencia_condominio)})`).join('; ') };
 }
 
@@ -7289,7 +7325,7 @@ export function textoSemBoleto(s, comp) {
  */
 export function ressarcimentosEmCredito(d, c) {
   if (!c) return [];
-  return (d.ressarcimentos || []).filter((r) => r.contrato_id === c.id && r.competencia_abatimento && !boletoDoMes(d, c.id, r.competencia_abatimento))
+  return (d.ressarcimentos || []).filter((r) => r.contrato_id === c.id && ressarcimentoConfirmado(r) && r.competencia_abatimento && !boletoDoMes(d, c.id, r.competencia_abatimento))
     .filter((r) => { const s = semBoletoNoMes(d, c, r.competencia_abatimento); return s && s.motivo !== 'entrada'; })
     .sort((a, b) => String(a.data_pagamento).localeCompare(String(b.data_pagamento)) || a.id - b.id);
 }
@@ -7405,7 +7441,7 @@ export function alertaCreditoRessarcimento(d, c) {
 export function alertaRessarcimentoEmAcordo(d, c) {
   const credito = alertaCreditoRessarcimento(d, c);
   if (credito) return credito;
-  const meses = [...new Set((d.ressarcimentos || []).filter((r) => r.contrato_id === c.id).map((r) => r.competencia_abatimento))].sort();
+  const meses = [...new Set((d.ressarcimentos || []).filter((r) => r.contrato_id === c.id && ressarcimentoConfirmado(r)).map((r) => r.competencia_abatimento))].sort();
   for (const comp of meses) {
     const cb = boletoDoMes(d, c.id, comp);
     // mês sem boleto deste contrato antes da entrada: o ressarcimento não abate em lugar nenhum (depois da saída ou da troca de
