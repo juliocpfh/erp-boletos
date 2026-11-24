@@ -448,7 +448,7 @@ Documento de 24/11/2026 (pedido C5 de 24/11). Ele junta, por assunto, tudo o que
 Junta as listas dos sete assuntos, sem repetir. **Quem faz:** "Claude" (programa ou escreve), "Você" (confere, decide ou faz fora do sistema).
 
 ### 1. Urgente (dinheiro cobrado errado ou trabalho que a equipe faz por fora)
-1. [ ] **Claude:** confirmar e testar o **ressarcimento do condomínio no boleto** (pedido A1 de 24/11). ⚠ A PR #364 diz que um ressarcimento de R$ 45,00 entrou no teste, mas a sua lista ainda o dá como quebrado: precisa de teste próprio, com o seu caso.
+1. [ ] **Claude:** **ressarcimento do condomínio no boleto** (pedido A1 de 24/11): **explicado em 24/11**, a causa foi o mês de referência digitado no lugar do mês do vencimento; correção e testes na PR #373 (falta você conferir com o seu caso).
 2. [ ] **Claude:** **conferência completa do boleto** (pedido A5): aluguel, proporcional, IPTU, condomínio, seguro, ressarcimentos, abatimentos, multas, diferenças, caução, acordo, reserva e NF, com testes.
 3. [ ] **Claude:** **mandar pelo sistema o boleto feito à mão no banco** (pedido A4): anexar o PDF em Boletos e enviar pelo Gmail com o descritivo, o mês e o vencimento.
 4. [ ] **Você:** rever os **boletos em aberto alterados à mão antes de 24/11**: o sistema não sabe quais valores foram digitados e não os recalcula (ex.: seguro lançado depois não entra).
