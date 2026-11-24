@@ -239,7 +239,8 @@ async function janelaEmail(chave, alvo) {
     const alertas = [];
     if (!arquivos.length && modelo.anexos) alertas.push(`ATENÇÃO: o texto fala em anexo (${modelo.anexos}), mas nenhum arquivo vai junto. Anexe em "${prontos.length ? 'Outros anexos' : 'Anexos'}" antes de enviar.`);
     const marcados = [...dlg.querySelectorAll('[name=pronto]:checked')].map((el) => prontos[Number(el.value)]);
-    if (n && !n.arquivo_assinado && marcados.some((a) => a.tipo === 'recibo' && a.recibo === 'notificacao')) alertas.push('ATENÇÃO: vai o PDF da notificação SEM a assinatura (a assinada não foi anexada na notificação). Ao enviar, a notificação fica marcada como enviada hoje e o prazo começa a correr.');
+    // com a assinatura digital ligada, o PDF que vai é o assinado pelo PC (reciboParaEnviar): o alerta seria falso
+    if (n && !n.arquivo_assinado && !R.regra('assinatura_digital') && marcados.some((a) => a.tipo === 'recibo' && a.recibo === 'notificacao')) alertas.push('ATENÇÃO: vai o PDF da notificação SEM a assinatura (a assinada não foi anexada na notificação). Ao enviar, a notificação fica marcada como enviada hoje e o prazo começa a correr.');
     if (!(await confirmar(`${alertas.length ? `${alertas.join('\n\n')}\n\n` : ''}O e-mail vai agora para ${e.para}${arquivos.length ? `, com ${arquivos.length} anexo(s)` : ', sem anexo'}.`, { titulo: alertas.length ? 'Enviar mesmo assim?' : 'Enviar o e-mail?', sim: 'Enviar agora', forte: alertas.length > 0 }))) return;
     enviar.disabled = true;
     try {

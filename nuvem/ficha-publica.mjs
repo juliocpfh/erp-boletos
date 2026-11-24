@@ -688,7 +688,15 @@ td:first-child{color:var(--suave);width:38%}.doc{padding:10px 0;border-bottom:1p
   const dataBr = (iso) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '');
   const horaBr = (iso) => (iso ? new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '');
   const reais = (c) => (c === null || c === undefined || c === '' ? '' : (c / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-  const centavos = (t) => { const s = String(t || '').replace(/[^0-9,]/g, ''); if (!s) return null; const [i, d = ''] = s.split(','); return Number(i || 0) * 100 + Number((d + '00').slice(0, 2)); };
+  // valor em reais: "2.500,50" ou, no teclado do celular que só tem ponto, "2500.50" (sem vírgula e com 1 ou 2 algarismos depois
+  // do último ponto, o ponto é a vírgula; "2.500" continua sendo dois mil e quinhentos)
+  const centavos = (t) => {
+    let s = String(t || '').replace(/[^0-9,.]/g, '');
+    if (!/[0-9]/.test(s)) return null;
+    if (!s.includes(',') && /[.][0-9]{1,2}$/.test(s)) { const k = s.lastIndexOf('.'); s = s.slice(0, k) + ',' + s.slice(k + 1); }
+    const [i, d = ''] = s.split('.').join('').split(',');
+    return Number(i || 0) * 100 + Number((d + '00').slice(0, 2));
+  };
   const api = async (caminho, op = {}) => {
     const r = await fetch('/api/publico/' + caminho, { ...op, headers: { 'X-Ficha-Token': chave, ...(op.method && op.method !== 'GET' ? { 'X-Ficha': '1' } : {}), ...(op.headers || {}) } });
     const tipo = r.headers.get('content-type') || '';

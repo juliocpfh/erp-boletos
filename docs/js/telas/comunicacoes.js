@@ -356,10 +356,11 @@ export const ACOES_COMUNICACOES = {
   async emailTodosComunicado({ id }) {
     exigir();
     const com = buscar('comunicados', Number(id));
-    const alvos = com.destinos.filter((x) => !x.email_em && !x.confirmado_em && (CM.pessoaDoDestino(d(), x) || {}).email);
-    const sem = com.destinos.filter((x) => !x.confirmado_em && !(CM.pessoaDoDestino(d(), x) || {}).email);
-    if (!alvos.length) { aviso(`Não há e-mail para enviar: ${sem.length ? `${sem.length} pessoa(s) sem e-mail no cadastro (use o WhatsApp)` : 'todos já receberam'}.`, 'info'); return; }
-    if (!(await confirmar(`Enviar o e-mail com o link para ${alvos.length} pessoa(s)?${sem.length ? ` ${sem.length} sem e-mail ficam para o WhatsApp.` : ''}`, { titulo: 'Enviar e-mail a todos', sim: 'Enviar' }))) return;
+    // só quem continua no cadastro (contrato ativo, fiador ainda fiador), como no lembrete
+    const { alvos, sem, fora } = CM.filaDoEnvio(d(), com, 'email');
+    const saiu = fora ? ` ${fora} pessoa(s) que não confirmaram ficam de fora: já saíram (contrato encerrado, fiador trocado ou excluído).` : '';
+    if (!alvos.length) { aviso(`Não há e-mail para enviar: ${sem.length ? `${sem.length} pessoa(s) sem e-mail no cadastro (use o WhatsApp)` : 'todos já receberam'}.${saiu}`, 'info'); return; }
+    if (!(await confirmar(`Enviar o e-mail com o link para ${alvos.length} pessoa(s)?${sem.length ? ` ${sem.length} sem e-mail ficam para o WhatsApp.` : ''}${saiu}`, { titulo: 'Enviar e-mail a todos', sim: 'Enviar' }))) return;
     const { ok, falhas } = await enviarEmails(com, alvos);
     if (falhas.length) await janela({ titulo: `${ok} enviado(s), ${falhas.length} com problema`, sim: 'Fechar', nao: null, html: `<ul>${falhas.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` });
     else aviso(`${ok} e-mail(s) enviado(s).`);
@@ -378,8 +379,8 @@ export const ACOES_COMUNICACOES = {
   async whatsTodosComunicado({ id }) {
     exigir();
     const com = buscar('comunicados', Number(id));
-    const fila = com.destinos.filter((x) => !x.whats_em && !x.confirmado_em && CM.pessoaDoDestino(d(), x));
-    if (!fila.length) { aviso('Todos já receberam pelo WhatsApp (ou já confirmaram).', 'info'); return; }
+    const { alvos: fila, fora } = CM.filaDoEnvio(d(), com, 'whats');
+    if (!fila.length) { aviso(`Todos já receberam pelo WhatsApp (ou já confirmaram).${fora ? ` ${fora} pessoa(s) que não confirmaram ficam de fora: já saíram.` : ''}`, 'info'); return; }
     if (!(await seguirSemGmail())) return;
     await filaWhatsapp(com.id, fila);
   },

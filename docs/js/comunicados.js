@@ -283,6 +283,21 @@ export function novoComunicado(d, modelo, { prazo, email_empresa, telefone_empre
   };
 }
 
+/**
+ * Quem recebe o "Enviar e-mail a todos" (``canal`` 'email') ou o "WhatsApp a todos" ('whats'): quem ainda não confirmou, não
+ * recebeu por aquele canal e continua no cadastro (``destinoAtivo``: ex-inquilino e fiador trocado ficam de fora, como no
+ * lembrete; busca de 24/11, FIC-09). { alvos, sem (ativos sem e-mail no cadastro), fora (quantos não confirmaram e já saíram) }.
+ */
+export function filaDoEnvio(d, com, canal, hoje = C.hojeIso()) {
+  const abertos = ((com && com.destinos) || []).filter((x) => x && !x.confirmado_em);
+  const ativos = abertos.filter((x) => destinoAtivo(d, x, hoje));
+  const fora = abertos.length - ativos.length;
+  if (canal === 'email') {
+    return { alvos: ativos.filter((x) => !x.email_em && (pessoaDoDestino(d, x) || {}).email), sem: ativos.filter((x) => !(pessoaDoDestino(d, x) || {}).email), fora };
+  }
+  return { alvos: ativos.filter((x) => !x.whats_em && pessoaDoDestino(d, x)), sem: [], fora };
+}
+
 /** O destinatário de hoje (com contrato, imóvel e contatos atuais) de uma pessoa do comunicado. */
 export function pessoaDoDestino(d, x) {
   const c = R.buscar(d, 'contratos', x.contrato_id);

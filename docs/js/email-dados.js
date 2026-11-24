@@ -278,7 +278,9 @@ export function anexosProntos(d, modelo, alvo) {
       if (n.arquivo_assinado) arquivo('contrato', n.contrato_id, n.arquivo_assinado, `notificação de ${C.dataBr(n.data)} assinada`);
       else {
         const disp = REC.reciboDisponivel(d, 'notificacao', alvo);
-        out.push({ tipo: 'recibo', recibo: 'notificacao', rotulo: `${REC.TIPOS_RECIBO.notificacao} de ${C.dataBr(n.data)} (sem a assinatura: anexe a assinada na notificação)`, ok: disp.ok, motivo: disp.motivo || '', alvo });
+        // com a assinatura digital ligada, vai o PDF assinado pelo PC (reciboParaEnviar, telas/emails.js), não o sem assinatura
+        const comoVai = R.regra('assinatura_digital') ? 'assinada digitalmente pelo PC' : 'sem a assinatura: anexe a assinada na notificação';
+        out.push({ tipo: 'recibo', recibo: 'notificacao', rotulo: `${REC.TIPOS_RECIBO.notificacao} de ${C.dataBr(n.data)} (${comoVai})`, ok: disp.ok, motivo: disp.motivo || '', alvo });
       }
       continue;
     }

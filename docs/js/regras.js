@@ -2973,7 +2973,8 @@ export function imoveisParaContrato(d, f) {
   if (f.situacao !== 'Aprovada') return [];
   const feitos = contratosDaFicha(d, f);
   if (f.modo_imoveis !== 'Todos juntos' && Object.keys(feitos).length) return [];
-  return (f.imoveis_ids || []).filter((id) => !feitos[id]);
+  // imóvel excluído depois (dado antigo: a exclusão hoje é barrada com a ficha aberta) não fica como contrato por fazer
+  return (f.imoveis_ids || []).filter((id) => !feitos[id] && buscar(d, 'imoveis', id));
 }
 
 /** Ficha ainda aberta: em análise, ou aprovada com contrato por fazer. Ocupa os imóveis dela. */
@@ -3209,6 +3210,9 @@ export function excluirContrato(d, contratoId, usuario, descricao) {
   }
   // a garantia que tinha passado a este contrato volta a ser do anterior (senão não passa a um novo titular)
   for (const a of d.contratos.filter((x) => x.garantia_transferida_para === c.id)) atualizar(d, 'contratos', a.id, { garantia_transferida_para: null }, usuario, `${a.inquilino_nome}: garantia volta para este contrato (${c.inquilino_nome} excluído)`);
+  // a ficha que mandou os documentos para este contrato deixa de apontar para ele (senão o próximo contrato da ficha não
+  // recebia o comprovante da reserva e a página da ficha mostrava um link para um contrato apagado)
+  for (const f of (d.fichas || []).filter((x) => x && Number(x.documentos_no_contrato) === c.id)) atualizar(d, 'fichas', f.id, { documentos_no_contrato: null }, usuario, `Ficha de ${f.inquilino_nome}: o contrato que tinha recebido os documentos foi excluído`);
   excluir(d, 'contratos', c.id, usuario, descricao || c.inquilino_nome);
 }
 
@@ -6397,6 +6401,23 @@ export function editarNotificacao(d, id, dados, usuario) {
   const mudouTexto = campos.texto !== n.texto || campos.data !== n.data || campos.data_limite !== n.data_limite;
   atualizar(d, 'notificacoes', n.id, { ...campos, ...(mudouTexto && n.arquivo_assinado ? { arquivo_assinado: null } : {}) }, usuario, `Notificação de ${C.dataBr(campos.data)}: rascunho alterado`);
   return n;
+}
+
+/**
+ * PDF da notificação assinado pelo programa do PC (assinatura digital) e baixado pelo "Baixar PDF assinado": vira a notificação
+ * assinada (``arquivo_assinado``), como se fosse anexado à mão (busca de 24/11, DOC-02). Só se ainda não há assinada, a
+ * notificação não foi cancelada e o texto não mudou depois do pedido (``pedidoEm``, ISO): mudar o rascunho apaga a assinada
+ * (``editarNotificacao``), e o PDF pedido antes é do texto antigo. Devolve true se ligou.
+ * Ex.: pedido em 17/11/2026 10:00, rascunho alterado às 11:00 → false (o assinado é do texto de antes).
+ */
+export function ligarNotificacaoAssinada(d, id, arquivo, pedidoEm, usuario) {
+  const n = buscar(d, 'notificacoes', id);
+  if (!n || !arquivo || !pedidoEm || n.arquivo_assinado || n.situacao === 'Cancelada') return false;
+  const mudouDepois = (d.historico || []).some((h) => h.tabela === 'notificacoes' && Number(h.registro_id) === n.id && h.detalhes
+    && ['texto', 'data', 'data_limite'].some((k) => h.detalhes[k]) && String(h.quando) > String(pedidoEm));
+  if (mudouDepois) return false;
+  anexarComprovante(d, 'notificacoes', n.id, 'arquivo_assinado', arquivo, usuario);
+  return true;
 }
 
 /** Marca o envio (data e por onde): o prazo passa a correr ("Aguardando resposta"); a anterior do mesmo assunto fica "Reiterada". */

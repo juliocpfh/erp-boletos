@@ -81,12 +81,21 @@ export function partesDaPessoa(d, cpf) {
   const saem = new Set([...proprios, ...ligados].map((x) => `${x.tabela}:${x.id}`));
   // respostas aos comunicados (nome, contatos, IP, aparelho, assinatura): ficam dentro do comunicado, na lista `destinos`, pelo
   // contrato (inquilino) ou pelo fiador; o comunicado continua, só sai o item dela
+  // (o solidário e o representante são dela pelo CPF do papel naquele contrato, não pelo dono do contrato: no contrato dela o
+  // solidário é outra pessoa, e ela pode ser a solidária do contrato de outro)
   const fiadoresDela = new Set(proprios.filter((x) => x.tabela === 'fiadores').map((x) => Number(x.id)));
+  const alvo = soDigitos(cpf);
+  const papelDela = (x) => {
+    const c = R.buscar(d, 'contratos', x.contrato_id);
+    return !!c && soDigitos(c[`${x.tipo}_cpf`] || '') === alvo;
+  };
   const destinos = [];
   for (const com of d.comunicados || []) {
     for (const x of com.destinos || []) {
       if (!x) continue;
-      const dela = x.tipo === 'fiador' ? fiadoresDela.has(Number(x.fiador_id)) : contratos.has(Number(x.contrato_id));
+      const dela = x.tipo === 'fiador' ? fiadoresDela.has(Number(x.fiador_id))
+        : (x.tipo === 'solidario' || x.tipo === 'representante') ? papelDela(x)
+        : contratos.has(Number(x.contrato_id));
       if (dela) destinos.push({ comunicado_id: com.id, chave: x.chave });
     }
   }

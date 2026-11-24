@@ -11,7 +11,7 @@ import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { confirmarAvisos, conferirAvulsa, conferirBoleto, conferirContrato, conferirIptu, conferirLeitura, conferirPessoa, conferirRenovacao, conferirRessarcimento, conferirSeguro, dataNoFuturo } from './avisos.js';
 import { CAMPOS_GARANTIA_HERDADA, CAMPOS_VALORES_HERDADOS, ENDERECO_DO_IMOVEL, enderecoInquilino } from './campos.js';
-import { ACEITA_DOCUMENTOS, arquivoSumiu, botao, buscar, d, encerrarLinksDaFicha, etiqueta, extensao, guardarGuiasSoltas, levarDocumentosDaFicha, memoria, naoEncontrado, nomePastaContrato, nomePastaFicha, opera, PASTA_FICHAS, ordenar, pastaDoEscopo, pastaPaiContrato, renomearNoDisco, salvarAssinado, semAcentoArquivo, trazerHeranca, trazerHerancaAssinada, cienciaDaTroca, registrarCiencia } from './comum.js';
+import { ACEITA_DOCUMENTOS, arquivoSumiu, botao, buscar, d, encerrarLinksDaFicha, etiqueta, extensao, guardarGuiasSoltas, levarDocumentosDaFicha, memoria, naoEncontrado, nomePastaContrato, nomePastaFicha, opera, PASTA_FICHAS, pastaFichaLivre, ordenar, pastaDoEscopo, pastaPaiContrato, renomearNoDisco, salvarAssinado, semAcentoArquivo, trazerHeranca, trazerHerancaAssinada, cienciaDaTroca, registrarCiencia } from './comum.js';
 import { confirmarValoresIniciais, inicialBonificado } from './contrato.js';
 
 // --------------------------------------------------------------------------
@@ -605,6 +605,9 @@ export const CADASTROS = {
       // decisão: data (em branco: hoje) e quem decidiu; voltou para "Em análise": sem decisão
       if (dados.situacao === 'Em análise') { dados.decisao_data = null; dados.decisao_por = null; } else {
         dados.decisao_data = dados.decisao_data || hoje;
+        // mudou a decisão (ex.: aprovada em 10/10, reprovada hoje) e a data ficou a da decisão anterior, que veio no formulário:
+        // é a de hoje (a data antiga contava os meses para apagar os documentos a partir da aprovação)
+        if (r && r.situacao !== dados.situacao && r.decisao_data && dados.decisao_data === r.decisao_data) dados.decisao_data = hoje;
         dados.decisao_por = r && r.situacao === dados.situacao && r.decisao_por ? r.decisao_por : login();
         if (dados.decisao_data > hoje) erros.decisao_data = 'A decisão não pode ser numa data futura';
         else if (dados.data_recebida && dados.decisao_data < dados.data_recebida) erros.decisao_data = `A decisão não pode ser antes de a ficha chegar (${dataBr(dados.data_recebida)})`;
@@ -649,7 +652,7 @@ export const CADASTROS = {
       if (dados.desconto_pontualidade_percentual !== null && (dados.desconto_pontualidade_percentual < 0 || dados.desconto_pontualidade_percentual > 100)) erros.desconto_pontualidade_percentual = 'Informe um percentual entre 0 e 100';
       if (dados.dia_vencimento !== null && (dados.dia_vencimento < 1 || dados.dia_vencimento > 31)) erros.dia_vencimento = 'Informe um dia entre 1 e 31';
       // a pasta é escolhida ao criar e não muda (o nome pode ser corrigido depois)
-      dados.pasta = r ? (r.pasta || nomePastaFicha(r)) : nomePastaFicha(dados);
+      dados.pasta = r ? (r.pasta || nomePastaFicha(r)) : pastaFichaLivre(dados);
       conferirComprovantes(COMPROVANTES_FICHA, dados, r, form);
     },
     async ajustarAsync(dados, erros, r, form) {
