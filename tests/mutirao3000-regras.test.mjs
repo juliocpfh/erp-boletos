@@ -270,7 +270,8 @@ test('[segurança 11] ficha reprovada: no prazo, os dados pessoais saem da ficha
   const f = R.inserir(d, 'fichas', { inquilino_nome: 'Ana Exemplo', inquilino_cpf: '529.982.247-25', inquilino_rg: '12.345.678-9', inquilino_email: 'ana@exemplo.com',
     renda_valor: 500000, endereco: 'Rua B, 2', fiador1_nome: 'Beto Exemplo', fiador1_cpf: '529.982.247-25', reserva_valor: 50000, reserva_data: '2026-07-01',
     comprovante_reserva: 'reserva.pdf', aluguel_inicial: 200000 }, 'j');
-  R.atualizar(d, 'fichas', f.id, { situacao: 'Reprovada', decisao_data: '2026-07-10', decisao_motivo: 'renda insuficiente', inquilino_telefone: '41 99999-0000' }, 'j', 'Reprovada');
+  // reserva devolvida em 15/07 (com a reserva por devolver os dados esperam: decisão do dono de 24/11/2026, FIC-03)
+  R.atualizar(d, 'fichas', f.id, { situacao: 'Reprovada', decisao_data: '2026-07-10', decisao_motivo: 'renda insuficiente', inquilino_telefone: '41 99999-0000', devolucao_data: '2026-07-15', devolucao_valor: 50000 }, 'j', 'Reprovada');
   d.envios_email = [{ id: 1, ficha_id: f.id, para: 'ana@exemplo.com', assunto: 'Ficha' }];
   R.registrar(d, 'j', 'Inclusão', 'envios_email', 1, 'E-mail "Ficha" enviado para ana@exemplo.com', { para: 'ana@exemplo.com' });
   assert.equal(R.fichasComDadosVencidos(d, '2026-11-17').length, 0, 'os documentos saem antes');

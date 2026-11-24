@@ -131,15 +131,25 @@ test('CON-05: acordo sem parcela paga nem descontada continua podendo ser desfei
   assert.equal(R.buscar(d, 'cobrancas', jul.id).situacao, 'Em aberto');
 });
 
-test('CON-07: termo do novo valor que não valeu avisa que a data de término continua', () => {
+test('CON-07: termo do novo valor que não valeu: a data de término volta à de antes (decisão do dono de 24/11)', () => {
   const { d, c } = base({ garantia_tipo: 'Fiador', caucao_valor: null });
   const ren = R.registrarRenovacao(d, c.id, { tipo: 'Renovado com nova data de término', data: '2027-07-10', nova_vigencia_fim: '2030-01-10', novo_valor: 200000, vale_desde: '2027-08' }, 'j');
   const ad = d.aditivos.find((a) => a.renovacao_id === ren.id);
   R.atualizar(d, 'aditivos', ad.id, { arquivo: 'x.pdf', assinado_em: '2026-11-24' }, 'j');
   const msg = R.desfazerAditivo(d, ad.id, 'j', { excluirTermo: true });
   assert.match(msg, /O novo valor de R\$ 2\.000,00 saiu/);
+  assert.match(msg, /data de término do contrato volta a 10\/07\/2027/);
+  assert.equal(R.buscar(d, 'contratos', c.id).vigencia_fim, '2027-07-10');
+});
+
+test('CON-07: renovação antiga (sem o prazo de antes guardado): a data fica e a tela avisa para conferir', () => {
+  const { d, c } = base({ garantia_tipo: 'Fiador', caucao_valor: null });
+  const ren = R.registrarRenovacao(d, c.id, { tipo: 'Renovado com nova data de término', data: '2027-07-10', nova_vigencia_fim: '2030-01-10', novo_valor: 200000, vale_desde: '2027-08' }, 'j');
+  for (const k of ['vigencia_fim_anterior', 'prazo_meses_anterior', 'prazo_tipo_anterior']) delete ren[k];
+  const ad = d.aditivos.find((a) => a.renovacao_id === ren.id);
+  R.atualizar(d, 'aditivos', ad.id, { arquivo: 'x.pdf', assinado_em: '2026-11-24' }, 'j');
+  const msg = R.desfazerAditivo(d, ad.id, 'j', { excluirTermo: true });
   assert.match(msg, /data de término do contrato continua 10\/01\/2030.*Editar contrato/);
-  // o que se desfaz não mudou (a data continua: decisão do dono)
   assert.equal(R.buscar(d, 'contratos', c.id).vigencia_fim, '2030-01-10');
 });
 
