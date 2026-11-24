@@ -243,7 +243,7 @@ Este resumo explica, em palavras simples, os pontos que mais geram dúvida. Ele 
 
 **1. Qual é o valor do aluguel e quando vence?**
 
-[se bonificacao]O aluguel é de {aluguel_cheio}. Pagando até o vencimento, há bonificação de {bonificacao_percentual} e o valor fica em {aluguel_bonificado}.[senão]O aluguel é de {aluguel_cheio}.[fim] Ele vence todo dia {dia_vencimento} de cada mês e é pago por boleto bancário, enviado por e-mail.[se iptu_inquilino] O IPTU vem no mesmo boleto[se seguro_inquilino], assim como o seguro contra incêndio[fim].[fim] Se o vencimento cair em sábado, domingo ou feriado, o pagamento pode ser feito no dia útil seguinte, sem multa.
+[se bonificacao]O aluguel é de {aluguel_cheio}. Pagando até o vencimento, há bonificação de {bonificacao_percentual} e o valor fica em {aluguel_bonificado}.[senão]O aluguel é de {aluguel_cheio}.[fim] Ele vence todo dia {dia_vencimento} de cada mês e é pago por boleto bancário, enviado por e-mail.[se iptu_inquilino] O IPTU vem no mesmo boleto[se seguro_inquilino], assim como o seguro contra incêndio[fim].[fim][se tarifa_boleto] O LOCATÁRIO também paga, junto com cada aluguel, a tarifa bancária de emissão do boleto, hoje de {tarifa_boleto}.[fim] Se o vencimento cair em sábado, domingo ou feriado, o pagamento pode ser feito no dia útil seguinte, sem multa.
 
 **2. O que acontece se eu pagar atrasado?**
 

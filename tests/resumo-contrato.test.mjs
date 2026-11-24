@@ -111,3 +111,12 @@ test('o resumo pode ser usado sozinho com os dados de qualquer contrato (ex.: no
   for (const campo of ['exemplo_atraso', 'exemplo_saida']) assert.deepEqual(K.camposDesconhecidosDoModelo(`{${campo}}`), []);
   assert.equal(K.dadosDoContrato(d, { ...c, aluguel_inicial: 0 }).campos.exemplo_atraso, '', 'sem aluguel, sem exemplo');
 });
+
+test('tarifa do boleto: o resumo fala dela só quando o contrato tem a tarifa (condição tarifa_boleto)', () => {
+  const { d, c } = banco();
+  const dados = K.dadosDoContrato(d, c);
+  assert.doesNotMatch(resumoDe(K.montarContrato(MODELOS_PADRAO[0].texto, dados)), /tarifa bancária/);
+  dados.condicoes.tarifa_boleto = true;
+  dados.campos.tarifa_boleto = 'R$ 3,50 (três reais e cinquenta centavos)';
+  assert.match(resumoDe(K.montarContrato(MODELOS_PADRAO[0].texto, dados)), /também paga, junto com cada aluguel, a tarifa bancária de emissão do boleto, hoje de R\$ 3,50 \(três reais e cinquenta centavos\)\./);
+});
