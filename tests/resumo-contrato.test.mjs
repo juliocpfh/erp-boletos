@@ -134,3 +134,23 @@ test('tarifa do boleto: o resumo fala sempre dela (como a cláusula), com o valo
   assert.equal(atualizarTextoModelo(gravado), atual);
   assert.equal(atualizarTextoModelo(atual), atual);
 });
+
+test('resumo gravado com a 1ª versão (pergunta dos animais, dia não útil sem "regra dos bancos") passa ao texto de hoje, uma vez', () => {
+  const ANIMAIS = '**10. Posso ter animais de estimação?**\n\nO contrato não proíbe. O LOCATÁRIO responde pelos danos que os animais causarem ao imóvel e deve respeitar as regras do condomínio, quando houver.\n\n';
+  for (const m of MODELOS_PADRAO.filter((x) => !x.tipo)) {
+    const atual = m.texto;
+    const i = atual.indexOf('**10. Qual é a garantia');
+    // como estava na 1ª versão do resumo (main de 24/11, PR #374)
+    const gravado = (atual.slice(0, i) + ANIMAIS + atual.slice(i).replace(/^\*\*(1[0-5])\./gm, (_, n) => `**${Number(n) + 1}.`))
+      .replace(' Pela regra dos bancos (não é uma cláusula deste contrato), o boleto que vence em sábado, domingo ou feriado pode ser pago no dia útil seguinte, sem multa.',
+        ' Se o vencimento cair em sábado, domingo ou feriado, o pagamento pode ser feito no dia útil seguinte, sem multa.');
+    assert.match(gravado, /\*\*16\. Este resumo substitui o contrato\?\*\*/);
+    const novo = atualizarTextoModelo(gravado);
+    assert.equal(novo, atual, m.nome);
+    assert.equal(atualizarTextoModelo(novo), novo, 'não troca duas vezes');
+    assert.equal(atualizarTextoModelo(gravado.replace(/\n/g, '\r\n')), atual, 'quebra de linha do Windows');
+    // pergunta dos animais editada à mão: a numeração fica como está (não fica pela metade)
+    const editado = gravado.replace('quando houver.\n\n**11.', 'quando houver (editado).\n\n**11.');
+    assert.equal((atualizarTextoModelo(editado).match(/^\*\*\d+\./gm) || []).length, 16);
+  }
+});

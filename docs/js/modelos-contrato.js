@@ -317,6 +317,20 @@ Por e-mail ou por carta com aviso de recebimento, que valem como entregues. Por 
 
 Não. Ele só ajuda a entender o contrato. Em caso de dúvida ou de diferença, valem as cláusulas do contrato e a Lei nº 8.245/91 (Lei do Inquilinato).`;
 
+/**
+ * Resumo gravado com a primeira versão (#374, 24/11): tinha a pergunta 10 dos animais (as seguintes iam até a 16) e o dia não útil
+ * sem dizer que é regra dos bancos. Os modelos gravados trocam pelo texto de hoje (ATUALIZACOES_MODELO); a troca é do trecho inteiro,
+ * da pergunta 10 até o fim, para a numeração nunca ficar pela metade (trecho editado à mão fica como está).
+ */
+const DIA_NAO_UTIL_ANTIGO = ' Se o vencimento cair em sábado, domingo ou feriado, o pagamento pode ser feito no dia útil seguinte, sem multa.';
+const DIA_NAO_UTIL = ' Pela regra dos bancos (não é uma cláusula deste contrato), o boleto que vence em sábado, domingo ou feriado pode ser pago no dia útil seguinte, sem multa.';
+const RESUMO_FIM = RESUMO_CONTRATO.slice(RESUMO_CONTRATO.indexOf('**10. Qual é a garantia do contrato'));
+const RESUMO_FIM_COM_ANIMAIS = `**10. Posso ter animais de estimação?**
+
+O contrato não proíbe. O LOCATÁRIO responde pelos danos que os animais causarem ao imóvel e deve respeitar as regras do condomínio, quando houver.
+
+${RESUMO_FIM.replace(/^\*\*(1[0-5])\./gm, (_, n) => `**${Number(n) + 1}.`)}`;
+
 const FINAIS = (extra) => `## DISPOSIÇÕES FINAIS
 
 ${REPRESENTACAO}
@@ -625,6 +639,9 @@ export const ATUALIZACOES_MODELO = [
   [FECHO_CONTRATO, `${FECHO_CONTRATO}\n\n${RESUMO_CONTRATO}`, 'RESUMO DO CONTRATO EM PERGUNTAS E RESPOSTAS'],
   // resumo gravado antes da tarifa ir sempre ao contrato (24/11): a frase da tarifa passa a sair sempre
   [TARIFA_RESUMO_ANTIGA, TARIFA_RESUMO],
+  // resumo sem a pergunta dos animais e com o dia não útil como regra dos bancos (decisões do dono, 24/11)
+  [`${DIA_NAO_UTIL_ANTIGO}\n\n**2. O que acontece se eu pagar atrasado?**`, `${DIA_NAO_UTIL}\n\n**2. O que acontece se eu pagar atrasado?**`],
+  [RESUMO_FIM_COM_ANIMAIS, RESUMO_FIM],
 ];
 
 /** Aplica ATUALIZACOES_MODELO num texto de contrato (o 3º item, quando há, é o sinal de que a troca já foi feita). */
