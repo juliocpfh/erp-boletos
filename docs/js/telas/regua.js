@@ -62,6 +62,8 @@ export async function telaRegua() {
   const envio = ligada && gmail;
   const dias = R.regra('regua_email_dias') || [];
   const tolerancia = R.regra('tolerancia_boleto_dias'); // o mesmo número do início da cobrança (G.inicioDaCobranca)
+  // contratos numa regra especial com outro prazo do banco (G.inicioDaCobranca usa o de cada contrato): o texto diz quais
+  const tolEspeciais = R.especiaisDiferentes(db, 'tolerancia_boleto_dias').map((x) => ` (na regra especial "${esc(x.nome)}": ${x.valor})`).join('');
   // contratos numa regra especial com outros dias (a fila já os usa, filaRegua): o texto diz quais
   const especiais = R.especiaisDiferentes(db, 'regua_email_dias').map((x) => `${esc(x.nome)}: ${(x.valor || []).length ? esc(x.valor.map(G.nomeDaEtapa).join('; ')) : 'nenhum dia'}`);
   const estado = !ligada ? 'O envio direto está <b>desligado</b> (Regras do sistema → "Régua de cobrança: botão Autorizar e enviar"): abra cada e-mail no Gmail ou copie o texto.'
@@ -71,7 +73,7 @@ export async function telaRegua() {
   return `<h1>E-mails da régua</h1><div class="abas"><a href="#/cobrancas">← Boletos</a></div>
     <div class="cabecalho"><h2>E-mails da régua de cobrança: aguardando sua autorização</h2>${link('#/modelos-email', 'Textos dos e-mails')}</div>
     <p class="suave">O sistema prepara os e-mails ${dias.length ? `de cada boleto em aberto: ${esc(dias.map(G.nomeDaEtapa).join('; '))}` : `(nenhum dia escolhido nas Regras do sistema: nada é preparado${especiais.length ? ' para os contratos que as seguem' : ''})`}.${especiais.length ? ` Contratos com regra especial: ${especiais.join(' · ')}.` : ''} <b>Nada é enviado sozinho.</b>
-      Boleto pago, em acordo ou de contrato encerrado sai da lista. A cobrança de atraso só aparece passados ${tolerancia} dia(s) úteis do último dia para pagar (o prazo que o banco leva para creditar o boleto: regra "Extrato: entrada casa com o boleto até quantos dias úteis depois do último dia para pagar"). E-mail enviado ou marcado "Não enviar" não volta.${admin() ? '' : ' Só o administrador autoriza.'}</p>
+      Boleto pago, em acordo ou de contrato encerrado sai da lista. A cobrança de atraso só aparece passados ${tolerancia} dia(s) úteis${tolEspeciais} do último dia para pagar (o prazo que o banco leva para creditar o boleto: regra "Extrato: entrada casa com o boleto até quantos dias úteis depois do último dia para pagar"). E-mail enviado ou marcado "Não enviar" não volta.${admin() ? '' : ' Só o administrador autoriza.'}</p>
     <div class="alerta ${envio ? 'info' : 'aviso'}">${estado}</div>
     <div class="cartao rolagem regua"><table>
       <tr><th>${admin() && envio && fila.some((x) => x.para) ? '<input type="checkbox" data-marcar-todas="regua" title="Marcar todos">' : ''}</th><th>Imóvel / inquilino</th><th>Boleto</th><th>Etapa</th><th class="n">Valor hoje</th><th>Para</th><th>Prévia do e-mail</th><th></th></tr>
