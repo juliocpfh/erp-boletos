@@ -161,7 +161,8 @@ export const RESSARCIMENTO = [
   campo('competencia_condominio', 'Mês do boleto do condomínio', 'mes', { obrig: true }),
   campo('descricao', 'Taxa', 'texto', { obrig: true, sugestoes: [], ajuda: 'Escreva o nome da taxa: nas próximas vezes ele aparece para escolher, e dá para mudar' }),
   campo('valor', 'Valor pago pelo inquilino', 'dinheiro', { obrig: true }),
-  campo('data_pagamento', 'Data em que o inquilino pagou o condomínio', 'data', { obrig: true }),
+  // em branco: lançado antes do pagamento, "falta o comprovante"; o desconto só entra no boleto com a data (decisão do dono, 24/11/2026)
+  campo('data_pagamento', 'Data em que o inquilino pagou o condomínio', 'data', { ajuda: 'Em branco se o inquilino ainda não pagou ou não mandou o comprovante: o ressarcimento fica lançado como "falta o comprovante" e o desconto só entra no boleto do aluguel quando a data for posta' }),
   // o mês é o do aluguel (competência), como na lista de Boletos, e não o do vencimento (conferência de 24/11/2026)
   campo('competencia_abatimento', 'Abater no boleto do aluguel de (mês do aluguel)', 'mes', { ajuda: 'O mês do aluguel, como aparece em Boletos (ex.: aluguel de 11/2026, que vence em 12/2026 quando o aluguel vence no mês seguinte). Em branco: o boleto que vence no mês seguinte ao pagamento do condomínio' }),
 ];
@@ -338,9 +339,11 @@ export const CONTRATO = [
   campo('cobranca_mes_seguinte', 'O aluguel do mês vence no mês seguinte', 'simnao', { padrao: true, ajuda: 'Marcado: aluguel de julho vence em agosto' }),
   campo('bonificacao', 'Tem bonificação (desconto) por pontualidade', 'simnao', { padrao: true, colado: true }),
   QUEBRA,
-  campo('taxa_boleto', 'Tarifa de emissão do boleto (R$)', 'dinheiro', { ajuda: 'Entra no boleto e na descrição do boleto' }),
+  // decisão do dono de 24/11/2026: a tarifa é sempre cobrada; em branco vale a de Regras do sistema (tarifa_padrao)
+  campo('taxa_boleto', 'Tarifa de emissão do boleto (R$)', 'dinheiro', { ajuda: 'Em branco: a tarifa padrão de Sistema → Regras do sistema. Um valor aqui vale só para este contrato. Entra no boleto e na descrição do boleto' }),
   campo('multa_percentual', 'Multa por atraso (%)', 'pct', { padrao: 2 }),
   campo('juros_mensal_percentual', 'Juros por atraso (% ao mês)', 'pct', { padrao: 1 }),
+  campo('nao_cobrar_tarifa', 'Não cobrar tarifa do boleto', 'simnao', { ajuda: 'Marcado: este contrato não paga tarifa, nem a padrão de Regras do sistema' }),
   secao('Garantia'),
   campo('garantia_tipo', 'Tipo de garantia', 'opcao', { obrig: true, opcoes: GARANTIAS, ajuda: '"Fiador + depósito" são duas garantias: a Lei 8.245/91 permite só uma por contrato (art. 37, parágrafo único)' }),
   campo('caucao_meses', 'Caução equivale a quantos aluguéis', 'inteiro', { ...quando('garantia_tipo', 'Caução'), ajuda: 'O valor da caução é calculado: aluguéis × aluguel bonificado (parte "Valores e boleto"). Caução em dinheiro: no máximo 3 aluguéis (Lei 8.245/91, art. 38, §2º)' }),

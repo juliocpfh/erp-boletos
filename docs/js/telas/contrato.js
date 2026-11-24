@@ -9,6 +9,7 @@ import { caixaProvasContrato } from './cobranca-provas.js';
 import { janela, podeUsuario } from '../app.js';
 import * as C from '../calculos.js';
 import * as K from '../contratos.js';
+import * as DL from '../documentos-locacao.js';
 import { compBr, dataBr, pct, reais } from '../calculos.js';
 import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
@@ -52,6 +53,7 @@ export const inicialBonificado = (c, inicial = c.aluguel_inicial, pctB = R.perce
 export function oQueContinuaDoAditivo(a, c) {
   if (a.tipo === 'Vencimento' && a.dia_novo) return ` Atenção: o dia do vencimento continua ${a.dia_novo} no cadastro e nos boletos em aberto. Se o termo foi anexado por engano, corrija o dia em "Editar" (o anterior era ${a.dia_anterior || '—'}).`;
   if (a.tipo === K.TIPO_ADITIVO_VALOR) return ' Atenção: o novo valor do aluguel continua valendo nos boletos; o termo assinado terá de ser anexado de novo.';
+  if (DL.ehProrrogacao(a) && a.renovacao_id) return ` Atenção: a data de término do contrato continua ${dataBr(a.nova_vigencia_fim)} (a da prorrogação).`;
   if ((!a.tipo || a.tipo === K.TIPO_ADITIVO_TROCA) && c && c.contrato_anterior_id) return c.heranca_transferida ? ' Atenção: a troca de titular já feita continua valendo; o termo assinado terá de ser anexado de novo (o Painel volta a pedir).' : ' Atenção: sem o termo assinado, a troca de titular volta a esperar por ele.';
   return '';
 }
@@ -489,13 +491,19 @@ function caixaRessarcimentos(c) {
   const aConferir = R.condominioAConferir(c);
   return `<div class="cartao" id="ressarcimentos"><div class="cabecalho"><h2>Condomínio: taxas do proprietário (ressarcimento)</h2>
       ${opera() ? link(`#/novo/ressarcimentos?contrato=${c.id}`, 'Lançar ressarcimento') : ''}</div>
-    <p class="suave">O inquilino paga o condomínio. Quando o boleto do condomínio trouxer taxas que são do proprietário (fundo de obras, fundo de reserva, chamadas extras de obra…), lance aqui: o valor é abatido no boleto do aluguel do mês seguinte ao pagamento${R.regra('ressarcimento_na_nf', c) ? ' e também sai do valor da NF' : ' e conta como gasto nos Resultados (a NF sai com o aluguel cheio)'}.</p>
+    <p class="suave">O inquilino paga o condomínio. Quando o boleto do condomínio trouxer taxas que são do proprietário (fundo de obras, fundo de reserva, chamadas extras de obra…), lance aqui (pode ser antes do pagamento: sem a data, fica "falta o comprovante" e o desconto só entra no boleto quando a data for posta): o valor é abatido no boleto do aluguel do mês seguinte ao pagamento${R.regra('ressarcimento_na_nf', c) ? ' e também sai do valor da NF' : ' e conta como gasto nos Resultados (a NF sai com o aluguel cheio)'}.</p>
     ${aConferir ? `<div class="alerta info">Condomínio de ${compBr(aConferir)} ainda não conferido. ${opera() ? botao('condominioConferido', `Conferido: sem taxa do proprietário em ${compBr(aConferir)}`, { id: c.id, mes: aConferir }, 'secundario pequeno') : ''}</div>`
-    : R.inquilinoPagaCondominio(c) ? `<p class="suave">Conferido até ${c.condominio_conferido_ate ? compBr(c.condominio_conferido_ate) : '-'}.</p>` : ''}
+    : R.inquilinoPagaCondominio(c) ? `<p class="suave">Conferido até ${c.condominio_conferido_ate ? compBr(c.condominio_conferido_ate) : '-'}.${(() => {
+      // o boleto do condomínio do mês corrente chega antes do fim do mês (ex.: o de 11/2026 vence em 05/12 e chega em 24/11):
+      // dá para conferir já, sem esperar o alerta do mês seguinte
+      const mesHoje = C.competenciaDe(C.hojeIso());
+      const atual = R.condominioAConferir(c, C.hojeIso(), { ate: mesHoje });
+      return atual && opera() ? ` Se o boleto do condomínio de ${compBr(atual)} já chegou: ${link(`#/novo/ressarcimentos?contrato=${c.id}`, 'lance a taxa do proprietário', '')} ou ${botao('condominioConferido', `Conferido: sem taxa do proprietário em ${compBr(atual)}`, { id: c.id, mes: atual }, 'secundario pequeno')}` : '';
+    })()}</p>` : ''}
     ${lista.length ? `<div class="rolagem"><table><tr><th>Condomínio de</th><th>Taxa</th><th class="n">Valor</th><th>Pago pelo inquilino em</th><th>Abatido no boleto (referência e vencimento)</th><th></th></tr>
-      ${lista.map((x) => { const cb = R.boletoDoMes(d(), c.id, x.competencia_abatimento); return `<tr><td>${compBr(x.competencia_condominio)}</td><td>${esc(x.descricao)}</td><td class="n">${reais(x.valor)}</td><td>${dataBr(x.data_pagamento)}</td>
-        <td>${compBr(x.competencia_abatimento)} <span class="suave">(vence ${dataBr(cb ? cb.vencimento : R.vencimentoDoContrato(d(), c, x.competencia_abatimento))})</span> ${cb ? (cb.data_pagamento ? etiqueta('abatido', 'ok') : R.emAcordo(cb) ? etiqueta('em acordo: não abatido', 'aviso') : etiqueta('no boleto em aberto', 'info')) : etiquetaSemBoleto(c, x)}</td>
-        <td class="n nw">${opera() && !(cb && cb.data_pagamento) ? `${link(`#/editar/ressarcimentos/${x.id}`, 'Editar')} ${botao('excluir', '×', { tabela: 'ressarcimentos', id: x.id }, 'x-excluir', 'Excluir este ressarcimento?')}` : ''}</td></tr>`; }).join('')}</table></div>` : ''}</div>`;
+      ${lista.map((x) => { const cb = R.boletoDoMes(d(), c.id, x.competencia_abatimento); return `<tr><td>${compBr(x.competencia_condominio)}</td><td>${esc(x.descricao)}</td><td class="n">${reais(x.valor)}</td><td>${x.data_pagamento ? dataBr(x.data_pagamento) : etiqueta('falta o comprovante', 'aviso')}</td>
+        <td>${compBr(x.competencia_abatimento)} <span class="suave">(vence ${dataBr(cb ? cb.vencimento : R.vencimentoDoContrato(d(), c, x.competencia_abatimento))})</span> ${!R.ressarcimentoConfirmado(x) ? etiqueta(cb && (cb.data_pagamento || R.emAcordo(cb)) ? 'saiu sem o desconto' : 'entra com a data do pagamento', 'aviso') : cb ? (cb.data_pagamento ? etiqueta('abatido', 'ok') : R.emAcordo(cb) ? etiqueta('em acordo: não abatido', 'aviso') : etiqueta('no boleto em aberto', 'info')) : etiquetaSemBoleto(c, x)}</td>
+        <td class="n nw">${opera() && !(cb && cb.data_pagamento && R.ressarcimentoConfirmado(x)) ? `${link(`#/editar/ressarcimentos/${x.id}`, 'Editar')} ${botao('excluir', '×', { tabela: 'ressarcimentos', id: x.id }, 'x-excluir', 'Excluir este ressarcimento?')}` : ''}</td></tr>`; }).join('')}</table></div>` : ''}</div>`;
 }
 
 function caixaSolicitacoes(c) {
@@ -767,7 +775,28 @@ function caixaDocumentos(c) {
     <p id="vistoria">${c.vistoria_link ? `<a class="botao secundario pequeno" href="${esc(c.vistoria_link)}" target="_blank" rel="noopener noreferrer">Abrir a pasta das fotos da vistoria</a> <span class="suave">${esc(c.vistoria_link)}</span>`
     : '<span class="suave">Link das fotos da vistoria: use "Editar" e cole o link da pasta na nuvem (ou informe direto na vistoria).</span>'}</p>
     <p class="suave">Para marcar como assinado, escolha a data, anexe o arquivo assinado (PDF ou foto) e clique em "Marcar". Se ainda falta a assinatura de alguém, anexe o arquivo e clique em "Falta assinatura": fica um alerta até chegar o arquivo completo.</p>
-    ${caixaAditivos(c)}</div>`;
+    ${caixaAditivos(c)}
+    ${caixaOutrosDocumentos(c)}</div>`;
+}
+
+/**
+ * Outros documentos da locação gerados por modelo (decisão do dono de 24/11/2026, DOC-07): distrato, avisos, autorização de obra,
+ * declaração e aviso ao fiador, com a data, o que foi digitado e a via assinada (a prorrogação e a troca de garantia são termos
+ * aditivos: ficam na caixa acima). Mostra o histórico: todos os gerados, do mais recente ao mais antigo.
+ */
+function caixaOutrosDocumentos(c) {
+  const lista = DL.documentosDo(d(), c.id);
+  const abrir = (x) => `<a href="#" data-acao="abrirArquivo" data-escopo="aditivos" data-id="${x.contrato_id}" data-nome="${esc(x.arquivo)}">📎 ${esc(x.arquivo)}</a>`;
+  const assinatura = (x) => (x.arquivo ? `${etiqueta(`assinado em ${dataBr(x.assinado_em)}`, 'ok')}<br>${abrir(x)}${xAnexo('tirarArquivoDocumento', { id: x.id })}`
+    : `${etiqueta('aguardando a via assinada', 'aviso')}${opera() ? `<form data-form="anexarDocumentoLocacao" class="acoes" style="margin-top:4px"><input type="hidden" name="id" value="${x.id}">
+      <input type="date" name="data" value="${C.hojeIso()}" style="width:auto" title="Data da assinatura">${F.atalhosData()}
+      <label class="botao secundario pequeno enviar" title="Via assinada (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}" data-arquivo-doc></label>
+      <button class="pequeno">Anexar assinado</button></form>` : ''}`);
+  return `<div class="cabecalho"><h3 id="outros-documentos">Outros documentos da locação</h3>${opera() ? link(`#/documento-gerar?contrato=${c.id}`, 'Gerar documento', 'botao secundario') : ''}</div>
+    ${lista.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Documento</th><th>Via assinada</th><th></th></tr>${lista.map((x) => `<tr><td class="nw">${dataBr(x.data)}</td>
+      <td><b>${esc(x.nome)}</b><br><span class="suave">${esc(x.assunto || '')}</span></td><td>${assinatura(x)}</td>
+      <td class="n nw">${link(`#/imprimir/documento?id=${x.id}`, 'Ver / PDF')} ${opera() ? botao('excluir', '×', { tabela: 'documentos_locacao', id: x.id }, 'x-excluir', `Excluir o registro do documento de ${dataBr(x.data)}${x.arquivo ? ' e a via assinada' : ''}?`) : ''}</td></tr>`).join('')}</table></div>`
+    : '<p class="suave">Nenhum documento gerado. Distrato, aviso de desocupação, autorização de obra, declaração de pagamentos e aviso ao fiador ficam registrados aqui quando gerados em "Gerar documento".</p>'}`;
 }
 
 /** Termos aditivos: depois do contrato (mudança de vencimento, garantia, valor etc.), cada um com o arquivo assinado. */
@@ -790,8 +819,8 @@ function caixaAditivos(c) {
     ${faltaTroca ?`<div class="alerta perigo">Obrigatório: termo aditivo da troca de titular (${esc(ant.inquilino_nome)} → ${esc(c.inquilino_nome)}). ${aguardando.some((a) => a.tipo === K.TIPO_ADITIVO_TROCA) ? 'Colha as assinaturas e anexe o arquivo assinado.' : `Gere o termo em ${opera() ? link(`#/aditivo/novo?contrato=${c.id}&tipo=troca`, '"Gerar termo aditivo"', '') : '"Gerar termo aditivo"'} ou registre o arquivo já assinado.`}</div>` : ''}
     ${aguardando.length ? `<div class="alerta aviso"><b>Aguardando assinatura:</b> imprima ou baixe o PDF, colha as assinaturas e anexe o arquivo assinado.
       <div class="rolagem"><table>${aguardando.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td>
-      <td class="n nw">${a.tipo === K.TIPO_ADITIVO_VALOR ? `${botaoEmail('novo_valor', { contrato: c.id, aditivo: a.id }, '✉ E-mail: termo para assinar')} ` : ''}${ver(a)} ${opera() ? `${a.texto && a.tipo !== K.TIPO_ADITIVO_VALOR ? link(`#/aditivo/${a.id}`, 'Editar') : ''} ${botao('excluir', '×', { tabela: 'aditivos', id: a.id }, 'x-excluir', `Excluir o termo aditivo de ${dataBr(a.data)} (ainda não assinado)?`)}
-        ${a.tipo === 'Troca de titular' ? '' : botao('aditivoPerdido', 'Perdido', { id: a.id }, 'perigo pequeno', `Registrar o termo aditivo de ${dataBr(a.data)} como perdido (foi assinado, mas o papel se perdeu)? Passa a valer como assinado, sem o arquivo${a.dia_novo ? `: o vencimento muda para o dia ${a.dia_novo} a partir de ${dataBr(a.primeiro_vencimento)}` : ''}.${adm ? '' : ` O administrador vai analisar${a.dia_novo ? ' (a troca do dia só vale depois da confirmação)' : ''}.`}`)}` : ''}
+      <td class="n nw">${a.tipo === K.TIPO_ADITIVO_VALOR ? `${botaoEmail('novo_valor', { contrato: c.id, aditivo: a.id }, '✉ E-mail: termo para assinar')} ` : ''}${ver(a)} ${opera() ? `${a.texto && a.tipo !== K.TIPO_ADITIVO_VALOR ? link(a.documento ? `#/documento-gerar?modelo=${a.modelo_doc}&contrato=${c.id}` : `#/aditivo/${a.id}`, 'Editar') : ''} ${botao('excluir', '×', { tabela: 'aditivos', id: a.id }, 'x-excluir', `Excluir o termo aditivo de ${dataBr(a.data)} (ainda não assinado)?`)}
+        ${a.tipo === 'Troca de titular' || DL.ehProrrogacao(a) ? '' : botao('aditivoPerdido', 'Perdido', { id: a.id }, 'perigo pequeno', `Registrar o termo aditivo de ${dataBr(a.data)} como perdido (foi assinado, mas o papel se perdeu)? Passa a valer como assinado, sem o arquivo${a.dia_novo ? `: o vencimento muda para o dia ${a.dia_novo} a partir de ${dataBr(a.primeiro_vencimento)}` : ''}.${adm ? '' : ` O administrador vai analisar${a.dia_novo ? ' (a troca do dia só vale depois da confirmação)' : ''}.`}`)}` : ''}
       ${opera() ? `<form data-form="assinarAditivo" class="acoes" style="justify-content:flex-end;margin-top:4px"><input type="hidden" name="id" value="${a.id}">
         <input type="date" name="data" value="${C.hojeIso()}" style="width:auto" title="Data da assinatura">${F.atalhosData()}
         <label class="botao secundario pequeno enviar" title="Termo aditivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}" data-arquivo-doc></label>
@@ -904,7 +933,7 @@ export function telaContrato(c) {
       ${item('Contrato', `${dataBr(c.data_entrada || c.vigencia_inicio)} a ${c.prazo_tipo === 'Indeterminado' ? 'prazo indeterminado' : `${dataBr(c.vigencia_fim)}${R.prazoDoContrato(d(), c) ? ` (${R.prazoDoContrato(d(), c)} meses)` : ''}`}`)}
       ${item('Aluguel inicial (histórico)', reais(c.aluguel_inicial))}${item('Aluguel atual (cheio)', `<span class="maior">${reais(aluguel)}</span>`)}
       ${item('Bonificação de pontualidade', c.bonificacao === false ? 'não tem' : `${pct(pctBonif)} = ${reais(desconto)}`)}${item('Aluguel com bonificação', reais(aluguel - desconto))}
-      ${item('Vencimento', `dia ${c.dia_vencimento} ${c.cobranca_mes_seguinte !== false ? 'do mês seguinte' : 'do próprio mês'}`)}${item('Taxa do boleto', reais(c.taxa_boleto))}
+      ${item('Vencimento', `dia ${c.dia_vencimento} ${c.cobranca_mes_seguinte !== false ? 'do mês seguinte' : 'do próprio mês'}`)}${item('Taxa do boleto', c.nao_cobrar_tarifa ? 'não cobra' : `${reais(R.tarifaDoContrato(c))}${R.usaTarifaPadrao(c) ? ' <span class="suave">(padrão de Regras do sistema)</span>' : ''}`)}
       ${item('Multa por atraso', pct(c.multa_percentual))}${item('Juros por atraso', `${pct(c.juros_mensal_percentual)} ao mês`)}
       ${item('NF', c.gerar_nf === false ? 'não emite (só controle do pagamento)' : 'emite')}
       ${car ? item('Carência', `${R.referenciaEVencimento(d(), c, car[0])}${car[0] !== car[1] ? `<br>até a ${R.referenciaEVencimento(d(), c, car[1]).replace(/^R/, 'r')}` : ''}<br>cobra: ${['iptu', 'seguro', 'taxa'].filter((k) => c[`carencia_cobrar_${k}`]).map((k) => ({ iptu: 'IPTU', seguro: 'seguro', taxa: 'tarifa' })[k]).join(', ') || 'nada'}`) : ''}</div>

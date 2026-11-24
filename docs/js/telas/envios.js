@@ -7,6 +7,7 @@ import * as BANCO from '../banco.js';
 import * as C from '../calculos.js';
 import { compBr, dataBr, pct, reais } from '../calculos.js';
 import * as K from '../contratos.js';
+import * as DL from '../documentos-locacao.js';
 import * as F from '../formularios.js';
 import * as R from '../regras.js';
 import * as Z from '../conciliacao.js';
@@ -20,7 +21,7 @@ import { FORMULARIOS_COMUNICACOES } from './comunicacoes.js';
 import { CADASTROS, nomeComprovante } from './cadastros.js';
 import { apagarRascunhoVistoria } from './campos.js';
 import { acertarNomesDosComprovantes, adiados, alterarApagandoAnexos, buscar, cienciaDaTroca, d, memoria, pastaDoEscopo, registrarCiencia, salvarAssinado, SO_ADMIN_NUMERACAO, trazerHerancaAssinada } from './comum.js';
-import { guardarCamposDoDocumento, modelosNoBanco, reduzirFoto } from './documentos.js';
+import { fimParaDocumento, guardarCamposDoDocumento, modeloDocumento, modelosNoBanco, reduzirFoto } from './documentos.js';
 import { TIPOS_DOCUMENTO } from '../modelos-documentos.js';
 
 const REGISTRO_EXCLUIDO = 'Este registro foi excluído por outra pessoa; nada foi salvo.';
@@ -386,13 +387,20 @@ export const FORMULARIOS = {
     const ciencia = a.tipo === K.TIPO_ADITIVO_TROCA ? await cienciaDaTroca(a.contrato_id) : {};
     if (!ciencia) return;
     const nome = await salvarAssinado('aditivos', a.contrato_id, arquivo, `termo aditivo ${f.data} ${a.assunto}`.slice(0, 80));
-    await alterar((db) => { R.assinarAditivo(db, a.id, { data: f.data, arquivo: nome }, login()); registrarCiencia(db, a, ciencia); });
+    let prazo = '';
+    await alterar((db) => {
+      R.assinarAditivo(db, a.id, { data: f.data, arquivo: nome }, login()); registrarCiencia(db, a, ciencia);
+      prazo = DL.aplicarProrrogacao(db, a.id, login()); // prorrogação do prazo (2026-11-24, DOC-07): muda a data de término
+    });
     await trazerHerancaAssinada(a.contrato_id);
-    aviso(a.dia_novo && a.primeiro_vencimento ? `Termo aditivo assinado e registrado. O vencimento passou ao dia ${a.dia_novo}: os boletos a partir de ${C.dataBr(a.primeiro_vencimento)} já saem no dia novo.` : 'Termo aditivo assinado e registrado.');
+    aviso(a.dia_novo && a.primeiro_vencimento ? `Termo aditivo assinado e registrado. O vencimento passou ao dia ${a.dia_novo}: os boletos a partir de ${C.dataBr(a.primeiro_vencimento)} já saem no dia novo.` : `Termo aditivo assinado e registrado. ${prazo}`.trim());
     await mostrar();
   },
 
-  /** Outros documentos (modelos-documentos.js): os campos digitados ficam só nesta aba, até o PDF ou o Word. */
+  /**
+   * Outros documentos (modelos-documentos.js): o documento gerado fica registrado no contrato com o tipo, a data e os campos
+   * digitados (decisão do dono de 24/11/2026, DOC-07); os termos aditivos (prorrogação, troca de garantia) em "Termos aditivos".
+   */
   async gerarDocumento(form) {
     const f = new FormData(form);
     const modelo = String(f.get('modelo'));
@@ -402,7 +410,29 @@ export const FORMULARIOS = {
     // valor no formato errado ou negativo: avisa antes (o negativo saía como "sem valor": no distrato, multa dispensada)
     for (const [k, v] of Object.entries(valores)) if (v && form.querySelector(`[name="${k}"][data-dinheiro]`) && C.centavos(v) < 0) throw new C.ErroUsuario(`Valor negativo: ${v}. Digite o valor sem o sinal de menos.`);
     guardarCamposDoDocumento(modelo, contrato, valores, String(f.get('data') || ''));
-    ir(`#/imprimir/documento?modelo=${modelo}&contrato=${contrato}`);
+    const m = modeloDocumento(modelo);
+    const c = buscar('contratos', contrato);
+    if (!m || !c) throw new C.ErroUsuario('Modelo ou inquilino não encontrado.');
+    const tipo = K.tipoDoModelo(m);
+    let reg = null;
+    await alterar((db) => { reg = DL.registrarDocumento(db, c.id, { tipo, modelo: m, valores, data: String(f.get('data') || ''), fim: fimParaDocumento(c) }, login()); });
+    aviso(DL.ehTermoAditivo(tipo) ? 'Termo aditivo registrado em "Termos aditivos", aguardando assinatura: imprima ou baixe o PDF, colha as assinaturas e anexe o assinado.'
+      : 'Documento registrado na página do inquilino ("Outros documentos da locação"): depois de assinado, anexe a via assinada lá.');
+    ir(reg.tabela === 'aditivos' ? `#/imprimir/aditivo?id=${reg.registro.id}` : `#/imprimir/documento?id=${reg.registro.id}`);
+  },
+
+  /** Via assinada de um outro documento da locação (2026-11-24, DOC-07): na pasta "Aditivos, correções e comunicação" do contrato. */
+  async anexarDocumentoLocacao(form) {
+    const f = Object.fromEntries(new FormData(form));
+    const arquivo = form.querySelector('[name=arquivo]').files[0];
+    const x = buscar('documentos_locacao', f.id);
+    if (!x) throw new C.ErroUsuario('Documento não encontrado.');
+    if (!C.dataValida(f.data)) throw new C.ErroUsuario('Informe a data da assinatura.');
+    if (!arquivo) throw new C.ErroUsuario('Anexe o arquivo assinado.');
+    const nome = await salvarAssinado('aditivos', x.contrato_id, arquivo, `${x.nome.replace(/\s*\(.*\)$/, '')} ${f.data}`.slice(0, 80));
+    await alterar((db) => DL.anexarDocumento(db, x.id, { data: f.data, arquivo: nome }, login()));
+    aviso('Via assinada anexada.');
+    await mostrar();
   },
 
   async escolherInquilinoDocumento(form) {

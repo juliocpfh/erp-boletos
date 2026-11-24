@@ -18,7 +18,7 @@ export const TABELAS = {
   devolucoes_garantia: 'Devolução da garantia (troca de titular ou de garantia)',
   renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'NF avulsa',
   reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino', notificacoes: 'Notificação ao inquilino', fichas: 'Ficha em análise', comunicados: 'Comunicado aos inquilinos',
-  indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', despesas: 'Conta paga por nós', ganhos_airbnb: 'Ganho do Airbnb', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', guias_impostos: 'Guia de imposto',
+  indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', documentos_locacao: 'Outro documento da locação (distrato, aviso, declaração etc.)', despesas: 'Conta paga por nós', ganhos_airbnb: 'Ganho do Airbnb', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', guias_impostos: 'Guia de imposto',
   modelos_email: 'Modelo de e-mail', envios_email: 'E-mail enviado', taxas_poupanca: 'Taxas da poupança do Banco Central (um mês)',
   regua_emails: 'E-mail da régua de cobrança (autorizado ou não)',
   cobranca_registros: 'Registro da cobrança (passo, despesa e prova)',
@@ -1739,6 +1739,30 @@ function seguroProporcionalNoMes(d, c, comp) {
   return (entradaNoMes && !c.contrato_anterior_id) || (saidaNoMes && !continuadoPor(d, c));
 }
 
+/**
+ * Tarifa do boleto cobrada no contrato (decisão do dono de 24/11/2026: sempre cobrada por padrão): o valor próprio do contrato;
+ * sem valor próprio, a regra `tarifa_padrao` (Regras do sistema, ou a regra especial do contrato); "Não cobrar tarifa do boleto"
+ * marcado, nada. Ex.: regra R$ 8,50, contrato em branco → R$ 8,50; contrato com R$ 3,50 → R$ 3,50; marcado → R$ 0,00.
+ */
+export function tarifaDoContrato(c) {
+  if (!c || c.nao_cobrar_tarifa) return 0;
+  if (c.taxa_boleto > 0) return c.taxa_boleto;
+  const padrao = CR.regra('tarifa_padrao', c);
+  return padrao > 0 ? padrao : 0;
+}
+/** O contrato segue a tarifa padrão (sem valor próprio e sem "Não cobrar"). */
+export const usaTarifaPadrao = (c) => !!c && !c.nao_cobrar_tarifa && !(c.taxa_boleto > 0);
+
+/**
+ * Tarifa padrão mudou: os boletos em aberto dos contratos que a seguem são refeitos. Pagos, emitidos no banco (ou com o PDF do
+ * banco anexado), em acordo e alterados à mão na tarifa não mudam. ``filtroContrato``: só os contratos dessa regra (regra especial).
+ * Devolve quantos boletos mudaram.
+ */
+export function recalcularTarifaPadrao(d, usuario, filtroContrato = () => true) {
+  const ids = new Set(d.contratos.filter((c) => usaTarifaPadrao(c) && filtroContrato(c)).map((c) => c.id));
+  return recalcularCobrancas(d, (cb) => ids.has(cb.contrato_id) && !emitidoNoBanco(cb) && !cb.boleto_pdf, usuario);
+}
+
 export function montarCobranca(d, contrato, comp) {
   // mês coberto pelo acordo do novo titular (termo da troca que não valeu): o anterior paga só até a véspera da troca
   const cobertoPor = !contrato.data_saida || contrato.data_saida >= `${comp}-01` ? mesCobertoPorAcordoDoNovo(d, contrato, comp) : null;
@@ -1770,7 +1794,7 @@ export function montarCobranca(d, contrato, comp) {
     entrada: contrato.data_entrada, saida: contrato.data_saida,
     descontoPercentual: bonificacaoNaCompetencia(d, contrato, comp), iptu, seguro,
     seguroProporcional: seguroProporcionalNoMes(d, contrato, comp),
-    taxaBoleto: cobra('taxa') ? contrato.taxa_boleto || 0 : 0, contrato,
+    taxaBoleto: cobra('taxa') ? tarifaDoContrato(contrato) : 0, contrato,
   });
   const seguroParcela = seguro && r.seguro < seguro ? `${seguroRot} proporcional ${r.dias_cobrados}/${r.dias_mes} dias de ${C.reais(seguro)}` : seguroRot;
   // troca de titular no dia 31: o anterior já pagou 30/30 e o novo não tem dia a pagar no mês (saida-016): sem boleto
@@ -2882,7 +2906,7 @@ export const CAMPOS_PESSOA = ['inquilino_tipo', 'inquilino_nome', 'inquilino_ape
   ...['inquilino_', 'representante_', 'solidario_'].flatMap((p) => ['genero', 'nacionalidade', 'estado_civil', 'profissao', 'nascimento', 'endereco'].map((k) => p + k))];
 /** Condições do contrato que servem de ponto de partida para o contrato no outro imóvel (são conferidas depois). */
 const CAMPOS_CONDICOES = ['prazo_tipo', 'prazo_meses', 'renovacao_automatica', 'indice_correcao', 'aluguel_inicial', 'dia_vencimento',
-  'cobranca_mes_seguinte', 'bonificacao', 'desconto_pontualidade_percentual', 'taxa_boleto', 'multa_percentual', 'juros_mensal_percentual',
+  'cobranca_mes_seguinte', 'bonificacao', 'desconto_pontualidade_percentual', 'taxa_boleto', 'nao_cobrar_tarifa', 'multa_percentual', 'juros_mensal_percentual',
   'cobrar_iptu', 'cobrar_seguro', 'conta_iptu', 'conta_seguro', 'fci_percentual', 'fci_indice', 'gerar_nf', 'garantia_tipo', 'finalidade', 'atividade', 'perfil_regras_id'];
 
 /** Dados da pessoa (sem as condições do contrato): a mesma pessoa alugando outro imóvel começa um contrato novo com eles. */
@@ -4129,6 +4153,7 @@ export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
     alertaCondominio(contrato, hoje),
     alertaSeguroSemQuemPaga(contrato),
     alertaRessarcimentoEmAcordo(d, contrato),
+    alertaRessarcimentoSemComprovante(d, contrato),
     alertaTermoAcordo(d, contrato),
     alertaNotificacoes(d, contrato, hoje),
     alertaReemitirNoBanco(d, contrato),
@@ -5500,6 +5525,7 @@ export function arquivosReferenciados(d) {
   // termo de quitação assinado da saída: o × apaga o arquivo e ele entra na conferência e no ZIP da pessoa (2026-11-20)
   for (const x of d.encerramentos || []) usa('contrato', x.contrato_id, x.termo_assinado);
   for (const a of d.aditivos) usa('aditivos', a.contrato_id, a.arquivo);
+  for (const x of d.documentos_locacao || []) usa('aditivos', x.contrato_id, x.arquivo); // outros documentos da locação assinados (2026-11-24, DOC-07)
   for (const a of d.acordos || []) usa('contrato', a.contrato_id, a.termo_assinado); // termo do acordo assinado (2026-11-15)
   for (const x of d.devolucoes_garantia || []) usa('contrato', x.contrato_id, x.termo_assinado); // recibo da devolução da garantia assinado (2026-11-21)
   // termo de quitação assinado da saída (estava fora: a limpeza "arquivos sem lançamento" o apagava, mutirão 19/11 fios-002)
@@ -5578,6 +5604,7 @@ export function rotulosDosArquivos(d) {
     }
   }
   for (const a of d.aditivos) poe('aditivos', a.contrato_id, a.arquivo, `termo aditivo${a.data ? ` (${C.dataBr(a.data)})` : ''}`);
+  for (const x of d.documentos_locacao || []) poe('aditivos', x.contrato_id, x.arquivo, `${String(x.nome || 'documento').toLocaleLowerCase('pt-BR')} de ${C.dataBr(x.data)} assinado`);
   for (const a of d.acordos || []) poe('contrato', a.contrato_id, a.termo_assinado, `termo do acordo de ${C.dataBr(a.data)} assinado`);
   for (const x of d.devolucoes_garantia || []) poe('contrato', x.contrato_id, x.termo_assinado, `recibo da devolução da garantia de ${C.dataBr(x.data)} assinado`);
   for (const n of d.notificacoes || []) {
@@ -7467,13 +7494,47 @@ export function competenciaDoAbatimento(c, dataPagamento) {
 }
 
 /**
+ * Ressarcimento lançado sem a data do pagamento (o inquilino ainda não mandou o comprovante): o boleto previsto é o do mês
+ * seguinte ao vencimento do boleto do condomínio, que vence no mês seguinte ao do condomínio. Ex.: condomínio de 11/2026
+ * (vence em 05/12) → boleto que vence em 01/2027 (referência 12/2026, quando o aluguel vence no mês seguinte).
+ */
+export function competenciaDoAbatimentoPrevisto(c, compCondominio) {
+  return C.competenciaValida(compCondominio) ? competenciaDoAbatimento(c, `${C.somarMeses(compCondominio, 1)}-01`) : null;
+}
+
+/**
+ * O desconto do ressarcimento só entra no boleto com o pagamento do condomínio confirmado (data do pagamento posta). Sem ela,
+ * o boleto sai sem o desconto, que entra quando a data for posta (com o boleto ainda em aberto). Decisão do dono, 24/11/2026.
+ */
+export const ressarcimentoConfirmado = (r) => !!(r && r.data_pagamento);
+
+/** Ressarcimentos lançados sem o comprovante do pagamento do condomínio. */
+export const ressarcimentosSemComprovante = (d, contratoId) => (d.ressarcimentos || []).filter((r) => r.contrato_id === contratoId && !ressarcimentoConfirmado(r));
+
+/**
+ * Aviso dos ressarcimentos sem o comprovante: o desconto ainda não entrou. Ex.: fundo de obras de R$ 150,00 do condomínio de
+ * 11/2026, sem data → "entra no boleto que vence em 01/2027 só com a data do pagamento"; boleto já pago → saiu sem ele.
+ */
+export function alertaRessarcimentoSemComprovante(d, c) {
+  const lista = ressarcimentosSemComprovante(d, c.id);
+  if (!lista.length) return null;
+  const partes = lista.map((r) => {
+    const cb = r.competencia_abatimento && boletoDoMes(d, c.id, r.competencia_abatimento);
+    const onde = r.competencia_abatimento ? `boleto que vence em ${C.compBr(mesVencimentoDaCompetencia(c, r.competencia_abatimento))}` : 'boleto do aluguel';
+    return `${r.descricao} ${C.reais(r.valor)} (condomínio de ${C.compBr(r.competencia_condominio)}): ${cb && (cb.data_pagamento || emAcordo(cb)) ? `o ${onde} saiu sem o desconto` : cb ? `o ${onde} está sem o desconto até a data ser posta` : `entra no ${onde} só com a data do pagamento`}`;
+  });
+  return { nivel: 'info', tipo: 'Condomínio', ancora: 'ressarcimentos',
+    texto: `Falta o comprovante do pagamento do condomínio: ${partes.join('; ')}. Quando o inquilino mandar, ponha a data do pagamento no ressarcimento (Editar).` };
+}
+
+/**
  * Taxas do condomínio abatidas no boleto, agrupadas pelo mês do condomínio, para o demonstrativo (pedido do dono de 24/11/2026:
  * uma linha por taxa, como na página do inquilino). Ex.: [{ mes: '2026-10', itens: [{ descricao: 'Extraordinárias', valor: 35318 },
  * { descricao: 'Fundo de reserva', valor: 10092 }] }]. Vazio se o que está lançado não soma o que o boleto abate (boleto antigo).
  */
 export function taxasNoBoleto(d, cb) {
   if (!cb.ressarcimento) return [];
-  const lista = (d.ressarcimentos || []).filter((r) => r.contrato_id === cb.contrato_id && r.competencia_abatimento === cb.competencia);
+  const lista = (d.ressarcimentos || []).filter((r) => r.contrato_id === cb.contrato_id && r.competencia_abatimento === cb.competencia && ressarcimentoConfirmado(r));
   if (lista.reduce((t, r) => t + r.valor, 0) !== cb.ressarcimento) return [];
   const meses = [...new Set(lista.map((r) => r.competencia_condominio))].sort();
   return meses.map((mes) => ({ mes, itens: lista.filter((r) => r.competencia_condominio === mes)
@@ -7481,7 +7542,8 @@ export function taxasNoBoleto(d, cb) {
 }
 
 function ressarcimentosNoBoleto(d, contratoId, comp) {
-  const lista = (d.ressarcimentos || []).filter((r) => r.contrato_id === contratoId && r.competencia_abatimento === comp);
+  // só com o pagamento do condomínio confirmado (``ressarcimentoConfirmado``)
+  const lista = (d.ressarcimentos || []).filter((r) => r.contrato_id === contratoId && r.competencia_abatimento === comp && ressarcimentoConfirmado(r));
   return { valor: lista.reduce((t, r) => t + r.valor, 0), descricao: lista.map((r) => `${r.descricao} (condomínio ${C.compBr(r.competencia_condominio)})`).join('; ') };
 }
 
@@ -7516,7 +7578,7 @@ export function textoSemBoleto(s, comp) {
  */
 export function ressarcimentosEmCredito(d, c) {
   if (!c) return [];
-  return (d.ressarcimentos || []).filter((r) => r.contrato_id === c.id && r.competencia_abatimento && !boletoDoMes(d, c.id, r.competencia_abatimento))
+  return (d.ressarcimentos || []).filter((r) => r.contrato_id === c.id && ressarcimentoConfirmado(r) && r.competencia_abatimento && !boletoDoMes(d, c.id, r.competencia_abatimento))
     .filter((r) => { const s = semBoletoNoMes(d, c, r.competencia_abatimento); return s && s.motivo !== 'entrada'; })
     .sort((a, b) => String(a.data_pagamento).localeCompare(String(b.data_pagamento)) || a.id - b.id);
 }
@@ -7568,13 +7630,18 @@ export function reaplicarRessarcimentos(d, contratoId, usuario) {
   for (const comp of new Set(meses.filter(Boolean))) aplicarRessarcimentos(d, c, comp, usuario);
 }
 
-/** Mês de condomínio mais antigo ainda não conferido (para o alerta e o fechamento), ou null. */
-export function condominioAConferir(c, hoje = C.hojeIso()) {
+/**
+ * Mês de condomínio mais antigo ainda não conferido (para o alerta e o fechamento), ou null. O alerta só cobra o mês que
+ * acabou; ``ate`` deixa olhar até outro mês: o boleto do condomínio de um mês chega antes do fim dele (24/11/2026, dados
+ * reais: o do Ascot de 11/2026, que vence em 05/12, chegou em 24/11 e o fechamento de 12/2026 dizia "nada a conferir").
+ */
+export function condominioAConferir(c, hoje = C.hojeIso(), { ate = null } = {}) {
   if (!inquilinoPagaCondominio(c) || !contratoAtivo(c, hoje)) return null;
   const ultimo = C.somarMeses(C.competenciaDe(hoje), -1); // o mês que acabou: o inquilino já pagou o condomínio dele
+  const limite = ate || ultimo;
   const inicio = C.competenciaDe(c.data_entrada || hoje);
-  const proximo = c.condominio_conferido_ate ? C.somarMeses(c.condominio_conferido_ate, 1) : (inicio > ultimo ? null : ultimo);
-  return proximo && proximo <= ultimo ? proximo : null;
+  const proximo = c.condominio_conferido_ate ? C.somarMeses(c.condominio_conferido_ate, 1) : (inicio > ultimo ? inicio : ultimo);
+  return proximo && proximo <= limite ? proximo : null;
 }
 
 export function alertaCondominio(c, hoje = C.hojeIso()) {
@@ -7627,7 +7694,7 @@ export function alertaCreditoRessarcimento(d, c) {
 export function alertaRessarcimentoEmAcordo(d, c) {
   const credito = alertaCreditoRessarcimento(d, c);
   if (credito) return credito;
-  const meses = [...new Set((d.ressarcimentos || []).filter((r) => r.contrato_id === c.id).map((r) => r.competencia_abatimento))].sort();
+  const meses = [...new Set((d.ressarcimentos || []).filter((r) => r.contrato_id === c.id && ressarcimentoConfirmado(r)).map((r) => r.competencia_abatimento))].sort();
   for (const comp of meses) {
     const cb = boletoDoMes(d, c.id, comp);
     // mês sem boleto deste contrato antes da entrada: o ressarcimento não abate em lugar nenhum (depois da saída ou da troca de
@@ -7730,10 +7797,19 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso(), { pendentes = null 
       pendentes: nfs, aPartirDe: `${seguinte}-01`, detalhe: [airPendente ? `gerar a NF do Airbnb (${C.reais(air.total)}) em Financeiro` : '', nfs - airPendente ? `${nfs - airPendente} pagamento(s) aguardando número` : ''].filter(Boolean).join(' · ') || 'nada aguardando número',
       link: airPendente ? `#/financeiro?mes=${mes}` : `#/faturas?mes=${mes}` },
     (() => {
-      const conferir = ativos.filter((c) => { const m = condominioAConferir(c, hoje); return m && m <= comp; });
-      return { chave: 'condominio', titulo: `Conferir as taxas do condomínio de ${C.compBr(comp)} (ressarcimento ao inquilino)`, pendentes: conferir.length,
-        detalhe: conferir.length ? `a conferir: ${conferir.map((c) => c.inquilino_nome).join(', ')}` : 'nada a conferir', link: conferir.length === 1 ? `#/contrato/${conferir[0].id}?ir=ressarcimentos` : '#/inquilinos',
-        contratos: conferir.length > 1 ? conferir.map((c) => c.id) : [] }; // com mais de um, a tela põe um botão por inquilino
+      // o condomínio de ``comp`` (o boleto dele vence no começo de ``mes``) chega antes do fim de ``comp``: conta desde já,
+      // e não só depois que o mês acaba (24/11/2026, dados reais: Ascot de 11/2026, vence em 05/12, chegou em 24/11)
+      // (mês ainda por vir: a etapa fica prevista até o 1º dia dele, ``aPartirDe``)
+      const conferir = ativos.filter((c) => condominioAConferir(c, hoje, { ate: comp }));
+      // um botão por inquilino que paga o condomínio (o de cada imóvel), feito ou não: o "Abrir" leva sempre à caixa dos
+      // ressarcimentos do inquilino certo, e não à lista dos inquilinos (antes, com zero ou vários, abria #/inquilinos)
+      const pagam = ativos.filter((c) => inquilinoPagaCondominio(c) && contratoAtivo(c, hoje));
+      const ordem = [...conferir, ...pagam.filter((c) => !conferir.includes(c))];
+      return { chave: 'condominio', titulo: `Conferir as taxas do condomínio de ${C.compBr(comp)} (boleto do condomínio que vence em ${C.compBr(mes)}; ressarcimento ao inquilino)`, pendentes: conferir.length,
+        aPartirDe: `${comp}-01`,
+        detalhe: conferir.length ? `a conferir: ${conferir.map((c) => c.inquilino_nome).join(', ')}` : pagam.length ? 'nada a conferir' : 'nenhum inquilino paga o condomínio',
+        link: ordem.length === 1 ? `#/contrato/${ordem[0].id}?ir=ressarcimentos` : null,
+        contratos: ordem.length > 1 ? ordem.map((c) => ({ id: c.id, conferir: conferir.includes(c) })) : [] }; // com mais de um, a tela põe um botão por inquilino
     })(),
     { chave: 'contas', titulo: `Lançar as contas pagas por nós de ${C.compBr(mes)}`, pendentes: contas.length,
       detalhe: contas.length ? `sem lançamento: ${contas.map((i) => i.nome).join(', ')}` : comConta.length ? `${comConta.length} imóvel(is) com conta lançada` : 'nenhum imóvel com conta nossa', link: '#/resultados', imoveis: contas.map((i) => i.id) },
@@ -9262,6 +9338,7 @@ export function salvarRegrasSistema(d, valores, usuario, motivo = 'Regras do sis
   let mudou = 0;
   const antes = CR.regrasDe(d);
   const naNfAntes = antes.ressarcimento_na_nf;
+  const tarifaAntes = antes.tarifa_padrao;
   for (const def of CR.DEFINICOES_REGRAS) {
     // a que fica em outra tela (`fora`, ex.: a assinatura digital) continua como está, salvo pelo botão dela (foraQueMuda)
     const novo = def.fora && def.chave !== foraQueMuda ? antes[def.chave] : def.chave in limpos ? limpos[def.chave] : def.padrao;
@@ -9278,6 +9355,8 @@ export function salvarRegrasSistema(d, valores, usuario, motivo = 'Regras do sis
   // ressarcimento na NF mudou: os boletos em aberto com ressarcimento passam a seguir a regra nova (os pagos não mudam)
   const naNf = CR.regra('ressarcimento_na_nf');
   if (naNf !== naNfAntes) for (const cb of d.cobrancas.filter((x) => !x.data_pagamento && x.ressarcimento > 0 && !!x.ressarcimento_na_nf !== naNf)) atualizar(d, 'cobrancas', cb.id, { ressarcimento_na_nf: naNf }, usuario, 'Ressarcimento na NF (regra do sistema)');
+  // tarifa padrão mudou: os boletos em aberto de quem a segue acompanham (os da regra especial com tarifa própria, não)
+  if (!CR.mesmoValor(CR.regra('tarifa_padrao'), tarifaAntes)) recalcularTarifaPadrao(d, usuario, (c) => !c.perfil_regras_id || CR.regra('tarifa_padrao', c) === CR.regra('tarifa_padrao'));
   return mudou;
 }
 
@@ -9346,9 +9425,12 @@ export function salvarPerfilRegras(d, id, { nome, descricao = '', valores = {} }
   const dados = { nome: n, descricao: String(descricao || '').trim().slice(0, 300), valores: limpos };
   const r = id ? buscar(d, 'perfis_regras', Number(id)) : null;
   if (id && !r) throw new C.ErroUsuario('Regra especial não encontrada.');
+  const tarifaAntes = r ? (r.valores || {}).tarifa_padrao : undefined;
   const salvo = r ? (atualizar(d, 'perfis_regras', r.id, dados, usuario, `Regra especial "${n}" alterada`), r)
     : inserir(d, 'perfis_regras', { ...dados, criado_em: C.hojeIso() }, usuario, `Regra especial "${n}" criada`);
   CR.usarRegras(d);
+  // tarifa da regra especial mudou: os boletos em aberto dos contratos dela que seguem a tarifa padrão acompanham (24/11/2026)
+  if (r && !CR.mesmoValor(tarifaAntes, limpos.tarifa_padrao)) recalcularTarifaPadrao(d, usuario, (c) => c.perfil_regras_id === r.id);
   return salvo;
 }
 
@@ -9360,6 +9442,11 @@ export function excluirPerfilRegras(d, id, usuario) {
   for (const c of contratos) atualizar(d, 'contratos', c.id, { perfil_regras_id: null }, usuario, `${c.inquilino_nome}: volta às regras do sistema (regra especial "${p.nome}" excluída)`);
   excluir(d, 'perfis_regras', p.id, usuario, `Regra especial "${p.nome}" excluída`);
   CR.usarRegras(d);
+  // a regra especial tinha tarifa própria: os boletos em aberto dos contratos dela que seguem a tarifa padrão passam à do sistema
+  if ('tarifa_padrao' in (p.valores || {}) && !CR.mesmoValor(p.valores.tarifa_padrao, CR.regra('tarifa_padrao'))) {
+    const ids = new Set(contratos.map((c) => c.id));
+    recalcularTarifaPadrao(d, usuario, (c) => ids.has(c.id));
+  }
   return contratos.length;
 }
 
@@ -9374,7 +9461,7 @@ export function padroesNovoContrato(perfil = null) {
     cobranca_mes_seguinte: r('mes_seguinte_padrao'), conta_iptu: r('conta_iptu_padrao'), conta_seguro: r('conta_seguro_padrao') };
   if (CR.perfilDe(ctx)) out.perfil_regras_id = CR.perfilDe(ctx);
   if (r('bonificacao_percentual_padrao') !== null && r('bonificacao_padrao')) out.desconto_pontualidade_percentual = r('bonificacao_percentual_padrao');
-  if (r('tarifa_padrao') !== null) out.taxa_boleto = r('tarifa_padrao');
+  // tarifa do boleto: não vem preenchida; o contrato em branco segue a regra `tarifa_padrao` (tarifaDoContrato, 24/11/2026)
   if (r('fci_percentual_padrao') !== null) out.fci_percentual = r('fci_percentual_padrao');
   // o índice vem preenchido mesmo com o % em branco (o campo só aparece quando o % é digitado; sem %, o cadastro o apaga)
   if (r('fci_indice_padrao')) out.fci_indice = r('fci_indice_padrao');

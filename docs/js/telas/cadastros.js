@@ -265,7 +265,7 @@ export const CADASTROS = {
         ajuda: 'O mês em que vence o boleto do aluguel (ex.: 12/2026 = o boleto que vence em dezembro). Em branco: o boleto que vence no mês seguinte ao pagamento do condomínio' }
         : c)),
     valores: (r) => ({ ...r, vencimento_abatimento: R.mesVencimentoDaCompetencia(buscar('contratos', r.contrato_id), r.competencia_abatimento) }),
-    extraHtml: (r, q) => `<span hidden data-contrato-boleto="${Number(r ? r.contrato_id : q.contrato)}" data-mes-boleto="vencimento_abatimento" data-pagamento="data_pagamento"></span>`,
+    extraHtml: (r, q) => `<span hidden data-contrato-boleto="${Number(r ? r.contrato_id : q.contrato)}" data-mes-boleto="vencimento_abatimento" data-pagamento="data_pagamento" data-condominio="competencia_condominio"></span>`,
     conferir: conferirRessarcimento,
     padrao: () => ({ competencia_condominio: C.competenciaDe(C.hojeIso()) }),
     fixos: (r, q) => (r ? {} : { contrato_id: Number(q.contrato) }),
@@ -282,7 +282,11 @@ export const CADASTROS = {
       // (conferência de 24/11/2026). Ex.: pago em 05/11 (boleto de 11/2026) corrigido para 05/12 → boleto de 12/2026
       if (r && dados.data_pagamento && r.data_pagamento && dados.data_pagamento !== r.data_pagamento
         && dados.competencia_abatimento === R.competenciaDoAbatimento(c, r.data_pagamento)) dados.competencia_abatimento = null;
+      // lançado sem a data (falta o comprovante) com o mês previsto: a data posta depois manda o mês pela data (24/11/2026)
+      if (r && dados.data_pagamento && !r.data_pagamento && dados.competencia_abatimento === R.competenciaDoAbatimentoPrevisto(c, r.competencia_condominio)) dados.competencia_abatimento = null;
       if (!dados.competencia_abatimento && dados.data_pagamento) dados.competencia_abatimento = R.competenciaDoAbatimento(c, dados.data_pagamento);
+      // sem a data do pagamento: o boleto previsto (o desconto só entra quando a data for posta, ``ressarcimentoConfirmado``)
+      if (!dados.competencia_abatimento && !dados.data_pagamento) dados.competencia_abatimento = R.competenciaDoAbatimentoPrevisto(c, dados.competencia_condominio);
       // mês antes da entrada: não abateria em lugar nenhum. Depois da saída ou da troca de titular (o boleto passou ao novo) vira
       // crédito de quem pagou, no cálculo final ou na devolução da garantia (decisões do dono de 24/11/2026; ``conferirRessarcimento`` avisa)
       const sem = R.semBoletoNoMes(d(), c, dados.competencia_abatimento);
@@ -295,17 +299,19 @@ export const CADASTROS = {
         erros.valor = `Este ressarcimento já entrou como crédito no ${R.acertoDoCredito(d(), c).tipo === 'saida' ? 'cálculo final da saída' : 'acerto da devolução da garantia'}: não dá para mudar o valor nem o mês. Lance a diferença como um novo ressarcimento`;
       }
       const cb = R.boletoDoMes(d(), c.id, dados.competencia_abatimento);
-      if (cb && cb.data_pagamento && (!r || r.competencia_abatimento !== dados.competencia_abatimento)) {
+      // a data posta agora (falta o comprovante → confirmado) também conta como entrar no boleto
+      const confirmando = !!(r && !r.data_pagamento && dados.data_pagamento);
+      if (cb && cb.data_pagamento && (!r || confirmando || r.competencia_abatimento !== dados.competencia_abatimento) && (dados.data_pagamento || !r)) {
         erros.vencimento_abatimento = `O boleto que vence em ${compBr(R.mesVencimentoDaCompetencia(c, dados.competencia_abatimento))} (referência ${compBr(dados.competencia_abatimento)}) já foi pago. Escolha o próximo boleto em aberto`;
       }
       // boleto em acordo fica como estava no dia do acordo (aplicarRessarcimentos não mexe nele): o ressarcimento novo, de mês
       // trocado ou de valor mudado não seria abatido. Ex.: boleto de 10/2026 em acordo → escolha 11/2026
-      if (cb && !cb.data_pagamento && R.emAcordo(cb) && (!r || r.competencia_abatimento !== dados.competencia_abatimento || dados.valor !== r.valor)) {
+      if (cb && !cb.data_pagamento && R.emAcordo(cb) && dados.data_pagamento && (!r || confirmando || r.competencia_abatimento !== dados.competencia_abatimento || dados.valor !== r.valor)) {
         erros.vencimento_abatimento = `O boleto que vence em ${compBr(R.mesVencimentoDaCompetencia(c, dados.competencia_abatimento))} (referência ${compBr(dados.competencia_abatimento)}) está em acordo (fica como estava no dia do acordo) e não recebe o ressarcimento. Escolha o próximo boleto em aberto`;
       }
       // boleto do abatimento já pago com este ressarcimento: mudar o valor não muda o boleto pago. Lance a diferença como
       // outro ressarcimento, no próximo boleto em aberto
-      if (cb && cb.data_pagamento && r && r.competencia_abatimento === dados.competencia_abatimento && dados.valor !== r.valor) {
+      if (cb && cb.data_pagamento && r && r.data_pagamento && r.competencia_abatimento === dados.competencia_abatimento && dados.valor !== r.valor) {
         erros.valor = `O boleto que vence em ${compBr(R.mesVencimentoDaCompetencia(c, dados.competencia_abatimento))} (referência ${compBr(dados.competencia_abatimento)}) já foi pago com ${reais(r.valor)}: não dá para mudar o valor. Lance a diferença como um novo ressarcimento, no próximo boleto em aberto`;
       }
     },

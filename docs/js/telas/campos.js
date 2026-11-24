@@ -195,7 +195,7 @@ export const CAMPOS_GARANTIA_HERDADA = ['garantia_tipo', 'caucao_meses', 'caucao
 
 /** Valores e boleto e reserva que vêm iguais do contrato anterior na troca de titular (travados no formulário). */
 export const CAMPOS_VALORES_HERDADOS = ['aluguel_inicial', 'aluguel_bonificado', 'desconto_pontualidade_percentual', 'bonificacao', 'dia_vencimento', 'cobranca_mes_seguinte',
-  'taxa_boleto', 'fci_percentual', 'fci_indice', 'multa_percentual', 'juros_mensal_percentual', 'reserva_valor', 'reserva_data', 'reserva_competencia', 'comprovante_reserva'];
+  'taxa_boleto', 'nao_cobrar_tarifa', 'fci_percentual', 'fci_indice', 'multa_percentual', 'juros_mensal_percentual', 'reserva_valor', 'reserva_data', 'reserva_competencia', 'comprovante_reserva'];
 
 /** Trava campos do formulário (só leitura, em cinza); ``valores`` (já no formato da tela) troca o que estiver escrito. */
 function travarCampos(form, nomes, valores = {}) {
@@ -647,16 +647,22 @@ function ligarMesDoBoleto(raiz) {
   const c = campo && buscar('contratos', marca.dataset.contratoBoleto);
   if (!c) return;
   const pagamento = marca.dataset.pagamento && form.querySelector(`[name="${marca.dataset.pagamento}"]`);
+  const condominio = marca.dataset.condominio && form.querySelector(`[name="${marca.dataset.condominio}"]`);
   const mostrar = () => {
     let comp = C.competenciaValida(campo.value) ? R.competenciaDoMesVencimento(c, campo.value) : null;
     const emBranco = !campo.value.trim() && pagamento && C.dataValida(pagamento.value);
     if (emBranco) comp = R.competenciaDoAbatimento(c, pagamento.value);
+    // sem a data do pagamento (falta o comprovante): o boleto previsto pelo mês do condomínio; o desconto só entra com a data
+    const semData = !campo.value.trim() && pagamento && !pagamento.value.trim() && condominio && C.competenciaValida(condominio.value);
+    if (semData) comp = R.competenciaDoAbatimentoPrevisto(c, condominio.value);
     const t = comp ? R.textoBoletoDaCompetencia(d(), c, comp) : '';
-    mensagemAuto(campo, t ? `${esc(emBranco ? `Em branco: ${t}` : t.charAt(0).toUpperCase() + t.slice(1))}.` : '');
+    const aviso = pagamento && !pagamento.value.trim() ? ' O desconto só entra no boleto quando a data do pagamento do condomínio for posta.' : '';
+    mensagemAuto(campo, t ? `${esc(emBranco || semData ? `Em branco: ${t}` : t.charAt(0).toUpperCase() + t.slice(1))}.${esc(aviso)}` : '');
   };
   campo.addEventListener('input', mostrar);
   campo.addEventListener('change', mostrar);
   if (pagamento) pagamento.addEventListener('change', mostrar);
+  if (condominio) condominio.addEventListener('change', mostrar);
   mostrar();
 }
 
