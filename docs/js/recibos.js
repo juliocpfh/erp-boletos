@@ -20,6 +20,7 @@ const PJ = 'Pessoa jurídica (empresa)';
 
 /** Os documentos que o sistema emite, na ordem das etapas. */
 export const TIPOS_RECIBO = {
+  termo_reserva: 'Termo de aceite da reserva',
   reserva: 'Recibo da reserva',
   devolucao_reserva: 'Termo de devolução da reserva',
   garantia: 'Recibo da garantia',
@@ -72,6 +73,80 @@ export function itensDaProposta(f) {
   return out;
 }
 
+// --------------------------------------------------------------------------
+// Termo de aceite da reserva (decisões do dono de 2026-11-24): o que a pessoa lê e aceita pelo link antes de depositar
+// (nuvem/aceite-reserva.mjs) ou assina à mão. Depois do aceite, o PDF repete o texto exato aceito (aceite_reserva.texto_aceito)
+// com a prova (data, hora, e-mail confirmado, IP, aparelho e o resumo SHA-256 do texto).
+// --------------------------------------------------------------------------
+const pctTexto = (n) => `${String(Math.round((Number(n) || 0) * 100) / 100).replace('.', ',')}%`;
+
+/**
+ * Frase da desistência para a pessoa (página da ficha, e-mails, ficha em PDF). Com o termo aceito e o depósito: "Se desistir
+ * até 17/12/2026, a reserva de R$ 500,00 volta por inteiro; depois, devolvemos R$ 300,00 (ficam R$ 200,00, como no termo da
+ * reserva)." Sem termo aceito: "A reserva de R$ 500,00 é devolvida por inteiro, sem descontos."
+ */
+export function textoDesistencia(f) {
+  const valor = R.valorDaReserva(f);
+  if (!valor) return '';
+  if (!f.aceite_reserva) return `A reserva de ${C.reais(valor)} é devolvida por inteiro, sem descontos.`;
+  const c = R.condicoesDaReserva(f);
+  const reter = R.retencaoDaReserva(valor, c.retencao_pct);
+  if (!reter) return `A reserva de ${C.reais(valor)} é devolvida por inteiro, sem descontos.`;
+  const pz = R.prazosDaReserva(f);
+  const ate = pz ? `até ${C.dataBr(pz.arrependimento_ate)}` : `em até ${c.dias_arrependimento} dias do depósito`;
+  return `Se desistir ${ate}, a reserva de ${C.reais(valor)} volta por inteiro; depois, devolvemos ${C.reais(valor - reter)} (ficam ${C.reais(reter)}, como no termo da reserva).`;
+}
+
+/**
+ * O termo que a pessoa lê antes de depositar: { titulo, intro, itens: [[rótulo, valor]], requisitos, documentos, clausulas,
+ * deposito, ciencia, condicoes, reserva_valor }. Usa as regras de agora (o aceite guarda as condições e o texto do dia).
+ * Ex.: reserva de R$ 500,00 com 40% → item 6: "... a empresa fica com 40% da reserva (R$ 200,00) ... devolve o restante (R$ 300,00)".
+ */
+export function termoDaReserva(d, f) {
+  const i = imovelDe(d, { ficha: f });
+  const e = emitenteDe(d, { ficha: f }, i);
+  const empresa = e.razao_social || e.nome || 'a administradora';
+  const enderecos = (f.imoveis_ids || []).map((id) => R.buscar(d, 'imoveis', id)).filter(Boolean).map((x) => enderecoDe(d, x));
+  const c = R.condicoesDaReservaAgora();
+  const valor = R.valorDaReserva(f);
+  const reter = R.retencaoDaReserva(valor, c.retencao_pct);
+  const deposito = K.dadoDaEmpresa(d, { imovel_id: i ? i.id : null }, 'conta_deposito') || '';
+  const itens = [['Imóvel', enderecos.join(' ou ') || 'imóvel não informado'], ...itensDaProposta(f), ['Reserva', valor ? `${C.reais(valor)}, abatida do 1º aluguel` : 'valor a combinar']];
+  const garantia = { Fiador: 'fiador com imóvel próprio, que também manda a ficha e os documentos', 'Fiador + depósito': 'fiador com imóvel próprio e depósito de garantia',
+    Caução: 'caução em dinheiro, depositada antes da entrega das chaves', 'Depósito garantia': 'depósito de garantia em dinheiro, antes da entrega das chaves',
+    'Seguro fiança': 'seguro fiança aprovado pela seguradora' }[f.garantia_tipo];
+  const requisitos = [...(garantia ? [`Garantia: ${garantia}.`] : []), 'Consulta do nome e do CPF (ou do CNPJ) em cadastros de crédito, como Serasa e SPC.',
+    ...String(f.requisitos || '').split(/\n+/).map((x) => x.trim()).filter(Boolean)];
+  const documentos = [...R.documentosDaFicha(f), ...(R.temFiador(f) ? ['Do fiador: documento com foto e CPF, comprovante de renda e de residência e a matrícula de um imóvel em nome dele (a lista completa vai no link dele)'] : [])];
+  const valorTexto = valor ? K.valorComExtenso(valor) : 'o valor combinado';
+  const clausulas = [
+    `1. Para reservar o imóvel, você deposita ${valorTexto} na conta da empresa${deposito ? ' informada no fim deste termo' : ''}. O imóvel fica reservado para você por ${c.dias_validade} dias, contados do depósito, enquanto analisamos a ficha.`,
+    '2. A reserva não é aluguel e não forma o contrato: a locação só existe depois do contrato assinado por todos.',
+    '3. Aprovada a ficha e assinado o contrato, a reserva é abatida do primeiro aluguel: o primeiro boleto já vem com o desconto. É para isso que ela serve.',
+    `4. Depois do depósito, você tem ${C.plural(c.dias_uteis_documentos, 'dia útil', 'dias úteis')} para preencher a ficha e mandar todos os documentos pelo link que vamos enviar. Sem os documentos nesse prazo, a reserva é cancelada e o imóvel volta a ser oferecido; a devolução segue os itens 5 e 6.`,
+    '5. Se a ficha não for aprovada, devolvemos a reserva inteira, sem nenhum desconto.',
+    reter > 0
+      ? `6. Se você desistir em até ${c.dias_arrependimento} dias do depósito, devolvemos a reserva inteira. Depois desse prazo, a empresa fica com ${pctTexto(c.retencao_pct)} da reserva (${C.reais(reter)}), pelo tempo em que o imóvel ficou reservado e pela análise, e devolve o restante (${C.reais(valor - reter)}). Dados ou documentos que não se confirmarem na conferência contam como desistência.`
+      : '6. Se você desistir antes de assinar o contrato, devolvemos a reserva inteira.',
+    `7. A devolução é feita em até ${C.plural(c.dias_uteis_devolucao, 'dia útil', 'dias úteis')} da reprovação ou da desistência, na conta de onde veio o depósito.`,
+    '8. Seus dados são usados só para a análise desta locação e, se aprovada, para o contrato (Lei 13.709/2018).',
+  ];
+  return {
+    titulo: 'TERMO DE ACEITE DA RESERVA DE IMÓVEL', empresa, cnpj: e.cnpj || '', condicoes: { ...c }, reserva_valor: valor,
+    intro: `${empresa}${e.cnpj ? `, CNPJ ${e.cnpj}` : ''}, apresenta a ${f.inquilino_nome || 'você'} as condições para reservar o imóvel abaixo enquanto a ficha cadastral é analisada. As condições da locação dependem da aprovação da ficha.`,
+    itens, requisitos, documentos, clausulas, deposito,
+    ciencia: 'Li as condições acima e concordo com elas. Sei que a reserva é abatida do primeiro aluguel se a ficha for aprovada, e como ela é devolvida se a ficha não for aprovada ou se eu desistir.',
+  };
+}
+
+/** O termo como texto corrido (o que a pessoa aceita no link; o servidor guarda este texto e o resumo SHA-256 dele). */
+export function textoDoTermo(t) {
+  return [t.titulo, t.intro, `CONDIÇÕES DA LOCAÇÃO\n${t.itens.map(([a, b]) => `- ${a}: ${b}`).join('\n')}`,
+    `REQUISITOS PARA A APROVAÇÃO\n${t.requisitos.map((x) => `- ${x}`).join('\n')}`,
+    `DOCUMENTOS PARA A ANÁLISE\n${t.documentos.map((x, k) => `${k + 1}. ${x}`).join('\n')}`,
+    `CONDIÇÕES DA RESERVA\n${t.clausulas.join('\n')}`, ...(t.deposito ? [`CONTA PARA O DEPÓSITO DA RESERVA\n${t.deposito}`] : [])].join('\n\n');
+}
+
 /**
  * Caução ou depósito que saiu numa troca de garantia e ainda não foi devolvido (os depósitos ficam guardados na troca):
  * o recibo continua podendo sair. Ex.: caução de R$ 3.600,00 trocada por fiador em 01/12/2026, ainda a devolver.
@@ -111,6 +186,11 @@ export function reciboDisponivel(d, tipo, alvo) {
     if (!f) return { ok: false, motivo: 'A ficha cadastral é da ficha em análise.' };
     if (tipo === 'ficha_fiador' && !R.temFiador(f) && !R.fiadoresDaFicha(f).length) return { ok: false, motivo: 'A garantia da proposta não é fiador.' };
     return { ok: true };
+  }
+  if (tipo === 'termo_reserva') {
+    if (!f) return { ok: false, motivo: 'O termo de aceite da reserva é da ficha em análise.' };
+    if (f.aceite_reserva) return { ok: true };
+    return R.valorDaReserva(f) > 0 ? { ok: true } : { ok: false, motivo: 'Informe a reserva combinada (em "Editar") antes do termo.' };
   }
   if (tipo === 'reserva') {
     // troca de titular: a reserva copiada do contrato anterior foi paga pelo titular anterior (o recibo é o dele)
@@ -189,6 +269,8 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
   if (tipo === 'ficha') return fichaCadastral(d, f, base, nomeArq);
   if (tipo === 'ficha_fiador') return fichaDoFiador(d, f, Number(alvo.fiador) || 1, i, base, nomeArq);
 
+  if (tipo === 'termo_reserva') return termoReservaPdf(d, f, base, nomeArq);
+
   if (tipo === 'reserva') {
     const proposta = f ? itensDaProposta(f) : [];
     return {
@@ -198,7 +280,9 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
         'Condições da reserva:',
         '1. A reserva não forma a locação: o contrato só existe depois de assinado por todas as partes.',
         '2. Aprovada a ficha e assinado o contrato, o valor é abatido do primeiro aluguel.',
-        '3. Não aprovada a ficha, ou se o interessado desistir antes de assinar o contrato, o valor é devolvido por inteiro, sem desconto, na conta de onde veio o depósito.',
+        f && f.aceite_reserva && R.retencaoDaReserva(p.reserva_valor, R.condicoesDaReserva(f).retencao_pct) > 0
+          ? `3. Não aprovada a ficha, o valor é devolvido por inteiro, sem desconto, na conta de onde veio o depósito. Na desistência, vale o termo de aceite da reserva de ${C.dataBr(String(f.aceite_reserva.em).slice(0, 10))}: ${textoDesistencia(f)}`
+          : '3. Não aprovada a ficha, ou se o interessado desistir antes de assinar o contrato, o valor é devolvido por inteiro, sem desconto, na conta de onde veio o depósito.',
       ],
       tabela: proposta.length ? [['CONDIÇÕES PROPOSTAS (dependem da aprovação da ficha)', null], ...proposta] : [],
       depois: ['Damos quitação do valor acima, nos termos dos artigos 319 e 320 do Código Civil.'],
@@ -218,7 +302,9 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
         `Com a devolução, a ficha cadastral fica encerrada${R.fichaSemContrato(f) ? ', sem a formação de contrato de locação' : ''}.`,
         integral
           ? 'As partes declaram que nada mais devem uma à outra em razão da reserva e da ficha cadastral, e dão-se mútua quitação desse valor (Código Civil, artigos 319 e 320).'
-          : `A diferença de ${C.reais(f.reserva_valor - devolvido)} fica explicada nas observações da ficha. As partes dão-se quitação do valor devolvido (Código Civil, artigos 319 e 320).`,
+          : f.aceite_reserva && R.devolucaoDaReserva(f).devolver === devolvido
+            ? `A diferença de ${C.reais(f.reserva_valor - devolvido)} fica com a empresa, como no termo de aceite da reserva aceito em ${C.dataBr(String(f.aceite_reserva.em).slice(0, 10))} (${R.devolucaoDaReserva(f).motivo}). As partes dão-se quitação do valor devolvido e do retido (Código Civil, artigos 319, 320 e 418).`
+            : `A diferença de ${C.reais(f.reserva_valor - devolvido)} fica explicada nas observações da ficha. As partes dão-se quitação do valor devolvido (Código Civil, artigos 319 e 320).`,
         `Os documentos pessoais enviados para a análise serão apagados em até ${meses} meses. Ficam guardados só os comprovantes da reserva e da devolução, por obrigação legal (Lei 13.709/2018, artigo 16, I).`,
       ],
       assinaturas: [assinaEmpresa, assinaPessoa('recebi o valor e dou quitação')],
@@ -529,7 +615,7 @@ function fichaCadastral(d, f, base, nomeArq) {
     tabela.push(['FIADOR', null], ...(fiadores.length ? fiadores.map((x) => [`Fiador ${x.n}`, `${x.nome}${x.cpf ? `, CPF ${x.cpf}` : ''} (preenche e assina a ficha do fiador)`]) : [['Fiador', 'preenche e assina a ficha do fiador']]));
   }
   tabela.push(...listaDocumentos(R.documentosDaFicha(f)));
-  const reserva = f.reserva_valor > 0 ? `A reserva de ${C.reais(f.reserva_valor)} é devolvida por inteiro, sem descontos.` : 'Nada é cobrado.';
+  const reserva = textoDesistencia(f) || 'Nada é cobrado.';
   return {
     ...base, titulo: 'FICHA CADASTRAL',
     paragrafos: [`Ficha para a análise da locação. Confira os dados já preenchidos, complete o que faltar e assine no fim.${f.data_recebida ? ` Ficha aberta em ${C.dataBr(f.data_recebida)}.` : ''}`],
@@ -537,7 +623,7 @@ function fichaCadastral(d, f, base, nomeArq) {
     depois: [
       ...declaracao(pj ? 'A empresa declara, por meio do representante,' : 'Declaro', pj),
       `Se faltar algum documento ou você preferir não seguir com a análise, sem problema: marque abaixo e devolva esta ficha. ${reserva}`,
-      `(   ) Não vou seguir com a análise${f.reserva_valor > 0 ? ' e peço a devolução integral da reserva' : ''}.`,
+      `(   ) Não vou seguir com a análise${f.reserva_valor > 0 ? (f.aceite_reserva ? ' e peço a devolução da reserva, como no termo da reserva' : ' e peço a devolução integral da reserva') : ''}.`,
       COMO_ASSINAR,
     ],
     assinaturas: [pj ? { nome: f.representante_nome || EM_BRANCO, linha: `representante de ${f.inquilino_nome || 'EMPRESA'}` } : { nome: f.inquilino_nome || EM_BRANCO, linha: f.inquilino_cpf ? `CPF ${f.inquilino_cpf} · INTERESSADO` : 'INTERESSADO' }],
@@ -565,5 +651,42 @@ function fichaDoFiador(d, f, n, i, base, nomeArq) {
     assinaturas: [{ nome: x.nome || EM_BRANCO, linha: x.cpf ? `CPF ${x.cpf} · FIADOR` : 'FIADOR' },
       ...(conjuge ? [{ nome: x.nome_conjuge || EM_BRANCO, linha: 'CÔNJUGE OU COMPANHEIRO(A) DO FIADOR' }] : [])],
     arquivo: `${nomeArq('Ficha cadastral do fiador', base.data)}${x.nome ? ` - ${x.nome}` : ''}`,
+  };
+}
+
+/**
+ * Termo de aceite da reserva em PDF. Aceito pelo link: o texto exato aceito e a prova (sem linhas de assinatura: o aceite é
+ * eletrônico, com o e-mail confirmado por código; Lei 14.063/2020, art. 4º, I, e MP 2.200-2/2001, art. 10, § 2º). Ainda não
+ * aceito: o termo de agora, com as linhas para assinar à mão ou pelo gov.br.
+ */
+function termoReservaPdf(d, f, base, nomeArq) {
+  const a = f.aceite_reserva;
+  if (a && a.texto_aceito) {
+    const partes = String(a.texto_aceito).split(/\n{2,}/);
+    const quando = new Date(a.em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' });
+    return {
+      ...base, titulo: partes[0] || 'TERMO DE ACEITE DA RESERVA DE IMÓVEL', data: String(a.em).slice(0, 10),
+      paragrafos: partes.slice(1).flatMap((x) => x.split('\n')).filter((x) => !/^Declaração: /.test(x)),
+      depois: [
+        `ACEITE ELETRÔNICO. ${f.inquilino_nome} leu este termo e marcou "Li e concordo" no link enviado só a essa pessoa, em ${quando} (horário de Brasília).`,
+        ...partes.filter((x) => /^Declaração: /.test(x)).map((x) => `Declaração aceita: ${x.replace(/^Declaração: /, '')}`),
+        `E-mail confirmado pelo código de 6 números enviado a este endereço: ${a.email}.${a.ip ? ` Endereço de internet (IP): ${a.ip}.` : ''}${a.aparelho ? ` Aparelho: ${String(a.aparelho).slice(0, 160)}.` : ''}`,
+        `Código de conferência do texto (SHA-256): ${a.texto_sha256}. Qualquer mudança no texto muda este código.`,
+        'Aceite eletrônico com o e-mail confirmado (Lei 14.063/2020, artigo 4º, I; Medida Provisória 2.200-2/2001, artigo 10, § 2º).',
+      ],
+      imagem: a.assinatura ? { rotulo: 'Assinatura desenhada na tela:', src: a.assinatura } : null,
+      assinaturas: [],
+      arquivo: nomeArq('Termo aceite reserva', String(a.em).slice(0, 10)),
+    };
+  }
+  const t = termoDaReserva(d, f);
+  return {
+    ...base, titulo: t.titulo,
+    paragrafos: [t.intro],
+    tabela: [['CONDIÇÕES DA LOCAÇÃO', null], ...t.itens, ['REQUISITOS PARA A APROVAÇÃO', null], ...t.requisitos.map((x, k) => [`${k + 1}.`, x]),
+      ['DOCUMENTOS PARA A ANÁLISE', null], ...t.documentos.map((x, k) => [`${k + 1}.`, x]), ...(t.deposito ? [['CONTA PARA O DEPÓSITO DA RESERVA', null], ['Depósito', t.deposito]] : [])],
+    depois: ['CONDIÇÕES DA RESERVA', ...t.clausulas, `DECLARAÇÃO. ${t.ciencia}`, COMO_ASSINAR],
+    assinaturas: [{ nome: f.inquilino_nome || EM_BRANCO, linha: f.inquilino_cpf ? `${documentoDe(f)} · INTERESSADO` : 'INTERESSADO' }],
+    arquivo: nomeArq('Termo aceite reserva', base.data),
   };
 }

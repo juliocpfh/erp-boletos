@@ -2992,6 +2992,79 @@ export const fichaSemContrato = (f) => f.situacao === 'Reprovada' || f.situacao 
 /** Reserva de ficha reprovada (ou com desistência) que ainda não teve a devolução registrada. */
 export const devolucaoPendente = (f) => fichaSemContrato(f) && f.reserva_valor > 0 && !f.devolucao_data;
 
+// --------------------------------------------------------------------------
+// Termo de aceite da reserva (decisões do dono de 2026-11-24): antes do depósito, o interessado lê as condições e aceita pelo
+// link (código no e-mail). O aceite guarda as condições do dia (`aceite_reserva.condicoes`): mudar as regras depois não muda
+// o que a pessoa aceitou. Reprovada: devolve tudo. Desistência até `dias_arrependimento` dias do depósito: devolve tudo; depois,
+// a empresa fica com `retencao_pct` (padrão 40%). Dados ou documentos que não se confirmam na conferência contam como desistência
+// (`reprovada_conferencia`). A reserva é sempre abatida do 1º aluguel (competenciaReserva: em branco = mês de entrada).
+// --------------------------------------------------------------------------
+/** Condições da reserva pelas regras de agora (Sistema → Regras do sistema, grupo "Reserva e termo de aceite"). */
+export const condicoesDaReservaAgora = () => ({
+  retencao_pct: CR.regra('reserva_retencao_pct'), dias_arrependimento: CR.regra('reserva_dias_arrependimento'),
+  dias_uteis_documentos: CR.regra('reserva_dias_uteis_documentos'), dias_validade: CR.regra('reserva_dias_validade'),
+  dias_uteis_devolucao: CR.regra('reserva_dias_uteis_devolucao'),
+});
+/** Condições da ficha: as do termo aceito ou, sem aceite, as de agora. */
+export const condicoesDaReserva = (f) => ({ ...condicoesDaReservaAgora(), ...(((f && f.aceite_reserva) || {}).condicoes || {}) });
+/** Valor da reserva da ficha: o depositado ou, antes do depósito, o combinado no termo. */
+export const valorDaReserva = (f) => (f.reserva_valor > 0 ? f.reserva_valor : f.reserva_combinada > 0 ? f.reserva_combinada : 0);
+/** Quanto a empresa fica numa desistência depois do prazo. Ex.: R$ 500,00 com 40% → R$ 200,00. */
+export const retencaoDaReserva = (valor, pct) => Math.round((valor || 0) * (Number(pct) || 0) / 100);
+
+/**
+ * Prazos contados do depósito da reserva (null sem a data do depósito). Ex.: depósito na quinta, 10/12/2026 → documentos até
+ * 15/12/2026 (3 dias úteis), reservado até 17/12/2026 (7 dias) e desistência com tudo de volta até 17/12/2026 (7 dias).
+ */
+export function prazosDaReserva(f) {
+  if (!f || !/^\d{4}-\d{2}-\d{2}$/.test(String(f.reserva_data || ''))) return null;
+  const c = condicoesDaReserva(f);
+  return { documentos_ate: C.somarDiasUteis(f.reserva_data, c.dias_uteis_documentos), vale_ate: C.somarDias(f.reserva_data, c.dias_validade),
+    arrependimento_ate: C.somarDias(f.reserva_data, c.dias_arrependimento) };
+}
+
+/**
+ * Quanto devolver da reserva: { reserva, devolver, reter, integral, motivo }. ``data``: o dia da desistência (padrão: o da
+ * decisão; ficha ainda aberta: hoje, para mostrar "se desistir hoje"). Sem o termo aceito, devolve tudo (a pessoa não aceitou
+ * a retenção). Ex.: reserva de R$ 500,00, depósito em 10/12/2026, desistência em 20/12/2026 → devolve R$ 300,00, fica R$ 200,00.
+ */
+export function devolucaoDaReserva(f, { data = null, hoje = C.hojeIso() } = {}) {
+  const reserva = f && f.reserva_valor > 0 ? f.reserva_valor : 0;
+  const tudo = (motivo) => ({ reserva, devolver: reserva, reter: 0, integral: true, motivo });
+  if (!reserva) return { reserva: 0, devolver: 0, reter: 0, integral: true, motivo: 'sem reserva' };
+  if (!f.aceite_reserva) return tudo('sem o termo de aceite da reserva: devolve tudo');
+  if (f.situacao === 'Reprovada' && !f.reprovada_conferencia) return tudo('ficha não aprovada: devolve tudo');
+  const c = condicoesDaReserva(f);
+  const quando = data || (fichaSemContrato(f) ? f.decisao_data : null) || hoje;
+  const prazos = prazosDaReserva(f);
+  if (!prazos || quando <= prazos.arrependimento_ate) return tudo(`desistência em até ${c.dias_arrependimento} dias do depósito: devolve tudo`);
+  const reter = Math.min(retencaoDaReserva(reserva, c.retencao_pct), reserva);
+  const porque = f.situacao === 'Reprovada' ? 'dados ou documentos que não se confirmaram na conferência (conta como desistência)' : 'desistência';
+  return { reserva, devolver: reserva - reter, reter, integral: reter === 0,
+    motivo: `${porque} depois de ${c.dias_arrependimento} dias do depósito: a empresa fica com ${C.pct(c.retencao_pct)} (${C.reais(reter)}), como no termo aceito em ${C.dataBr(String(f.aceite_reserva.em).slice(0, 10))}` };
+}
+
+/** Último dia para devolver a reserva (reprovada ou desistência): a decisão mais os dias úteis do termo. */
+export const devolverReservaAte = (f) => (fichaSemContrato(f) && f.decisao_data ? C.somarDiasUteis(f.decisao_data, condicoesDaReserva(f).dias_uteis_devolucao) : null);
+
+/** Ficha sem os documentos marcados como recebidos (pessoais, renda e residência). */
+export const fichaSemDocumentos = (f) => !(f.doc_pessoais && f.doc_renda && f.doc_residencia);
+
+/**
+ * Guarda na ficha o aceite que veio do link (nuvem/aceite-reserva.mjs). Só a primeira vez de cada aceite (pelo instante):
+ * devolve true se mudou.
+ */
+export function guardarAceiteReserva(d, fichaId, resposta, usuario) {
+  const f = buscar(d, 'fichas', fichaId);
+  if (!f || !resposta || !resposta.em) return false;
+  if (f.aceite_reserva && f.aceite_reserva.em === resposta.em) return false;
+  const campos = ['em', 'email', 'canal', 'ip', 'aparelho', 'assinatura', 'texto_aceito', 'texto_sha256', 'condicoes', 'reserva_valor', 'comprovante_em'];
+  const aceite = Object.fromEntries(campos.filter((k) => resposta[k] !== undefined && resposta[k] !== null && resposta[k] !== '').map((k) => [k, resposta[k]]));
+  atualizar(d, 'fichas', f.id, { aceite_reserva: aceite }, usuario,
+    `Ficha de ${f.inquilino_nome}: termo de aceite da reserva aceito pelo link em ${C.dataHoraBr(resposta.em)} (e-mail ${resposta.email} confirmado pelo código)`);
+  return true;
+}
+
 /** Data em que os documentos da ficha reprovada (ou com desistência) são apagados (3 meses depois da decisão), ou null. */
 export const dataApagarDocumentosFicha = (f) => (fichaSemContrato(f) && f.decisao_data && !f.documentos_apagados_em ? C.somarMesesData(f.decisao_data, CR.regra('meses_documentos_ficha')) : null);
 
@@ -3000,7 +3073,7 @@ export const dataApagarDocumentosFicha = (f) => (fichaSemContrato(f) && f.decisa
  * situação e o motivo, a proposta (valores do imóvel, não da pessoa), as ligações (ids) e o dinheiro da reserva com os comprovantes.
  */
 const FICHA_FICA = new Set(['id', 'inquilino_nome', 'inquilino_tipo', 'situacao', 'decisao_data', 'decisao_por', 'decisao_motivo', 'data_recebida',
-  'imoveis_ids', 'modo_imoveis', 'pasta', 'documentos_apagados_em', 'dados_apagados_em', 'historico_limpo_em', 'documentos_no_contrato', 'criado_em', 'criado_por', 'alterado_em', 'alterado_por',
+  'imoveis_ids', 'modo_imoveis', 'pasta', 'documentos_apagados_em', 'reprovada_conferencia', 'link_aceite', 'dados_apagados_em', 'historico_limpo_em', 'documentos_no_contrato', 'criado_em', 'criado_por', 'alterado_em', 'alterado_por',
   ...COMPROVANTES_DINHEIRO_FICHA, ...CAMPOS_PROPOSTA_FICHA]);
 const fichaFica = (k) => FICHA_FICA.has(k) || /^(reserva|devolucao)_/.test(k) || /_ids?$/.test(k);
 
@@ -3015,7 +3088,9 @@ export function apagarDadosPessoaisDaFicha(d, fichaId, usuario, hoje = C.hojeIso
   const f = buscar(d, 'fichas', fichaId);
   if (!f) throw new C.ErroUsuario('Ficha não encontrada.');
   if (!fichaSemContrato(f)) throw new C.ErroUsuario('Só a ficha reprovada ou com desistência tem os dados pessoais apagados.');
-  const saem = Object.keys(f).filter((k) => !fichaFica(k) && f[k] !== null && f[k] !== undefined && f[k] !== '');
+  // reserva com parte retida: o termo aceito fica, como prova do combinado (LGPD, art. 16, I, e art. 7º, VI)
+  const retida = f.devolucao_valor > 0 && f.devolucao_valor < (f.reserva_valor || 0);
+  const saem = Object.keys(f).filter((k) => !fichaFica(k) && !(retida && k === 'aceite_reserva') && f[k] !== null && f[k] !== undefined && f[k] !== '');
   for (const k of saem) f[k] = null;
   f.dados_apagados_em = hoje;
   // e-mails mandados para a pessoa: sai o endereço
@@ -3044,12 +3119,20 @@ export const fichasComDadosVencidos = (d, hoje = C.hojeIso()) => (d.fichas || []
 export const fichasComDocumentosVencidos = (d, hoje = C.hojeIso()) => (d.fichas || []).filter((f) => dataApagarDocumentosFicha(f) && dataApagarDocumentosFicha(f) <= hoje);
 
 /** O que falta fazer nas fichas, para o Painel: [{ ficha, texto }]. */
-export function pendenciasDasFichas(d) {
+export function pendenciasDasFichas(d, hoje = C.hojeIso()) {
   const out = [];
   for (const f of d.fichas || []) {
     if (f.situacao === 'Em análise') out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome} em análise desde ${C.dataBr(f.data_recebida)}` });
     else if (imoveisParaContrato(d, f).length) out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome} aprovada: falta fazer o contrato` });
-    if (devolucaoPendente(f)) out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome} ${f.situacao === 'Desistiu' ? 'com desistência' : 'reprovada'}: registrar a devolução da reserva de ${C.reais(f.reserva_valor)}` });
+    if (devolucaoPendente(f)) {
+      const dv = devolucaoDaReserva(f);
+      const ate = devolverReservaAte(f);
+      out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome} ${f.situacao === 'Desistiu' ? 'com desistência' : 'reprovada'}: registrar a devolução ${dv.integral ? `da reserva de ${C.reais(f.reserva_valor)}` : `de ${C.reais(dv.devolver)} da reserva de ${C.reais(f.reserva_valor)} (fica ${C.reais(dv.reter)}, como no termo)`}${ate ? (ate < hoje ? ` (o prazo era ${C.dataBr(ate)})` : ` até ${C.dataBr(ate)}`) : ''}` });
+    }
+    // termo aceito (2026-11-24): prazo dos documentos e validade da reserva, contados do depósito
+    const pz = f.situacao === 'Em análise' && f.aceite_reserva ? prazosDaReserva(f) : null;
+    if (pz && pz.documentos_ate < hoje && fichaSemDocumentos(f)) out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome}: o prazo dos documentos acabou em ${C.dataBr(pz.documentos_ate)} e eles não estão marcados como recebidos (o termo diz que a reserva é cancelada: decida)` });
+    else if (pz && pz.vale_ate < hoje) out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome}: a reserva segurava o imóvel até ${C.dataBr(pz.vale_ate)} (decida a ficha)` });
   }
   return out;
 }

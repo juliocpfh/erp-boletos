@@ -2,6 +2,7 @@
 // Funções puras (rodam no Node, tests/emails.test.mjs). Valores em centavos viram "R$ 1.234,56"; datas viram "dd/mm/aaaa".
 import * as C from './calculos.js';
 import * as FO from './ficha-online.js';
+import * as TR from './termo-reserva.js';
 import * as K from './contratos.js';
 import { MODELOS_EMAIL } from './modelos-email.js';
 import * as NT from './notificacoes.js';
@@ -86,6 +87,39 @@ function linkDaFicha(f, pessoa, hoje) {
   const naAba = f && FO.urlDoLink(f.id, pessoa);
   return l && !l.encerrado && naAba && String(l.vence_em).slice(0, 10) >= hoje ? { url: naAba.url, validade: C.dataBr(String(l.vence_em).slice(0, 10)) } : { url: '', validade: '' };
 }
+
+/**
+ * Campos do termo de aceite da reserva (2026-11-24): as condições do termo (as aceitas ou, sem aceite, as de agora), o link do
+ * aceite desta aba e o que fica numa desistência. Ex.: reserva combinada de R$ 500,00 com 40% → retencao "40%",
+ * retencao_valor "R$ 200,00", devolve_depois "R$ 300,00".
+ */
+function camposDoTermo(f, hoje) {
+  if (!f) return {};
+  const c = R.condicoesDaReserva(f);
+  const valor = R.valorDaReserva(f);
+  const reter = R.retencaoDaReserva(valor, c.retencao_pct);
+  const link = TR.urlDoAceite(f.id);
+  const pz = R.prazosDaReserva(f);
+  const dv = R.fichaSemContrato(f) ? R.devolucaoDaReserva(f) : null;
+  return {
+    reserva_combinada: valor ? C.reais(valor) : '', dias_validade: String(c.dias_validade), dias_documentos: String(c.dias_uteis_documentos),
+    dias_arrependimento: String(c.dias_arrependimento), dias_devolucao: String(c.dias_uteis_devolucao), retencao: C.pct(c.retencao_pct),
+    retencao_valor: C.reais(reter), devolve_depois: C.reais(valor - reter),
+    requisitos: String(f.requisitos || '').split(/\n+/).map((x) => x.trim()).filter(Boolean).map((x) => `- ${x}`).join('\n'),
+    link_termo: link && String(link.vence_em).slice(0, 10) >= hoje ? link.url : '', link_termo_validade: link ? C.dataBr(String(link.vence_em).slice(0, 10)) : '',
+    aceite_data: f.aceite_reserva ? C.dataBr(String(f.aceite_reserva.em).slice(0, 10)) : '',
+    desistencia: f.aceite_reserva ? REC.textoDesistencia(f) : '',
+    prazo_documentos: f.aceite_reserva && pz ? C.dataBr(pz.documentos_ate) : '',
+    devolver_reserva: dv ? C.reais(dv.devolver) : '', reter_reserva: dv ? C.reais(dv.reter) : '',
+  };
+}
+const condicoesDoTermo = (f) => {
+  if (!f) return {};
+  const c = R.condicoesDaReserva(f);
+  const dv = R.fichaSemContrato(f) ? R.devolucaoDaReserva(f) : null;
+  return { retencao: R.retencaoDaReserva(R.valorDaReserva(f), c.retencao_pct) > 0, requisitos: !!String(f.requisitos || '').trim(), link_termo: !!TR.urlDoAceite(f.id),
+    termo_aceito: !!f.aceite_reserva, prazo_documentos: !!(f.aceite_reserva && R.prazosDaReserva(f)), retencao_aplicada: !!(dv && !dv.integral) };
+};
 
 /**
  * Campos do boleto para os e-mails da régua de cobrança (modelos com ``boleto``): põe em ``campos`` e devolve as condições.
@@ -195,6 +229,7 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
     link: linkDaFicha(f, 'interessado', hoje).url, link_validade: linkDaFicha(f, 'interessado', hoje).validade,
     link_fiador: fiadoresLink.length ? fiadoresLink[0].url : '', links_fiadores: linksFiadores,
     conta_deposito: K.dadoDaEmpresa(d, doImovel, 'conta_deposito'),
+    ...camposDoTermo(f, hoje),
   };
   const condicoes = {
     ...g, pj, bonificacao: desconto > 0, reserva: p.reserva_valor > 0, contas: contas.length > 0,
@@ -209,6 +244,7 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
     garantia_depositada: !!c && REC.reciboDisponivel(d, 'garantia', { contrato: c }).ok,
     varios_fiadores: !!f && R.fiadoresDaFicha(f).length > 1,
     devolucao: !!(f && f.devolucao_data),
+    ...condicoesDoTermo(f),
   };
   if (alvo.cobranca) Object.assign(condicoes, camposDoBoleto(alvo.cobranca, campos, hoje));
   const a = alvo.aditivo || null;

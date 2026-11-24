@@ -324,7 +324,7 @@ export function alvoDoRecibo(q) {
 }
 
 /** E-mail da etapa que leva cada recibo (o "Enviar ao inquilino" da caixa da assinatura). */
-const EMAIL_DO_RECIBO = { reserva: 'ficha_envio', devolucao_reserva: 'ficha_devolucao', garantia: 'contrato_assinado', quitacao: 'saida_encerramento', notificacao: 'notificacao_envio' };
+const EMAIL_DO_RECIBO = { termo_reserva: 'ficha_termo_reserva', reserva: 'ficha_envio', devolucao_reserva: 'ficha_devolucao', garantia: 'contrato_assinado', quitacao: 'saida_encerramento', notificacao: 'notificacao_envio' };
 
 /**
  * Caixa da assinatura digital na página do recibo (regra `assinatura_digital`, pedido do dono de 2026-11-21): o "Baixar PDF"
@@ -363,6 +363,7 @@ export function reciboHtml(r) {
     ${r.paragrafos.map(par).join('')}
     ${r.tabela.length ? `<table class="carta-tabela" style="width:100%">${r.tabela.map(linha).join('')}</table>` : ''}
     ${r.depois.map(par).join('')}
+    ${r.imagem && /^data:image\/png;base64,/.test(r.imagem.src) ? `<p>${esc(r.imagem.rotulo)}<br><img src="${esc(r.imagem.src)}" alt="Assinatura" style="max-width:320px;border-bottom:1px solid #999"></p>` : ''}
     <p class="carta-data">${esc(r.cidade)}, ${K.dataPorExtenso(r.data, { zero: false })}.</p>
     ${r.assinaturas.map((a) => `<p style="margin-top:48px;text-align:center">_______________________________________<br><b>${esc(a.nome)}</b>${a.linha ? `<br>${esc(a.linha)}` : ''}</p>`).join('')}</div>`;
 }

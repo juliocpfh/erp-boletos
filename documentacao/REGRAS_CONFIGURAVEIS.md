@@ -99,6 +99,20 @@ Tabela nova em `TABELAS` (ex.: `config_regras`, só administrador grava), lida p
 tela em Empresas ou Sistema, testes em `tests/`, `DECISOES.md` e `REGRAS_TEXTO` atualizados. Itens C3–C6 entram no
 contrato como campos que o texto do modelo usa; isso precisa ser combinado com a sessão que revisa o contrato.
 
+## Reserva e termo de aceite (24/11/2026)
+
+Grupo novo em Regras do sistema (`grupo: 'reserva'`, `config-regras.js`). Todas são da empresa toda (não entram em `REGRAS_POR_CONTRATO`:
+a ficha ainda não tem contrato). O aceite pelo link guarda as condições do dia (`fichas.aceite_reserva.condicoes`): mudar a regra só vale
+para os termos aceitos depois.
+
+| Chave | Regra | Padrão | Exemplo | Lei |
+|---|---|---|---|---|
+| `reserva_retencao_pct` | Desistência depois do prazo: a empresa fica com (%) | 40 | Reserva de R$ 500,00 → fica R$ 200,00, devolve R$ 300,00. **Dono ainda confirma** (juízes costumam aceitar 10% a 25%) | CC arts. 413, 418 e 420; CDC arts. 49 e 51, IV |
+| `reserva_dias_arrependimento` | Desistência com tudo de volta até (dias do depósito) | 7 (mínimo 7) | Depósito em 10/12/2026 → até 17/12/2026 | CDC art. 49 |
+| `reserva_dias_uteis_documentos` | Prazo dos documentos (dias úteis do depósito) | 3 | Depósito na quinta, 10/12/2026 → até terça, 15/12/2026 | CC art. 421 (o combinado) |
+| `reserva_dias_validade` | A reserva segura o imóvel por (dias) | 7 | Até 17/12/2026 | CC art. 421 |
+| `reserva_dias_uteis_devolucao` | Prazo da devolução (dias úteis da decisão) | 5 | Reprovada em 14/12/2026 → até 21/12/2026 | CDC art. 49, parágrafo único; CC art. 418 |
+
 ## Regras especiais por contrato (18/11/2026)
 
 Pedido do dono: alguns contratos fogem do habitual. Em Regras do sistema → **Regras especiais** o administrador cria grupos com nome

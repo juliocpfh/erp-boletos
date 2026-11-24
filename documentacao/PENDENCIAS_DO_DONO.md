@@ -11,7 +11,17 @@
 4. [ ] **Mandar o boleto feito à mão por e-mail** (enquanto a API do C6 não sai): em Boletos, anexar o PDF do boleto emitido no banco e enviar ao inquilino pelo Gmail um e-mail curto com o descritivo (como no boleto), o mês de competência, o vencimento e o boleto anexado. Hoje a equipe manda sempre esse e-mail por fora; agora quer mandar pelo sistema.
 5. [ ] **Conferir tudo o que entra e sai do boleto** (aluguel, proporcional, IPTU, condomínio, seguro, ressarcimentos, abatimentos, multas da notificação, diferenças, caução, acordo, reserva, NF), com testes automáticos e de tela.
 
-### B. Termo de aceite da reserva (decisões do dono em 24/11)
+### B. Termo de aceite da reserva (decisões do dono em 24/11) — [x] programado em 24/11 (PR "Termo de aceite da reserva"); faltam as 2 confirmações abaixo e o teste do dono
+
+**Feito (24/11):** na página da ficha, a caixa "Termo de aceite da reserva": e-mail "Condições e termo da reserva" e link do aceite (código no e-mail, PDF do aceite) → depósito da reserva → ficha e documentos pelo link. O % e os prazos estão em Sistema → Regras do sistema → "Reserva e termo de aceite". A pessoa vê o que mandou e corrige (troca e apaga documento) até a equipe conferir; a equipe é avisada a cada dado e documento. Decisões em `DECISOES.md` (24/11).
+
+**Ainda falta o dono:**
+- [ ] **Confirmar os 40%** (ou trocar em Regras do sistema; os termos já aceitos ficam com o % do dia).
+- [ ] **Confirmar o texto** "Dados ou documentos que não se confirmarem na conferência contam como desistência" (item 6 do termo).
+- [ ] Ler o termo inteiro (ficha de teste → caixa do termo → "Ver o termo como a pessoa vai ler" ou o PDF) e testar o link com um conhecido.
+- [ ] Conferir em Sistema → Empresas o campo "Conta para depósito da caução e da reserva" (vai no termo e no comprovante).
+- [ ] Decidir se o termo diz o que acontece quando **a empresa** desiste (a lei das arras manda devolver em dobro, CC art. 418; hoje o termo não fala nisso).
+
 1. **Desistência:** em até 7 dias devolve tudo. Depois de 7 dias a empresa fica com **40%** (reserva de R$ 500,00: devolve R$ 300,00 e fica com R$ 200,00); **falta confirmar se 40% é aceitável pela lei** (o Claude explicou os riscos no chat de 24/11). Ficha reprovada: devolve tudo. "Documento falso": o dono quer ficar com tudo, mas perguntou se pode acusar sem prova. **Em aberto até ele responder** (sugestão do Claude: no texto, não falar em "falso"; falar em "informação ou documento que não se confirma na conferência", e tratar como desistência).
 2. **Prazos:** o texto avisa antes que a pessoa tem **3 dias úteis para mandar os documentos, senão a reserva é cancelada** (para ela andar com a documentação). Avisar a equipe a cada dado novo e a cada documento enviado. A pessoa pode **ver o que já mandou e corrigir dados e documentos** (trocar e apagar o anexo errado).
 3. **Onde entra a reserva:** sempre **abatida do 1º aluguel**, com o texto explicando que vai para esse fim.
@@ -32,7 +42,7 @@ A simulação de todas as etapas (item 5b) fica para depois que o Claude fizer a
 
 Tudo o que foi pedido até 22/11 está na `main` (PRs #335 a #361). O que **você** precisa fazer, na ordem:
 
-1. [ ] **PRIORIDADE: Termo de aceite da reserva** (pedido em 18/11; **nada programado ainda**, parado porque faltam 3 decisões suas). Hoje o sistema começa no "Novo pedido de reserva", com a reserva já combinada. A etapa de antes não existe: nas Fichas abertas, uma **mensagem para quem demonstrou interesse** com as condições do imóvel (endereço, aluguel, seguro e IPTU estimados, vencimento, garantia, requisitos e documentos) → **aceite pelo link** (código no e-mail, PDF do aceite) → **depósito da reserva** → pedido de reserva. Decidir (sugestão de 19/11, com reserva de R$ 500,00):
+1. [ ] **PRIORIDADE: Termo de aceite da reserva** (pedido em 18/11; **programado em 24/11** com as decisões de 24/11: veja o item B de "PEDIDOS DE 24/11/2026", acima, com o que falta você confirmar e testar; o texto abaixo é o histórico). Hoje o sistema começa no "Novo pedido de reserva", com a reserva já combinada. A etapa de antes não existe: nas Fichas abertas, uma **mensagem para quem demonstrou interesse** com as condições do imóvel (endereço, aluguel, seguro e IPTU estimados, vencimento, garantia, requisitos e documentos) → **aceite pelo link** (código no e-mail, PDF do aceite) → **depósito da reserva** → pedido de reserva. Decidir (sugestão de 19/11, com reserva de R$ 500,00):
    1. **Desistência:** em até 7 dias, devolve tudo (CDC art. 49); depois disso a empresa fica com 20% (devolve R$ 400,00, fica com R$ 100,00); ficha reprovada devolve tudo; documento falso, a empresa fica com tudo.
    2. **Prazos:** documentos em 3 dias úteis; a reserva vale 10 dias; devolução em 5 dias úteis.
    3. **Onde a reserva entra:** na caução (sugestão: descontar do 1º aluguel pode ser visto como aluguel adiantado) ou no 1º aluguel.

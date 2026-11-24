@@ -379,9 +379,12 @@ export function camposDaPessoa(nomesDaPessoa) {
 export const FICHA_INICIO = [
   secao('Ficha'),
   campo('data_recebida', 'Ficha recebida em', 'data', { obrig: true }),
-  campo('situacao', 'Situação', 'opcao', { obrig: true, padrao: 'Em análise', opcoes: ['Em análise', 'Aprovada', 'Reprovada', 'Desistiu'], ajuda: 'Aprovada: na página da ficha aparece o botão para fazer o contrato. Desistiu: o interessado não segue e a reserva é devolvida por inteiro (com contrato já gerado, use o botão "Desistiu antes de assinar" na página da ficha)' }),
+  campo('situacao', 'Situação', 'opcao', { obrig: true, padrao: 'Em análise', opcoes: ['Em análise', 'Aprovada', 'Reprovada', 'Desistiu'], ajuda: 'Aprovada: na página da ficha aparece o botão para fazer o contrato. Desistiu: o interessado não segue e a reserva é devolvida conforme o termo de aceite (sem termo, por inteiro; com contrato já gerado, use o botão "Desistiu antes de assinar" na página da ficha)' }),
   campo('decisao_data', 'Data da decisão', 'data', { ...quando('situacao', 'Aprovada', 'Reprovada', 'Desistiu'), ajuda: 'Em branco: hoje' }),
   campo('decisao_motivo', 'Motivo / observação da decisão', 'area', { largo: true, linha: true, ...quando('situacao', 'Aprovada', 'Reprovada', 'Desistiu') }),
+  // termo de aceite da reserva (2026-11-24): dado ou documento que não se confirma na conferência conta como desistência
+  campo('reprovada_conferencia', 'Reprovada porque dados ou documentos não se confirmaram na conferência', 'simnao', { ...quando('situacao', 'Reprovada'), largo: true,
+    ajuda: 'Conta como desistência: depois do prazo de arrependimento do termo aceito, a empresa fica com a parte combinada da reserva. Desmarcado: a reserva volta por inteiro' }),
 ];
 
 /** Tipos de renda da ficha: cada um tem a sua lista de documentos (R.DOCUMENTOS_RENDA, regras.js). */
@@ -430,6 +433,7 @@ export const FICHA_FIM = [
   campo('bonificacao', 'Tem bonificação (desconto) por pontualidade', 'simnao', { padrao: true, colado: true }),
   campo('garantia_tipo', 'Tipo de garantia', 'opcao', { opcoes: GARANTIAS }),
   campo('prazo_meses', 'Prazo do contrato (meses)', 'inteiro', { ajuda: 'Ex.: 30. Vai no e-mail da ficha, no recibo da reserva e no contrato' }),
+  campo('requisitos', 'Requisitos para a aprovação (vão no termo da reserva)', 'area', { largo: true, ajuda: 'Opcional. Ex.: renda de pelo menos 3 vezes o aluguel; sem restrição no nome. A lista de documentos e a garantia já vão sozinhas' }),
   // o que está incluso (pedido do dono em 2026-11-13): sai no e-mail da ficha e no recibo da reserva, e vai para o contrato
   secao('O que está incluso (vai na proposta e no contrato)'),
   campo('conta_iptu', 'IPTU', 'opcao', { opcoes: SITUACOES_CONTA, padrao: SITUACOES_CONTA[0] }),
@@ -438,12 +442,13 @@ export const FICHA_FIM = [
   campo('seguro_estimado', 'Seguro por ano (estimado)', 'dinheiro', { ...quando('conta_seguro', 'Por conta do inquilino'), ajuda: 'Ex.: R$ 250,00, parcelado no boleto. Só informa: o valor certo vem da apólice' }),
   ...CONTAS.map(([nome, rotulo]) => campo(nome, rotulo, 'opcao', { opcoes: SITUACOES_CONTA, padrao: contaPadrao(nome) })),
   secao('Reserva'),
-  campo('reserva_valor', 'Valor da reserva', 'dinheiro'),
+  campo('reserva_combinada', 'Reserva combinada (vai no termo de aceite)', 'dinheiro', { ajuda: 'Ex.: R$ 500,00. É o valor que a pessoa aceita no termo antes de depositar. Depois do depósito, preencha o valor e a data abaixo' }),
+  campo('reserva_valor', 'Valor da reserva depositada', 'dinheiro'),
   campo('reserva_data', 'Data da reserva', 'data'),
   comprovante('comprovante_reserva', 'Comprovante da reserva', { ajuda: 'PDF ou foto do comprovante da reserva. Ao fazer o contrato, ele vai junto para a pasta do inquilino' }),
   { secao: 'Devolução da reserva (ficha reprovada ou desistência)', ...quando('situacao', 'Reprovada', 'Desistiu') },
   campo('devolucao_data', 'Reserva devolvida em', 'data', quando('situacao', 'Reprovada', 'Desistiu')),
-  campo('devolucao_valor', 'Valor devolvido', 'dinheiro', { ...quando('situacao', 'Reprovada', 'Desistiu'), ajuda: 'Em branco: o valor da reserva' }),
+  campo('devolucao_valor', 'Valor devolvido', 'dinheiro', { ...quando('situacao', 'Reprovada', 'Desistiu'), ajuda: 'Em branco: o valor do termo de aceite (a reserva inteira, ou menos a parte combinada na desistência depois do prazo); sem termo, a reserva inteira' }),
   comprovante('comprovante_devolucao', 'Comprovante da devolução', { ...quando('situacao', 'Reprovada', 'Desistiu'), ajuda: 'PDF ou foto do comprovante da devolução' }),
   secao('Observações'),
   campo('observacoes', 'Observações da análise', 'area'),
@@ -625,7 +630,7 @@ export const EMITENTE = [
   campo('assinatura_email', 'Nome que assina os e-mails', 'texto', { ajuda: 'Vai depois de "Atenciosamente," no fim de todo e-mail. Ex.: Administradora' }),
   campo('email_contato', 'E-mail da administração', 'email', { ajuda: 'Vai embaixo do nome, no fim de todo e-mail. Ex.: contato@imobiliariaexemplo.com.br' }),
   campo('assinatura_mensagens', 'Assinatura dos lembretes de boleto', 'texto', { ajuda: 'Vai no fim do lembrete por e-mail ou WhatsApp. Ex.: Imobiliária Exemplo' }),
-  campo('conta_deposito', 'Conta para depósito da caução', 'area', { largo: true, ajuda: 'Titular, banco, agência, conta e Pix, como devem sair no e-mail do contrato para assinar. Sem ela, o e-mail mostra "[preencher: conta_deposito]"' }),
+  campo('conta_deposito', 'Conta para depósito da caução e da reserva', 'area', { largo: true, ajuda: 'Titular, banco, agência, conta e Pix, como devem sair no e-mail do contrato para assinar e no termo da reserva. Sem ela, o e-mail mostra "[preencher: conta_deposito]"' }),
 ];
 
 export const USUARIO = [

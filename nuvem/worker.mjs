@@ -19,6 +19,8 @@
 //   sozinho dados/tudo, a carga/substituição e a entrada do programa do PC.
 // · contatos/… (link, lista, encerrar): o comunicado com confirmação de contatos (contatos-publico.mjs; página em /contatos no
 //   endereço da ficha).
+// · aceite-reserva/… (link, ler, encerrar): o termo de aceite da reserva (aceite-reserva.mjs; página em /reserva no endereço
+//   da ficha).
 // · ficha-online/… (link, pdf, lista, atualizar): a ficha cadastral pela internet (ficha-publica.mjs). O endereço da ficha
 //   (HOST_FICHA, ficha.ankjck.com.br) não passa pelo login: lá só respondem a página e as rotas /api/publico/ da ficha.
 // Detalhes e decisões: documentacao/ESTUDO_DADOS_NUVEM.md.
@@ -27,6 +29,7 @@ import { crachaValido, ERRO_ENTRAR, hashDoCracha } from './aparelhos.mjs';
 import { avisar } from './avisos-ficha.mjs';
 import { SO_SE_NOVO, atenderEquipe, atenderFicha, lerAteLimite } from './ficha-publica.mjs';
 import { atenderEquipeContatos } from './contatos-publico.mjs';
+import { atenderEquipeAceite } from './aceite-reserva.mjs';
 import { ErroAssinatura, atenderAparelhoAssinaturas, atenderEquipeAssinaturas } from './assinaturas.mjs';
 import {
   ErroEmail, MAX_BYTES_ANEXOS, MAX_PEDIDO, cifrarToken, clienteConfigurado, contaGuardada, decifrarToken, enderecoDeRetorno, enviarEmail,
@@ -202,6 +205,7 @@ export function rotaDoRegistro(rota, metodo) {
   if (rota.startsWith('email/google/')) return [rota, true]; // ligar e desligar o Gmail (só o caminho: o código do Google não entra)
   if (rota.startsWith('ficha-online/')) return [`${metodo === 'GET' ? '' : `${metodo} `}${rota}`, metodo !== 'GET'];
   if (rota.startsWith('contatos/')) return [`${metodo === 'GET' ? '' : `${metodo} `}${rota}`, metodo !== 'GET'];
+  if (rota.startsWith('aceite-reserva/')) return [`${metodo === 'GET' ? '' : `${metodo} `}${rota}`, metodo !== 'GET'];
   return null;
 }
 
@@ -695,6 +699,11 @@ async function atenderComLogin(request, env, rota, email, url, buscar, ctx) {
     if (m !== 'GET') conferirGravacao(request, env);
     await exigirPapel(env, email, 'operador');
     return await atenderEquipeContatos(request, env, rota.slice(9), email);
+  }
+  if (rota.startsWith('aceite-reserva/')) { // termo de aceite da reserva (aceite-reserva.mjs)
+    if (m !== 'GET') conferirGravacao(request, env);
+    await exigirPapel(env, email, 'operador');
+    return await atenderEquipeAceite(request, env, rota.slice('aceite-reserva/'.length), email);
   }
   if (rota === 'assinaturas' || rota.startsWith('assinaturas/')) { // fila da assinatura digital (assinaturas.mjs)
     return await atenderEquipeAssinaturas(request, env, rota.slice('assinaturas/'.length), email, { exigir: (nivel) => exigirPapel(env, email, nivel), conferirGravacao: () => conferirGravacao(request, env) });

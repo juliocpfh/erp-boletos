@@ -9,6 +9,7 @@ export const GRUPOS_REGRAS = [
   ['aluguel', 'Aluguel e cobrança'],
   ['garantia', 'Garantia e FCI'],
   ['contrato', 'Novo contrato (valores que vêm preenchidos)'],
+  ['reserva', 'Reserva e termo de aceite'],
   ['rotina', 'Régua de cobrança e prazos de rotina'],
 ];
 
@@ -136,6 +137,28 @@ export const DEFINICOES_REGRAS = [
       ['Incluso no aluguel', 'Incluso no aluguel', 'O locador paga, como diz a lei quando o contrato não fala nada. Legal.']],
     // sem "Não tem" (decisão do dono de 2026-11-20: o seguro contra incêndio sempre existe); escolha antiga "Não tem" volta ao padrão
     explica: 'Quem paga o seguro obrigatório nos contratos novos (o seguro sempre existe).', consequencia: 'Só muda o que vem preenchido.', lei: LI + ', art. 22, VIII.' },
+
+  // ------------------------------------------------------------------ reserva (termo de aceite, decisões do dono de 2026-11-24)
+  { chave: 'reserva_retencao_pct', grupo: 'reserva', rotulo: 'Desistência depois do prazo de arrependimento: a empresa fica com (%) da reserva', tipo: 'pct', padrao: 40, min: 0, max: 100,
+    explica: 'Vale para quem aceitou o termo da reserva e desistiu depois do prazo de arrependimento (abaixo), ou teve dados ou documentos que não se confirmaram na conferência. Ex.: reserva de R$ 500,00 com 40% → a empresa fica com R$ 200,00 e devolve R$ 300,00. Ficha reprovada e desistência dentro do prazo: devolve tudo. O termo guarda o % do dia do aceite: mudar aqui não muda os termos já aceitos.',
+    consequencia: 'Muda o % dos termos aceitos daqui em diante. Atenção: os juízes costumam aceitar de 10% a 25%; acima disso, o juiz pode reduzir (Código Civil, art. 413) e a cláusula pode ser vista como abusiva (CDC, art. 51, IV). Ficar com tudo é o que mais perde na Justiça.',
+    lei: 'Código Civil, arts. 413 (o juiz reduz a penalidade excessiva), 418 e 420 (sinal e arras de arrependimento); Código de Defesa do Consumidor, arts. 49 (7 dias para desistir do que foi contratado fora da loja, como pela internet) e 51, IV (cláusula que tira do consumidor vantagem demais).' },
+  { chave: 'reserva_dias_arrependimento', grupo: 'reserva', rotulo: 'Desistência com a reserva devolvida por inteiro: até quantos dias depois do depósito', tipo: 'inteiro', padrao: 7, min: 7, max: 60,
+    explica: 'Dentro deste prazo, contado do depósito da reserva, quem desiste recebe tudo de volta. Ex.: depósito em 10/12/2026 e 7 dias → desistência até 17/12/2026 devolve tudo; em 18/12/2026, vale o % acima.',
+    consequencia: 'Muda o prazo dos termos aceitos daqui em diante. Menos de 7 dias não é permitido: o aceite é feito pela internet.',
+    lei: 'Código de Defesa do Consumidor, art. 49 (direito de arrependimento de 7 dias, com a devolução de tudo o que foi pago).' },
+  { chave: 'reserva_dias_uteis_documentos', grupo: 'reserva', rotulo: 'Prazo para mandar os documentos depois do depósito (dias úteis)', tipo: 'inteiro', padrao: 3, min: 1, max: 15,
+    explica: 'O termo avisa: sem os documentos neste prazo, a reserva é cancelada. Passado o prazo sem os documentos marcados na ficha, o Painel avisa a equipe. Ex.: depósito na quinta, 10/12/2026, e 3 dias úteis → documentos até terça, 15/12/2026.',
+    consequencia: 'Muda o prazo dos termos aceitos daqui em diante e o aviso do Painel. O cancelamento não é automático: a equipe decide.',
+    lei: 'Sem lei específica: é o combinado no termo (Código Civil, art. 421).' },
+  { chave: 'reserva_dias_validade', grupo: 'reserva', rotulo: 'A reserva segura o imóvel por (dias) depois do depósito', tipo: 'inteiro', padrao: 7, min: 1, max: 60,
+    explica: 'Enquanto a ficha é analisada, o imóvel fica reservado para a pessoa. Passado o prazo sem decisão, o Painel avisa. Ex.: depósito em 10/12/2026 e 7 dias → reservado até 17/12/2026.',
+    consequencia: 'Muda o prazo dos termos aceitos daqui em diante e o aviso do Painel.',
+    lei: 'Sem lei específica: é o combinado no termo (Código Civil, art. 421).' },
+  { chave: 'reserva_dias_uteis_devolucao', grupo: 'reserva', rotulo: 'Prazo para devolver a reserva (dias úteis)', tipo: 'inteiro', padrao: 5, min: 1, max: 30,
+    explica: 'Contado da reprovação ou da desistência. Ex.: ficha reprovada na segunda, 14/12/2026, e 5 dias úteis → devolver até segunda, 21/12/2026. O Painel avisa quando o prazo passa.',
+    consequencia: 'Muda o prazo dos termos aceitos daqui em diante, o e-mail da ficha reprovada e o aviso do Painel.',
+    lei: 'Código de Defesa do Consumidor, art. 49, parágrafo único (devolução imediata no arrependimento); Código Civil, art. 418.' },
 
   // ------------------------------------------------------------------ rotina
   { chave: 'regua_cobranca', grupo: 'rotina', rotulo: 'Régua de cobrança', tipo: 'regua',

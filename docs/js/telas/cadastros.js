@@ -564,10 +564,14 @@ export const CADASTROS = {
     voltar: (r) => (r ? `#/ficha/${r.id}` : '#/inquilinos'),
     destino: (salvo) => `#/ficha/${salvo.id}`,
     descricao: (dados) => `Ficha de ${dados.inquilino_nome}`,
-    // o recibo da reserva promete devolução por inteiro: devolver só uma parte pede confirmação
-    conferir: (dados, r) => (R.fichaSemContrato(dados) && dados.devolucao_valor > 0 && dados.devolucao_valor < dados.reserva_valor
-      && (!r || r.devolucao_valor !== dados.devolucao_valor || r.reserva_valor !== dados.reserva_valor)
-      ? [`Devolução de ${reais(dados.devolucao_valor)} de uma reserva de ${reais(dados.reserva_valor)}: ficam ${reais(dados.reserva_valor - dados.devolucao_valor)} sem devolver. O recibo da reserva promete a devolução por inteiro; o alerta "devolver a reserva" some e o termo sai como devolução de parte.`] : []),
+    // devolver menos do que diz o termo de aceite (sem termo: a reserva inteira) pede confirmação
+    conferir: (dados, r) => {
+      if (!(R.fichaSemContrato(dados) && dados.devolucao_valor > 0 && dados.devolucao_valor < dados.reserva_valor)) return [];
+      if (r && r.devolucao_valor === dados.devolucao_valor && r.reserva_valor === dados.reserva_valor) return [];
+      const certo = R.devolucaoDaReserva({ ...r, ...dados });
+      if (dados.devolucao_valor === certo.devolver) return [];
+      return [`Devolução de ${reais(dados.devolucao_valor)} de uma reserva de ${reais(dados.reserva_valor)}: ficam ${reais(dados.reserva_valor - dados.devolucao_valor)} sem devolver. ${certo.integral ? 'Pelo termo (ou sem termo aceito), a reserva volta por inteiro' : `Pelo termo aceito, o certo é devolver ${reais(certo.devolver)}`}; o alerta "devolver a reserva" some e o termo de devolução sai como devolução de parte.`];
+    },
     ajustar(dados, erros, r, form) {
       const hoje = C.hojeIso();
       // pedido de reserva: começa em análise; o link da ficha vai pelo e-mail ou pelo WhatsApp
@@ -594,6 +598,7 @@ export const CADASTROS = {
       }
       if (comContrato.length && dados.situacao !== 'Aprovada') erros.situacao = dados.situacao === 'Desistiu' ? 'Esta ficha já virou contrato: use o botão "Desistiu antes de assinar" na página da ficha (ele cancela o contrato não assinado)' : 'Esta ficha já virou contrato: a situação fica "Aprovada"';
       // decisão: data (em branco: hoje) e quem decidiu; voltou para "Em análise": sem decisão
+      if (dados.situacao !== 'Reprovada') dados.reprovada_conferencia = null;
       if (dados.situacao === 'Em análise') { dados.decisao_data = null; dados.decisao_por = null; } else {
         dados.decisao_data = dados.decisao_data || hoje;
         dados.decisao_por = r && r.situacao === dados.situacao && r.decisao_por ? r.decisao_por : login();
@@ -613,13 +618,15 @@ export const CADASTROS = {
         erros.situacao = `A reserva de ${reais(r.reserva_valor || 0)} já foi devolvida${r.devolucao_data ? ` em ${dataBr(r.devolucao_data)}` : ''}${r.devolucao_valor ? ` (${reais(r.devolucao_valor)})` : ''}. Para reabrir a ficha, apague o valor da reserva (ela já foi devolvida; a devolução fica no Histórico). Se a pessoa fizer nova reserva, lance depois, com a data e o comprovante novos.`;
       }
       if (!R.fichaSemContrato(dados)) { dados.devolucao_data = null; dados.devolucao_valor = null; } else {
-        if (dados.devolucao_data && !dados.devolucao_valor) dados.devolucao_valor = dados.reserva_valor || null;
+        // em branco: o que diz o termo de aceite (a reserva inteira, ou menos a parte combinada na desistência depois do prazo)
+        if (dados.devolucao_data && !dados.devolucao_valor) dados.devolucao_valor = R.devolucaoDaReserva({ ...r, ...dados }).devolver || dados.reserva_valor || null;
         if (dados.devolucao_valor > 0 && !dados.devolucao_data) erros.devolucao_data = 'Informe a data da devolução';
         else if (dados.devolucao_data && dados.devolucao_data > hoje) erros.devolucao_data = 'A devolução não pode ser numa data futura (registre depois de devolver)';
         else if (dados.devolucao_data && dados.reserva_data && dados.devolucao_data < dados.reserva_data) erros.devolucao_data = `A devolução não pode ser antes da reserva (${dataBr(dados.reserva_data)})`;
         if (dados.devolucao_valor > (dados.reserva_valor || 0)) erros.devolucao_valor = `A devolução não pode passar da reserva (${reais(dados.reserva_valor || 0)})`;
-        // devolução de só uma parte: o termo diz que a diferença "fica explicada nas observações da ficha"
-        else if (dados.devolucao_valor > 0 && dados.devolucao_valor < dados.reserva_valor && !String(dados.observacoes || '').trim()) {
+        // devolução de só uma parte: o termo diz que a diferença "fica explicada nas observações da ficha" (a parte retida
+        // pelo termo de aceite já sai explicada no termo de devolução)
+        else if (dados.devolucao_valor > 0 && dados.devolucao_valor < dados.reserva_valor && dados.devolucao_valor !== R.devolucaoDaReserva({ ...r, ...dados }).devolver && !String(dados.observacoes || '').trim()) {
           erros.observacoes = `Devolução de ${reais(dados.devolucao_valor)} de uma reserva de ${reais(dados.reserva_valor)}: explique a diferença nas observações (ela sai no termo de devolução)`;
         }
       }
