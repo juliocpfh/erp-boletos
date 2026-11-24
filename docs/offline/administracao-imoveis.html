@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-SlQZwqLRS9fMdWvQuXxN+4VLgbmhVL4OD8DdyMZ9Jls='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-JcolyBFaICY8tWqGaFP8cisbvShBEqoN7KfhcPjOriA='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="1390529540570c1b">
+<meta name="fontes" content="e8da4efad6497809">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1610,6 +1610,20 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           consequencia: "Só muda o que vem preenchido no Novo contrato.",
           lei: "Sem lei: vale o contrato."
         },
+        // decisão do dono, 24/11/2026: pintura nova na entrada → devolve pintado (orçamento inteiro); sem pintura nova → paga só a vida
+        // que faltava da pintura (orçamento × (vida − meses de moradia) ÷ vida, mínimo zero)
+        {
+          chave: "pintura_vida_meses",
+          grupo: "garantia",
+          rotulo: "Pintura na saída: vida da pintura (meses)",
+          tipo: "inteiro",
+          padrao: 36,
+          min: 1,
+          max: 120,
+          explica: "Sugere o valor do reparo de pintura no cálculo final. Se a vistoria de entrada registrou pintura nova, o inquilino paga o orçamento inteiro (ex.: R$ 2.400,00). Sem pintura nova, paga só o que faltava da vida da pintura: orçamento de R$ 2.400,00, morou 12 meses → R$ 2.400,00 × 24/36 = R$ 1.600,00; 36 meses ou mais → nada.",
+          consequencia: "Só muda a sugestão (a equipe sempre pode mudar o valor). Vida maior cobra mais de quem morou pouco; menor cobra menos. O desgaste natural do uso não pode ser cobrado.",
+          lei: LI + ", art. 23, III (devolver o imóvel no estado em que o recebeu, salvo as deteriorações do uso normal)."
+        },
         // ------------------------------------------------------------------ contrato
         {
           chave: "prazo_residencial_padrao",
@@ -2297,6 +2311,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     liquidar: () => liquidar,
     maisAntigoPrimeiro: () => maisAntigoPrimeiro,
     maisRecentePrimeiro: () => maisRecentePrimeiro,
+    mesesDeMoradia: () => mesesDeMoradia,
     mesesDoPrazo: () => mesesDoPrazo,
     mesesEntre: () => mesesEntre,
     multaEJuros: () => multaEJuros,
@@ -2596,6 +2611,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     const s = continuacao && ini === entrada && dia(ini) > 1 ? Math.min(dia(ini) - 1, 30) + 1 : dia(ini) === ultimo ? 30 : Math.min(dia(ini), 30);
     const e = dia(fim) === ultimo ? 30 : Math.min(dia(fim), 30);
     return Math.max(0, Math.min(30, e - s + 1));
+  }
+  function mesesDeMoradia(entrada, saida) {
+    if (!entrada || !saida || saida < entrada) return 0;
+    let dias = 0;
+    for (let comp = entrada.slice(0, 7); comp <= saida.slice(0, 7); comp = somarMeses(comp, 1)) dias += diasComerciais(comp, entrada, saida);
+    return Math.floor(dias / 30);
   }
   function calcularCobranca({
     competencia,
@@ -4762,9 +4783,46 @@ ${RESUMO_CONTRATO}`, "RESUMO DO CONTRATO EM PERGUNTAS E RESPOSTAS"],
     }).map((x) => `${x.comodo} – ${x.item} (${x.situacao}${x.obs ? `: ${x.obs}` : ""})`);
     if (!(vistoria.itens || []).length) pendencias = linhasDe(vistoria.descritivo).filter((l) => /DIFERENÇA/i.test(l)).map((l) => l.replace(/^[-•*]\s+/, ""));
     const guardados = vistoria.reparos || {};
-    const reparos = pendencias.map((p2) => ({ pendencia: p2, valor: guardados[p2] ? guardados[p2].valor : null, orcamento: guardados[p2] ? guardados[p2].orcamento || "" : "" }));
+    const reparos = pendencias.map((p2) => ({
+      pendencia: p2,
+      valor: guardados[p2] ? guardados[p2].valor : null,
+      orcamento: guardados[p2] ? guardados[p2].orcamento || "" : "",
+      pintura: guardados[p2] && guardados[p2].pintura !== void 0 ? !!guardados[p2].pintura : ehPintura(p2),
+      orcamento_valor: guardados[p2] && Number.isInteger(guardados[p2].orcamento_valor) ? guardados[p2].orcamento_valor : null
+    }));
     const totalReparos = reparos.reduce((s, x) => s + (x.valor || 0), 0);
     return { texto: pendencias.length ? "Com pendências" : "Sem pendências", vistoria, pendencias, reparos, totalReparos, semValor: reparos.filter((x) => x.valor === null).length };
+  }
+  function sugestaoPintura(d2, c, orcamento) {
+    const entrada = vistoriaDeEntrada(d2, c);
+    const vida = Number(regra("pintura_vida_meses", c)) || 36;
+    if (!entrada) return { caso: "sem_vistoria", valor: null, meses: null, vida, texto: "Sem vistoria de entrada: confira como o imóvel foi entregue antes de cobrar a pintura." };
+    if (entrada.pintura_nova !== true && entrada.pintura_nova !== false) {
+      return { caso: "sem_info", valor: null, meses: null, vida, texto: `A vistoria de entrada (${dataBr(entrada.data)}) não diz se a pintura era nova: confira a vistoria de entrada e as fotos antes de dar o valor.` };
+    }
+    const dono = d2.contratos.find((x) => x.id === entrada.contrato_id) || c;
+    const inicio = dono.data_entrada || dono.vigencia_inicio || entrada.data;
+    const meses = mesesDeMoradia(inicio, c.data_saida || hojeIso());
+    const temOrcamento = Number.isInteger(orcamento) && orcamento >= 0;
+    if (entrada.pintura_nova) {
+      return {
+        caso: "nova",
+        valor: temOrcamento ? orcamento : null,
+        meses,
+        vida,
+        texto: `Pintura nova na entrada: o inquilino devolve pintado, pelo orçamento inteiro${temOrcamento ? ` = ${reais(orcamento)}` : ""}.`
+      };
+    }
+    const resta = Math.max(0, vida - meses);
+    const valor = temOrcamento ? Math.round(orcamento * resta / vida) : null;
+    const conta = temOrcamento ? `${reais(orcamento)} × ${resta}/${vida} = ${reais(valor)}` : `orçamento × ${resta}/${vida}`;
+    return {
+      caso: "antiga",
+      valor,
+      meses,
+      vida,
+      texto: `Sem pintura nova na entrada: morou ${meses} ${meses === 1 ? "mês" : "meses"} (de ${dataBr(inicio)} a ${dataBr(c.data_saida || hojeIso())}); paga só o que faltava dos ${vida} meses da pintura: ${conta}.`
+    };
   }
   function textoVistoriaSaida(d2, c, encerramento) {
     const r = resultadoVistoriaSaida(d2, c);
@@ -4861,10 +4919,11 @@ ${RESUMO_CONTRATO}`, "RESUMO DO CONTRATO EM PERGUNTAS E RESPOSTAS"],
     blocos.push({ tipo: "assinaturas", pessoas });
     return { blocos, rodape: dados.rodape };
   }
-  var UNIDADES, DEZENAS, CENTENAS, valorComExtenso, numeroComExtenso, MESES_EXTENSO, mesPorExtenso, dataPorExtenso, ORD_UNID, ORD_DEZ, ordinalPorExtenso, fem, neutro, gen, flexao, estadoCivil, nacionalidade, conjugeDoFiador, conjugeFaltando, pessoaDe, rotuloDocumento, ENCARGOS, lista, LOCADORA_ANTIGA, DADOS_ANTIGOS_EMPRESA, DADOS_ANTIGOS_LOCADORA, comCamposNovos, comArtigo, companhiaDoImovel, fiadoresNaData, CAMPOS_EXTRAS, camposConhecidos, escDoc, runsHtml, assinaHtml, textoCss, FONTE_RODAPE, estiloRodape, NS, EMU_CM, LOGO, runX, parX, tipoDoModelo, LINHA_EM_BRANCO, valoresDeExemplo, TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR, VISTORIA_INTRO, VISTORIA_ABERTURA, VISTORIA_ABERTURA_SEM_LINK, vistoriaFinal, VISTORIA_FINAL_ANTIGA, semEspacosVistoria, textoFinalVistoria, VISTORIA_CONDICOES, p, it, linhasDe, SITUACOES_VISTORIA, NAO_SE_APLICA, GRAU, piorou, textoReparo, PRESENCA_VISTORIA_SAIDA, FOTOS_VISTORIA;
+  var UNIDADES, DEZENAS, CENTENAS, valorComExtenso, numeroComExtenso, MESES_EXTENSO, mesPorExtenso, dataPorExtenso, ORD_UNID, ORD_DEZ, ordinalPorExtenso, fem, neutro, gen, flexao, estadoCivil, nacionalidade, conjugeDoFiador, conjugeFaltando, pessoaDe, rotuloDocumento, ENCARGOS, lista, LOCADORA_ANTIGA, DADOS_ANTIGOS_EMPRESA, DADOS_ANTIGOS_LOCADORA, comCamposNovos, comArtigo, companhiaDoImovel, fiadoresNaData, CAMPOS_EXTRAS, camposConhecidos, escDoc, runsHtml, assinaHtml, textoCss, FONTE_RODAPE, estiloRodape, NS, EMU_CM, LOGO, runX, parX, tipoDoModelo, LINHA_EM_BRANCO, valoresDeExemplo, TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR, VISTORIA_INTRO, VISTORIA_ABERTURA, VISTORIA_ABERTURA_SEM_LINK, vistoriaFinal, VISTORIA_FINAL_ANTIGA, semEspacosVistoria, textoFinalVistoria, VISTORIA_CONDICOES, p, it, linhasDe, SITUACOES_VISTORIA, NAO_SE_APLICA, GRAU, piorou, ehPintura, textoReparo, PRESENCA_VISTORIA_SAIDA, FOTOS_VISTORIA;
   var init_contratos = __esm({
     "docs/js/contratos.js"() {
       init_calculos();
+      init_config_regras();
       init_modelos_contrato();
       init_modelos_documentos();
       UNIDADES = [
@@ -5048,6 +5107,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       NAO_SE_APLICA = "Não se aplica";
       GRAU = { Novo: 0, "Ótimo": 1, Bom: 2, "Marcas de uso": 3, Avaria: 4, "Não funciona": 5 };
       piorou = (entrada, saida) => GRAU[saida] !== void 0 && GRAU[entrada] !== void 0 && GRAU[saida] > GRAU[entrada];
+      ehPintura = (pendencia) => /pintur/i.test(String(pendencia || ""));
       textoReparo = (x) => `${x.pendencia}: ${x.valor === null ? "valor a definir" : reais(x.valor)}${x.orcamento ? ` (${x.orcamento})` : ""}`;
       PRESENCA_VISTORIA_SAIDA = ["Acompanhou", "Mandou representante", "Não veio"];
       FOTOS_VISTORIA = [["fachada", "Fachada"], ["agua", "Relógio de água"], ["energia", "Relógio de energia"], ["gas", "Relógio de gás"], ["disjuntores", "Quadro de disjuntores"]];
@@ -13532,8 +13592,15 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     for (const x of lista3) {
       if (!atuais.has(x.pendencia)) continue;
       if (x.valor !== null && !(Number.isInteger(x.valor) && x.valor >= 0)) throw new ErroUsuario(`Valor inválido em "${x.pendencia}".`);
-      if (x.valor === null && !String(x.orcamento || "").trim()) continue;
-      reparos[x.pendencia] = { valor: x.valor, orcamento: String(x.orcamento || "").trim() };
+      const ov = x.orcamento_valor === void 0 ? null : x.orcamento_valor;
+      if (ov !== null && !(Number.isInteger(ov) && ov >= 0)) throw new ErroUsuario(`Orçamento inválido em "${x.pendencia}".`);
+      if (x.valor === null && !String(x.orcamento || "").trim() && ov === null) continue;
+      reparos[x.pendencia] = {
+        valor: x.valor,
+        orcamento: String(x.orcamento || "").trim(),
+        ...x.pintura !== void 0 ? { pintura: !!x.pintura } : {},
+        ...ov !== null ? { orcamento_valor: ov } : {}
+      };
     }
     const total = Object.values(reparos).reduce((s, x) => s + (x.valor || 0), 0);
     atualizar(d2, "vistorias", v.id, { reparos }, usuario, `${c.inquilino_nome}: valores dos reparos da vistoria de saída (${reais(total)})`);
@@ -18938,7 +19005,7 @@ Não mova nem renomeie os arquivos desta pasta. chave-do-backup.json é a chave:
       SECRETO = /senha|hash|(^|_)sal$|^sessoes$/;
       DINHEIRO = /^(valor|aluguel|desconto|iptu|seguro|taxa_boleto|outros|multa|juros|ressarcimento|reserva|caucao|deposito|complemento|debitos|total|saldo|credito|abatimento|devolucao|garantia|divida|fci|diferenca)(_|$)/;
       NAO_DINHEIRO = /(_percentual|_descricao|_parcela|_parcelas|_data|_comp|_competencia|_na_nf|_tipo|_id|_comprovante|_inscricao|_mes|_ano|_dias|_texto|_obs|_indice|_indices|_no_boleto)$/;
-      DINHEIRO_SEMPRE = /* @__PURE__ */ new Set(["divida_na_data"]);
+      DINHEIRO_SEMPRE = /* @__PURE__ */ new Set(["divida_na_data", "orcamento_valor"]);
       SEM_DINHEIRO = /* @__PURE__ */ new Set(["config_regras", "versoes_regras", "perfis_regras"]);
       ehDinheiro = (nome, tabela = "") => !SEM_DINHEIRO.has(tabela) && (CAMPOS2.has(nome) ? CAMPOS2.get(nome).tipo === "dinheiro" : DINHEIRO_SEMPRE.has(nome) || DINHEIRO.test(nome) && !NAO_DINHEIRO.test(nome));
       ROTULOS = {
@@ -18970,7 +19037,10 @@ Não mova nem renomeie os arquivos desta pasta. chave-do-backup.json é a chave:
         valor_pago: "Valor pago",
         vencimento: "Vencimento",
         regra: "Regra",
-        chave: "Chave"
+        chave: "Chave",
+        orcamento_valor: "Orçamento inteiro da pintura",
+        pintura: "Reparo de pintura",
+        pintura_nova: "Pintura nova na entrada"
       };
       FORM_DA_TABELA = {
         imoveis: IMOVEL,
@@ -32712,6 +32782,11 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       <div class="formulario">
         <div><label>Data da vistoria</label><input type="date" name="data" value="${esc(data2)}" required></div>
         ${tipo === "Saída" ? `<div><label>O inquilino acompanhou?</label><select name="inquilino_presente" required>${["", ...PRESENCA_VISTORIA_SAIDA].map((x) => `<option value="${esc(x)}"${(v ? v.inquilino_presente || "" : "") === x ? " selected" : ""}>${esc(x || "Escolha…")}</option>`).join("")}</select></div>` : ""}
+        ${tipo === "Entrada" ? (() => {
+      const pn = v ? v.pintura_nova === true ? "sim" : v.pintura_nova === false ? "nao" : "" : "";
+      return `<div><label>Pintura nova na entrada?</label><select name="pintura_nova" required>${[["", "Escolha…"], ["sim", "Sim: o imóvel foi pintado para esta entrada"], ["nao", "Não"]].map(([k, t]) => `<option value="${k}"${pn === k ? " selected" : ""}>${t}</option>`).join("")}</select>
+            <span class="suave">Na saída: pintura nova = o inquilino devolve pintado; sem pintura nova, paga só o que faltava da vida da pintura (${Number(regra("pintura_vida_meses", c)) || 36} meses).</span></div>`;
+    })() : ""}
         <div><label>Link das fotos (pasta na nuvem)</label><input name="link_fotos" value="${esc(v ? v.link_fotos || "" : tipo === "Entrada" ? c.vistoria_link || "" : "")}" placeholder="deixe vazio se as fotos vão em anexo"></div>
       </div>
       <p><label>Texto de abertura <span class="suave">(o link das fotos sai na linha de baixo)</span></label><textarea name="texto_abertura" rows="3">${esc(abertura)}</textarea></p>
@@ -40107,14 +40182,52 @@ ${MODELO_COMODOS[comodo].join("\n")}
           const c = v && buscar2("contratos", v.contrato_id);
           if (!c) throw new ErroUsuario("Este inquilino não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.");
           const res = resultadoVistoriaSaida(d(), c);
+          const lerCentavos = (t) => {
+            const x = String(t || "").trim();
+            if (!x) return null;
+            try {
+              return centavos(x);
+            } catch {
+              return void 0;
+            }
+          };
+          const sugestao = (orc) => sugestaoPintura(d(), c, orc);
+          const textoSugestao = (orc) => {
+            const s = sugestao(orc);
+            if (s.caso === "sem_info" || s.caso === "sem_vistoria") return `<span class="alerta aviso" style="display:block;margin:4px 0">${esc(s.texto)} Sem sugestão: digite o valor.</span>`;
+            return `<span class="suave">${esc(s.texto)}${s.valor === null ? " Digite o orçamento inteiro para ver a conta." : ""}</span>${s.valor !== null ? ` <button type="button" class="secundario pequeno" data-usar-pintura>Usar ${esc(reais(s.valor))}</button>` : ""}`;
+          };
           const r = await janela({
             titulo: `Reparos da vistoria de saída - ${c.inquilino_nome}`,
             sim: "Salvar",
             nao: "Cancelar",
             html: `<p>O valor de cada reparo vem do orçamento (melhor dois) ou da nota do serviço. Entra nos débitos do cálculo final, descontado da garantia ou cobrado. Guarde os orçamentos na pasta do inquilino. Item sem reparo a cobrar (ex.: desgaste natural): valor 0,00.</p>
-        ${res.reparos.map((x) => `<fieldset style="margin:8px 0"><legend>${esc(x.pendencia)}</legend>
+        ${res.reparos.map((x, k) => `<fieldset style="margin:8px 0" data-reparo="${k}"><legend>${esc(x.pendencia)}</legend>
+          <p class="check"><label><input type="checkbox" name="pintura_${k}" value="1"${x.pintura ? " checked" : ""} data-pintura> Reparo de pintura (sugerir o valor pela vistoria de entrada)</label></p>
+          <div data-bloco-pintura${x.pintura ? "" : " hidden"}><label>Orçamento inteiro da pintura (R$)</label><input name="orc_pintura_${k}" inputmode="decimal" data-orc-pintura value="${x.orcamento_valor === null ? "" : esc(dinheiroTexto(x.orcamento_valor))}" placeholder="ex.: 2.400,00">
+            <p data-sugestao-pintura>${textoSugestao(x.orcamento_valor)}</p></div>
           <label>Valor (R$)</label><input name="valor" inputmode="decimal" value="${x.valor === null ? "" : esc(dinheiroTexto(x.valor))}" placeholder="ex.: 350,00">
-          <label>Orçamento ou nota <span class="suave">(de quem, data)</span></label><input name="orcamento" value="${esc(x.orcamento)}" placeholder="ex.: Pinturas Silva, 18/11/2026"></fieldset>`).join("")}`
+          <label>Orçamento ou nota <span class="suave">(de quem, data)</span></label><input name="orcamento" value="${esc(x.orcamento)}" placeholder="ex.: Pinturas Silva, 18/11/2026"></fieldset>`).join("")}`,
+            ligar: (dlg) => {
+              for (const fs of dlg.querySelectorAll("[data-reparo]")) {
+                const caixa = fs.querySelector("[data-pintura]");
+                const bloco = fs.querySelector("[data-bloco-pintura]");
+                const orc = fs.querySelector("[data-orc-pintura]");
+                const alvo = fs.querySelector("[data-sugestao-pintura]");
+                caixa.addEventListener("change", () => {
+                  bloco.hidden = !caixa.checked;
+                });
+                orc.addEventListener("input", () => {
+                  const v2 = lerCentavos(orc.value);
+                  alvo.innerHTML = textoSugestao(v2 === void 0 ? null : v2);
+                });
+                alvo.addEventListener("click", (ev) => {
+                  if (!ev.target.closest("[data-usar-pintura]")) return;
+                  const s = sugestao(lerCentavos(orc.value) ?? null);
+                  if (s.valor !== null) fs.querySelector('input[name="valor"]').value = dinheiroTexto(s.valor);
+                });
+              }
+            }
           });
           if (!r) return;
           const lista3 = res.reparos.map((x, k) => {
@@ -40127,7 +40240,10 @@ ${MODELO_COMODOS[comodo].join("\n")}
                 throw new ErroUsuario(`Valor inválido em "${x.pendencia}".`);
               }
             }
-            return { pendencia: x.pendencia, valor, orcamento: String((r.orcamento || [])[k] || "") };
+            const pintura = String((r[`pintura_${k}`] || [])[0] || "") === "1";
+            const ov = pintura ? lerCentavos((r[`orc_pintura_${k}`] || [])[0]) : null;
+            if (ov === void 0) throw new ErroUsuario(`Orçamento da pintura inválido em "${x.pendencia}".`);
+            return { pendencia: x.pendencia, valor, orcamento: String((r.orcamento || [])[k] || ""), pintura, orcamento_valor: ov };
           });
           await alterar((db) => valoresReparos(db, v.id, lista3, login()));
           aviso("Valores dos reparos salvos: entram nos débitos do cálculo final.");
@@ -41706,6 +41822,10 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
             texto_abertura: String(f.texto_abertura || "").trim(),
             texto_final: f.tipo === "Entrada" ? String(f.texto_final || "").trim() : ""
           };
+          if (f.tipo === "Entrada") {
+            if (!["sim", "nao"].includes(f.pintura_nova)) throw new ErroUsuario("Diga se a pintura era nova na entrada (Sim ou Não).");
+            dados.pintura_nova = f.pintura_nova === "sim";
+          }
           if (f.tipo === "Saída") {
             if (!PRESENCA_VISTORIA_SAIDA.includes(f.inquilino_presente)) throw new ErroUsuario("Diga se o inquilino acompanhou a vistoria.");
             dados.inquilino_presente = f.inquilino_presente;
