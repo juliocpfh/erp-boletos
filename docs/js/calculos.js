@@ -442,6 +442,17 @@ export function diasComerciais(comp, entrada, saida, { continuacao = false } = {
   return Math.max(0, Math.min(30, e - s + 1));
 }
 
+/**
+ * Meses completos de moradia pelo mês comercial de 30 dias (`diasComerciais`), da entrada à saída (as duas contam).
+ * Ex.: 10/01/2025 a 09/01/2026 → 21 + 11 × 30 + 9 = 360 dias → 12 meses; 10/01/2025 a 20/02/2025 → 41 dias → 1 mês.
+ */
+export function mesesDeMoradia(entrada, saida) {
+  if (!entrada || !saida || saida < entrada) return 0;
+  let dias = 0;
+  for (let comp = entrada.slice(0, 7); comp <= saida.slice(0, 7); comp = somarMeses(comp, 1)) dias += diasComerciais(comp, entrada, saida);
+  return Math.floor(dias / 30);
+}
+
 export function calcularCobranca({ competencia, aluguelMensal, entrada, saida, descontoPercentual = 0, iptu = 0,
   seguro = 0, seguroProporcional = false, taxaBoleto = 0, outros = 0, reservaDisponivel = 0, contrato = null }) {
   const diasReais = diasOcupados(competencia, entrada, saida);

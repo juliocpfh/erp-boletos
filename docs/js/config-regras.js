@@ -88,6 +88,12 @@ export const DEFINICOES_REGRAS = [
   { chave: 'fci_indice_padrao', grupo: 'garantia', rotulo: 'FCI: índice de correção que vem preenchido', tipo: 'opcao', padrao: '',
     opcoes: [['', 'Escolher em cada contrato', 'O campo vem vazio.'], ['Poupança', 'Poupança', ''], ['IPCA', 'IPCA', ''], ['IGP-M', 'IGP-M', ''], ['INPC', 'INPC', ''], ['IGP-DI', 'IGP-DI', ''], ['SELIC', 'SELIC', '']],
     explica: 'Índice do Banco Central que corrige o saldo do FCI mês a mês.', consequencia: 'Só muda o que vem preenchido no Novo contrato.', lei: 'Sem lei: vale o contrato.' },
+  // decisão do dono, 24/11/2026: pintura nova na entrada → devolve pintado (orçamento inteiro); sem pintura nova → paga só a vida
+  // que faltava da pintura (orçamento × (vida − meses de moradia) ÷ vida, mínimo zero)
+  { chave: 'pintura_vida_meses', grupo: 'garantia', rotulo: 'Pintura na saída: vida da pintura (meses)', tipo: 'inteiro', padrao: 36, min: 1, max: 120,
+    explica: 'Sugere o valor do reparo de pintura no cálculo final. Se a vistoria de entrada registrou pintura nova, o inquilino paga o orçamento inteiro (ex.: R$ 2.400,00). Sem pintura nova, paga só o que faltava da vida da pintura: orçamento de R$ 2.400,00, morou 12 meses → R$ 2.400,00 × 24/36 = R$ 1.600,00; 36 meses ou mais → nada.',
+    consequencia: 'Só muda a sugestão (a equipe sempre pode mudar o valor). Vida maior cobra mais de quem morou pouco; menor cobra menos. O desgaste natural do uso não pode ser cobrado.',
+    lei: LI + ', art. 23, III (devolver o imóvel no estado em que o recebeu, salvo as deteriorações do uso normal).' },
 
   // ------------------------------------------------------------------ contrato
   { chave: 'prazo_residencial_padrao', grupo: 'contrato', rotulo: 'Prazo do contrato residencial (meses)', tipo: 'inteiro', padrao: 30, min: 1, max: 600,
