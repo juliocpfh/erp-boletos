@@ -283,10 +283,6 @@ export function arquivoApagadoNoFormulario(el, nome) {
  * Troca de titular: traz do contrato anterior as correções, a caução (com os comprovantes, que mudam de pasta) e os boletos
  * a partir da data da troca (R.transferirHeranca). Avisa o que foi feito.
  */
-/** Pagamentos do novo titular já devolvidos depois de um termo que não valeu (``voltarPagamentosDoNovo``): texto do aviso. */
-const textoDevolvidos = (r, nome) => (r && r.pagamentosDevolvidos && r.pagamentosDevolvidos.length
-  ? ` Atenção: ${r.pagamentosDevolvidos.map((x) => `o pagamento de ${compBr(x.cobranca.competencia)} (${reais(x.valor)})`).join(', ')} de ${nome} já foi devolvido: cobre de novo (desfaça o pagamento do boleto e registre quando pagar).` : '');
-
 export async function trazerHeranca(id) {
   let r = null;
   await alterar((db) => {
@@ -296,14 +292,19 @@ export async function trazerHeranca(id) {
     r = R.transferirHeranca(db, Number(id), login());
   });
   if (!r) return null;
+  // termo certo anexado depois de um "não valeu": pagamento do novo titular que já tinha sido devolvido (voltarPagamentosDoNovo)
+  if (r.pagamentosDevolvidos && r.pagamentosDevolvidos.length) {
+    const nome = buscar('contratos', id).inquilino_nome;
+    aviso(`Atenção: ${r.pagamentosDevolvidos.map((x) => `o pagamento de ${compBr(x.cobranca.competencia)} (${reais(x.valor)})`).join(', ')} de ${nome} já tinha sido devolvido: cobre de novo (desfaça o pagamento do boleto e registre quando pagar).`, 'aviso');
+  }
   if (r.agendada) {
     await arquivosParaHerdeiro(r.anterior.id, id, r.arquivosReserva, false);
     const n = buscar('contratos', id);
     if (r.aguardaAditivo) {
-      aviso(`${n.inquilino_nome} assume o contrato de ${r.anterior.inquilino_nome} quando o termo aditivo for assinado. Até lá, os boletos, as correções, a garantia, o seguro e a reserva continuam com ${r.anterior.inquilino_nome}.${textoDevolvidos(r, n.inquilino_nome)}`, 'info');
+      aviso(`${n.inquilino_nome} assume o contrato de ${r.anterior.inquilino_nome} quando o termo aditivo for assinado. Até lá, os boletos, as correções, a garantia, o seguro e a reserva continuam com ${r.anterior.inquilino_nome}.`, 'info');
       return r;
     }
-    aviso(`${n.inquilino_nome} assume o contrato de ${r.anterior.inquilino_nome} em ${dataBr(r.data)}. Até ${dataBr(C.somarDias(r.data, -1))}, os boletos, a garantia, o seguro e a reserva continuam com ${r.anterior.inquilino_nome} (o último boleto sai proporcional aos dias). A partir de ${dataBr(r.data)}, os boletos saem para ${n.inquilino_nome}: o resto passa ao abrir o Painel nesse dia ou depois.${textoDevolvidos(r, n.inquilino_nome)}`, textoDevolvidos(r, n.inquilino_nome) ? 'aviso' : 'info');
+    aviso(`${n.inquilino_nome} assume o contrato de ${r.anterior.inquilino_nome} em ${dataBr(r.data)}. Até ${dataBr(C.somarDias(r.data, -1))}, os boletos, a garantia, o seguro e a reserva continuam com ${r.anterior.inquilino_nome} (o último boleto sai proporcional aos dias). A partir de ${dataBr(r.data)}, os boletos saem para ${n.inquilino_nome}${r.boletosMovidos ? ` (${r.boletosMovidos === 1 ? 'o boleto já gerado de depois da troca passou' : `os ${r.boletosMovidos} boletos já gerados de depois da troca passaram`} para ${n.inquilino_nome})` : ''}${r.noBanco ? `; ${r.noBanco} boleto(s) de ${r.anterior.inquilino_nome} emitido(s) no banco ficaram com ele: cancele no banco` : ''}: o resto passa ao abrir o Painel nesse dia ou depois.`, 'info');
     return r;
   }
   if (r.arquivos.length) {
@@ -326,7 +327,7 @@ export async function trazerHeranca(id) {
   const c = buscar('contratos', id);
   const partes = [r.correcoes && `${r.correcoes} correção(ões) do aluguel`, c.reserva_usada_anterior !== undefined && 'a reserva', r.garantia && `a garantia (${c.garantia_tipo})`, r.arquivosSeguro && r.arquivosSeguro.length && 'o seguro (apólice e documentos)',
     r.boletosMovidos && `${r.boletosMovidos} boleto(s) (a NF sai no nome do novo titular)`].filter(Boolean);
-  aviso(`${c.inquilino_nome}: contrato continuado de ${r.anterior.inquilino_nome} desde ${dataBr(r.data)}. Fim do vínculo do anterior em ${dataBr(C.somarDias(r.data, -1))}; reajuste no aniversário do contrato original${partes.length ? `; vieram ${partes.join(', ')}` : ''}.${r.comNf ? ` ${r.comNf} boleto(s) depois da troca já com NF emitida ficaram com ${r.anterior.inquilino_nome}: confira.` : ''}${r.noBanco ? ` ${r.noBanco} boleto(s) de ${r.anterior.inquilino_nome} já emitido(s) no banco ficaram com ele (o novo titular já tem o do mesmo mês): cancele no banco e exclua.` : ''}${textoDevolvidos(r, c.inquilino_nome)}`, r.noBanco || textoDevolvidos(r, c.inquilino_nome) ? 'aviso' : 'info');
+  aviso(`${c.inquilino_nome}: contrato continuado de ${r.anterior.inquilino_nome} desde ${dataBr(r.data)}. Fim do vínculo do anterior em ${dataBr(C.somarDias(r.data, -1))}; reajuste no aniversário do contrato original${partes.length ? `; vieram ${partes.join(', ')}` : ''}.${r.comNf ? ` ${r.comNf} boleto(s) depois da troca já com NF emitida ficaram com ${r.anterior.inquilino_nome}: confira.` : ''}${r.noBanco ? ` ${r.noBanco} boleto(s) de ${r.anterior.inquilino_nome} já emitido(s) no banco ficaram com ele (o novo titular já tem o do mesmo mês): cancele no banco e exclua.` : ''}`, r.noBanco ? 'aviso' : 'info');
   return r;
 }
 

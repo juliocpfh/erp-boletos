@@ -124,3 +124,18 @@ test('termo certo anexado depois de o pagamento de Maria já ter sido devolvido:
   assert.deepEqual(r.pagamentosDevolvidos.map((x) => [x.cobranca.id, x.valor]), [[dela.id, 96000]]);
   assert.ok(d.historico.some((h) => /já tinha sido devolvido. Cobre o mês de novo de Maria Lima/.test(h.descricao || '')));
 });
+
+test('"Desfazer pagamento" do boleto de Maria depois do "não valeu": o boleto dela sai e fica só o de João (antes R$ 3.600,00)', () => {
+  for (const [entrada, joao] of [['2026-12-01', 180000], ['2026-12-15', 180000]]) {
+    const { d, c } = base();
+    const { n, ad } = troca(d, c, entrada);
+    R.gerarCobrancas(d, '2026-12', 'j');
+    const dela = d.cobrancas.find((x) => x.contrato_id === n.id && x.competencia === '2026-12');
+    R.registrarPagamento(d, dela.id, '2026-11-22', null, 'j');
+    R.desfazerAditivo(d, ad.id, 'j', { excluirTermo: false });
+    R.marcarDevolvidoAMao(d, dela.id, '2026-11-23', 'j');
+    R.estornarPagamento(d, dela.id, 'j');
+    assert.ok(!R.buscar(d, 'cobrancas', dela.id), 'o boleto de Maria saiu');
+    assert.deepEqual(doMes(d, '2026-12'), [['João Souza', joao]]);
+  }
+});

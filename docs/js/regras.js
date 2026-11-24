@@ -2181,6 +2181,17 @@ export function estornarPagamento(d, cobrancaId, usuario) {
       ...(m.comprovante || m.comprovante_contador || m.comprovante_origem || m.nome_arquivo ? { comprovante: null, comprovante_contador: null, comprovante_origem: null, nome_arquivo: null } : {}),
       ...(m.pago_a_mais ? { pago_a_mais: false } : {}) }, usuario, 'Pagamento do boleto desfeito: movimentação volta a ficar sem destino');
   }
+  // boleto do novo titular depois do termo da troca que não valeu (2º teste de tela da PR #393): sem o pagamento, ele é como o
+  // boleto em aberto do novo, que não existe sem o termo assinado: sai (o anterior já é cobrado pelo mês cheio). Antes ficava em
+  // aberto ao lado do de João: R$ 3.600,00 a cobrar no mês. Emitido no banco: fica, para cancelar lá. Termo válido de novo: só a marca sai.
+  if (cb && cb.troca_nao_valeu) {
+    const n = buscar(d, 'contratos', cb.contrato_id);
+    if (n && trocaAguardaAditivo(d, n) && !emitidoNoBanco(cb) && !emAcordo(cb)) {
+      excluir(d, 'cobrancas', cb.id, usuario, `Boleto ${C.compBr(cb.competencia)} de ${n.inquilino_nome} excluído com o pagamento desfeito: o termo da troca de titular não valeu e o mês é cobrado do titular anterior`);
+    } else {
+      atualizar(d, 'cobrancas', cb.id, { troca_nao_valeu: null }, usuario, `Boleto ${C.compBr(cb.competencia)}: pagamento desfeito${n && trocaAguardaAditivo(d, n) ? ' (emitido no banco: cancele lá, porque o mês é cobrado do titular anterior)' : ''}`);
+    }
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -4288,7 +4299,11 @@ export function transferirHeranca(d, novoId, usuario, hoje = C.hojeIso()) {
     if (!assinado && a.data_saida === fim) atualizar(d, 'contratos', a.id, { data_saida: null }, usuario, `${a.inquilino_nome}: continua no contrato até o termo aditivo ser assinado`);
     if (assinado && a.data_saida !== fim) atualizar(d, 'contratos', a.id, { data_saida: fim }, usuario, `${a.inquilino_nome}: fim do vínculo em ${C.dataBr(fim)} (o contrato continua com ${n.inquilino_nome} a partir de ${C.dataBr(data)})`);
     if (!n.data_base_correcao) atualizar(d, 'contratos', n.id, { data_base_correcao: dataBaseCorrecao(a) }, usuario, `${n.inquilino_nome}: reajuste no aniversário do contrato de ${a.inquilino_nome}`);
-    recalcularCobrancas(d, (cb) => cb.contrato_id === a.id, usuario);
+    // termo assinado antes da data: os boletos do anterior dos meses depois da troca passam já ao novo (como a janela da ciência
+    // promete), e não só no dia. Antes, "Gerar boletos" nesse meio-tempo cobrava o mês dos dois (pedido do dono de 24/11/2026).
+    // Ex.: troca em 01/12, boleto de dezembro de João gerado em 20/11, termo anexado em 22/11 → o boleto passa a Maria (R$ 1.800,00)
+    if (assinado) passarBoletosAoNovo(d, n, a, fim, usuario, out, { soAluguel: true });
+    recalcularCobrancas(d, (cb) => cb.contrato_id === a.id || (assinado && cb.contrato_id === n.id), usuario);
     // a reserva já aparece no novo (valor, comprovante e o que foi usado), para não abater de novo; no dia, confere o uso outra vez
     return { ...out, agendada: true, aguardaAditivo: !assinado, arquivosReserva: herdarReserva(d, n, a, usuario) };
   }
@@ -4321,7 +4336,24 @@ export function transferirHeranca(d, novoId, usuario, hoje = C.hojeIso()) {
   atualizar(d, 'contratos', n.id, mud, usuario, `${n.inquilino_nome}: dados do contrato trazidos de ${a.inquilino_nome} (troca de titular em ${C.dataBr(data)})`);
   if (out.garantia) sincronizarGarantiaHerdeiro(d, a.id, usuario);
   // boletos a partir do mês seguinte ao fim do vínculo
+  passarBoletosAoNovo(d, n, a, fim, usuario, out);
+  out.arquivosReserva = herdarReserva(d, n, a, usuario, true);
+  out.arquivosSeguro = herdarSeguros(d, n, a, usuario);
+  recalcularCobrancas(d, (cb) => cb.contrato_id === a.id || cb.contrato_id === n.id, usuario);
+  desativarSeSaiu(d, a, usuario);
+  out.arquivos = [...new Set(out.arquivos)];
+  return out;
+}
+
+/**
+ * Boletos do anterior dos meses depois do fim do vínculo (``fim``, a véspera da troca) passam ao novo titular: também os pagos
+ * ainda sem NF; em aberto, saem se o novo já tem o do mês (o emitido no banco fica até ser cancelado lá); com NF emitida e parcelas
+ * de acordo ficam com o anterior. ``soAluguel`` (termo assinado antes da data): só os boletos do aluguel; complemento da caução e
+ * saldo esperam o dia da troca, junto com a garantia. Conta em ``out`` (boletosMovidos, boletosApagados, comNf, noBanco).
+ */
+function passarBoletosAoNovo(d, n, a, fim, usuario, out, { soAluguel = false } = {}) {
   for (const cb of d.cobrancas.filter((x) => x.contrato_id === a.id && x.competencia > fim.slice(0, 7))) {
+    if (soAluguel && ehBoletoAvulso(cb)) continue;
     if (ehComplementoCaucao(cb) && !out.garantia) continue;
     // parcela de acordo: é dívida de quem saiu (débitos até a véspera ficam com ele, decisão de 2026-10-27)
     if (ehParcelaAcordo(cb)) continue;
@@ -4334,16 +4366,10 @@ export function transferirHeranca(d, novoId, usuario, hoje = C.hojeIso()) {
     } else {
       // a multa de notificação e a diferença antiga de quem sai ficam com ele (débitos dele): o novo recebe o boleto limpo
       limparDoAnterior(d, cb, a.id, usuario);
-      passa('cobrancas', cb, `Boleto ${C.compBr(cb.competencia)}`);
+      atualizar(d, 'cobrancas', cb.id, { contrato_id: n.id }, usuario, `Boleto ${C.compBr(cb.competencia)} passa de ${a.inquilino_nome} para ${n.inquilino_nome} (troca de titular)`);
       out.boletosMovidos += 1;
     }
   }
-  out.arquivosReserva = herdarReserva(d, n, a, usuario, true);
-  out.arquivosSeguro = herdarSeguros(d, n, a, usuario);
-  recalcularCobrancas(d, (cb) => cb.contrato_id === a.id || cb.contrato_id === n.id, usuario);
-  desativarSeSaiu(d, a, usuario);
-  out.arquivos = [...new Set(out.arquivos)];
-  return out;
 }
 
 /**
