@@ -133,16 +133,28 @@ test('saída: ressarcimento para um mês depois da saída não abate em lugar ne
   assert.equal(R.boletoDoMes(d, c.id, '2026-12'), null);
   assert.deepEqual(R.semBoletoNoMes(d, c, '2026-12'), { motivo: 'saida', data: '2026-11-20' });
   assert.equal(R.semBoletoNoMes(d, c, '2026-11'), null, 'o de 11/2026 existe');
-  assert.match(R.alertaRessarcimentoEmAcordo(d, c).texto, /R\$\s?50,00 marcado para o boleto de 12\/2026, mas o contrato termina em 20\/11\/2026/);
+  assert.match(R.alertaRessarcimentoEmAcordo(d, c).texto, /R\$\s?50,00 marcado para o boleto de 12\/2026, mas o contrato termina em 20\/11\/2026 e não tem boleto de 12\/2026: entra como crédito de Maria Exemplo no cálculo final da saída/);
+  // decisão do dono de 24/11/2026: crédito no cálculo final (abate dos débitos). Boleto de 11/2026 em aberto: R$ 1.200,00 em dia
+  // (20/30 de R$ 1.800,00) − R$ 50,00 = R$ 1.150,00 de débitos
+  const deb = R.debitosDaSaida(d, c, '2026-11-25');
+  const credito = deb.itens.find((x) => x.valor < 0);
+  assert.equal(credito.valor, -5000);
+  assert.match(credito.texto, /Crédito: ressarcimento do condomínio de 11\/2026 \(Fundo de obras\), sem boleto para abater: −R\$\s?50,00/);
+  assert.equal(deb.total, R.totais(R.boletoDoMes(d, c.id, '2026-11')).a_pagar_pontual - 5000);
+  // cálculo final feito: o aviso some
+  R.inserir(d, 'encerramentos', { contrato_id: c.id, data: '2026-11-25', garantia_valor: 0, debitos: deb.total }, 'j');
+  assert.equal(R.alertaRessarcimentoEmAcordo(d, c), null);
+  d.encerramentos = [];
   // escolhendo o boleto de 11/2026 (em aberto), abate e o aviso some
   const r = d.ressarcimentos[0];
   R.atualizar(d, 'ressarcimentos', r.id, { competencia_abatimento: '2026-11' }, 'j');
   R.reaplicarRessarcimentos(d, c.id, 'j');
   assert.equal(R.boletoDoMes(d, c.id, '2026-11').ressarcimento, 5000);
   assert.equal(R.alertaRessarcimentoEmAcordo(d, c), null);
+  assert.ok(!R.debitosDaSaida(d, c, '2026-11-25').itens.some((x) => x.valor < 0), 'abatido no boleto: não é crédito de novo');
 });
 
-test('troca de titular: ressarcimento do boleto que passou ao novo titular sumia do boleto; agora avisa nos dois contratos', () => {
+test('troca de titular: o ressarcimento fica com quem pagou, como crédito na devolução da garantia (decisão de 24/11)', () => {
   const { d, c } = base();
   for (const m of ['2026-10', '2026-11', '2026-12']) R.gerarCobrancas(d, m, 'j');
   lancar(d, c, { competencia_condominio: '2026-12', data_pagamento: '2026-12-05' });
@@ -150,13 +162,18 @@ test('troca de titular: ressarcimento do boleto que passou ao novo titular sumia
   assert.equal(dez.ressarcimento, 5000, 'antes da troca, no boleto de 12/2026');
   const novo = trocaDeTitular(d, c, '2026-12-01');
   assert.equal(dez.contrato_id, novo.id, 'o boleto de 12/2026 passa ao novo titular');
-  // o lançamento continua no contrato de Maria e o boleto (agora de Pedro) é recalculado sem ele. Quem fica com o valor
-  // (Maria, que pagou o condomínio, ou o boleto de Pedro) é decisão do dono: até lá, avisa
+  // o lançamento continua no contrato de Maria (quem pagou) e o boleto, agora de Pedro, é recalculado sem ele
   assert.equal(dez.ressarcimento, 0);
   assert.equal(R.semBoletoNoMes(d, c, '2026-12').motivo, 'troca');
-  assert.match(R.alertaRessarcimentoEmAcordo(d, c).texto, /já é de Pedro Novo \(troca de titular em 01\/12\/2026\)/);
-  assert.match(R.alertaRessarcimentoEmAcordo(d, novo).texto, /lançado no contrato de Maria Exemplo para o boleto de 12\/2026, que é deste contrato/);
+  assert.match(R.alertaRessarcimentoEmAcordo(d, c).texto, /já é de Pedro Novo \(troca de titular em 01\/12\/2026\): entra como crédito de Maria Exemplo na devolução da garantia/);
+  assert.match(R.alertaRessarcimentoEmAcordo(d, novo).texto, /lançado no contrato de Maria Exemplo para o boleto de 12\/2026, que passou a este contrato: não é abatido daqui. Fica com Maria Exemplo/);
   assert.ok(R.alertasContrato(d, novo, '2026-12-02').some((a) => /lançado no contrato de Maria/.test(a.texto)), 'aparece nos alertas do novo titular');
+  // na devolução da garantia de Maria, entra como crédito (os débitos dela até a véspera da troca diminuem R$ 50,00)
+  assert.ok(R.debitosDaSaida(d, c, '2026-12-02').itens.some((x) => x.valor === -5000 && /Crédito: ressarcimento/.test(x.texto)));
+  // devolução registrada: os avisos somem
+  R.inserir(d, 'devolucoes_garantia', { contrato_id: c.id, data: '2026-12-05', garantia_valor: 0, debitos: 0 }, 'j');
+  assert.equal(R.alertaRessarcimentoEmAcordo(d, c), null);
+  assert.equal(R.alertaRessarcimentoEmAcordo(d, novo), null);
   // lançado no novo titular, abate no boleto dele
   lancar(d, novo, { competencia_condominio: '2026-12', data_pagamento: '2026-12-05' });
   assert.equal(dez.ressarcimento, 5000);

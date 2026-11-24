@@ -238,11 +238,10 @@ export const CADASTROS = {
       if (r && dados.data_pagamento && r.data_pagamento && dados.data_pagamento !== r.data_pagamento
         && dados.competencia_abatimento === R.competenciaDoAbatimento(c, r.data_pagamento)) dados.competencia_abatimento = null;
       if (!dados.competencia_abatimento && dados.data_pagamento) dados.competencia_abatimento = R.competenciaDoAbatimento(c, dados.data_pagamento);
-      // mês sem boleto deste contrato (depois da saída ou da troca de titular): o ressarcimento não abateria em lugar nenhum
+      // mês antes da entrada: não há boleto. Depois da saída ou da troca de titular o lançamento vale: vira crédito no cálculo
+      // final ou na devolução da garantia (decisão do dono de 24/11/2026; conferirRessarcimento avisa antes de salvar)
       const sem = R.semBoletoNoMes(d(), c, dados.competencia_abatimento);
-      if (sem) {
-        erros.competencia_abatimento = `Não há onde abater: ${R.textoSemBoleto(sem, dados.competencia_abatimento)}. ${sem.motivo === 'troca' ? `Lance o ressarcimento no contrato de ${sem.novo.inquilino_nome}, ou escolha` : 'Escolha'} um boleto em aberto deste contrato${sem.motivo === 'saida' ? ' (ou devolva ao inquilino)' : ''}`;
-      }
+      if (sem && sem.motivo === 'entrada') erros.competencia_abatimento = `Não há onde abater: ${R.textoSemBoleto(sem, dados.competencia_abatimento)}. Escolha um boleto deste contrato`;
       const cb = R.boletoDoMes(d(), c.id, dados.competencia_abatimento);
       if (cb && cb.data_pagamento && (!r || r.competencia_abatimento !== dados.competencia_abatimento)) {
         erros.competencia_abatimento = `O boleto de ${compBr(dados.competencia_abatimento)} já foi pago. Escolha o próximo boleto em aberto`;

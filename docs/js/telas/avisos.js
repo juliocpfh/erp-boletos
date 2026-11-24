@@ -193,8 +193,12 @@ export function conferirLeitura(dados, r, q) {
 export function conferirRessarcimento(dados, r, q) {
   const cid = r ? r.contrato_id : Number(q.contrato);
   const igual = d().ressarcimentos.find((x) => x.contrato_id === cid && (!r || x.id !== r.id) && x.competencia_condominio === dados.competencia_condominio && x.valor === dados.valor);
+  // depois da saída (ou da troca de titular) não há boleto: vira crédito no acerto final (decisão do dono de 24/11/2026)
+  const c = buscar('contratos', cid);
+  const sem = c && dados.competencia_abatimento && R.semBoletoNoMes(d(), c, dados.competencia_abatimento);
   return [dataNoFuturo(dados.data_pagamento, 'A data do pagamento'), dataMuitoAntiga(dados.data_pagamento, 'A data do pagamento'),
-    igual ? `Já há ressarcimento de ${reais(igual.valor)} do condomínio de ${compBr(igual.competencia_condominio)} (${igual.descricao}). Não está repetido?` : ''].filter(Boolean);
+    igual ? `Já há ressarcimento de ${reais(igual.valor)} do condomínio de ${compBr(igual.competencia_condominio)} (${igual.descricao}). Não está repetido?` : '',
+    sem && sem.motivo !== 'entrada' ? `Não há boleto para abater (${R.textoSemBoleto(sem, dados.competencia_abatimento)}): o valor entra como crédito de ${c.inquilino_nome} ${sem.motivo === 'troca' ? 'na devolução da garantia da troca de titular' : 'no cálculo final da saída'}.` : ''].filter(Boolean);
 }
 
 /** Avisos da NF avulsa: data no futuro, outra NF avulsa com a mesma data e o mesmo valor. */

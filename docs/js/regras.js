@@ -1763,10 +1763,17 @@ export function montarCobranca(d, contrato, comp) {
       }
     }
   }
-  const [seguro, seguroRot] = contrato.cobrar_seguro !== false && cobra('seguro')
+  let [seguro, seguroRot] = contrato.cobrar_seguro !== false && cobra('seguro')
     ? parcelasDoMes(segurosDoContrato(d, contrato.id), comp,
       (s) => `Seguro${s.seguradora ? ` ${s.seguradora}` : ''}`)
     : [0, ''];
+  // no mês da saída o seguro é proporcional aos dias, como o IPTU (decisão do dono de 24/11/2026; o mês de entrada continua com
+  // a parcela inteira). Ex.: saída em 15/11/2026, parcela de R$ 30,00 → R$ 15,00 (15/30 dias)
+  if (seguro && contrato.data_saida && contrato.data_saida.slice(0, 7) === comp && dias < diasMes) {
+    const cheio = seguro;
+    seguro = C.aluguelProporcional(cheio, dias, diasMes);
+    seguroRot = `${seguroRot} proporcional ${dias}/${diasMes} dias de ${C.reais(cheio)}`;
+  }
   const ressarc = ressarcimentosNoBoleto(d, contrato.id, comp);
   const r = C.calcularCobranca({
     competencia: comp, aluguelMensal: carencia ? 0 : aluguelAtual(d, contrato, `${comp}-01`),
@@ -2789,6 +2796,12 @@ export function debitosDaSaida(d, c, data = C.hojeIso()) {
   }
   for (const n of (d.notificacoes || []).filter((x) => x.contrato_id === c.id && x.multa_valor > 0 && (!x.multa_cobranca_id || !buscar(d, 'cobrancas', x.multa_cobranca_id)))) {
     itens.push({ cobranca: null, valor: n.multa_valor, texto: `${textoMultaNotificacao(n)}, ainda não cobrada: ${C.reais(n.multa_valor)}` });
+  }
+  // crédito do inquilino: ressarcimento do condomínio que ficou sem boleto para abater (depois da saída, ou boleto que passou ao
+  // novo titular na troca). Decisão do dono de 24/11/2026: fica com quem pagou e abate dos débitos. Ex.: débitos R$ 300,00 e
+  // fundo de obras de R$ 50,00 pago em 05/12 por quem saiu em 20/11 → R$ 250,00 (valor negativo nos itens)
+  for (const r of ressarcimentosSemBoleto(d, c)) {
+    itens.push({ cobranca: null, ressarcimento: r, valor: -r.valor, texto: `Crédito: ressarcimento do condomínio de ${C.compBr(r.competencia_condominio)} (${r.descricao}), sem boleto para abater: −${C.reais(r.valor)}` });
   }
   return { itens, total: itens.reduce((s, x) => s + x.valor, 0) };
 }
@@ -6986,6 +6999,19 @@ export function semBoletoNoMes(d, c, comp) {
   return novo ? { motivo: 'troca', data: novo.data_entrada || novo.vigencia_inicio, novo } : { motivo: 'saida', data: c.data_saida };
 }
 
+/**
+ * Ressarcimentos do contrato que ficaram sem boleto para abater porque o inquilino saiu (ou o boleto passou ao novo titular na
+ * troca): viram crédito de quem pagou o condomínio em ``debitosDaSaida`` (decisão do dono de 24/11/2026). Antes da entrada não conta.
+ */
+export function ressarcimentosSemBoleto(d, c) {
+  return (d.ressarcimentos || []).filter((r) => r.contrato_id === c.id && r.valor > 0)
+    .filter((r) => { const s = semBoletoNoMes(d, c, r.competencia_abatimento); return s && s.motivo !== 'entrada'; })
+    .sort((a, b) => String(a.competencia_abatimento).localeCompare(String(b.competencia_abatimento)) || a.id - b.id);
+}
+
+/** Cálculo final da saída feito, ou devolução da garantia da troca de titular registrada: o crédito já foi acertado. */
+const acertoDaSaidaFeito = (d, c) => !!encerramentoDo(d, c.id) || devolucoesDaTrocaDeTitular(d, c.id).length > 0;
+
 /** Texto do motivo de ``semBoletoNoMes`` (para o formulário e o alerta). */
 export function textoSemBoleto(s, comp) {
   if (s.motivo === 'troca') return `o boleto de ${C.compBr(comp)} já é de ${s.novo.inquilino_nome} (troca de titular em ${C.dataBr(s.data)})`;
@@ -7043,24 +7069,29 @@ export function aplicarRessarcimentos(d, contrato, comp, usuario) {
  * Ex.: boleto de 10/2026 em acordo e ressarcimento de R$ 50,00 lançado depois para 10/2026 → aviso para passar ao próximo boleto em aberto.
  */
 export function alertaRessarcimentoEmAcordo(d, c) {
-  // lançado no contrato anterior (troca de titular) para um mês que já é deste: aparece aqui, onde está o boleto
+  // troca de titular: o ressarcimento lançado no anterior para um boleto que passou a este fica com quem pagou (crédito na
+  // devolução da garantia dele). Avisa aqui, onde a equipe trabalha, até a devolução ser registrada
   const anterior = contratoHerdado(d, c);
-  const mesesAnt = anterior ? [...new Set((d.ressarcimentos || []).filter((r) => r.contrato_id === anterior.id).map((r) => r.competencia_abatimento))].sort() : [];
-  for (const comp of mesesAnt) {
-    const sem = semBoletoNoMes(d, anterior, comp);
-    if (sem && sem.motivo === 'troca' && sem.novo.id === c.id) {
-      return { nivel: 'aviso', tipo: 'Condomínio', ancora: 'ressarcimentos',
-        texto: `Ressarcimento de ${C.reais(ressarcimentosNoBoleto(d, anterior.id, comp).valor)} lançado no contrato de ${anterior.inquilino_nome} para o boleto de ${C.compBr(comp)}, que é deste contrato (troca de titular): não foi abatido em nenhum boleto. Exclua lá e lance aqui, ou escolha lá um boleto em aberto de ${anterior.inquilino_nome}.` };
-    }
+  const doAnterior = anterior && !acertoDaSaidaFeito(d, anterior) ? ressarcimentosSemBoleto(d, anterior).filter((r) => (semBoletoNoMes(d, anterior, r.competencia_abatimento).novo || {}).id === c.id) : [];
+  if (doAnterior.length) {
+    const total = doAnterior.reduce((s, r) => s + r.valor, 0);
+    return { nivel: 'info', tipo: 'Condomínio', ancora: 'ressarcimentos',
+      texto: `Ressarcimento de ${C.reais(total)} lançado no contrato de ${anterior.inquilino_nome} para o boleto de ${doAnterior.map((r) => C.compBr(r.competencia_abatimento)).join(', ')}, que passou a este contrato: não é abatido daqui. Fica com ${anterior.inquilino_nome}, como crédito na devolução da garantia da troca de titular.` };
   }
-  const meses = [...new Set((d.ressarcimentos || []).filter((r) => r.contrato_id === c.id).map((r) => r.competencia_abatimento))].sort();
+  const meses =[...new Set((d.ressarcimentos || []).filter((r) => r.contrato_id === c.id).map((r) => r.competencia_abatimento))].sort();
   for (const comp of meses) {
     const cb = boletoDoMes(d, c.id, comp);
-    // mês sem boleto deste contrato (depois da saída ou da troca de titular): o ressarcimento não abate em lugar nenhum
+    // mês sem boleto deste contrato (depois da saída ou da troca de titular): vira crédito no cálculo final da saída ou na
+    // devolução da garantia da troca (decisão do dono de 24/11/2026); avisa até esse acerto ser feito
     const sem = !cb && semBoletoNoMes(d, c, comp);
+    if (sem && sem.motivo !== 'entrada' && !acertoDaSaidaFeito(d, c)) {
+      return { nivel: 'aviso', tipo: 'Condomínio', ancora: 'ressarcimentos',
+        texto: `Ressarcimento de ${C.reais(ressarcimentosNoBoleto(d, c.id, comp).valor)} marcado para o boleto de ${C.compBr(comp)}, mas ${textoSemBoleto(sem, comp)}: entra como crédito de ${c.inquilino_nome} ${sem.motivo === 'troca' ? 'na devolução da garantia da troca de titular' : 'no cálculo final da saída'} (abate dos débitos).` };
+    }
+    if (sem && sem.motivo !== 'entrada') continue; // acerto final já feito: o crédito entrou nele
     if (sem) {
       return { nivel: 'aviso', tipo: 'Condomínio', ancora: 'ressarcimentos',
-        texto: `Ressarcimento de ${C.reais(ressarcimentosNoBoleto(d, c.id, comp).valor)} marcado para o boleto de ${C.compBr(comp)}, mas ${textoSemBoleto(sem, comp)}: não foi abatido em nenhum boleto. Em "Ressarcimentos", escolha um boleto em aberto deste contrato${sem.motivo === 'troca' ? ` ou exclua aqui e lance no contrato de ${sem.novo.inquilino_nome}` : ' ou devolva ao inquilino'}.` };
+        texto: `Ressarcimento de ${C.reais(ressarcimentosNoBoleto(d, c.id, comp).valor)} marcado para o boleto de ${C.compBr(comp)}, mas ${textoSemBoleto(sem, comp)}: não foi abatido em nenhum boleto. Em "Ressarcimentos", escolha um boleto deste contrato.` };
     }
     // ressarcimento maior que o boleto: o boleto fica em R$ 0,00 e a sobra não passa sozinha ao próximo. Ex.: aluguel R$ 2.000,00
     // (R$ 1.800,00 em dia) e fundo de obras de R$ 2.500,00 → R$ 700,00 a lançar no próximo boleto

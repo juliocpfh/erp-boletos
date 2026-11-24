@@ -242,7 +242,8 @@ test('seguro é do inquilino: o anterior leva a apólice, quem entra precisa de 
   for (const comp of ['2026-03', '2026-04', '2026-05']) R.gerarCobrancas(d, comp, 'julio');
   const seg = (c, comp) => d.cobrancas.find((x) => x.contrato_id === c.id && x.competencia === comp)?.seguro;
   assert.equal(seg(v, '2026-03'), 10000);
-  assert.equal(seg(v, '2026-04'), 10000, 'no mês da saída, o anterior paga a parcela da apólice dele');
+  // no mês da saída, o anterior paga a parcela da apólice dele, proporcional aos dias (decisão do dono de 24/11/2026): 26/30
+  assert.equal(seg(v, '2026-04'), Math.round(10000 * 26 / 30), 'no mês da saída, o anterior paga a parcela da apólice dele (proporcional)');
   assert.equal(seg(l, '2026-04'), 0, 'quem entra não paga a apólice do anterior');
   assert.equal(seg(l, '2026-05'), 10000, 'só a apólice dele (1ª de 3 parcelas)');
 });

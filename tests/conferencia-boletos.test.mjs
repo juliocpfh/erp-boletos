@@ -178,3 +178,25 @@ test('demonstrativo do boleto: mostra cada parte e o total bate com o boleto', a
   assert.match(b.descricao, /CONSERTO RS80,00/);
   assert.match(b.descricao, /RESSARC.* -RS50,00/);
 });
+
+test('seguro no mês da saída é proporcional aos dias, como o IPTU; o mês de entrada fica com a parcela inteira (decisão de 24/11)', () => {
+  const { d, c, boleto } = base({ data_entrada: '2026-03-10', vigencia_inicio: '2026-03-10', data_saida: '2026-11-15' });
+  R.inserir(d, 'seguros', { contrato_id: c.id, imovel_id: c.imovel_id, vigencia_inicio: '2026-03-01', vigencia_fim: '2027-02-28', valor_total: 36000, num_parcelas: 12, primeira_competencia: '2026-03' }, 'j');
+  R.gerarCobrancas(d, '2026-03', 'j');
+  R.gerarCobrancas(d, '2026-11', 'j');
+  // entrada em 10/03: parcela inteira (R$ 30,00)
+  assert.equal(boleto('2026-03').seguro, 3000);
+  // saída em 15/11: R$ 30,00 × 15/30 = R$ 15,00
+  const nov = boleto('2026-11');
+  assert.equal(nov.seguro, 1500);
+  assert.equal(nov.seguro_parcela, 'Seguro parc. 9/12 proporcional 15/30 dias de R$\u00a030,00'.replace('\u00a0', C.reais(1).includes('\u00a0') ? '\u00a0' : ' '));
+  assert.match(R.dadosBoleto(d, nov).descricao, /SEGURO9\/12 RS15,00/);
+  // saída marcada depois de gerado: o recálculo deixa o seguro proporcional
+  R.atualizar(d, 'contratos', c.id, { data_saida: '2026-11-20' }, 'j');
+  recalcular(d, c);
+  assert.equal(nov.seguro, 2000, 'R$ 30,00 × 20/30');
+  // mês cheio: parcela inteira
+  R.atualizar(d, 'contratos', c.id, { data_saida: '2026-11-30' }, 'j');
+  recalcular(d, c);
+  assert.equal(nov.seguro, 3000);
+});

@@ -48,7 +48,11 @@ Exemplos com aluguel de R$ 2.000,00, bonificação de 10% e tarifa de R$ 3,50:
 
 **Já coberto por testes de antes** (continuam passando): complemento da caução (`regras.test.mjs`, `mutirao3000-regras.test.mjs`), acordo (`acordo.test.mjs`, `mutirao-regras.test.mjs`), saldo da saída (`decisoes-20-11.test.mjs`), diferenças presas (`mutirao-19-11-abh.test.mjs`), troca de titular (`regras.test.mjs`, `mutirao-e2e.test.mjs`), FCI (`fci.test.mjs`), recálculo de boleto alterado à mão (`boletos-24-11.test.mjs`).
 
-## Para o dono decidir (nada disto foi mudado)
+## Decisões do dono (24/11)
+
+Respostas: 1 = opção (b), 2 = opção (a), 3 = deixar como está com o aviso na tela até conferir a documentação nova do C6 (na emissão à mão o banco aceitou texto maior), 4 = opção (b), só no mês da saída (o mês de entrada continua com a parcela inteira). Programado na PR "Decisões da conferência dos boletos". O texto das perguntas fica abaixo, como foi feito.
+
+## Para o dono decidir (perguntas feitas)
 
 1. **Ressarcimento na troca de titular.** Maria pagou R$ 50,00 de fundo de obras no condomínio; o boleto onde ele seria abatido (12/2026) passou para Pedro. Opções: **(a)** o valor acompanha o boleto e é abatido de Pedro (simples, mas o dinheiro foi de Maria); **(b)** fica com Maria e entra na devolução/cálculo da saída dela (sugestão do Claude: é o mesmo critério das dívidas, que ficam com quem sai). Hoje só aparece o alerta e a equipe resolve à mão.
 2. **Ressarcimento depois da saída.** Maria sai em 20/11/2026 e paga R$ 50,00 de fundo de obras em 05/12. Hoje o cálculo final da saída só tem débitos, não créditos. Opções: **(a)** entrar como crédito no cálculo final (abate dos débitos ou é devolvido); **(b)** continuar à mão (lançar no último boleto em aberto ou devolver por fora).
