@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-trQozbIgKR7B7+fP+xIui4PZTvXPqyctLUz7YEUJmuI='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-TtQi7TAbdIPO3lMrHptXjRwh62jsH5ZhAub/PUoQ8lw='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="9c54eef1d21e5bc5">
+<meta name="fontes" content="e11233004c1e0892">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1727,15 +1727,16 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           consequencia: "Não: o aluguel de julho vence em julho. Cobrar antes de usar é proibido quando há garantia (art. 20; só é permitido sem garantia, art. 42, ou na temporada) e é contravenção (art. 43, III).",
           lei: LI + ", arts. 20, 42 e 43, III."
         },
+        // decisão do dono de 24/11/2026: a tarifa é sempre cobrada; o contrato sem valor próprio cobra esta (antes ela só vinha preenchida)
         {
           chave: "tarifa_padrao",
-          grupo: "contrato",
-          rotulo: "Tarifa do boleto cobrada do inquilino (R$) que vem preenchida",
+          grupo: "aluguel",
+          rotulo: "Tarifa do boleto cobrada do inquilino (R$)",
           tipo: "dinheiro",
           padrao: null,
           min: 0,
-          explica: "Em branco: sem tarifa. Ex.: R$ 3,50 por boleto.",
-          consequencia: "Só muda o que vem preenchido. Os tribunais divergem sobre repassar a tarifa do banco ao inquilino: só com cláusula clara no contrato.",
+          explica: 'Vale para todo contrato sem valor próprio da tarifa. No contrato dá para pôr outro valor ou marcar "Não cobrar tarifa do boleto". Em branco: sem tarifa. Ex.: R$ 8,50 por boleto.',
+          consequencia: "Os boletos em aberto dos contratos sem valor próprio são refeitos com a tarifa nova; os pagos, os emitidos no banco (ou com o PDF do banco anexado) e os alterados à mão não mudam. Os tribunais divergem sobre repassar a tarifa do banco ao inquilino: só com cláusula clara no contrato.",
           lei: LI + ", art. 22, VII (despesas de administração são do locador)."
         },
         {
@@ -2246,6 +2247,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         "reajuste_inicio",
         "base_multa",
         "proporcional",
+        "tarifa_padrao",
         ...DEFINICOES_REGRAS.filter((x) => x.grupo === "garantia" || x.grupo === "contrato").map((x) => x.chave),
         "regua_email_dias",
         "notificacao_prazo_dias",
@@ -4254,7 +4256,7 @@ ${RESUMO_CONTRATO}`, "RESUMO DO CONTRATO EM PERGUNTAS E RESPOSTAS"],
       multa: percentualComExtenso(c.multa_percentual ?? 2),
       juros: percentualComExtenso(c.juros_mensal_percentual ?? 1),
       // tarifa do boleto (cláusula de volta em 24/11/2026; tirada em 2026-10-20): o valor de hoje, do cadastro do contrato
-      tarifa_boleto: c.taxa_boleto > 0 ? valorComExtenso(c.taxa_boleto) : "",
+      tarifa_boleto: tarifaDoTexto(c) > 0 ? valorComExtenso(tarifaDoTexto(c)) : "",
       fci_percentual: percentualComExtenso(c.fci_percentual || 0),
       fci_indice: textoIndice(c.fci_indice),
       encargos_inquilino: lista([...inquilinoPaga, "telefone", "dedetização", "limpeza de calhas"]),
@@ -4286,7 +4288,7 @@ ${RESUMO_CONTRATO}`, "RESUMO DO CONTRATO EM PERGUNTAS E RESPOSTAS"],
       seguro_inquilino: inquilinoPaga.includes("seguro incêndio"),
       seguro_incluso: inclusos.includes("seguro incêndio"),
       tem_incluso: inclusos.length > 0,
-      tarifa_boleto: c.taxa_boleto > 0,
+      tarifa_boleto: tarifaDoTexto(c) > 0,
       fci: c.fci_percentual > 0,
       area_comum: !!imovel.area_comum,
       imovel_fiador: !!campos.fiadores_imoveis,
@@ -4922,7 +4924,7 @@ ${RESUMO_CONTRATO}`, "RESUMO DO CONTRATO EM PERGUNTAS E RESPOSTAS"],
     blocos.push({ tipo: "assinaturas", pessoas });
     return { blocos, rodape: dados.rodape };
   }
-  var UNIDADES, DEZENAS, CENTENAS, valorComExtenso, numeroComExtenso, MESES_EXTENSO, mesPorExtenso, dataPorExtenso, ORD_UNID, ORD_DEZ, ordinalPorExtenso, fem, neutro, gen, flexao, estadoCivil, nacionalidade, conjugeDoFiador, conjugeFaltando, pessoaDe, rotuloDocumento, ENCARGOS, lista, LOCADORA_ANTIGA, DADOS_ANTIGOS_EMPRESA, DADOS_ANTIGOS_LOCADORA, comCamposNovos, comArtigo, companhiaDoImovel, fiadoresNaData, CAMPOS_EXTRAS, camposConhecidos, escDoc, runsHtml, assinaHtml, textoCss, FONTE_RODAPE, estiloRodape, NS, EMU_CM, LOGO, runX, parX, tipoDoModelo, LINHA_EM_BRANCO, valoresDeExemplo, TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR, VISTORIA_INTRO, VISTORIA_ABERTURA, VISTORIA_ABERTURA_SEM_LINK, vistoriaFinal, VISTORIA_FINAL_ANTIGA, semEspacosVistoria, textoFinalVistoria, VISTORIA_CONDICOES, p, it, linhasDe, SITUACOES_VISTORIA, NAO_SE_APLICA, GRAU, piorou, ehPintura, textoReparo, PRESENCA_VISTORIA_SAIDA, FOTOS_VISTORIA;
+  var UNIDADES, DEZENAS, CENTENAS, tarifaDoTexto, valorComExtenso, numeroComExtenso, MESES_EXTENSO, mesPorExtenso, dataPorExtenso, ORD_UNID, ORD_DEZ, ordinalPorExtenso, fem, neutro, gen, flexao, estadoCivil, nacionalidade, conjugeDoFiador, conjugeFaltando, pessoaDe, rotuloDocumento, ENCARGOS, lista, LOCADORA_ANTIGA, DADOS_ANTIGOS_EMPRESA, DADOS_ANTIGOS_LOCADORA, comCamposNovos, comArtigo, companhiaDoImovel, fiadoresNaData, CAMPOS_EXTRAS, camposConhecidos, escDoc, runsHtml, assinaHtml, textoCss, FONTE_RODAPE, estiloRodape, NS, EMU_CM, LOGO, runX, parX, tipoDoModelo, LINHA_EM_BRANCO, valoresDeExemplo, TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR, VISTORIA_INTRO, VISTORIA_ABERTURA, VISTORIA_ABERTURA_SEM_LINK, vistoriaFinal, VISTORIA_FINAL_ANTIGA, semEspacosVistoria, textoFinalVistoria, VISTORIA_CONDICOES, p, it, linhasDe, SITUACOES_VISTORIA, NAO_SE_APLICA, GRAU, piorou, ehPintura, textoReparo, PRESENCA_VISTORIA_SAIDA, FOTOS_VISTORIA;
   var init_contratos = __esm({
     "docs/js/contratos.js"() {
       init_calculos();
@@ -4953,6 +4955,7 @@ ${RESUMO_CONTRATO}`, "RESUMO DO CONTRATO EM PERGUNTAS E RESPOSTAS"],
       ];
       DEZENAS = ["", "", "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa"];
       CENTENAS = ["", "cento", "duzentos", "trezentos", "quatrocentos", "quinhentos", "seiscentos", "setecentos", "oitocentos", "novecentos"];
+      tarifaDoTexto = (c) => c.nao_cobrar_tarifa ? 0 : c.taxa_boleto > 0 ? c.taxa_boleto : Math.max(0, regra("tarifa_padrao", c) || 0);
       valorComExtenso = (centavos2) => `R$ ${reais(centavos2, false)} (${reaisPorExtenso(centavos2)})`;
       numeroComExtenso = (n) => `${n} (${numeroPorExtenso(n)})`;
       MESES_EXTENSO = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
@@ -5671,9 +5674,11 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         campo("cobranca_mes_seguinte", "O aluguel do mês vence no mês seguinte", "simnao", { padrao: true, ajuda: "Marcado: aluguel de julho vence em agosto" }),
         campo("bonificacao", "Tem bonificação (desconto) por pontualidade", "simnao", { padrao: true, colado: true }),
         QUEBRA,
-        campo("taxa_boleto", "Tarifa de emissão do boleto (R$)", "dinheiro", { ajuda: "Entra no boleto e na descrição do boleto" }),
+        // decisão do dono de 24/11/2026: a tarifa é sempre cobrada; em branco vale a de Regras do sistema (tarifa_padrao)
+        campo("taxa_boleto", "Tarifa de emissão do boleto (R$)", "dinheiro", { ajuda: "Em branco: a tarifa padrão de Sistema → Regras do sistema. Um valor aqui vale só para este contrato. Entra no boleto e na descrição do boleto" }),
         campo("multa_percentual", "Multa por atraso (%)", "pct", { padrao: 2 }),
         campo("juros_mensal_percentual", "Juros por atraso (% ao mês)", "pct", { padrao: 1 }),
+        campo("nao_cobrar_tarifa", "Não cobrar tarifa do boleto", "simnao", { ajuda: "Marcado: este contrato não paga tarifa, nem a padrão de Regras do sistema" }),
         secao("Garantia"),
         campo("garantia_tipo", "Tipo de garantia", "opcao", { obrig: true, opcoes: GARANTIAS, ajuda: '"Fiador + depósito" são duas garantias: a Lei 8.245/91 permite só uma por contrato (art. 37, parágrafo único)' }),
         campo("caucao_meses", "Caução equivale a quantos aluguéis", "inteiro", { ...quando("garantia_tipo", "Caução"), ajuda: 'O valor da caução é calculado: aluguéis × aluguel bonificado (parte "Valores e boleto"). Caução em dinheiro: no máximo 3 aluguéis (Lei 8.245/91, art. 38, §2º)' }),
@@ -6586,6 +6591,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     reaplicarRessarcimentos: () => reaplicarRessarcimentos,
     recalcularCobrancas: () => recalcularCobrancas,
     recalcularCorrecoes: () => recalcularCorrecoes,
+    recalcularTarifaPadrao: () => recalcularTarifaPadrao,
     recebedorDaAplicacao: () => recebedorDaAplicacao,
     recebedoresUsados: () => recebedoresUsados,
     refazerConferenciaDoLink: () => refazerConferenciaDoLink,
@@ -6678,6 +6684,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     soltarSaidaDoAnterior: () => soltarSaidaDoAnterior,
     somaDepositos: () => somaDepositos,
     tamanhoDoBanco: () => tamanhoDoBanco,
+    tarifaDoContrato: () => tarifaDoContrato,
     taxasCondominioUsadas: () => taxasCondominioUsadas,
     taxasNoBoleto: () => taxasNoBoleto,
     temCaucao: () => temCaucao,
@@ -6711,6 +6718,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     ultimoCicloDeNumeracao: () => ultimoCicloDeNumeracao,
     ultimoEnvioEmail: () => ultimoEnvioEmail,
     ultimosValores: () => ultimosValores,
+    usaTarifaPadrao: () => usaTarifaPadrao,
     usoDoItem: () => usoDoItem,
     valeDesdeDaRenovacao: () => valeDesdeDaRenovacao,
     validarFciPrevios: () => validarFciPrevios,
@@ -7941,6 +7949,16 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const saidaNoMes = !!c.data_saida && c.data_saida.slice(0, 7) === comp;
     return entradaNoMes && !c.contrato_anterior_id || saidaNoMes && !continuadoPor(d2, c);
   }
+  function tarifaDoContrato(c) {
+    if (!c || c.nao_cobrar_tarifa) return 0;
+    if (c.taxa_boleto > 0) return c.taxa_boleto;
+    const padrao = regra("tarifa_padrao", c);
+    return padrao > 0 ? padrao : 0;
+  }
+  function recalcularTarifaPadrao(d2, usuario, filtroContrato = () => true) {
+    const ids = new Set(d2.contratos.filter((c) => usaTarifaPadrao(c) && filtroContrato(c)).map((c) => c.id));
+    return recalcularCobrancas(d2, (cb) => ids.has(cb.contrato_id) && !emitidoNoBanco(cb) && !cb.boleto_pdf, usuario);
+  }
   function montarCobranca(d2, contrato, comp) {
     const dias = diasOcupados(comp, contrato.data_entrada, contrato.data_saida);
     if (dias === 0 || trocaAguardaAditivo(d2, contrato)) return null;
@@ -7973,7 +7991,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       iptu,
       seguro,
       seguroProporcional: seguroProporcionalNoMes(d2, contrato, comp),
-      taxaBoleto: cobra("taxa") ? contrato.taxa_boleto || 0 : 0,
+      taxaBoleto: cobra("taxa") ? tarifaDoContrato(contrato) : 0,
       contrato
     });
     const seguroParcela = seguro && r.seguro < seguro ? `${seguroRot} proporcional ${r.dias_cobrados}/${r.dias_mes} dias de ${reais(seguro)}` : seguroRot;
@@ -13700,6 +13718,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     let mudou = 0;
     const antes = regrasDe(d2);
     const naNfAntes = antes.ressarcimento_na_nf;
+    const tarifaAntes = antes.tarifa_padrao;
     for (const def of DEFINICOES_REGRAS) {
       const novo = def.fora && def.chave !== foraQueMuda ? antes[def.chave] : def.chave in limpos ? limpos[def.chave] : def.padrao;
       const linha = d2.config_regras.find((r) => r.chave === def.chave);
@@ -13726,6 +13745,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     usarRegras(d2);
     const naNf = regra("ressarcimento_na_nf");
     if (naNf !== naNfAntes) for (const cb of d2.cobrancas.filter((x) => !x.data_pagamento && x.ressarcimento > 0 && !!x.ressarcimento_na_nf !== naNf)) atualizar(d2, "cobrancas", cb.id, { ressarcimento_na_nf: naNf }, usuario, "Ressarcimento na NF (regra do sistema)");
+    if (!mesmoValor(regra("tarifa_padrao"), tarifaAntes)) recalcularTarifaPadrao(d2, usuario, (c) => !c.perfil_regras_id || regra("tarifa_padrao", c) === regra("tarifa_padrao"));
     return mudou;
   }
   function salvarVersaoRegras(d2, nome, usuario) {
@@ -13770,8 +13790,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const dados = { nome: n, descricao: String(descricao2 || "").trim().slice(0, 300), valores: limpos };
     const r = id ? buscar(d2, "perfis_regras", Number(id)) : null;
     if (id && !r) throw new ErroUsuario("Regra especial não encontrada.");
+    const tarifaAntes = r ? (r.valores || {}).tarifa_padrao : void 0;
     const salvo = r ? (atualizar(d2, "perfis_regras", r.id, dados, usuario, `Regra especial "${n}" alterada`), r) : inserir(d2, "perfis_regras", { ...dados, criado_em: hojeIso() }, usuario, `Regra especial "${n}" criada`);
     usarRegras(d2);
+    if (r && !mesmoValor(tarifaAntes, limpos.tarifa_padrao)) recalcularTarifaPadrao(d2, usuario, (c) => c.perfil_regras_id === r.id);
     return salvo;
   }
   function excluirPerfilRegras(d2, id, usuario) {
@@ -13781,6 +13803,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     for (const c of contratos) atualizar(d2, "contratos", c.id, { perfil_regras_id: null }, usuario, `${c.inquilino_nome}: volta às regras do sistema (regra especial "${p2.nome}" excluída)`);
     excluir(d2, "perfis_regras", p2.id, usuario, `Regra especial "${p2.nome}" excluída`);
     usarRegras(d2);
+    if ("tarifa_padrao" in (p2.valores || {}) && !mesmoValor(p2.valores.tarifa_padrao, regra("tarifa_padrao"))) {
+      const ids = new Set(contratos.map((c) => c.id));
+      recalcularTarifaPadrao(d2, usuario, (c) => ids.has(c.id));
+    }
     return contratos.length;
   }
   function padroesNovoContrato(perfil = null) {
@@ -13796,7 +13822,6 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     };
     if (perfilDe(ctx)) out.perfil_regras_id = perfilDe(ctx);
     if (r("bonificacao_percentual_padrao") !== null && r("bonificacao_padrao")) out.desconto_pontualidade_percentual = r("bonificacao_percentual_padrao");
-    if (r("tarifa_padrao") !== null) out.taxa_boleto = r("tarifa_padrao");
     if (r("fci_percentual_padrao") !== null) out.fci_percentual = r("fci_percentual_padrao");
     if (r("fci_indice_padrao")) out.fci_indice = r("fci_indice_padrao");
     if (r("indice_padrao")) out.indice_correcao = r("indice_padrao");
@@ -13858,7 +13883,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (!(r.arquivos || []).includes(nome)) throw new ErroUsuario("Este arquivo já foi tirado do registro.");
     atualizar(d2, "cobranca_registros", r.id, { arquivos: r.arquivos.filter((x) => x !== nome) }, usuario, `Cobrança (${r.tipo} de ${dataBr(r.data)}): arquivo tirado: ${nome}`);
   }
-  var TABELAS, SITUACOES, CONCESSIONARIAS_POR_UF, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, IMAGEM_FORA_DO_HISTORICO, semPeso, RESPOSTA_PESADA, FORMULARIOS_DA_TABELA, camposDinheiro, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, camposDaGravacao, CODIGO_DE, nomeCurto, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, aplicacaoBaixada, aplicacoesEmVigor, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehSaldoSaida, ehBoletoAvulso, semMultaJuros, emAcordo, MOTIVO_EM_ACORDO, quitadoNaSaida, aCobrar, boletosCaucaoDa, parcelasIrmasDoComplemento, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, IPTU_DIVISAO_NOVA_DESDE, dividirIptu, vencimentoParcela, mesBoletoDaParcela, CAMPOS_RECALCULO, CAMPOS_MANUAIS, JUNTOS_DO_MANUAL, totais, previstoNoPagamento, pagoAMaisDo, MOTIVO_PAGO_A_MENOS, textoDiferenca, diferencaPendente, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, fixosDoBoleto, somaValores, cobrancasEmAberto, nomeDebitoSaida, proximoBoletoAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, MODOS_FICHA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, DOCUMENTOS_RENDA, DICA_DOCUMENTOS, PJ2, casadoOuUniao, fichaComConjuge, PARTES_DOCUMENTOS_PF, separacaoTotal, documentosDoFiador, VAGAS_FIADOR_FICHA, fiadoresDaFicha, fichaAberta, fichaAbertaDoImovel, fichaSemContrato, devolucaoPendente, condicoesDaReservaAgora, condicoesDaReserva, valorDaReserva, retencaoDaReserva, devolverReservaAte, fichaSemDocumentos, inicioPrazoApagarFicha, apagarFichaEsperaDevolucao, dataApagarDocumentosFicha, FICHA_FICA, fichaFica, fichasComDadosVencidos, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraObrigatoria, relogiosObrigatorios, leituraDo, encerramentoDo, boletoDoSaldo, garantiaADevolverNaSaida, COMPROVANTE_SAIDA_DESDE, pastaDoBoletoPdf, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, titularidadeDevolvida, boletosParaReemitir, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, devolucoesDaTrocaDeTitular, devolucaoDaTrocaDeGarantia, garantiaDevolvidaNaTroca, devolucoesDeTrocaPendentes, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, companhiaCurtaDaConta, tamanhosVistos, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contasSoArquivo, contaSoArquivo, contasDoExtrato, contaBanco, limparId, contaPreMarcada, EMISSAO_EM_ANDAMENTO_MS, corta, encargosParaComparar, descontoLiberado, diasBaixaDaConta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, vencidosSemEmissao, boletosDoMesSemEmissao, solicitacoesDo, SITUACOES_NOTIFICACAO, MEIOS_NOTIFICACAO, NOTIFICACAO_ABERTA, notificacaoEmAberto, limiteNotificacao, notificacoesDo, numeroDaNotificacao, textoMultaNotificacao, multaSugerida, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, competenciaDoMesVencimento, mesVencimentoDaCompetencia, ressarcimentoConfirmado, ressarcimentosSemComprovante, textoCreditoRessarcimento, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DESTINOS_MOVIMENTACAO, contratoEncerrado, FAIXAS_ATRASO, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, mesDoPeriodoGuia, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, pagosAquiAbertosNoBanco, textoDeBusca, assinaturaLembrete, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, alvoDoAlerta, mesmoAlvo, desligamentosOrfaos, TIPOS_ALERTA_DO_IMOVEL, PRAZO_CONTESTAR_SAIDA, prazoContestarSaida, mudarRegraSistema, voltarRegrasAoPadrao, contratosDoPerfil, TIPOS_REGISTRO_COBRANCA, registrosCobrancaDo, acordoDoBoleto, gastoDaCobranca;
+  var TABELAS, SITUACOES, CONCESSIONARIAS_POR_UF, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, IMAGEM_FORA_DO_HISTORICO, semPeso, RESPOSTA_PESADA, FORMULARIOS_DA_TABELA, camposDinheiro, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, camposDaGravacao, CODIGO_DE, nomeCurto, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, aplicacaoBaixada, aplicacoesEmVigor, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehSaldoSaida, ehBoletoAvulso, semMultaJuros, emAcordo, MOTIVO_EM_ACORDO, quitadoNaSaida, aCobrar, boletosCaucaoDa, parcelasIrmasDoComplemento, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, IPTU_DIVISAO_NOVA_DESDE, dividirIptu, vencimentoParcela, mesBoletoDaParcela, usaTarifaPadrao, CAMPOS_RECALCULO, CAMPOS_MANUAIS, JUNTOS_DO_MANUAL, totais, previstoNoPagamento, pagoAMaisDo, MOTIVO_PAGO_A_MENOS, textoDiferenca, diferencaPendente, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, fixosDoBoleto, somaValores, cobrancasEmAberto, nomeDebitoSaida, proximoBoletoAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, MODOS_FICHA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, DOCUMENTOS_RENDA, DICA_DOCUMENTOS, PJ2, casadoOuUniao, fichaComConjuge, PARTES_DOCUMENTOS_PF, separacaoTotal, documentosDoFiador, VAGAS_FIADOR_FICHA, fiadoresDaFicha, fichaAberta, fichaAbertaDoImovel, fichaSemContrato, devolucaoPendente, condicoesDaReservaAgora, condicoesDaReserva, valorDaReserva, retencaoDaReserva, devolverReservaAte, fichaSemDocumentos, inicioPrazoApagarFicha, apagarFichaEsperaDevolucao, dataApagarDocumentosFicha, FICHA_FICA, fichaFica, fichasComDadosVencidos, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraObrigatoria, relogiosObrigatorios, leituraDo, encerramentoDo, boletoDoSaldo, garantiaADevolverNaSaida, COMPROVANTE_SAIDA_DESDE, pastaDoBoletoPdf, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, titularidadeDevolvida, boletosParaReemitir, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, devolucoesDaTrocaDeTitular, devolucaoDaTrocaDeGarantia, garantiaDevolvidaNaTroca, devolucoesDeTrocaPendentes, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, companhiaCurtaDaConta, tamanhosVistos, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contasSoArquivo, contaSoArquivo, contasDoExtrato, contaBanco, limparId, contaPreMarcada, EMISSAO_EM_ANDAMENTO_MS, corta, encargosParaComparar, descontoLiberado, diasBaixaDaConta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, vencidosSemEmissao, boletosDoMesSemEmissao, solicitacoesDo, SITUACOES_NOTIFICACAO, MEIOS_NOTIFICACAO, NOTIFICACAO_ABERTA, notificacaoEmAberto, limiteNotificacao, notificacoesDo, numeroDaNotificacao, textoMultaNotificacao, multaSugerida, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, competenciaDoMesVencimento, mesVencimentoDaCompetencia, ressarcimentoConfirmado, ressarcimentosSemComprovante, textoCreditoRessarcimento, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DESTINOS_MOVIMENTACAO, contratoEncerrado, FAIXAS_ATRASO, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, mesDoPeriodoGuia, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, pagosAquiAbertosNoBanco, textoDeBusca, assinaturaLembrete, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, alvoDoAlerta, mesmoAlvo, desligamentosOrfaos, TIPOS_ALERTA_DO_IMOVEL, PRAZO_CONTESTAR_SAIDA, prazoContestarSaida, mudarRegraSistema, voltarRegrasAoPadrao, contratosDoPerfil, TIPOS_REGISTRO_COBRANCA, registrosCobrancaDo, acordoDoBoleto, gastoDaCobranca;
   var init_regras = __esm({
     "docs/js/regras.js"() {
       init_alertas();
@@ -14035,6 +14060,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       dividirIptu = (p2, n) => (Number(p2.ano) >= IPTU_DIVISAO_NOVA_DESDE ? parcelas : parcelasAntigas)(p2.valor_total, n);
       vencimentoParcela = (p2, n) => p2.vencimento_primeira ? somarMesesData(p2.vencimento_primeira, n - 1) : null;
       mesBoletoDaParcela = (p2, n) => p2.primeiro_vencimento_boleto ? somarMeses(p2.primeiro_vencimento_boleto, n - 1) : null;
+      usaTarifaPadrao = (c) => !!c && !c.nao_cobrar_tarifa && !(c.taxa_boleto > 0);
       CAMPOS_RECALCULO = [
         "dias_cobrados",
         "dias_mes",
@@ -14151,6 +14177,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         "bonificacao",
         "desconto_pontualidade_percentual",
         "taxa_boleto",
+        "nao_cobrar_tarifa",
         "multa_percentual",
         "juros_mensal_percentual",
         "cobrar_iptu",
@@ -29464,6 +29491,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
         "dia_vencimento",
         "cobranca_mes_seguinte",
         "taxa_boleto",
+        "nao_cobrar_tarifa",
         "fci_percentual",
         "fci_indice",
         "multa_percentual",
@@ -31923,7 +31951,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       ${item("Contrato", `${dataBr(c.data_entrada || c.vigencia_inicio)} a ${c.prazo_tipo === "Indeterminado" ? "prazo indeterminado" : `${dataBr(c.vigencia_fim)}${prazoDoContrato(d(), c) ? ` (${prazoDoContrato(d(), c)} meses)` : ""}`}`)}
       ${item("Aluguel inicial (histórico)", reais(c.aluguel_inicial))}${item("Aluguel atual (cheio)", `<span class="maior">${reais(aluguel)}</span>`)}
       ${item("Bonificação de pontualidade", c.bonificacao === false ? "não tem" : `${pct(pctBonif)} = ${reais(desconto)}`)}${item("Aluguel com bonificação", reais(aluguel - desconto))}
-      ${item("Vencimento", `dia ${c.dia_vencimento} ${c.cobranca_mes_seguinte !== false ? "do mês seguinte" : "do próprio mês"}`)}${item("Taxa do boleto", reais(c.taxa_boleto))}
+      ${item("Vencimento", `dia ${c.dia_vencimento} ${c.cobranca_mes_seguinte !== false ? "do mês seguinte" : "do próprio mês"}`)}${item("Taxa do boleto", c.nao_cobrar_tarifa ? "não cobra" : `${reais(tarifaDoContrato(c))}${usaTarifaPadrao(c) ? ' <span class="suave">(padrão de Regras do sistema)</span>' : ""}`)}
       ${item("Multa por atraso", pct(c.multa_percentual))}${item("Juros por atraso", `${pct(c.juros_mensal_percentual)} ao mês`)}
       ${item("NF", c.gerar_nf === false ? "não emite (só controle do pagamento)" : "emite")}
       ${car ? item("Carência", `${referenciaEVencimento(d(), c, car[0])}${car[0] !== car[1] ? `<br>até a ${referenciaEVencimento(d(), c, car[1]).replace(/^R/, "r")}` : ""}<br>cobra: ${["iptu", "seguro", "taxa"].filter((k) => c[`carencia_cobrar_${k}`]).map((k) => ({ iptu: "IPTU", seguro: "seguro", taxa: "tarifa" })[k]).join(", ") || "nada"}`) : ""}</div>
