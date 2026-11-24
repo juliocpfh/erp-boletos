@@ -7,7 +7,7 @@ import { sanearParametros } from '../docs/js/calculos.js';
 
 // Outros documentos da locação (pedido do dono de 24/11/2026, item C2): cada modelo sai sem marcação sobrando,
 // com os dados de exemplo (pessoa fictícia, CPF de teste 529.982.247-25) e nas variações do contrato.
-const textoDe = (blocos) => blocos.map((b) => (b.runs ? b.runs.map((r) => r.t).join('') : `[ASSINATURAS ${b.pessoas.map((p) => p.papel).join(', ')}]`)).join('\n');
+const textoDe = (blocos) => blocos.map((b) => (b.runs ? b.runs.map((r) => r.t).join('') : !b.pessoas ? `[${b.tipo}]` : `[ASSINATURAS ${b.pessoas.map((p) => p.papel).join(', ')}]`)).join('\n');
 const SOBRA = /\{[^}]*\}|\[[a-z_]+\?\]|\[se |\[senão\]|\[fim\]|CL[ÁA]USULA #|#i\.|\[cláusula/;
 
 const outros = MODELOS_PADRAO.filter((m) => m.tipo in TIPOS_DOCUMENTO);
