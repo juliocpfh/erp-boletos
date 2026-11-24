@@ -25,9 +25,9 @@ test('ajuste do mês: vários abatimentos e cobranças no mesmo boleto, cada um 
   assert.equal(R.totais(cb).a_pagar_pontual, antes - 10000);
   assert.deepEqual(R.partesDosOutros(cb).map((p) => p.valor), [8000, -15000, -3000]);
   const desc = R.dadosBoleto(d, cb).descricao;
-  assert.match(desc, /CONSERTO DA TORNEIRA RS80,00/);
-  assert.match(desc, /REFORMA DO BANHEIRO -RS150,00/);
-  assert.match(desc, /ACERTO DA ÁGUA -RS30,00/);
+  assert.match(desc, /CONSERTO DA TORNEIRA 80,00/);
+  assert.match(desc, /REFORMA DO BANHEIRO -150,00/);
+  assert.match(desc, /ACERTO DA ÁGUA -30,00/);
   const [, reforma] = R.ajustesDoBoleto(cb);
   R.retirarAjuste(d, cb.id, reforma.id, 'j');
   assert.equal(cb.outros, 5000);

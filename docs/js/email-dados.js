@@ -136,9 +136,9 @@ function camposDoBoleto(d, cb, campos, hoje) {
   Object.assign(campos, {
     boleto_referente: R.ehParcelaAcordo(cb) ? `da parcela ${cb.acordo_parcela || ''} do acordo`.replace(/ {2,}/g, ' ')
       : R.ehComplementoCaucao(cb) ? 'do complemento da caução' : R.ehSaldoSaida(cb) ? 'do saldo do acerto final' : `do aluguel de ${C.compBr(cb.competencia)}`,
-    // e-mail do boleto feito à mão no banco (2026-11-24): o mês de uso e o descritivo, o mesmo da descrição do boleto (lá "RS1.350,00",
-    // porque o banco não aceita o "$"; no e-mail, "R$ 1.350,00")
-    competencia_boleto: C.compBr(cb.competencia), descricao_boleto: R.dadosBoleto(d, cb).descricao.replace(/\bRS(?=\d)/g, 'R$ '),
+    // e-mail do boleto feito à mão no banco (2026-11-24): o mês de uso e o descritivo, o mesmo da descrição do boleto (lá "1.350,00",
+    // sem moeda, para caber nas 100 letras do banco; no e-mail, "R$ 1.350,00" e por extenso)
+    competencia_boleto: C.compBr(cb.competencia), descricao_boleto: R.dadosBoleto(d, cb, { moeda: 'R$ ' }).descricao,
     vencimento_boleto: C.dataBr(cb.vencimento), limite_pagamento: C.dataBr(limite),
     valor_em_dia: C.reais(t.a_pagar_pontual), valor_cheio: C.reais(t.a_pagar_sem_desconto),
     multa_pct: C.pct(cb.multa_percentual || 0), juros_pct: C.pct(cb.juros_mensal_percentual || 0),

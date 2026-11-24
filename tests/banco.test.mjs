@@ -123,7 +123,7 @@ test('pedidoBoletoC6: valor cheio, desconto até o vencimento, multa e juros em 
   assert.equal(p.payer.tax_id, '52998224725');
   assert.equal(p.payer.email, 'maria@exemplo.com.br');
   assert.deepEqual(p.payer.address, { address: 'Rua das Flores, 45', neighborhood: 'Centro', city: 'Curitiba', state: 'PR', zip_code: '80010000' });
-  assert.equal(p.description, 'ALUGUEL RS3.644,45 COM BONF. RS3.280,00');
+  assert.equal(p.description, 'ALUGUEL 3.644,45 COM BONF. 3.280,00');
   assert.ok(p.description.length <= 100);
   assert.equal(p.days_after_due_date, 30);
   assert.equal(p.origin, 'ADM-IMOVEIS');
@@ -132,7 +132,7 @@ test('pedidoBoletoC6: valor cheio, desconto até o vencimento, multa e juros em 
   assert.deepEqual(p.payment_method.pix, { key: 'chave-aleatoria-ank', type: 'EVP' });
   assert.equal(p.payment_method.bank_slip.billing_scheme, '21');
   assert.equal(p.payment_method.bank_slip.your_number, '1');
-  assert.deepEqual(p.payment_method.bank_slip.instructions, ['Após o vencimento, pagar só pelo Pix', 'ALUGUEL RS3.644,45', 'COM BONF. RS3.280,00']);
+  assert.deepEqual(p.payment_method.bank_slip.instructions, ['Após o vencimento, pagar só pelo Pix', 'ALUGUEL 3.644,45', 'COM BONF. 3.280,00']);
   // avisos automáticos: e-mail e SMS × 4 momentos = 8
   assert.equal(p.payer_notification.length, 8);
   assert.deepEqual(p.payer_notification[0], { channel: 'EMAIL', destination: 'maria@exemplo.com.br', notification_date: 'ISSUE_DATE' });
@@ -311,7 +311,7 @@ test('erro na emissão, cancelamento e reemissão; boleto alterado depois de emi
   assert.deepEqual([div.no_banco, div.no_sistema], [364445, 374445]);
   // item 12: a alteração leva também os encargos recalculados (desconto, multa e juros), não só valor, vencimento e descrição
   const alt = R.alteracaoBoletoC6(d, cb);
-  assert.deepEqual({ ...alt, fees: undefined }, { amount: 3744.45, due_date: '2026-03-10', description: 'ALUGUEL RS3.644,45 COM BONF. RS3.280,00 COBRANÇA ADICIONAL RS100,00', fees: undefined });
+  assert.deepEqual({ ...alt, fees: undefined }, { amount: 3744.45, due_date: '2026-03-10', description: 'ALUGUEL 3.644,45 COM BONF. 3.280,00 COBRANÇA ADICIONAL 100,00', fees: undefined });
   assert.deepEqual(alt.fees, R.encargosDoBoletoC6(d, cb, R.contaBanco(d, cb.banco.conta_id)));
   assert.equal(alt.fees.fine_type, 'PERCENTAGE');
   R.registrarBoletoBancario(d, cb.id, { ...CONSULTA, amount: 3744.45 }, 'teste', { alterado: true });

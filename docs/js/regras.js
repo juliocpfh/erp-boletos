@@ -5701,12 +5701,17 @@ export function salvarOrdemCaixas(d, pagina, grupo, visiveis, usuario) {
 // --------------------------------------------------------------------------
 // Boleto: textos para copiar no site do banco
 // --------------------------------------------------------------------------
-const rs = (c) => `RS${C.reais(c, false)}`;
 /** Tamanho máximo da descrição da cobrança no C6 (Bolepix). */
 export const LIMITE_DESCRICAO_BOLETO = 100;
 
-/** Valor, desconto, juros ao dia e descrição no formato usado nos boletos (ex.: "ALUGUEL RS3.644,45"). */
-export function dadosBoleto(d, cb) {
+/**
+ * Valor, desconto, juros ao dia e descrição no formato usado nos boletos (ex.: "ALUGUEL 3.644,45"). Decisão do dono de 24/11/2026:
+ * os valores vão sem o "RS" (o banco não aceita o "$"), para caber nas 100 letras da descrição do C6. ``moeda``: o que vai antes de
+ * cada valor (o e-mail do boleto usa "R$ " e não precisa caber em 100 letras: nada é encurtado).
+ */
+export function dadosBoleto(d, cb, { moeda = '' } = {}) {
+  const rs = (v) => `${moeda}${C.reais(v, false)}`;
+  const limite = moeda ? Infinity : LIMITE_DESCRICAO_BOLETO;
   const c = buscar(d, 'contratos', cb.contrato_id);
   const imovel = buscar(d, 'imoveis', c.imovel_id);
   const t = totais(cb);
@@ -5743,7 +5748,7 @@ export function dadosBoleto(d, cb) {
     ...(cb.ressarcimento ? ['RESSARC. CONDOMÍNIO', 'RESSARC. COND.'].map((x) => () => { extras[iRessarc] = `${x} -${rs(cb.ressarcimento)}`; }) : []),
   ];
   for (const passo of encurtar) {
-    if (ehBoletoAvulso(cb) || linhas.join('\n').length <= LIMITE_DESCRICAO_BOLETO) break;
+    if (ehBoletoAvulso(cb) || linhas.join('\n').length <= limite) break;
     passo();
     linhas[linhas.length - 1] = extras.join(' ');
   }
@@ -5757,8 +5762,28 @@ export function dadosBoleto(d, cb) {
     multa_valor: t.base_multa !== valor ? C.arred((t.base_multa * (cb.multa_percentual || 0)) / 100) : null,
     juros_ao_dia: C.jurosAoDia(t.base_multa, cb.juros_mensal_percentual), descricao: linhas.join('\n'),
     // letras a mais que o C6 corta no fim da descrição (0 = cabe)
-    excesso: Math.max(0, linhas.join('\n').length - LIMITE_DESCRICAO_BOLETO),
+    excesso: moeda ? 0 : Math.max(0, linhas.join('\n').length - LIMITE_DESCRICAO_BOLETO),
   };
+}
+
+/**
+ * Quebra os textos em linhas de até ``largura`` letras sem partir palavra nem valor (as instruções do boleto no C6: 4 linhas de 80).
+ * Antes o corte era seco (``slice``) e podia sair "RS1.80" numa linha e "0,00" perdido. Palavra maior que a linha (raro) é cortada.
+ * Ex.: linha de 95 letras → uma de até 80, terminando num espaço, e o resto na seguinte.
+ */
+export function quebrarLinhas(textos, largura) {
+  const out = [];
+  for (const t of textos) {
+    let resto = String(t || '').trim().replace(/\s+/g, ' ');
+    while (resto.length > largura) {
+      const corte = resto.lastIndexOf(' ', largura);
+      const ate = corte > 0 ? corte : largura;
+      out.push(resto.slice(0, ate).trim());
+      resto = resto.slice(ate).trim();
+    }
+    if (resto) out.push(resto);
+  }
+  return out;
 }
 
 // --------------------------------------------------------------------------
@@ -6088,14 +6113,16 @@ export function pedidoBoletoC6(d, cb, conta, referencia = referenciaExterna(cb))
   }
   if (endereco.zip_code.length !== 8) problemas.push(`O CEP tem ${endereco.zip_code.length} números e precisa ter 8 ("${endereco.zip_code}"): corrija ${ondeEndereco('zip_code')}`);
   if (problemas.length) throw new C.ErroUsuario(`O boleto de ${c.inquilino_nome} (${C.compBr(cb.competencia)}) não foi ao banco: ${problemas.join('; ')}. Ex.: "Avenida" → "Av.", "Professor" → "Prof.".`);
-  const instrucoes = [...String(conta.instrucoes || '').split('\n'), ...b.descricao.split('\n')].map((x) => x.trim().slice(0, L.instrucao)).filter(Boolean).slice(0, L.instrucoes);
+  // cada linha da instrução com até 80 letras, quebrada entre palavras (nunca no meio de um valor); até 4 linhas
+  const instrucoes = quebrarLinhas([...String(conta.instrucoes || '').split('\n'), ...b.descricao.split('\n')], L.instrucao).slice(0, L.instrucoes);
   const boleto = { [K.carteira]: carteiraDaConta(conta), [K.seu_numero]: String(cb.id).slice(-L.seu_numero) };
   if (instrucoes.length) boleto[K.instrucoes] = instrucoes;
   const pedido = {
     [K.referencia]: referencia,
     [K.valor]: centavosParaReais(b.valor),
     [K.vencimento]: b.vencimento,
-    [K.descricao]: b.descricao.replace(/\n/g, ' ').slice(0, L.descricao),
+    // acima de 100 letras (a tela avisa), corta entre palavras, nunca no meio de um valor
+    [K.descricao]: quebrarLinhas([b.descricao.replace(/\n/g, ' ')], L.descricao)[0] || '',
     // limites da API (nome, endereço, bairro e cidade 40, e-mail 70) conferidos acima, sem cortar; CEP com 8 dígitos, UF com 2 letras
     [K.pagador]: { [K.pagador_nome]: pagador.nome, [K.pagador_documento]: taxId,
       [K.pagador_endereco]: { [K.endereco_rua]: pagador.rua, [K.endereco_bairro]: pagador.bairro,
