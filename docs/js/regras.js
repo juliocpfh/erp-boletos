@@ -3151,6 +3151,8 @@ export function apagarDadosPessoaisDaFicha(d, fichaId, usuario, hoje = C.hojeIso
   if (!fichaSemContrato(f)) throw new C.ErroUsuario('Só a ficha reprovada ou com desistência tem os dados pessoais apagados.');
   // reserva com parte retida: o termo aceito fica, como prova do combinado (LGPD, art. 16, I, e art. 7º, VI)
   const retida = f.devolucao_valor > 0 && f.devolucao_valor < (f.reserva_valor || 0);
+  // de onde contaram os meses (lido antes de apagar): a decisão ou a devolução da reserva (FIC-03)
+  const desde = inicioPrazoApagarFicha(f) && inicioPrazoApagarFicha(f) !== f.decisao_data ? 'devolução da reserva' : 'decisão';
   const saem = Object.keys(f).filter((k) => !fichaFica(k) && !(retida && k === 'aceite_reserva') && f[k] !== null && f[k] !== undefined && f[k] !== '');
   for (const k of saem) f[k] = null;
   f.dados_apagados_em = hoje;
@@ -3168,7 +3170,7 @@ export function apagarDadosPessoaisDaFicha(d, fichaId, usuario, hoje = C.hojeIso
     }
     return h;
   });
-  registrar(d, usuario, 'Alteração', 'fichas', f.id, `Ficha de ${f.inquilino_nome} (${f.situacao.toLocaleLowerCase('pt-BR')}): dados pessoais apagados (${CR.regra('meses_documentos_ficha')} meses depois da decisão; ficam o nome, as datas, a situação e a reserva)`, { campos_apagados: saem.length });
+  registrar(d, usuario, 'Alteração', 'fichas', f.id, `Ficha de ${f.inquilino_nome} (${f.situacao.toLocaleLowerCase('pt-BR')}): dados pessoais apagados (${CR.regra('meses_documentos_ficha')} meses depois da ${desde}; ficam o nome, as datas, a situação e a reserva)`, { campos_apagados: saem.length });
   return f;
 }
 
