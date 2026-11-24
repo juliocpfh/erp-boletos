@@ -72,7 +72,7 @@ function itensContrato() {
   const out = [];
   out.push(['Contrato de locação', c ? esc(nomeContrato(c)) : linhaFalta('um contrato'), c ? abrir(`#/imprimir/contrato?contrato=${c.id}`) : '']);
   const aditivo = (tipo, nome) => {
-    const a = (db.aditivos || []).find((x) => x.texto && (tipo ? x.tipo === tipo : ![K.TIPO_ADITIVO_TROCA, K.TIPO_ADITIVO_VALOR].includes(x.tipo)));
+    const a = (db.aditivos || []).find((x) => x.texto && !x.documento && (tipo ? x.tipo === tipo : ![K.TIPO_ADITIVO_TROCA, K.TIPO_ADITIVO_VALOR].includes(x.tipo)));
     const ca = a && buscar('contratos', a.contrato_id);
     out.push([nome, ca ? `${esc(nomeContrato(ca))} · aditivo nº ${esc(a.numero || a.id)}` : linhaFalta(`um termo aditivo (${nome.replace('Termo aditivo ', '')}) feito pelo sistema`), ca ? abrir(`#/imprimir/aditivo?id=${a.id}`) : '']);
   };

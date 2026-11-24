@@ -82,6 +82,11 @@ export function itensDaPasta(d, c, soltos = null) {
   for (const a of d.aditivos.filter((x) => x.contrato_id === c.id && x.arquivo).sort((x, y) => String(x.data).localeCompare(String(y.data)) || x.id - y.id)) {
     poe({ vaga: `aditivo:${a.id}`, grupo: 'contrato', rotulo: `Termo aditivo${a.numero ? ` nº ${a.numero}` : ''}${a.assunto ? ` (${a.assunto})` : a.tipo ? ` (${a.tipo.toLocaleLowerCase('pt-BR')})` : ''}`, data: a.data || null, escopo: 'aditivos', pasta: c.id, nome: a.arquivo });
   }
+  // outros documentos da locação assinados (distrato, avisos, autorização de obra, declaração, aviso ao fiador; 2026-11-24,
+  // DOC-07): uma vaga por documento registrado (a prorrogação e a troca de garantia são termos aditivos, logo acima)
+  for (const x of (d.documentos_locacao || []).filter((y) => y.contrato_id === c.id && y.arquivo).sort((a, b) => String(a.data).localeCompare(String(b.data)) || a.id - b.id)) {
+    poe({ vaga: `documento:${x.id}`, grupo: 'contrato', rotulo: `${x.nome || 'Documento'} de ${C.dataBr(x.data)} assinado`, data: x.assinado_em || x.data || null, escopo: 'aditivos', pasta: c.id, nome: x.arquivo });
+  }
   // termo do acordo de dívida assinado (anexado no boleto do acordo, etapa "Termo do acordo assinado")
   for (const a of (d.acordos || []).filter((x) => x.contrato_id === c.id && x.termo_assinado)) {
     poe({ vaga: `acordo:${a.id}`, grupo: 'contrato', rotulo: `Termo do acordo de ${C.dataBr(a.data)} assinado (${a.referente})`, data: a.data, escopo: 'contrato', pasta: c.id, nome: a.termo_assinado });

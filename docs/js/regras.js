@@ -18,7 +18,7 @@ export const TABELAS = {
   devolucoes_garantia: 'Devolução da garantia (troca de titular ou de garantia)',
   renovacoes: 'Renovação / novo valor', trocas_garantia: 'Troca de garantia', leituras: 'Leitura dos relógios', encerramentos: 'Saída do inquilino', avulsas: 'NF avulsa',
   reformas: 'Reforma / investimento', solicitacoes: 'Solicitação do inquilino', notificacoes: 'Notificação ao inquilino', fichas: 'Ficha em análise', comunicados: 'Comunicado aos inquilinos',
-  indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', despesas: 'Conta paga por nós', ganhos_airbnb: 'Ganho do Airbnb', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', guias_impostos: 'Guia de imposto',
+  indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', documentos_locacao: 'Outro documento da locação (distrato, aviso, declaração etc.)', despesas: 'Conta paga por nós', ganhos_airbnb: 'Ganho do Airbnb', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', guias_impostos: 'Guia de imposto',
   modelos_email: 'Modelo de e-mail', envios_email: 'E-mail enviado', taxas_poupanca: 'Taxas da poupança do Banco Central (um mês)',
   regua_emails: 'E-mail da régua de cobrança (autorizado ou não)',
   cobranca_registros: 'Registro da cobrança (passo, despesa e prova)',
@@ -5360,6 +5360,7 @@ export function arquivosReferenciados(d) {
   // termo de quitação assinado da saída: o × apaga o arquivo e ele entra na conferência e no ZIP da pessoa (2026-11-20)
   for (const x of d.encerramentos || []) usa('contrato', x.contrato_id, x.termo_assinado);
   for (const a of d.aditivos) usa('aditivos', a.contrato_id, a.arquivo);
+  for (const x of d.documentos_locacao || []) usa('aditivos', x.contrato_id, x.arquivo); // outros documentos da locação assinados (2026-11-24, DOC-07)
   for (const a of d.acordos || []) usa('contrato', a.contrato_id, a.termo_assinado); // termo do acordo assinado (2026-11-15)
   for (const x of d.devolucoes_garantia || []) usa('contrato', x.contrato_id, x.termo_assinado); // recibo da devolução da garantia assinado (2026-11-21)
   // termo de quitação assinado da saída (estava fora: a limpeza "arquivos sem lançamento" o apagava, mutirão 19/11 fios-002)
@@ -5438,6 +5439,7 @@ export function rotulosDosArquivos(d) {
     }
   }
   for (const a of d.aditivos) poe('aditivos', a.contrato_id, a.arquivo, `termo aditivo${a.data ? ` (${C.dataBr(a.data)})` : ''}`);
+  for (const x of d.documentos_locacao || []) poe('aditivos', x.contrato_id, x.arquivo, `${String(x.nome || 'documento').toLocaleLowerCase('pt-BR')} de ${C.dataBr(x.data)} assinado`);
   for (const a of d.acordos || []) poe('contrato', a.contrato_id, a.termo_assinado, `termo do acordo de ${C.dataBr(a.data)} assinado`);
   for (const x of d.devolucoes_garantia || []) poe('contrato', x.contrato_id, x.termo_assinado, `recibo da devolução da garantia de ${C.dataBr(x.data)} assinado`);
   for (const n of d.notificacoes || []) {
