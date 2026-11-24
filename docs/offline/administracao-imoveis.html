@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-PntMo7z5e9g+wfBXWv2vobYMEbLLJT1CtoE2zaCe89g='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-trQozbIgKR7B7+fP+xIui4PZTvXPqyctLUz7YEUJmuI='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="69fc43404237b49d">
+<meta name="fontes" content="9c54eef1d21e5bc5">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -2951,6 +2951,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     }
     for (const a of d2.aditivos.filter((x) => x.contrato_id === c.id && x.arquivo).sort((x, y) => String(x.data).localeCompare(String(y.data)) || x.id - y.id)) {
       poe({ vaga: `aditivo:${a.id}`, grupo: "contrato", rotulo: `Termo aditivo${a.numero ? ` nº ${a.numero}` : ""}${a.assunto ? ` (${a.assunto})` : a.tipo ? ` (${a.tipo.toLocaleLowerCase("pt-BR")})` : ""}`, data: a.data || null, escopo: "aditivos", pasta: c.id, nome: a.arquivo });
+    }
+    for (const x of (d2.documentos_locacao || []).filter((y) => y.contrato_id === c.id && y.arquivo).sort((a, b) => String(a.data).localeCompare(String(b.data)) || a.id - b.id)) {
+      poe({ vaga: `documento:${x.id}`, grupo: "contrato", rotulo: `${x.nome || "Documento"} de ${dataBr(x.data)} assinado`, data: x.assinado_em || x.data || null, escopo: "aditivos", pasta: c.id, nome: x.arquivo });
     }
     for (const a of (d2.acordos || []).filter((x) => x.contrato_id === c.id && x.termo_assinado)) {
       poe({ vaga: `acordo:${a.id}`, grupo: "contrato", rotulo: `Termo do acordo de ${dataBr(a.data)} assinado (${a.referente})`, data: a.data, escopo: "contrato", pasta: c.id, nome: a.termo_assinado });
@@ -10646,6 +10649,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     for (const t of TABELAS_COMPROVANTE) for (const x of d2[t] || []) usa("contrato", x.contrato_id, x.comprovante);
     for (const x of d2.encerramentos || []) usa("contrato", x.contrato_id, x.termo_assinado);
     for (const a of d2.aditivos) usa("aditivos", a.contrato_id, a.arquivo);
+    for (const x of d2.documentos_locacao || []) usa("aditivos", x.contrato_id, x.arquivo);
     for (const a of d2.acordos || []) usa("contrato", a.contrato_id, a.termo_assinado);
     for (const x of d2.devolucoes_garantia || []) usa("contrato", x.contrato_id, x.termo_assinado);
     for (const x of d2.encerramentos || []) usa("contrato", x.contrato_id, x.termo_assinado);
@@ -10702,6 +10706,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       }
     }
     for (const a of d2.aditivos) poe("aditivos", a.contrato_id, a.arquivo, `termo aditivo${a.data ? ` (${dataBr(a.data)})` : ""}`);
+    for (const x of d2.documentos_locacao || []) poe("aditivos", x.contrato_id, x.arquivo, `${String(x.nome || "documento").toLocaleLowerCase("pt-BR")} de ${dataBr(x.data)} assinado`);
     for (const a of d2.acordos || []) poe("contrato", a.contrato_id, a.termo_assinado, `termo do acordo de ${dataBr(a.data)} assinado`);
     for (const x of d2.devolucoes_garantia || []) poe("contrato", x.contrato_id, x.termo_assinado, `recibo da devolução da garantia de ${dataBr(x.data)} assinado`);
     for (const n of d2.notificacoes || []) {
@@ -13899,6 +13904,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         modelos_contrato: "Modelo de contrato",
         vistorias: "Vistoria",
         aditivos: "Termo aditivo",
+        documentos_locacao: "Outro documento da locação (distrato, aviso, declaração etc.)",
         despesas: "Conta paga por nós",
         ganhos_airbnb: "Ganho do Airbnb",
         ressarcimentos: "Ressarcimento de condomínio",
@@ -21874,8 +21880,8 @@ ${DICA_DOCUMENTOS}`].join("\n");
     const p2 = c || f;
     const pj = p2.inquilino_tipo === PJ5;
     const imoveis = c ? [buscar(d2, "imoveis", c.imovel_id)].filter(Boolean) : (f.imoveis_ids || []).map((id) => buscar(d2, "imoveis", id)).filter(Boolean);
-    const curto2 = (i) => [i.endereco, i.complemento].filter(Boolean).join(" – ");
-    const completo = (i) => [curto2(i), i.bairro, cidadeUfDoImovel(d2, i, c)].filter(Boolean).join(", ");
+    const curto3 = (i) => [i.endereco, i.complemento].filter(Boolean).join(" – ");
+    const completo = (i) => [curto3(i), i.bairro, cidadeUfDoImovel(d2, i, c)].filter(Boolean).join(", ");
     const aluguel = p2.aluguel_inicial || 0;
     const pct2 = p2.bonificacao === false ? 0 : p2.desconto_pontualidade_percentual || 0;
     const desconto = aluguel ? descontoPorPercentual(aluguel, pct2) : 0;
@@ -21903,7 +21909,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
       nome: primeiroNome(pj ? p2.representante_nome || p2.inquilino_nome : p2.inquilino_nome),
       locatario: p2.inquilino_nome || "",
       documento: p2.inquilino_cpf ? `${pj ? "CNPJ" : "CPF"} ${p2.inquilino_cpf}` : "",
-      imovel: imoveis.map(curto2).join(" ou "),
+      imovel: imoveis.map(curto3).join(" ou "),
       endereco: imoveis.map(completo).join(" ou "),
       aluguel: aluguel ? reais(aluguel) : "",
       aluguel_bonificado: aluguel ? reais(aluguel - desconto) : "",
@@ -25563,6 +25569,139 @@ ${m.texto}
   bonificacao, reserva, saida_antecipada, devolver, cobrar, garantia_depositada (caução ou depósito já registrado), inclusos, iptu_valor, seguro_valor, link, link_fiador, varios_fiadores,
   novo_bonificacao (termo do novo valor), reiteracao e vence_hoje (notificação). Também "[se não pj]". Qualquer campo serve de condição: "[se valor_deposito]" sai só quando o campo tem valor.</p>
   <p class="suave">O fecho ("Agradecemos e ficamos à disposição em caso de dúvidas." e a assinatura) entra sozinho no fim de todo e-mail.</p></div>`;
+    }
+  });
+
+  // docs/js/documentos-locacao.js
+  function assuntoDoDocumento(tipo, v = {}) {
+    const data2 = (k) => dataValida(v[k]) ? dataBr(v[k]) : "___";
+    switch (tipo) {
+      case "aditivo_prazo":
+        return `Prorrogação do prazo${Number(v.novo_prazo_meses) > 0 ? `: ${Number(v.novo_prazo_meses)} meses,` : ":"} de ${data2("nova_data_inicio")} a ${data2("nova_data_fim")}`;
+      case "aditivo_garantia":
+        return `Troca de garantia a partir de ${data2("data_troca")}${v.garantia_nova ? `: ${curto2(v.garantia_nova, 60)}` : ""}`;
+      case "distrato":
+        return `Distrato: entrega das chaves em ${data2("data_saida")}${String(v.multa_combinada || "").trim() ? `, multa de R$ ${String(v.multa_combinada).trim()}` : ", multa dispensada"}`;
+      case "aviso_desocupacao":
+        return `Aviso de desocupação: entrega prevista em ${data2("data_saida_prevista")}`;
+      case "notificacao_desocupacao":
+        return `Notificação para desocupar até ${data2("data_limite")}`;
+      case "autorizacao_obra":
+        return `Autorização de obra${v.descricao_obra ? `: ${curto2(v.descricao_obra, 60)}` : ""}${dataValida(v.prazo_obra) ? ` (até ${data2("prazo_obra")})` : ""}`;
+      case "declaracao_pagamentos":
+        return `Declaração de pagamentos em dia de ${data2("periodo_inicio")} a ${data2("periodo_fim")}`;
+      case "aviso_fiador":
+        return `Aviso ao fiador${String(v.valor_debito || "").trim() ? `: R$ ${String(v.valor_debito).trim()} em atraso` : ""}${dataValida(v.prazo_pagamento) ? `, pagar até ${data2("prazo_pagamento")}` : ""}`;
+      default:
+        return (TIPOS_DOCUMENTO[tipo] || {}).nome || "Documento";
+    }
+  }
+  function registrarDocumento(d2, contratoId, { tipo, modelo, valores = {}, data: data2, fim = null }, usuario) {
+    const c = buscar(d2, "contratos", contratoId);
+    if (!c) throw new ErroUsuario("Inquilino não encontrado.");
+    const def = TIPOS_DOCUMENTO[tipo];
+    if (!def || !modelo) throw new ErroUsuario("Modelo de documento não encontrado.");
+    const campos = Object.fromEntries(def.campos.map(([k]) => [k, String(valores[k] ?? "").trim()]));
+    const dataDoc = dataValida(data2, hojeIso());
+    const base = { contrato_id: c.id, imovel_id: c.imovel_id || null, documento: tipo, data: dataDoc, campos, modelo_doc: modelo.id, texto: String(modelo.texto || ""), fim: fim || null };
+    if (ehTermoAditivo(tipo)) {
+      const pendente = termoAguardando(d2, c.id, tipo);
+      const numero2 = Number(campos.numero_aditivo) > 0 ? Math.trunc(Number(campos.numero_aditivo)) : pendente && pendente.numero || proximoNumeroAditivo(d2, c);
+      campos.numero_aditivo = String(numero2);
+      const dados = {
+        ...base,
+        campos,
+        tipo: TIPOS_ADITIVO_DOCUMENTO[tipo],
+        numero: numero2,
+        assunto: assuntoDoDocumento(tipo, campos),
+        testemunhas: [],
+        arquivo: null,
+        ...tipo === "aditivo_prazo" ? { nova_vigencia_fim: dataValida(campos.nova_data_fim) || null } : {}
+      };
+      if (pendente) {
+        atualizar(d2, "aditivos", pendente.id, dados, usuario, `${c.inquilino_nome}: ${numero2}º termo aditivo (${dados.tipo.toLocaleLowerCase("pt-BR")}) gerado de novo, aguardando assinatura`);
+        return { tabela: "aditivos", registro: pendente };
+      }
+      return { tabela: "aditivos", registro: inserir(d2, "aditivos", dados, usuario, `${c.inquilino_nome}: ${numero2}º termo aditivo (${dados.tipo.toLocaleLowerCase("pt-BR")}) gerado, aguardando assinatura`) };
+    }
+    const igual2 = documentosDo(d2, c.id).find((x) => x.documento === tipo && !x.arquivo && x.data === dataDoc && x.texto === base.texto && JSON.stringify(x.campos || {}) === JSON.stringify(campos));
+    if (igual2) return { tabela: "documentos_locacao", registro: igual2 };
+    const r = inserir(
+      d2,
+      "documentos_locacao",
+      { ...base, nome: def.nome, assunto: assuntoDoDocumento(tipo, campos), arquivo: null, assinado_em: null },
+      usuario,
+      `${c.inquilino_nome}: ${def.nome} gerado (${dataBr(dataDoc)})`
+    );
+    return { tabela: "documentos_locacao", registro: r };
+  }
+  function anexarDocumento(d2, id, { data: data2, arquivo }, usuario) {
+    const x = buscar(d2, "documentos_locacao", id);
+    if (!x) throw new ErroUsuario("Documento não encontrado.");
+    if (!dataValida(data2)) throw new ErroUsuario("Informe a data da assinatura.");
+    if (!arquivo) throw new ErroUsuario("Anexe o arquivo assinado.");
+    const c = buscar(d2, "contratos", x.contrato_id);
+    atualizar(d2, "documentos_locacao", x.id, { arquivo, assinado_em: data2 }, usuario, `${c ? c.inquilino_nome : "Contrato"}: ${x.nome} de ${dataBr(x.data)} assinado em ${dataBr(data2)}`);
+    return x;
+  }
+  function tirarArquivoDocumento(d2, id, usuario) {
+    const x = buscar(d2, "documentos_locacao", id);
+    if (!x || !x.arquivo) throw new ErroUsuario("Arquivo não encontrado.");
+    const c = buscar(d2, "contratos", x.contrato_id);
+    atualizar(d2, "documentos_locacao", x.id, { arquivo: null, assinado_em: null }, usuario, `${c ? c.inquilino_nome : "Contrato"}: arquivo assinado do ${x.nome} de ${dataBr(x.data)} apagado (volta a aguardar assinatura)`);
+  }
+  function aplicarProrrogacao(d2, aditivoId, usuario) {
+    const a = buscar(d2, "aditivos", aditivoId);
+    if (!ehProrrogacao(a) || !a.arquivo) return "";
+    if (a.renovacao_id && buscar(d2, "renovacoes", a.renovacao_id)) return "";
+    const c = buscar(d2, "contratos", a.contrato_id);
+    const nova = dataValida(a.nova_vigencia_fim);
+    if (!nova) return "O termo foi gerado sem a nova data de término: a data de término do contrato não mudou (gere o termo de novo com a data, ou registre a renovação).";
+    const inicio = c.data_entrada || c.vigencia_inicio;
+    if (inicio && nova <= inicio) return `A nova data de término (${dataBr(nova)}) é antes da entrada: a data de término do contrato não mudou.`;
+    const antes = { vigencia_fim: c.vigencia_fim ?? null, prazo_meses: c.prazo_meses ?? null, prazo_tipo: c.prazo_tipo ?? null };
+    const r = registrarRenovacao(d2, c.id, {
+      tipo: "Renovado com nova data de término",
+      data: a.assinado_em || hojeIso(),
+      nova_vigencia_fim: nova,
+      aditivo_id: a.id,
+      observacoes: `${a.numero || ""}º termo aditivo de prorrogação do prazo, assinado`
+    }, usuario);
+    atualizar(d2, "aditivos", a.id, { renovacao_id: r.id, prazo_antes: antes }, usuario, `${c.inquilino_nome}: prorrogação assinada, término do contrato passa a ${dataBr(nova)}`);
+    return `A data de término do contrato passou a ${dataBr(nova)}.`;
+  }
+  function desfazerProrrogacao(d2, aditivoId, usuario) {
+    const a = buscar(d2, "aditivos", aditivoId);
+    if (!ehProrrogacao(a) || !a.renovacao_id) return "";
+    const c = buscar(d2, "contratos", a.contrato_id);
+    const ren = buscar(d2, "renovacoes", a.renovacao_id);
+    const antes = { ...a.prazo_antes || {} };
+    if (ren) excluirRenovacao(d2, ren.id, usuario);
+    atualizar(d2, "aditivos", a.id, { renovacao_id: null, prazo_antes: null }, usuario, `${c.inquilino_nome}: prorrogação do termo aditivo de ${dataBr(a.data)} desfeita`);
+    if (!ren || c.vigencia_fim !== ren.nova_vigencia_fim) return "";
+    const outra = fimRenovado(d2, c);
+    const mud = outra ? { vigencia_fim: outra, prazo_tipo: "Determinado", prazo_meses: prazoDoContrato(d2, c) } : { vigencia_fim: antes.vigencia_fim ?? null, prazo_meses: antes.prazo_meses ?? null, prazo_tipo: antes.prazo_tipo ?? "Determinado" };
+    atualizar(d2, "contratos", c.id, mud, usuario, `${c.inquilino_nome}: término do contrato volta a ${mud.vigencia_fim ? dataBr(mud.vigencia_fim) : "prazo indeterminado"} (prorrogação não valeu)`);
+    const fim = fimDoContrato(d2, c) || mud.vigencia_fim;
+    return mud.prazo_tipo === "Indeterminado" ? "O contrato volta a prazo indeterminado." : `A data de término do contrato volta a ${dataBr(fim)}.`;
+  }
+  var TIPOS_ADITIVO_DOCUMENTO, ehTermoAditivo, ehProrrogacao, porData2, curto2, termoAguardando, documentosDo, termoDaRenovacao;
+  var init_documentos_locacao = __esm({
+    "docs/js/documentos-locacao.js"() {
+      init_calculos();
+      init_modelos_documentos();
+      init_regras();
+      TIPOS_ADITIVO_DOCUMENTO = { aditivo_prazo: "Prorrogação do prazo", aditivo_garantia: "Troca de garantia" };
+      ehTermoAditivo = (tipo) => Object.prototype.hasOwnProperty.call(TIPOS_ADITIVO_DOCUMENTO, tipo);
+      ehProrrogacao = (a) => !!(a && a.documento === "aditivo_prazo");
+      porData2 = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
+      curto2 = (t, n = 90) => {
+        const s = String(t || "").replace(/\s+/g, " ").trim();
+        return s.length > n ? `${s.slice(0, n - 1)}…` : s;
+      };
+      termoAguardando = (d2, contratoId, tipo) => (d2.aditivos || []).filter((a) => a.contrato_id === contratoId && a.documento === tipo && !a.arquivo && !a.perdido_em).sort(porData2)[0] || null;
+      documentosDo = (d2, contratoId) => (d2.documentos_locacao || []).filter((x) => x.contrato_id === contratoId).sort(porData2);
+      termoDaRenovacao = (d2, ren) => ren && ren.aditivo_id ? (d2.aditivos || []).find((a) => a.id === ren.aditivo_id && a.renovacao_id === ren.id) || null : null;
     }
   });
 
@@ -31056,6 +31195,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
   function oQueContinuaDoAditivo(a, c) {
     if (a.tipo === "Vencimento" && a.dia_novo) return ` Atenção: o dia do vencimento continua ${a.dia_novo} no cadastro e nos boletos em aberto. Se o termo foi anexado por engano, corrija o dia em "Editar" (o anterior era ${a.dia_anterior || "—"}).`;
     if (a.tipo === TIPO_ADITIVO_VALOR) return " Atenção: o novo valor do aluguel continua valendo nos boletos; o termo assinado terá de ser anexado de novo.";
+    if (ehProrrogacao(a) && a.renovacao_id) return ` Atenção: a data de término do contrato continua ${dataBr(a.nova_vigencia_fim)} (a da prorrogação).`;
     if ((!a.tipo || a.tipo === TIPO_ADITIVO_TROCA) && c && c.contrato_anterior_id) return c.heranca_transferida ? " Atenção: a troca de titular já feita continua valendo; o termo assinado terá de ser anexado de novo (o Painel volta a pedir)." : " Atenção: sem o termo assinado, a troca de titular volta a esperar por ele.";
     return "";
   }
@@ -31518,12 +31658,12 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
   }
   function atalhosDocumentos(c) {
     const abrir2 = (escopo, id, nome, texto3) => `<a href="#" class="botao secundario pequeno" data-acao="abrirArquivo" data-escopo="${escopo}" data-id="${id}" data-nome="${esc(nome)}" title="${esc(nome)}">📎 ${esc(texto3)}</a>`;
-    const curto2 = { doc_contrato_em: "Contrato", doc_vistoria_em: "Vistoria de entrada", doc_chaves_em: "Termo das chaves" };
+    const curto3 = { doc_contrato_em: "Contrato", doc_vistoria_em: "Vistoria de entrada", doc_chaves_em: "Termo das chaves" };
     const botoes = DOCUMENTOS_ENTRADA.map(([k]) => {
       const doc2 = documentoEntrada(d(), c, k);
-      if (doc2 && doc2.arquivo) return abrir2("assinados", doc2.contrato.id, doc2.arquivo, curto2[k]);
+      if (doc2 && doc2.arquivo) return abrir2("assinados", doc2.contrato.id, doc2.arquivo, curto3[k]);
       const p2 = documentoParcial(d(), c, k);
-      return p2 ? abrir2("assinados", c.id, p2.arquivo, `${curto2[k]} (falta assinatura)`) : "";
+      return p2 ? abrir2("assinados", c.id, p2.arquivo, `${curto3[k]} (falta assinatura)`) : "";
     }).filter(Boolean);
     for (const a of [...aditivosDo(d(), c.id)].reverse()) botoes.push(abrir2("aditivos", a.contrato_id, a.arquivo, `${ehTermoDeReajuste(a) ? "Termo de reajuste" : "Aditivo"} ${dataBr(a.data)}`));
     return botoes.length ? `<div class="atalhos-docs"><span class="suave">Documentos:</span> ${botoes.join(" ")}</div>` : "";
@@ -31654,7 +31794,20 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       ${podeUsuario("admin") ? botao("excluir", "×", { tabela: "vistorias", id: v.id }, "x-excluir", `Excluir a vistoria de ${v.tipo.toLocaleLowerCase("pt-BR")} de ${dataBr(v.data)}?`) : ""}</td></tr>`).join("")}</table>` : ""}
     <p id="vistoria">${c.vistoria_link ? `<a class="botao secundario pequeno" href="${esc(c.vistoria_link)}" target="_blank" rel="noopener noreferrer">Abrir a pasta das fotos da vistoria</a> <span class="suave">${esc(c.vistoria_link)}</span>` : '<span class="suave">Link das fotos da vistoria: use "Editar" e cole o link da pasta na nuvem (ou informe direto na vistoria).</span>'}</p>
     <p class="suave">Para marcar como assinado, escolha a data, anexe o arquivo assinado (PDF ou foto) e clique em "Marcar". Se ainda falta a assinatura de alguém, anexe o arquivo e clique em "Falta assinatura": fica um alerta até chegar o arquivo completo.</p>
-    ${caixaAditivos(c)}</div>`;
+    ${caixaAditivos(c)}
+    ${caixaOutrosDocumentos(c)}</div>`;
+  }
+  function caixaOutrosDocumentos(c) {
+    const lista3 = documentosDo(d(), c.id);
+    const abrir2 = (x) => `<a href="#" data-acao="abrirArquivo" data-escopo="aditivos" data-id="${x.contrato_id}" data-nome="${esc(x.arquivo)}">📎 ${esc(x.arquivo)}</a>`;
+    const assinatura = (x) => x.arquivo ? `${etiqueta(`assinado em ${dataBr(x.assinado_em)}`, "ok")}<br>${abrir2(x)}${xAnexo("tirarArquivoDocumento", { id: x.id })}` : `${etiqueta("aguardando a via assinada", "aviso")}${opera() ? `<form data-form="anexarDocumentoLocacao" class="acoes" style="margin-top:4px"><input type="hidden" name="id" value="${x.id}">
+      <input type="date" name="data" value="${hojeIso()}" style="width:auto" title="Data da assinatura">${atalhosData()}
+      <label class="botao secundario pequeno enviar" title="Via assinada (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}" data-arquivo-doc></label>
+      <button class="pequeno">Anexar assinado</button></form>` : ""}`;
+    return `<div class="cabecalho"><h3 id="outros-documentos">Outros documentos da locação</h3>${opera() ? link(`#/documento-gerar?contrato=${c.id}`, "Gerar documento", "botao secundario") : ""}</div>
+    ${lista3.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Documento</th><th>Via assinada</th><th></th></tr>${lista3.map((x) => `<tr><td class="nw">${dataBr(x.data)}</td>
+      <td><b>${esc(x.nome)}</b><br><span class="suave">${esc(x.assunto || "")}</span></td><td>${assinatura(x)}</td>
+      <td class="n nw">${link(`#/imprimir/documento?id=${x.id}`, "Ver / PDF")} ${opera() ? botao("excluir", "×", { tabela: "documentos_locacao", id: x.id }, "x-excluir", `Excluir o registro do documento de ${dataBr(x.data)}${x.arquivo ? " e a via assinada" : ""}?`) : ""}</td></tr>`).join("")}</table></div>` : '<p class="suave">Nenhum documento gerado. Distrato, aviso de desocupação, autorização de obra, declaração de pagamentos e aviso ao fiador ficam registrados aqui quando gerados em "Gerar documento".</p>'}`;
   }
   function caixaAditivos(c) {
     const lista3 = aditivosValidos(d(), c.id);
@@ -31672,8 +31825,8 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     ${faltaTroca ? `<div class="alerta perigo">Obrigatório: termo aditivo da troca de titular (${esc(ant.inquilino_nome)} → ${esc(c.inquilino_nome)}). ${aguardando.some((a) => a.tipo === TIPO_ADITIVO_TROCA) ? "Colha as assinaturas e anexe o arquivo assinado." : `Gere o termo em ${opera() ? link(`#/aditivo/novo?contrato=${c.id}&tipo=troca`, '"Gerar termo aditivo"', "") : '"Gerar termo aditivo"'} ou registre o arquivo já assinado.`}</div>` : ""}
     ${aguardando.length ? `<div class="alerta aviso"><b>Aguardando assinatura:</b> imprima ou baixe o PDF, colha as assinaturas e anexe o arquivo assinado.
       <div class="rolagem"><table>${aguardando.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td>
-      <td class="n nw">${a.tipo === TIPO_ADITIVO_VALOR ? `${botaoEmail("novo_valor", { contrato: c.id, aditivo: a.id }, "✉ E-mail: termo para assinar")} ` : ""}${ver(a)} ${opera() ? `${a.texto && a.tipo !== TIPO_ADITIVO_VALOR ? link(`#/aditivo/${a.id}`, "Editar") : ""} ${botao("excluir", "×", { tabela: "aditivos", id: a.id }, "x-excluir", `Excluir o termo aditivo de ${dataBr(a.data)} (ainda não assinado)?`)}
-        ${a.tipo === "Troca de titular" ? "" : botao("aditivoPerdido", "Perdido", { id: a.id }, "perigo pequeno", `Registrar o termo aditivo de ${dataBr(a.data)} como perdido (foi assinado, mas o papel se perdeu)? Passa a valer como assinado, sem o arquivo${a.dia_novo ? `: o vencimento muda para o dia ${a.dia_novo} a partir de ${dataBr(a.primeiro_vencimento)}` : ""}.${adm ? "" : ` O administrador vai analisar${a.dia_novo ? " (a troca do dia só vale depois da confirmação)" : ""}.`}`)}` : ""}
+      <td class="n nw">${a.tipo === TIPO_ADITIVO_VALOR ? `${botaoEmail("novo_valor", { contrato: c.id, aditivo: a.id }, "✉ E-mail: termo para assinar")} ` : ""}${ver(a)} ${opera() ? `${a.texto && a.tipo !== TIPO_ADITIVO_VALOR ? link(a.documento ? `#/documento-gerar?modelo=${a.modelo_doc}&contrato=${c.id}` : `#/aditivo/${a.id}`, "Editar") : ""} ${botao("excluir", "×", { tabela: "aditivos", id: a.id }, "x-excluir", `Excluir o termo aditivo de ${dataBr(a.data)} (ainda não assinado)?`)}
+        ${a.tipo === "Troca de titular" || ehProrrogacao(a) ? "" : botao("aditivoPerdido", "Perdido", { id: a.id }, "perigo pequeno", `Registrar o termo aditivo de ${dataBr(a.data)} como perdido (foi assinado, mas o papel se perdeu)? Passa a valer como assinado, sem o arquivo${a.dia_novo ? `: o vencimento muda para o dia ${a.dia_novo} a partir de ${dataBr(a.primeiro_vencimento)}` : ""}.${adm ? "" : ` O administrador vai analisar${a.dia_novo ? " (a troca do dia só vale depois da confirmação)" : ""}.`}`)}` : ""}
       ${opera() ? `<form data-form="assinarAditivo" class="acoes" style="justify-content:flex-end;margin-top:4px"><input type="hidden" name="id" value="${a.id}">
         <input type="date" name="data" value="${hojeIso()}" style="width:auto" title="Data da assinatura">${atalhosData()}
         <label class="botao secundario pequeno enviar" title="Termo aditivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}" data-arquivo-doc></label>
@@ -31832,6 +31985,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       init_app();
       init_calculos();
       init_contratos();
+      init_documentos_locacao();
       init_calculos();
       init_formularios();
       init_formularios();
@@ -32298,11 +32452,12 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       const m = await documentoMontado(tipo, rota.q);
       if (!m) return naoEncontrado("Registro não encontrado", "#/inquilinos", "Ver os inquilinos");
       const falta = m.exemplo ? [] : pendenciasDoContrato(d(), m.c);
-      const volta = m.exemplo ? "#/modelos-contrato" : tipo === "documento" ? `#/documento-gerar?modelo=${m.modelo.id}&contrato=${m.c.id}` : tipo === "contrato" ? `#/contrato-gerar/${m.c.id}?modelo=${m.modelo.id}` : `#/contrato/${m.c.id}?ir=${tipo === "aditivo" ? "aditivos" : "documentos"}`;
+      const volta = m.exemplo ? "#/modelos-contrato" : m.volta ? m.volta : tipo === "documento" ? `#/documento-gerar?modelo=${m.modelo.id}&contrato=${m.c.id}` : tipo === "contrato" ? `#/contrato-gerar/${m.c.id}?modelo=${m.modelo.id}` : `#/contrato/${m.c.id}?ir=${tipo === "aditivo" ? "aditivos" : "documentos"}`;
       return `<div class="impressao">
       <div class="acoes nao-imprimir" style="margin:12px 0"><button data-acao="imprimir">Imprimir</button>${botao("documentoPdf", "Baixar PDF", {}, "secundario")}${botao("documentoWord", "Baixar Word", {}, "secundario")}
         ${tipo === "vistoria" && opera() ? link(`#/vistoria/${m.v.id}`, "Editar a vistoria", "botao secundario") : ""}
-        ${tipo === "aditivo" && opera() && !m.a.arquivo && m.a.tipo !== TIPO_ADITIVO_VALOR ? link(`#/aditivo/${m.a.id}`, "Editar o aditivo", "botao secundario") : ""}
+        ${tipo === "aditivo" && opera() && !m.a.arquivo && m.a.tipo !== TIPO_ADITIVO_VALOR ? link(m.a.documento ? `#/documento-gerar?modelo=${m.a.modelo_doc}&contrato=${m.c.id}` : `#/aditivo/${m.a.id}`, "Editar o aditivo", "botao secundario") : ""}
+        ${m.registro && !m.a && opera() && !m.registro.arquivo ? link(`#/documento-gerar?modelo=${m.registro.modelo_doc}&contrato=${m.c.id}`, "Gerar de novo (mudar os campos)", "botao secundario") : ""}
         <a class="botao secundario" href="${volta}">Voltar</a></div>
       ${m.exemplo ? `<div class="alerta info nao-imprimir"><b>Exemplo com dados fictícios</b> (Maria de Teste Souza, CPF de teste 529.982.247-25), para ler e ajustar o texto do modelo "${esc(m.modelo.nome)}". ${opera() ? link(`#/modelo-contrato/${m.modelo.id}`, "Editar o texto do modelo", "") : ""}</div>` : ""}
       ${m.semCampos ? `<div class="alerta aviso nao-imprimir">Os campos deste documento saíram em branco (linha para preencher à mão). ${link(volta, "Preencher os campos", "")}</div>` : ""}
@@ -32678,6 +32833,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       const a = buscar2("aditivos", q.id);
       const c2 = a && buscar2("contratos", a.contrato_id);
       if (!c2 || !a.texto) return null;
+      if (a.documento) return documentoRegistrado(a, c2, "aditivos");
       const dados = dadosDoAditivo(d(), c2, a);
       return {
         c: c2,
@@ -32695,6 +32851,11 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     return { c, temChaves: !!chaves.trim() || !!(buscar2("imoveis", c.imovel_id) || {}).sem_chaves, ...reciboChavesBlocos(d(), c, chaves, q.data || ""), nome: "Recibo de entrega das chaves", arquivo: nomeArquivoDoc("Recibo entrega chaves", c) };
   }
   function documentoPorModelo(q) {
+    if (q.id) {
+      const x = buscar2("documentos_locacao", q.id);
+      const c2 = x && buscar2("contratos", x.contrato_id);
+      return c2 ? documentoRegistrado(x, c2, "documentos_locacao") : null;
+    }
     const modelo = todosOsModelos().find((m) => String(m.id) === String(q.modelo));
     if (!modelo) return null;
     const tipo = tipoDoModelo(modelo);
@@ -32707,8 +32868,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     const c = buscar2("contratos", q.contrato);
     if (!c || !(tipo in TIPOS_DOCUMENTO)) return null;
     const p2 = preenchidos.get(`${modelo.id}:${c.id}`) || {};
-    const fim = c.prazo_tipo === "Indeterminado" ? c.vigencia_fim || null : fimDoContrato(d(), c) || c.vigencia_fim || null;
-    const dados = dadosDoDocumento(d(), c, tipo, p2.valores || {}, { data: p2.data || hojeIso(), fim });
+    const dados = dadosDoDocumento(d(), c, tipo, p2.valores || {}, { data: p2.data || hojeIso(), fim: fimParaDocumento(c) });
     return {
       c,
       modelo,
@@ -32717,6 +32877,23 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       nome: modelo.nome,
       semCampos: !p2.valores,
       arquivo: nomeArquivoDoc(TIPOS_DOCUMENTO[tipo].nome.replace(/\s*\(.*\)$/, ""), c, String(p2.data || hojeIso()).slice(0, 10))
+    };
+  }
+  function documentoRegistrado(x, c, tabela) {
+    const tipo = x.documento;
+    if (!(tipo in TIPOS_DOCUMENTO)) return null;
+    const dados = dadosDoDocumento(d(), c, tipo, x.campos || {}, { data: x.data, fim: x.fim ?? fimParaDocumento(c) });
+    const nome = TIPOS_DOCUMENTO[tipo].nome.replace(/\s*\(.*\)$/, "");
+    return {
+      c,
+      registro: x,
+      ...tabela === "aditivos" ? { a: x } : {},
+      modelo: { id: x.modelo_doc, nome: TIPOS_DOCUMENTO[tipo].nome },
+      blocos: montarContrato(x.texto, dados),
+      rodape: dados.rodape,
+      nome: TIPOS_DOCUMENTO[tipo].nome,
+      volta: `#/contrato/${c.id}?ir=${tabela === "aditivos" ? "aditivos" : "outros-documentos"}`,
+      arquivo: nomeArquivoDoc(tabela === "aditivos" ? `${nome} ${x.numero || ""}`.trim() : nome, c, String(x.data || "").slice(0, 10))
     };
   }
   function valoresSugeridos(tipo, c) {
@@ -32775,16 +32952,18 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
         <select name="contrato" required><option value="">Escolha o inquilino</option>${ativos.map((x) => `<option value="${x.id}">${esc(x.inquilino_nome)}${((i) => i ? ` · ${esc(i.nome)}` : "")(buscar2("imoveis", x.imovel_id))}</option>`).join("")}</select>
         <button>Continuar</button></form></div>`;
     }
-    const guardado = preenchidos.get(`${modelo.id}:${c.id}`);
+    const pendente = ehTermoAditivo(tipo) ? termoAguardando(d(), c.id, tipo) : null;
+    const guardado = preenchidos.get(`${modelo.id}:${c.id}`) || (pendente ? { valores: pendente.campos || {}, data: pendente.data } : null);
     const v = guardado && guardado.valores || valoresSugeridos(tipo, c);
     const campo2 = ([k, rotulo3, formato]) => `<div><label>${esc(rotulo3)}</label>${formato === "texto" ? `<textarea name="${k}" rows="2">${esc(v[k] || "")}</textarea>` : `<input name="${k}" ${formato === "data" ? 'type="date"' : formato === "dinheiro" ? 'inputmode="decimal" data-dinheiro' : 'inputmode="numeric"'} value="${esc(v[k] || "")}">`}</div>`;
     const avisos = avisosDoDocumento(tipo, c);
     return `${topo3}
     ${avisos.map((a) => `<div class="alerta aviso">${esc(a)}</div>`).join("")}
     <form class="cartao" data-form="gerarDocumento"><h2>${esc(modelo.nome)}</h2><p class="suave">${esc(def.explica)} Campo em branco sai como uma linha para preencher à mão.</p>
+      <p class="suave">${ehTermoAditivo(tipo) ? `O termo fica registrado em "Termos aditivos" da página do inquilino, aguardando a assinatura${pendente ? ` (o ${pendente.numero || ""}º termo, gerado em ${dataBr(pendente.data)}, ainda sem assinatura, é atualizado)` : ""}${tipo === "aditivo_prazo" ? '. Quando a via assinada for anexada, a data de término do contrato passa a ser a do "Fim do novo prazo"' : ""}.` : 'O documento fica registrado na página do inquilino ("Outros documentos da locação"), onde se anexa a via assinada.'}</p>
       <input type="hidden" name="modelo" value="${esc(modelo.id)}"><input type="hidden" name="contrato" value="${c.id}">
       <div class="grade">${def.campos.map(campo2).join("")}<div><label>Data do documento</label><input type="date" name="data" value="${esc(guardado && guardado.data || hojeIso())}"></div></div>
-      <div class="acoes"><button>Ver o documento</button>${link(`#/modelo-contrato/${modelo.id}`, "Editar o texto do modelo", "botao secundario")}</div></form>`;
+      <div class="acoes"><button>Gerar o documento</button>${link(`#/modelo-contrato/${modelo.id}`, "Editar o texto do modelo", "botao secundario")}</div></form>`;
   }
   function guardarCamposDoDocumento(modeloId, contratoId, valores, data2) {
     preenchidos.set(`${modeloId}:${contratoId}`, { valores, data: dataValida(data2) ? data2 : hojeIso() });
@@ -33127,7 +33306,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     g.drawImage(img, 0, 0);
     return { bytes: bytes2, marca: await png(), largura: canvas.width, altura: canvas.height };
   }
-  var ESCALA_PDF, cartasGuardadas, EMAIL_DO_RECIBO, todosOsModelos, temExemplo, preenchidos, ROTEIRO_BASE, ROTEIROS, roteiroTexto, ESTADOS_COMODO, GERAIS, MODELO_COMODOS, AJUDA_MODELO, TIPOS_MODELO, TIPOS_COM_CARTAO, NOVO_MODELO;
+  var ESCALA_PDF, cartasGuardadas, EMAIL_DO_RECIBO, todosOsModelos, temExemplo, preenchidos, modeloDocumento, fimParaDocumento, ROTEIRO_BASE, ROTEIROS, roteiroTexto, ESTADOS_COMODO, GERAIS, MODELO_COMODOS, AJUDA_MODELO, TIPOS_MODELO, TIPOS_COM_CARTAO, NOVO_MODELO;
   var init_documentos = __esm({
     "docs/js/telas/documentos.js"() {
       init_emails();
@@ -33137,6 +33316,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       init_calculos();
       init_calculos();
       init_contratos();
+      init_documentos_locacao();
       init_fatura();
       init_formularios();
       init_formularios();
@@ -33156,6 +33336,8 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
         return t === "contrato" || t in TIPOS_DOCUMENTO;
       };
       preenchidos = /* @__PURE__ */ new Map();
+      modeloDocumento = (id) => todosOsModelos().find((m) => String(m.id) === String(id) && tipoDoModelo(m) in TIPOS_DOCUMENTO) || null;
+      fimParaDocumento = (c) => c.prazo_tipo === "Indeterminado" ? c.vigencia_fim || null : fimDoContrato(d(), c) || c.vigencia_fim || null;
       ROTEIRO_BASE = [
         "Piso e rodapé",
         "Paredes e teto (pintura, manchas, fissuras, furos)",
@@ -33298,7 +33480,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
     const out = [];
     out.push(["Contrato de locação", c ? esc(nomeContrato(c)) : linhaFalta("um contrato"), c ? abrir(`#/imprimir/contrato?contrato=${c.id}`) : ""]);
     const aditivo = (tipo, nome) => {
-      const a = (db.aditivos || []).find((x) => x.texto && (tipo ? x.tipo === tipo : ![TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR].includes(x.tipo)));
+      const a = (db.aditivos || []).find((x) => x.texto && !x.documento && (tipo ? x.tipo === tipo : ![TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR].includes(x.tipo)));
       const ca = a && buscar2("contratos", a.contrato_id);
       out.push([nome, ca ? `${esc(nomeContrato(ca))} · aditivo nº ${esc(a.numero || a.id)}` : linhaFalta(`um termo aditivo (${nome.replace("Termo aditivo ", "")}) feito pelo sistema`), ca ? abrir(`#/imprimir/aditivo?id=${a.id}`) : ""]);
     };
@@ -37630,7 +37812,7 @@ ${xref}
       porDia.get(e.data).push(e);
     }
     const destino = (e) => e.fechamento ? `#/fechamento?mes=${e.fechamento}` : e.cobranca_id ? `#/cobranca/${e.cobranca_id}` : e.tipo === "Boleto" ? `#/cobrancas?comp=${e.competencia || somarMeses(e.data.slice(0, 7), -1)}` : e.tipo === "IPTU" ? `#/imovel/${e.imovel_id}?ir=iptu` : e.tipo === "Seguro" ? `#/contrato/${e.contrato_id}?ir=seguros` : `#/contrato/${e.contrato_id}`;
-    const curto2 = (e) => `${e.tipo} ${e.texto.split(" · ")[0]}`;
+    const curto3 = (e) => `${e.tipo} ${e.texto.split(" · ")[0]}`;
     const [ini] = limitesCompetencia(mes);
     const vazios = paraData(ini).getUTCDay();
     const celulas = [...Array(vazios)].map(() => '<div class="cal-dia vazio"></div>');
@@ -37639,7 +37821,7 @@ ${xref}
       const evs = porDia.get(dia) || [];
       celulas.push(`<div class="cal-dia ${dia === hoje3 ? "hoje" : ""} ${evs.length ? "com-eventos" : ""}" ${evs.length ? `data-acao="abrirDia" data-dia="${dia}" title="Ver a agenda do dia"` : ""}>
       <div class="cal-num">${n}</div>
-      ${evs.slice(0, 7).map((e) => `<div class="cal-ev ${e.situacao}" title="${esc(`${e.tipo}: ${e.texto} (${e.estado})`)}">${esc(curto2(e))}</div>`).join("")}
+      ${evs.slice(0, 7).map((e) => `<div class="cal-ev ${e.situacao}" title="${esc(`${e.tipo}: ${e.texto} (${e.estado})`)}">${esc(curto3(e))}</div>`).join("")}
       ${evs.length > 7 ? `<div class="cal-mais">+${evs.length - 7}</div>` : ""}</div>`);
     }
     const maisCheio = Array(7).fill(0);
@@ -39332,6 +39514,7 @@ ${xref}
       init_calculos();
       init_compactar();
       init_conferir_pdf();
+      init_documentos_locacao();
       init_conciliacao();
       init_contratos();
       init_fatura();
@@ -39365,6 +39548,7 @@ ${xref}
         cobrancas: ["boleto", "boletos"],
         vistorias: ["vistoria", "vistorias"],
         aditivos: ["termo aditivo", "termos aditivos"],
+        documentos_locacao: ["outro documento da locação", "outros documentos da locação"],
         fiadores: ["fiador", "fiadores"],
         seguros: ["apólice de seguro", "apólices de seguro"],
         acordos: ["acordo", "acordos"],
@@ -39412,6 +39596,8 @@ ${xref}
         },
         vistorias: { admin: true, voltar: (r) => `#/contrato/${r.contrato_id}?ir=documentos` },
         aditivos: { depois: (db, r) => marcarAditivos(db, r.contrato_id, login()), voltar: (r) => `#/contrato/${r.contrato_id}?ir=aditivos` },
+        // outros documentos da locação (2026-11-24, DOC-07): a via assinada sai junto (alterarApagandoAnexos)
+        documentos_locacao: { voltar: (r) => `#/contrato/${r.contrato_id}?ir=outros-documentos` },
         fiadores: { voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },
         // a devolução da troca de titular descontava boletos em aberto: eles voltam a ser cobrados
         devolucoes_garantia: { depois: (db, r) => liberarBoletosDaDevolucao(db, r.id, login()), voltar: (r) => `#/contrato/${r.contrato_id}?ir=garantia` },
@@ -39812,6 +39998,15 @@ ${MODELO_COMODOS[comodo].join("\n")}
           aviso("Arquivo anexado.");
           await mostrar();
         },
+        /** Outro documento da locação (2026-11-24, DOC-07): tira a via assinada (o arquivo sai da pasta) e ele volta a aguardar a assinatura. */
+        async tirarArquivoDocumento({ id }) {
+          const x = buscar2("documentos_locacao", id);
+          if (!x || !x.arquivo) throw new ErroUsuario("Arquivo não encontrado.");
+          if (!await confirmar(`O arquivo "${x.arquivo}" sai da pasta e o documento volta a aguardar a assinatura.`, { titulo: "Apagar a via assinada?", sim: "Apagar", forte: true })) return;
+          await alterarApagandoAnexos((db) => tirarArquivoDocumento(db, Number(id), login()));
+          aviso('Arquivo apagado: o documento voltou a "aguardando assinatura".');
+          await mostrar();
+        },
         /** Termo aditivo gerado que não voltou assinado: vale como assinado, sem arquivo (quem não é administrador aguarda a análise). */
         async aditivoPerdido({ id }) {
           const a = buscar2("aditivos", id);
@@ -39870,7 +40065,8 @@ ${MODELO_COMODOS[comodo].join("\n")}
           } else {
             let feito = "";
             await alterarApagandoAnexos((db) => {
-              feito = desfazerAditivo(db, Number(id), login(), { excluirTermo: so !== "arquivo" });
+              const prazo = desfazerProrrogacao(db, Number(id), login());
+              feito = `${desfazerAditivo(db, Number(id), login(), { excluirTermo: so !== "arquivo" })} ${prazo}`.trim();
             });
             aviso(`${so === "arquivo" ? 'Arquivo apagado: o termo voltou a "aguardando assinatura".' : "Termo aditivo excluído."} ${feito}`.trim(), "ok");
           }
@@ -40627,6 +40823,8 @@ ${MODELO_COMODOS[comodo].join("\n")}
           await mostrar();
         },
         async excluirRenovacao({ id }) {
+          const termo = termoDaRenovacao(d(), buscar2("renovacoes", id));
+          if (termo) throw new ErroUsuario(`Esta renovação veio do ${termo.numero || ""}º termo aditivo de prorrogação assinado. Para desfazer, apague o arquivo assinado do termo em "Termos aditivos" e responda que o termo não valeu: a data de término volta sozinha.`);
           await alterar((db) => {
             const r = buscar(db, "renovacoes", id);
             excluirRenovacao(db, Number(id), login());
@@ -41628,6 +41826,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
       init_calculos();
       init_calculos();
       init_contratos();
+      init_documentos_locacao();
       init_formularios();
       init_regras();
       init_conciliacao();
@@ -41971,15 +42170,20 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           const ciencia = a.tipo === TIPO_ADITIVO_TROCA ? await cienciaDaTroca(a.contrato_id) : {};
           if (!ciencia) return;
           const nome = await salvarAssinado("aditivos", a.contrato_id, arquivo, `termo aditivo ${f.data} ${a.assunto}`.slice(0, 80));
+          let prazo = "";
           await alterar((db) => {
             assinarAditivo(db, a.id, { data: f.data, arquivo: nome }, login());
             registrarCiencia(db, a, ciencia);
+            prazo = aplicarProrrogacao(db, a.id, login());
           });
           await trazerHerancaAssinada(a.contrato_id);
-          aviso(a.dia_novo && a.primeiro_vencimento ? `Termo aditivo assinado e registrado. O vencimento passou ao dia ${a.dia_novo}: os boletos a partir de ${dataBr(a.primeiro_vencimento)} já saem no dia novo.` : "Termo aditivo assinado e registrado.");
+          aviso(a.dia_novo && a.primeiro_vencimento ? `Termo aditivo assinado e registrado. O vencimento passou ao dia ${a.dia_novo}: os boletos a partir de ${dataBr(a.primeiro_vencimento)} já saem no dia novo.` : `Termo aditivo assinado e registrado. ${prazo}`.trim());
           await mostrar();
         },
-        /** Outros documentos (modelos-documentos.js): os campos digitados ficam só nesta aba, até o PDF ou o Word. */
+        /**
+         * Outros documentos (modelos-documentos.js): o documento gerado fica registrado no contrato com o tipo, a data e os campos
+         * digitados (decisão do dono de 24/11/2026, DOC-07); os termos aditivos (prorrogação, troca de garantia) em "Termos aditivos".
+         */
         async gerarDocumento(form) {
           const f = new FormData(form);
           const modelo = String(f.get("modelo"));
@@ -41988,7 +42192,29 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           for (const [k, v] of f.entries()) if (!["modelo", "contrato", "data"].includes(k)) valores[k] = String(v).trim();
           for (const [k, v] of Object.entries(valores)) if (v && form.querySelector(`[name="${k}"][data-dinheiro]`) && centavos(v) < 0) throw new ErroUsuario(`Valor negativo: ${v}. Digite o valor sem o sinal de menos.`);
           guardarCamposDoDocumento(modelo, contrato, valores, String(f.get("data") || ""));
-          ir(`#/imprimir/documento?modelo=${modelo}&contrato=${contrato}`);
+          const m = modeloDocumento(modelo);
+          const c = buscar2("contratos", contrato);
+          if (!m || !c) throw new ErroUsuario("Modelo ou inquilino não encontrado.");
+          const tipo = tipoDoModelo(m);
+          let reg = null;
+          await alterar((db) => {
+            reg = registrarDocumento(db, c.id, { tipo, modelo: m, valores, data: String(f.get("data") || ""), fim: fimParaDocumento(c) }, login());
+          });
+          aviso(ehTermoAditivo(tipo) ? 'Termo aditivo registrado em "Termos aditivos", aguardando assinatura: imprima ou baixe o PDF, colha as assinaturas e anexe o assinado.' : 'Documento registrado na página do inquilino ("Outros documentos da locação"): depois de assinado, anexe a via assinada lá.');
+          ir(reg.tabela === "aditivos" ? `#/imprimir/aditivo?id=${reg.registro.id}` : `#/imprimir/documento?id=${reg.registro.id}`);
+        },
+        /** Via assinada de um outro documento da locação (2026-11-24, DOC-07): na pasta "Aditivos, correções e comunicação" do contrato. */
+        async anexarDocumentoLocacao(form) {
+          const f = Object.fromEntries(new FormData(form));
+          const arquivo = form.querySelector("[name=arquivo]").files[0];
+          const x = buscar2("documentos_locacao", f.id);
+          if (!x) throw new ErroUsuario("Documento não encontrado.");
+          if (!dataValida(f.data)) throw new ErroUsuario("Informe a data da assinatura.");
+          if (!arquivo) throw new ErroUsuario("Anexe o arquivo assinado.");
+          const nome = await salvarAssinado("aditivos", x.contrato_id, arquivo, `${x.nome.replace(/\s*\(.*\)$/, "")} ${f.data}`.slice(0, 80));
+          await alterar((db) => anexarDocumento(db, x.id, { data: f.data, arquivo: nome }, login()));
+          aviso("Via assinada anexada.");
+          await mostrar();
         },
         async escolherInquilinoDocumento(form) {
           const f = new FormData(form);
