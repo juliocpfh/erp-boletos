@@ -693,15 +693,19 @@ const pagoEntre = (cb, de, ate) => [cb.data_pagamento, cb.data_pagou].some((x) =
  */
 export const ehPix = (x) => !!x && /\bPIX\b|_PIX_|^PIX/.test(maiusculaSemAcento(`${x.categoria_banco || ''} ${x.payment_type || ''} ${x.descricao || ''} ${x.titulo || ''}`).trim());
 
-/** Dias úteis que o banco leva para creditar um boleto pago pelo código de barras (decisão do dono, 16/11/2026: dentro deles não é atraso). */
-export const DIAS_COMPENSACAO_BOLETO = 3;
+/**
+ * Dias úteis que o banco leva para creditar um boleto pago pelo código de barras (decisão do dono, 16/11/2026: dentro deles não é
+ * atraso): a regra `tolerancia_boleto_dias` (padrão 3; decisão de 24/11/2026: o botão "É o pagamento do boleto", a sugestão e o
+ * início da régua de cobrança usam o mesmo número). Com o boleto (ou o contrato), vale a regra especial do contrato quando houver.
+ */
+export const diasCompensacaoBoleto = (x = null) => regra('tolerancia_boleto_dias', x);
 
-/** Dias em que o inquilino pode ter pago um boleto creditado em ``credito`` (código de barras): o próprio dia e até 3 dias úteis antes. */
-export function datasPossiveisDoPagamento(credito, pix = false) {
+/** Dias em que o inquilino pode ter pago um boleto creditado em ``credito`` (código de barras): o próprio dia e até ``dias`` dias úteis antes (a regra). */
+export function datasPossiveisDoPagamento(credito, pix = false, dias = diasCompensacaoBoleto()) {
   const out = [credito];
   if (pix) return out;
   let x = credito;
-  for (let i = 0; i < DIAS_COMPENSACAO_BOLETO; i += 1) { x = C.diaUtilAteh(C.somarDias(x, -1)); out.push(x); }
+  for (let i = 0; i < dias; i += 1) { x = C.diaUtilAteh(C.somarDias(x, -1)); out.push(x); }
   return out;
 }
 
@@ -748,7 +752,7 @@ function casarBoletos(d, valor, data, dias, { idExterno = null, nossoNumero = nu
         const noPrazo = valor === pontual && data <= (pix ? C.limitePagamento(cb.vencimento) : ultimoCreditoEmDia(cb, false, dias));
         // valor menor que o devido (mesmo no dia de pagamento mais favorável): não existe pagamento em parte (decisão de 2026-11-20),
         // nada é proposto e o dinheiro fica sem destino
-        const minimo = Math.min(...(pix ? [data] : datasPossiveisDoPagamento(data)).map((x) => previstoNoPagamento(cb, data, { dataPagou: x }).valor_devido));
+        const minimo = Math.min(...(pix ? [data] : datasPossiveisDoPagamento(data, false, dias)).map((x) => previstoNoPagamento(cb, data, { dataPagou: x }).valor_devido));
         if (!noPrazo && valor < minimo) return [];
         return [{ cobranca: cb, certeza: 'exata', previsto: noPrazo ? pontual : previstoNoPagamento(cb, data).valor_devido, pagouEmDia: noPrazo && data > cb.vencimento, peloId: true }];
       }
@@ -778,7 +782,7 @@ function casarBoletos(d, valor, data, dias, { idExterno = null, nossoNumero = nu
   // com o dia do pagamento conhecido (listagem do banco) ou por Pix, "em dia" é até o limite; boleto só com a data do crédito, até
   // ``dias`` dias úteis depois (compensação). Pix pago depois do vencimento com o valor do desconto não é "em dia" (decisão de 16/11/2026).
   const exato = pix || pagouConhecido;
-  const datas = exato ? [data] : datasPossiveisDoPagamento(data);
+  const datas = exato ? [data] : datasPossiveisDoPagamento(data, false, dias);
   for (const cb of abertos) {
     if (cb.vencimento > limite) continue;
     const pontual = ib ? ib.pontual.get(cb) : totais(cb).a_pagar_pontual;
@@ -924,6 +928,36 @@ export function conciliarMovimentacoes(d, movs, { dias = null, indice = null } =
  * e chama de novo). Nunca duplica: boleto já pago lança erro. ``pagou``: com a linha do extrato, o dia em que o inquilino pagou
  * (informado pelo banco), para a multa e os juros irem só até ele.
  */
+/**
+ * O que o boleto deve no crédito de ``valor`` em ``credito``, como "É o pagamento do boleto" confere: { emDia, dataPagou, previsto
+ * (resultado de previstoNoPagamento), minimo (abaixo disto é pagamento a menos e é recusado) }. ``pagou``: dia em que pagou, se
+ * conhecido; ``pagouEmDia``: a escolha do usuário (null = a conta do sistema). Ex.: regra da tolerância em 6, vence 10/08/2026, o
+ * valor em dia creditado em 17/08 (5 dias úteis depois) → em dia, como na sugestão.
+ */
+export function devidoNoCredito(cb, valor, credito, { pix = false, pagou = null, pagouEmDia = null } = {}) {
+  const pontual = totais(cb).a_pagar_pontual;
+  const limite = C.limitePagamento(cb.vencimento);
+  const dias = diasCompensacaoBoleto(cb);
+  // Em dia (decisão do dono, 16/11/2026): com o dia do pagamento conhecido, pagou até o limite; Pix entra na hora, então o dia do
+  // crédito é o do pagamento (Pix depois do vencimento com o valor do desconto NÃO é em dia); boleto só com a data do crédito: o
+  // banco leva alguns dias úteis, então o valor em dia creditado até ``dias`` dias úteis (a regra) depois do limite é em dia.
+  const emDia = pagouEmDia !== null ? pagouEmDia
+    : pagou ? credito > cb.vencimento && pagou <= limite
+      : !pix && credito > cb.vencimento && valor === pontual && credito <= ultimoCreditoEmDia(cb, false, dias);
+  let dataPagou = !emDia && pagou && pagou < credito ? pagou : null;
+  // boleto pago com atraso e creditado dias depois, sem o dia do pagamento: o dia útil (até ``dias`` antes do crédito) que dá o valor recebido
+  if (!emDia && !pagou && !pix && credito > limite) {
+    const dia = datasPossiveisDoPagamento(credito, false, dias).slice(1).find((x) => x > limite && previstoNoPagamento(cb, credito, { dataPagou: x }).valor_devido === valor);
+    if (dia) dataPagou = dia;
+  }
+  const previsto = previstoNoPagamento(cb, credito, { pagouEmDia: emDia, dataPagou });
+  // não existe pagamento em parte (decisão do dono, 2026-11-20): valor menor que o devido (também o Pix pago depois do vencimento
+  // com o valor do desconto) é recusado; o boleto continua em aberto e o dinheiro fica no extrato sem destino
+  // (boleto só com a data do crédito: vale o devido no dia de pagamento mais favorável, até ``dias`` dias úteis antes do crédito)
+  const minimo = !emDia && !pagou && !pix ? Math.min(previsto.valor_devido, ...datasPossiveisDoPagamento(credito, false, dias).map((x) => previstoNoPagamento(cb, credito, { dataPagou: x }).valor_devido)) : previsto.valor_devido;
+  return { emDia, dataPagou, previsto, minimo };
+}
+
 export function confirmarPagamentoPeloBanco(d, cobrancaId, origem, usuario, { pagouEmDia = null, valorNf = null, justificativa = '', pagou: pagouInformado = null, diferencaNoProximo = false } = {}) {
   const cb = buscar(d, 'cobrancas', cobrancaId);
   if (!cb) throw new Error('Boleto não encontrado.');
@@ -936,26 +970,8 @@ export function confirmarPagamentoPeloBanco(d, cobrancaId, origem, usuario, { pa
   const valor = mov ? mov.valor : centavosDoC6(origem.amount);
   const credito = mov ? mov.data : dataDe(origem.credit_date || origem.payment_date);
   const pagou = mov ? (pagouInformado ? dataDe(pagouInformado) : null) : dataDe(origem.payment_date || origem.credit_date);
-  const pontual = totais(cb).a_pagar_pontual;
-  const limite = C.limitePagamento(cb.vencimento);
   const pix = mov ? ehPix(mov) : ehPix(origem);
-  // Em dia (decisão do dono, 16/11/2026): com o dia do pagamento conhecido, pagou até o limite; Pix entra na hora, então o dia do
-  // crédito é o do pagamento (Pix depois do vencimento com o valor do desconto NÃO é em dia); boleto só com a data do crédito: o
-  // banco leva de 1 a 3 dias úteis, então o valor em dia creditado até 3 dias úteis depois do limite é em dia.
-  const emDia = pagouEmDia !== null ? pagouEmDia
-    : pagou ? credito > cb.vencimento && pagou <= limite
-      : !pix && credito > cb.vencimento && valor === pontual && credito <= ultimoCreditoEmDia(cb, false, DIAS_COMPENSACAO_BOLETO);
-  let dataPagou = !emDia && pagou && pagou < credito ? pagou : null;
-  // boleto pago com atraso e creditado dias depois, sem o dia do pagamento: o dia útil (até 3 antes do crédito) que dá o valor recebido
-  if (!emDia && !pagou && !pix && credito > limite) {
-    const dia = datasPossiveisDoPagamento(credito).slice(1).find((x) => x > limite && previstoNoPagamento(cb, credito, { dataPagou: x }).valor_devido === valor);
-    if (dia) dataPagou = dia;
-  }
-  const previsto = previstoNoPagamento(cb, credito, { pagouEmDia: emDia, dataPagou });
-  // não existe pagamento em parte (decisão do dono, 2026-11-20): valor menor que o devido (também o Pix pago depois do vencimento
-  // com o valor do desconto) é recusado; o boleto continua em aberto e o dinheiro fica no extrato sem destino
-  // (boleto só com a data do crédito: vale o devido no dia de pagamento mais favorável, até 3 dias úteis antes do crédito)
-  const minimo = !emDia && !pagou && !pix ? Math.min(previsto.valor_devido, ...datasPossiveisDoPagamento(credito).map((x) => previstoNoPagamento(cb, credito, { dataPagou: x }).valor_devido)) : previsto.valor_devido;
+  const { emDia, dataPagou, previsto, minimo } = devidoNoCredito(cb, valor, credito, { pix, pagou, pagouEmDia });
   if (diferencaNoProximo || valor < minimo || ehComplementoCaucao(cb)) conferirValorRecebido(cb, valor, ehComplementoCaucao(cb) ? previsto.valor_devido : minimo, { extrato: !!mov });
   if (valor !== previsto.valor_devido && valorNf === null) {
     return { divergente: true, previsto: previsto.valor_devido, recebido: valor, cobranca: cb, pagouEmDia: emDia, dataPagou: dataPagou || pagou || credito };
