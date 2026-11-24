@@ -3,7 +3,8 @@
 // As ações ficam em telas/acoes.js. A conta que emite: padrão (ANK) ou escolhida boleto a boleto (opção em Sistema → Banco).
 import { podeUsuario } from '../app.js';
 import * as B from '../banco.js';
-import { dataBr, dataHoraBr, reais } from '../calculos.js';
+import { compBr, dataBr, dataHoraBr, reais } from '../calculos.js';
+import * as C from '../calculos.js';
 import { esc } from '../formularios.js';
 import * as M from '../mapa-c6.js';
 import * as R from '../regras.js';
@@ -31,13 +32,20 @@ export function botoesMesC6(comp) {
   const vencidos = R.vencidosSemEmissao(d(), comp).length;
   const texto = `Emitir no C6 todos em aberto do mês${n ? ` (${n})` : ''}`;
   const notaVencidos = vencidos ? ` <span class="suave">${vencidos} boleto(s) já vencido(s) sem emissão ficam de fora: o banco não aceita vencimento no passado (mude o vencimento do boleto para hoje ou depois antes de emitir).</span>` : '';
-  const emitidos = d().cobrancas.some((cb) => cb.competencia === comp && R.emitidoNoBanco(cb));
-  // a conferência dos boletos pagos é uma só, na tela Banco (lista com marcação): daqui só o atalho até ela
+  const emitidos = d().cobrancas.filter((cb) => cb.competencia === comp && R.emitidoNoBanco(cb));
+  // a conferência dos boletos pagos é uma só, na tela Banco (lista com marcação): daqui só o atalho até ela. O Banco busca pelo
+  // mês do PAGAMENTO: vai o mês do vencimento dos boletos emitidos (ex.: aluguel de 01/2027 vence em 10/02/2027 → Banco em 02/2027;
+  // o contrato que cobra o mês do próprio vencimento fica no mesmo mês). Mais de um mês: o mais comum, e a nota diz os outros.
+  const porMes = new Map();
+  for (const cb of emitidos) { const m = String(cb.vencimento || '').slice(0, 7); if (C.competenciaValida(m)) porMes.set(m, (porMes.get(m) || 0) + 1); }
+  const meses = [...porMes.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([m]) => m);
+  const mesBanco = meses[0] || comp;
   const rotuloConferir = 'Conferir pagamentos no banco (tela Banco)';
-  const conferir = link(`#/banco?mes=${comp}&ir=conferir-boletos`, rotuloConferir, 'botao secundario');
+  const outrosMeses = meses.length > 1 ? ` <span class="suave">Os boletos deste mês vencem em ${meses.map(compBr).join(' e ')}: a tela Banco abre em ${compBr(mesBanco)}; para os outros, troque o mês lá.</span>` : '';
+  const conferir = `${link(`#/banco?mes=${mesBanco}&ir=conferir-boletos`, rotuloConferir, 'botao secundario')}${outrosMeses}`;
   if (!B.pontePronta(d())) return `${botaoInativo(texto, B.motivoIndisponivel(d()), 'secundario')} ${botaoInativo(rotuloConferir, B.motivoIndisponivel(d()), 'secundario')}<br><span class="ajuda">Emitir no C6: ${esc(String(B.motivoIndisponivel(d())).replace(/\.$/, ''))}.</span>`;
   return `${n ? botao('emitirBoletosMesC6', texto, { comp }, 'secundario', `Emitir ${n} boleto(s) em aberto no C6?`) : botaoInativo(texto, 'Nenhum boleto em aberto sem emissão neste mês', 'secundario')}
-    ${emitidos ? conferir : botaoInativo(rotuloConferir, 'Nenhum boleto deste mês foi emitido no C6', 'secundario')}${notaVencidos}`;
+    ${emitidos.length ? conferir : botaoInativo(rotuloConferir, 'Nenhum boleto deste mês foi emitido no C6', 'secundario')}${notaVencidos}`;
 }
 
 const ROTULO = { emitido: ['emitido no C6', 'info'], pago: ['pago no C6', 'ok'], cancelado: ['cancelado no C6', 'neutra'], erro: ['erro na emissão', 'perigo'] };

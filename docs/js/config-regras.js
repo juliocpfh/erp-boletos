@@ -425,6 +425,16 @@ export function regra(chave, x) {
 /** Todos os valores de uma regra em uso (sistema e cada regra especial), ex.: para a janela da régua de cobrança. */
 export const valoresEmUso = (chave) => [regra(chave), ...[...perfis.values()].filter((p) => chave in p).map((p) => p[chave])];
 
+/**
+ * Regras especiais do banco ``d`` em que ``chave`` difere das regras do sistema: [{ id, nome, valor }], para os textos de tela que
+ * mostram o valor do sistema. Ex.: sistema com 5 dias e "Regra especial A" com 10 → [{ id: 1, nome: 'Regra especial A', valor: 10 }].
+ */
+export function especiaisDiferentes(d, chave) {
+  if (!REGRAS_POR_CONTRATO.has(chave)) return [];
+  return (d && Array.isArray(d.perfis_regras) ? d.perfis_regras : []).map((x) => ({ id: x.id, nome: x.nome, v: perfis.get(x.id) }))
+    .filter((x) => x.v && chave in x.v && !mesmoValor(x.v[chave], regra(chave))).map((x) => ({ id: x.id, nome: x.nome, valor: x.v[chave] }));
+}
+
 /** Feriados da cidade num ano: datas "AAAA-MM-DD" (os "MM-DD" valem todo ano). */
 export function feriadosLocais(ano) {
   return (regra('feriados_locais') || []).map((x) => (x.length === 5 ? `${ano}-${x}` : x)).filter((x) => x.startsWith(`${ano}-`));
