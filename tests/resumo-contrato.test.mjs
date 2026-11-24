@@ -21,7 +21,7 @@ function banco() {
 }
 const resumoDe = (blocos) => texto(blocos.slice(blocos.findIndex((b) => b.tipo === 'nova_pagina')));
 
-test('os dois contratos terminam com uma folha nova, depois das assinaturas, com as 16 perguntas', () => {
+test('os dois contratos terminam com uma folha nova, depois das assinaturas, com as 15 perguntas', () => {
   const { d, c } = banco();
   for (const m of MODELOS_PADRAO.filter((x) => !x.tipo)) {
     const blocos = K.montarContrato(m.texto, K.dadosDoContrato(d, c, { data: '2026-11-24' }));
@@ -29,7 +29,9 @@ test('os dois contratos terminam com uma folha nova, depois das assinaturas, com
     assert.equal(blocos[q - 1].tipo, 'assinaturas', `${m.nome}: o resumo vem logo depois das assinaturas`);
     assert.equal(texto([blocos[q + 1]]), 'RESUMO DO CONTRATO EM PERGUNTAS E RESPOSTAS');
     const r = resumoDe(blocos);
-    assert.equal((r.match(/^\d+\. .*\?$/gm) || []).length, 16, m.nome);
+    assert.equal((r.match(/^\d+\. .*\?$/gm) || []).length, 15, m.nome);
+    assert.doesNotMatch(r, /animais/, 'a pergunta dos animais saiu (decisão do dono, 24/11)');
+    assert.match(r, /Pela regra dos bancos \(não é uma cláusula deste contrato\), o boleto que vence em sábado, domingo ou feriado pode ser pago no dia útil seguinte, sem multa\./);
     assert.doesNotMatch(texto(blocos), SOBRA, m.nome);
     assert.match(K.contratoHtml(blocos, { logo: '', rodape: [] }), /<div class="ct-nova-pagina"><\/div><h2 class="ct-secao">RESUMO DO CONTRATO/);
   }

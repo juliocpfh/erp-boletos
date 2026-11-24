@@ -246,7 +246,7 @@ const TARIFA_RESUMO = ' O LOCATÁRIO também paga, junto com cada aluguel, a tar
 const TARIFA_RESUMO_ANTIGA = '[se tarifa_boleto] O LOCATÁRIO também paga, junto com cada aluguel, a tarifa bancária de emissão do boleto, hoje de {tarifa_boleto}.[fim]';
 
 /**
- * Resumo do contrato em perguntas e respostas (pedido do dono em 24/11/2026): última página dos contratos, em linguagem simples,
+ * Resumo do contrato em perguntas e respostas (pedido do dono em 24/11/2026; sem a pergunta dos animais e com o vencimento em dia não útil como regra dos bancos, decisões do mesmo dia): última página dos contratos, em linguagem simples,
  * com os valores do próprio contrato ({campo} e [se x]), para quem lê (ou passa o contrato numa ferramenta de busca ou de IA) achar
  * as respostas sem voltar com dúvidas que o contrato já responde. Texto visível e normal, sem instrução escondida. Não substitui
  * as cláusulas (a última resposta diz isso). Pode ser reaproveitado em outro documento com os dados do contrato (dadosDoContrato).
@@ -259,7 +259,7 @@ Este resumo explica, em palavras simples, os pontos que mais geram dúvida. Ele 
 
 **1. Qual é o valor do aluguel e quando vence?**
 
-[se bonificacao]O aluguel é de {aluguel_cheio}. Pagando até o vencimento, há bonificação de {bonificacao_percentual} e o valor fica em {aluguel_bonificado}.[senão]O aluguel é de {aluguel_cheio}.[fim] Ele vence todo dia {dia_vencimento} de cada mês e é pago por boleto bancário, enviado por e-mail.[se iptu_inquilino] O IPTU vem no mesmo boleto[se seguro_inquilino], assim como o seguro contra incêndio[fim].[fim]${TARIFA_RESUMO} Se o vencimento cair em sábado, domingo ou feriado, o pagamento pode ser feito no dia útil seguinte, sem multa.
+[se bonificacao]O aluguel é de {aluguel_cheio}. Pagando até o vencimento, há bonificação de {bonificacao_percentual} e o valor fica em {aluguel_bonificado}.[senão]O aluguel é de {aluguel_cheio}.[fim] Ele vence todo dia {dia_vencimento} de cada mês e é pago por boleto bancário, enviado por e-mail.[se iptu_inquilino] O IPTU vem no mesmo boleto[se seguro_inquilino], assim como o seguro contra incêndio[fim].[fim]${TARIFA_RESUMO} Pela regra dos bancos (não é uma cláusula deste contrato), o boleto que vence em sábado, domingo ou feriado pode ser pago no dia útil seguinte, sem multa.
 
 **2. O que acontece se eu pagar atrasado?**
 
@@ -293,31 +293,27 @@ Só com autorização por escrito {l:da LOCADORA|das LOCADORAS}. Sem ela, a mult
 
 Não, a não ser com o consentimento por escrito {l:da LOCADORA|das LOCADORAS}. Isso vale para todo o imóvel ou só para uma parte dele.
 
-**10. Posso ter animais de estimação?**
-
-O contrato não proíbe. O LOCATÁRIO responde pelos danos que os animais causarem ao imóvel e deve respeitar as regras do condomínio, quando houver.
-
-**11. Qual é a garantia do contrato e como ela é devolvida?**
+**10. Qual é a garantia do contrato e como ela é devolvida?**
 
 [se caucao]A garantia é uma caução de {caucao_valor}, depositada em caderneta de poupança. Ao fim da locação, depois da entrega das chaves e da vistoria de saída, ela é devolvida com os rendimentos da poupança, descontados os aluguéis, as contas e os reparos que estiverem em aberto.[fim][se deposito]A garantia é um depósito de {deposito_valor}. Ao fim da locação, ele paga os débitos, danos e reparos que estiverem em aberto, e o que sobrar é devolvido ao LOCATÁRIO.[fim][se fiador][se deposito] Além do depósito, há a fiança[senão]A garantia é a fiança[fim]: {f:o FIADOR responde|os FIADORES respondem} junto com o LOCATÁRIO por todas as obrigações do contrato, até a entrega das chaves.[fim][se seguro_fianca]A garantia é um seguro fiança locatícia, contratado pelo LOCATÁRIO e mantido em vigor durante toda a locação.[fim][se sem_garantia]Este contrato não tem garantia.[fim]
 
-**12. Como é a entrega das chaves e a vistoria de saída?**
+**11. Como é a entrega das chaves e a vistoria de saída?**
 
 Depois do aviso de saída, o LOCATÁRIO devolve o imóvel vazio, limpo e como recebeu, conforme a vistoria de entrada, e entrega os comprovantes das últimas contas pagas (água, luz, condomínio, IPTU e outras que forem dele). O aluguel e os encargos são devidos até o dia da devolução das chaves. A vistoria de saída é feita em até [se residencial]72 (setenta e duas)[senão]48 (quarenta e oito)[fim] horas úteis, com fotos e vídeo; o LOCATÁRIO é convidado por e-mail e pode acompanhá-la, mas ela acontece mesmo sem ele. O relatório é enviado por e-mail, e o LOCATÁRIO tem 5 (cinco) dias úteis para contestar por escrito.
 
-**13. O que pode ser cobrado na saída?**
+**12. O que pode ser cobrado na saída?**
 
 Os reparos necessários para o imóvel voltar ao estado da vistoria de entrada, como pintura, limpeza e consertos, com base em orçamento ou nota do serviço. O desgaste natural do uso não é cobrado. Também entram os aluguéis e as contas em aberto e, quando for o caso, as multas das perguntas 2, 5 e 8.[se caucao] Esses valores são descontados da caução; se ela não bastar, a diferença é cobrada.[fim][se deposito] Esses valores são descontados do depósito; se ele não bastar, a diferença é cobrada.[fim][se fci] O Fundo de Conservação do Imóvel (FCI) paga primeiro os reparos, e o que sobrar dele é devolvido corrigido.[fim]
 
-**14. A empresa pode entrar no imóvel?**
+**13. A empresa pode entrar no imóvel?**
 
 Pode vistoriar o imóvel com agendamento prévio. Se o imóvel for colocado à venda, o LOCATÁRIO tem preferência para comprar nas mesmas condições e deve permitir as visitas dos interessados, pelo menos 2 (duas) horas por dia, entre 8h e 20h.
 
-**15. Como recebo os avisos sobre o contrato?**
+**14. Como recebo os avisos sobre o contrato?**
 
 Por e-mail ou por carta com aviso de recebimento, que valem como entregues. Por isso, avise sempre que mudar de endereço, de e-mail ou de telefone.
 
-**16. Este resumo substitui o contrato?**
+**15. Este resumo substitui o contrato?**
 
 Não. Ele só ajuda a entender o contrato. Em caso de dúvida ou de diferença, valem as cláusulas do contrato e a Lei nº 8.245/91 (Lei do Inquilinato).`;
 
