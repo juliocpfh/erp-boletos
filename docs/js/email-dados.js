@@ -367,6 +367,16 @@ export function anexosProntos(d, modelo, alvo) {
 }
 
 /**
+ * Aviso do PDF do boleto feito à mão no banco que ficou velho (o boleto mudou depois de anexado: ``R.boletoPdfDesatualizado``),
+ * o mesmo do "Enviar boleto por e-mail" e dos lembretes da régua (decisão do dono de 24/11/2026, DOC-05); '' se está em dia.
+ * Ex.: anexado com R$ 2.000,00 e o valor passou a R$ 2.100,00 → "O boleto mudou depois que o PDF do banco foi anexado: o valor era…".
+ */
+export function avisoBoletoPdfDesatualizado(cb) {
+  const mudou = cb ? R.boletoPdfDesatualizado(cb) : '';
+  return mudou ? `O boleto mudou depois que o PDF do banco foi anexado: ${mudou}. O PDF anexado pode estar com o valor antigo.` : '';
+}
+
+/**
  * Informe anual do IR (pedido do dono em 2026-11-12: todo ano, a todos os inquilinos com NF): de 01/02 a 31/03, os inquilinos
  * com NF de aluguel emitida no ano anterior que ainda não receberam o e-mail do informe neste ano (aberto ou enviado).
  * Uma passada pelas NFs (sem declaracaoAnual por contrato, que seria lento no Painel). Ex.: em 10/02/2027 → NFs de 2026.
