@@ -311,7 +311,7 @@ export const CONTRATO = [
   campo('reserva_valor', 'Valor da reserva', 'dinheiro'),
   campo('reserva_data', 'Data da reserva', 'data'),
   comprovante('comprovante_reserva', 'Comprovante da reserva', { ajuda: `PDF ou foto do comprovante da reserva. ${SEM_COMPROVANTE}` }),
-  campo('reserva_competencia', 'Usar a reserva no aluguel de', 'mes', { ajuda: 'Em branco: usa no primeiro aluguel' }),
+  campo('reserva_competencia', 'Usar a reserva no aluguel de (mês de referência)', 'mes', { autoMsg: true, ajuda: 'O mês do aluguel, não o do vencimento (ex.: aluguel de 11/2026 vence em 12/2026 quando vence no mês seguinte). Em branco: usa no primeiro aluguel' }),
   secao('O que está incluso no contrato'),
   campo('conta_iptu', 'IPTU', 'opcao', { obrig: true, padrao: 'Por conta do inquilino', opcoes: SITUACOES_CONTA, ajuda: 'Por conta do inquilino: as parcelas entram no boleto' }),
   campo('conta_seguro', 'Seguro contra incêndio (obrigatório)', 'opcao', { obrig: true, padrao: 'Por conta do inquilino', opcoes: SITUACOES_SEGURO, ajuda: 'Sempre existe (obrigatório por lei). Por conta do inquilino: as parcelas entram no boleto; incluso no aluguel: a locadora paga' }),
@@ -350,7 +350,7 @@ export const CONTRATO = [
   campo('data_base_correcao', 'Data-base da correção', 'data', { ajuda: 'O alerta de correção usa o aniversário desta data. Em branco: início do contrato' }),
   { secao: 'Carência de aluguel', recolher: 'Expanda para cadastrar carência' },
   campo('carencia_meses', 'Meses de carência', 'inteiro', { ajuda: 'Nestes meses o aluguel não é cobrado. Em branco: sem carência' }),
-  campo('carencia_inicio', 'Carência a partir do aluguel de', 'mes', { ajuda: 'Em branco: mês de entrada' }),
+  campo('carencia_inicio', 'Carência a partir do aluguel de (mês de referência)', 'mes', { autoMsg: true, ajuda: 'O mês do aluguel, não o do vencimento. Em branco: mês de entrada' }),
   campo('carencia_cobrar_iptu', 'Na carência, cobrar o IPTU', 'simnao'),
   campo('carencia_cobrar_seguro', 'Na carência, cobrar o seguro', 'simnao'),
   campo('carencia_cobrar_taxa', 'Na carência, cobrar a tarifa do boleto', 'simnao'),
@@ -568,7 +568,7 @@ export const RENOVACAO = [
   campo('novo_bonificado', 'Novo aluguel bonificado', 'dinheiro', { virtual: true, vinculo: 'desconto', ajuda: 'O valor que o inquilino paga em dia. Preencha dois dos três (cheio, bonificado, %): o terceiro é calculado' }),
   campo('novo_percentual', 'Bonificação (%)', 'pct', { vinculo: 'desconto', ajuda: 'Vem a bonificação atual do contrato' }),
   // decisão do dono (16/11/2026): o operador diz de qual aluguel em diante vale; os boletos em aberto desse mês em diante são refeitos
-  campo('vale_desde', 'O novo valor vale a partir do aluguel de', 'mes', { ajuda: 'Os boletos em aberto deste mês em diante são refeitos com o novo valor (os pagos e os de antes ficam como estão). Em branco: o mês da data acima, se for dia 1º, ou o mês seguinte' }),
+  campo('vale_desde', 'O novo valor vale a partir do aluguel de (mês de referência)', 'mes', { autoMsg: true, ajuda: 'O mês do aluguel, não o do vencimento. Os boletos em aberto deste mês em diante são refeitos com o novo valor (os pagos e os de antes ficam como estão). Em branco: o mês da data acima, se for dia 1º, ou o mês seguinte' }),
   campo('observacoes', 'Observações', 'area'),
 ];
 
