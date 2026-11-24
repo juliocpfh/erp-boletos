@@ -1739,22 +1739,6 @@ function seguroProporcionalNoMes(d, c, comp) {
   return (entradaNoMes && !c.contrato_anterior_id) || (saidaNoMes && !continuadoPor(d, c));
 }
 
-/**
- * Termo da troca de titular que não valeu com o mês do novo titular em acordo (decisão do dono de 24/11/2026, opção (a)): o acordo
- * do novo vale para aquele mês e o anterior não é cobrado por ele (só pelos dias até a véspera da troca, como se a troca valesse).
- * Devolve o contrato do novo titular cujo acordo cobre ``comp`` (ou null). Ex.: troca de João para Maria em 01/12, Maria fez acordo
- * de dezembro em 2 × R$ 900,00 e o termo "não valeu" → João sem boleto em dezembro; troca em 15/12 → João fica em 14/30 (R$ 840,00).
- */
-export function mesCobertoPorAcordoDoNovo(d, c, comp) {
-  if (!c || !comp) return null;
-  for (const n of d.contratos) {
-    if (n.contrato_anterior_id !== c.id || !trocaAguardaAditivo(d, n)) continue;
-    const cb = boletoDoMes(d, n.id, comp);
-    if (cb && emAcordo(cb)) return n;
-  }
-  return null;
-}
-
 export function montarCobranca(d, contrato, comp) {
   // mês coberto pelo acordo do novo titular (termo da troca que não valeu): o anterior paga só até a véspera da troca
   const cobertoPor = !contrato.data_saida || contrato.data_saida >= `${comp}-01` ? mesCobertoPorAcordoDoNovo(d, contrato, comp) : null;
@@ -3942,6 +3926,22 @@ export function desfazerAditivo(d, id, usuario, { excluirTermo = false } = {}) {
     return `Sem o termo assinado, a troca de titular volta a esperar por ele: ${anterior ? anterior.inquilino_nome : 'o titular anterior'} continua no contrato.${boletos}`;
   }
   return '';
+}
+
+/**
+ * Termo da troca de titular que não valeu com o mês do novo titular em acordo (decisão do dono de 24/11/2026, opção (a)): o acordo
+ * do novo vale para aquele mês e o anterior não é cobrado por ele (só pelos dias até a véspera da troca, como se a troca valesse).
+ * Devolve o contrato do novo titular cujo acordo cobre ``comp`` (ou null). Ex.: troca de João para Maria em 01/12, Maria fez acordo
+ * de dezembro em 2 × R$ 900,00 e o termo "não valeu" → João sem boleto em dezembro; troca em 15/12 → João fica em 14/30 (R$ 840,00).
+ */
+export function mesCobertoPorAcordoDoNovo(d, c, comp) {
+  if (!c || !comp) return null;
+  for (const n of d.contratos) {
+    if (n.contrato_anterior_id !== c.id || !trocaAguardaAditivo(d, n)) continue;
+    const cb = boletoDoMes(d, n.id, comp);
+    if (cb && emAcordo(cb)) return n;
+  }
+  return null;
 }
 
 /**
