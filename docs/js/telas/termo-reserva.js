@@ -61,7 +61,7 @@ export function caixaTermoReserva(f) {
     : `${botao('gerarLinkTermo', vale ? 'Gerar novo link' : 'Gerar o link do aceite', { id: f.id }, vale ? 'secundario pequeno' : 'pequeno', vale ? 'Gerar um link novo? O link atual deixa de valer.' : '')}
       ${vale && naAba ? botao('compartilharLinkTermo', 'Copiar / WhatsApp', { id: f.id }, 'secundario pequeno') : ''}`;
   return `<div class="cartao" data-termo-reserva="${f.id}">${titulo}
-    <p><b>1º passo, antes do depósito:</b> a pessoa recebe as condições do imóvel e o termo da reserva, confirma o e-mail com um código e dá o aceite pelo link. Depois ela deposita a reserva.</p>
+    <p><b>1º passo, antes do depósito:</b> a pessoa recebe as condições do imóvel e o termo da reserva${E.nuvem ? ', confirma o e-mail com um código e dá o aceite pelo link' : ', assina o termo (gov.br ou à mão) e devolve'}. Depois ela deposita a reserva.</p>
     <p class="suave">Reserva de <b>${reais(valor)}</b>, abatida do 1º aluguel · documentos em ${C.plural(c.dias_uteis_documentos, 'dia útil', 'dias úteis')} do depósito · reservado por ${c.dias_validade} dias · ficha não aprovada: devolve tudo · ${esc(desistenciaResumo(c, valor))} (o termo avisa em destaque antes do aceite e do pagamento) · devolução (quando houver) em ${C.plural(c.dias_uteis_devolucao, 'dia útil', 'dias úteis')}. <a href="#/regras">Regras do sistema</a></p>
     <details><summary class="suave">Ver o termo como a pessoa vai ler</summary><pre class="texto-modelo">${esc(REC.textoDoTermo(REC.termoDaReserva(d(), f)))}</pre></details>
     <p class="acoes">${botoes} ${botaoEmail('ficha_termo_reserva', { ficha: f.id }, '✉ E-mail: condições e termo da reserva')} ${pdf}</p>
@@ -97,7 +97,7 @@ async function janelaDoAceite(f, l) {
   await janela({
     titulo: `Termo da reserva: ${f.inquilino_nome}`, sim: 'Fechar', nao: 'Voltar',
     html: `<p>Vale até <b>${dataBr(String(l.vence_em).slice(0, 10))}</b>. É só desta pessoa: não publique.</p>
-      <p class="texto-aviso"><b>Copie agora:</b> por segurança, este link não fica guardado no sistema. O e-mail "Condições e termo da reserva", mandado agora, já leva o link.</p>
+      <p class="texto-aviso"><b>Copie agora:</b> por segurança, este link não fica guardado no sistema. Se você mandar agora o e-mail "Condições e termo da reserva" (botão na ficha), ele já leva o link.</p>
       <p><textarea rows="5" readonly data-texto-link style="width:100%">${esc(TR.textoWhatsappAceite(f, l))}</textarea></p>
       <p class="acoes"><button type="button" class="secundario pequeno" data-copiar-link>Copiar a mensagem</button>
       ${tel ? `<a class="botao pequeno" target="_blank" rel="noopener noreferrer" href="https://wa.me/${tel}" data-abrir-zap>Copiar e abrir o WhatsApp</a>` : '<span class="suave">Sem telefone cadastrado para o WhatsApp.</span>'}</p>`,

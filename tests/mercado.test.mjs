@@ -42,7 +42,7 @@ const ANTES = {
   'recibo:reserva:João Teste': '5816468f00fd38ad',
   'recibo:devolucao_chaves:João Teste': '354c41db31cdeb74',
   'recibo:ficha:ficha': 'c1fb1b26d3b7215f',
-  'recibo:termo_reserva:ficha': '8470c5220ff5e81a', // 2026-11-24 (novo)
+  'recibo:termo_reserva:ficha': '3f9a3f0623886a01', // 2026-11-24 (novo)
   lembrete: '8efce35480e4a45e',
   conta_emissora: '30804615d55e104f',
 };

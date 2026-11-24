@@ -717,6 +717,6 @@ function termoReservaPdf(d, f, base, nomeArq) {
       ['DOCUMENTOS PARA A ANÁLISE', null], ...t.documentos.map((x, k) => [`${k + 1}.`, x]), ...(t.deposito ? [['CONTA PARA O DEPÓSITO DA RESERVA', null], ['Depósito', t.deposito]] : [])],
     depois: ['CONDIÇÕES DA RESERVA', ...t.clausulas, `DECLARAÇÃO. ${t.ciencia}`, COMO_ASSINAR],
     assinaturas: [{ nome: f.inquilino_nome || EM_BRANCO, linha: f.inquilino_cpf ? `${documentoDe(f)} · INTERESSADO` : 'INTERESSADO' }],
-    arquivo: nomeArq('Termo aceite reserva', base.data),
+    arquivo: nomeArq('Termo reserva para assinar', base.data),
   };
 }
