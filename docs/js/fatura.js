@@ -16,7 +16,9 @@ export function linhasObservacoes(texto, porLinha = 90, maxLinhas = 5) {
   const linhas = [];
   for (const par of String(texto || '').split(/\r?\n/)) {
     let atual = '';
-    for (const palavra of par.split(/\s+/).filter(Boolean)) {
+    // "R$" anda junto com o valor: a linha não termina em "R$" com o número na de baixo (ex.: "... por atraso R$" / "115,77")
+    const palavras = par.split(/\s+/).filter(Boolean).reduce((ps, w) => { if (ps.at(-1) === 'R$') ps[ps.length - 1] += ` ${w}`; else ps.push(w); return ps; }, []);
+    for (const palavra of palavras) {
       const p = palavra.slice(0, porLinha);
       if (atual && `${atual} ${p}`.length > porLinha) { linhas.push(atual); atual = p; } else atual = atual ? `${atual} ${p}` : p;
     }
