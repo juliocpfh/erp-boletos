@@ -12,6 +12,7 @@ import { ACEITA_DOCUMENTOS, arquivoSumiu, botao, buscar, d, endereco, etiqueta, 
 import { ultimoEnvio } from './emails.js';
 import { AVISO_CONTROLE, seloControle, situacaoBoleto } from './contrato.js';
 import { linkComprovante } from './cadastros.js';
+import { caixaProvasBoleto } from './cobranca-provas.js';
 import { nomeArquivoDoc } from './documentos.js';
 import { formNfExterna } from './faturas.js';
 
@@ -490,6 +491,7 @@ export function telaCobranca(cb) {
         ${R.segundaVia(d(), cb, C.hojeIso()) ? `<p class="acoes">${botao('segundaVia', '2ª via com o valor de hoje', { id: cb.id }, 'secundario')}<span class="suave">Valor com multa e juros até hoje e o texto pronto para o inquilino (não emite boleto novo no banco).</span></p>` : ''}
         ${opera() && R.aCobrar(cb) ? formPagamento(cb) : ''}
         ${opera() ? `<p class="acoes" style="margin-top:10px">${botao('lembrete', C.vencido(cb.vencimento, C.hojeIso()) ? 'Cobrar o inquilino (texto pronto)' : 'Lembrar o inquilino (texto pronto)', { id: cb.id }, 'secundario')}<span class="suave">E-mail, WhatsApp ou copiar; o texto muda se já venceu.</span></p>` : ''}`}</div>
+    ${caixaProvasBoleto(cb)}
     ${R.emAcordo(cb) ? '' : caixaBancoC6(cb)}
     ${R.emAcordo(cb) ? '' : caixaPdfBanco(cb)}
     ${R.emAcordo(cb) ? '' : caixaBoleto(cb)}

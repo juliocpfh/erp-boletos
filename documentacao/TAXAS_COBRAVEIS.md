@@ -130,6 +130,8 @@ A resposta sobre várias taxas muda se a empresa é a **dona do imóvel** (locad
 - "Na cobrança judicial, honorários de **20%**" (já está). Ex.: ação de R$ 3.700,00 → R$ 740,00.
 - Despesas de cobrança só com comprovante (cartório de protesto, carta registrada, custas). Ex.: protesto do boleto, custo do cartório de R$ 45,00 → cobra R$ 45,00.
 
+**Pesquisa jurídica completa (24/11):** `HONORARIOS_E_DESPESAS_DE_COBRANCA.md` (o que é e o que não é abusivo, decisões do STJ, cláusulas). Enquanto o dono não decide, o sistema só guarda as provas da cobrança ("Cobrança: registros e provas"), sem cobrar nada.
+
 **Pergunta para o dono:** pôr no contrato os 10% da cobrança extrajudicial (só com advogado ou empresa de cobrança, depois de 30 dias)?
 - [ ] Sim  - [ ] Não
 
