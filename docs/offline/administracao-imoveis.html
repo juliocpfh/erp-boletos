@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-hVE+tjc0qTJyYBEBtFd0hpDLRKEj298RWUR892ijHvc='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-5hIwvJ/vXIgO9NsJoaQCJnwv+Ra8Ni46NGgBo1nPWiw='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="dbb43d3b8dd254d0">
+<meta name="fontes" content="70b2a7c08cf78540">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -6370,6 +6370,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     liberarBoletosDaDevolucao: () => liberarBoletosDaDevolucao,
     liberarBoletosDaSaida: () => liberarBoletosDaSaida,
     ligarArquivoSeguro: () => ligarArquivoSeguro,
+    ligarNotificacaoAssinada: () => ligarNotificacaoAssinada,
     limiteNotificacao: () => limiteNotificacao,
     lista: () => lista2,
     mapaIptuAvista: () => mapaIptuAvista,
@@ -8823,7 +8824,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (f.situacao !== "Aprovada") return [];
     const feitos = contratosDaFicha(d2, f);
     if (f.modo_imoveis !== "Todos juntos" && Object.keys(feitos).length) return [];
-    return (f.imoveis_ids || []).filter((id) => !feitos[id]);
+    return (f.imoveis_ids || []).filter((id) => !feitos[id] && buscar(d2, "imoveis", id));
   }
   function prazosDaReserva(f) {
     if (!f || !/^\d{4}-\d{2}-\d{2}$/.test(String(f.reserva_data || ""))) return null;
@@ -9048,6 +9049,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       d2[t].filter((x) => x && x.contrato_id === c.id).forEach((x) => excluir(d2, t, x.id, usuario));
     }
     for (const a of d2.contratos.filter((x) => x.garantia_transferida_para === c.id)) atualizar(d2, "contratos", a.id, { garantia_transferida_para: null }, usuario, `${a.inquilino_nome}: garantia volta para este contrato (${c.inquilino_nome} excluído)`);
+    for (const f of (d2.fichas || []).filter((x) => x && Number(x.documentos_no_contrato) === c.id)) atualizar(d2, "fichas", f.id, { documentos_no_contrato: null }, usuario, `Ficha de ${f.inquilino_nome}: o contrato que tinha recebido os documentos foi excluído`);
     excluir(d2, "contratos", c.id, usuario, descricao2 || c.inquilino_nome);
   }
   function gravarLeitura(d2, c, momento, data2, valores, usuario) {
@@ -11548,6 +11550,14 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const mudouTexto = campos.texto !== n.texto || campos.data !== n.data || campos.data_limite !== n.data_limite;
     atualizar(d2, "notificacoes", n.id, { ...campos, ...mudouTexto && n.arquivo_assinado ? { arquivo_assinado: null } : {} }, usuario, `Notificação de ${dataBr(campos.data)}: rascunho alterado`);
     return n;
+  }
+  function ligarNotificacaoAssinada(d2, id, arquivo, pedidoEm, usuario) {
+    const n = buscar(d2, "notificacoes", id);
+    if (!n || !arquivo || !pedidoEm || n.arquivo_assinado || n.situacao === "Cancelada") return false;
+    const mudouDepois = (d2.historico || []).some((h) => h.tabela === "notificacoes" && Number(h.registro_id) === n.id && h.detalhes && ["texto", "data", "data_limite"].some((k) => h.detalhes[k]) && String(h.quando) > String(pedidoEm));
+    if (mudouDepois) return false;
+    anexarComprovante(d2, "notificacoes", n.id, "arquivo_assinado", arquivo, usuario);
+    return true;
   }
   function marcarNotificacaoEnviada(d2, id, { data: data2, meio }, usuario) {
     const n = buscar(d2, "notificacoes", id);
@@ -19984,11 +19994,16 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
     for (const f of d2.faturas || []) if (f.origem_tipo === "cobranca" && boletos.has(Number(f.origem_id)) && !ligados.some((x) => x.tabela === "faturas" && x.id === f.id)) ligados.push({ tabela: "faturas", id: f.id });
     const saem = new Set([...proprios, ...ligados].map((x) => `${x.tabela}:${x.id}`));
     const fiadoresDela = new Set(proprios.filter((x) => x.tabela === "fiadores").map((x) => Number(x.id)));
+    const alvo = soDigitos(cpf);
+    const papelDela = (x) => {
+      const c = buscar(d2, "contratos", x.contrato_id);
+      return !!c && soDigitos(c[`${x.tipo}_cpf`] || "") === alvo;
+    };
     const destinos = [];
     for (const com of d2.comunicados || []) {
       for (const x of com.destinos || []) {
         if (!x) continue;
-        const dela2 = x.tipo === "fiador" ? fiadoresDela.has(Number(x.fiador_id)) : contratos.has(Number(x.contrato_id));
+        const dela2 = x.tipo === "fiador" ? fiadoresDela.has(Number(x.fiador_id)) : x.tipo === "solidario" || x.tipo === "representante" ? papelDela(x) : contratos.has(Number(x.contrato_id));
         if (dela2) destinos.push({ comunicado_id: com.id, chave: x.chave });
       }
     }
@@ -21771,7 +21786,8 @@ ${DICA_DOCUMENTOS}`].join("\n");
         if (n.arquivo_assinado) arquivo("contrato", n.contrato_id, n.arquivo_assinado, `notificação de ${dataBr(n.data)} assinada`);
         else {
           const disp = reciboDisponivel(d2, "notificacao", alvo);
-          out.push({ tipo: "recibo", recibo: "notificacao", rotulo: `${TIPOS_RECIBO.notificacao} de ${dataBr(n.data)} (sem a assinatura: anexe a assinada na notificação)`, ok: disp.ok, motivo: disp.motivo || "", alvo });
+          const comoVai = regra("assinatura_digital") ? "assinada digitalmente pelo PC" : "sem a assinatura: anexe a assinada na notificação";
+          out.push({ tipo: "recibo", recibo: "notificacao", rotulo: `${TIPOS_RECIBO.notificacao} de ${dataBr(n.data)} (${comoVai})`, ok: disp.ok, motivo: disp.motivo || "", alvo });
         }
         continue;
       }
@@ -24016,7 +24032,15 @@ ${e.texto}`) ? 'Assunto e texto copiados: cole no e-mail. Depois de mandar, use 
           const e = emailDoItem(d(), item3);
           const comCorpo = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(item3.para)}&su=${encodeURIComponent(e.assunto)}&body=${encodeURIComponent(e.texto)}`;
           const cabe = comCorpo.length <= LIMITE_ENDERECO;
-          window.open(cabe ? comCorpo : `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(item3.para)}&su=${encodeURIComponent(e.assunto)}`, "_blank", "noopener");
+          const aba = window.open(cabe ? comCorpo : `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(item3.para)}&su=${encodeURIComponent(e.assunto)}`, "_blank");
+          if (!aba) {
+            aviso('O navegador bloqueou a aba do Gmail (bloqueador de janelas): permita janelas deste site e clique de novo, ou use "Copiar texto". O e-mail continua na lista.', "aviso");
+            return;
+          }
+          try {
+            aba.opener = null;
+          } catch {
+          }
           const copiado = cabe || await copiar2(e.texto);
           await decidir(item3, "gmail", { para: item3.para, assunto: e.assunto });
           aviso(`${cabe ? "Gmail aberto com o texto." : copiado ? "Gmail aberto; o texto é comprido e foi copiado: cole no corpo do e-mail." : "Gmail aberto: copie o texto da prévia e cole no corpo do e-mail."}${e.prontos.length ? " Anexe o boleto e o QR Code (página do boleto) antes de mandar." : ""}`, cabe ? "ok" : "aviso");
@@ -25020,7 +25044,7 @@ Abrir o Gmail mesmo assim? O texto vai com o buraco, e você completa por lá.`,
       const alertas = [];
       if (!arquivos.length && modelo.anexos) alertas.push(`ATENÇÃO: o texto fala em anexo (${modelo.anexos}), mas nenhum arquivo vai junto. Anexe em "${prontos.length ? "Outros anexos" : "Anexos"}" antes de enviar.`);
       const marcados = [...dlg.querySelectorAll("[name=pronto]:checked")].map((el) => prontos[Number(el.value)]);
-      if (n && !n.arquivo_assinado && marcados.some((a) => a.tipo === "recibo" && a.recibo === "notificacao")) alertas.push("ATENÇÃO: vai o PDF da notificação SEM a assinatura (a assinada não foi anexada na notificação). Ao enviar, a notificação fica marcada como enviada hoje e o prazo começa a correr.");
+      if (n && !n.arquivo_assinado && !regra("assinatura_digital") && marcados.some((a) => a.tipo === "recibo" && a.recibo === "notificacao")) alertas.push("ATENÇÃO: vai o PDF da notificação SEM a assinatura (a assinada não foi anexada na notificação). Ao enviar, a notificação fica marcada como enviada hoje e o prazo começa a correr.");
       if (!await confirmar(`${alertas.length ? `${alertas.join("\n\n")}
 
 ` : ""}O e-mail vai agora para ${e.para}${arquivos.length ? `, com ${arquivos.length} anexo(s)` : ", sem anexo"}.`, { titulo: alertas.length ? "Enviar mesmo assim?" : "Enviar o e-mail?", sim: "Enviar agora", forte: alertas.length > 0 })) return;
@@ -26542,6 +26566,15 @@ ${m.texto}
       destinos: destinatarios(d2, hoje3).map((p2) => ({ chave: p2.chave, tipo: p2.tipo, contrato_id: p2.contrato_id, fiador_id: p2.fiador_id, nome: p2.nome }))
     };
   }
+  function filaDoEnvio(d2, com, canal, hoje3 = hojeIso()) {
+    const abertos = (com && com.destinos || []).filter((x) => x && !x.confirmado_em);
+    const ativos = abertos.filter((x) => destinoAtivo(d2, x, hoje3));
+    const fora = abertos.length - ativos.length;
+    if (canal === "email") {
+      return { alvos: ativos.filter((x) => !x.email_em && (pessoaDoDestino(d2, x) || {}).email), sem: ativos.filter((x) => !(pessoaDoDestino(d2, x) || {}).email), fora };
+    }
+    return { alvos: ativos.filter((x) => !x.whats_em && pessoaDoDestino(d2, x)), sem: [], fora };
+  }
   function pessoaDoDestino(d2, x) {
     const c = buscar(d2, "contratos", x.contrato_id);
     if (!c) return null;
@@ -26998,13 +27031,13 @@ ${m.texto}`);
         async emailTodosComunicado({ id }) {
           exigir();
           const com = buscar2("comunicados", Number(id));
-          const alvos = com.destinos.filter((x) => !x.email_em && !x.confirmado_em && (pessoaDoDestino(d(), x) || {}).email);
-          const sem = com.destinos.filter((x) => !x.confirmado_em && !(pessoaDoDestino(d(), x) || {}).email);
+          const { alvos, sem, fora } = filaDoEnvio(d(), com, "email");
+          const saiu = fora ? ` ${fora} pessoa(s) que não confirmaram ficam de fora: já saíram (contrato encerrado, fiador trocado ou excluído).` : "";
           if (!alvos.length) {
-            aviso(`Não há e-mail para enviar: ${sem.length ? `${sem.length} pessoa(s) sem e-mail no cadastro (use o WhatsApp)` : "todos já receberam"}.`, "info");
+            aviso(`Não há e-mail para enviar: ${sem.length ? `${sem.length} pessoa(s) sem e-mail no cadastro (use o WhatsApp)` : "todos já receberam"}.${saiu}`, "info");
             return;
           }
-          if (!await confirmar(`Enviar o e-mail com o link para ${alvos.length} pessoa(s)?${sem.length ? ` ${sem.length} sem e-mail ficam para o WhatsApp.` : ""}`, { titulo: "Enviar e-mail a todos", sim: "Enviar" })) return;
+          if (!await confirmar(`Enviar o e-mail com o link para ${alvos.length} pessoa(s)?${sem.length ? ` ${sem.length} sem e-mail ficam para o WhatsApp.` : ""}${saiu}`, { titulo: "Enviar e-mail a todos", sim: "Enviar" })) return;
           const { ok, falhas } = await enviarEmails(com, alvos);
           if (falhas.length) await janela({ titulo: `${ok} enviado(s), ${falhas.length} com problema`, sim: "Fechar", nao: null, html: `<ul>${falhas.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>` });
           else aviso(`${ok} e-mail(s) enviado(s).`);
@@ -27023,9 +27056,9 @@ ${m.texto}`);
         async whatsTodosComunicado({ id }) {
           exigir();
           const com = buscar2("comunicados", Number(id));
-          const fila2 = com.destinos.filter((x) => !x.whats_em && !x.confirmado_em && pessoaDoDestino(d(), x));
+          const { alvos: fila2, fora } = filaDoEnvio(d(), com, "whats");
           if (!fila2.length) {
-            aviso("Todos já receberam pelo WhatsApp (ou já confirmaram).", "info");
+            aviso(`Todos já receberam pelo WhatsApp (ou já confirmaram).${fora ? ` ${fora} pessoa(s) que não confirmaram ficam de fora: já saíram.` : ""}`, "info");
             return;
           }
           if (!await seguirSemGmail()) return;
@@ -27543,7 +27576,7 @@ ${m.texto}`);
     }).join("");
     return `<div class="cartao" data-ficha-online="${f.id}">${titulo2}
     ${encerrada ? `<div class="alerta aviso">A ficha ${f.documentos_no_contrato ? "já virou contrato" : `está "${esc(f.situacao)}"`}, mas ainda há link valendo: o que a pessoa mandar por ele cai na pasta da ficha. ${botao("encerrarLinksDaFicha", "Encerrar os links", { id: f.id }, "pequeno")}</div>` : ""}
-    <p class="suave">Cada pessoa recebe um link só dela, que vale ${7} dias: preenche os dados, manda os documentos e, depois, a ficha assinada (gov.br ou à mão). O que ela manda só entra na ficha quando vocês conferem. Por segurança, o link só aparece na hora em que é gerado: copie e mande na hora (o e-mail de envio da ficha, mandado logo depois, também leva o link). Para mandar de novo, o sistema gera outro e o anterior deixa de valer.</p>
+    <p class="suave">Cada pessoa recebe um link só dela, que vale ${7} dias: preenche os dados, manda os documentos e, depois, a ficha assinada (gov.br ou à mão). O que ela manda só entra na ficha quando vocês conferem. Por segurança, o link só aparece na hora em que é gerado: copie e mande na hora (o e-mail de envio da ficha, mandado logo depois, também leva o link). "Mandar de novo" gera outro endereço com a mesma validade, e o que a pessoa já tem continua valendo; "Gerar novo link" começa outro prazo de 7 dias, e o anterior deixa de valer.</p>
     <ul style="padding-left:18px">${linhas2}</ul><div data-respostas-link></div><p class="suave" data-aviso-aparelho></p></div>`;
   }
   async function ligarFichaOnline(raiz) {
@@ -28103,7 +28136,7 @@ ${m.texto}`);
           if (!resp) return;
           const data2 = (resp.data || [])[0] || "";
           const motivo = (resp.motivo || [])[0] || "";
-          const pasta = f ? f.pasta || nomePastaFicha(f) : nomePastaFicha({ inquilino_nome: nome, data_recebida: contratos[0].reserva_data || data2 });
+          const pasta = f ? f.pasta || nomePastaFicha(f) : pastaFichaLivre({ inquilino_nome: nome, data_recebida: contratos[0].reserva_data || data2 });
           const pedido = { fichaId: f ? f.id : null, contratoId: contratos[0] ? contratos[0].id : null, data: data2, motivo, pasta };
           desistirAntesDeAssinar(structuredClone(d()), pedido, login());
           const copia2 = contratos.length ? await copiarDocumentosParaFicha(contratos, pasta) : { nomes: [], apagarOriginais: async () => {
@@ -29659,6 +29692,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
               dados.decisao_por = null;
             } else {
               dados.decisao_data = dados.decisao_data || hoje3;
+              if (r && r.situacao !== dados.situacao && r.decisao_data && dados.decisao_data === r.decisao_data) dados.decisao_data = hoje3;
               dados.decisao_por = r && r.situacao === dados.situacao && r.decisao_por ? r.decisao_por : login();
               if (dados.decisao_data > hoje3) erros.decisao_data = "A decisão não pode ser numa data futura";
               else if (dados.data_recebida && dados.decisao_data < dados.data_recebida) erros.decisao_data = `A decisão não pode ser antes de a ficha chegar (${dataBr(dados.data_recebida)})`;
@@ -29700,7 +29734,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
             if (!dados.bonificacao) dados.desconto_pontualidade_percentual = 0;
             if (dados.desconto_pontualidade_percentual !== null && (dados.desconto_pontualidade_percentual < 0 || dados.desconto_pontualidade_percentual > 100)) erros.desconto_pontualidade_percentual = "Informe um percentual entre 0 e 100";
             if (dados.dia_vencimento !== null && (dados.dia_vencimento < 1 || dados.dia_vencimento > 31)) erros.dia_vencimento = "Informe um dia entre 1 e 31";
-            dados.pasta = r ? r.pasta || nomePastaFicha(r) : nomePastaFicha(dados);
+            dados.pasta = r ? r.pasta || nomePastaFicha(r) : pastaFichaLivre(dados);
             conferirComprovantes(COMPROVANTES_FICHA, dados, r, form);
           },
           async ajustarAsync(dados, erros, r, form) {
@@ -32229,6 +32263,10 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     const c = buscar2("contratos", q.contrato);
     return c ? { contrato: c, ...q.id ? { acordo: Number(q.id), id: Number(q.id) } : {} } : null;
   }
+  function emailDoRecibo(tipo, alvo) {
+    const modelo = EMAIL_DO_RECIBO[tipo] || null;
+    return modelo && (alvo.ficha || !/^ficha_/.test(modelo)) ? modelo : null;
+  }
   async function caixaAssinatura(tipo, alvo) {
     if (!regra("assinatura_digital") || SEM_ASSINATURA_DA_EMPRESA.includes(tipo) || !opera()) return "";
     if (!E.nuvem) return '<div class="alerta info nao-imprimir">Assinatura digital: só pelo sistema na internet (a fila fica na nuvem e o PC com o certificado assina).</div>';
@@ -32241,7 +32279,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     }
     const p2 = pedidoDe(fila2, chaveDoRecibo(tipo, alvo));
     const s = situacaoDoPedido(p2, fila2.pc);
-    const modelo = EMAIL_DO_RECIBO[tipo];
+    const modelo = emailDoRecibo(tipo, alvo);
     const alvoEmail = alvo.ficha ? { ficha: alvo.ficha.id } : { contrato: alvo.contrato.id, ...tipo === "notificacao" && alvo.id ? { notificacao: alvo.id } : {} };
     return `<div class="cartao nao-imprimir" style="margin:0 0 12px"><p><b>Assinatura digital da empresa</b> · <span class="etiqueta ${s.cor}">${esc(s.texto)}</span></p>
     <p class="acoes">${p2 && p2.situacao === "assinado" ? `${botao("assinaturaBaixar", "Baixar PDF assinado", { ...dados, pedido: p2.id }, "")} ${modelo ? botaoEmail(modelo, alvoEmail, "✉ Enviar ao inquilino") : '<span class="suave">Para enviar: anexe o PDF assinado no e-mail.</span>'} ` : ""}
@@ -33125,6 +33163,16 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       <td class="detalhes">${det}</td></tr>`;
     }).join("");
     return `<div class="rolagem"><table><tr><th>Quando</th><th>Quem</th><th>O quê</th><th>Detalhes</th></tr>${linhas2 || '<tr><td colspan="4" class="suave">Nada registrado ainda.</td></tr>'}</table></div>`;
+  }
+  function pastaFichaLivre(f, fichas = d().fichas || []) {
+    const usadas = new Set(fichas.filter(Boolean).map((x) => String(x.pasta || nomePastaFicha(x)).toLowerCase()));
+    const base = nomePastaFicha(f);
+    if (!usadas.has(base.toLowerCase())) return base;
+    const data2 = dataBr(f.data_recebida || hojeIso()).replace(/\//g, "-");
+    for (let n = 2; ; n += 1) {
+      const nome = limparNome(`${f.inquilino_nome} (ficha ${data2} ${n})`);
+      if (!usadas.has(nome.toLowerCase())) return nome;
+    }
   }
   function pastaPaiContrato(c) {
     const i = c.imovel_id ? buscar2("imoveis", c.imovel_id) : null;
@@ -38480,6 +38528,8 @@ ${xref}
   }
   function motivoNaoExcluirImovel(db, r) {
     if (db.contratos.some((c) => c.imovel_id === r.id)) return "Este imóvel tem inquilinos. Exclua os contratos antes.";
+    const ficha = fichaAbertaDoImovel(db, r.id);
+    if (ficha) return `Este imóvel está na ficha de ${ficha.inquilino_nome}, ainda em aberto (${ficha.situacao}). Decida a ficha (reprovar ou "Desistiu") ou desmarque o imóvel nela antes.`;
     if ((db.ganhos_airbnb || []).some((g) => g.imovel_id === r.id)) return "Este imóvel tem ganhos do Airbnb lançados. Exclua os ganhos antes.";
     if ((db.avulsas || []).some((a) => a.imovel_id === r.id)) return "Este imóvel tem NFs avulsas. Exclua as NFs avulsas antes.";
     const doImovel = (t) => (db[t] || []).filter((x) => x.imovel_id === r.id);
@@ -38512,6 +38562,8 @@ ${xref}
     if ((db.movimentacoes_banco || []).some((m) => m.cobranca_id && ids.has(m.cobranca_id))) return "Este contrato tem boletos ligados ao extrato: desfaça o destino das movimentações na tela Banco antes.";
     const novo = continuadoPor(db, r);
     if (novo) return `Este contrato continua com ${novo.inquilino_nome} (troca de titular): exclua antes o contrato do novo titular.`;
+    const ficha = r.ficha_id && !r.doc_contrato_em ? buscar(db, "fichas", r.ficha_id) : null;
+    if (ficha && !fichaSemContrato(ficha)) return `Este contrato foi feito da ficha de ${ficha.inquilino_nome} e ainda não foi assinado. Para cancelar, use "Desistiu antes de assinar" na página da ficha: o contrato sai e a reserva e os documentos voltam para a ficha. Para corrigir um dado, use "Editar".`;
     return motivoNaoExcluirHerdeiro(db, r);
   }
   function descricaoDaExclusao(db, tabela, reg) {
@@ -39488,19 +39540,31 @@ ${MODELO_COMODOS[comodo].join("\n")}
           await mostrar();
         },
         /** Baixa o PDF assinado e guarda uma cópia na pasta do inquilino (ou da ficha). */
-        async assinaturaBaixar({ pedido, contrato, ficha }) {
+        async assinaturaBaixar({ pedido, contrato, ficha, tipo, id }) {
           const blob = await baixarAssinado(pedido);
-          const alvo = alvoDoRecibo({ contrato, ficha });
+          const alvo = alvoDoRecibo({ contrato, ficha, id });
           const p2 = ((await fila()).pedidos || []).find((x) => x.id === pedido) || {};
           const nome = limparNome(String(p2.nome || "documento-assinado.pdf").replace(/\.pdf$/i, "")) + " - assinado.pdf";
+          let guardado = false;
           if (alvo) {
             try {
               await escreverTexto(await pastaDoEscopo(alvo.ficha ? "ficha" : "contrato", (alvo.ficha || alvo.contrato).id), nome, blob);
+              guardado = true;
             } catch (e) {
               aviso(`O PDF foi baixado, mas não consegui guardar a cópia na pasta: ${e.message}`, "aviso");
             }
           }
           baixar(blob, nome);
+          if (guardado && tipo === "notificacao" && alvo.contrato && alvo.id && p2.chave === chaveDoRecibo("notificacao", alvo)) {
+            let ligou = false;
+            await alterar((db) => {
+              ligou = ligarNotificacaoAssinada(db, alvo.id, nome, p2.pedido_em, login());
+            });
+            if (ligou) {
+              aviso("PDF assinado baixado e anexado na notificação como a assinada.");
+              await mostrar();
+            }
+          }
         },
         async assinaturaCancelar({ id }) {
           if (!await confirmar("Tirar este documento da fila de assinatura? Ele não será assinado.", { titulo: "Tirar da fila", sim: "Tirar", nao: "Voltar" })) return;
