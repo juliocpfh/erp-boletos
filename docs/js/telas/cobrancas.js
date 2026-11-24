@@ -332,8 +332,8 @@ export function demonstrativo(cb) {
       ${cb.seguro ? linha(`Seguro obrigatório${cb.seguro_parcela ? ` (${esc(cb.seguro_parcela)})` : ''}`, reais(cb.seguro)) : ''}
       ${cb.taxa_boleto ? linha('Tarifa de emissão do boleto', reais(cb.taxa_boleto)) : ''}
       ${cb.fci ? linha(`FCI: fundo de conservação do imóvel${c.fci_percentual ? ` (${pct(c.fci_percentual)} do aluguel bonificado)` : ''}, devolvido corrigido na saída`, reais(cb.fci)) : ''}
-      ${cb.outros > 0 ? linha(`Cobrança adicional${cb.outros_descricao ? `: ${esc(cb.outros_descricao)}` : ''}`, reais(cb.outros)) : ''}
-      ${cb.outros < 0 ? linha(`(-) Ressarcimento${cb.outros_descricao ? `: ${esc(cb.outros_descricao)}` : ''}`, `- ${reais(-cb.outros)}`) : ''}
+      ${R.partesDosOutros(cb).map((p) => (p.valor > 0 ? linha(`Cobrança adicional${p.texto ? `: ${esc(p.texto)}` : ''}`, reais(p.valor))
+    : linha(`(-) Ressarcimento${p.texto ? `: ${esc(p.texto)}` : ''}`, `- ${reais(-p.valor)}`))).join('')}
       <tr class="total"><td>Total sem desconto</td><td class="n">${reais(t.total_sem_desconto)}</td></tr>
       ${cb.desconto ? linha('(-) Desconto de pontualidade, se pago até o vencimento', `- ${reais(cb.desconto)}`) : ''}
       ${cb.reserva_utilizada ? linha('(-) Reserva paga na visita, abatida neste mês', `- ${reais(cb.reserva_utilizada)}`) : ''}
@@ -344,18 +344,28 @@ export function demonstrativo(cb) {
     ${cb.observacoes ? `<p class="pre">${esc(cb.observacoes)}</p>` : ''}</div>`;
 }
 
-/** Ajuste do mês: cobrança adicional ou ressarcimento (reforma, acerto etc.). Fica no histórico. */
+/**
+ * Ajustes do mês: cobranças adicionais (+) e ressarcimentos (−), quantos precisar (pedido do dono de 24/11/2026), cada um com o
+ * motivo e o botão de tirar. Multa de notificação e diferença presa ao boleto aparecem, mas saem só pelo caminho delas.
+ */
 function caixaAjuste(cb) {
   if (!opera() || cb.data_pagamento || R.ehBoletoAvulso(cb) || R.emAcordo(cb)) return '';
-  const tipo = cb.outros < 0 ? 'ressarcimento' : 'adicional';
+  const ajustes = R.ajustesDoBoleto(cb);
+  const fixos = [...(cb.multas_notificacao || []), ...(cb.diferencas_cobradas || [])];
+  const valor = (v) => (v < 0 ? `− ${reais(-v)}` : `+ ${reais(v)}`);
+  const lista = ajustes.length || fixos.length ? `<table class="ajustes-do-mes">
+      ${ajustes.map((a) => `<tr><td>${a.valor < 0 ? 'Ressarcimento' : 'Cobrança adicional'}: ${esc(a.motivo || '')}</td><td class="n">${valor(a.valor)}</td>
+        <td>${botao('tirarAjuste', 'Tirar', { id: cb.id, ajuste: a.id }, 'perigo pequeno', `Tirar este ajuste (${a.valor < 0 ? 'ressarcimento' : 'cobrança adicional'} de ${reais(Math.abs(a.valor))})?`)}</td></tr>`).join('')}
+      ${fixos.map((e) => `<tr><td>${esc(e.texto)} <span class="suave">(sai pelo caminho dela, não por aqui)</span></td><td class="n">${valor(e.valor)}</td><td></td></tr>`).join('')}
+    </table>` : '';
   return `<div class="cartao"><h2>Ajuste deste mês</h2>
-    <p class="suave">Para corrigir o valor do boleto: cobrar algo a mais ou devolver/descontar um valor (reforma, acerto do mês anterior etc.). Fica registrado no histórico do inquilino.</p>
+    <p class="suave">Para corrigir o valor do boleto: cobrar algo a mais ou devolver/descontar um valor (reforma, acerto do mês anterior etc.). Pode lançar quantos precisar; cada um fica registrado no histórico do inquilino.</p>
+    ${lista}
     <form data-form="ajuste" data-id="${cb.id}" class="acoes">
-      <select name="tipo" style="width:auto"><option value="adicional" ${tipo === 'adicional' ? 'selected' : ''}>Cobrança adicional (+)</option><option value="ressarcimento" ${tipo === 'ressarcimento' ? 'selected' : ''}>Ressarcimento (−)</option></select>
-      <input name="valor" inputmode="decimal" placeholder="Valor" value="${cb.outros ? esc(F.dinheiroTexto(Math.abs(cb.outros))) : ''}" style="width:130px">
-      <input name="motivo" placeholder="Motivo (ex.: reforma do banheiro)" value="${esc(cb.outros_descricao || '')}" style="flex:1;min-width:220px">
-      <button class="secundario">Salvar ajuste</button>
-      ${cb.outros ? botao('tirarAjuste', 'Tirar ajuste', { id: cb.id }, 'perigo pequeno', 'Tirar o ajuste deste boleto?') : ''}</form></div>`;
+      <select name="tipo" style="width:auto"><option value="adicional">Cobrança adicional (+)</option><option value="ressarcimento">Ressarcimento (−)</option></select>
+      <input name="valor" inputmode="decimal" placeholder="Valor" style="width:130px">
+      <input name="motivo" placeholder="Motivo (ex.: reforma do banheiro)" style="flex:1;min-width:220px">
+      <button class="secundario">${ajustes.length ? 'Acrescentar outro ajuste' : 'Salvar ajuste'}</button></form></div>`;
 }
 
 function caixaBoleto(cb) {
@@ -397,6 +407,16 @@ function caixaAcordo(cb) {
     ${depois ? `<br><span class="suave">Para desfazer este acordo, desfaça antes o ${link(`#/cobranca/${depois.parcela.id}`, `acordo de ${dataBr(depois.acordo.data)}`)}, que inclui a parcela ${esc(depois.parcela.acordo_parcela || 'única')}.</span>` : ''}</div>`;
 }
 
+/** Texto do aviso do boleto alterado à mão: o que ficou digitado e o que não bate com o cadastro. */
+function avisoDoManual(cb) {
+  const rotulos = { aluguel: 'aluguel', desconto: 'bonificação', iptu: 'IPTU', seguro: 'seguro', taxa_boleto: 'taxa do boleto', fci: 'FCI', multa_percentual: 'multa', juros_mensal_percentual: 'juros' };
+  const dif = R.divergenciasDoManual(d(), cb);
+  if (Array.isArray(cb.campos_manuais)) {
+    return cb.campos_manuais.length ? `Valores digitados à mão (${cb.campos_manuais.map((k) => rotulos[k] || k).join(', ')}): ficam como estão; o resto continua sendo calculado pelo cadastro.` : 'Boleto alterado à mão.';
+  }
+  return `Valores alterados à mão: este boleto não é recalculado sozinho quando o cadastro muda.${dif.length ? ` <b>Não bate com o cadastro:</b> ${dif.map((x) => `${x.rotulo} ${reais(x.cadastro)} no cadastro e ${reais(x.boleto)} no boleto`).join('; ')}.` : ''}`;
+}
+
 export function telaCobranca(cb) {
   const c = buscar('contratos', cb.contrato_id);
   const fs = R.faturasDe(d(), 'cobranca', cb.id, false);
@@ -409,7 +429,7 @@ export function telaCobranca(cb) {
     <div class="cabecalho"><h1>Boleto ${R.ehComplementoCaucao(cb) ? 'do complemento da caução' : R.ehSaldoSaida(cb) ? 'do saldo da saída' : R.ehParcelaAcordo(cb) ? `do acordo ${esc(cb.acordo_parcela || '')}` : compBr(cb.competencia)} ${situacaoBoleto(cb, C.hojeIso())}</h1><div class="acoes">
       <button class="secundario" data-acao="imprimir">Imprimir demonstrativo</button>${botao('baixarPdfTela', 'Baixar PDF', { seletor: '.demonstrativo', nome: nomeArquivoDoc(R.ehComplementoCaucao(cb) ? 'Demonstrativo complemento caução' : 'Demonstrativo boleto', c, cb.competencia) }, 'secundario')}
       ${opera() && !cb.data_pagamento && !R.emAcordo(cb) && !R.ehParcelaAcordo(cb) ? `${R.ehComplementoCaucao(cb) || R.ehSaldoSaida(cb) ? '' : link(`#/editar/cobrancas/${cb.id}`, 'Alterar valores', 'botao secundario')} ${botao('excluir', 'Excluir', { tabela: 'cobrancas', id: cb.id }, 'perigo', irmas.length ? `Excluir este boleto? ${C.plural(irmas.length, 'A outra parcela', 'As outras parcelas')} do complemento da caução em aberto ${irmas.length === 1 ? 'sai junto' : 'saem juntas'} e o complemento volta a "Caução a completar" (tela Reajustes), para gerar de novo.` : 'Excluir este boleto?')}` : ''}</div></div>
-    ${cb.editado_manual && !cb.data_pagamento ? `<div class="alerta info">Valores alterados à mão: este boleto não é recalculado sozinho quando o cadastro muda. ${opera() ? botao('recalcularBoleto', 'Voltar a calcular pelo cadastro', { id: cb.id }, 'secundario pequeno', 'Recalcular este boleto pelo cadastro? Os valores digitados à mão serão substituídos (o ajuste do mês fica).') : ''}</div>` : ''}</div>
+    ${cb.editado_manual && !cb.data_pagamento ? `<div class="alerta ${R.divergenciasDoManual(d(), cb).length ? 'aviso' : 'info'}">${avisoDoManual(cb)} ${opera() ? botao('recalcularBoleto', 'Voltar a calcular pelo cadastro', { id: cb.id }, 'secundario pequeno', 'Recalcular este boleto pelo cadastro? Os valores digitados à mão serão substituídos (o ajuste do mês fica).') : ''}</div>` : ''}</div>
     ${R.geraNf(c) ? '' : `<div class="alerta controle nao-imprimir"><b>Boleto de controle.</b> Este inquilino ${AVISO_CONTROLE}</div>`}
     ${caixaAcordo(cb)}
     ${demonstrativo(cb)}

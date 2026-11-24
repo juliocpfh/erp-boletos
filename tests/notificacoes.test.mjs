@@ -155,7 +155,9 @@ test('multa: valor digitado vai ao próximo boleto do aluguel (fora da NF); reti
   assert.equal(atraso.multa, Math.round(200000 * cb.multa_percentual / 100), 'multa de atraso sobre R$ 2.000,00');
   assert.match(R.dadosBoleto(d, cb).descricao, /MULTA NOTIF\. 17\/11\/2026 RS1\.500,00|MULTA NOTIF\. 17\/11\/2026 R\$ ?1\.500,00/);
   assert.ok(R.dadosBoleto(d, cb).descricao.length <= R.LIMITE_DESCRICAO_BOLETO);
-  assert.throws(() => R.ajustarBoleto(d, cb.id, 0, '', 'j'), /Retirar a multa/, 'o "Tirar ajuste" não apaga a multa');
+  const comMulta = cb.outros;
+  R.ajustarBoleto(d, cb.id, 0, '', 'j');
+  assert.equal(cb.outros, comMulta, 'o "Tirar ajuste" não apaga a multa (desde 24/11/2026 tira só os ajustes)');
   assert.ok(!R.todosAlertas(d, '2026-12-03').some((a) => a.tipo === 'Notificação ao inquilino' && a.nivel === 'perigo'), 'com a multa gerada, o vermelho some');
   // retirar
   R.retirarMultaNotificacao(d, n.id, 'j');

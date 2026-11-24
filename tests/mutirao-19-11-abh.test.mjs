@@ -87,10 +87,13 @@ test('dados antigos — mensal-025: o ajuste do mês não apaga a diferença pre
   const jun = boleto('2026-06'); const jul = boleto('2026-07');
   const falta = pagoEmParteAntigo(d, jun, '2026-07-10', 100000);
   assert.equal(jul.outros, falta);
-  assert.throws(() => R.ajustarBoleto(d, jul.id, 5000, 'reforma do banheiro', 'julio'), /não sai pelo ajuste/);
-  assert.throws(() => R.ajustarBoleto(d, jul.id, 0, '', 'julio'), /não sai pelo ajuste/, '"Tirar ajuste" também não apaga');
-  R.ajustarBoleto(d, jul.id, falta + 5000, `${R.textoDiferenca(jun)}; reforma do banheiro`, 'julio');
+  // desde 24/11/2026 o ajuste é uma lista à parte: a diferença presa continua no total, e "Tirar" não a apaga
+  R.ajustarBoleto(d, jul.id, 0, '', 'julio');
+  assert.equal(jul.outros, falta, '"Tirar ajuste" não apaga a diferença');
+  R.ajustarBoleto(d, jul.id, 5000, 'reforma do banheiro', 'julio');
   assert.equal(jul.outros, falta + 5000);
+  assert.match(jul.outros_descricao, /reforma do banheiro/);
+  assert.ok(jul.outros_descricao.includes(R.textoDiferenca(jun)));
   // base de multa e juros: sem a diferença (que já tem multa e juros dentro)
   const t = R.totais(jul);
   assert.equal(t.base_multa, t.total_sem_desconto - falta);

@@ -1098,7 +1098,16 @@ export const CADASTROS = {
         return;
       }
       for (const k of ['desconto', 'iptu', 'seguro', 'taxa_boleto', 'fci', 'outros', 'reserva_utilizada', 'multa_percentual', 'juros_mensal_percentual']) if (dados[k] === null) dados[k] = 0;
-      dados.editado_manual = true; // o recálculo automático não mexe mais nestes valores
+      // o recálculo não mexe mais nos valores digitados aqui (``campos_manuais``), mas continua cuidando do resto (ex.: o seguro
+      // lançado depois entra). Só observações ou vencimento mudados: o boleto continua calculado pelo cadastro (24/11/2026)
+      const mudou = R.CAMPOS_MANUAIS.filter((k) => (dados[k] ?? 0) !== (r[k] ?? 0));
+      if (r.editado_manual && !Array.isArray(r.campos_manuais)) dados.editado_manual = true; // de antes de 24/11: fica todo à mão
+      else if (mudou.length || r.editado_manual) {
+        dados.editado_manual = true;
+        dados.campos_manuais = [...new Set([...(r.campos_manuais || []), ...mudou])];
+      }
+      // total dos ajustes digitado aqui: a lista de ajustes do mês volta a ser um só (o que sobra das multas e diferenças presas)
+      if (dados.outros !== (r.outros || 0) || (dados.outros_descricao ?? '') !== (r.outros_descricao || '')) dados.ajustes = null;
       // bonificação maior que o aluguel deixava o boleto "a pagar R$ 0,00" (ex.: aluguel R$ 2.400,00 e desconto R$ 5.000,00)
       if (dados.aluguel > 0 && dados.desconto > dados.aluguel) erros.desconto = `O desconto não pode passar do aluguel (${reais(dados.aluguel)})`;
       const disp = R.saldoReserva(d(), buscar('contratos', r.contrato_id), r.id);
