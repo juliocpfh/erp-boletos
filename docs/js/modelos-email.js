@@ -30,13 +30,53 @@ const CONDICOES = `CONDIÇÕES DA LOCAÇÃO
  */
 export const MODELOS_EMAIL = [
   {
+    chave: 'ficha_termo_reserva', nome: 'Condições e termo da reserva', etapa: 'Ficha',
+    // 1º contato com quem demonstrou interesse (decisões do dono de 2026-11-24): as condições, o termo e o link do aceite
+    assunto: '{imovel}: condições e termo da reserva',
+    anexos: '', prontos: ['recibo:termo_reserva'],
+    perguntas: [['prazo', 'Prazo do contrato', 'texto']],
+    texto: `Olá, {nome}, tudo bem?
+
+Obrigado pelo interesse no imóvel da {endereco}. Seguem as condições e o termo da reserva.
+[se aviso_desistencia]
+{aviso_desistencia}
+[fim]
+${CONDICOES}
+Condições sujeitas à aprovação da ficha; a locação só vale com o contrato assinado por todos.
+[se requisitos]
+REQUISITOS PARA A APROVAÇÃO
+{requisitos}
+[fim]
+DOCUMENTOS PARA A ANÁLISE
+{documentos_ficha}
+
+RESERVA
+- Valor: {reserva_combinada}, abatido do 1º aluguel se a ficha for aprovada
+- O imóvel fica reservado para você por {dias_validade} dias depois do depósito
+- Depois do depósito, você tem {dias_documentos} dias úteis para mandar a ficha e os documentos; sem eles, a reserva é cancelada
+- Ficha não aprovada: devolvemos tudo
+- {regra_desistencia}
+- {texto_conferencia}
+- Quando houver devolução, ela sai em até {dias_devolucao} dias úteis, na conta de onde veio o depósito
+
+PRÓXIMO PASSO
+[se link_termo]Leia o termo completo e dê o seu aceite por este link, só seu, válido até {link_termo_validade}:
+{link_termo}
+Lá você confirma o e-mail com um código e recebe o comprovante.[senão]Leia o termo anexo e, se estiver de acordo, responda este e-mail com ele assinado (pelo gov.br ou à mão).[fim]
+
+Depois do aceite, faça o depósito da reserva na conta abaixo e mande o comprovante:
+{conta_deposito}
+
+Seus dados são tratados conforme a LGPD (Lei 13.709/2018).`,
+  },
+  {
     chave: 'ficha_envio', nome: 'Envio de ficha cadastral', etapa: 'Ficha',
     assunto: '{imovel}: ficha cadastral e condições da locação',
     anexos: '', prontos: ['recibo:ficha', 'recibo:ficha_fiador', 'recibo:reserva', 'comprovante:reserva'],
     perguntas: [['prazo', 'Prazo do contrato', 'texto']],
     texto: `Olá, {nome}, tudo bem?
 
-[se reserva]Recebemos a reserva de {reserva} em {reserva_data} para o imóvel da {endereco} (recibo e comprovante anexos). Aprovada a ficha, ela é descontada do primeiro aluguel; não aprovada, ou se você desistir antes de assinar, devolvemos tudo.[senão]Obrigado pelo interesse no imóvel da {endereco}.[fim]
+[se reserva]Recebemos a reserva de {reserva} em {reserva_data} para o imóvel da {endereco} (recibo e comprovante anexos). Aprovada a ficha, ela é descontada do primeiro aluguel[se termo_aceito], como no termo da reserva que você aceitou em {aceite_data}: não aprovada, devolvemos tudo. {desistencia}[senão]; não aprovada, ou se você desistir antes de assinar, devolvemos tudo.[fim][senão]Obrigado pelo interesse no imóvel da {endereco}.[fim]
 
 ${CONDICOES}
 Condições sujeitas à aprovação da ficha; a locação só vale com o contrato assinado por todos.
@@ -50,7 +90,9 @@ Ou, se preferir, responda[senão]Responda[fim] este e-mail com a ficha anexa ass
 {documentos_ficha}[se seguro_fianca]
 A seguradora analisa junto e pode pedir algum documento a mais.[fim]
 
-Depois: análise em até 2 dias úteis, contrato para assinar[se dinheiro], depósito da {tipo_deposito}[fim] e entrega das chaves com a vistoria.
+[se prazo_documentos]Prazo para mandar a ficha e os documentos: {prazo_documentos} (sem eles, a reserva é cancelada).
+
+[fim]Depois: análise em até 2 dias úteis, contrato para assinar[se dinheiro], depósito da {tipo_deposito}[fim] e entrega das chaves com a vistoria.
 
 Seus dados são tratados conforme a LGPD (Lei 13.709/2018).`,
   },
@@ -78,7 +120,7 @@ Próximos passos: contrato para assinar em até 2 dias úteis[se fiador] (o fiad
 
 Agradecemos o interesse no imóvel da {imovel}. Depois da análise, não foi possível aprovar a ficha neste momento.
 
-[se reserva][se devolucao]A reserva de {reserva} já foi devolvida em {devolucao_data}, na conta de onde veio o depósito.[senão]A reserva de {reserva} será devolvida em até 24 horas úteis, na conta de onde veio o depósito.[fim]
+[se reserva][se devolucao]A reserva de {reserva} já foi devolvida em {devolucao_data}, na conta de onde veio o depósito.[senão][se retencao_aplicada]Na conferência, informações ou documentos enviados não corresponderam à realidade, o que conta como desistência no termo da reserva aceito em {aceite_data}: [se devolve_algo]devolvemos {devolver_reserva} e ficamos com {reter_reserva}, em até {dias_devolucao} dias úteis, na conta de onde veio o depósito.[senão]a reserva de {reserva} fica com a empresa, como no termo.[fim][senão]A reserva de {reserva} será devolvida em até {dias_devolucao} dias úteis, na conta de onde veio o depósito.[fim][fim]
 
 [fim]Os documentos enviados serão apagados, conforme a LGPD (Lei 13.709/2018).`,
   },
@@ -90,7 +132,7 @@ Agradecemos o interesse no imóvel da {imovel}. Depois da análise, não foi pos
 
 Devolvemos {devolucao} em {devolucao_data}, na conta de onde veio a reserva do imóvel da {imovel}. Anexos: o comprovante e o termo de devolução e quitação.
 
-A ficha está encerrada[se devolucao_parcial]. Da reserva, {devolucao_parcial} não foi devolvido: qualquer dúvida, responda este e-mail[senão], sem valores pendentes[fim]. Se puder, responda com o termo assinado (pode ser pelo gov.br); o comprovante do banco já prova a devolução.
+A ficha está encerrada[se devolucao_parcial]. Da reserva, {devolucao_parcial} não foi devolvido[se termo_aceito], como no termo da reserva aceito em {aceite_data}[fim]: qualquer dúvida, responda este e-mail[senão], sem valores pendentes[fim]. Se puder, responda com o termo assinado (pode ser pelo gov.br); o comprovante do banco já prova a devolução.
 
 Os documentos da análise serão apagados, conforme a LGPD (Lei 13.709/2018).`,
   },
@@ -372,6 +414,11 @@ Já resolveu? Responda com uma foto ou um documento, para darmos a baixa. Sem is
  * [chave, texto antigo exato, texto novo]. O trecho só é trocado se ainda estiver igual ao antigo (o resto do texto editado fica).
  */
 export const ATUALIZACOES_EMAIL = [
+  // termo de aceite da reserva (decisões do dono de 2026-11-24): desistência, prazo dos documentos e devolução em dias úteis
+  ['ficha_envio', 'Aprovada a ficha, ela é descontada do primeiro aluguel; não aprovada, ou se você desistir antes de assinar, devolvemos tudo.[senão]', 'Aprovada a ficha, ela é descontada do primeiro aluguel[se termo_aceito], como no termo da reserva que você aceitou em {aceite_data}: não aprovada, devolvemos tudo. {desistencia}[senão]; não aprovada, ou se você desistir antes de assinar, devolvemos tudo.[fim][senão]'],
+  ['ficha_envio', 'Depois: análise em até 2 dias úteis,', '[se prazo_documentos]Prazo para mandar a ficha e os documentos: {prazo_documentos} (sem eles, a reserva é cancelada).\n\n[fim]Depois: análise em até 2 dias úteis,'],
+  ['ficha_reprovada', '[senão]A reserva de {reserva} será devolvida em até 24 horas úteis, na conta de onde veio o depósito.[fim]', '[senão][se retencao_aplicada]Na conferência, informações ou documentos enviados não corresponderam à realidade, o que conta como desistência no termo da reserva aceito em {aceite_data}: [se devolve_algo]devolvemos {devolver_reserva} e ficamos com {reter_reserva}, em até {dias_devolucao} dias úteis, na conta de onde veio o depósito.[senão]a reserva de {reserva} fica com a empresa, como no termo.[fim][senão]A reserva de {reserva} será devolvida em até {dias_devolucao} dias úteis, na conta de onde veio o depósito.[fim][fim]'],
+  ['ficha_devolucao', 'Da reserva, {devolucao_parcial} não foi devolvido: qualquer dúvida, responda este e-mail', 'Da reserva, {devolucao_parcial} não foi devolvido[se termo_aceito], como no termo da reserva aceito em {aceite_data}[fim]: qualquer dúvida, responda este e-mail'],
   ['ficha_envio', 'Link do fiador (encaminhe para ele): {link_fiador}', '{links_fiadores}'],
   ['ficha_aprovada', 'depósito de {valor_deposito} da {tipo_deposito}', 'depósito[se valor_deposito] de {valor_deposito}[fim] da {tipo_deposito}'],
   ['contrato_assinado', '[se dinheiro] Recebemos também a {tipo_deposito} de {valor_deposito} (recibo e comprovante anexos).[fim]',

@@ -8,6 +8,7 @@ import { Aparelhos, ErroAparelho } from './aparelhos.mjs';
 import { ContaGmail } from './gmail-conta.mjs';
 import { faxinaDosLinks } from './ficha-publica.mjs';
 import { faxinaDosContatos } from './contatos-publico.mjs';
+import { faxinaDosAceites } from './aceite-reserva.mjs';
 import { faxinaDaLixeira } from './lixeira.mjs';
 import { chaveDoBackupValida, cifrarBackup, resumoDaChave } from './cifrar-backup.mjs';
 
@@ -1259,6 +1260,7 @@ export class CofreDO {
         await faxinaDaLixeira(this.env.DADOS, agora, c.regraNumero('dias_lixeira_anexos')).catch((e) => console.error('lixeira', e));
         await faxinaDosLinks(this.env).catch((e) => console.error('links da ficha', e));
         await faxinaDosContatos(this.env).catch((e) => console.error('links dos contatos', e));
+        await faxinaDosAceites(this.env).catch((e) => console.error('links do termo da reserva', e));
       }
     }
   }

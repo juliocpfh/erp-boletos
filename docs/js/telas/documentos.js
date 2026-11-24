@@ -398,7 +398,7 @@ export function alvoDoRecibo(q) {
 }
 
 /** E-mail da etapa que leva cada recibo (o "Enviar ao inquilino" da caixa da assinatura). */
-const EMAIL_DO_RECIBO = { reserva: 'ficha_envio', devolucao_reserva: 'ficha_devolucao', garantia: 'contrato_assinado', quitacao: 'saida_encerramento', notificacao: 'notificacao_envio' };
+const EMAIL_DO_RECIBO = { termo_reserva: 'ficha_termo_reserva', reserva: 'ficha_envio', devolucao_reserva: 'ficha_devolucao', garantia: 'contrato_assinado', quitacao: 'saida_encerramento', notificacao: 'notificacao_envio' };
 
 /**
  * Caixa da assinatura digital na página do recibo (regra `assinatura_digital`, pedido do dono de 2026-11-21): o "Baixar PDF"
@@ -426,7 +426,9 @@ async function caixaAssinatura(tipo, alvo) {
 /** Recibo ou termo (recibos.js) como carta: logo, empresa, título, texto, tabela de valores, local e data e as assinaturas. */
 export function reciboHtml(r) {
   const e = r.emitente;
-  const par = (t) => `<p${/^\d\. /.test(t) ? ' style="margin-left:12px"' : ''}>${esc(t)}</p>`;
+  // aviso em destaque (termo da reserva: "ATENÇÃO, LEIA ANTES DE ACEITAR E DE PAGAR"): negrito e moldura
+  const par = (t) => (/^ATENÇÃO/.test(t) ? `<p style="font-weight:bold;border:2px solid #000;padding:8px 10px">${esc(t)}</p>`
+    : `<p${/^\d\. /.test(t) ? ' style="margin-left:12px"' : ''}>${esc(t)}</p>`);
   const linha = ([a, b]) => (b === null ? `<tr><th colspan="2" style="text-align:left">${esc(a)}</th></tr>`
     // texto (proposta) à esquerda e quebrando; valor em reais à direita
     : `<tr><td style="width:34%;white-space:normal">${esc(a).replace(/^ {3}/, '&nbsp;&nbsp;&nbsp;')}</td><td style="white-space:normal${/^R\$ [\d.,]+$/.test(b) ? ';text-align:right' : ''}">${esc(b)}</td></tr>`);
@@ -439,6 +441,7 @@ export function reciboHtml(r) {
     ${r.paragrafos.map(par).join('')}
     ${r.tabela.length ? `<table class="carta-tabela" style="width:100%">${r.tabela.map(linha).join('')}</table>` : ''}
     ${r.depois.map(par).join('')}
+    ${r.imagem && /^data:image\/png;base64,/.test(r.imagem.src) ? `<p>${esc(r.imagem.rotulo)}<br><img src="${esc(r.imagem.src)}" alt="Assinatura" style="max-width:320px;border-bottom:1px solid #999"></p>` : ''}
     <p class="carta-data">${esc(r.cidade)}, ${K.dataPorExtenso(r.data, { zero: false })}.</p>
     ${r.assinaturas.map((a, k) => `<p style="margin-top:48px;text-align:center"${k === daEmpresa ? ' data-assina-empresa' : ''}><span class="assina-linha">_______________________________________</span><br><b>${esc(a.nome)}</b>${a.linha ? `<br>${esc(a.linha)}` : ''}</p>`).join('')}</div>`;
 }
