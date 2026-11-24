@@ -3860,7 +3860,7 @@ export function alertasContrato(d, contrato, hoje = C.hojeIso()) {
     contrato.verificar ? { nivel: 'aviso', tipo: 'A verificar', texto: contrato.verificar } : null,
     ag ? null : alertaReajuste(d, contrato, hoje),
     ag ? null : alertaCaucao(d, contrato),
-    ag ? null : alertaReservaParada(d, contrato) || alertas.alertaReserva(contrato.reserva_valor, saldoReserva(d, contrato), competenciaReserva(contrato), hoje),
+    ag ? null : alertaReservaParada(d, contrato) || (() => { const comp = competenciaReserva(contrato); const cb = comp && boletoDoMes(d, contrato.id, comp); return alertas.alertaReserva(contrato.reserva_valor, saldoReserva(d, contrato), comp, hoje, comp ? (cb ? cb.vencimento : vencimentoDoContrato(d, contrato, comp)) : null); })(),
     // fim do contrato só por ``fimDoContrato``; com a saída já informada não há renovação a negociar
     ag || contrato.prazo_tipo === 'Indeterminado' || contrato.data_saida ? null : alertas.alertaVigencia(fimDoContrato(d, contrato) || contrato.vigencia_fim, hoje, contrato),
     ag ? null : alertaFiador(d, contrato, hoje),
@@ -5359,6 +5359,18 @@ export function vencimentoDoContrato(d, c, comp) {
   const mesVenc = mesSeguinte ? C.somarMeses(comp, 1) : comp;
   const depois = aditivosDeVencimento(d, c.id).find((a) => a.primeiro_vencimento.slice(0, 7) > mesVenc);
   return C.vencimentoDaCompetencia(comp, depois ? depois.dia_anterior : c.dia_vencimento || 10, mesSeguinte);
+}
+
+/**
+ * Mês de referência e vencimento juntos, para os campos de mês que escolhem um boleto (pedido do dono de 24/11/2026: o mês
+ * de referência digitado como se fosse o do vencimento deixava a reserva, a carência e o novo valor no boleto errado).
+ * Ex.: aluguel que vence no mês seguinte, dia 10 → "Referência 11/2026 – vence 10/12/2026". O boleto já gerado manda no
+ * vencimento; sem ele, o do cadastro (``c`` pode ser o contrato ainda no formulário, sem id).
+ */
+export function referenciaEVencimento(d, c, comp) {
+  if (!c || !C.competenciaValida(comp, '')) return '';
+  const cb = c.id ? boletoDoMes(d, c.id, comp) : null;
+  return `Referência ${C.compBr(comp)} – vence ${C.dataBr(cb ? cb.vencimento : vencimentoDoContrato(d, c, comp))}`;
 }
 
 /**

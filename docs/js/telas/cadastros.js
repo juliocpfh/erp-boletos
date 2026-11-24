@@ -28,7 +28,7 @@ const comListas = (campos) => campos.map((c) => (c.lista ? { ...c, opcoes: R.lis
 export function caixaReservaAbatida(c) {
   const usos = d().cobrancas.filter((x) => x.contrato_id === c.id && x.reserva_utilizada > 0);
   const ant = c.reserva_usada_anterior > 0 && R.contratoHerdado(d(), c);
-  const nosBoletos = [usos.length ? `Abatida nos boletos: ${usos.map((x) => `${compBr(x.competencia)} ${reais(x.reserva_utilizada)}${x.data_pagamento ? ' (pago)' : ''}`).join('; ')}.` : '',
+  const nosBoletos = [usos.length ? `Abatida nos boletos: ${usos.map((x) => `ref. ${compBr(x.competencia)} (vence ${dataBr(x.vencimento)}) ${reais(x.reserva_utilizada)}${x.data_pagamento ? ' (pago)' : ''}`).join('; ')}.` : '',
     ant ? `Já usada no contrato de ${esc(ant.inquilino_nome)}: ${reais(c.reserva_usada_anterior)}${R.mesesUsoReserva(d(), ant).length ? `, em ${R.mesesUsoReserva(d(), ant).map(compBr).join(', ')}` : ''}.` : ''].filter(Boolean).join(' ');
   if (c.reserva_abatida_valor > 0) {
     return `<div class="alerta ok"><b>Reserva já abatida</b> em ${compBr(c.reserva_abatida_comp)}: ${reais(c.reserva_abatida_valor)} (aluguel antigo, fora dos boletos do sistema).
@@ -38,7 +38,7 @@ export function caixaReservaAbatida(c) {
   const max = R.reservaParaMarcarAbatida(d(), c);
   return `${usos.length || ant ? `<p class="suave">${nosBoletos}</p>` : `<div class="alerta aviso"><b>Reserva ainda não abatida em nenhum boleto do sistema.</b> Se ela já foi abatida num aluguel antigo, marque abaixo o mês e o valor.</div>`}
     ${opera() ? `${max > 0 ? `<form data-form="reservaAbatida" class="acoes" style="margin-top:6px"><input type="hidden" name="contrato" value="${c.id}">
-        <label class="suave" style="margin:0">Abatida em</label><input type="month" name="competencia" value="${esc(R.competenciaReserva(c) || '')}" style="width:auto" required>
+        <label class="suave" style="margin:0" title="Mês de referência do aluguel antigo (não o do vencimento)">Abatida no aluguel de (referência)</label><input type="month" name="competencia" value="${esc(R.competenciaReserva(c) || '')}" style="width:auto" required>
         <label class="suave" style="margin:0">valor R$</label><input name="valor" value="${esc(C.reais(max, false))}" style="width:120px" inputmode="decimal" data-dinheiro required>
         <button class="secundario pequeno">Marcar como já abatida</button></form>` : ''}` : ''}`;
 }
@@ -1164,8 +1164,10 @@ function montarFormulario(cfg, tabela, registro, q, estado) {
   if (!estado) memoria.formularioAberto = registro ? { chave: `${tabela}:${registro.id}`, valores } : null;
   const base = cfg.base ? cfg.base(registro) : null;
   const avisoTexto = cfg.aviso ? cfg.aviso(registro, q) : '';
+  // contrato do formulário: os campos de mês de um boleto mostram o vencimento pelo cadastro dele (ligarMesesDoBoleto)
+  const contratoRef = Number(tabela === 'contratos' ? registro && registro.id : (registro && registro.contrato_id) || (q && q.contrato)) || '';
   return `<h1>${esc(cfg.titulo(registro, q))}</h1>${avisoTexto ? `<div class="alerta info">${esc(avisoTexto)}</div>` : ''}${cfg.topo ? cfg.topo(registro, q) : ''}
-    <form class="cartao" data-form="cadastro" ${base !== null && base !== undefined ? `data-base="${base}"` : ''}>
+    <form class="cartao" data-form="cadastro" ${base !== null && base !== undefined ? `data-base="${base}"` : ''}${contratoRef ? ` data-contrato-ref="${contratoRef}"` : ''}>
       ${F.camposHtml(campos, valores, estado ? estado.erros : {}, { compacto: !!cfg.compacto })}${cfg.extraHtml ? cfg.extraHtml(registro, q) : ''}
       <p class="acoes" style="margin-top:16px"><button>Salvar</button><a class="botao secundario" href="${esc(cfg.voltar(registro, q))}">Voltar</a></p></form>`;
 }
