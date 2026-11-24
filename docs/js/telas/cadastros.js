@@ -75,6 +75,25 @@ function conferirComprovantes(lista, dados, r, form) {
 /** Nome do arquivo do comprovante (ex.: comprovante-caucao-2026-10-05.pdf). */
 export const nomeComprovante = (tipo, data, arq) => `comprovante-${tipo}-${data || C.hojeIso()}${extensao(arq.name)}`;
 
+/** Aviso das provas da cobrança: guardar não é cobrar (até o dono decidir, ver HONORARIOS_E_DESPESAS_DE_COBRANCA.md). */
+export const AVISO_PROVAS_COBRANCA = 'Só para guardar a prova da cobrança (para o advogado ou para a Justiça): o valor gasto fica anotado e não entra no boleto, na NF, no acordo nem no cálculo final da saída.';
+
+/**
+ * Opções do "Referente a" do registro da cobrança: cobrança em geral, os boletos vencidos e não pagos (também os em acordo), os
+ * acordos do contrato e o que o registro já tinha. Ex.: [['geral', 'Cobrança em geral'], ['b12', 'Boleto de 10/2026 (vence 05/11/2026)'], ['a3', 'Acordo de 12/11/2026']].
+ */
+function referentesDaCobranca(contratoId, r, q = {}) {
+  const hoje = C.hojeIso();
+  const atual = r ? r.cobranca_id : Number(q.cobranca) || null;
+  const acordoAtual = r ? r.acordo_id : Number(q.acordo) || null;
+  const maiuscula = (t) => t.charAt(0).toLocaleUpperCase('pt-BR') + t.slice(1);
+  const boletos = d().cobrancas.filter((cb) => cb.contrato_id === contratoId && (cb.id === atual || (!cb.data_pagamento && C.vencido(cb.vencimento, hoje))))
+    .sort((a, b) => String(b.vencimento).localeCompare(String(a.vencimento)));
+  const acordos = (d().acordos || []).filter((a) => a.contrato_id === contratoId || a.id === acordoAtual).sort((a, b) => String(b.data).localeCompare(String(a.data)));
+  return [['geral', 'Cobrança em geral'], ...boletos.map((cb) => [`b${cb.id}`, maiuscula(R.referenteDoRegistro(d(), { cobranca_id: cb.id }))]),
+    ...acordos.map((a) => [`a${a.id}`, maiuscula(R.referenteDoRegistro(d(), { acordo_id: a.id }))])];
+}
+
 /** Grava na pasta os comprovantes escolhidos e guarda o nome do arquivo no registro. */
 async function guardarComprovantes(lista, dados, form, pasta) {
   for (const k of lista) {
@@ -793,6 +812,51 @@ export const CADASTROS = {
   fiadores: {
     semFormulario: ['O fiador é incluído ou trocado na página do inquilino ("Trocar garantia ou fiador") ou no Editar contrato', '#/inquilinos', 'Ver os inquilinos'],
     descricao: (dados) => `Fiador ${dados.nome}`,
+  },
+  // registro da cobrança de um atraso (2026-11-24): passo ou despesa, com os comprovantes; só guarda a prova (não soma em nada)
+  cobranca_registros: {
+    titulo: (r, q) => `${r ? 'Registro' : 'Registrar passo ou despesa'} da cobrança - ${buscar('contratos', r ? r.contrato_id : q.contrato).inquilino_nome}`,
+    campos: (r, q) => [{ nome: 'referente', rotulo: 'Referente a', tipo: 'opcao', obrig: true, virtual: true, opcoes: referentesDaCobranca(r ? r.contrato_id : Number(q.contrato), r, q),
+      ajuda: 'O boleto vencido ou o acordo que está sendo cobrado. "Cobrança em geral" quando vale para vários meses' },
+    ...F.REGISTRO_COBRANCA.map((c) => (c.nome === 'tipo' ? { ...c, opcoes: R.TIPOS_REGISTRO_COBRANCA } : c))],
+    valores: (r) => ({ ...r, referente: r.cobranca_id ? `b${r.cobranca_id}` : r.acordo_id ? `a${r.acordo_id}` : 'geral' }),
+    padrao: (q) => ({ data: C.hojeIso(), referente: q.cobranca ? `b${q.cobranca}` : q.acordo ? `a${q.acordo}` : 'geral' }),
+    fixos: (r, q) => (r ? {} : { contrato_id: Number(q.contrato) }),
+    aviso: () => AVISO_PROVAS_COBRANCA,
+    extraHtml: (r) => `<h3>Comprovantes</h3><div class="formulario"><div class="largo"><label>Anexar arquivos (pode escolher vários)</label>
+      <input type="file" name="arquivos_novos" multiple accept="${ACEITA_DOCUMENTOS}">
+      <small class="suave">PDF ou foto: a carta e o AR, o print do e-mail ou do WhatsApp, o recibo do cartório, o contrato e o recibo do advogado.${r && (r.arquivos || []).length ? ` Já anexados: ${r.arquivos.length} (para tirar um, use o × na lista da página do inquilino).` : ''}</small></div></div>`,
+    ajustar(dados, erros, r, form, q) {
+      const v = String(new FormData(form).get('referente') || '');
+      const contratoId = r ? r.contrato_id : Number(q.contrato);
+      dados.cobranca_id = /^b\d+$/.test(v) ? Number(v.slice(1)) : null;
+      dados.acordo_id = /^a\d+$/.test(v) ? Number(v.slice(1)) : null;
+      const cb = dados.cobranca_id && buscar('cobrancas', dados.cobranca_id);
+      const a = dados.acordo_id && buscar('acordos', dados.acordo_id);
+      if ((dados.cobranca_id && !cb) || (dados.acordo_id && !a)) erros.referente = 'Este boleto ou acordo não existe mais: escolha outro (ou "Cobrança em geral")';
+      dados.tipo = R.TIPOS_REGISTRO_COBRANCA.includes(dados.tipo) ? dados.tipo : 'Outro';
+      if (!r && !contratoId) erros.referente = 'Abra o registro pela página do inquilino ou do boleto';
+    },
+    async ajustarAsync(dados, erros, r, form, q) {
+      // a pergunta da data no futuro vem ANTES de gravar os arquivos: no "Voltar e corrigir" nada fica solto na pasta
+      await confirmarAvisos([dataNoFuturo(dados.data, 'A data do registro')].filter(Boolean));
+      const arqs = [...((form.querySelector('[name=arquivos_novos]') || {}).files || [])];
+      dados.arquivos_novos = [];
+      if (!arqs.length) return;
+      const pasta = await pastaDoEscopo('contrato', r ? r.contrato_id : Number(q.contrato));
+      const tipo = C.paraNomeDeArquivo(String(dados.tipo || 'outro').toLowerCase()) || 'outro';
+      for (const arq of arqs) dados.arquivos_novos.push(await S.salvarArquivo(pasta, new File([arq], `cobranca-${tipo}-${dados.data}-${semAcentoArquivo(arq.name)}`)));
+    },
+    salvar(db, dados, q, r) {
+      const novos = dados.arquivos_novos || [];
+      delete dados.arquivos_novos;
+      const texto = `Cobrança: ${dados.tipo} de ${dataBr(dados.data)}${dados.valor ? ` (gasto ${reais(dados.valor)})` : ''}${novos.length ? ` · ${C.plural(novos.length, 'arquivo')}` : ''}`;
+      if (!r) return R.inserir(db, 'cobranca_registros', { ...dados, arquivos: novos }, login(), texto);
+      const agora = R.buscar(db, 'cobranca_registros', r.id);
+      R.atualizar(db, 'cobranca_registros', r.id, { ...dados, arquivos: [...(agora.arquivos || []), ...novos] }, login(), texto);
+      return R.buscar(db, 'cobranca_registros', r.id);
+    },
+    voltar: (r, q) => (q && q.cobranca ? `#/cobranca/${q.cobranca}?ir=provas` : `#/contrato/${r ? r.contrato_id : q.contrato}?ir=provas-cobranca`),
   },
   aplicacoes: {
     titulo: (r, q) => `Aplicação da garantia - ${buscar('contratos', r ? r.contrato_id : q.contrato).inquilino_nome}`,

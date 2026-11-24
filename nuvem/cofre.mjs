@@ -97,7 +97,7 @@ export const TABELAS_CONHECIDAS = ['imoveis', 'contratos', 'correcoes', 'seguros
   'participacoes', 'usuarios', 'fiadores', 'aplicacoes', 'correcoes_garantia', 'depositos_garantia', 'devolucoes_garantia', 'renovacoes', 'trocas_garantia',
   'leituras', 'encerramentos', 'avulsas', 'reformas', 'solicitacoes', 'notificacoes', 'fichas', 'indices_acumulados', 'cartas_reajuste', 'modelos_contrato', 'vistorias',
   'aditivos', 'despesas', 'ganhos_airbnb', 'ressarcimentos', 'fechamentos', 'guias_impostos', 'modelos_email', 'envios_email', 'movimentacoes_banco',
-  'regua_emails',
+  'regua_emails', 'cobranca_registros',
   'pagamentos_banco', 'adiamentos_alerta', 'alertas_desligados', 'acordos', 'pastas_fisicas', 'config_regras', 'versoes_regras', 'taxas_poupanca', 'comunicados', 'perfis_regras'];
 /** Fora do administrador, o número da próxima NF só anda para a frente, e no máximo isto de uma vez (numerar um lote grande). */
 export const MAX_SALTO_NF = 300;

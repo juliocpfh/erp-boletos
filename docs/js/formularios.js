@@ -145,6 +145,17 @@ export const REFORMA = [
   campo('observacoes', 'Observações', 'area'),
 ];
 
+/**
+ * Registro da cobrança de um atraso (2026-11-24): cada passo e cada gasto, com os comprovantes (os arquivos vão num campo à parte
+ * do formulário, vários de uma vez). Só guarda a prova: não entra no boleto, na NF, no acordo nem no cálculo final.
+ */
+export const REGISTRO_COBRANCA = [
+  campo('data', 'Data', 'data', { obrig: true, ajuda: 'Dia em que a carta saiu, o e-mail foi mandado, o protesto foi feito ou a despesa foi paga' }),
+  campo('tipo', 'O que foi feito', 'opcao', { obrig: true, opcoes: [], ajuda: 'Ex.: Carta (registrada ou não), Protesto do boleto em cartório, Advogado contratado' }),
+  campo('valor', 'Valor gasto', 'dinheiro', { ajuda: 'Quanto custou (ex.: carta registrada R$ 28,50; protesto R$ 45,00). Em branco se não teve custo. Fica só anotado: não é cobrado do inquilino' }),
+  campo('descricao', 'Descrição', 'area', { obrig: true, largo: true, max: 2000, ajuda: 'Ex.: carta com AR enviada ao endereço do imóvel cobrando os aluguéis de 09 e 10/2026; protesto do boleto de 10/2026 no 2º Tabelionato' }),
+];
+
 /** Taxa do proprietário (condomínio) paga pelo inquilino: volta para ele no boleto do aluguel. */
 export const RESSARCIMENTO = [
   campo('competencia_condominio', 'Mês do boleto do condomínio', 'mes', { obrig: true }),

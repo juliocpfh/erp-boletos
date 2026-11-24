@@ -21,6 +21,7 @@ export const TABELAS = {
   indices_acumulados: 'Índice acumulado em 12 meses', cartas_reajuste: 'Carta de reajuste', modelos_contrato: 'Modelo de contrato', vistorias: 'Vistoria', aditivos: 'Termo aditivo', despesas: 'Conta paga por nós', ganhos_airbnb: 'Ganho do Airbnb', ressarcimentos: 'Ressarcimento de condomínio', fechamentos: 'Etapa do fechamento do mês', guias_impostos: 'Guia de imposto',
   modelos_email: 'Modelo de e-mail', envios_email: 'E-mail enviado', taxas_poupanca: 'Taxas da poupança do Banco Central (um mês)',
   regua_emails: 'E-mail da régua de cobrança (autorizado ou não)',
+  cobranca_registros: 'Registro da cobrança (passo, despesa e prova)',
   movimentacoes_banco: 'Movimentação bancária', pagamentos_banco: 'Pagamento pelo banco', adiamentos_alerta: 'Adiamento de alerta', alertas_desligados: 'Alerta desligado', acordos: 'Acordo de dívida', pastas_fisicas: 'Pasta física (arquivo impresso)', config_regras: 'Regra do sistema', versoes_regras: 'Versão salva das regras', perfis_regras: 'Regra especial (de alguns contratos)', arquivos: 'Arquivo', banco: 'Banco de dados', listas: 'Lista de opções',
 };
 
@@ -104,6 +105,8 @@ export function normalizar(d) {
   d.config_banco.contas = (Array.isArray(d.config_banco.contas) ? d.config_banco.contas : []).map((x) => ({ ...CONTA_BANCO_PADRAO, ...x,
     notificar: { ...CONTA_BANCO_PADRAO.notificar, ...((x && x.notificar) || {}) }, negativacao: { ...CONTA_BANCO_PADRAO.negativacao, ...((x && x.negativacao) || {}) } }));
   for (const cb of d.cobrancas) if (cb.banco === undefined) cb.banco = null;
+  // registros da cobrança (2026-11-24): a lista de arquivos sempre existe
+  for (const x of d.cobranca_registros) if (!Array.isArray(x.arquivos)) x.arquivos = x.arquivos ? [String(x.arquivos)] : [];
   // conta padrão dos boletos sem escolha: era a de identificador "ank" (2026-11-05); passou a ser só a escolhida em Sistema → Banco
   if (!d.config_banco.conta_padrao_id && d.config_banco.contas.some((x) => x.id === 'ank')) d.config_banco.conta_padrao_id = 'ank';
   // o que era fixo da ANK no código (e-mail, assinaturas, conta da caução, cidade, Copel/Sanepar) passou ao cadastro da empresa
@@ -5234,6 +5237,8 @@ export function arquivosReferenciados(d) {
   // notificação ao inquilino (2026-11-17): a assinada e o comprovante da baixa (foto ou arquivo de que foi resolvido)
   for (const n of d.notificacoes || []) { usa('contrato', n.contrato_id, n.arquivo_assinado); usa('contrato', n.contrato_id, n.comprovante_baixa); }
   for (const x of d.cartas_reajuste || []) usa('aditivos', x.contrato_id, x.arquivo);
+  // provas da cobrança (2026-11-24): os comprovantes de cada passo ou despesa, na pasta do inquilino
+  for (const x of d.cobranca_registros || []) for (const nome of x.arquivos || []) usa('contrato', x.contrato_id, nome);
   // PDF do boleto emitido à mão no banco (2026-11-24): na pasta do inquilino em que foi anexado (a troca de titular muda o contrato_id)
   for (const cb of d.cobrancas || []) usa('contrato', pastaDoBoletoPdf(cb), cb.boleto_pdf);
   for (const v of d.vistorias) for (const nome of Object.values(v.fotos || {})) usa('contrato', v.contrato_id, nome);
@@ -5310,6 +5315,7 @@ export function rotulosDosArquivos(d) {
     poe('contrato', n.contrato_id, n.comprovante_baixa, `comprovante da baixa da notificação de ${C.dataBr(n.data)}${n.resolvida_em ? ` (resolvida em ${C.dataBr(n.resolvida_em)})` : ''}`);
   }
   for (const cb of d.cobrancas || []) poe('contrato', pastaDoBoletoPdf(cb), cb.boleto_pdf, `PDF do boleto emitido no banco (${C.compBr(cb.competencia)}, vence ${C.dataBr(cb.vencimento)})`);
+  for (const x of d.cobranca_registros || []) for (const nome of x.arquivos || []) poe('contrato', x.contrato_id, nome, `prova da cobrança: ${String(x.tipo || '').toLowerCase()} de ${C.dataBr(x.data)}`);
   for (const x of d.cartas_reajuste || []) poe('aditivos', x.contrato_id, x.arquivo, `carta de reajuste de ${C.compBr(x.competencia)} (enviada em ${C.dataBr(x.enviada_em)})`);
   for (const v of d.vistorias) for (const nome of Object.values(v.fotos || {})) poe('contrato', v.contrato_id, nome, `foto da vistoria de ${String(v.tipo || '').toLowerCase()} (${C.dataBr(v.data)})`);
   for (const f of d.fichas || []) {
@@ -9063,4 +9069,57 @@ export function avisosLegaisDoContrato(dados) {
     out.push('"Fiador + depósito": os tribunais costumam tratar o depósito em dinheiro como caução; aí são duas garantias, o que a Lei 8.245/91 proíbe (art. 37, parágrafo único): risco de ter de devolver o depósito e de contravenção (art. 43, II).');
   }
   return out;
+}
+
+// --------------------------------------------------------------------------
+// Cobrança: registros e provas (2026-11-24)
+// --------------------------------------------------------------------------
+// Cada passo e cada gasto da cobrança de um atraso (carta, e-mail, notificação, protesto, cartório, advogado…), com a data, o
+// valor gasto, a descrição e os comprovantes (vários arquivos, na pasta do inquilino). Só guarda a prova para levar ao
+// advogado: NADA daqui entra no boleto, na NF, no acordo nem no cálculo final da saída (decisão do dono pendente, ver
+// documentacao/HONORARIOS_E_DESPESAS_DE_COBRANCA.md). Tabela `cobranca_registros`: { contrato_id, cobranca_id?, acordo_id?,
+// data, tipo, valor (centavos, opcional), descricao, arquivos: [nomes] }.
+export const TIPOS_REGISTRO_COBRANCA = ['Carta', 'E-mail', 'WhatsApp / ligação', 'Notificação', 'Protesto', 'Cartório', 'Advogado', 'Outro'];
+
+/** Registros da cobrança de um contrato, do mais antigo para o mais novo (a ordem em que o advogado lê). */
+export const registrosCobrancaDo = (d, contratoId) => (d.cobranca_registros || []).filter((x) => x.contrato_id === contratoId)
+  .sort((a, b) => String(a.data || '').localeCompare(String(b.data || '')) || a.id - b.id);
+
+/** Acordo de que o boleto faz parte (o boleto original que ele substituiu ou a parcela dele); null se nenhum. */
+const acordoDoBoleto = (cb) => (cb && (cb.acordo_id || cb.acordo_parcela_de)) || null;
+
+/** Registros ligados a um boleto: os do próprio boleto e os do acordo de que ele faz parte. */
+export function registrosDoBoleto(d, cb) {
+  const a = acordoDoBoleto(cb);
+  return (d.cobranca_registros || []).filter((x) => x.cobranca_id === cb.id || (a && x.acordo_id === a))
+    .sort((x, y) => String(x.data || '').localeCompare(String(y.data || '')) || x.id - y.id);
+}
+
+/**
+ * A que o registro se refere, em texto. Ex.: "boleto de 10/2026 (vence 05/11/2026)", "acordo de 12/11/2026", "cobrança em geral".
+ * Boleto ou acordo excluído depois: diz que foi excluído (o registro e a prova ficam).
+ */
+export function referenteDoRegistro(d, r) {
+  if (r.cobranca_id) {
+    const cb = buscar(d, 'cobrancas', r.cobranca_id);
+    if (!cb) return 'boleto (excluído depois)';
+    const qual = ehComplementoCaucao(cb) ? 'complemento da caução' : ehParcelaAcordo(cb) ? `parcela ${cb.acordo_parcela || ''} do acordo`.replace('  ', ' ') : C.compBr(cb.competencia);
+    return `boleto de ${qual} (vence ${C.dataBr(cb.vencimento)})`;
+  }
+  if (r.acordo_id) {
+    const a = buscar(d, 'acordos', r.acordo_id);
+    return a ? `acordo de ${C.dataBr(a.data)}${a.desfeito_em ? ' (desfeito)' : ''}` : 'acordo (excluído depois)';
+  }
+  return 'cobrança em geral';
+}
+
+/** Soma do que foi gasto na cobrança (só para informar: não é cobrado de ninguém). */
+export const gastoDaCobranca = (lista) => lista.reduce((s, x) => s + (Number(x.valor) || 0), 0);
+
+/** Tira um arquivo da lista de um registro (o arquivo é apagado por quem chama, alterarApagandoAnexos). */
+export function removerArquivoDoRegistro(d, id, nome, usuario) {
+  const r = buscar(d, 'cobranca_registros', id);
+  if (!r) throw new C.ErroUsuario('Este registro não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.');
+  if (!(r.arquivos || []).includes(nome)) throw new C.ErroUsuario('Este arquivo já foi tirado do registro.');
+  atualizar(d, 'cobranca_registros', r.id, { arquivos: r.arquivos.filter((x) => x !== nome) }, usuario, `Cobrança (${r.tipo} de ${C.dataBr(r.data)}): arquivo tirado: ${nome}`);
 }

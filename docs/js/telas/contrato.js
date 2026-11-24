@@ -5,6 +5,7 @@ import { botaoEmail } from './emails.js';
 import { siglaEmpresa } from './faturas.js';
 import { botaoDesistenciaContrato } from './fichas.js';
 import { caixaNotificacoes } from './notificacoes.js';
+import { caixaProvasContrato } from './cobranca-provas.js';
 import { janela, podeUsuario } from '../app.js';
 import * as C from '../calculos.js';
 import * as K from '../contratos.js';
@@ -896,6 +897,7 @@ export function telaContrato(c) {
     ${caixaRessarcimentos(c)}
     ${caixaSolicitacoes(c)}
     ${caixaNotificacoes(c)}
+    ${caixaProvasContrato(c)}
     ${caixaGarantia(c)}
     ${caixaSeguros(c)}
     ${caixaFci(c)}
