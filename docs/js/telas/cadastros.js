@@ -233,7 +233,16 @@ export const CADASTROS = {
     ajustar(dados, erros, r, form, q) {
       const c = buscar('contratos', r ? r.contrato_id : q.contrato);
       if (dados.valor !== null && dados.valor <= 0) erros.valor = 'Informe o valor';
+      // data do pagamento mudada na edição e o mês do abatimento era o calculado pela data antiga: acompanha a data nova
+      // (conferência de 24/11/2026). Ex.: pago em 05/11 (boleto de 11/2026) corrigido para 05/12 → boleto de 12/2026
+      if (r && dados.data_pagamento && r.data_pagamento && dados.data_pagamento !== r.data_pagamento
+        && dados.competencia_abatimento === R.competenciaDoAbatimento(c, r.data_pagamento)) dados.competencia_abatimento = null;
       if (!dados.competencia_abatimento && dados.data_pagamento) dados.competencia_abatimento = R.competenciaDoAbatimento(c, dados.data_pagamento);
+      // mês sem boleto deste contrato (depois da saída ou da troca de titular): o ressarcimento não abateria em lugar nenhum
+      const sem = R.semBoletoNoMes(d(), c, dados.competencia_abatimento);
+      if (sem) {
+        erros.competencia_abatimento = `Não há onde abater: ${R.textoSemBoleto(sem, dados.competencia_abatimento)}. ${sem.motivo === 'troca' ? `Lance o ressarcimento no contrato de ${sem.novo.inquilino_nome}, ou escolha` : 'Escolha'} um boleto em aberto deste contrato${sem.motivo === 'saida' ? ' (ou devolva ao inquilino)' : ''}`;
+      }
       const cb = R.boletoDoMes(d(), c.id, dados.competencia_abatimento);
       if (cb && cb.data_pagamento && (!r || r.competencia_abatimento !== dados.competencia_abatimento)) {
         erros.competencia_abatimento = `O boleto de ${compBr(dados.competencia_abatimento)} já foi pago. Escolha o próximo boleto em aberto`;

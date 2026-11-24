@@ -151,7 +151,8 @@ export const RESSARCIMENTO = [
   campo('descricao', 'Taxa', 'texto', { obrig: true, sugestoes: [], ajuda: 'Escreva o nome da taxa: nas próximas vezes ele aparece para escolher, e dá para mudar' }),
   campo('valor', 'Valor pago pelo inquilino', 'dinheiro', { obrig: true }),
   campo('data_pagamento', 'Data em que o inquilino pagou o condomínio', 'data', { obrig: true }),
-  campo('competencia_abatimento', 'Abater no boleto do aluguel de', 'mes', { ajuda: 'Em branco: o boleto que vence no mês seguinte ao pagamento' }),
+  // o mês é o do aluguel (competência), como na lista de Boletos, e não o do vencimento (conferência de 24/11/2026)
+  campo('competencia_abatimento', 'Abater no boleto do aluguel de (mês do aluguel)', 'mes', { ajuda: 'O mês do aluguel, como aparece em Boletos (ex.: aluguel de 11/2026, que vence em 12/2026 quando o aluguel vence no mês seguinte). Em branco: o boleto que vence no mês seguinte ao pagamento do condomínio' }),
 ];
 
 /** Contas do imóvel e quem paga cada uma, conforme o contrato. */
