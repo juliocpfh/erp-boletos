@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-1AbqFnby6HwqvBF2zwAjxDNxKXbo593oMaqRSUgQ/Fc='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-qeYcJ29Wwahxdf9Jn43n4QkC2n8dmGgb8RupfDpL2X0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="d76a2c646e774fd9">
+<meta name="fontes" content="67329a11b30bbc43">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -411,6 +411,8 @@ table.compacta td, table.compacta th { padding: 3px 6px; font-size: 13px; }
 .contrato .ct-pagina > * > tr > td { display: block; }
 .contrato .ct-espaco-rodape { height: 0; }
 /* assinaturas: todas juntas (de preferência numa página), um conjunto por linha; conjunto de uma pessoa, centralizado */
+/* [nova página] do modelo: a impressão e o PDF começam uma folha nova (ex.: o resumo em perguntas e respostas) */
+.ct-nova-pagina { break-before: page; page-break-before: always; height: 0; margin: 0; }
 .ct-assinaturas { margin-top: calc(24px + 1.55em); /* uma linha a mais antes das 1ªs assinaturas: cabe a assinatura gov.br */ break-inside: avoid; page-break-inside: avoid; }
 .ct-grupo-assina { display: grid; grid-template-columns: 1fr 1fr; gap: 64px 40px; /* entre linhas do mesmo conjunto, o mesmo espaço de assinatura que entre conjuntos */ margin-bottom: 64px; break-inside: avoid; page-break-inside: avoid; }
 .contrato .ct-titulo, .contrato .ct-secao, .contrato .ct-subsecao { break-after: avoid; page-break-after: avoid; }
@@ -3387,7 +3389,7 @@ Sem o pagamento, o débito poderá ser cobrado do LOCATÁRIO e {f:do FIADOR|dos 
     for (const [antigo, novo, feito] of ATUALIZACOES_MODELO) if (t.includes(antigo) && !t.includes(feito || novo)) t = t.split(antigo).join(novo);
     return t;
   }
-  var VISTORIA_ENTRADA, VISTORIA_ENTRADA_1211, SEM_AVISO, REPRESENTACAO, LGPD, PARTES, ITENS, PRAZO_ANTIGO, PRAZO_PARAGRAFO, EXTRAORDINARIAS, ALUGUEL, CONSERVACAO, CLAUSULAS_FCI, SEGURO_ANTIGO, SEGURO_INCENDIO, RESTITUICAO, MULTA, RESCISAO, GARANTIA, CONVITE_SAIDA, NEGATIVACAO, FINAIS, CONDOMINIO, ADITIVO_VENCIMENTO, ADITIVO_VALOR, ACERTO_POUPANCA, DEVOLUCAO_POUPANCA, ACERTO_CAUCAO_ANTIGO, ACERTO_DEPOSITO_ANTIGO, DEVOLUCAO_ANTIGA, GARANTIA_NOVA_TROCA, CONTAS_TROCA_ANTIGA, CONTAS_TROCA, ADITIVO_TROCA, MODELOS_PADRAO, ENDERECO_PARAGRAFO, ATUALIZACOES_MODELO;
+  var VISTORIA_ENTRADA, VISTORIA_ENTRADA_1211, SEM_AVISO, REPRESENTACAO, LGPD, PARTES, ITENS, PRAZO_ANTIGO, PRAZO_PARAGRAFO, EXTRAORDINARIAS, ALUGUEL, CONSERVACAO, CLAUSULAS_FCI, SEGURO_ANTIGO, SEGURO_INCENDIO, RESTITUICAO, MULTA, RESCISAO, GARANTIA, CONVITE_SAIDA, NEGATIVACAO, FECHO_CONTRATO, RESUMO_CONTRATO, FINAIS, CONDOMINIO, ADITIVO_VENCIMENTO, ADITIVO_VALOR, ACERTO_POUPANCA, DEVOLUCAO_POUPANCA, ACERTO_CAUCAO_ANTIGO, ACERTO_DEPOSITO_ANTIGO, DEVOLUCAO_ANTIGA, GARANTIA_NOVA_TROCA, CONTAS_TROCA_ANTIGA, CONTAS_TROCA, ADITIVO_TROCA, MODELOS_PADRAO, ENDERECO_PARAGRAFO, ATUALIZACOES_MODELO;
   var init_modelos_contrato = __esm({
     "docs/js/modelos-contrato.js"() {
       init_modelos_documentos();
@@ -3570,6 +3572,76 @@ ${CLAUSULAS_FCI}
 **CLÁUSULA #** – A presente locação é garantida por seguro fiança locatícia, contratado pelo LOCATÁRIO e mantido vigente durante todo o prazo da locação e suas prorrogações, sob pena de rescisão deste contrato.[fim]`;
       CONVITE_SAIDA = "O LOCATÁRIO será convidado por escrito, por e-mail, a acompanhar a vistoria; se aceitar, a acompanhará do início ao fim. Sua ausência ou recusa não impede a vistoria, que será feita com fotos e vídeo, comparando o imóvel com a vistoria de entrada. Na devolução das chaves, o LOCATÁRIO assinará termo registrando se acompanhará a vistoria, e o recebimento das chaves não dá quitação. O relatório da vistoria de saída será enviado ao LOCATÁRIO por e-mail, e ele terá 5 (cinco) dias úteis para contestá-lo por escrito; passado esse prazo, o relatório vale como aceito, ressalvado o direito de provar o contrário.";
       NEGATIVACAO = "**CLÁUSULA #** – Em caso de atraso no pagamento de aluguéis e encargos, {l:a LOCADORA poderá|as LOCADORAS poderão} incluir o nome do LOCATÁRIO[se fiador] e {f:do FIADOR|dos FIADORES}[fim] nos órgãos de proteção ao crédito (SERASA, SCPC e similares), depois do aviso prévio feito pelo próprio órgão.";
+      FECHO_CONTRATO = "herdeiros e sucessores a qualquer título.\n\n> {cidade}, {data_assinatura}.\n\n[assinaturas]";
+      RESUMO_CONTRATO = `[nova página]
+
+## RESUMO DO CONTRATO EM PERGUNTAS E RESPOSTAS
+
+Este resumo explica, em palavras simples, os pontos que mais geram dúvida. Ele faz parte do contrato acima e usa os mesmos valores e datas; se houver qualquer diferença, valem as cláusulas do contrato.
+
+**1. Qual é o valor do aluguel e quando vence?**
+
+[se bonificacao]O aluguel é de {aluguel_cheio}. Pagando até o vencimento, há bonificação de {bonificacao_percentual} e o valor fica em {aluguel_bonificado}.[senão]O aluguel é de {aluguel_cheio}.[fim] Ele vence todo dia {dia_vencimento} de cada mês e é pago por boleto bancário, enviado por e-mail.[se iptu_inquilino] O IPTU vem no mesmo boleto[se seguro_inquilino], assim como o seguro contra incêndio[fim].[fim][se tarifa_boleto] O LOCATÁRIO também paga, junto com cada aluguel, a tarifa bancária de emissão do boleto, hoje de {tarifa_boleto}.[fim] Se o vencimento cair em sábado, domingo ou feriado, o pagamento pode ser feito no dia útil seguinte, sem multa.
+
+**2. O que acontece se eu pagar atrasado?**
+
+[se bonificacao]Perde-se a bonificação e paga-se o aluguel cheio, com[senão]Paga-se o valor com[fim] multa de {multa} e juros de {juros} ao mês, contados por dia de atraso. {exemplo_atraso} Se for preciso cobrar, entram também as despesas da cobrança e os honorários do advogado. Depois do aviso feito pelo próprio órgão, o nome do LOCATÁRIO[se fiador] e {f:do FIADOR|dos FIADORES}[fim] pode ir para os cadastros de proteção ao crédito (SERASA, SCPC e similares).
+
+**3. Quando o aluguel é reajustado e por qual índice?**
+
+A cada 12 (doze) meses, sempre sobre o último valor corrigido, pela variação acumulada no período d{indice}. Se o índice do período for negativo, o aluguel continua o mesmo (não diminui).[se caucao] A caução acompanha o reajuste: a diferença é paga junto, para a caução continuar equivalente a {caucao_meses_aluguel} de aluguel.[fim]
+
+**4. Quanto tempo dura o contrato?**
+
+[se indeterminado]A locação é por prazo indeterminado, a partir de {data_inicio}. Qualquer das partes pode encerrá-la avisando a outra por escrito com 30 (trinta) dias de antecedência.[senão]O prazo é de {prazo_meses} meses, de {data_inicio} a {data_fim}. Se o LOCATÁRIO continuar no imóvel depois disso sem um contrato novo, a locação continua por prazo indeterminado, com as mesmas regras.[fim]
+
+**5. Posso sair antes do fim do contrato?**
+
+Pode. É preciso avisar por escrito, por e-mail, com 30 (trinta) dias de antecedência. Sem esse aviso, paga-se o valor de 1 (um) mês de aluguel e encargos.[se não indeterminado] Saindo antes de {data_fim}, há também a multa de 3 (três) meses de aluguel, proporcional ao tempo que falta para terminar o contrato. {exemplo_saida} A lei dispensa essa multa quando o LOCATÁRIO é transferido pelo empregador para outra cidade e avisa com 30 (trinta) dias de antecedência (Lei nº 8.245/91, art. 4º).[fim]
+
+**6. Quem paga as contas e os impostos do imóvel?**
+
+Ficam com o LOCATÁRIO: {encargos_inquilino}.[se tem_incluso] Já estão incluídos no aluguel, por conta {l:da LOCADORA|das LOCADORAS}: {encargos_inclusos}.[fim][se seguro_incluso] O seguro contra incêndio é contratado {l:pela LOCADORA|pelas LOCADORAS} e já está no aluguel.[fim][se condominio] As despesas extraordinárias do condomínio (obras na estrutura do prédio, pintura das fachadas, fundo de reserva e outras da mesma natureza) são {l:da LOCADORA|das LOCADORAS}.[fim] Contas e impostos do período da locação que chegarem depois da saída continuam sendo do LOCATÁRIO.
+
+**7. Quem cuida dos consertos do imóvel?**
+
+O LOCATÁRIO cuida da conservação do dia a dia: limpeza, torneiras, pias, ralos, vasos sanitários, iluminação, trincos, vidros, calhas e telhado, piso e pintura, para devolver tudo como recebeu. As obras que afetam a segurança do imóvel (como a estrutura) são {l:da LOCADORA|das LOCADORAS}.
+
+**8. Posso fazer reformas ou mudanças no imóvel?**
+
+Só com autorização por escrito {l:da LOCADORA|das LOCADORAS}. Sem ela, a multa é de 3 (três) meses de aluguel. Mesmo autorizadas, as melhorias ficam no imóvel, sem direito a indenização ou a reter o imóvel por causa delas.
+
+**9. Posso sublocar, emprestar ou passar o contrato para outra pessoa?**
+
+Não, a não ser com o consentimento por escrito {l:da LOCADORA|das LOCADORAS}. Isso vale para todo o imóvel ou só para uma parte dele.
+
+**10. Posso ter animais de estimação?**
+
+O contrato não proíbe. O LOCATÁRIO responde pelos danos que os animais causarem ao imóvel e deve respeitar as regras do condomínio, quando houver.
+
+**11. Qual é a garantia do contrato e como ela é devolvida?**
+
+[se caucao]A garantia é uma caução de {caucao_valor}, depositada em caderneta de poupança. Ao fim da locação, depois da entrega das chaves e da vistoria de saída, ela é devolvida com os rendimentos da poupança, descontados os aluguéis, as contas e os reparos que estiverem em aberto.[fim][se deposito]A garantia é um depósito de {deposito_valor}. Ao fim da locação, ele paga os débitos, danos e reparos que estiverem em aberto, e o que sobrar é devolvido ao LOCATÁRIO.[fim][se fiador][se deposito] Além do depósito, há a fiança[senão]A garantia é a fiança[fim]: {f:o FIADOR responde|os FIADORES respondem} junto com o LOCATÁRIO por todas as obrigações do contrato, até a entrega das chaves.[fim][se seguro_fianca]A garantia é um seguro fiança locatícia, contratado pelo LOCATÁRIO e mantido em vigor durante toda a locação.[fim][se sem_garantia]Este contrato não tem garantia.[fim]
+
+**12. Como é a entrega das chaves e a vistoria de saída?**
+
+Depois do aviso de saída, o LOCATÁRIO devolve o imóvel vazio, limpo e como recebeu, conforme a vistoria de entrada, e entrega os comprovantes das últimas contas pagas (água, luz, condomínio, IPTU e outras que forem dele). O aluguel e os encargos são devidos até o dia da devolução das chaves. A vistoria de saída é feita em até [se residencial]72 (setenta e duas)[senão]48 (quarenta e oito)[fim] horas úteis, com fotos e vídeo; o LOCATÁRIO é convidado por e-mail e pode acompanhá-la, mas ela acontece mesmo sem ele. O relatório é enviado por e-mail, e o LOCATÁRIO tem 5 (cinco) dias úteis para contestar por escrito.
+
+**13. O que pode ser cobrado na saída?**
+
+Os reparos necessários para o imóvel voltar ao estado da vistoria de entrada, como pintura, limpeza e consertos, com base em orçamento ou nota do serviço. O desgaste natural do uso não é cobrado. Também entram os aluguéis e as contas em aberto e, quando for o caso, as multas das perguntas 2, 5 e 8.[se caucao] Esses valores são descontados da caução; se ela não bastar, a diferença é cobrada.[fim][se deposito] Esses valores são descontados do depósito; se ele não bastar, a diferença é cobrada.[fim][se fci] O Fundo de Conservação do Imóvel (FCI) paga primeiro os reparos, e o que sobrar dele é devolvido corrigido.[fim]
+
+**14. A empresa pode entrar no imóvel?**
+
+Pode vistoriar o imóvel com agendamento prévio. Se o imóvel for colocado à venda, o LOCATÁRIO tem preferência para comprar nas mesmas condições e deve permitir as visitas dos interessados, pelo menos 2 (duas) horas por dia, entre 8h e 20h.
+
+**15. Como recebo os avisos sobre o contrato?**
+
+Por e-mail ou por carta com aviso de recebimento, que valem como entregues. Por isso, avise sempre que mudar de endereço, de e-mail ou de telefone.
+
+**16. Este resumo substitui o contrato?**
+
+Não. Ele só ajuda a entender o contrato. Em caso de dúvida ou de diferença, valem as cláusulas do contrato e a Lei nº 8.245/91 (Lei do Inquilinato).`;
       FINAIS = (extra) => `## DISPOSIÇÕES FINAIS
 
 ${REPRESENTACAO}
@@ -3592,7 +3664,9 @@ E por assim estarem justos e contratados, e após terem os contratantes lido e e
 
 > {cidade}, {data_assinatura}.
 
-[assinaturas]`;
+[assinaturas]
+
+${RESUMO_CONTRATO}`;
       CONDOMINIO = `[se nao_residencial]**CLÁUSULA #** – O LOCATÁRIO se obriga a cumprir as determinações do condomínio a que o imóvel pertence e seu regimento interno, principalmente no que se refere à manutenção da ordem e respeito ao condomínio, suas coisas e condôminos, ao silêncio após os horários determinados, à utilização de áreas comuns e privativas, aos horários de mudança e ao tratamento com os funcionários do condomínio, respondendo pelas despesas e danos causados por si e por outros sob sua responsabilidade.[fim]`;
       ADITIVO_VENCIMENTO = `# {numero_aditivo} TERMO ADITIVO AO CONTRATO DE LOCAÇÃO
 
@@ -3832,7 +3906,11 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
 
 **CLÁUSULA #** – O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES} aceitam[senão] aceita[fim] como válidas todas as comunicações`, "depois do aviso prévio feito pelo próprio órgão"],
         ["Contrato de Locação {finalidade} do imóvel {objeto},", "Contrato de Locação {finalidade} que tem por objeto {objeto},"],
-        [" úteis para providenciar a vistoria do imóvel. O aluguel e os encargos", ` úteis para providenciar a vistoria do imóvel. ${CONVITE_SAIDA} O aluguel e os encargos`, "convidado por escrito, por e-mail, a acompanhar a vistoria"]
+        [" úteis para providenciar a vistoria do imóvel. O aluguel e os encargos", ` úteis para providenciar a vistoria do imóvel. ${CONVITE_SAIDA} O aluguel e os encargos`, "convidado por escrito, por e-mail, a acompanhar a vistoria"],
+        // resumo em perguntas e respostas na última página (24/11/2026): só nos contratos, onde o fecho continua igual
+        [FECHO_CONTRATO, `${FECHO_CONTRATO}
+
+${RESUMO_CONTRATO}`, "RESUMO DO CONTRATO EM PERGUNTAS E RESPOSTAS"]
       ];
     }
   });
@@ -3967,6 +4045,17 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
     if (doInquilino("conta_condominio")) out.push(`a administradora do condomínio${imovel.administradora_nome ? ` ${imovel.administradora_nome}` : ""}`);
     return out;
   }
+  function exemploAtraso(aluguel, multaPct, jurosPct) {
+    if (!(aluguel > 0)) return "";
+    const multa = Math.round(aluguel * multaPct / 100);
+    const juros = jurosAoDia(aluguel, jurosPct) * 10;
+    return `Exemplo: o aluguel de ${reais(aluguel)} pago 10 (dez) dias depois do vencimento fica em ${reais(aluguel)} + ${reais(multa)} de multa + ${reais(juros)} de juros = ${reais(aluguel + multa + juros)} (o exemplo usa só o aluguel; o que mais estiver no boleto entra na mesma conta).`;
+  }
+  function exemploSaida(aluguel, meses) {
+    if (!(aluguel > 0) || !(meses > 1)) return "";
+    const faltam = Math.floor(meses / 2);
+    return `Exemplo: saindo quando ainda faltam ${faltam} dos ${meses} meses, a multa é de 3 × ${reais(aluguel)} × ${faltam}/${meses} = ${reais(Math.round(3 * aluguel * faltam / meses))} (a conta exata é feita pelos dias que faltam).`;
+  }
   function dadosDoContrato(d2, c, extra = {}) {
     const R = { buscar: (t, id) => d2[t].find((x) => x.id === Number(id)) };
     const imovel = R.buscar("imoveis", c.imovel_id) || {};
@@ -4023,7 +4112,10 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
       deposito_valor: valorComExtenso(c.deposito_valor || 0),
       deposito_uso: c.deposito_uso || "",
       cidade: imovel.cidade || dadoDaEmpresa(d2, c, "cidade_documentos"),
-      data_assinatura: dataPorExtenso(extra.data || hojeIso())
+      data_assinatura: dataPorExtenso(extra.data || hojeIso()),
+      // resumo em perguntas e respostas (RESUMO_CONTRATO): exemplos com os valores do contrato
+      exemplo_atraso: exemploAtraso(aluguel, c.multa_percentual ?? 2, c.juros_mensal_percentual ?? 1),
+      exemplo_saida: exemploSaida(aluguel, Number(c.prazo_meses) || mesesDoPrazo(c.data_entrada || c.vigencia_inicio, c.vigencia_fim) || 0)
     };
     const condicoes = {
       fiador: temFiador2,
@@ -4165,6 +4257,7 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
       const linha = parte.replace(/\s*\n\s*/g, " ").trim();
       if (!linha) continue;
       if (linha === "[assinaturas]") blocos.push({ tipo: "assinaturas", pessoas: dados.assinaturas });
+      else if (linha === "[nova página]") blocos.push({ tipo: "nova_pagina" });
       else if (linha.startsWith("## ")) blocos.push({ tipo: "secao", runs: negritos(linha.slice(3)) });
       else if (linha.startsWith("# ")) blocos.push({ tipo: "titulo", runs: negritos(linha.slice(2)) });
       else if (linha.startsWith("> ")) blocos.push({ tipo: "direita", runs: negritos(linha.slice(2)) });
@@ -4211,6 +4304,7 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
   }
   function blocoHtml(b) {
     {
+      if (b.tipo === "nova_pagina") return '<div class="ct-nova-pagina"></div>';
       if (b.tipo === "titulo") return `<h1 class="ct-titulo">${runsHtml(b.runs)}</h1>`;
       if (b.tipo === "secao") return `<h2 class="ct-secao">${runsHtml(b.runs)}</h2>`;
       if (b.tipo === "direita") return `<p class="ct-direita">${runsHtml(b.runs)}</p>`;
@@ -4255,7 +4349,8 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
       corpo.push(`<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/></w:pPr>${imagemX(1, "rIdLogo", lado, lado * prop, { topo: LOGO.topoCm })}</w:p>`);
     }
     for (const b of blocos) {
-      if (b.tipo === "titulo") corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: "center", depois: 360, rPr: '<w:u w:val="single"/><w:sz w:val="26"/>' }).replace("<w:pPr>", "<w:pPr><w:keepNext/>"));
+      if (b.tipo === "nova_pagina") corpo.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
+      else if (b.tipo === "titulo") corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: "center", depois: 360, rPr: '<w:u w:val="single"/><w:sz w:val="26"/>' }).replace("<w:pPr>", "<w:pPr><w:keepNext/>"));
       else if (b.tipo === "secao") corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: "center", antes: 240, depois: 160, rPr: '<w:u w:val="single"/>' }).replace("<w:pPr>", "<w:pPr><w:keepNext/>"));
       else if (b.tipo === "direita") corpo.push(parX(b.runs, { alinhar: "right", antes: 240, depois: 480 }));
       else if (b.tipo === "subsecao") corpo.push(parX(b.runs.map((r) => ({ ...r, b: true })), { alinhar: "left", antes: 200, depois: 60 }).replace("<w:pPr>", "<w:pPr><w:keepNext/>"));
@@ -4772,7 +4867,9 @@ Pix (CNPJ): 58.492.818/0001-59`
         "aluguel_atual",
         "garantia_anterior",
         "garantia_depositada",
-        "garantia_corrigida"
+        "garantia_corrigida",
+        "exemplo_atraso",
+        "exemplo_saida"
       ];
       camposConhecidos = null;
       escDoc = (v) => String(v ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
@@ -30811,11 +30908,12 @@ ${m.texto}`);
       return { url: a.href, x: x.left - caixa.left, y: x.top - topo3, w: x.width, h: x.height };
     });
     const cortes = cortesDoDocumento(el, topo3);
+    const quebras = [...el.querySelectorAll(".ct-nova-pagina")].map((x) => x.getBoundingClientRect().top - topo3);
     const marca2 = await marcaDaguaPdf(el.querySelector(".ct-marca"));
     const opcoes2 = { scale: ESCALA_PDF, backgroundColor: "#ffffff", onclone: (doc2) => {
       doc2.querySelectorAll(".ct-rodape, .ct-marcas").forEach((x) => x.remove());
       doc2.querySelectorAll(".contrato").forEach((x) => {
-        x.style.border = "0";
+        x.style.borderColor = "transparent";
         x.style.boxShadow = "none";
       });
     } };
@@ -30833,6 +30931,8 @@ ${m.texto}`);
       let fim = ini + alturaFolha + (fatias.length ? 0 : (margemTopo - topoDa(0)) * pxMm);
       if (fim >= total) fim = total;
       else fim = cortes.filter((y) => y > ini + alturaFolha * 0.4 && y <= fim).pop() || fim;
+      const quebra = quebras.find((y) => y > ini + 2 && y < fim);
+      if (quebra !== void 0) fim = quebra;
       fatias.push([ini, fim]);
       ini = fim;
     }

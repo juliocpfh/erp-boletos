@@ -19,7 +19,7 @@ function base(extra = {}) {
     garantia_tipo: 'Caução', caucao_valor: 315000, caucao_meses: 1, finalidade: 'Residencial', descricao_objeto: 'a casa nº 3', ...extra }, 'j');
   return { d, c };
 }
-const texto = (blocos) => blocos.map((b) => (b.runs ? b.runs.map((r) => r.t).join('') : b.linhas ? '[tabela]' : b.pessoas ? `[${b.pessoas.map((p) => `${p.papel} ${p.doc}${p.extra ? ` ${p.extra}` : ''}`).join(', ')}]` : '')).join('\n');
+const texto = (blocos) => blocos.map((b) => (b.runs ? b.runs.map((r) => r.t).join('') : b.tipo === 'nova_pagina' ? '[nova página]' : b.linhas ? '[tabela]' : b.pessoas ? `[${b.pessoas.map((p) => `${p.papel} ${p.doc}${p.extra ? ` ${p.extra}` : ''}`).join(', ')}]` : '')).join('\n');
 const contrato = (extra = {}, nome = 'Residencial') => {
   const { d, c } = base(extra);
   return texto(K.montarContrato(K.modelosDe(d).find((m) => m.nome === nome).texto, K.dadosDoContrato(d, c, { data: '2026-09-01' })));
