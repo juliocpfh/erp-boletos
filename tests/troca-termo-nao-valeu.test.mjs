@@ -85,3 +85,42 @@ test('boleto do novo emitido no banco e não pago: fica com aviso para cancelar 
   assert.deepEqual(doMes(d, '2027-02'), [['João Souza', 180000]]);
   assert.ok(d.historico.some((h) => /Boleto 01\/2027 de Maria Lima emitido no banco: .*Cancele este boleto no banco/.test(h.descricao || '')), 'anotado no Histórico');
 });
+
+// 2º teste de tela da PR #393: termo "não valeu" e depois o termo certo anexado. O pagamento de Maria continuava "a devolver"
+// e a empresa perdia o mês (R$ 960,00 na troca em 15/12; R$ 1.800,00 na troca em 01/12).
+for (const [entrada, maria, joao] of [['2026-12-15', 96000, [['João Souza', 84000]]], ['2026-12-01', 180000, []]]) {
+  test(`troca em ${entrada.slice(8)}/12: termo certo anexado depois do "não valeu" → o pagamento de Maria volta a ser dela`, () => {
+    const { d, c } = base();
+    const { n, ad } = troca(d, c, entrada);
+    R.gerarCobrancas(d, '2026-12', 'j');
+    const dela = d.cobrancas.find((x) => x.contrato_id === n.id && x.competencia === '2026-12');
+    assert.equal(dela.aluguel, maria);
+    R.registrarPagamento(d, dela.id, '2026-11-22', null, 'j');
+    R.desfazerAditivo(d, ad.id, 'j', { excluirTermo: false });
+    assert.equal(R.pagoAMaisDo(R.buscar(d, 'cobrancas', dela.id)), maria, 'depois do "não valeu": a devolver');
+    // o termo certo é anexado (o mesmo termo volta a ter o arquivo)
+    R.atualizar(d, 'aditivos', ad.id, { arquivo: 'termo-certo.pdf' }, 'j');
+    const r = R.transferirHeranca(d, n.id, 'j', '2026-11-24');
+    assert.deepEqual(r.pagamentosDevolvidos, []);
+    const pago = R.buscar(d, 'cobrancas', dela.id);
+    assert.equal(pago.troca_nao_valeu, null);
+    assert.equal(R.devidoDoPago(pago), maria);
+    assert.equal(R.pagoAMaisDo(pago), 0, 'nada a devolver');
+    const deJoao = doMes(d, '2026-12').filter(([nome]) => nome === 'João Souza');
+    assert.deepEqual(deJoao, joao, entrada.endsWith('15') ? 'João volta ao proporcional' : 'o boleto de João sai');
+  });
+}
+
+test('termo certo anexado depois de o pagamento de Maria já ter sido devolvido: fica devolvido e avisa para cobrar de novo', () => {
+  const { d, c } = base();
+  const { n, ad } = troca(d, c, '2026-12-15');
+  R.gerarCobrancas(d, '2026-12', 'j');
+  const dela = d.cobrancas.find((x) => x.contrato_id === n.id && x.competencia === '2026-12');
+  R.registrarPagamento(d, dela.id, '2026-11-22', null, 'j');
+  R.desfazerAditivo(d, ad.id, 'j', { excluirTermo: false });
+  R.marcarDevolvidoAMao(d, dela.id, '2026-11-23', 'j');
+  R.atualizar(d, 'aditivos', ad.id, { arquivo: 'termo-certo.pdf' }, 'j');
+  const r = R.transferirHeranca(d, n.id, 'j', '2026-11-24');
+  assert.deepEqual(r.pagamentosDevolvidos.map((x) => [x.cobranca.id, x.valor]), [[dela.id, 96000]]);
+  assert.ok(d.historico.some((h) => /já tinha sido devolvido. Cobre o mês de novo de Maria Lima/.test(h.descricao || '')));
+});
