@@ -781,7 +781,7 @@ button.mini{padding:5px 10px;font-size:.85rem;margin:2px 4px 2px 6px}.enviado{ma
     'Falta documento': '<div class="aviso"><b>Falta mandar:</b><ul>{faltando}</ul>Mande pelo campo do documento, mais abaixo.</div>',
     Assinar: '<div class="aviso"><b>Falta assinar a ficha.</b> Baixe a ficha em PDF, assine pelo gov.br (gratuito, em assinador.iti.br) ou à mão, e mande em "Ficha assinada", no fim da página.</div>',
     Assinada: '<div class="ok">Recebemos a ficha assinada. Obrigado! Avisaremos o resultado da análise.</div>',
-    Desistiu: '<div class="aviso">Você avisou em {desistiu} que não vai seguir com a análise. A reserva é devolvida na conta de onde veio o depósito, como combinado.</div>',
+    Desistiu: '<div class="aviso">Você avisou em {desistiu} que não vai seguir com a análise.{devolucao}</div>',
   };
 
   function campoHtml(c, v) {
@@ -877,8 +877,11 @@ button.mini{padding:5px 10px;font-size:.85rem;margin:2px 4px 2px 6px}.enviado{ma
     const fiador = F.pessoa !== 'interessado';
     const bloqueado = F.situacao === 'Desistiu' || F.vencido;
     podeCorrigir = !bloqueado && !F.conferido_em;
-    const modelo = F.situacao === 'Respondida' && !F.enviado_em ? '<div class="ok">Recebemos seus documentos. Obrigado!</div>' : (SITUACAO[F.situacao] || '');
-    const situacao = modelo.replace('{enviado}', horaBr(F.enviado_em)).replace('{desistiu}', dataBr(F.desistiu_em)).replace('{faltando}', F.faltando.map((x) => '<li>' + esc(x) + '</li>').join(''));
+    const modelo = F.situacao === 'Respondida' && !F.enviado_em ? '<div class="ok">Recebemos seus documentos. Obrigado!</div>'
+      : F.situacao === 'Respondida' && F.conferido_em ? '<div class="ok">Recebemos seus dados em {enviado}. A equipe já conferiu: para corrigir alguma coisa, fale com quem enviou o link.</div>' : (SITUACAO[F.situacao] || '');
+    // desistência: a regra do termo aceito (ctx.devolucao, ex.: "a reserva de R$ 500,00 não é devolvida"); sem termo, devolve tudo
+    const devolucao = fiador ? '' : ctx.devolucao ? ' Como combinado: ' + ctx.devolucao.charAt(0).toLowerCase() + ctx.devolucao.slice(1) : ctx.reserva ? ' A reserva de ' + ctx.reserva + ' é devolvida por inteiro, na conta de onde veio o depósito.' : '';
+    const situacao = modelo.replace('{enviado}', horaBr(F.enviado_em)).replace('{desistiu}', dataBr(F.desistiu_em)).replace('{devolucao}', esc(devolucao)).replace('{faltando}', F.faltando.map((x) => '<li>' + esc(x) + '</li>').join(''));
     app.innerHTML = '<p class="suave">' + esc(ctx.empresa) + '</p><h1>' + (fiador ? 'Ficha do fiador' : 'Ficha cadastral') + '</h1>'
       + '<p>' + esc(ctx.nome ? 'Olá, ' + ctx.nome.split(' ')[0] + '! ' : '') + (fiador ? 'Você foi indicado como fiador' + (ctx.de ? ' de ' + esc(ctx.de) : '') + ' na locação do imóvel abaixo.' : 'Preencha seus dados e mande os documentos para a análise da locação.') + '</p>'
       + (F.vencido ? '<div class="aviso">O prazo deste link acabou em ' + dataBr(F.vence_em) + '. Peça um novo para quem enviou: o que você já mandou continua guardado.</div>' : '<p class="suave">Este link é só seu e vale até ' + dataBr(F.vence_em) + '.</p>')
