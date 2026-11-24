@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-Ktl4TqR6Fq2clN4XyKaOnjcHdvKxDY3AD2LrAe4bsmw='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-QRNVwnl8GKEZZaEdR8rsb7LtwcP0/USc97AOXkZZAII='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="666bd9822f0415a0">
+<meta name="fontes" content="01c1f575147c4aab">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -30447,7 +30447,43 @@ ${m.texto}`);
     const larguraPx = Math.max(1, Math.ceil(el.offsetWidth) * ESCALA_PDF);
     return Math.floor(Math.min(32e3, (toque ? 16e6 : 2e8) / larguraPx) / ESCALA_PDF);
   }
-  async function pdfDoDocumento(el, rodape = [], { margemLado = 0, alturaMaxima = 0 } = {}) {
+  async function logoJpeg(src) {
+    if (!src) return null;
+    try {
+      const img = new Image();
+      img.src = src;
+      await img.decode();
+      const larg = Math.min(600, img.naturalWidth || 600);
+      const alt = Math.max(1, Math.round(larg * ((img.naturalHeight || 1) / (img.naturalWidth || 1))));
+      const canvas = document.createElement("canvas");
+      canvas.width = larg;
+      canvas.height = alt;
+      const g = canvas.getContext("2d");
+      g.fillStyle = "#ffffff";
+      g.fillRect(0, 0, larg, alt);
+      g.drawImage(img, 0, 0, larg, alt);
+      return { bin: atob(canvas.toDataURL("image/jpeg", 0.9).split(",")[1]), largura: larg, altura: alt };
+    } catch {
+      return null;
+    }
+  }
+  function marcarAssinatura(pdf, local4, logo) {
+    if (!local4 && !logo) return;
+    let nLogo = 0;
+    if (logo) pdf.internal.events.subscribe("postPutResources", () => {
+      nLogo = pdf.internal.newObject();
+      pdf.internal.write(`<< /Type /XObject /Subtype /Image /Width ${logo.largura} /Height ${logo.altura} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${logo.bin.length} >>`);
+      pdf.internal.write("stream");
+      pdf.internal.write(logo.bin);
+      pdf.internal.write("endstream");
+      pdf.internal.write("endobj");
+    });
+    pdf.internal.events.subscribe("putCatalog", () => {
+      const r = (v) => Math.round(v * 100) / 100;
+      pdf.internal.write(`/ImoveisAssinatura << ${local4 ? `/Pagina ${local4.pagina} /Rect [${local4.rect.map(r).join(" ")}]` : ""}${nLogo ? ` /Logo ${nLogo} 0 R` : ""} >>`);
+    });
+  }
+  async function pdfDoDocumento(el, rodape = [], { margemLado = 0, alturaMaxima = 0, assinatura = null } = {}) {
     const { html2canvas, jsPDF } = await bibliotecasPdf();
     const caixa = el.getBoundingClientRect();
     const topo3 = caixa.top;
@@ -30494,6 +30530,22 @@ ${m.texto}`);
       }
     }
     const pdf = new jsPDF({ unit: "mm", format: "a4" });
+    if (assinatura) {
+      const linha = el.querySelector("[data-assina-empresa] .assina-linha");
+      let local4 = null;
+      if (linha) {
+        const x = linha.getBoundingClientRect();
+        const yDoc = x.top - topo3;
+        const k = fatias.findIndex(([ini, fim]) => yDoc >= ini && yDoc < fim);
+        if (k >= 0) {
+          const pt = (mm) => mm * 72 / 25.4;
+          const esq = pt(margemLado + (x.left - caixa.left) / pxMm);
+          const cima = pt(topoDa(k) + (yDoc - fatias[k][0]) / pxMm);
+          local4 = { pagina: k + 1, rect: [esq, 841.89 - cima - pt(x.height / pxMm), esq + pt(x.width / pxMm), 841.89 - cima] };
+        }
+      }
+      marcarAssinatura(pdf, local4, await logoJpeg(assinatura.logo));
+    }
     let n = 0;
     for (const lote2 of lotes) {
       const canvas = await html2canvas(el, lote2.inteiro ? opcoes2 : { ...opcoes2, y: lote2.ini, height: Math.ceil(lote2.fim - lote2.ini) });
@@ -30614,6 +30666,7 @@ ${m.texto}`);
     const e = r.emitente;
     const par = (t) => `<p${/^\d\. /.test(t) ? ' style="margin-left:12px"' : ""}>${esc(t)}</p>`;
     const linha = ([a, b]) => b === null ? `<tr><th colspan="2" style="text-align:left">${esc(a)}</th></tr>` : `<tr><td style="width:34%;white-space:normal">${esc(a).replace(/^ {3}/, "&nbsp;&nbsp;&nbsp;")}</td><td style="white-space:normal${/^R\$ [\d.,]+$/.test(b) ? ";text-align:right" : ""}">${esc(b)}</td></tr>`;
+    const daEmpresa = r.assinaturas.findIndex((a) => a.nome === (e.razao_social || e.nome || "LOCADORA"));
     return `<div class="carta recibo">
     ${d().logo ? `${marcaDagua(d().logo)}<p class="ct-capa"><img src="${esc(d().logo)}" alt="Logo"></p>` : ""}
     <p style="text-align:center"><b>${esc(e.razao_social || e.nome || "")}</b>${e.cnpj ? `<br>CNPJ ${esc(e.cnpj)}` : ""}${e.endereco ? `<br>${esc(e.endereco)}` : ""}</p>
@@ -30622,9 +30675,9 @@ ${m.texto}`);
     ${r.tabela.length ? `<table class="carta-tabela" style="width:100%">${r.tabela.map(linha).join("")}</table>` : ""}
     ${r.depois.map(par).join("")}
     <p class="carta-data">${esc(r.cidade)}, ${dataPorExtenso(r.data, { zero: false })}.</p>
-    ${r.assinaturas.map((a) => `<p style="margin-top:48px;text-align:center">_______________________________________<br><b>${esc(a.nome)}</b>${a.linha ? `<br>${esc(a.linha)}` : ""}</p>`).join("")}</div>`;
+    ${r.assinaturas.map((a, k) => `<p style="margin-top:48px;text-align:center"${k === daEmpresa ? " data-assina-empresa" : ""}><span class="assina-linha">_______________________________________</span><br><b>${esc(a.nome)}</b>${a.linha ? `<br>${esc(a.linha)}` : ""}</p>`).join("")}</div>`;
   }
-  async function pdfDoRecibo(tipo, alvo) {
+  async function pdfDoRecibo(tipo, alvo, { paraAssinar = false } = {}) {
     const r = montarRecibo(d(), tipo, alvo);
     const caixa = document.createElement("div");
     caixa.className = "impressao";
@@ -30632,7 +30685,7 @@ ${m.texto}`);
     caixa.innerHTML = reciboHtml(r);
     document.body.append(caixa);
     try {
-      return { blob: await pdfDoDocumento(caixa.querySelector(".carta"), [], { margemLado: 15 }), nome: `${limparNome(r.arquivo)}.pdf` };
+      return { blob: await pdfDoDocumento(caixa.querySelector(".carta"), [], { margemLado: 15, ...paraAssinar ? { assinatura: { logo: d().logo } } : {} }), nome: `${limparNome(r.arquivo)}.pdf` };
     } finally {
       caixa.remove();
     }
@@ -37698,7 +37751,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
           const alvo = alvoDoRecibo({ contrato, ficha, id, fiador });
           if (!alvo) throw new ErroUsuario("Ficha ou inquilino não encontrado.");
           aviso("Montando o PDF para assinar…", "info");
-          const r = await pdfDoRecibo(tipo, alvo);
+          const r = await pdfDoRecibo(tipo, alvo, { paraAssinar: true });
           await pedirAssinatura(r.blob, { titulo: `${TIPOS_RECIBO[tipo] || "Documento"} · ${(alvo.ficha || alvo.contrato).inquilino_nome}`, chave: chaveDoRecibo(tipo, alvo), nome: r.nome, contrato: alvo.contrato ? alvo.contrato.id : null });
           aviso("Enviado para assinar: o programa do PC com o certificado assina em cerca de 1 minuto (se estiver ligado).", "ok");
           await mostrar();
