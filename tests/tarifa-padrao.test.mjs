@@ -72,3 +72,17 @@ test('marcar "Não cobrar tarifa" ou pôr valor próprio no contrato muda os bol
     assert.equal(tarifa(d, padrao, '2026-12'), 500);
   } finally { CR.usarRegras(null); }
 });
+
+test('regra especial com tarifa própria excluída: os boletos em aberto dos contratos dela passam à tarifa do sistema', () => {
+  const { d, padrao } = base();
+  try {
+    R.salvarRegrasSistema(d, { tarifa_padrao: 400 }, 'admin');
+    const p = R.salvarPerfilRegras(d, null, { nome: 'Especial', valores: { tarifa_padrao: 600 } }, 'admin');
+    R.atualizar(d, 'contratos', padrao.id, { perfil_regras_id: p.id }, 'j');
+    R.gerarCobrancas(d, '2026-12', 'j');
+    assert.equal(tarifa(d, padrao, '2026-12'), 600);
+    R.excluirPerfilRegras(d, p.id, 'admin');
+    assert.equal(tarifa(d, padrao, '2026-12'), 400);
+    assert.equal(R.totais(R.boletoDoMes(d, padrao.id, '2026-12')).a_pagar_pontual, 200000 + 400);
+  } finally { CR.usarRegras(null); }
+});

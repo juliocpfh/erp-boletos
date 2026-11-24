@@ -9177,6 +9177,11 @@ export function excluirPerfilRegras(d, id, usuario) {
   for (const c of contratos) atualizar(d, 'contratos', c.id, { perfil_regras_id: null }, usuario, `${c.inquilino_nome}: volta às regras do sistema (regra especial "${p.nome}" excluída)`);
   excluir(d, 'perfis_regras', p.id, usuario, `Regra especial "${p.nome}" excluída`);
   CR.usarRegras(d);
+  // a regra especial tinha tarifa própria: os boletos em aberto dos contratos dela que seguem a tarifa padrão passam à do sistema
+  if ('tarifa_padrao' in (p.valores || {}) && !CR.mesmoValor(p.valores.tarifa_padrao, CR.regra('tarifa_padrao'))) {
+    const ids = new Set(contratos.map((c) => c.id));
+    recalcularTarifaPadrao(d, usuario, (c) => ids.has(c.id));
+  }
   return contratos.length;
 }
 
