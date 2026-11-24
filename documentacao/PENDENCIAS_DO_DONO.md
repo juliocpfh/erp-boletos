@@ -22,6 +22,7 @@
 **Esperando o dono:**
 - NF do proporcional **pago em dia**: hoje a linha sai "16/30 × R$ 1.800,00" (aluguel com bonificação), e não "× R$ 2.000,00" como no exemplo dele. Fica assim? (pergunta da sessão da busca; não mudar até ele responder).
 - Tarifa no Sobrado Almir e no Posto (acima).
+- Pintura (#395): contar só meses completos (12 meses e meio = 12)? E, na troca de titular sem vistoria nova, contar desde a entrada do titular anterior (a vistoria que vale)?
 - Termo da reserva: dizer o que acontece se **a empresa** desistir (lei das arras: devolver em dobro, CC art. 418)?
 - Mandar ao advogado `Conferencia do advogado - 24-11 - v2.html` e o PDF (raiz do projeto). As cláusulas novas (honorários, IPCA, visita perdida, serviços extras, pagamento devolvido, pintura) só entram no contrato depois da resposta dele; então o Claude programa despesas e 10% só no acordo e no cálculo final.
 - Depois do aceite da #392: mandar a si mesmo um lembrete da régua de um boleto feito à mão e ver se o PDF chega pelo Gmail.
