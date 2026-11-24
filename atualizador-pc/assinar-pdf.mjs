@@ -114,6 +114,15 @@ const tamanhoQueCabe = (texto, fonte, tamanho, max, minimo = 6) => {
   return t;
 };
 
+/** O texto, cortado com "..." no fim se nem no tamanho mínimo couber em ``max`` pontos (nome comprido não sai da caixa). */
+export function cortarQueCabe(texto, fonte, tamanho, max) {
+  const t = String(texto);
+  if (larguraTexto(t, fonte, tamanho) <= max) return t;
+  let n = t.length;
+  while (n > 1 && larguraTexto(`${t.slice(0, n).trimEnd()}...`, fonte, tamanho) > max) n -= 1;
+  return `${t.slice(0, n).trimEnd()}...`;
+}
+
 const n2 = (v) => String(Math.round(v * 100) / 100);
 const cor = ([r, g, b], op) => `${n2(r)} ${n2(g)} ${n2(b)} ${op}`;
 // cores sóbrias: azul-marinho para os títulos e o selo, cinzas para o texto e as linhas
@@ -163,8 +172,8 @@ export function desenhoDoSelo(larg, alt, { nome, cnpj, dataBr }) {
   return [`q 1 1 1 rg ${contorno} f Q`, `q ${contorno} W n ${cor(MARINHO, 'rg')} 0 0 3.5 ${n2(alt)} re f Q`, `q ${cor(MARINHO, 'RG')} 0.9 w ${contorno} S Q`,
     emblema(10 + r, alt / 2, r),
     txt(xTexto, alt - 12, 'F1', 6.75, 'ASSINADO DIGITALMENTE POR', CINZA),
-    txt(xTexto, alt - 23.5, 'F2', tNome, nome, MARINHO),
-    txt(xTexto, alt - 33.5, 'F1', tMeio, meio, TEXTO),
+    txt(xTexto, alt - 23.5, 'F2', tNome, cortarQueCabe(nome, 'F2', tNome, max), MARINHO),
+    txt(xTexto, alt - 33.5, 'F1', tMeio, cortarQueCabe(meio, 'F1', tMeio, max), TEXTO),
     txt(xTexto, alt - 42, 'F1', 6.5, 'Certificado ICP-Brasil · confira em validar.iti.gov.br', CINZA)].join('\n');
 }
 
@@ -251,7 +260,16 @@ function desenhoDaPagina({ L, H, selo, dataBr, paginas, resumo, logo, comSeloNaF
   y -= 12;
   const linhas = [['ASSINADO POR', selo.nome], ['CNPJ', selo.cnpj || 'não informado no certificado'], ...(selo.responsavel ? [['RESPONSÁVEL', selo.responsavel]] : []),
     ['CERTIFICADORA', selo.emissor || 'ICP-Brasil'], ['DATA E HORA', `${dataBr} (horário de Brasília)`]];
-  const alturaQuadro = 58 + linhas.length * 30 + 44;
+  // cada valor numa linha (a letra diminui até 7); se nem assim couber (nome muito comprido), quebra em mais linhas de 8,5
+  const xValor = m + 140;
+  const maxValor = L - m - 22 - xValor;
+  const valores = linhas.map(([rot, valor]) => {
+    const fonte = rot === 'ASSINADO POR' ? 'F2' : 'F1';
+    const tam = tamanhoQueCabe(valor, fonte, 10.5, maxValor, 7);
+    return larguraTexto(valor, fonte, tam) <= maxValor ? { fonte, tam, partes: [valor] } : { fonte, tam: 8.5, partes: quebrar(valor, fonte, 8.5, maxValor) };
+  });
+  const extra = valores.reduce((s, v) => s + (v.partes.length - 1) * 11, 0);
+  const alturaQuadro = 58 + linhas.length * 30 + 44 + extra;
   const topoQuadro = y;
   out.push(`q ${cor(FUNDO, 'rg')} ${cor(LINHA, 'RG')} 0.75 w ${arredondado(m, topoQuadro - alturaQuadro, larg, alturaQuadro, 6)} B Q`);
   out.push(emblema(m + 30, topoQuadro - 30, 13, VERDE));
@@ -259,14 +277,13 @@ function desenhoDaPagina({ L, H, selo, dataBr, paginas, resumo, logo, comSeloNaF
   out.push(txt(m + 52, topoQuadro - 39, 'F1', 8.5, 'Assinatura CMS destacada (SHA-256), com a cadeia do certificado e a hora da assinatura.', CINZA));
   let yq = topoQuadro - 58;
   out.push(`q ${cor(LINHA, 'RG')} 0.5 w ${m + 18} ${n2(yq + 8)} m ${L - m - 18} ${n2(yq + 8)} l S Q`);
-  const xValor = m + 140;
-  for (const [rot, valor] of linhas) {
+  linhas.forEach(([rot], k) => {
     yq -= 12;
     out.push(txt(m + 22, yq, 'F1', 7.5, rot, CINZA));
-    const tam = tamanhoQueCabe(valor, rot === 'ASSINADO POR' ? 'F2' : 'F1', 10.5, L - m - 22 - xValor, 7);
-    out.push(txt(xValor, yq, rot === 'ASSINADO POR' ? 'F2' : 'F1', tam, valor, TEXTO));
-    yq -= 18;
-  }
+    const { fonte, tam, partes } = valores[k];
+    partes.forEach((p, j) => out.push(txt(xValor, yq - j * 11, fonte, tam, cortarQueCabe(p, fonte, tam, maxValor), TEXTO)));
+    yq -= 18 + (partes.length - 1) * 11;
+  });
   out.push(txt(m + 22, yq - 12, 'F1', 7.5, 'RESUMO DO DOCUMENTO', CINZA));
   out.push(txt(m + 22, yq - 22, 'F1', 7.5, 'ORIGINAL (SHA-256)', CINZA));
   out.push(txt(xValor, yq - 12, 'F3', 8.75, resumo.slice(0, 32), TEXTO));
@@ -282,8 +299,10 @@ function desenhoDaPagina({ L, H, selo, dataBr, paginas, resumo, logo, comSeloNaF
   ];
   passos.forEach((p, k) => {
     out.push(`q ${cor(MARINHO, 'rg')} ${arredondado(m, y - 4, 14, 14, 7)} f Q`, txt(m + 4.6, y, 'F2', 8.5, String(k + 1), [1, 1, 1]));
-    for (const [j, l] of quebrar(p, 'F1', 10, larg - 24).entries()) { out.push(txt(m + 24, y - j * 14, 'F1', 10, l, TEXTO)); if (j) y -= 14; }
-    y -= 24;
+    // cada linha 14 pontos abaixo da anterior (antes, da 3ª linha em diante o texto descia em dobro e invadia o passo seguinte)
+    const partes = quebrar(p, 'F1', 10, larg - 24);
+    partes.forEach((l, j) => out.push(txt(m + 24, y - j * 14, 'F1', 10, l, TEXTO)));
+    y -= 24 + (partes.length - 1) * 14;
   });
   // base legal, no pé da folha
   const lei = 'A assinatura digital feita com certificado ICP-Brasil tem a mesma validade jurídica da assinatura de próprio punho (Medida Provisória 2.200-2/2001, artigo 10, e Lei 14.063/2020, artigo 4º, III).';

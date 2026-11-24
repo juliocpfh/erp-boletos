@@ -104,6 +104,22 @@ test('PDF marcado pelo site: o selo vai na linha da assinatura da empresa e a lo
   assert.match(A.desenhoDoSelo(240, 50, { nome: 'ANK ADMINISTRADORA DE BENS E PARTICIPACOES IMOBILIARIAS LTDA', cnpj: '', dataBr: 'x' }), /\/F2 [67](\.\d+)? Tf/);
 });
 
+test('nome muito comprido: o selo corta com "...", o quadro quebra a linha e nada sai da folha nem se sobrepõe', () => {
+  const nome = 'ANK ADMINISTRADORA DE BENS IMOVEIS PARTICIPACOES E EMPREENDIMENTOS IMOBILIARIOS DO PARANA LTDA';
+  const curto = A.cortarQueCabe(nome, 'F2', 6, 190);
+  assert.match(curto, /^ANK ADMINISTRADORA .*\.\.\.$/);
+  assert.ok(A.larguraTexto(curto, 'F2', 6) <= 190);
+  assert.equal(A.cortarQueCabe('ANK', 'F2', 9, 190), 'ANK');
+  const texto = A.prepararPdf(pdfMarcado(), { nome, cnpj: '11.222.333/0001-81', quando: new Date('2026-12-05T13:32:00Z') }).pdf.toString('latin1');
+  const pagina = texto.slice(texto.indexOf('(Documento assinado digitalmente) Tj') - 200);
+  const textos = [...pagina.matchAll(/\/(F[12]) ([\d.]+) Tf ([\d.]+) ([\d.]+) Td \(((?:[^()\\]|\\.)*)\) Tj/g)].map((m) => ({ f: m[1], t: Number(m[2]), x: Number(m[3]), y: Number(m[4]), s: m[5].replace(/\\(.)/g, '$1') }));
+  for (const t of textos) assert.ok(t.x + A.larguraTexto(t.s, t.f, t.t) <= 595.28 - 56 + 0.5, `dentro da margem: ${t.s}`);
+  // os passos de "Como conferir": linhas a 14 pontos uma da outra, sem duas na mesma altura
+  const passos = textos.filter((t) => t.x === 80 && t.t === 10).map((t) => t.y);
+  assert.ok(passos.length >= 6);
+  for (let k = 1; k < passos.length; k += 1) assert.ok(passos[k - 1] - passos[k] >= 14, `passos sem sobreposição (${passos[k - 1]} → ${passos[k]})`);
+});
+
 const noWindows = process.platform === 'win32';
 
 /** Certificado de teste na memória (.NET CertificateRequest): devolve o .pfx em base64. */
