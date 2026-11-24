@@ -647,16 +647,22 @@ function ligarMesDoBoleto(raiz) {
   const c = campo && buscar('contratos', marca.dataset.contratoBoleto);
   if (!c) return;
   const pagamento = marca.dataset.pagamento && form.querySelector(`[name="${marca.dataset.pagamento}"]`);
+  const condominio = marca.dataset.condominio && form.querySelector(`[name="${marca.dataset.condominio}"]`);
   const mostrar = () => {
     let comp = C.competenciaValida(campo.value) ? R.competenciaDoMesVencimento(c, campo.value) : null;
     const emBranco = !campo.value.trim() && pagamento && C.dataValida(pagamento.value);
     if (emBranco) comp = R.competenciaDoAbatimento(c, pagamento.value);
+    // sem a data do pagamento (falta o comprovante): o boleto previsto pelo mês do condomínio; o desconto só entra com a data
+    const semData = !campo.value.trim() && pagamento && !pagamento.value.trim() && condominio && C.competenciaValida(condominio.value);
+    if (semData) comp = R.competenciaDoAbatimentoPrevisto(c, condominio.value);
     const t = comp ? R.textoBoletoDaCompetencia(d(), c, comp) : '';
-    mensagemAuto(campo, t ? `${esc(emBranco ? `Em branco: ${t}` : t.charAt(0).toUpperCase() + t.slice(1))}.` : '');
+    const aviso = pagamento && !pagamento.value.trim() ? ' O desconto só entra no boleto quando a data do pagamento do condomínio for posta.' : '';
+    mensagemAuto(campo, t ? `${esc(emBranco || semData ? `Em branco: ${t}` : t.charAt(0).toUpperCase() + t.slice(1))}.${esc(aviso)}` : '');
   };
   campo.addEventListener('input', mostrar);
   campo.addEventListener('change', mostrar);
   if (pagamento) pagamento.addEventListener('change', mostrar);
+  if (condominio) condominio.addEventListener('change', mostrar);
   mostrar();
 }
 

@@ -161,7 +161,8 @@ export const RESSARCIMENTO = [
   campo('competencia_condominio', 'Mês do boleto do condomínio', 'mes', { obrig: true }),
   campo('descricao', 'Taxa', 'texto', { obrig: true, sugestoes: [], ajuda: 'Escreva o nome da taxa: nas próximas vezes ele aparece para escolher, e dá para mudar' }),
   campo('valor', 'Valor pago pelo inquilino', 'dinheiro', { obrig: true }),
-  campo('data_pagamento', 'Data em que o inquilino pagou o condomínio', 'data', { obrig: true }),
+  // em branco: lançado antes do pagamento, "falta o comprovante"; o desconto só entra no boleto com a data (decisão do dono, 24/11/2026)
+  campo('data_pagamento', 'Data em que o inquilino pagou o condomínio', 'data', { ajuda: 'Em branco se o inquilino ainda não pagou ou não mandou o comprovante: o ressarcimento fica lançado como "falta o comprovante" e o desconto só entra no boleto do aluguel quando a data for posta' }),
   // o mês é o do aluguel (competência), como na lista de Boletos, e não o do vencimento (conferência de 24/11/2026)
   campo('competencia_abatimento', 'Abater no boleto do aluguel de (mês do aluguel)', 'mes', { ajuda: 'O mês do aluguel, como aparece em Boletos (ex.: aluguel de 11/2026, que vence em 12/2026 quando o aluguel vence no mês seguinte). Em branco: o boleto que vence no mês seguinte ao pagamento do condomínio' }),
 ];

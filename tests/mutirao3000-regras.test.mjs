@@ -161,7 +161,7 @@ test('[13][14] ressarcimento maior que o boleto: em dia nunca negativo e aviso d
   const { d, c } = base();
   R.gerarCobrancas(d, '2026-07', 'j');
   const cb = d.cobrancas[0];
-  R.inserir(d, 'ressarcimentos', { contrato_id: c.id, descricao: 'Fundo de obras', valor: 250000, competencia_condominio: '2026-06', competencia_abatimento: '2026-07' }, 'j');
+  R.inserir(d, 'ressarcimentos', { contrato_id: c.id, descricao: 'Fundo de obras', valor: 250000, competencia_condominio: '2026-06', competencia_abatimento: '2026-07', data_pagamento: '2026-07-05' }, 'j');
   R.aplicarRessarcimentos(d, c, '2026-07', 'j');
   assert.equal(R.totais(cb).a_pagar_pontual, 0);
   assert.equal(R.totais(cb).a_pagar_sem_desconto, 0);

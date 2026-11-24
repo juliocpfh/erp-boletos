@@ -64,7 +64,7 @@ test('boleto em acordo: não recebe pagamento (à mão nem pelo banco) nem ajust
 
 test('ressarcimento marcado para boleto em acordo: não entra nele, fica à espera de outro mês, com aviso', () => {
   const { d, c, julho } = comAcordo();
-  const r = R.inserir(d, 'ressarcimentos', { contrato_id: c.id, competencia_condominio: '2026-08', competencia_abatimento: '2026-07', valor: 5000, descricao: 'Fundo de obras' }, 'julio');
+  const r = R.inserir(d, 'ressarcimentos', { contrato_id: c.id, competencia_condominio: '2026-08', competencia_abatimento: '2026-07', data_pagamento: '2026-09-05', valor: 5000, descricao: 'Fundo de obras' }, 'julio');
   assert.equal(R.aplicarRessarcimentos(d, c, '2026-07', 'julio'), julho);
   assert.deepEqual([julho.ressarcimento || 0, julho.situacao], [0, 'Em acordo']);
   const aviso = () => R.alertasContrato(d, c, '2026-09-20').find((a) => /está em acordo: não foi abatido/.test(a.texto));
@@ -88,7 +88,7 @@ test('reserva acompanha o ajuste e o ressarcimento: R$ 500,00, outubro de R$ 200
   // ajuste de -R$ 200,00 em outubro: o boleto passa a R$ 200,00 e o resto da reserva vai para novembro
   R.ajustarBoleto(d, out.id, -20000, 'desconto combinado', 'julio');
   assert.deepEqual(reservas(), [20000, 30000]);
-  R.inserir(d, 'ressarcimentos', { contrato_id: c.id, competencia_condominio: '2026-10', competencia_abatimento: '2026-10', valor: 5000, descricao: 'Fundo de obras' }, 'julio');
+  R.inserir(d, 'ressarcimentos', { contrato_id: c.id, competencia_condominio: '2026-10', competencia_abatimento: '2026-10', data_pagamento: '2026-10-05', valor: 5000, descricao: 'Fundo de obras' }, 'julio');
   R.aplicarRessarcimentos(d, c, '2026-10', 'julio');
   assert.deepEqual(reservas(), [15000, 35000], 'outubro só comporta R$ 150,00; os R$ 50,00 seguem para novembro');
   assert.equal(out.reserva_utilizada + nov.reserva_utilizada, 50000, 'a reserva abatida continua R$ 500,00');
