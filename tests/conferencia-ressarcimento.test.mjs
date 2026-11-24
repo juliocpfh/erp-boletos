@@ -185,3 +185,12 @@ test('formulários perguntam o mês do vencimento: 12/2026 é o boleto de refer�
   // ida e volta: o registro gravado aparece no formulário pelo vencimento e volta igual
   for (const comp of ['2026-01', '2026-11', '2026-12']) assert.equal(R.competenciaDoMesVencimento(c, R.mesVencimentoDaCompetencia(c, comp)), comp);
 });
+
+test('mês 13/2026 digitado (campo de texto, ex.: Firefox) é recusado, não vira outro mês', async () => {
+  const F = await import('../docs/js/formularios.js');
+  const campos = [{ nome: 'vencimento_abatimento', rotulo: 'Mês', tipo: 'mes' }];
+  const fd = (v) => { const f = new FormData(); f.append('vencimento_abatimento', v); return f; };
+  // antes, 13/2026 passava e, no aluguel que vence no mês seguinte, virava a referência 12/2026 (boleto que vence em janeiro)
+  for (const ruim of ['2026-13', '2026-00']) assert.equal(F.ler(campos, fd(ruim)).erros.vencimento_abatimento, 'Valor inválido', ruim);
+  assert.deepEqual(F.ler(campos, fd('2026-12')).dados, { vencimento_abatimento: '2026-12' });
+});

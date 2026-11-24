@@ -649,7 +649,7 @@ function ligarMesDoBoleto(raiz) {
   const pagamento = marca.dataset.pagamento && form.querySelector(`[name="${marca.dataset.pagamento}"]`);
   const mostrar = () => {
     let comp = C.competenciaValida(campo.value) ? R.competenciaDoMesVencimento(c, campo.value) : null;
-    const emBranco = !comp && pagamento && C.dataValida(pagamento.value);
+    const emBranco = !campo.value.trim() && pagamento && C.dataValida(pagamento.value);
     if (emBranco) comp = R.competenciaDoAbatimento(c, pagamento.value);
     const t = comp ? R.textoBoletoDaCompetencia(d(), c, comp) : '';
     mensagemAuto(campo, t ? `${esc(emBranco ? `Em branco: ${t}` : t.charAt(0).toUpperCase() + t.slice(1))}.` : '');

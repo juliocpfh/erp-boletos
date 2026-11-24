@@ -720,7 +720,8 @@ export function ler(campos, form, antigo = null) {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(bruto)) throw new Error();
         dados[c.nome] = bruto;
       } else if (c.tipo === 'mes') {
-        if (!/^\d{4}-\d{2}$/.test(bruto)) throw new Error();
+        // mês 13 ou 00 (navegador que mostra o campo como texto, ex.: Firefox) passava e virava outro mês na conta do vencimento
+        if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(bruto)) throw new Error();
         dados[c.nome] = bruto;
       } else if (c.tipo === 'url') {
         const u = /^https?:\/\//i.test(bruto) ? bruto : `https://${bruto}`;
