@@ -4282,6 +4282,8 @@ export function transferirHeranca(d, novoId, usuario, hoje = C.hojeIso()) {
   // troca numa data futura ou sem o termo assinado: o contrato (boletos, garantia, seguro, reserva) continua com o anterior;
   // agora só a data-base do reajuste e, com o termo assinado, o fim do vínculo dele (o último boleto sai proporcional). O resto passa depois.
   const assinado = !!aditivoDaTroca(d, n);
+  // termo válido anexado depois de um "não valeu": o pagamento do novo volta a ser dele (não fica mais "a devolver")
+  if (assinado) out.pagamentosDevolvidos = voltarPagamentosDoNovo(d, n, usuario);
   if (data > hoje || !assinado) {
     if (!assinado && a.data_saida === fim) atualizar(d, 'contratos', a.id, { data_saida: null }, usuario, `${a.inquilino_nome}: continua no contrato até o termo aditivo ser assinado`);
     if (assinado && a.data_saida !== fim) atualizar(d, 'contratos', a.id, { data_saida: fim }, usuario, `${a.inquilino_nome}: fim do vínculo em ${C.dataBr(fim)} (o contrato continua com ${n.inquilino_nome} a partir de ${C.dataBr(data)})`);
@@ -4342,6 +4344,30 @@ export function transferirHeranca(d, novoId, usuario, hoje = C.hojeIso()) {
   desativarSeSaiu(d, a, usuario);
   out.arquivos = [...new Set(out.arquivos)];
   return out;
+}
+
+/**
+ * Termo da troca marcado "não valeu" e depois o termo certo anexado (achado no teste de tela da PR #393): o boleto do novo que
+ * ele já tinha pago tinha virado "a devolver" (``troca_nao_valeu``). Com a troca valendo de novo, o pagamento volta a ser do
+ * boleto dele: a marca sai e o pago a mais volta à conta normal. O boleto do anterior do mesmo mês volta ao proporcional ou sai
+ * (``transferirHeranca``). Ex.: troca em 15/12, Maria pagou R$ 960,00 → continua paga; João volta a R$ 840,00.
+ * Já devolvido (botão "Devolvi" ou pelo extrato): fica como está, anotado no Histórico, e volta na lista (a equipe cobra de novo
+ * o novo titular). Devolve [{ cobranca, valor }] dos já devolvidos.
+ */
+function voltarPagamentosDoNovo(d, n, usuario) {
+  const devolvidos = [];
+  for (const cb of d.cobrancas.filter((x) => x.contrato_id === n.id && x.troca_nao_valeu)) {
+    if (cb.valor_devolvido > 0) {
+      registrar(d, usuario, 'Alteração', 'cobrancas', cb.id, `Boleto ${C.compBr(cb.competencia)} de ${n.inquilino_nome}: o termo da troca de titular foi anexado, mas o pagamento (${C.reais(cb.valor_devolvido)}) já tinha sido devolvido. Cobre o mês de novo de ${n.inquilino_nome} (desfaça o pagamento do boleto e registre quando ele pagar)`, null, { contrato_id: n.id, imovel_id: n.imovel_id });
+      devolvidos.push({ cobranca: cb, valor: cb.valor_devolvido });
+      continue;
+    }
+    const devido = devidoDoPago({ ...cb, troca_nao_valeu: false });
+    const aMais = Math.max(0, (cb.valor_pago || 0) - devido);
+    atualizar(d, 'cobrancas', cb.id, { troca_nao_valeu: null, valor_a_mais: aMais || null }, usuario,
+      `Boleto ${C.compBr(cb.competencia)} de ${n.inquilino_nome}: o termo da troca de titular foi anexado e o pagamento de ${C.dataBr(cb.data_pagamento)} volta a ser dele (não há mais o que devolver${aMais ? `, salvo ${C.reais(aMais)} pagos a mais` : ''})`);
+  }
+  return devolvidos;
 }
 
 /**
