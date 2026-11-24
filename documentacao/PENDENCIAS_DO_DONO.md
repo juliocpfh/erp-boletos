@@ -4,24 +4,20 @@
 
 **Para o Claude:** o dono só responde à **conversa principal**; as perguntas das outras sessões passam por ela. Sessão que terminou o trabalho e os testes é **fechada** (arquivada). Confira o estado com `mcp__ccd_session_mgmt__list_sessions {"linked": true}` e `gh pr list`. Regra do dono (24/11): **nenhuma PR sem teste de tela e teste de links quebrados**, e só aceitar depois do comentário de aprovação da sessão "Testar cada PR na tela antes do aceite". Antes de mandar o dono aceitar várias, junte-as numa cópia da `main` e diga a ordem (quem mexe em `regras.js` conflita).
 
-**Já na `main` em 24/11:** #363 a #377 e #379 a #389 (a #378 foi fechada, repetida na #379). Resumo: boletos (vários ajustes, seguro, PDF do boleto feito à mão por e-mail, descrição sem "RS"), mês do vencimento no seguro e no ressarcimento (#373) e referência + vencimento nos campos de mês (#381), termo de aceite da reserva (#372), resumo do contrato em perguntas e respostas (#374, sem a pergunta dos animais; dia não útil = regra dos bancos), tarifa no contrato (#376), crédito do condomínio e seguro proporcional (#379), provas da cobrança (#380), busca de erros com 52 erros e correções (#383 a #387), saldo da saída na nuvem (#388), troca de titular que não valeu (#389).
+**Já na `main` em 24/11:** #363 a #377, #379 a #392, #394 a #396 e #398 a #401 (a #378 foi fechada, repetida na #379). Resumo: boletos (vários ajustes, seguro, PDF do boleto feito à mão por e-mail, descrição sem "RS"), mês do vencimento no seguro e no ressarcimento (#373) e referência + vencimento nos campos de mês (#381), termo de aceite da reserva (#372), resumo do contrato em perguntas e respostas (#374, sem a pergunta dos animais; dia não útil = regra dos bancos), tarifa no contrato (#376), crédito do condomínio e seguro proporcional (#379), provas da cobrança (#380), busca de erros com 52 erros e correções (#383 a #387), saldo da saída na nuvem (#388), troca de titular que não valeu (#389).
 
-**PRs abertas (24/11, fim da tarde), todas na fila da sessão de testes:**
-- #390: atualização automática dos modelos de contrato não vira conflito na nuvem (causa dos 4 conflitos que o dono viu às 12h42 e 12h58; ele escolheu "Fica o 2º", que era o texto atual).
-- #391: tolerância do extrato em dias úteis; botão "É o pagamento do boleto" e régua usam o número da regra.
-- #392: lembretes da régua levam o PDF do boleto feito à mão; papel do boleto do saldo diz multa e juros.
-- #393: troca que não valeu com o boleto do novo já pago (vira "a devolver") ou emitido no banco (aviso).
-- #394: lote A das respostas do dono (ficha reprovada, multa depois da troca, carta do reajuste, data do término, troca do vencimento que não valeu, NF "1 × total").
-- #395: pintura na saída (campo na vistoria de entrada e sugestão do valor no cálculo final).
-- #396: termo da troca anexado antes da data já passa os boletos de depois da troca (não testada na tela pela sessão dela).
+**PRs abertas (24/11, noite):**
+- #393: troca que não valeu com o boleto do novo já pago (vira "a devolver") ou emitido no banco (aviso). Esperando o dono escolher entre (a) e (b) no acordo da troca que não valeu.
+- #402: só documentação (decisões da busca de 24/11 em `DECISOES.md`, relatório `BUSCA_24_11.md` e `CLAUDE.md`).
+
+**Depois do aceite da #393:** fechar e abrir o sistema em todos os aparelhos (computador, celular, programa do PC), para pegarem a versão nova.
 
 **Sessões trabalhando (retomadas às 16h15, depois do limite de uso):** "Testar cada PR na tela antes do aceite" (testa #390 a #396 e manda a ordem de aceite); "Busca geral de erros com vários agentes e correções" (falta: tolerância do extrato por contrato como regra especial, depois da #391; DOC-07, os 8 documentos registrados no contrato, depois da #394; PR de documentos com DECISOES e relatório no fim); "Boletos: troca de titular, saída e seguro" (teste de tela da #396 e a tarifa padrão); "Pintura na saída" (terminar a #395). A sessão "Conferir tudo que entra e sai dos boletos" terminou mas o aplicativo não deixou arquivar ("ainda tem algo rodando"): arquivar depois.
 
-**Tarifa (decisão do dono, 24/11):** sempre cobrada, padrão **R$ 8,50**, com outro valor ou "Não cobrar tarifa" em cada contrato. Nos dados reais (conferido em 24/11): 16 contratos já com R$ 8,50; 5 com zero, dos quais 3 encerrados e 2 ativos: **Sobrado Almir** (contrato 2, boleto de controle do Márcio, sem NF) e **Posto** (contrato 15); boletos em aberto que mudariam: só o 160 (Sobrado Almir, 11/2026) e o 168 (Posto, 11/2026). **Decidido (24/11):** os dois ficam com "Não cobrar tarifa", e o próprio dono marca no sistema (página do inquilino → Editar contrato).
+**Tarifa (decisão do dono, 24/11):** sempre cobrada, padrão **R$ 8,50**, com outro valor ou "Não cobrar tarifa" em cada contrato. Nos dados reais (conferido em 24/11): 16 contratos já com R$ 8,50; 5 com zero, dos quais 3 encerrados e 2 ativos: **Sobrado Almir** (contrato 2, boleto de controle do Márcio, sem NF) e **Posto** (contrato 15); boletos em aberto que mudariam: só o 160 (Sobrado Almir, 11/2026) e o 168 (Posto, 11/2026). **Feito (24/11):** os dois ficaram com "Não cobrar tarifa", marcados pelo dono, que também conferiu a regra em R$ 8,50.
 
 **Esperando o dono:**
 - NF do proporcional **pago em dia**: hoje a linha sai "16/30 × R$ 1.800,00" (aluguel com bonificação), e não "× R$ 2.000,00" como no exemplo dele. Fica assim? (pergunta da sessão da busca; não mudar até ele responder).
-- Marcar "Não cobrar tarifa" no Sobrado Almir (contrato 2) e no Posto (contrato 15) (decidido em 24/11, acima).
 - Pintura (#395): contar só meses completos (12 meses e meio = 12)? E, na troca de titular sem vistoria nova, contar desde a entrada do titular anterior (a vistoria que vale)?
 - Termo da reserva: dizer o que acontece se **a empresa** desistir (lei das arras: devolver em dobro, CC art. 418)?
 - Mandar ao advogado `Conferencia do advogado - 24-11 - v2.html` e o PDF (raiz do projeto). As cláusulas novas (honorários, IPCA, visita perdida, serviços extras, pagamento devolvido, pintura) só entram no contrato depois da resposta dele; então o Claude programa despesas e 10% só no acordo e no cálculo final.
