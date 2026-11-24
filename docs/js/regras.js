@@ -3768,7 +3768,8 @@ function alertasDaSaidaContinuam(d, c, hoje) {
   return roteiroSaida(d, c, hoje).some((e) => e.chave !== 'arquivo' && !e.feito);
 }
 function alertasDepoisDaSaida(d, c, hoje) {
-  return [alertaComprovantes(d, c), alertaTermoAcordo(d, c), alertaNotificacoes(d, c, hoje)].filter(Boolean);
+  // o ressarcimento lançado para depois da saída ou da troca de titular continua avisando (não abateu em nenhum boleto)
+  return [alertaComprovantes(d, c), alertaTermoAcordo(d, c), alertaNotificacoes(d, c, hoje), alertaRessarcimentoEmAcordo(d, c)].filter(Boolean);
 }
 /** Alertas do inquilino (Painel e página dele): os do contrato ativo ou, depois da saída, os que ainda continuam. */
 export function alertasDoInquilino(d, c, hoje = C.hojeIso()) {
@@ -6924,6 +6925,42 @@ function ressarcimentosNoBoleto(d, contratoId, comp) {
   return { valor: lista.reduce((t, r) => t + r.valor, 0), descricao: lista.map((r) => `${r.descricao} (condomínio ${C.compBr(r.competencia_condominio)})`).join('; ') };
 }
 
+/**
+ * Por que o contrato não terá boleto do aluguel no mês do abatimento (ressarcimento que não entraria em lugar nenhum), ou null.
+ * Conferência de 24/11/2026: o ressarcimento de um mês depois da saída, ou depois da troca de titular (o boleto do mês é do
+ * novo titular), ficava lançado e não abatia em nenhum boleto, sem aviso. Ex.: Maria sai em 20/11/2026 e o fundo de obras de
+ * R$ 50,00 pago em 05/12 cairia no boleto de 12/2026, que não existe.
+ * { motivo: 'troca' | 'saida' | 'entrada', data, novo? }
+ */
+export function semBoletoNoMes(d, c, comp) {
+  if (!c || !comp || boletoDoMes(d, c.id, comp)) return null;
+  if (C.diasOcupados(comp, c.data_entrada, c.data_saida) > 0) return null;
+  if (c.data_entrada && `${comp}-31` < c.data_entrada) return { motivo: 'entrada', data: c.data_entrada };
+  const novo = continuadoPor(d, c);
+  return novo ? { motivo: 'troca', data: novo.data_entrada || novo.vigencia_inicio, novo } : { motivo: 'saida', data: c.data_saida };
+}
+
+/** Texto do motivo de ``semBoletoNoMes`` (para o formulário e o alerta). */
+export function textoSemBoleto(s, comp) {
+  if (s.motivo === 'troca') return `o boleto de ${C.compBr(comp)} já é de ${s.novo.inquilino_nome} (troca de titular em ${C.dataBr(s.data)})`;
+  if (s.motivo === 'entrada') return `o contrato começa em ${C.dataBr(s.data)} e não tem boleto de ${C.compBr(comp)}`;
+  return `o contrato termina em ${C.dataBr(s.data)} e não tem boleto de ${C.compBr(comp)}`;
+}
+
+/**
+ * Depois do Desfazer de um ressarcimento pelo Histórico (valor, mês do abatimento), põe os boletos em aberto do contrato de
+ * novo de acordo com os ressarcimentos lançados: os meses que têm ressarcimento e os boletos que ainda mostram um.
+ * Conferência de 24/11/2026: o Desfazer voltava o ressarcimento e o boleto continuava com o valor de antes. Ex.: R$ 50,00
+ * mudado para R$ 80,00 e desfeito → o boleto de 11/2026 volta a abater R$ 50,00.
+ */
+export function reaplicarRessarcimentos(d, contratoId, usuario) {
+  const c = buscar(d, 'contratos', contratoId);
+  if (!c) return;
+  const meses = [...(d.ressarcimentos || []).filter((r) => r.contrato_id === c.id).map((r) => r.competencia_abatimento),
+    ...d.cobrancas.filter((cb) => cb.contrato_id === c.id && cb.ressarcimento && !cb.data_pagamento).map((cb) => cb.competencia)];
+  for (const comp of new Set(meses.filter(Boolean))) aplicarRessarcimentos(d, c, comp, usuario);
+}
+
 /** Mês de condomínio mais antigo ainda não conferido (para o alerta e o fechamento), ou null. */
 export function condominioAConferir(c, hoje = C.hojeIso()) {
   if (!inquilinoPagaCondominio(c) || !contratoAtivo(c, hoje)) return null;
@@ -6960,9 +6997,25 @@ export function aplicarRessarcimentos(d, contrato, comp, usuario) {
  * Ex.: boleto de 10/2026 em acordo e ressarcimento de R$ 50,00 lançado depois para 10/2026 → aviso para passar ao próximo boleto em aberto.
  */
 export function alertaRessarcimentoEmAcordo(d, c) {
+  // lançado no contrato anterior (troca de titular) para um mês que já é deste: aparece aqui, onde está o boleto
+  const anterior = contratoHerdado(d, c);
+  const mesesAnt = anterior ? [...new Set((d.ressarcimentos || []).filter((r) => r.contrato_id === anterior.id).map((r) => r.competencia_abatimento))].sort() : [];
+  for (const comp of mesesAnt) {
+    const sem = semBoletoNoMes(d, anterior, comp);
+    if (sem && sem.motivo === 'troca' && sem.novo.id === c.id) {
+      return { nivel: 'aviso', tipo: 'Condomínio', ancora: 'ressarcimentos',
+        texto: `Ressarcimento de ${C.reais(ressarcimentosNoBoleto(d, anterior.id, comp).valor)} lançado no contrato de ${anterior.inquilino_nome} para o boleto de ${C.compBr(comp)}, que é deste contrato (troca de titular): não foi abatido em nenhum boleto. Exclua lá e lance aqui, ou escolha lá um boleto em aberto de ${anterior.inquilino_nome}.` };
+    }
+  }
   const meses = [...new Set((d.ressarcimentos || []).filter((r) => r.contrato_id === c.id).map((r) => r.competencia_abatimento))].sort();
   for (const comp of meses) {
     const cb = boletoDoMes(d, c.id, comp);
+    // mês sem boleto deste contrato (depois da saída ou da troca de titular): o ressarcimento não abate em lugar nenhum
+    const sem = !cb && semBoletoNoMes(d, c, comp);
+    if (sem) {
+      return { nivel: 'aviso', tipo: 'Condomínio', ancora: 'ressarcimentos',
+        texto: `Ressarcimento de ${C.reais(ressarcimentosNoBoleto(d, c.id, comp).valor)} marcado para o boleto de ${C.compBr(comp)}, mas ${textoSemBoleto(sem, comp)}: não foi abatido em nenhum boleto. Em "Ressarcimentos", escolha um boleto em aberto deste contrato${sem.motivo === 'troca' ? ` ou exclua aqui e lance no contrato de ${sem.novo.inquilino_nome}` : ' ou devolva ao inquilino'}.` };
+    }
     // ressarcimento maior que o boleto: o boleto fica em R$ 0,00 e a sobra não passa sozinha ao próximo. Ex.: aluguel R$ 2.000,00
     // (R$ 1.800,00 em dia) e fundo de obras de R$ 2.500,00 → R$ 700,00 a lançar no próximo boleto
     if (cb && !cb.data_pagamento && !emAcordo(cb)) {
