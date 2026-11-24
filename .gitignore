@@ -10,3 +10,6 @@ nuvem/.local/
 atualizador-pc/.env
 atualizador-pc/dist/
 _site/
+
+# PDF para o dono revisar os modelos (tools/modelos-para-revisar.mjs): fica só no computador
+Modelos de documentos - para revisar.pdf
