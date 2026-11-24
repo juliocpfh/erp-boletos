@@ -279,6 +279,10 @@ export const FORMULARIOS = {
     const dados = { contrato_id: c.id, imovel_id: c.imovel_id || null, tipo: f.tipo, data: f.data, link_fotos: (f.link_fotos || '').trim(),
       chaves: f.chaves || '', descritivo: f.descritivo || '', condicoes: f.condicoes || '',
       texto_abertura: String(f.texto_abertura || '').trim(), texto_final: f.tipo === 'Entrada' ? String(f.texto_final || '').trim() : '' };
+    if (f.tipo === 'Entrada') {
+      if (!['sim', 'nao'].includes(f.pintura_nova)) throw new C.ErroUsuario('Diga se a pintura era nova na entrada (Sim ou Não).');
+      dados.pintura_nova = f.pintura_nova === 'sim';
+    }
     // B3: na saída, se o inquilino acompanhou (sem ele, o relatório vai por e-mail com 5 dias úteis para contestar)
     if (f.tipo === 'Saída') {
       if (!K.PRESENCA_VISTORIA_SAIDA.includes(f.inquilino_presente)) throw new C.ErroUsuario('Diga se o inquilino acompanhou a vistoria.');

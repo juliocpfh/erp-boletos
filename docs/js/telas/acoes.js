@@ -1502,17 +1502,46 @@ export const ACOES = {
     const c = v && buscar('contratos', v.contrato_id);
     if (!c) throw new C.ErroUsuario('Este inquilino não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.');
     const res = K.resultadoVistoriaSaida(d(), c);
+    // pintura (decisão do dono, 24/11/2026): com o orçamento inteiro, a sugestão pela vistoria de entrada (K.sugestaoPintura)
+    const lerCentavos = (t) => { const x = String(t || '').trim(); if (!x) return null; try { return C.centavos(x); } catch { return undefined; } };
+    const sugestao = (orc) => K.sugestaoPintura(d(), c, orc);
+    const textoSugestao = (orc) => {
+      const s = sugestao(orc);
+      if (s.caso === 'sem_info' || s.caso === 'sem_vistoria') return `<span class="alerta aviso" style="display:block;margin:4px 0">${esc(s.texto)} Sem sugestão: digite o valor.</span>`;
+      return `<span class="suave">${esc(s.texto)}${s.valor === null ? ' Digite o orçamento inteiro para ver a conta.' : ''}</span>${s.valor !== null ? ` <button type="button" class="secundario pequeno" data-usar-pintura>Usar ${esc(reais(s.valor))}</button>` : ''}`;
+    };
     const r = await janela({ titulo: `Reparos da vistoria de saída - ${c.inquilino_nome}`, sim: 'Salvar', nao: 'Cancelar',
       html: `<p>O valor de cada reparo vem do orçamento (melhor dois) ou da nota do serviço. Entra nos débitos do cálculo final, descontado da garantia ou cobrado. Guarde os orçamentos na pasta do inquilino. Item sem reparo a cobrar (ex.: desgaste natural): valor 0,00.</p>
-        ${res.reparos.map((x) => `<fieldset style="margin:8px 0"><legend>${esc(x.pendencia)}</legend>
+        ${res.reparos.map((x, k) => `<fieldset style="margin:8px 0" data-reparo="${k}"><legend>${esc(x.pendencia)}</legend>
+          <p class="check"><label><input type="checkbox" name="pintura_${k}" value="1"${x.pintura ? ' checked' : ''} data-pintura> Reparo de pintura (sugerir o valor pela vistoria de entrada)</label></p>
+          <div data-bloco-pintura${x.pintura ? '' : ' hidden'}><label>Orçamento inteiro da pintura (R$)</label><input name="orc_pintura_${k}" inputmode="decimal" data-orc-pintura value="${x.orcamento_valor === null ? '' : esc(dinheiroTexto(x.orcamento_valor))}" placeholder="ex.: 2.400,00">
+            <p data-sugestao-pintura>${textoSugestao(x.orcamento_valor)}</p></div>
           <label>Valor (R$)</label><input name="valor" inputmode="decimal" value="${x.valor === null ? '' : esc(dinheiroTexto(x.valor))}" placeholder="ex.: 350,00">
-          <label>Orçamento ou nota <span class="suave">(de quem, data)</span></label><input name="orcamento" value="${esc(x.orcamento)}" placeholder="ex.: Pinturas Silva, 18/11/2026"></fieldset>`).join('')}` });
+          <label>Orçamento ou nota <span class="suave">(de quem, data)</span></label><input name="orcamento" value="${esc(x.orcamento)}" placeholder="ex.: Pinturas Silva, 18/11/2026"></fieldset>`).join('')}`,
+      ligar: (dlg) => {
+        for (const fs of dlg.querySelectorAll('[data-reparo]')) {
+          const caixa = fs.querySelector('[data-pintura]');
+          const bloco = fs.querySelector('[data-bloco-pintura]');
+          const orc = fs.querySelector('[data-orc-pintura]');
+          const alvo = fs.querySelector('[data-sugestao-pintura]');
+          caixa.addEventListener('change', () => { bloco.hidden = !caixa.checked; });
+          orc.addEventListener('input', () => { const v = lerCentavos(orc.value); alvo.innerHTML = textoSugestao(v === undefined ? null : v); });
+          alvo.addEventListener('click', (ev) => {
+            if (!ev.target.closest('[data-usar-pintura]')) return;
+            const s = sugestao(lerCentavos(orc.value) ?? null);
+            if (s.valor !== null) fs.querySelector('input[name="valor"]').value = dinheiroTexto(s.valor);
+          });
+        }
+      } });
     if (!r) return;
     const lista = res.reparos.map((x, k) => {
       const t = String((r.valor || [])[k] || '').trim();
       let valor = null;
       if (t) { try { valor = C.centavos(t); } catch { throw new C.ErroUsuario(`Valor inválido em "${x.pendencia}".`); } }
-      return { pendencia: x.pendencia, valor, orcamento: String((r.orcamento || [])[k] || '') };
+      const pintura = String((r[`pintura_${k}`] || [])[0] || '') === '1';
+      const ov = pintura ? lerCentavos((r[`orc_pintura_${k}`] || [])[0]) : null;
+      if (ov === undefined) throw new C.ErroUsuario(`Orçamento da pintura inválido em "${x.pendencia}".`);
+      return { pendencia: x.pendencia, valor, orcamento: String((r.orcamento || [])[k] || ''), pintura, orcamento_valor: ov };
     });
     await alterar((db) => R.valoresReparos(db, v.id, lista, login()));
     aviso('Valores dos reparos salvos: entram nos débitos do cálculo final.');
