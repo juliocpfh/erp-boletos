@@ -528,8 +528,10 @@ function documentoPorModelo(q) {
   const c = buscar('contratos', q.contrato);
   if (!c || !(tipo in TIPOS_DOCUMENTO)) return null;
   const p = preenchidos.get(`${modelo.id}:${c.id}`) || {};
-  // o fim do contrato com a renovação e a troca de titular (contrato por prazo indeterminado: sem data, o texto muda)
-  const dados = K.dadosDoDocumento(d(), c, tipo, p.valores || {}, { data: p.data || C.hojeIso(), fim: R.fimDoContrato(d(), c) });
+  // o fim do contrato com a renovação e a troca de titular (contrato por prazo indeterminado: sem data, o texto muda);
+  // sem o prazo em meses (dados antigos), a data de término gravada; indeterminado desde o início não usa o prazo que sobrou
+  const fim = c.prazo_tipo === 'Indeterminado' ? (c.vigencia_fim || null) : (R.fimDoContrato(d(), c) || c.vigencia_fim || null);
+  const dados = K.dadosDoDocumento(d(), c, tipo, p.valores || {}, { data: p.data || C.hojeIso(), fim });
   return { c, modelo, blocos: K.montarContrato(modelo.texto, dados), rodape: dados.rodape, nome: modelo.nome, semCampos: !p.valores,
     arquivo: nomeArquivoDoc(TIPOS_DOCUMENTO[tipo].nome.replace(/\s*\(.*\)$/, ''), c, String(p.data || C.hojeIso()).slice(0, 10)) };
 }
