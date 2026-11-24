@@ -317,11 +317,12 @@ Ficha "Pagamentos Efetuados", código 70 (Aluguéis de imóveis), um lançamento
 O aluguel de moradia não reduz o imposto; a informação serve para o cruzamento da Receita Federal. Não houve retenção de imposto de renda na fonte.[fim]`,
   },
   // Régua de cobrança por e-mail (pedido do dono em 2026-11-16): o sistema prepara (regua-email.js) e só sai com a autorização
-  // do administrador (#/regua). ``boleto``: o e-mail é de um boleto (alvo { contrato, cobranca }); boleto do C6 e QR Code do Pix anexados.
+  // do administrador (#/regua). ``boleto``: o e-mail é de um boleto (alvo { contrato, cobranca }); boleto do C6 e QR Code do Pix anexados,
+  // ou o PDF do boleto feito à mão no banco (``boleto:anexado``, decisão do dono de 24/11/2026, DOC-05).
   {
     chave: 'cobranca_antes', nome: 'Lembrete antes do vencimento', etapa: 'Régua de cobrança', boleto: true,
     assunto: 'Lembrete: boleto {boleto_referente} ({imovel}) vence em {vencimento_boleto}',
-    anexos: '', prontos: ['boleto:pdf', 'boleto:pix'],
+    anexos: '', prontos: ['boleto:pdf', 'boleto:pix', 'boleto:anexado'],
     texto: `Olá, {nome}, tudo bem?
 
 O boleto {boleto_referente} ({imovel}) vence em {vencimento_boleto}[se nao_util], que não é dia útil: sem multa até {limite_pagamento}[fim]. Valor: {valor_em_dia}[se bonificacao_boleto], já com a bonificação[fim]. Depois de {limite_pagamento}: {valor_cheio}, mais multa de {multa_pct} e juros de {juros_pct} ao mês.
@@ -337,7 +338,7 @@ Já pagou? Desconsidere esta mensagem.`,
   {
     chave: 'cobranca_dia', nome: 'Lembrete no dia do vencimento', etapa: 'Régua de cobrança', boleto: true,
     assunto: 'Lembrete: boleto {boleto_referente} ({imovel}) vence hoje',
-    anexos: '', prontos: ['boleto:pdf', 'boleto:pix'],
+    anexos: '', prontos: ['boleto:pdf', 'boleto:pix', 'boleto:anexado'],
     texto: `Olá, {nome}, tudo bem?
 
 [se nao_util]O boleto {boleto_referente} ({imovel}) venceu em {vencimento_boleto}, que não é dia útil: pode pagar sem multa até hoje, {limite_pagamento}[senão]O boleto {boleto_referente} ({imovel}) vence hoje, {vencimento_boleto}[fim]. Valor: {valor_em_dia}[se bonificacao_boleto], já com a bonificação[fim]. A partir de amanhã: {valor_cheio}, mais multa de {multa_pct} e juros de {juros_pct} ao mês.
@@ -353,7 +354,7 @@ Já pagou? Desconsidere esta mensagem.`,
   {
     chave: 'cobranca_atraso', nome: 'Boleto em atraso', etapa: 'Régua de cobrança', boleto: true,
     assunto: 'Boleto {boleto_referente} em aberto ({imovel})',
-    anexos: '', prontos: ['boleto:pdf', 'boleto:pix'],
+    anexos: '', prontos: ['boleto:pdf', 'boleto:pix', 'boleto:anexado'],
     texto: `Olá, {nome}, tudo bem?
 
 O boleto {boleto_referente} ({imovel}), vencido em {vencimento_boleto}, está em aberto ({dias_atraso} dia(s) de atraso). Para pagar hoje ({data_hoje}): {valor_hoje} ({valor_cheio} + multa de {multa_hoje} + juros de {juros_hoje}). Em outro dia o valor muda: responda que mandamos o atualizado.

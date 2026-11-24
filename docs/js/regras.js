@@ -8,7 +8,7 @@ import { camposAntigosDaEmpresa, companhiaDoImovel, dadoDaEmpresa, locadorasDoCo
 import * as CR from './config-regras.js';
 import * as F from './formularios.js';
 import * as M from './mapa-c6.js';
-import { CLAUSULAS_FCI, GARANTIA_NOVA_TROCA, atualizarTextoModelo } from './modelos-contrato.js';
+import { textoAtualizadoDoModelo } from './modelos-contrato.js';
 
 export const TABELAS = {
   imoveis: 'Imóvel', contratos: 'Inquilino / contrato', correcoes: 'Correção de aluguel', seguros: 'Seguro',
@@ -187,34 +187,12 @@ export function normalizar(d) {
     const c = s.contrato_id && contratoPorId.get(s.contrato_id);
     if (c) s.imovel_id = c.imovel_id; // acompanha o imóvel do contrato (ex.: "Corrigir imóvel")
   }
-  // cláusulas do FCI (só saem com o FCI ativado) entram nos modelos de contrato já gravados, antes da renovação
+  // atualizações automáticas dos modelos de contrato já gravados (FCI, revisão jurídica de 12 e 13/11, garantia nova e contas de
+  // consumo no termo da troca, resumo do contrato...): os passos estão em textoAtualizadoDoModelo (modelos-contrato.js), que a
+  // nuvem usa também para não abrir conflito quando dois aparelhos com versões diferentes do site atualizam o mesmo modelo (24/11)
   for (const m of d.modelos_contrato || []) {
-    if (m.tipo || !m.texto || m.texto.includes('[se fci]') || !m.texto.includes('## RENOVAÇÃO DO CONTRATO')) continue;
-    m.texto = m.texto.replace('## RENOVAÇÃO DO CONTRATO', `${CLAUSULAS_FCI}\n\n## RENOVAÇÃO DO CONTRATO`);
-  }
-  // revisão jurídica de 2026-11-12 (vistoria na entrega das chaves com 10 dias, aviso prévio do art. 6º, procuração por imóvel,
-  // honorários de 20%, multa do comercial, LGPD): troca só o texto antigo que continua igual nos modelos já gravados
-  for (const m of d.modelos_contrato || []) {
-    if (m.tipo || !m.texto) continue;
-    const novo = atualizarTextoModelo(m.texto);
-    if (novo !== m.texto.replace(/\r\n/g, '\n')) m.texto = novo;
-  }
-  // termo de troca de inquilino: a garantia nova (a de quem sai é devolvida) entra nos modelos já gravados; o texto da
-  // garantia que continua fica como estava, no [senão]
-  for (const m of d.modelos_contrato || []) {
-    if (m.tipo !== 'aditivo_troca' || !m.texto || m.texto.includes('[se garantia_nova]')) continue;
-    const t = m.texto.replace(/\r\n/g, '\n');
-    const ini = t.indexOf('## DA GARANTIA\n');
-    const fim = t.indexOf('\n\n## ', ini + 1);
-    if (ini < 0 || fim < 0) continue;
-    const corpo = ini + '## DA GARANTIA\n'.length;
-    m.texto = `${t.slice(0, corpo)}\n[se garantia_nova]${GARANTIA_NOVA_TROCA}[senão]${t.slice(corpo, fim).trim()}[fim]${t.slice(fim)}`;
-  }
-  // termo de troca de inquilino (2026-11-13): contas de consumo trocadas pela empresa, com a autorização de quem sai e de quem entra
-  for (const m of d.modelos_contrato || []) {
-    if (m.tipo !== 'aditivo_troca' || !m.texto) continue;
-    const novo = atualizarTextoModelo(m.texto);
-    if (novo !== m.texto.replace(/\r\n/g, '\n')) m.texto = novo;
+    const novo = textoAtualizadoDoModelo(m);
+    if (novo !== m.texto) m.texto = novo;
   }
   // o Estado (UF) do imóvel passou a ser guardado: vem do CEP
   for (const i of d.imoveis) if (!i.uf && C.ufDoCep(i.cep)) i.uf = C.ufDoCep(i.cep);
