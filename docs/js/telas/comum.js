@@ -740,7 +740,8 @@ export async function apagarPastaDaFicha(pastaNome) {
 let documentosDeFichasConferidos = false;
 
 /**
- * Ficha reprovada: 3 meses depois da decisão, os documentos pessoais são apagados (pedido do dono). Ficam o registro da
+ * Ficha reprovada: 3 meses depois da decisão, os documentos pessoais são apagados (pedido do dono); com reserva a devolver, só
+ * 3 meses depois da devolução (R.inicioPrazoApagarFicha, decisão de 2026-11-24). Ficam o registro da
  * ficha e os comprovantes da reserva e da devolução (são de dinheiro). Uma vez por sessão, ao abrir o Painel.
  */
 export async function apagarDocumentosVencidosDasFichas() {
@@ -757,7 +758,7 @@ export async function apagarDocumentosVencidosDasFichas() {
     // no mesmo prazo, os dados pessoais da ficha também saem (CPF, RG, renda, endereço, contatos, fiadores; também no histórico)
     await alterar((db) => {
       R.atualizar(db, 'fichas', f.id, { documentos_apagados_em: C.hojeIso(), analise_serasa: null }, login(),
-        `Documentos da ficha reprovada apagados (${R.regra('meses_documentos_ficha')} meses depois da decisão)${apagados.length ? `: ${apagados.join(', ')}` : ''}`);
+        `Documentos da ficha reprovada apagados (${R.regra('meses_documentos_ficha')} meses depois da ${R.inicioPrazoApagarFicha(f) === f.decisao_data ? 'decisão' : 'devolução da reserva'})${apagados.length ? `: ${apagados.join(', ')}` : ''}`);
       R.apagarDadosPessoaisDaFicha(db, f.id, login());
     });
   }
