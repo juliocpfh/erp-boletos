@@ -80,27 +80,57 @@ export function itensDaProposta(f) {
 // --------------------------------------------------------------------------
 const pctTexto = (n) => `${String(Math.round((Number(n) || 0) * 100) / 100).replace('.', ',')}%`;
 
+/** Dados ou documentos que não correspondem à realidade (decisão do dono de 2026-11-24: exemplos claros, sem falar em "falso"). */
+export const TEXTO_CONFERENCIA = 'Se, na conferência, alguma informação ou documento que você enviou não corresponder à realidade (por exemplo: renda diferente da declarada, emprego que a empresa não confirma, documento com dados alterados ou de outra pessoa), a proposta é encerrada e conta como desistência: vale a mesma regra da desistência acima.';
+
 /**
- * Frase da desistência para a pessoa (página da ficha, e-mails, ficha em PDF). Com o termo aceito e o depósito: "Se desistir
- * até 17/12/2026, a reserva de R$ 500,00 volta por inteiro; depois, devolvemos R$ 300,00 (ficam R$ 200,00, como no termo da
- * reserva)." Sem termo aceito: "A reserva de R$ 500,00 é devolvida por inteiro, sem descontos."
+ * Regra da desistência, para a pessoa (termo, e-mail). ``c``: condições; ``valor``: a reserva. Ex.: 100% e 0 dias → "Se você
+ * desistir depois do depósito, a reserva não é devolvida: os R$ 500,00 ficam com a empresa, como sinal de arrependimento
+ * (Código Civil, artigos 418 e 420)."; 40% e 7 dias → "Se você desistir em até 7 dias do depósito, devolvemos a reserva
+ * inteira. Depois desse prazo, a empresa fica com 40% da reserva (R$ 200,00) e devolve o restante (R$ 300,00)."
+ */
+export function regraDaDesistencia(c, valor) {
+  const reter = Math.min(R.retencaoDaReserva(valor, c.retencao_pct), valor);
+  if (!reter) return 'Se você desistir antes de assinar o contrato, devolvemos a reserva inteira.';
+  const quando = c.dias_arrependimento > 0 ? `Se você desistir em até ${C.plural(c.dias_arrependimento, 'dia', 'dias')} do depósito, devolvemos a reserva inteira. Depois desse prazo, se desistir, ` : 'Se você desistir depois do depósito, ';
+  return reter >= valor
+    ? `${quando}a reserva não é devolvida: ${valor ? `os ${C.reais(valor)} ficam` : 'ela fica'} com a empresa, como sinal de arrependimento (Código Civil, artigos 418 e 420), pelo tempo em que o imóvel ficou reservado para você e pela análise.`
+    : `${quando}a empresa fica com ${pctTexto(c.retencao_pct)} da reserva (${C.reais(reter)}), pelo tempo em que o imóvel ficou reservado e pela análise, e devolve o restante (${C.reais(valor - reter)}).`;
+}
+
+/** Aviso em destaque, antes de aceitar e de pagar (decisão do dono de 2026-11-24: a proteção principal é avisar antes). '' sem retenção. */
+export function avisoDaDesistencia(c, valor) {
+  const reter = Math.min(R.retencaoDaReserva(valor, c.retencao_pct), valor);
+  if (!reter) return '';
+  const quando = c.dias_arrependimento > 0 ? `depois de ${C.plural(c.dias_arrependimento, 'dia', 'dias')} do depósito` : 'depois de depositar';
+  return `ATENÇÃO, LEIA ANTES DE ACEITAR E DE PAGAR: se você desistir ${quando}, ${reter >= valor ? `você perde a reserva inteira (${C.reais(valor)})` : `você perde ${C.reais(reter)} da reserva`}. O mesmo vale se alguma informação ou documento enviado não corresponder à realidade. Só faça o depósito se tiver certeza de que quer alugar o imóvel.`;
+}
+
+/**
+ * Frase da desistência para a pessoa (página da ficha, e-mails, ficha em PDF), já com as datas. Ex.: 100% e 0 dias → "Se você
+ * desistir, a reserva de R$ 500,00 não é devolvida (fica com a empresa, como no termo da reserva)."; 40% e 7 dias, depósito em
+ * 10/12/2026 → "Se desistir até 17/12/2026, a reserva de R$ 500,00 volta por inteiro; depois, devolvemos R$ 300,00 (ficam
+ * R$ 200,00, como no termo da reserva)." Sem termo aceito: "A reserva de R$ 500,00 é devolvida por inteiro, sem descontos."
  */
 export function textoDesistencia(f) {
   const valor = R.valorDaReserva(f);
   if (!valor) return '';
   if (!f.aceite_reserva) return `A reserva de ${C.reais(valor)} é devolvida por inteiro, sem descontos.`;
   const c = R.condicoesDaReserva(f);
-  const reter = R.retencaoDaReserva(valor, c.retencao_pct);
+  const reter = Math.min(R.retencaoDaReserva(valor, c.retencao_pct), valor);
   if (!reter) return `A reserva de ${C.reais(valor)} é devolvida por inteiro, sem descontos.`;
   const pz = R.prazosDaReserva(f);
-  const ate = pz ? `até ${C.dataBr(pz.arrependimento_ate)}` : `em até ${c.dias_arrependimento} dias do depósito`;
-  return `Se desistir ${ate}, a reserva de ${C.reais(valor)} volta por inteiro; depois, devolvemos ${C.reais(valor - reter)} (ficam ${C.reais(reter)}, como no termo da reserva).`;
+  const depois = reter >= valor ? `a reserva de ${C.reais(valor)} não é devolvida (fica com a empresa, como no termo da reserva)` : `devolvemos ${C.reais(valor - reter)} da reserva de ${C.reais(valor)} (ficam ${C.reais(reter)}, como no termo da reserva)`;
+  if (!(c.dias_arrependimento > 0)) return `Se você desistir, ${depois}.`;
+  const ate = pz && pz.arrependimento_ate ? `até ${C.dataBr(pz.arrependimento_ate)}` : `em até ${C.plural(c.dias_arrependimento, 'dia', 'dias')} do depósito`;
+  return `Se desistir ${ate}, a reserva de ${C.reais(valor)} volta por inteiro; depois, ${depois.replace(/^a reserva de R\$ [\d.,]+ /, 'ela ')}.`;
 }
 
 /**
  * O termo que a pessoa lê antes de depositar: { titulo, intro, itens: [[rótulo, valor]], requisitos, documentos, clausulas,
  * deposito, ciencia, condicoes, reserva_valor }. Usa as regras de agora (o aceite guarda as condições e o texto do dia).
- * Ex.: reserva de R$ 500,00 com 40% → item 6: "... a empresa fica com 40% da reserva (R$ 200,00) ... devolve o restante (R$ 300,00)".
+ * Ex.: reserva de R$ 500,00 com 100% e 0 dias → item 6: "Se você desistir depois do depósito, a reserva não é devolvida ...", com o
+ * aviso em destaque (``aviso``) logo depois da apresentação.
  */
 export function termoDaReserva(d, f) {
   const i = imovelDe(d, { ficha: f });
@@ -109,7 +139,6 @@ export function termoDaReserva(d, f) {
   const enderecos = (f.imoveis_ids || []).map((id) => R.buscar(d, 'imoveis', id)).filter(Boolean).map((x) => enderecoDe(d, x));
   const c = R.condicoesDaReservaAgora();
   const valor = R.valorDaReserva(f);
-  const reter = R.retencaoDaReserva(valor, c.retencao_pct);
   const deposito = K.dadoDaEmpresa(d, { imovel_id: i ? i.id : null }, 'conta_deposito') || '';
   const itens = [['Imóvel', enderecos.join(' ou ') || 'imóvel não informado'], ...itensDaProposta(f), ['Reserva', valor ? `${C.reais(valor)}, abatida do 1º aluguel` : 'valor a combinar']];
   const garantia = { Fiador: 'fiador com imóvel próprio, que também manda a ficha e os documentos', 'Fiador + depósito': 'fiador com imóvel próprio e depósito de garantia',
@@ -123,25 +152,26 @@ export function termoDaReserva(d, f) {
     `1. Para reservar o imóvel, você deposita ${valorTexto} na conta da empresa${deposito ? ' informada no fim deste termo' : ''}. O imóvel fica reservado para você por ${c.dias_validade} dias, contados do depósito, enquanto analisamos a ficha.`,
     '2. A reserva não é aluguel e não forma o contrato: a locação só existe depois do contrato assinado por todos.',
     '3. Aprovada a ficha e assinado o contrato, a reserva é abatida do primeiro aluguel: o primeiro boleto já vem com o desconto. É para isso que ela serve.',
-    `4. Depois do depósito, você tem ${C.plural(c.dias_uteis_documentos, 'dia útil', 'dias úteis')} para preencher a ficha e mandar todos os documentos pelo link que vamos enviar. Sem os documentos nesse prazo, a reserva é cancelada e o imóvel volta a ser oferecido; a devolução segue os itens 5 e 6.`,
+    `4. Depois do depósito, você tem ${C.plural(c.dias_uteis_documentos, 'dia útil', 'dias úteis')} para preencher a ficha e mandar todos os documentos pelo link que vamos enviar. Sem os documentos nesse prazo, a reserva é cancelada, conta como desistência (item 6) e o imóvel volta a ser oferecido.`,
     '5. Se a ficha não for aprovada, devolvemos a reserva inteira, sem nenhum desconto.',
-    reter > 0
-      ? `6. Se você desistir em até ${c.dias_arrependimento} dias do depósito, devolvemos a reserva inteira. Depois desse prazo, a empresa fica com ${pctTexto(c.retencao_pct)} da reserva (${C.reais(reter)}), pelo tempo em que o imóvel ficou reservado e pela análise, e devolve o restante (${C.reais(valor - reter)}). Dados ou documentos que não se confirmarem na conferência contam como desistência.`
-      : '6. Se você desistir antes de assinar o contrato, devolvemos a reserva inteira.',
-    `7. A devolução é feita em até ${C.plural(c.dias_uteis_devolucao, 'dia útil', 'dias úteis')} da reprovação ou da desistência, na conta de onde veio o depósito.`,
-    '8. Seus dados são usados só para a análise desta locação e, se aprovada, para o contrato (Lei 13.709/2018).',
+    `6. ${regraDaDesistencia(c, valor)}`,
+    `7. ${TEXTO_CONFERENCIA}`,
+    Math.min(R.retencaoDaReserva(valor, c.retencao_pct), valor) >= valor && !(c.dias_arrependimento > 0)
+      ? `8. Quando houver devolução (ficha não aprovada), ela é feita em até ${C.plural(c.dias_uteis_devolucao, 'dia útil', 'dias úteis')} da reprovação, na conta de onde veio o depósito.`
+      : `8. Quando houver devolução, ela é feita em até ${C.plural(c.dias_uteis_devolucao, 'dia útil', 'dias úteis')} da reprovação ou da desistência, na conta de onde veio o depósito.`,
+    '9. Seus dados são usados só para a análise desta locação e, se aprovada, para o contrato (Lei 13.709/2018).',
   ];
   return {
     titulo: 'TERMO DE ACEITE DA RESERVA DE IMÓVEL', empresa, cnpj: e.cnpj || '', condicoes: { ...c }, reserva_valor: valor,
     intro: `${empresa}${e.cnpj ? `, CNPJ ${e.cnpj}` : ''}, apresenta a ${f.inquilino_nome || 'você'} as condições para reservar o imóvel abaixo enquanto a ficha cadastral é analisada. As condições da locação dependem da aprovação da ficha.`,
-    itens, requisitos, documentos, clausulas, deposito,
-    ciencia: 'Li as condições acima e concordo com elas. Sei que a reserva é abatida do primeiro aluguel se a ficha for aprovada, e como ela é devolvida se a ficha não for aprovada ou se eu desistir.',
+    aviso: avisoDaDesistencia(c, valor), itens, requisitos, documentos, clausulas, deposito,
+    ciencia: 'Li as condições acima e concordo com elas, inclusive com a regra da desistência (itens 6 e 7). Sei que a reserva é abatida do primeiro aluguel se a ficha for aprovada.',
   };
 }
 
 /** O termo como texto corrido (o que a pessoa aceita no link; o servidor guarda este texto e o resumo SHA-256 dele). */
 export function textoDoTermo(t) {
-  return [t.titulo, t.intro, `CONDIÇÕES DA LOCAÇÃO\n${t.itens.map(([a, b]) => `- ${a}: ${b}`).join('\n')}`,
+  return [t.titulo, t.intro, ...(t.aviso ? [t.aviso] : []), `CONDIÇÕES DA LOCAÇÃO\n${t.itens.map(([a, b]) => `- ${a}: ${b}`).join('\n')}`,
     `REQUISITOS PARA A APROVAÇÃO\n${t.requisitos.map((x) => `- ${x}`).join('\n')}`,
     `DOCUMENTOS PARA A ANÁLISE\n${t.documentos.map((x, k) => `${k + 1}. ${x}`).join('\n')}`,
     `CONDIÇÕES DA RESERVA\n${t.clausulas.join('\n')}`, ...(t.deposito ? [`CONTA PARA O DEPÓSITO DA RESERVA\n${t.deposito}`] : [])].join('\n\n');
@@ -682,7 +712,7 @@ function termoReservaPdf(d, f, base, nomeArq) {
   const t = termoDaReserva(d, f);
   return {
     ...base, titulo: t.titulo,
-    paragrafos: [t.intro],
+    paragrafos: [t.intro, ...(t.aviso ? [t.aviso] : [])],
     tabela: [['CONDIÇÕES DA LOCAÇÃO', null], ...t.itens, ['REQUISITOS PARA A APROVAÇÃO', null], ...t.requisitos.map((x, k) => [`${k + 1}.`, x]),
       ['DOCUMENTOS PARA A ANÁLISE', null], ...t.documentos.map((x, k) => [`${k + 1}.`, x]), ...(t.deposito ? [['CONTA PARA O DEPÓSITO DA RESERVA', null], ['Depósito', t.deposito]] : [])],
     depois: ['CONDIÇÕES DA RESERVA', ...t.clausulas, `DECLARAÇÃO. ${t.ciencia}`, COMO_ASSINAR],

@@ -2990,13 +2990,15 @@ export const fichaAbertaDoImovel = (d, imovelId, excetoId = null) => (d.fichas |
 export const fichaSemContrato = (f) => f.situacao === 'Reprovada' || f.situacao === 'Desistiu';
 
 /** Reserva de ficha reprovada (ou com desistência) que ainda não teve a devolução registrada. */
-export const devolucaoPendente = (f) => fichaSemContrato(f) && f.reserva_valor > 0 && !f.devolucao_data;
+// com o termo aceito, a reserva retida por inteiro não fica "a devolver" (devolucaoDaReserva, mais abaixo)
+export const devolucaoPendente = (f) => fichaSemContrato(f) && f.reserva_valor > 0 && !f.devolucao_data && devolucaoDaReserva(f).devolver > 0;
 
 // --------------------------------------------------------------------------
 // Termo de aceite da reserva (decisões do dono de 2026-11-24): antes do depósito, o interessado lê as condições e aceita pelo
 // link (código no e-mail). O aceite guarda as condições do dia (`aceite_reserva.condicoes`): mudar as regras depois não muda
-// o que a pessoa aceitou. Reprovada: devolve tudo. Desistência até `dias_arrependimento` dias do depósito: devolve tudo; depois,
-// a empresa fica com `retencao_pct` (padrão 40%). Dados ou documentos que não se confirmam na conferência contam como desistência
+// o que a pessoa aceitou. Reprovada: devolve tudo. Desistência até `dias_arrependimento` dias do depósito (padrão 0: nenhum):
+// devolve tudo; depois, a empresa fica com `retencao_pct` (padrão 100%, arras penitenciais, CC arts. 418 e 420; decisão do dono de
+// 2026-11-24). Informação ou documento que não corresponde à realidade na conferência conta como desistência
 // (`reprovada_conferencia`). A reserva é sempre abatida do 1º aluguel (competenciaReserva: em branco = mês de entrada).
 // --------------------------------------------------------------------------
 /** Condições da reserva pelas regras de agora (Sistema → Regras do sistema, grupo "Reserva e termo de aceite"). */
@@ -3014,19 +3016,21 @@ export const retencaoDaReserva = (valor, pct) => Math.round((valor || 0) * (Numb
 
 /**
  * Prazos contados do depósito da reserva (null sem a data do depósito). Ex.: depósito na quinta, 10/12/2026 → documentos até
- * 15/12/2026 (3 dias úteis), reservado até 17/12/2026 (7 dias) e desistência com tudo de volta até 17/12/2026 (7 dias).
+ * 15/12/2026 (3 dias úteis) e reservado até 17/12/2026 (7 dias); desistência com tudo de volta até 17/12/2026 com 7 dias na regra,
+ * ou nenhuma (arrependimento_ate null) com 0 dias, o padrão.
  */
 export function prazosDaReserva(f) {
   if (!f || !/^\d{4}-\d{2}-\d{2}$/.test(String(f.reserva_data || ''))) return null;
   const c = condicoesDaReserva(f);
   return { documentos_ate: C.somarDiasUteis(f.reserva_data, c.dias_uteis_documentos), vale_ate: C.somarDias(f.reserva_data, c.dias_validade),
-    arrependimento_ate: C.somarDias(f.reserva_data, c.dias_arrependimento) };
+    arrependimento_ate: c.dias_arrependimento > 0 ? C.somarDias(f.reserva_data, c.dias_arrependimento) : null };
 }
 
 /**
  * Quanto devolver da reserva: { reserva, devolver, reter, integral, motivo }. ``data``: o dia da desistência (padrão: o da
  * decisão; ficha ainda aberta: hoje, para mostrar "se desistir hoje"). Sem o termo aceito, devolve tudo (a pessoa não aceitou
- * a retenção). Ex.: reserva de R$ 500,00, depósito em 10/12/2026, desistência em 20/12/2026 → devolve R$ 300,00, fica R$ 200,00.
+ * a retenção). Ex.: reserva de R$ 500,00 com 100% e 0 dias → desistência em qualquer dia depois do depósito: devolve R$ 0,00 e
+ * fica R$ 500,00; com 40% e 7 dias, depósito em 10/12/2026 e desistência em 20/12/2026 → devolve R$ 300,00, fica R$ 200,00.
  */
 export function devolucaoDaReserva(f, { data = null, hoje = C.hojeIso() } = {}) {
   const reserva = f && f.reserva_valor > 0 ? f.reserva_valor : 0;
@@ -3037,11 +3041,12 @@ export function devolucaoDaReserva(f, { data = null, hoje = C.hojeIso() } = {}) 
   const c = condicoesDaReserva(f);
   const quando = data || (fichaSemContrato(f) ? f.decisao_data : null) || hoje;
   const prazos = prazosDaReserva(f);
-  if (!prazos || quando <= prazos.arrependimento_ate) return tudo(`desistência em até ${c.dias_arrependimento} dias do depósito: devolve tudo`);
+  if (prazos && prazos.arrependimento_ate && quando <= prazos.arrependimento_ate) return tudo(`desistência em até ${c.dias_arrependimento} dias do depósito: devolve tudo`);
   const reter = Math.min(retencaoDaReserva(reserva, c.retencao_pct), reserva);
-  const porque = f.situacao === 'Reprovada' ? 'dados ou documentos que não se confirmaram na conferência (conta como desistência)' : 'desistência';
+  const porque = f.situacao === 'Reprovada' ? 'informação ou documento que não correspondeu à realidade na conferência (conta como desistência)' : 'desistência';
+  const prazo = c.dias_arrependimento > 0 ? ` depois de ${c.dias_arrependimento} dias do depósito` : '';
   return { reserva, devolver: reserva - reter, reter, integral: reter === 0,
-    motivo: `${porque} depois de ${c.dias_arrependimento} dias do depósito: a empresa fica com ${C.pct(c.retencao_pct)} (${C.reais(reter)}), como no termo aceito em ${C.dataBr(String(f.aceite_reserva.em).slice(0, 10))}` };
+    motivo: `${porque}${prazo}: a empresa fica com ${reter >= reserva ? 'a reserva inteira' : C.pct(c.retencao_pct)} (${C.reais(reter)}), como no termo aceito em ${C.dataBr(String(f.aceite_reserva.em).slice(0, 10))}` };
 }
 
 /** Último dia para devolver a reserva (reprovada ou desistência): a decisão mais os dias úteis do termo. */

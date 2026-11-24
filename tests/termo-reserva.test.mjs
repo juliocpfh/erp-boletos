@@ -1,5 +1,5 @@
-// Termo de aceite da reserva (decisões do dono de 2026-11-24): regras configuráveis (40%, 7 dias, 3 dias úteis, 7 dias, 5 dias
-// úteis), quanto devolver, prazos e alertas, o texto do termo e o PDF, o e-mail, o aceite pela nuvem (código no e-mail, prova)
+// Termo de aceite da reserva (decisões do dono de 2026-11-24): regras configuráveis (100%, 0 dias, 3 dias úteis, 7 dias, 5 dias
+// úteis; também com 40% e 7 dias, se o dono mudar), quanto devolver, prazos e alertas, o texto do termo e o PDF, o e-mail, o aceite pela nuvem (código no e-mail, prova)
 // e a correção pela pessoa na ficha pela internet (trocar e apagar documentos, só antes da conferência, com o registro).
 // Dados fictícios (CPF e CNPJ de teste).
 import assert from 'node:assert/strict';
@@ -28,27 +28,47 @@ function base(extra = {}) {
     reserva_combinada: 50000, requisitos: 'Renda de pelo menos 3 vezes o aluguel', ...extra }, 'j');
   return { d, i, f };
 }
-/** Aceite como o que vem da nuvem (condições de agora). */
-const aceite = (em = '2026-12-09T13:00:00.000Z') => ({ em, email: 'maria@exemplo.com.br', ip: '203.0.113.7', aparelho: 'Teste/1.0', texto_aceito: 'TERMO DE ACEITE DA RESERVA DE IMÓVEL\n\nTexto.\n\nDeclaração: Li e concordo.', texto_sha256: 'a'.repeat(64), condicoes: R.condicoesDaReservaAgora(), reserva_valor: 50000 });
+/** Aceite como o que vem da nuvem (``condicoes``: as do dia do aceite; padrão: as de agora, 100% e 0 dias). */
+const aceite = (em = '2026-12-09T13:00:00.000Z', condicoes = R.condicoesDaReservaAgora()) => ({ em, email: 'maria@exemplo.com.br', ip: '203.0.113.7', aparelho: 'Teste/1.0', texto_aceito: 'TERMO DE ACEITE DA RESERVA DE IMÓVEL\n\nTexto.\n\nDeclaração: Li e concordo.', texto_sha256: 'a'.repeat(64), condicoes, reserva_valor: 50000 });
+/** Termo aceito com 40% e 7 dias (se o dono mudar a regra). */
+const COND_40_7 = { retencao_pct: 40, dias_arrependimento: 7, dias_uteis_documentos: 3, dias_validade: 7, dias_uteis_devolucao: 5 };
+const aceite40 = () => aceite(undefined, COND_40_7);
 
-test('regras novas: padrões do dono (40%, 7 dias, 3 dias úteis, 7 dias, 5 dias úteis), com explicação, consequência e lei', () => {
+test('regras novas: padrões do dono (100%, 0 dias, 3 dias úteis, 7 dias, 5 dias úteis), com explicação, consequência, risco e lei', () => {
   const chaves = ['reserva_retencao_pct', 'reserva_dias_arrependimento', 'reserva_dias_uteis_documentos', 'reserva_dias_validade', 'reserva_dias_uteis_devolucao'];
-  assert.deepEqual(chaves.map((k) => CR.PADRAO_SISTEMA[k]), [40, 7, 3, 7, 5]);
+  assert.deepEqual(chaves.map((k) => CR.PADRAO_SISTEMA[k]), [100, 0, 3, 7, 5]);
   for (const k of chaves) {
     const def = CR.definicaoRegra(k);
     assert.equal(def.grupo, 'reserva');
     assert.ok(def.explica && def.consequencia && def.lei, k);
   }
-  assert.match(CR.definicaoRegra('reserva_retencao_pct').lei, /413.*418.*420.*49.*51/s);
-  assert.match(CR.definicaoRegra('reserva_retencao_pct').consequencia, /10% a 25%/);
-  assert.throws(() => CR.limparValorRegra('reserva_dias_arrependimento', 5), /mínimo é 7/, 'menos de 7 dias não (CDC art. 49)');
+  assert.match(CR.definicaoRegra('reserva_retencao_pct').lei, /418.*420.*413.*51/s);
+  assert.match(CR.definicaoRegra('reserva_retencao_pct').consequencia, /juiz pode reduzir.*413.*51.*10% a 25%/s, 'o risco fica registrado na regra');
+  assert.match(CR.definicaoRegra('reserva_dias_arrependimento').consequencia, /decisões isoladas que aplicam o art\. 49/);
+  assert.equal(CR.limparValorRegra('reserva_dias_arrependimento', 0), 0);
 });
 
-test('devolução: R$ 500,00 com 40% → em até 7 dias do depósito devolve tudo; depois devolve R$ 300,00 e fica R$ 200,00', () => {
+test('devolução pelo padrão (100%, 0 dias): desistência depois do depósito não devolve nada; reprovada devolve tudo', () => {
   const { d, f } = base({ reserva_valor: 50000, reserva_data: '2026-12-10' });
-  assert.deepEqual(R.prazosDaReserva(f), { documentos_ate: '2026-12-15', vale_ate: '2026-12-17', arrependimento_ate: '2026-12-17' }, 'quinta 10/12 + 3 dias úteis = terça 15/12');
-  assert.equal(R.devolucaoDaReserva(f, { data: '2026-12-20' }).devolver, 50000, 'sem o termo aceito: devolve tudo');
+  assert.deepEqual(R.prazosDaReserva(f), { documentos_ate: '2026-12-15', vale_ate: '2026-12-17', arrependimento_ate: null }, 'quinta 10/12 + 3 dias úteis = terça 15/12; sem prazo de devolução total');
+  assert.equal(R.devolucaoDaReserva(f, { data: '2026-12-10' }).devolver, 50000, 'sem o termo aceito: devolve tudo');
   R.guardarAceiteReserva(d, f.id, aceite(), 'j');
+  const dv = R.devolucaoDaReserva(R.buscar(d, 'fichas', f.id), { data: '2026-12-10' });
+  assert.deepEqual([dv.devolver, dv.reter], [0, 50000], 'no próprio dia do depósito já não devolve');
+  assert.match(dv.motivo, /a empresa fica com a reserva inteira \(R\$ 500,00\)/);
+  R.atualizar(d, 'fichas', f.id, { situacao: 'Desistiu', decisao_data: '2026-12-11' }, 'j');
+  assert.equal(R.devolucaoPendente(R.buscar(d, 'fichas', f.id)), false, 'nada a devolver: não fica "devolver a reserva"');
+  assert.ok(!R.pendenciasDasFichas(d, '2026-12-30').some((x) => /devolução/.test(x.texto)));
+  R.atualizar(d, 'fichas', f.id, { situacao: 'Reprovada', decisao_motivo: 'renda' }, 'j');
+  assert.equal(R.devolucaoDaReserva(R.buscar(d, 'fichas', f.id)).devolver, 50000, 'reprovada: devolve tudo');
+  R.atualizar(d, 'fichas', f.id, { reprovada_conferencia: true }, 'j');
+  assert.equal(R.devolucaoDaReserva(R.buscar(d, 'fichas', f.id)).devolver, 0, 'informação que não correspondeu à realidade conta como desistência');
+});
+
+test('devolução com 40% e 7 dias (se o dono mudar a regra): em até 7 dias devolve tudo; depois devolve R$ 300,00 e fica R$ 200,00', () => {
+  const { d, f } = base({ reserva_valor: 50000, reserva_data: '2026-12-10' });
+  R.guardarAceiteReserva(d, f.id, aceite40(), 'j');
+  assert.equal(R.prazosDaReserva(R.buscar(d, 'fichas', f.id)).arrependimento_ate, '2026-12-17');
   const g = R.buscar(d, 'fichas', f.id);
   assert.equal(R.devolucaoDaReserva(g, { data: '2026-12-17' }).devolver, 50000, 'no 7º dia ainda devolve tudo');
   const depois = R.devolucaoDaReserva(g, { data: '2026-12-18' });
@@ -69,7 +89,7 @@ test('devolução: R$ 500,00 com 40% → em até 7 dias do depósito devolve tud
 
 test('alertas do Painel: prazo dos documentos sem documento marcado, reserva vencida e devolução fora do prazo', () => {
   const { d, f } = base({ reserva_valor: 50000, reserva_data: '2026-12-10' });
-  R.guardarAceiteReserva(d, f.id, aceite(), 'j');
+  R.guardarAceiteReserva(d, f.id, aceite40(), 'j');
   assert.deepEqual(R.pendenciasDasFichas(d, '2026-12-15').map((x) => x.texto).filter((t) => /prazo|segurava/.test(t)), [], 'no último dia ainda não avisa');
   assert.ok(R.pendenciasDasFichas(d, '2026-12-16').some((x) => /prazo dos documentos acabou em 15\/12\/2026/.test(x.texto)));
   R.atualizar(d, 'fichas', f.id, { doc_pessoais: true, doc_renda: true, doc_residencia: true }, 'j');
@@ -97,9 +117,19 @@ test('termo: condições do imóvel, reserva abatida do 1º aluguel, prazos, dev
   assert.match(texto, /abatida do primeiro aluguel/);
   assert.match(texto, /3 dias úteis para preencher a ficha e mandar todos os documentos.*a reserva é cancelada/);
   assert.match(texto, /não for aprovada, devolvemos a reserva inteira/);
-  assert.match(texto, /em até 7 dias do depósito, devolvemos a reserva inteira.*fica com 40% da reserva \(R\$ 200,00\).*restante \(R\$ 300,00\)/);
-  assert.match(texto, /Dados ou documentos que não se confirmarem na conferência contam como desistência/);
-  assert.match(texto, /em até 5 dias úteis/);
+  assert.match(texto, /6\. Se você desistir depois do depósito, a reserva não é devolvida: os R\$ 500,00 ficam com a empresa, como sinal de arrependimento \(Código Civil, artigos 418 e 420\)/);
+  assert.match(texto, /7\. Se, na conferência, alguma informação ou documento que você enviou não corresponder à realidade \(por exemplo: renda diferente da declarada, emprego que a empresa não confirma, documento com dados alterados ou de outra pessoa\), a proposta é encerrada e conta como desistência: vale a mesma regra da desistência acima\./);
+  assert.match(texto, /8\. Quando houver devolução \(ficha não aprovada\), ela é feita em até 5 dias úteis da reprovação/);
+  // o aviso em destaque vem logo depois da apresentação, antes das condições (antes de aceitar e de pagar)
+  assert.ok(texto.indexOf('ATENÇÃO, LEIA ANTES DE ACEITAR E DE PAGAR: se você desistir depois de depositar, você perde a reserva inteira (R$ 500,00)') < texto.indexOf('CONDIÇÕES DA LOCAÇÃO'));
+  assert.doesNotMatch(texto, /fraude/i);
+  // com 40% e 7 dias (se o dono mudar a regra)
+  R.salvarRegrasSistema(d, { reserva_retencao_pct: 40, reserva_dias_arrependimento: 7 }, 'admin');
+  try {
+    const t40 = REC.textoDoTermo(REC.termoDaReserva(d, f));
+    assert.match(t40, /em até 7 dias do depósito, devolvemos a reserva inteira.*fica com 40% da reserva \(R\$ 200,00\).*restante \(R\$ 300,00\)/);
+    assert.match(t40, /se você desistir depois de 7 dias do depósito, você perde R\$ 200,00 da reserva/);
+  } finally { CR.usarRegras(null); }
   assert.match(texto, /CONTA PARA O DEPÓSITO DA RESERVA\nANK ADMINISTRADORA · Banco 336/);
   assert.doesNotMatch(texto, /fals/i, 'decisão do dono: não falar em documento falso no termo');
   // PDF antes do aceite: com a linha para assinar; depois do aceite: o texto aceito e a prova
@@ -112,14 +142,18 @@ test('termo: condições do imóvel, reserva abatida do 1º aluguel, prazos, dev
   assert.equal(depois.data, '2026-12-09');
   assert.ok(depois.depois.some((x) => /e-mail confirmado|E-mail confirmado pelo código de 6 números enviado a este endereço: maria@exemplo.com.br\. Endereço de internet \(IP\): 203\.0\.113\.7/.test(x)));
   assert.ok(depois.depois.some((x) => /^Declaração aceita: Li as condições acima e concordo/.test(x)));
-  assert.ok(depois.paragrafos.some((x) => /fica com 40% da reserva/.test(x)));
+  assert.ok(depois.paragrafos.some((x) => /a reserva não é devolvida/.test(x)));
+  assert.ok(depois.paragrafos.some((x) => /^ATENÇÃO, LEIA ANTES DE ACEITAR/.test(x)), 'o aviso aceito fica no PDF');
 });
 
 test('frase da desistência e termo de devolução de parte: citam o termo aceito', () => {
   const { d, f } = base({ reserva_valor: 50000, reserva_data: '2026-12-10' });
   assert.equal(REC.textoDesistencia(f), 'A reserva de R$ 500,00 é devolvida por inteiro, sem descontos.');
-  R.guardarAceiteReserva(d, f.id, aceite(), 'j');
-  assert.equal(REC.textoDesistencia(R.buscar(d, 'fichas', f.id)), 'Se desistir até 17/12/2026, a reserva de R$ 500,00 volta por inteiro; depois, devolvemos R$ 300,00 (ficam R$ 200,00, como no termo da reserva).');
+  const { d: d100, f: f100 } = base({ reserva_valor: 50000, reserva_data: '2026-12-10' });
+  R.guardarAceiteReserva(d100, f100.id, aceite(), 'j');
+  assert.equal(REC.textoDesistencia(R.buscar(d100, 'fichas', f100.id)), 'Se você desistir, a reserva de R$ 500,00 não é devolvida (fica com a empresa, como no termo da reserva).');
+  R.guardarAceiteReserva(d, f.id, aceite40(), 'j');
+  assert.equal(REC.textoDesistencia(R.buscar(d, 'fichas', f.id)), 'Se desistir até 17/12/2026, a reserva de R$ 500,00 volta por inteiro; depois, devolvemos R$ 300,00 da reserva de R$ 500,00 (ficam R$ 200,00, como no termo da reserva).');
   R.atualizar(d, 'fichas', f.id, { situacao: 'Desistiu', decisao_data: '2026-12-21', devolucao_data: '2026-12-22', devolucao_valor: 30000 }, 'j');
   const r = REC.montarRecibo(d, 'devolucao_reserva', { ficha: R.buscar(d, 'fichas', f.id) }, '2026-12-22');
   assert.ok(r.paragrafos.some((x) => /A diferença de R\$ 200,00 fica com a empresa, como no termo de aceite da reserva aceito em 09\/12\/2026/.test(x)));
@@ -135,7 +169,9 @@ test('e-mail "Condições e termo da reserva": sem campo faltando, com o link de
   const e = montarEmail(modeloEmail(d, 'ficha_termo_reserva'), dadosDoEmail(d, { ficha: f }, {}, '2026-12-09'));
   assert.doesNotMatch(e.texto, /\[preencher/);
   assert.match(e.texto, /Valor: R\$ 500,00, abatido do 1º aluguel/);
-  assert.match(e.texto, /ficamos com 40% \(R\$ 200,00\) e devolvemos R\$ 300,00/);
+  assert.match(e.texto, /- Se você desistir depois do depósito, a reserva não é devolvida/);
+  assert.match(e.texto, /- Se, na conferência, alguma informação ou documento/);
+  assert.ok(e.texto.indexOf('ATENÇÃO, LEIA ANTES DE ACEITAR E DE PAGAR') < e.texto.indexOf('CONDIÇÕES DA LOCAÇÃO'), 'o aviso vem logo no começo, antes das condições, do link e da conta');
   assert.match(e.texto, /https:\/\/ficha\.ankjck\.com\.br\/reserva#chave/);
   assert.match(e.texto, /- Renda de pelo menos 3 vezes o aluguel/);
   assert.match(e.texto, /Banco 336/);
@@ -152,7 +188,8 @@ test('pedido do link: termo, condições em números e a conta; WhatsApp com o v
   const p = TR.pedidoDoAceite(d, f);
   assert.equal(p.ficha_id, f.id);
   assert.equal(p.contexto.reserva_valor, 50000);
-  assert.deepEqual(p.contexto.condicoes, { retencao_pct: 40, dias_arrependimento: 7, dias_uteis_documentos: 3, dias_validade: 7, dias_uteis_devolucao: 5 });
+  assert.deepEqual(p.contexto.condicoes, { retencao_pct: 100, dias_arrependimento: 0, dias_uteis_documentos: 3, dias_validade: 7, dias_uteis_devolucao: 5 });
+  assert.match(p.contexto.aviso, /^ATENÇÃO, LEIA ANTES DE ACEITAR E DE PAGAR/);
   assert.match(p.contexto.termo, /^TERMO DE ACEITE DA RESERVA DE IMÓVEL\n\n/);
   assert.doesNotThrow(() => AR.contextoValido(p.contexto), 'a nuvem aceita o que o sistema manda');
   assert.match(TR.textoWhatsappAceite(f, { url: 'https://x/reserva#k', vence_em: '2026-12-16T12:00:00.000Z' }), /\(R\$ 500,00, abatida do 1º aluguel\).*até 16\/12\/2026: https:\/\/x\/reserva#k/s);
@@ -195,7 +232,8 @@ test('aceite pelo link: página no endereço da ficha, código no e-mail, prova 
   assert.equal(pagina.status, 200);
   assert.match(pagina.headers.get('Content-Security-Policy'), /script-src 'nonce-/);
   const lido = await (await ctx.publico(chave, 'GET', 'aceite')).json();
-  assert.match(lido.contexto.termo, /fica com 40% da reserva/);
+  assert.match(lido.contexto.termo, /a reserva não é devolvida/);
+  assert.match(lido.contexto.aviso, /^ATENÇÃO, LEIA ANTES DE ACEITAR E DE PAGAR/, 'o aviso em destaque chega à página');
   assert.equal(lido.resposta, null);
   assert.equal((await ctx.publico(chave, 'POST', 'aceite/confirmar', { email: 'maria@exemplo.com.br', codigo: '123456', ciente: true })).status, 400, 'sem pedir o código');
   const log = await saidas(async () => assert.equal((await ctx.publico(chave, 'POST', 'aceite/codigo', { email: 'Maria@Exemplo.com.br' })).status, 200));
@@ -215,7 +253,7 @@ test('aceite pelo link: página no endereço da ficha, código no e-mail, prova 
   assert.equal(eq.link.resposta.ip, '203.0.113.7');
   assert.equal(eq.link.resposta.texto_sha256, await AR.sha(eq.link.resposta.texto_aceito));
   assert.match(eq.link.resposta.texto_aceito, /\n\nDeclaração: Li as condições acima e concordo/);
-  assert.equal(eq.link.resposta.condicoes.retencao_pct, 40);
+  assert.equal(eq.link.resposta.condicoes.retencao_pct, 100);
   // de volta no sistema: o aceite vai para a ficha (uma vez) e o PDF sai com a prova
   assert.equal(R.guardarAceiteReserva(d, f.id, eq.link.resposta, 'j'), true);
   assert.equal(R.guardarAceiteReserva(d, f.id, eq.link.resposta, 'j'), false);
@@ -223,7 +261,7 @@ test('aceite pelo link: página no endereço da ficha, código no e-mail, prova 
   assert.ok(pdf.depois.some((x) => x.includes(eq.link.resposta.texto_sha256)));
   assert.equal((await ctx.equipe('POST', 'encerrar', { ficha_id: f.id })).status, 200);
   assert.equal((await ctx.publico(chave, 'GET', 'aceite')).status, 404, 'link encerrado');
-  assert.equal((await ctx.equipe('POST', 'link', { ficha_id: f.id, contexto: { ...TR.pedidoDoAceite(d, f).contexto, condicoes: { retencao_pct: 40, dias_arrependimento: 3 } } })).status, 400, 'condições inválidas (menos de 7 dias)');
+  assert.equal((await ctx.equipe('POST', 'link', { ficha_id: f.id, contexto: { ...TR.pedidoDoAceite(d, f).contexto, condicoes: { retencao_pct: 40, dias_arrependimento: 61 } } })).status, 400, 'condições inválidas (prazo fora da faixa)');
 });
 
 // ---------------------------------------------------------------------------

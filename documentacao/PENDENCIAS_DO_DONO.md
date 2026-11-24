@@ -13,17 +13,18 @@
 4. [x] **Mandar o boleto feito à mão por e-mail** (enquanto a API do C6 não sai): em Boletos, anexar o PDF do boleto emitido no banco e enviar ao inquilino pelo Gmail um e-mail curto com o descritivo (como no boleto), o mês de competência, o vencimento e o boleto anexado. Hoje a equipe manda sempre esse e-mail por fora; agora quer mandar pelo sistema. **Feito em 24/11:** na página do boleto, caixa "Boleto emitido no banco (PDF)" (anexar, abrir, trocar, tirar) e botão "Enviar boleto por e-mail" (abre a janela para revisar; vai com o PDF anexado); a lista de Boletos mostra "📎 PDF do banco" e "✉ enviado em ...". **Para conferir:** anexar o PDF de um boleto de verdade e mandar a si mesmo primeiro.
 5. [ ] **Conferir tudo o que entra e sai do boleto** (aluguel, proporcional, IPTU, condomínio, seguro, ressarcimentos, abatimentos, multas da notificação, diferenças, caução, acordo, reserva, NF), com testes automáticos e de tela.
 
-### B. Termo de aceite da reserva (decisões do dono em 24/11) — [x] programado em 24/11 (PR "Termo de aceite da reserva"); faltam as 2 confirmações abaixo e o teste do dono
+### B. Termo de aceite da reserva (decisões do dono em 24/11) — [x] programado em 24/11 (PR #372); falta a leitura e o teste do dono
 
 **Feito (24/11):** na página da ficha, a caixa "Termo de aceite da reserva": e-mail "Condições e termo da reserva" e link do aceite (código no e-mail, PDF do aceite) → depósito da reserva → ficha e documentos pelo link. O % e os prazos estão em Sistema → Regras do sistema → "Reserva e termo de aceite". A pessoa vê o que mandou e corrige (troca e apaga documento) até a equipe conferir; a equipe é avisada a cada dado e documento. Decisões em `DECISOES.md` (24/11).
 
-**Ainda falta o dono:**
-- [ ] **Confirmar os 40%** (ou trocar em Regras do sistema; os termos já aceitos ficam com o % do dia).
-- [ ] **Confirmar o texto** "Dados ou documentos que não se confirmarem na conferência contam como desistência" (item 6 do termo).
-- [ ] Ler o termo inteiro (ficha de teste → caixa do termo → "Ver o termo como a pessoa vai ler" ou o PDF) e testar o link com um conhecido.
-- [ ] Conferir em Sistema → Empresas o campo "Conta para depósito da caução e da reserva" (vai no termo e no comprovante).
-- [ ] Decidir se o termo diz o que acontece quando **a empresa** desiste (a lei das arras manda devolver em dobro, CC art. 418; hoje o termo não fala nisso).
+**Mudança do mesmo dia (24/11, 2ª decisão):** a empresa fica com **100%** da reserva na desistência depois do depósito (antes 40%), **sem prazo** de devolução total (antes 7 dias), com o aviso em destaque antes do aceite e do pagamento; texto dos documentos com exemplos ("renda diferente da declarada, emprego que a empresa não confirma, documento com dados alterados ou de outra pessoa"). Tudo continua configurável em Regras do sistema, com o risco escrito na explicação.
 
+**Ainda falta o dono:**
+- [ ] Ler o termo inteiro (ficha de teste → caixa do termo → "Ver o termo como a pessoa vai ler" ou o PDF), principalmente o aviso em destaque e os itens 6 e 7, e testar o link com um conhecido.
+- [ ] Conferir em Sistema → Empresas o campo "Conta para depósito da caução e da reserva" (vai no termo e no comprovante).
+- [ ] Decidir se o termo diz o que acontece quando **a empresa** desiste (a lei das arras manda devolver em dobro, CC art. 418; hoje o termo não fala nisso; com a retenção de 100%, a reciprocidade ajuda a defender a regra).
+
+Pedido original (histórico):
 1. **Desistência:** em até 7 dias devolve tudo. Depois de 7 dias a empresa fica com **40%** (reserva de R$ 500,00: devolve R$ 300,00 e fica com R$ 200,00); **falta confirmar se 40% é aceitável pela lei** (o Claude explicou os riscos no chat de 24/11). Ficha reprovada: devolve tudo. "Documento falso": o dono quer ficar com tudo, mas perguntou se pode acusar sem prova. **Em aberto até ele responder** (sugestão do Claude: no texto, não falar em "falso"; falar em "informação ou documento que não se confirma na conferência", e tratar como desistência).
 2. **Prazos:** o texto avisa antes que a pessoa tem **3 dias úteis para mandar os documentos, senão a reserva é cancelada** (para ela andar com a documentação). Avisar a equipe a cada dado novo e a cada documento enviado. A pessoa pode **ver o que já mandou e corrigir dados e documentos** (trocar e apagar o anexo errado).
 3. **Onde entra a reserva:** sempre **abatida do 1º aluguel**, com o texto explicando que vai para esse fim.

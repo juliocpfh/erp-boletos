@@ -85,7 +85,7 @@ export function contextoValido(ctx = {}) {
   const c = ctx.condicoes || {};
   const condicoes = {
     retencao_pct: Number.isFinite(Number(c.retencao_pct)) && Number(c.retencao_pct) >= 0 && Number(c.retencao_pct) <= 100 ? Number(c.retencao_pct) : null,
-    dias_arrependimento: inteiro(c.dias_arrependimento, 7, 60), dias_uteis_documentos: inteiro(c.dias_uteis_documentos, 1, 15),
+    dias_arrependimento: inteiro(c.dias_arrependimento, 0, 60), dias_uteis_documentos: inteiro(c.dias_uteis_documentos, 1, 15),
     dias_validade: inteiro(c.dias_validade, 1, 60), dias_uteis_devolucao: inteiro(c.dias_uteis_devolucao, 1, 30),
   };
   if (Object.values(condicoes).some((v) => v === null)) throw new ErroAceite(400, 'Condições da reserva inválidas.');
@@ -93,7 +93,7 @@ export function contextoValido(ctx = {}) {
   if (!Number.isInteger(valor) || valor <= 0 || valor > 1e9) throw new ErroAceite(400, 'Valor da reserva inválido.');
   return {
     empresa: texto(ctx.empresa, 160), cnpj: texto(ctx.cnpj, 20), logo: logoValida(ctx.logo), nome: texto(ctx.nome, 160), imovel: texto(ctx.imovel, 400),
-    email: texto(ctx.email, 254), reserva_valor: valor, reserva: texto(ctx.reserva, 40), condicoes, termo,
+    email: texto(ctx.email, 254), reserva_valor: valor, reserva: texto(ctx.reserva, 40), condicoes, termo, aviso: texto(ctx.aviso, 800),
     ciencia: texto(ctx.ciencia, 1200) || 'Li as condições acima e concordo com elas.', deposito: textoLongo(ctx.deposito, 600),
     email_empresa: texto(ctx.email_empresa, 254), telefone_empresa: texto(ctx.telefone_empresa, 40),
   };
@@ -430,12 +430,13 @@ button.sec{background:transparent;color:var(--cor);border:1px solid var(--cor)}b
       + '<div class="cartao"><h1>Olá, ' + esc(String(c.nome).split(' ')[0]) + '</h1>'
       + '<p>Antes de depositar a reserva, leia as condições do imóvel e o termo. Se estiver de acordo, confirme seu e-mail e dê o aceite no fim da página.</p>'
       + '<p class="suave">Imóvel: ' + esc(c.imovel) + ' · reserva de <b>' + esc(c.reserva) + '</b>, abatida do 1º aluguel. Este link é só seu e vale até ' + esc(dataBr(D.vence_em)) + '.</p></div>'
+      + (c.aviso ? '<div class="cartao"><div class="aviso"><b>' + esc(c.aviso) + '</b></div></div>' : '')
       + '<div class="cartao"><h2>1. Leia o termo</h2><div class="texto">' + esc(c.termo) + '</div></div>'
       + '<div class="cartao"><h2>2. Confirme o e-mail</h2><p class="suave">Mandamos um código de 6 números para este e-mail. O comprovante do aceite vai para ele.</p>'
       + '<label for="email">E-mail</label><input id="email" type="email" autocomplete="email" value="' + esc(c.email) + '">'
       + '<button class="sec" id="pedir">Mandar o código</button><div id="msg-codigo" class="suave"></div>'
       + '<label for="codigo">Código recebido</label><input id="codigo" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"></div>'
-      + '<div class="cartao"><h2>3. Aceite</h2><label class="caixa"><input type="checkbox" id="ciente"> <span>' + esc(c.ciencia) + '</span></label>'
+      + '<div class="cartao"><h2>3. Aceite</h2>' + (c.aviso ? '<p class="aviso">' + esc(c.aviso) + '</p>' : '') + '<label class="caixa"><input type="checkbox" id="ciente"> <span>' + esc(c.ciencia) + '</span></label>'
       + '<label>Assinatura com o dedo (opcional)</label><canvas id="ass"></canvas><button class="sec" id="limpar" type="button">Limpar assinatura</button></div>'
       + '<div class="cartao"><button id="confirmar">Aceitar o termo</button><div id="msg" class="erro"></div>'
       + '<p class="suave">Ao aceitar, guardamos a data, a hora, o endereço de internet, o aparelho usado e o texto acima, como prova do aceite. Seus dados são usados só para a análise desta locação (Lei 13.709/2018).</p></div>'

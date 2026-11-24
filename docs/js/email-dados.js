@@ -105,6 +105,7 @@ function camposDoTermo(f, hoje) {
     reserva_combinada: valor ? C.reais(valor) : '', dias_validade: String(c.dias_validade), dias_documentos: String(c.dias_uteis_documentos),
     dias_arrependimento: String(c.dias_arrependimento), dias_devolucao: String(c.dias_uteis_devolucao), retencao: C.pct(c.retencao_pct),
     retencao_valor: C.reais(reter), devolve_depois: C.reais(valor - reter),
+    regra_desistencia: REC.regraDaDesistencia(c, valor), texto_conferencia: REC.TEXTO_CONFERENCIA, aviso_desistencia: REC.avisoDaDesistencia(c, valor),
     requisitos: String(f.requisitos || '').split(/\n+/).map((x) => x.trim()).filter(Boolean).map((x) => `- ${x}`).join('\n'),
     link_termo: link && String(link.vence_em).slice(0, 10) >= hoje ? link.url : '', link_termo_validade: link ? C.dataBr(String(link.vence_em).slice(0, 10)) : '',
     aceite_data: f.aceite_reserva ? C.dataBr(String(f.aceite_reserva.em).slice(0, 10)) : '',
@@ -118,7 +119,8 @@ const condicoesDoTermo = (f) => {
   const c = R.condicoesDaReserva(f);
   const dv = R.fichaSemContrato(f) ? R.devolucaoDaReserva(f) : null;
   return { retencao: R.retencaoDaReserva(R.valorDaReserva(f), c.retencao_pct) > 0, requisitos: !!String(f.requisitos || '').trim(), link_termo: !!TR.urlDoAceite(f.id),
-    termo_aceito: !!f.aceite_reserva, prazo_documentos: !!(f.aceite_reserva && R.prazosDaReserva(f)), retencao_aplicada: !!(dv && !dv.integral) };
+    termo_aceito: !!f.aceite_reserva, prazo_documentos: !!(f.aceite_reserva && R.prazosDaReserva(f)), retencao_aplicada: !!(dv && !dv.integral), devolve_algo: !!(dv && dv.devolver > 0),
+    aviso_desistencia: !!REC.avisoDaDesistencia(c, R.valorDaReserva(f)) };
 };
 
 /**

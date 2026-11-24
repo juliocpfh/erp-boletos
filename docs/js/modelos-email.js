@@ -38,7 +38,9 @@ export const MODELOS_EMAIL = [
     texto: `Olá, {nome}, tudo bem?
 
 Obrigado pelo interesse no imóvel da {endereco}. Seguem as condições e o termo da reserva.
-
+[se aviso_desistencia]
+{aviso_desistencia}
+[fim]
 ${CONDICOES}
 Condições sujeitas à aprovação da ficha; a locação só vale com o contrato assinado por todos.
 [se requisitos]
@@ -53,8 +55,9 @@ RESERVA
 - O imóvel fica reservado para você por {dias_validade} dias depois do depósito
 - Depois do depósito, você tem {dias_documentos} dias úteis para mandar a ficha e os documentos; sem eles, a reserva é cancelada
 - Ficha não aprovada: devolvemos tudo
-[se retencao]- Desistência em até {dias_arrependimento} dias do depósito: devolvemos tudo; depois, ficamos com {retencao} ({retencao_valor}) e devolvemos {devolve_depois}. Dados ou documentos que não se confirmarem na conferência contam como desistência[senão]- Desistência antes de assinar o contrato: devolvemos tudo[fim]
-- Devolução em até {dias_devolucao} dias úteis, na conta de onde veio o depósito
+- {regra_desistencia}
+- {texto_conferencia}
+- Quando houver devolução, ela sai em até {dias_devolucao} dias úteis, na conta de onde veio o depósito
 
 PRÓXIMO PASSO
 [se link_termo]Leia o termo completo e dê o seu aceite por este link, só seu, válido até {link_termo_validade}:
@@ -117,7 +120,7 @@ Próximos passos: contrato para assinar em até 2 dias úteis[se fiador] (o fiad
 
 Agradecemos o interesse no imóvel da {imovel}. Depois da análise, não foi possível aprovar a ficha neste momento.
 
-[se reserva][se devolucao]A reserva de {reserva} já foi devolvida em {devolucao_data}, na conta de onde veio o depósito.[senão][se retencao_aplicada]Dados ou documentos não se confirmaram na conferência, o que conta como desistência no termo da reserva aceito em {aceite_data}: devolvemos {devolver_reserva} e ficamos com {reter_reserva}, em até {dias_devolucao} dias úteis, na conta de onde veio o depósito.[senão]A reserva de {reserva} será devolvida em até {dias_devolucao} dias úteis, na conta de onde veio o depósito.[fim][fim]
+[se reserva][se devolucao]A reserva de {reserva} já foi devolvida em {devolucao_data}, na conta de onde veio o depósito.[senão][se retencao_aplicada]Na conferência, informações ou documentos enviados não corresponderam à realidade, o que conta como desistência no termo da reserva aceito em {aceite_data}: [se devolve_algo]devolvemos {devolver_reserva} e ficamos com {reter_reserva}, em até {dias_devolucao} dias úteis, na conta de onde veio o depósito.[senão]a reserva de {reserva} fica com a empresa, como no termo.[fim][senão]A reserva de {reserva} será devolvida em até {dias_devolucao} dias úteis, na conta de onde veio o depósito.[fim][fim]
 
 [fim]Os documentos enviados serão apagados, conforme a LGPD (Lei 13.709/2018).`,
   },
@@ -414,7 +417,7 @@ export const ATUALIZACOES_EMAIL = [
   // termo de aceite da reserva (decisões do dono de 2026-11-24): desistência, prazo dos documentos e devolução em dias úteis
   ['ficha_envio', 'Aprovada a ficha, ela é descontada do primeiro aluguel; não aprovada, ou se você desistir antes de assinar, devolvemos tudo.[senão]', 'Aprovada a ficha, ela é descontada do primeiro aluguel[se termo_aceito], como no termo da reserva que você aceitou em {aceite_data}: não aprovada, devolvemos tudo. {desistencia}[senão]; não aprovada, ou se você desistir antes de assinar, devolvemos tudo.[fim][senão]'],
   ['ficha_envio', 'Depois: análise em até 2 dias úteis,', '[se prazo_documentos]Prazo para mandar a ficha e os documentos: {prazo_documentos} (sem eles, a reserva é cancelada).\n\n[fim]Depois: análise em até 2 dias úteis,'],
-  ['ficha_reprovada', '[senão]A reserva de {reserva} será devolvida em até 24 horas úteis, na conta de onde veio o depósito.[fim]', '[senão][se retencao_aplicada]Dados ou documentos não se confirmaram na conferência, o que conta como desistência no termo da reserva aceito em {aceite_data}: devolvemos {devolver_reserva} e ficamos com {reter_reserva}, em até {dias_devolucao} dias úteis, na conta de onde veio o depósito.[senão]A reserva de {reserva} será devolvida em até {dias_devolucao} dias úteis, na conta de onde veio o depósito.[fim][fim]'],
+  ['ficha_reprovada', '[senão]A reserva de {reserva} será devolvida em até 24 horas úteis, na conta de onde veio o depósito.[fim]', '[senão][se retencao_aplicada]Na conferência, informações ou documentos enviados não corresponderam à realidade, o que conta como desistência no termo da reserva aceito em {aceite_data}: [se devolve_algo]devolvemos {devolver_reserva} e ficamos com {reter_reserva}, em até {dias_devolucao} dias úteis, na conta de onde veio o depósito.[senão]a reserva de {reserva} fica com a empresa, como no termo.[fim][senão]A reserva de {reserva} será devolvida em até {dias_devolucao} dias úteis, na conta de onde veio o depósito.[fim][fim]'],
   ['ficha_devolucao', 'Da reserva, {devolucao_parcial} não foi devolvido: qualquer dúvida, responda este e-mail', 'Da reserva, {devolucao_parcial} não foi devolvido[se termo_aceito], como no termo da reserva aceito em {aceite_data}[fim]: qualquer dúvida, responda este e-mail'],
   ['ficha_envio', 'Link do fiador (encaminhe para ele): {link_fiador}', '{links_fiadores}'],
   ['ficha_aprovada', 'depósito de {valor_deposito} da {tipo_deposito}', 'depósito[se valor_deposito] de {valor_deposito}[fim] da {tipo_deposito}'],

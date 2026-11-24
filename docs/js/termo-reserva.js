@@ -16,7 +16,7 @@ export function pedidoDoAceite(d, f, logo = '') {
     contexto: {
       empresa: t.empresa, cnpj: t.cnpj, logo, nome: f.inquilino_nome || '', imovel: (t.itens[0] || [])[1] || '', email: f.inquilino_email || '',
       reserva_valor: t.reserva_valor, reserva: C.reais(t.reserva_valor), condicoes: t.condicoes, termo: REC.textoDoTermo(t), ciencia: t.ciencia,
-      deposito: t.deposito, email_empresa: K.dadoDaEmpresa(d, { imovel_id: imovel ? imovel.id : null }, 'email_contato') || '',
+      aviso: t.aviso, deposito: t.deposito, email_empresa: K.dadoDaEmpresa(d, { imovel_id: imovel ? imovel.id : null }, 'email_contato') || '',
     },
   };
 }
@@ -26,7 +26,7 @@ export function textoWhatsappAceite(f, link) {
   const nome = String(f.inquilino_nome || '').trim().split(/\s+/)[0];
   const valor = R.valorDaReserva(f);
   return `Olá${nome ? `, ${nome}` : ''}! Seguem as condições do imóvel e o termo da reserva${valor ? ` (${C.reais(valor)}, abatida do 1º aluguel)` : ''}. Leia e, se estiver de acordo, dê o aceite por este link, só seu, que vale até ${C.dataBr(String(link.vence_em).slice(0, 10))}: ${link.url}
-Depois do aceite, mandamos a conta para o depósito. Qualquer dúvida, é só responder.`;
+Depois do aceite, mandamos a conta para o depósito.${REC.avisoDaDesistencia(R.condicoesDaReservaAgora(), valor) ? ' Atenção: leia a regra da desistência antes de depositar.' : ''} Qualquer dúvida, é só responder.`;
 }
 
 const urls = new Map(); // ficha → { url, vence_em } (só nesta aba)

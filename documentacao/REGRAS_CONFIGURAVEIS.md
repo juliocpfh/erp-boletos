@@ -107,8 +107,8 @@ para os termos aceitos depois.
 
 | Chave | Regra | Padrão | Exemplo | Lei |
 |---|---|---|---|---|
-| `reserva_retencao_pct` | Desistência depois do prazo: a empresa fica com (%) | 40 | Reserva de R$ 500,00 → fica R$ 200,00, devolve R$ 300,00. **Dono ainda confirma** (juízes costumam aceitar 10% a 25%) | CC arts. 413, 418 e 420; CDC arts. 49 e 51, IV |
-| `reserva_dias_arrependimento` | Desistência com tudo de volta até (dias do depósito) | 7 (mínimo 7) | Depósito em 10/12/2026 → até 17/12/2026 | CDC art. 49 |
+| `reserva_retencao_pct` | Desistência depois do depósito: a empresa fica com (%) | 100 | Reserva de R$ 500,00 → fica tudo, nada é devolvido; com 40%, fica R$ 200,00 e devolve R$ 300,00. Risco: o juiz pode reduzir (CC art. 413; CDC art. 51, IV); decisões costumam aceitar 10% a 25%. O termo avisa em destaque antes do aceite e do pagamento | CC arts. 418, 420 e 413; CDC art. 51, IV |
+| `reserva_dias_arrependimento` | Dias para desistir com devolução total (do depósito) | 0 | 0: nenhum. Com 7: depósito em 10/12/2026 → até 17/12/2026. O dono entende que não é compra fora do estabelecimento (o interessado vê o imóvel); há decisões isoladas aplicando o art. 49 | CDC art. 49 |
 | `reserva_dias_uteis_documentos` | Prazo dos documentos (dias úteis do depósito) | 3 | Depósito na quinta, 10/12/2026 → até terça, 15/12/2026 | CC art. 421 (o combinado) |
 | `reserva_dias_validade` | A reserva segura o imóvel por (dias) | 7 | Até 17/12/2026 | CC art. 421 |
 | `reserva_dias_uteis_devolucao` | Prazo da devolução (dias úteis da decisão) | 5 | Reprovada em 14/12/2026 → até 21/12/2026 | CDC art. 49, parágrafo único; CC art. 418 |

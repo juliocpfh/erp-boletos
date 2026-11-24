@@ -13,6 +13,14 @@ import { logoReduzida } from './comunicacoes.js';
 import { botaoEmail } from './emails.js';
 import { botao, buscar, d, etiqueta, link, opera } from './comum.js';
 
+/** Regra da desistência para a equipe. Ex.: 100% e 0 dias → "desistência depois do depósito: a reserva fica com a empresa". */
+function desistenciaResumo(c, valor) {
+  const reter = Math.min(R.retencaoDaReserva(valor, c.retencao_pct), valor);
+  if (!reter) return 'desistência: devolve tudo';
+  const fica = reter >= valor ? 'a reserva fica com a empresa' : `a empresa fica com ${C.pct(c.retencao_pct)} (${reais(reter)})`;
+  return c.dias_arrependimento > 0 ? `desistência em até ${c.dias_arrependimento} dias do depósito: devolve tudo; depois, ${fica}` : `desistência depois do depósito: ${fica}`;
+}
+
 const quando = (iso) => C.dataHoraBr(iso).slice(0, 17).replace(', ', ' ');
 
 /** Prazos e "se desistir hoje", para a caixa (ficha com o termo aceito e o depósito registrado). */
@@ -27,7 +35,7 @@ function prazosHtml(f) {
   return `<ul>
     <li>Documentos até <b>${dataBr(pz.documentos_ate)}</b> (${C.plural(c.dias_uteis_documentos, 'dia útil', 'dias úteis')} do depósito)${passou(pz.documentos_ate)}${pz.documentos_ate < hoje && R.fichaSemDocumentos(f) ? ' · os documentos não estão marcados como recebidos: o termo diz que a reserva é cancelada' : ''}</li>
     <li>O imóvel fica reservado até <b>${dataBr(pz.vale_ate)}</b>${passou(pz.vale_ate)}</li>
-    <li>Desistência com tudo de volta até <b>${dataBr(pz.arrependimento_ate)}</b>; hoje, se desistir: ${dv.integral ? `devolve ${reais(dv.devolver)} (tudo)` : `devolve <b>${reais(dv.devolver)}</b> e a empresa fica com ${reais(dv.reter)}`}</li></ul>`;
+    <li>${pz.arrependimento_ate ? `Desistência com tudo de volta até <b>${dataBr(pz.arrependimento_ate)}</b>; hoje, se` : 'Sem prazo de devolução total; se'} desistir: ${dv.integral ? `devolve ${reais(dv.devolver)} (tudo)` : dv.devolver === 0 ? `a reserva de ${reais(dv.reter)} fica com a empresa` : `devolve <b>${reais(dv.devolver)}</b> e a empresa fica com ${reais(dv.reter)}`}</li></ul>`;
 }
 
 /** Caixa do termo na página da ficha. Ficha encerrada sem aceite: nada. */
@@ -39,7 +47,7 @@ export function caixaTermoReserva(f) {
   if (a) {
     return `<div class="cartao" data-termo-reserva="${f.id}">${titulo}
       <p>${etiqueta('✓ termo aceito', 'ok')} em <b>${esc(quando(a.em))}</b>, pelo link, com o e-mail <b>${esc(a.email)}</b> confirmado pelo código${a.assinatura ? ' e assinatura na tela' : ''}. ${pdf}</p>
-      <p class="suave">Reserva de ${reais(a.reserva_valor || R.valorDaReserva(f))}, abatida do 1º aluguel · ${a.condicoes ? `desistência depois de ${a.condicoes.dias_arrependimento} dias: a empresa fica com ${C.pct(a.condicoes.retencao_pct)}` : ''}</p>
+      <p class="suave">Reserva de ${reais(a.reserva_valor || R.valorDaReserva(f))}, abatida do 1º aluguel · ${a.condicoes ? esc(desistenciaResumo(a.condicoes, a.reserva_valor || R.valorDaReserva(f))) : ''}</p>
       ${prazosHtml(f)}</div>`;
   }
   const valor = R.valorDaReserva(f);
@@ -47,7 +55,6 @@ export function caixaTermoReserva(f) {
     return `<div class="cartao" data-termo-reserva="${f.id}">${titulo}<p class="suave">1º passo, antes do depósito: mande as condições do imóvel e o termo da reserva para a pessoa aceitar. Preencha antes a <b>Reserva combinada</b> (em ${link(`#/editar/fichas/${f.id}`, 'Editar', '')}), com o aluguel, o vencimento, a garantia e o que está incluso.</p></div>`;
   }
   const c = R.condicoesDaReservaAgora();
-  const reter = R.retencaoDaReserva(valor, c.retencao_pct);
   const vale = f.link_aceite && String(f.link_aceite.vence_em) > new Date().toISOString() ? f.link_aceite : null;
   const naAba = TR.urlDoAceite(f.id);
   const botoes = !E.nuvem ? '<span class="suave">Sem a nuvem, mande o termo em PDF (no e-mail) para a pessoa assinar e anexe o assinado na pasta da ficha.</span>'
@@ -55,7 +62,7 @@ export function caixaTermoReserva(f) {
       ${vale && naAba ? botao('compartilharLinkTermo', 'Copiar / WhatsApp', { id: f.id }, 'secundario pequeno') : ''}`;
   return `<div class="cartao" data-termo-reserva="${f.id}">${titulo}
     <p><b>1º passo, antes do depósito:</b> a pessoa recebe as condições do imóvel e o termo da reserva, confirma o e-mail com um código e dá o aceite pelo link. Depois ela deposita a reserva.</p>
-    <p class="suave">Reserva de <b>${reais(valor)}</b>, abatida do 1º aluguel · documentos em ${C.plural(c.dias_uteis_documentos, 'dia útil', 'dias úteis')} do depósito · reservado por ${c.dias_validade} dias · ficha não aprovada: devolve tudo · desistência em até ${c.dias_arrependimento} dias: devolve tudo${reter ? `; depois, a empresa fica com ${C.pct(c.retencao_pct)} (${reais(reter)})` : ''} · devolução em ${C.plural(c.dias_uteis_devolucao, 'dia útil', 'dias úteis')}. <a href="#/regras">Regras do sistema</a></p>
+    <p class="suave">Reserva de <b>${reais(valor)}</b>, abatida do 1º aluguel · documentos em ${C.plural(c.dias_uteis_documentos, 'dia útil', 'dias úteis')} do depósito · reservado por ${c.dias_validade} dias · ficha não aprovada: devolve tudo · ${esc(desistenciaResumo(c, valor))} (o termo avisa em destaque antes do aceite e do pagamento) · devolução (quando houver) em ${C.plural(c.dias_uteis_devolucao, 'dia útil', 'dias úteis')}. <a href="#/regras">Regras do sistema</a></p>
     <details><summary class="suave">Ver o termo como a pessoa vai ler</summary><pre class="texto-modelo">${esc(REC.textoDoTermo(REC.termoDaReserva(d(), f)))}</pre></details>
     <p class="acoes">${botoes} ${botaoEmail('ficha_termo_reserva', { ficha: f.id }, '✉ E-mail: condições e termo da reserva')} ${pdf}</p>
     <p class="suave" data-situacao-aceite>${vale ? `Link até ${dataBr(String(vale.vence_em).slice(0, 10))}.${naAba ? '' : ' Para mandar de novo, gere outro (o endereço só aparece na hora em que é gerado).'}` : ''}</p></div>`;

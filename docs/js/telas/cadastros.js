@@ -628,7 +628,9 @@ export const CADASTROS = {
       }
       if (!R.fichaSemContrato(dados)) { dados.devolucao_data = null; dados.devolucao_valor = null; } else {
         // em branco: o que diz o termo de aceite (a reserva inteira, ou menos a parte combinada na desistência depois do prazo)
-        if (dados.devolucao_data && !dados.devolucao_valor) dados.devolucao_valor = R.devolucaoDaReserva({ ...r, ...dados }).devolver || dados.reserva_valor || null;
+        const peloTermo = R.devolucaoDaReserva({ ...r, ...dados });
+        if (dados.devolucao_data && !dados.devolucao_valor && peloTermo.reserva > 0 && peloTermo.devolver === 0) erros.devolucao_valor = 'Pelo termo aceito, a reserva fica com a empresa: nada a devolver. Se devolveu mesmo assim, informe o valor devolvido';
+        else if (dados.devolucao_data && !dados.devolucao_valor) dados.devolucao_valor = peloTermo.devolver || dados.reserva_valor || null;
         if (dados.devolucao_valor > 0 && !dados.devolucao_data) erros.devolucao_data = 'Informe a data da devolução';
         else if (dados.devolucao_data && dados.devolucao_data > hoje) erros.devolucao_data = 'A devolução não pode ser numa data futura (registre depois de devolver)';
         else if (dados.devolucao_data && dados.reserva_data && dados.devolucao_data < dados.reserva_data) erros.devolucao_data = `A devolução não pode ser antes da reserva (${dataBr(dados.reserva_data)})`;

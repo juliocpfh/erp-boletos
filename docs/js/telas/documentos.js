@@ -352,7 +352,9 @@ async function caixaAssinatura(tipo, alvo) {
 /** Recibo ou termo (recibos.js) como carta: logo, empresa, título, texto, tabela de valores, local e data e as assinaturas. */
 export function reciboHtml(r) {
   const e = r.emitente;
-  const par = (t) => `<p${/^\d\. /.test(t) ? ' style="margin-left:12px"' : ''}>${esc(t)}</p>`;
+  // aviso em destaque (termo da reserva: "ATENÇÃO, LEIA ANTES DE ACEITAR E DE PAGAR"): negrito e moldura
+  const par = (t) => (/^ATENÇÃO/.test(t) ? `<p style="font-weight:bold;border:2px solid #000;padding:8px 10px">${esc(t)}</p>`
+    : `<p${/^\d\. /.test(t) ? ' style="margin-left:12px"' : ''}>${esc(t)}</p>`);
   const linha = ([a, b]) => (b === null ? `<tr><th colspan="2" style="text-align:left">${esc(a)}</th></tr>`
     // texto (proposta) à esquerda e quebrando; valor em reais à direita
     : `<tr><td style="width:34%;white-space:normal">${esc(a).replace(/^ {3}/, '&nbsp;&nbsp;&nbsp;')}</td><td style="white-space:normal${/^R\$ [\d.,]+$/.test(b) ? ';text-align:right' : ''}">${esc(b)}</td></tr>`);

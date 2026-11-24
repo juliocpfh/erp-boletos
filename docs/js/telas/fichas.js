@@ -110,6 +110,8 @@ export function telaFicha(id) {
       : (() => {
         const dv = R.devolucaoDaReserva(f);
         const ate = R.devolverReservaAte(f);
+        // termo aceito com retenção de tudo (padrão de 24/11/2026): nada a devolver
+        if (dv.devolver === 0) return `<p>A reserva de <b>${reais(f.reserva_valor)}</b> fica com a empresa: ${esc(dv.motivo)}. Nada a devolver.</p>`;
         return `<div class="alerta aviso"><b>${dv.integral ? `Devolver a reserva de ${reais(f.reserva_valor)}` : `Devolver ${reais(dv.devolver)} da reserva de ${reais(f.reserva_valor)}`}${ate ? ` até ${dataBr(ate)}` : ''}.</b> ${dv.integral ? '' : `A empresa fica com ${reais(dv.reter)}: ${esc(dv.motivo)}. `}Depois de devolver, registre a data e o comprovante em "Editar".</div>`;
       })();
   const documentos = primeiro ? `<p>Os documentos da ficha foram para a pasta do inquilino: ${link(`#/contrato/${primeiro.id}?ir=arquivos`, esc(primeiro.inquilino_nome), '')}.</p>`
@@ -359,7 +361,7 @@ function blocoDoLink(f, l) {
   const trazido = ultimo && guardado.trazido_em === ultimo.em;
   const partes = [];
   if (l.situacao === 'Desistiu' && p === 'interessado' && !R.fichaSemContrato(f)) {
-    partes.push(`<div class="alerta perigo"><b>${esc(nome)} avisou pelo link, em ${C.dataHoraBr(l.desistiu_em)}, que não vai seguir com a análise.</b> Registre com "Desistiu antes de assinar"${f.reserva_valor > 0 ? (() => { const dv = R.devolucaoDaReserva(f, { data: String(l.desistiu_em || '').slice(0, 10) || null }); return dv.integral ? ` e devolva a reserva de ${reais(f.reserva_valor)} por inteiro` : ` e devolva ${reais(dv.devolver)} da reserva de ${reais(f.reserva_valor)} (${esc(dv.motivo)})`; })() : ''}.</div><p>${botaoDesistencia(f)}</p>`);
+    partes.push(`<div class="alerta perigo"><b>${esc(nome)} avisou pelo link, em ${C.dataHoraBr(l.desistiu_em)}, que não vai seguir com a análise.</b> Registre com "Desistiu antes de assinar"${f.reserva_valor > 0 ? (() => { const dv = R.devolucaoDaReserva(f, { data: String(l.desistiu_em || '').slice(0, 10) || null }); return dv.integral ? ` e devolva a reserva de ${reais(f.reserva_valor)} por inteiro` : dv.devolver === 0 ? ` (a reserva de ${reais(f.reserva_valor)} fica com a empresa: ${esc(dv.motivo)})` : ` e devolva ${reais(dv.devolver)} da reserva de ${reais(f.reserva_valor)} (${esc(dv.motivo)})`; })() : ''}.</div><p>${botaoDesistencia(f)}</p>`);
   }
   if (ultimo && !trazido) {
     const dif = diferencasDoEnvio(f, l);
@@ -799,7 +801,7 @@ export const ACOES_FICHAS = {
       titulo: `Desistência de ${nome}`, sim: 'Confirmar a desistência', forte: contratos.length > 0,
       html: `<p>O interessado desistiu antes de assinar: nada segue em frente.</p><ul>
         ${contratos.length ? `<li>O contrato não assinado (${lista}) é <b>cancelado</b>: sai do sistema com os boletos ainda não pagos. Os arquivos da pasta do inquilino vão para a pasta da ficha.</li>` : ''}
-        <li>A ficha fica <b>"Desistiu"</b>${reserva ? ` e a reserva de <b>${reais(reserva)}</b> fica para <b>${dv.integral ? 'devolver por inteiro' : `devolver ${reais(dv.devolver)}`}</b>${dv.integral ? '' : ` (${esc(dv.motivo)}; a data abaixo decide)`}. Depois de devolver, registre a data e o comprovante em "Editar": sai o termo de devolução e quitação` : ''}.</li>
+        <li>A ficha fica <b>"Desistiu"</b>${reserva ? (dv.devolver === 0 ? ` e a reserva de <b>${reais(reserva)}</b> <b>fica com a empresa</b> (${esc(dv.motivo)}): nada a devolver` : ` e a reserva de <b>${reais(reserva)}</b> fica para <b>${dv.integral ? 'devolver por inteiro' : `devolver ${reais(dv.devolver)}`}</b>${dv.integral ? '' : ` (${esc(dv.motivo)}; a data abaixo decide)`}. Depois de devolver, registre a data e o comprovante em "Editar": sai o termo de devolução e quitação`) : ''}.</li>
         <li>Os documentos pessoais são apagados ${R.regra('meses_documentos_ficha')} meses depois.</li></ul>
         <p><label>Data da desistência</label><input type="date" name="data" value="${hoje}" max="${hoje}" required></p>
         <p><label>Motivo (opcional)</label><textarea name="motivo" rows="2"></textarea></p>`,
@@ -817,7 +819,7 @@ export const ACOES_FICHAS = {
     await copia.apagarOriginais();
     try { await encerrarLinksDaFicha(salva.id); } catch (e) { console.warn('encerrar os links da ficha', e); }
     const dvSalva = R.devolucaoDaReserva(salva);
-    aviso(`Desistência registrada${contratos.length ? ' e contrato cancelado' : ''}.${reserva ? ` Devolva ${dvSalva.integral ? `a reserva de ${reais(reserva)}` : `${reais(dvSalva.devolver)} da reserva de ${reais(reserva)} (a empresa fica com ${reais(dvSalva.reter)}, como no termo)`} e registre a devolução na ficha.` : ''}`);
+    aviso(`Desistência registrada${contratos.length ? ' e contrato cancelado' : ''}.${!reserva ? '' : dvSalva.devolver === 0 ? ` A reserva de ${reais(reserva)} fica com a empresa, como no termo: nada a devolver.` : ` Devolva ${dvSalva.integral ? `a reserva de ${reais(reserva)}` : `${reais(dvSalva.devolver)} da reserva de ${reais(reserva)} (a empresa fica com ${reais(dvSalva.reter)}, como no termo)`} e registre a devolução na ficha.`}`);
     ir(`#/ficha/${salva.id}`);
   },
   async decidirFicha({ id, situacao }) {

@@ -59,7 +59,7 @@ export function textosDoAviso(registro, evento, detalhe = '') {
     out.pessoa = { assunto: `Recebemos ${qual} assinada${imovel}`, texto: `${ola}\n\nRecebemos a ficha assinada. Avisaremos o resultado da análise.${fecho}` };
     out.equipe = { titulo: `${quem} mandou a ficha assinada`, texto: `A ficha assinada chegou pelo link${imovel}. Confira a assinatura na página da ficha.` };
   } else if (evento === 'desistiu') {
-    out.pessoa = { assunto: `Recebemos seu aviso${imovel}`, texto: `${ola}\n\nRecebemos o seu aviso de que não vai seguir com a análise. Sem problema${c.devolucao ? `. ${c.devolucao.replace(/[.]$/, '')}, na conta de onde veio o depósito` : c.reserva ? `: a reserva de ${c.reserva} é devolvida por inteiro, na conta de onde veio o depósito` : ''}.${fecho}` };
+    out.pessoa = { assunto: `Recebemos seu aviso${imovel}`, texto: `${ola}\n\nRecebemos o seu aviso de que não vai seguir com a análise. Sem problema${c.devolucao ? `. Como combinado: ${c.devolucao.replace(/[.]$/, '')}` : c.reserva ? `: a reserva de ${c.reserva} é devolvida por inteiro, na conta de onde veio o depósito` : ''}.${fecho}` };
     out.equipe = { titulo: `${quem} não vai seguir`, texto: `${quem} avisou pelo link que não vai seguir com a análise. Registre a desistência na ficha${c.reserva ? ` e devolva a reserva de ${c.reserva}` : ''}.` };
   } else if (evento === 'falta') {
     out.pessoa = { assunto: `Falta um documento: ${qual}${imovel}`, texto: `${ola}\n\nPara seguir com a análise, falta:\n${(registro.faltando || []).map((x) => `- ${x}`).join('\n')}\n\n${voltar} Lá aparece o que falta e o campo para mandar.${fecho}` };

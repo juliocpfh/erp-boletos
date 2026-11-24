@@ -24,7 +24,7 @@ const ANTES = {
   'email:ficha_envio': '16fae713ae62ca56',
   'email:ficha_aprovada': '911d169532402033', // mutirão 19/11 (lote E): sem "[preencher: valor_deposito]" na ficha
   'email:ficha_reprovada': '3bd5488e99758edc', // 2026-11-24: devolução em 5 dias úteis (antes 24 horas úteis)
-  'email:ficha_termo_reserva': '61d0debb77813d31', // 2026-11-24: termo de aceite da reserva (novo)
+  'email:ficha_termo_reserva': '26fb26c7150256f5', // 2026-11-24: termo de aceite da reserva (novo)
   'email:ficha_devolucao': 'dede29cb5e188ee0',
   'email:contrato_assinar': 'c82dc0dcc10b4fe2',
   'email:contrato_assinado': '65654954ba3d9470', // mutirão 19/11 (lote E): "falta o depósito" sem a caução registrada
@@ -42,7 +42,7 @@ const ANTES = {
   'recibo:reserva:João Teste': '5816468f00fd38ad',
   'recibo:devolucao_chaves:João Teste': '354c41db31cdeb74',
   'recibo:ficha:ficha': 'c1fb1b26d3b7215f',
-  'recibo:termo_reserva:ficha': 'f63d76bafdb43117', // 2026-11-24 (novo)
+  'recibo:termo_reserva:ficha': '8470c5220ff5e81a', // 2026-11-24 (novo)
   lembrete: '8efce35480e4a45e',
   conta_emissora: '30804615d55e104f',
 };
