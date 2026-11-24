@@ -64,7 +64,7 @@ Entrada em 15/11/2026, aluguel de R$ 2.000,00, boleto de 16/30 (R$ 1.066,67) pag
 - (a) Sai "quantidade 1" e o valor unitário igual ao total, R$ 1.182,44.
 - (b) Sai "16/30" com unitário de R$ 2.000,00, e a multa e os juros em outra linha (dá mais trabalho; confirmar com o contador se pode).
 - **Sugestão do Claude: (a)**, mais simples e o total bate.
-- **Resposta do dono (24/11):** (a): quantidade 1 e valor unitário igual ao total (R$ 1.182,44); a NF do pagamento atrasado continua com a perda da bonificação, a multa e os juros (regra de 16/10, com o contador). **Feito na PR #394.** Em aberto: pago em dia, a linha sai "16/30 × R$ 1.800,00" (aluguel com bonificação), e não "× R$ 2.000,00"; esperando o dono.
+- **Resposta do dono (24/11):** (a): quantidade 1 e valor unitário igual ao total (R$ 1.182,44); a NF do pagamento atrasado continua com a perda da bonificação, a multa e os juros (regra de 16/10, com o contador). **Feito na PR #394.** Depois (24/11), o dono completou: pago em dia, "16/30 × R$ 1.800,00" (o valor pago, bonificado); pago com atraso, uma linha só com o total e a conta nas observações da NF ("Aluguel proporcional 16/30 × R$ 2.000,00 = R$ 1.066,67 + multa e juros por atraso R$ 115,77 = R$ 1.182,44"), **PR #403**.
 
 **7. (DOC-05) Lembretes da régua ("vence em 3 dias", "vence hoje", "em atraso"): levar o PDF do boleto feito à mão no banco?**
 Hoje esses lembretes só sabem anexar o boleto do C6 pela ponte. O boleto feito à mão (PDF anexado) sai sem anexo e sem linha digitável.
