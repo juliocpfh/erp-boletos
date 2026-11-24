@@ -163,8 +163,10 @@ test('Novo contrato vem com os valores das regras', () => {
     conta_iptu: 'Por conta do inquilino', conta_seguro: 'Por conta do inquilino', prazo_meses: 30 });
   comRegras({ bonificacao_percentual_padrao: 10, tarifa_padrao: 350, fci_percentual_padrao: 5, fci_indice_padrao: 'Poupança', indice_padrao: 'IPCA' }, () => {
     assert.deepEqual(R.padroesNovoContrato(), { multa_percentual: 2, juros_mensal_percentual: 1, bonificacao: true, cobranca_mes_seguinte: true,
-      conta_iptu: 'Por conta do inquilino', conta_seguro: 'Por conta do inquilino', desconto_pontualidade_percentual: 10, taxa_boleto: 350,
+      conta_iptu: 'Por conta do inquilino', conta_seguro: 'Por conta do inquilino', desconto_pontualidade_percentual: 10,
       fci_percentual: 5, fci_indice: 'Poupança', indice_correcao: 'IPCA', prazo_meses: 30 });
+    // a tarifa não vem mais preenchida (24/11/2026): o contrato em branco segue a regra
+    assert.equal(R.tarifaDoContrato({ taxa_boleto: 0 }), 350);
   });
 });
 

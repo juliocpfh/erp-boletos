@@ -1761,6 +1761,30 @@ function seguroProporcionalNoMes(d, c, comp) {
   return (entradaNoMes && !c.contrato_anterior_id) || (saidaNoMes && !continuadoPor(d, c));
 }
 
+/**
+ * Tarifa do boleto cobrada no contrato (decisão do dono de 24/11/2026: sempre cobrada por padrão): o valor próprio do contrato;
+ * sem valor próprio, a regra `tarifa_padrao` (Regras do sistema, ou a regra especial do contrato); "Não cobrar tarifa do boleto"
+ * marcado, nada. Ex.: regra R$ 8,50, contrato em branco → R$ 8,50; contrato com R$ 3,50 → R$ 3,50; marcado → R$ 0,00.
+ */
+export function tarifaDoContrato(c) {
+  if (!c || c.nao_cobrar_tarifa) return 0;
+  if (c.taxa_boleto > 0) return c.taxa_boleto;
+  const padrao = CR.regra('tarifa_padrao', c);
+  return padrao > 0 ? padrao : 0;
+}
+/** O contrato segue a tarifa padrão (sem valor próprio e sem "Não cobrar"). */
+export const usaTarifaPadrao = (c) => !!c && !c.nao_cobrar_tarifa && !(c.taxa_boleto > 0);
+
+/**
+ * Tarifa padrão mudou: os boletos em aberto dos contratos que a seguem são refeitos. Pagos, emitidos no banco (ou com o PDF do
+ * banco anexado), em acordo e alterados à mão na tarifa não mudam. ``filtroContrato``: só os contratos dessa regra (regra especial).
+ * Devolve quantos boletos mudaram.
+ */
+export function recalcularTarifaPadrao(d, usuario, filtroContrato = () => true) {
+  const ids = new Set(d.contratos.filter((c) => usaTarifaPadrao(c) && filtroContrato(c)).map((c) => c.id));
+  return recalcularCobrancas(d, (cb) => ids.has(cb.contrato_id) && !emitidoNoBanco(cb) && !cb.boleto_pdf, usuario);
+}
+
 export function montarCobranca(d, contrato, comp) {
   const dias = C.diasOcupados(comp, contrato.data_entrada, contrato.data_saida);
   if (dias === 0 || trocaAguardaAditivo(d, contrato)) return null;
@@ -1789,7 +1813,7 @@ export function montarCobranca(d, contrato, comp) {
     entrada: contrato.data_entrada, saida: contrato.data_saida,
     descontoPercentual: bonificacaoNaCompetencia(d, contrato, comp), iptu, seguro,
     seguroProporcional: seguroProporcionalNoMes(d, contrato, comp),
-    taxaBoleto: cobra('taxa') ? contrato.taxa_boleto || 0 : 0, contrato,
+    taxaBoleto: cobra('taxa') ? tarifaDoContrato(contrato) : 0, contrato,
   });
   const seguroParcela = seguro && r.seguro < seguro ? `${seguroRot} proporcional ${r.dias_cobrados}/${r.dias_mes} dias de ${C.reais(seguro)}` : seguroRot;
   // troca de titular no dia 31: o anterior já pagou 30/30 e o novo não tem dia a pagar no mês (saida-016): sem boleto
@@ -2877,7 +2901,7 @@ export const CAMPOS_PESSOA = ['inquilino_tipo', 'inquilino_nome', 'inquilino_ape
   ...['inquilino_', 'representante_', 'solidario_'].flatMap((p) => ['genero', 'nacionalidade', 'estado_civil', 'profissao', 'nascimento', 'endereco'].map((k) => p + k))];
 /** Condições do contrato que servem de ponto de partida para o contrato no outro imóvel (são conferidas depois). */
 const CAMPOS_CONDICOES = ['prazo_tipo', 'prazo_meses', 'renovacao_automatica', 'indice_correcao', 'aluguel_inicial', 'dia_vencimento',
-  'cobranca_mes_seguinte', 'bonificacao', 'desconto_pontualidade_percentual', 'taxa_boleto', 'multa_percentual', 'juros_mensal_percentual',
+  'cobranca_mes_seguinte', 'bonificacao', 'desconto_pontualidade_percentual', 'taxa_boleto', 'nao_cobrar_tarifa', 'multa_percentual', 'juros_mensal_percentual',
   'cobrar_iptu', 'cobrar_seguro', 'conta_iptu', 'conta_seguro', 'fci_percentual', 'fci_indice', 'gerar_nf', 'garantia_tipo', 'finalidade', 'atividade', 'perfil_regras_id'];
 
 /** Dados da pessoa (sem as condições do contrato): a mesma pessoa alugando outro imóvel começa um contrato novo com eles. */
@@ -9049,6 +9073,7 @@ export function salvarRegrasSistema(d, valores, usuario, motivo = 'Regras do sis
   let mudou = 0;
   const antes = CR.regrasDe(d);
   const naNfAntes = antes.ressarcimento_na_nf;
+  const tarifaAntes = antes.tarifa_padrao;
   for (const def of CR.DEFINICOES_REGRAS) {
     // a que fica em outra tela (`fora`, ex.: a assinatura digital) continua como está, salvo pelo botão dela (foraQueMuda)
     const novo = def.fora && def.chave !== foraQueMuda ? antes[def.chave] : def.chave in limpos ? limpos[def.chave] : def.padrao;
@@ -9065,6 +9090,8 @@ export function salvarRegrasSistema(d, valores, usuario, motivo = 'Regras do sis
   // ressarcimento na NF mudou: os boletos em aberto com ressarcimento passam a seguir a regra nova (os pagos não mudam)
   const naNf = CR.regra('ressarcimento_na_nf');
   if (naNf !== naNfAntes) for (const cb of d.cobrancas.filter((x) => !x.data_pagamento && x.ressarcimento > 0 && !!x.ressarcimento_na_nf !== naNf)) atualizar(d, 'cobrancas', cb.id, { ressarcimento_na_nf: naNf }, usuario, 'Ressarcimento na NF (regra do sistema)');
+  // tarifa padrão mudou: os boletos em aberto de quem a segue acompanham (os da regra especial com tarifa própria, não)
+  if (!CR.mesmoValor(CR.regra('tarifa_padrao'), tarifaAntes)) recalcularTarifaPadrao(d, usuario, (c) => !c.perfil_regras_id || CR.regra('tarifa_padrao', c) === CR.regra('tarifa_padrao'));
   return mudou;
 }
 
@@ -9133,9 +9160,12 @@ export function salvarPerfilRegras(d, id, { nome, descricao = '', valores = {} }
   const dados = { nome: n, descricao: String(descricao || '').trim().slice(0, 300), valores: limpos };
   const r = id ? buscar(d, 'perfis_regras', Number(id)) : null;
   if (id && !r) throw new C.ErroUsuario('Regra especial não encontrada.');
+  const tarifaAntes = r ? (r.valores || {}).tarifa_padrao : undefined;
   const salvo = r ? (atualizar(d, 'perfis_regras', r.id, dados, usuario, `Regra especial "${n}" alterada`), r)
     : inserir(d, 'perfis_regras', { ...dados, criado_em: C.hojeIso() }, usuario, `Regra especial "${n}" criada`);
   CR.usarRegras(d);
+  // tarifa da regra especial mudou: os boletos em aberto dos contratos dela que seguem a tarifa padrão acompanham (24/11/2026)
+  if (r && !CR.mesmoValor(tarifaAntes, limpos.tarifa_padrao)) recalcularTarifaPadrao(d, usuario, (c) => c.perfil_regras_id === r.id);
   return salvo;
 }
 
@@ -9161,7 +9191,7 @@ export function padroesNovoContrato(perfil = null) {
     cobranca_mes_seguinte: r('mes_seguinte_padrao'), conta_iptu: r('conta_iptu_padrao'), conta_seguro: r('conta_seguro_padrao') };
   if (CR.perfilDe(ctx)) out.perfil_regras_id = CR.perfilDe(ctx);
   if (r('bonificacao_percentual_padrao') !== null && r('bonificacao_padrao')) out.desconto_pontualidade_percentual = r('bonificacao_percentual_padrao');
-  if (r('tarifa_padrao') !== null) out.taxa_boleto = r('tarifa_padrao');
+  // tarifa do boleto: não vem preenchida; o contrato em branco segue a regra `tarifa_padrao` (tarifaDoContrato, 24/11/2026)
   if (r('fci_percentual_padrao') !== null) out.fci_percentual = r('fci_percentual_padrao');
   // o índice vem preenchido mesmo com o % em branco (o campo só aparece quando o % é digitado; sem %, o cadastro o apaga)
   if (r('fci_indice_padrao')) out.fci_indice = r('fci_indice_padrao');

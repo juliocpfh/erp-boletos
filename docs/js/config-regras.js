@@ -124,9 +124,10 @@ export const DEFINICOES_REGRAS = [
     explica: 'Sim: o aluguel de julho vence em agosto (paga-se depois de usar).',
     consequencia: 'Não: o aluguel de julho vence em julho. Cobrar antes de usar é proibido quando há garantia (art. 20; só é permitido sem garantia, art. 42, ou na temporada) e é contravenção (art. 43, III).',
     lei: LI + ', arts. 20, 42 e 43, III.' },
-  { chave: 'tarifa_padrao', grupo: 'contrato', rotulo: 'Tarifa do boleto cobrada do inquilino (R$) que vem preenchida', tipo: 'dinheiro', padrao: null, min: 0,
-    explica: 'Em branco: sem tarifa. Ex.: R$ 3,50 por boleto.',
-    consequencia: 'Só muda o que vem preenchido. Os tribunais divergem sobre repassar a tarifa do banco ao inquilino: só com cláusula clara no contrato.',
+  // decisão do dono de 24/11/2026: a tarifa é sempre cobrada; o contrato sem valor próprio cobra esta (antes ela só vinha preenchida)
+  { chave: 'tarifa_padrao', grupo: 'aluguel', rotulo: 'Tarifa do boleto cobrada do inquilino (R$)', tipo: 'dinheiro', padrao: null, min: 0,
+    explica: 'Vale para todo contrato sem valor próprio da tarifa. No contrato dá para pôr outro valor ou marcar "Não cobrar tarifa do boleto". Em branco: sem tarifa. Ex.: R$ 8,50 por boleto.',
+    consequencia: 'Os boletos em aberto dos contratos sem valor próprio são refeitos com a tarifa nova; os pagos, os emitidos no banco (ou com o PDF do banco anexado) e os alterados à mão não mudam. Os tribunais divergem sobre repassar a tarifa do banco ao inquilino: só com cláusula clara no contrato.',
     lei: LI + ', art. 22, VII (despesas de administração são do locador).' },
   { chave: 'conta_iptu_padrao', grupo: 'contrato', rotulo: 'IPTU que vem preenchido', tipo: 'opcao', padrao: 'Por conta do inquilino',
     opcoes: [['Por conta do inquilino', 'Por conta do inquilino (padrão do sistema)', 'As parcelas entram no boleto, proporcionais aos dias ocupados. Legal com cláusula no contrato (arts. 22, VIII, e 25).'],
@@ -389,7 +390,7 @@ let emUso = { ...PADRAO_SISTEMA };
  * dia de gerar boletos, anexos) e o ressarcimento na NF (escrituração, com o contador) valem sempre para todos.
  */
 export const REGRAS_POR_CONTRATO = new Set([
-  'reajuste_inicio', 'base_multa', 'proporcional',
+  'reajuste_inicio', 'base_multa', 'proporcional', 'tarifa_padrao',
   ...DEFINICOES_REGRAS.filter((x) => x.grupo === 'garantia' || x.grupo === 'contrato').map((x) => x.chave),
   'regua_email_dias', 'notificacao_prazo_dias', 'notificacao_aviso_dias', 'notificacao_multa_alugueis',
   'antecedencia_seguro', 'antecedencia_vigencia', 'antecedencia_fiador', 'antecedencia_reajuste', 'dias_vermelho',
