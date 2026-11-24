@@ -11,7 +11,7 @@ import * as K from '../docs/js/contratos.js';
 import * as R from '../docs/js/regras.js';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
-const texto = (blocos) => blocos.map((b) => (b.runs ? b.runs.map((r) => r.t).join('') : b.linhas ? '[tabela]' : `[${(b.pessoas || []).map((p) => p.papel).join(', ')}]`)).join('\n');
+const texto = (blocos) => blocos.map((b) => (b.runs ? b.runs.map((r) => r.t).join('') : b.tipo === 'nova_pagina' ? '[nova página]' : b.linhas ? '[tabela]' : `[${(b.pessoas || []).map((p) => p.papel).join(', ')}]`)).join('\n');
 
 /** Formulário "Editar contrato" (valores → ajustar) num processo à parte (app.js não roda no Node). */
 function editarNoCadastro(d, id, mudancas = {}) {

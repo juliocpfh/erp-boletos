@@ -11,13 +11,13 @@ import { resumosGerados, textosGerados } from './mercado-fixo.mjs';
 
 /** Resumo de cada texto gerado pelo cenário ANK/JCK com o código de ANTES da mudança (2026-11-16). */
 const ANTES = {
-  'contrato:Residencial:Maria Souza': '83cb26abd78667d9',
-  'contrato:Não residencial (comercial):Maria Souza': '9703a3201ecf0346',
+  'contrato:Residencial:Maria Souza': '3e576c38be83d0e4', // 24/11: + resumo em perguntas e respostas (sem ele, o mesmo de antes: 83cb26abd78667d9)
+  'contrato:Não residencial (comercial):Maria Souza': '58c4c81c7c89e148', // 24/11: + resumo em perguntas e respostas (sem ele, o mesmo de antes: 9703a3201ecf0346)
   'locadoras:Maria Souza': 'c85480966d9c7b25',
   'representacao:Maria Souza': '264e192c61a07b4d',
   'cidade:Maria Souza': '377621052857a5ab',
-  'contrato:Residencial:João Teste': '00f1c530414bb1c5',
-  'contrato:Não residencial (comercial):João Teste': 'e948a11aa950da86',
+  'contrato:Residencial:João Teste': '3f58df502efd7459', // 24/11: + resumo em perguntas e respostas (sem ele, o mesmo de antes: 00f1c530414bb1c5)
+  'contrato:Não residencial (comercial):João Teste': 'd8aa296b734e7396', // 24/11: + resumo em perguntas e respostas (sem ele, o mesmo de antes: e948a11aa950da86)
   'locadoras:João Teste': 'c85480966d9c7b25',
   'representacao:João Teste': '661b724dffaa2bb9',
   'cidade:João Teste': '377621052857a5ab',

@@ -171,12 +171,16 @@ export async function pdfDoDocumento(el, rodape = [], { margemLado = 0, alturaMa
   // o link das fotos continua clicável no PDF (área do link na folha certa)
   const links = [...el.querySelectorAll('.ct-link a')].map((a) => { const x = a.getBoundingClientRect(); return { url: a.href, x: x.left - caixa.left, y: x.top - topo, w: x.width, h: x.height }; });
   const cortes = cortesDoDocumento(el, topo);
+  // [nova página] do modelo (ex.: o resumo em perguntas e respostas): a folha termina ali
+  const quebras = [...el.querySelectorAll('.ct-nova-pagina')].map((x) => x.getBoundingClientRect().top - topo);
   const marca = await marcaDaguaPdf(el.querySelector('.ct-marca'));
   const opcoes = { scale: ESCALA_PDF, backgroundColor: '#ffffff', onclone: (doc) => {
     // a marca-d'água da tela repete a cada altura de A4, mas as folhas do PDF são cortadas entre os blocos: sai da imagem
     // e entra por cima de cada folha, sempre no centro (como na impressão e no Word)
     doc.querySelectorAll('.ct-rodape, .ct-marcas').forEach((x) => x.remove());
-    doc.querySelectorAll('.contrato').forEach((x) => { x.style.border = '0'; x.style.boxShadow = 'none'; });
+    // borda transparente, não tirada: sem ela o documento ficava 2 px mais largo, as linhas quebravam diferente e o texto
+    // andava até ~25 px no fim, fora dos cortes medidos na tela (o [nova página] do resumo saía uma linha depois)
+    doc.querySelectorAll('.contrato').forEach((x) => { x.style.borderColor = 'transparent'; x.style.boxShadow = 'none'; });
   } };
   const largura = 210 - 2 * margemLado;
   const pxMm = el.offsetWidth / largura;
@@ -193,6 +197,8 @@ export async function pdfDoDocumento(el, rodape = [], { margemLado = 0, alturaMa
     let fim = ini + alturaFolha + (fatias.length ? 0 : (margemTopo - topoDa(0)) * pxMm);
     if (fim >= total) fim = total;
     else fim = cortes.filter((y) => y > ini + alturaFolha * 0.4 && y <= fim).pop() || fim;
+    const quebra = quebras.find((y) => y > ini + 2 && y < fim);
+    if (quebra !== undefined) fim = quebra;
     fatias.push([ini, fim]);
     ini = fim;
   }
