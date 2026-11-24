@@ -33,7 +33,7 @@ function prazosHtml(f) {
   const c = R.condicoesDaReserva(f);
   const passou = (x) => (x < hoje ? ` ${etiqueta('passou', 'aviso')}` : '');
   return `<ul>
-    <li>Documentos até <b>${dataBr(pz.documentos_ate)}</b> (${C.plural(c.dias_uteis_documentos, 'dia útil', 'dias úteis')} do depósito)${passou(pz.documentos_ate)}${pz.documentos_ate < hoje && R.fichaSemDocumentos(f) ? ' · os documentos não estão marcados como recebidos: o termo diz que a reserva é cancelada' : ''}</li>
+    <li>Documentos até <b>${dataBr(pz.documentos_ate)}</b> (${C.plural(c.dias_uteis_documentos, 'dia útil', 'dias úteis')} do depósito)${passou(pz.documentos_ate)}${pz.documentos_ate < hoje && R.fichaSemDocumentos(f) ? ' · os documentos não estão marcados como recebidos: pelo termo, conta como desistência (use "Desistiu antes de assinar")' : ''}</li>
     <li>O imóvel fica reservado até <b>${dataBr(pz.vale_ate)}</b>${passou(pz.vale_ate)}</li>
     <li>${pz.arrependimento_ate ? `Desistência com tudo de volta até <b>${dataBr(pz.arrependimento_ate)}</b>; hoje, se` : 'Sem prazo de devolução total; se'} desistir: ${dv.integral ? `devolve ${reais(dv.devolver)} (tudo)` : dv.devolver === 0 ? `a reserva de ${reais(dv.reter)} fica com a empresa` : `devolve <b>${reais(dv.devolver)}</b> e a empresa fica com ${reais(dv.reter)}`}</li></ul>`;
 }

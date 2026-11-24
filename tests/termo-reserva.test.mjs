@@ -56,6 +56,9 @@ test('devolução pelo padrão (100%, 0 dias): desistência depois do depósito 
   const dv = R.devolucaoDaReserva(R.buscar(d, 'fichas', f.id), { data: '2026-12-10' });
   assert.deepEqual([dv.devolver, dv.reter], [0, 50000], 'no próprio dia do depósito já não devolve');
   assert.match(dv.motivo, /a empresa fica com a reserva inteira \(R\$ 500,00\)/);
+  // sem os documentos em 3 dias úteis: conta como desistência e a reserva fica com a empresa (dono, 24/11)
+  const alerta = R.pendenciasDasFichas(d, '2026-12-16').find((x) => /prazo dos documentos/.test(x.texto));
+  assert.match(alerta.texto, /acabou em 15\/12\/2026 .*pelo termo, conta como desistência \(a reserva fica com a empresa\)/);
   R.atualizar(d, 'fichas', f.id, { situacao: 'Desistiu', decisao_data: '2026-12-11' }, 'j');
   assert.equal(R.devolucaoPendente(R.buscar(d, 'fichas', f.id)), false, 'nada a devolver: não fica "devolver a reserva"');
   assert.ok(!R.pendenciasDasFichas(d, '2026-12-30').some((x) => /devolução/.test(x.texto)));

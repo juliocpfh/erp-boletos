@@ -1,5 +1,24 @@
 # O que ainda falta no sistema (e como fazer)
 
+## ONDE PARAMOS (24/11/2026, manhã: para o Claude retomar depois do /clear)
+
+**Para o Claude:** o dono só responde à **conversa principal**: as perguntas das outras sessões passam por ela (pedido de 24/11). Sessão que terminou o trabalho e os testes é **fechada** (arquivada, com a pasta de trabalho apagada) e a lista abaixo é atualizada. Confira o estado com `mcp__ccd_session_mgmt__list_sessions` e `gh pr list`.
+
+**Já na `main` (24/11):** #363 (pendências), #364 (vários ajustes no boleto; boleto alterado à mão recebe o seguro), #365, #368 e #371 (conferência dos boletos: avisos, descrição curta, relatório `CONFERENCIA_BOLETOS_24_11.md`), #366 (histórico, conferir, taxas), #367 (boleto feito à mão: anexar PDF e enviar por e-mail), #369 (visual da assinatura), #370 (modelos novos de documentos).
+
+**PRs abertas, em teste pela sessão "Testar cada PR na tela antes do aceite":** #372 (termo de aceite da reserva: 100% na desistência, 0 dia de devolução total, texto claro dos dados que não se confirmam), #373 (seguro e ressarcimento perguntam o **mês do vencimento**; taxas do condomínio uma por linha), #374 (resumo do contrato em perguntas e respostas na última página), #375 (documentação: tarifa, reserva, locador direto). Só aceitar depois do comentário de aprovação na PR.
+
+**Sessões trabalhando:**
+- "Boletos: troca de titular, saída e seguro": decisões do dono de 24/11. A taxa do condomínio fica com quem pagou (crédito na devolução/acerto); paga depois da saída vira crédito no cálculo final; o seguro é proporcional aos dias no mês de entrada e de saída.
+- "Cobrança: pesquisa legal e anexar as provas": o dono acha que honorários e despesas de cobrança podem ser abusivos. Primeiro vem a pesquisa em PDF (nada de cobrança); depois, registros e anexos das provas da cobrança, que não somam em nada.
+- "Criar os modelos de PDF que faltam": tarifa do boleto **sempre** no contrato (desfaz a decisão de 20/10) e aditivo para os contratos já assinados.
+- "Nuvem recusa o boleto do saldo da saída": defeito achado no teste.
+- "Conferir tudo que entra e sai dos boletos": terminou; a pergunta que ficou aberta nela já foi respondida aqui e passada à sessão "Boletos: troca de titular, saída e seguro". Pode fechar.
+
+**Esperando o dono:** nada no momento. Depois virão a resposta sobre honorários (com o PDF da pesquisa) e o aceite das PRs aprovadas.
+
+**Próximos (pedidos de 24/11 ainda não feitos):** os mesmos campos de mês com a confusão referência × vencimento ("Usar a reserva no aluguel de", início da carência, "vale desde" da renovação); busca geral de erros com vários agentes (C5, parte "corrigir"); no fim, arquivar e compactar código e documentação (C6) e limpar as pastas de trabalho (PENDENCIAS_4000, item 7). Futuro: locador direto × procurador de terceiro no contrato.
+
 ## PEDIDOS DE 24/11/2026 (fazer em seguida, na ordem; marque `[x]` ao concluir)
 
 **Para o Claude:** o dono pediu (24/11) que, com o limite de uso liberado, o trabalho siga sozinho: PR atrás de PR (uma de cada vez, a partir da `main`, sem empilhar), conferindo que uma não trava a outra, com **testes de tela e conferências antes de cada PR**.
@@ -7,11 +26,11 @@
 **Três documentos novos (24/11), também em PDF na pasta do projeto:** `HISTORICO_DO_SISTEMA.md` (o que foi feito, tirado e por quê, e **o que ainda falta, em ordem de prioridade**), `CONFERIR_O_QUE_MUDOU.md` (o que **você** confere, tela por tela, com caixas para marcar) e `TAXAS_COBRAVEIS.md` (o que pode ser cobrado do inquilino, com uma pergunta sim/não para cada taxa; o advogado deve conferir).
 
 ### A. Boletos quebrados (urgente)
-1. [ ] **Condomínio, taxas do proprietário (ressarcimento):** lançadas, mas não entraram nos boletos do mês.
-2. [ ] **Seguro obrigatório** lançado para entrar neste mês não entrou no boleto do inquilino.
-3. [ ] **Ajuste do mês em Boletos:** permitir **mais de um abatimento e mais de um ressarcimento** no mesmo boleto (hoje só um de cada).
+1. [x] **Condomínio, taxas do proprietário (ressarcimento):** lançadas, mas não entraram nos boletos do mês. **Explicado em 24/11:** a causa foi o mês de referência digitado no lugar do mês do vencimento (em dois imóveis); correção e testes na PR #373.
+2. [x] **Seguro obrigatório** (PRs #364 e #373) lançado para entrar neste mês não entrou no boleto do inquilino.
+3. [x] **Ajuste do mês em Boletos:** (PR #364) permitir **mais de um abatimento e mais de um ressarcimento** no mesmo boleto (hoje só um de cada).
 4. [x] **Mandar o boleto feito à mão por e-mail** (enquanto a API do C6 não sai): em Boletos, anexar o PDF do boleto emitido no banco e enviar ao inquilino pelo Gmail um e-mail curto com o descritivo (como no boleto), o mês de competência, o vencimento e o boleto anexado. Hoje a equipe manda sempre esse e-mail por fora; agora quer mandar pelo sistema. **Feito em 24/11:** na página do boleto, caixa "Boleto emitido no banco (PDF)" (anexar, abrir, trocar, tirar) e botão "Enviar boleto por e-mail" (abre a janela para revisar; vai com o PDF anexado); a lista de Boletos mostra "📎 PDF do banco" e "✉ enviado em ...". **Para conferir:** anexar o PDF de um boleto de verdade e mandar a si mesmo primeiro.
-5. [ ] **Conferir tudo o que entra e sai do boleto** (aluguel, proporcional, IPTU, condomínio, seguro, ressarcimentos, abatimentos, multas da notificação, diferenças, caução, acordo, reserva, NF), com testes automáticos e de tela.
+5. [x] **Conferir tudo o que entra e sai do boleto** (aluguel, proporcional, IPTU, condomínio, seguro, ressarcimentos, abatimentos, multas da notificação, diferenças, caução, acordo, reserva, NF), com testes automáticos e de tela. **Feito em 24/11:** relatório em `CONFERENCIA_BOLETOS_24_11.md` (PRs #365 e #368; 4 decisões suas no fim do relatório).
 
 ### B. Termo de aceite da reserva (decisões do dono em 24/11) — [x] programado em 24/11 (PR #372); falta a leitura e o teste do dono
 
@@ -31,7 +50,7 @@ Pedido original (histórico):
 
 ### C. Outros pedidos de 24/11
 1. [ ] **Assinatura digital: melhorar o visual.** Funcionou (conferido no validar.iti.gov.br), mas o campo de assinatura do documento fica em branco e a última página só tem uma tarja azul. Fazer uma página de assinatura mais bonita e preencher o campo "assinatura" do documento com o selo.
-2. [ ] **Modelos de documentos (PDF):** criar os modelos que faltam para o dono baixar, ler e ajustar.
+2. [x] **Modelos de documentos (PDF):** criar os modelos que faltam para o dono baixar, ler e ajustar. **Feito em 24/11:** 8 modelos novos, editáveis em Sistema → Modelos de documentos → **Outros documentos da locação** (prorrogação do prazo, troca de garantia, distrato, aviso de desocupação do inquilino, notificação para desocupação, autorização de obra, declaração de pagamentos em dia, aviso ao fiador), cada um com **Exemplo em PDF** (pessoa fictícia) e **Gerar para um inquilino** (também no botão **Outros documentos** da página do inquilino, em "Termos aditivos"). O arquivo `Modelos de documentos - para revisar.pdf` (raiz do projeto, fora do Git; gerado de novo com `node tools/modelos-para-revisar.mjs`) traz todos os documentos do sistema com dados de exemplo, os novos marcados NOVO, e a lista do que é editável e do que é texto fixo. **Falta o dono:** ler o PDF e anotar o que mudar (os textos novos não foram vistos por advogado; a notificação para desocupação, principalmente).
 3. [x] **Lista do que conferir:** o dono não sabe o que mudou; montar a lista de tudo que ele precisa conferir de novo (tela por tela, o que fazer e o que deve aparecer). **Feito em 24/11:** `CONFERIR_O_QUE_MUDOU.md` (e o PDF de mesmo nome na pasta do projeto). **Falta o dono conferir** item por item.
 4. [x] **Taxas e cobranças extras:** trazer a lista do que pode ser cobrado do inquilino (com a lei de cada uma) para o dono decidir. **Feito em 24/11:** `TAXAS_COBRAVEIS.md` (e o PDF), com uma pergunta sim/não para cada taxa. **Falta o dono decidir**; depois o Claude escreve as cláusulas para o advogado conferir.
 5. [ ] **Busca geral com vários agentes ao mesmo tempo:** erros, partes quebradas, regras que deixaram de ser usadas; comparar com a memória e a documentação o que foi feito e o que deixou de ser feito, **quando** e **por quê** (o que foi implementado, o que foi tirado e a decisão). Tudo em **PDF** e documentado. Depois, listar o que ainda falta e começar as correções. **Parte feita em 24/11:** `HISTORICO_DO_SISTEMA.md` (e o PDF): o histórico por assunto (feito, tirado e por quê, pela metade) e a lista "O que ainda falta fazer" em ordem de prioridade. Falta a busca de erros e partes quebradas e começar as correções.
