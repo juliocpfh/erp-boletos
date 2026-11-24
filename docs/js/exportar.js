@@ -18,7 +18,7 @@ const SECRETO = /senha|hash|(^|_)sal$|^sessoes$/;
 const DINHEIRO = /^(valor|aluguel|desconto|iptu|seguro|taxa_boleto|outros|multa|juros|ressarcimento|reserva|caucao|deposito|complemento|debitos|total|saldo|credito|abatimento|devolucao|garantia|divida|fci|diferenca)(_|$)/;
 const NAO_DINHEIRO = /(_percentual|_descricao|_parcela|_parcelas|_data|_comp|_competencia|_na_nf|_tipo|_id|_comprovante|_inscricao|_mes|_ano|_dias|_texto|_obs|_indice|_indices|_no_boleto)$/;
 // Em centavos apesar do fim do nome (ex.: dívida do acordo na data, R$ 12.567,36 = 1256736)
-const DINHEIRO_SEMPRE = new Set(['divida_na_data']);
+const DINHEIRO_SEMPRE = new Set(['divida_na_data', 'orcamento_valor']);
 // Tabelas sem dinheiro solto: o valor da regra é dia, %, sim/não... (sai formatado pela definição da regra)
 const SEM_DINHEIRO = new Set(['config_regras', 'versoes_regras', 'perfis_regras']);
 
@@ -32,7 +32,7 @@ const ROTULOS = { numero: 'Número', divida_na_data: 'Dívida na data', dias_mes
   acordo_parcela_de: 'Parcela do acordo nº', diferenca_devida: 'Diferença devida (vai ao boleto seguinte)', diferenca_no_boleto: 'Diferença cobrada no boleto nº',
   competencia: 'Mês de referência', situacao: 'Situação', descricao: 'Descrição', observacao: 'Observação', observacoes: 'Observações',
   criado_em: 'Criado em', alterado_em: 'Alterado em', data_pagamento: 'Data do pagamento', valor_pago: 'Valor pago', vencimento: 'Vencimento',
-  regra: 'Regra', chave: 'Chave' };
+  regra: 'Regra', chave: 'Chave', orcamento_valor: 'Orçamento inteiro da pintura', pintura: 'Reparo de pintura', pintura_nova: 'Pintura nova na entrada' };
 
 // Formulário de cada cadastro: o rótulo da coluna vem dele (o mesmo campo pode ter outro nome em outro cadastro)
 const FORM_DA_TABELA = { imoveis: F.IMOVEL, contratos: F.CONTRATO, correcoes: F.CORRECAO, seguros: F.SEGURO, iptus: F.IPTU,

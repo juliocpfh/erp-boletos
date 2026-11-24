@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-h1nVu4//sWpyYavms5qUZOPUcMhfIGruG4ulzu+D7LU='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-JcolyBFaICY8tWqGaFP8cisbvShBEqoN7KfhcPjOriA='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="dc3ce21030427d5a">
+<meta name="fontes" content="e8da4efad6497809">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1610,6 +1610,20 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           consequencia: "Só muda o que vem preenchido no Novo contrato.",
           lei: "Sem lei: vale o contrato."
         },
+        // decisão do dono, 24/11/2026: pintura nova na entrada → devolve pintado (orçamento inteiro); sem pintura nova → paga só a vida
+        // que faltava da pintura (orçamento × (vida − meses de moradia) ÷ vida, mínimo zero)
+        {
+          chave: "pintura_vida_meses",
+          grupo: "garantia",
+          rotulo: "Pintura na saída: vida da pintura (meses)",
+          tipo: "inteiro",
+          padrao: 36,
+          min: 1,
+          max: 120,
+          explica: "Sugere o valor do reparo de pintura no cálculo final. Se a vistoria de entrada registrou pintura nova, o inquilino paga o orçamento inteiro (ex.: R$ 2.400,00). Sem pintura nova, paga só o que faltava da vida da pintura: orçamento de R$ 2.400,00, morou 12 meses → R$ 2.400,00 × 24/36 = R$ 1.600,00; 36 meses ou mais → nada.",
+          consequencia: "Só muda a sugestão (a equipe sempre pode mudar o valor). Vida maior cobra mais de quem morou pouco; menor cobra menos. O desgaste natural do uso não pode ser cobrado.",
+          lei: LI + ", art. 23, III (devolver o imóvel no estado em que o recebeu, salvo as deteriorações do uso normal)."
+        },
         // ------------------------------------------------------------------ contrato
         {
           chave: "prazo_residencial_padrao",
@@ -1940,7 +1954,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           padrao: 3,
           min: 0,
           max: 30,
-          explica: 'São os dias úteis que o banco leva para creditar o boleto pago pelo código de barras. A conta começa no último dia para pagar (o vencimento; se cair em sábado, domingo ou feriado, o próximo dia útil) e anda só em dias úteis. Entrada com o valor em dia creditada dentro desse prazo conta como paga em dia. Ex.: 3 → boleto que vence no sábado 10/10/2026 (12/10 é feriado): o último dia para pagar é terça 13/10 e a entrada até sexta 16/10/2026 ainda conta como em dia. Vale igual na sugestão do extrato, no botão "É o pagamento do boleto" e no primeiro dia da cobrança de atraso por e-mail (régua).',
+          explica: 'São os dias úteis que o banco leva para creditar o boleto pago pelo código de barras. A conta começa no último dia para pagar (o vencimento; se cair em sábado, domingo ou feriado, o próximo dia útil) e anda só em dias úteis. Entrada com o valor em dia creditada dentro desse prazo conta como paga em dia. Ex.: 3 → boleto que vence no sábado 10/10/2026 (12/10 é feriado): o último dia para pagar é terça 13/10 e a entrada até sexta 16/10/2026 ainda conta como em dia. Vale igual na sugestão do extrato, no botão "É o pagamento do boleto" e no primeiro dia da cobrança de atraso por e-mail (régua). Pode ser outro número numa regra especial (ex.: contratos comerciais com 6 e os demais com o da empresa): cada boleto segue a regra do seu contrato.',
           consequencia: "Mais dias: mais pagamentos atrasados pelo valor em dia contam como em dia, e o e-mail de cobrança de atraso demora mais para ficar pronto. Menos dias: boleto pago no último dia e creditado depois do prazo é tratado como atrasado (com multa e juros). Pix não usa este prazo: entra na hora. Só muda as contas e o aviso: nada é registrado sem a sua confirmação, e sem o código do boleto nada é ligado sozinho.",
           lei: "Sem lei: rotina."
         },
@@ -2241,7 +2255,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         "antecedencia_vigencia",
         "antecedencia_fiador",
         "antecedencia_reajuste",
-        "dias_vermelho"
+        "dias_vermelho",
+        "tolerancia_boleto_dias"
+        // decisão de 24/11/2026: prazo do banco diferente por tipo de contrato
       ]);
       podePorContrato = (chave) => REGRAS_POR_CONTRATO.has(chave);
       perfis = /* @__PURE__ */ new Map();
@@ -2295,6 +2311,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     liquidar: () => liquidar,
     maisAntigoPrimeiro: () => maisAntigoPrimeiro,
     maisRecentePrimeiro: () => maisRecentePrimeiro,
+    mesesDeMoradia: () => mesesDeMoradia,
     mesesDoPrazo: () => mesesDoPrazo,
     mesesEntre: () => mesesEntre,
     multaEJuros: () => multaEJuros,
@@ -2594,6 +2611,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     const s = continuacao && ini === entrada && dia(ini) > 1 ? Math.min(dia(ini) - 1, 30) + 1 : dia(ini) === ultimo ? 30 : Math.min(dia(ini), 30);
     const e = dia(fim) === ultimo ? 30 : Math.min(dia(fim), 30);
     return Math.max(0, Math.min(30, e - s + 1));
+  }
+  function mesesDeMoradia(entrada, saida) {
+    if (!entrada || !saida || saida < entrada) return 0;
+    let dias = 0;
+    for (let comp = entrada.slice(0, 7); comp <= saida.slice(0, 7); comp = somarMeses(comp, 1)) dias += diasComerciais(comp, entrada, saida);
+    return Math.floor(dias / 30);
   }
   function calcularCobranca({
     competencia,
@@ -4760,9 +4783,46 @@ ${RESUMO_CONTRATO}`, "RESUMO DO CONTRATO EM PERGUNTAS E RESPOSTAS"],
     }).map((x) => `${x.comodo} – ${x.item} (${x.situacao}${x.obs ? `: ${x.obs}` : ""})`);
     if (!(vistoria.itens || []).length) pendencias = linhasDe(vistoria.descritivo).filter((l) => /DIFERENÇA/i.test(l)).map((l) => l.replace(/^[-•*]\s+/, ""));
     const guardados = vistoria.reparos || {};
-    const reparos = pendencias.map((p2) => ({ pendencia: p2, valor: guardados[p2] ? guardados[p2].valor : null, orcamento: guardados[p2] ? guardados[p2].orcamento || "" : "" }));
+    const reparos = pendencias.map((p2) => ({
+      pendencia: p2,
+      valor: guardados[p2] ? guardados[p2].valor : null,
+      orcamento: guardados[p2] ? guardados[p2].orcamento || "" : "",
+      pintura: guardados[p2] && guardados[p2].pintura !== void 0 ? !!guardados[p2].pintura : ehPintura(p2),
+      orcamento_valor: guardados[p2] && Number.isInteger(guardados[p2].orcamento_valor) ? guardados[p2].orcamento_valor : null
+    }));
     const totalReparos = reparos.reduce((s, x) => s + (x.valor || 0), 0);
     return { texto: pendencias.length ? "Com pendências" : "Sem pendências", vistoria, pendencias, reparos, totalReparos, semValor: reparos.filter((x) => x.valor === null).length };
+  }
+  function sugestaoPintura(d2, c, orcamento) {
+    const entrada = vistoriaDeEntrada(d2, c);
+    const vida = Number(regra("pintura_vida_meses", c)) || 36;
+    if (!entrada) return { caso: "sem_vistoria", valor: null, meses: null, vida, texto: "Sem vistoria de entrada: confira como o imóvel foi entregue antes de cobrar a pintura." };
+    if (entrada.pintura_nova !== true && entrada.pintura_nova !== false) {
+      return { caso: "sem_info", valor: null, meses: null, vida, texto: `A vistoria de entrada (${dataBr(entrada.data)}) não diz se a pintura era nova: confira a vistoria de entrada e as fotos antes de dar o valor.` };
+    }
+    const dono = d2.contratos.find((x) => x.id === entrada.contrato_id) || c;
+    const inicio = dono.data_entrada || dono.vigencia_inicio || entrada.data;
+    const meses = mesesDeMoradia(inicio, c.data_saida || hojeIso());
+    const temOrcamento = Number.isInteger(orcamento) && orcamento >= 0;
+    if (entrada.pintura_nova) {
+      return {
+        caso: "nova",
+        valor: temOrcamento ? orcamento : null,
+        meses,
+        vida,
+        texto: `Pintura nova na entrada: o inquilino devolve pintado, pelo orçamento inteiro${temOrcamento ? ` = ${reais(orcamento)}` : ""}.`
+      };
+    }
+    const resta = Math.max(0, vida - meses);
+    const valor = temOrcamento ? Math.round(orcamento * resta / vida) : null;
+    const conta = temOrcamento ? `${reais(orcamento)} × ${resta}/${vida} = ${reais(valor)}` : `orçamento × ${resta}/${vida}`;
+    return {
+      caso: "antiga",
+      valor,
+      meses,
+      vida,
+      texto: `Sem pintura nova na entrada: morou ${meses} ${meses === 1 ? "mês" : "meses"} (de ${dataBr(inicio)} a ${dataBr(c.data_saida || hojeIso())}); paga só o que faltava dos ${vida} meses da pintura: ${conta}.`
+    };
   }
   function textoVistoriaSaida(d2, c, encerramento) {
     const r = resultadoVistoriaSaida(d2, c);
@@ -4859,10 +4919,11 @@ ${RESUMO_CONTRATO}`, "RESUMO DO CONTRATO EM PERGUNTAS E RESPOSTAS"],
     blocos.push({ tipo: "assinaturas", pessoas });
     return { blocos, rodape: dados.rodape };
   }
-  var UNIDADES, DEZENAS, CENTENAS, valorComExtenso, numeroComExtenso, MESES_EXTENSO, mesPorExtenso, dataPorExtenso, ORD_UNID, ORD_DEZ, ordinalPorExtenso, fem, neutro, gen, flexao, estadoCivil, nacionalidade, conjugeDoFiador, conjugeFaltando, pessoaDe, rotuloDocumento, ENCARGOS, lista, LOCADORA_ANTIGA, DADOS_ANTIGOS_EMPRESA, DADOS_ANTIGOS_LOCADORA, comCamposNovos, comArtigo, companhiaDoImovel, fiadoresNaData, CAMPOS_EXTRAS, camposConhecidos, escDoc, runsHtml, assinaHtml, textoCss, FONTE_RODAPE, estiloRodape, NS, EMU_CM, LOGO, runX, parX, tipoDoModelo, LINHA_EM_BRANCO, valoresDeExemplo, TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR, VISTORIA_INTRO, VISTORIA_ABERTURA, VISTORIA_ABERTURA_SEM_LINK, vistoriaFinal, VISTORIA_FINAL_ANTIGA, semEspacosVistoria, textoFinalVistoria, VISTORIA_CONDICOES, p, it, linhasDe, SITUACOES_VISTORIA, NAO_SE_APLICA, GRAU, piorou, textoReparo, PRESENCA_VISTORIA_SAIDA, FOTOS_VISTORIA;
+  var UNIDADES, DEZENAS, CENTENAS, valorComExtenso, numeroComExtenso, MESES_EXTENSO, mesPorExtenso, dataPorExtenso, ORD_UNID, ORD_DEZ, ordinalPorExtenso, fem, neutro, gen, flexao, estadoCivil, nacionalidade, conjugeDoFiador, conjugeFaltando, pessoaDe, rotuloDocumento, ENCARGOS, lista, LOCADORA_ANTIGA, DADOS_ANTIGOS_EMPRESA, DADOS_ANTIGOS_LOCADORA, comCamposNovos, comArtigo, companhiaDoImovel, fiadoresNaData, CAMPOS_EXTRAS, camposConhecidos, escDoc, runsHtml, assinaHtml, textoCss, FONTE_RODAPE, estiloRodape, NS, EMU_CM, LOGO, runX, parX, tipoDoModelo, LINHA_EM_BRANCO, valoresDeExemplo, TIPO_ADITIVO_TROCA, TIPO_ADITIVO_VALOR, VISTORIA_INTRO, VISTORIA_ABERTURA, VISTORIA_ABERTURA_SEM_LINK, vistoriaFinal, VISTORIA_FINAL_ANTIGA, semEspacosVistoria, textoFinalVistoria, VISTORIA_CONDICOES, p, it, linhasDe, SITUACOES_VISTORIA, NAO_SE_APLICA, GRAU, piorou, ehPintura, textoReparo, PRESENCA_VISTORIA_SAIDA, FOTOS_VISTORIA;
   var init_contratos = __esm({
     "docs/js/contratos.js"() {
       init_calculos();
+      init_config_regras();
       init_modelos_contrato();
       init_modelos_documentos();
       UNIDADES = [
@@ -5046,6 +5107,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       NAO_SE_APLICA = "Não se aplica";
       GRAU = { Novo: 0, "Ótimo": 1, Bom: 2, "Marcas de uso": 3, Avaria: 4, "Não funciona": 5 };
       piorou = (entrada, saida) => GRAU[saida] !== void 0 && GRAU[entrada] !== void 0 && GRAU[saida] > GRAU[entrada];
+      ehPintura = (pendencia) => /pintur/i.test(String(pendencia || ""));
       textoReparo = (x) => `${x.pendencia}: ${x.valor === null ? "valor a definir" : reais(x.valor)}${x.orcamento ? ` (${x.orcamento})` : ""}`;
       PRESENCA_VISTORIA_SAIDA = ["Acompanhou", "Mandou representante", "Não veio"];
       FOTOS_VISTORIA = [["fachada", "Fachada"], ["agua", "Relógio de água"], ["energia", "Relógio de energia"], ["gas", "Relógio de gás"], ["disjuntores", "Quadro de disjuntores"]];
@@ -9761,7 +9823,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       if (!assinado && a.data_saida === fim) atualizar(d2, "contratos", a.id, { data_saida: null }, usuario, `${a.inquilino_nome}: continua no contrato até o termo aditivo ser assinado`);
       if (assinado && a.data_saida !== fim) atualizar(d2, "contratos", a.id, { data_saida: fim }, usuario, `${a.inquilino_nome}: fim do vínculo em ${dataBr(fim)} (o contrato continua com ${n.inquilino_nome} a partir de ${dataBr(data2)})`);
       if (!n.data_base_correcao) atualizar(d2, "contratos", n.id, { data_base_correcao: dataBaseCorrecao(a) }, usuario, `${n.inquilino_nome}: reajuste no aniversário do contrato de ${a.inquilino_nome}`);
-      recalcularCobrancas(d2, (cb) => cb.contrato_id === a.id, usuario);
+      if (assinado) passarBoletosAoNovo(d2, n, a, fim, usuario, out, { soAluguel: true });
+      recalcularCobrancas(d2, (cb) => cb.contrato_id === a.id || assinado && cb.contrato_id === n.id, usuario);
       return { ...out, agendada: true, aguardaAditivo: !assinado, arquivosReserva: herdarReserva(d2, n, a, usuario) };
     }
     encerrarVinculoPorContinuacao(d2, a.id, data2, n.inquilino_nome, usuario);
@@ -9788,7 +9851,17 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     atualizar(d2, "contratos", n.id, mud, usuario, `${n.inquilino_nome}: dados do contrato trazidos de ${a.inquilino_nome} (troca de titular em ${dataBr(data2)})`);
     if (out.garantia) sincronizarGarantiaHerdeiro(d2, a.id, usuario);
+    passarBoletosAoNovo(d2, n, a, fim, usuario, out);
+    out.arquivosReserva = herdarReserva(d2, n, a, usuario, true);
+    out.arquivosSeguro = herdarSeguros(d2, n, a, usuario);
+    recalcularCobrancas(d2, (cb) => cb.contrato_id === a.id || cb.contrato_id === n.id, usuario);
+    desativarSeSaiu(d2, a, usuario);
+    out.arquivos = [...new Set(out.arquivos)];
+    return out;
+  }
+  function passarBoletosAoNovo(d2, n, a, fim, usuario, out, { soAluguel = false } = {}) {
     for (const cb of d2.cobrancas.filter((x) => x.contrato_id === a.id && x.competencia > fim.slice(0, 7))) {
+      if (soAluguel && ehBoletoAvulso(cb)) continue;
       if (ehComplementoCaucao(cb) && !out.garantia) continue;
       if (ehParcelaAcordo(cb)) continue;
       if (faturasDe(d2, "cobranca", cb.id).length) {
@@ -9804,16 +9877,10 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         out.boletosApagados += 1;
       } else {
         limparDoAnterior(d2, cb, a.id, usuario);
-        passa("cobrancas", cb, `Boleto ${compBr(cb.competencia)}`);
+        atualizar(d2, "cobrancas", cb.id, { contrato_id: n.id }, usuario, `Boleto ${compBr(cb.competencia)} passa de ${a.inquilino_nome} para ${n.inquilino_nome} (troca de titular)`);
         out.boletosMovidos += 1;
       }
     }
-    out.arquivosReserva = herdarReserva(d2, n, a, usuario, true);
-    out.arquivosSeguro = herdarSeguros(d2, n, a, usuario);
-    recalcularCobrancas(d2, (cb) => cb.contrato_id === a.id || cb.contrato_id === n.id, usuario);
-    desativarSeSaiu(d2, a, usuario);
-    out.arquivos = [...new Set(out.arquivos)];
-    return out;
   }
   function herdarReserva(d2, n, a, usuario, forcar = false) {
     if (!(a.reserva_valor > 0) || n.reserva_usada_anterior !== void 0 && !forcar) return [];
@@ -13525,8 +13592,15 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     for (const x of lista3) {
       if (!atuais.has(x.pendencia)) continue;
       if (x.valor !== null && !(Number.isInteger(x.valor) && x.valor >= 0)) throw new ErroUsuario(`Valor inválido em "${x.pendencia}".`);
-      if (x.valor === null && !String(x.orcamento || "").trim()) continue;
-      reparos[x.pendencia] = { valor: x.valor, orcamento: String(x.orcamento || "").trim() };
+      const ov = x.orcamento_valor === void 0 ? null : x.orcamento_valor;
+      if (ov !== null && !(Number.isInteger(ov) && ov >= 0)) throw new ErroUsuario(`Orçamento inválido em "${x.pendencia}".`);
+      if (x.valor === null && !String(x.orcamento || "").trim() && ov === null) continue;
+      reparos[x.pendencia] = {
+        valor: x.valor,
+        orcamento: String(x.orcamento || "").trim(),
+        ...x.pintura !== void 0 ? { pintura: !!x.pintura } : {},
+        ...ov !== null ? { orcamento_valor: ov } : {}
+      };
     }
     const total = Object.values(reparos).reduce((s, x) => s + (x.valor || 0), 0);
     atualizar(d2, "vistorias", v.id, { reparos }, usuario, `${c.inquilino_nome}: valores dos reparos da vistoria de saída (${reais(total)})`);
@@ -18931,7 +19005,7 @@ Não mova nem renomeie os arquivos desta pasta. chave-do-backup.json é a chave:
       SECRETO = /senha|hash|(^|_)sal$|^sessoes$/;
       DINHEIRO = /^(valor|aluguel|desconto|iptu|seguro|taxa_boleto|outros|multa|juros|ressarcimento|reserva|caucao|deposito|complemento|debitos|total|saldo|credito|abatimento|devolucao|garantia|divida|fci|diferenca)(_|$)/;
       NAO_DINHEIRO = /(_percentual|_descricao|_parcela|_parcelas|_data|_comp|_competencia|_na_nf|_tipo|_id|_comprovante|_inscricao|_mes|_ano|_dias|_texto|_obs|_indice|_indices|_no_boleto)$/;
-      DINHEIRO_SEMPRE = /* @__PURE__ */ new Set(["divida_na_data"]);
+      DINHEIRO_SEMPRE = /* @__PURE__ */ new Set(["divida_na_data", "orcamento_valor"]);
       SEM_DINHEIRO = /* @__PURE__ */ new Set(["config_regras", "versoes_regras", "perfis_regras"]);
       ehDinheiro = (nome, tabela = "") => !SEM_DINHEIRO.has(tabela) && (CAMPOS2.has(nome) ? CAMPOS2.get(nome).tipo === "dinheiro" : DINHEIRO_SEMPRE.has(nome) || DINHEIRO.test(nome) && !NAO_DINHEIRO.test(nome));
       ROTULOS = {
@@ -18963,7 +19037,10 @@ Não mova nem renomeie os arquivos desta pasta. chave-do-backup.json é a chave:
         valor_pago: "Valor pago",
         vencimento: "Vencimento",
         regra: "Regra",
-        chave: "Chave"
+        chave: "Chave",
+        orcamento_valor: "Orçamento inteiro da pintura",
+        pintura: "Reparo de pintura",
+        pintura_nova: "Pintura nova na entrada"
       };
       FORM_DA_TABELA = {
         imoveis: IMOVEL,
@@ -20693,7 +20770,7 @@ Lei Geral de Proteção de Dados (Lei 13.709/2018), art. 18: direito de acesso a
     const contratos = p2 ? contratosDoPerfil(d(), p2.id).sort((a, b) => a.inquilino_nome.localeCompare(b.inquilino_nome, "pt-BR")) : [];
     const des = admin3 ? "" : " disabled";
     return `<p class="suave"><a href="#/regras">← Regras do sistema</a></p><h1>${p2 ? esc(p2.nome) : "Nova regra especial"}</h1>
-    <div class="alerta info">Mude só o que for diferente para os contratos desta regra. O que ficar igual às regras do sistema acompanha as do sistema, mesmo se elas mudarem depois. As regras da rotina da empresa (backup, banco, extrato, dia de gerar os boletos, anexos, ressarcimento na NF) valem para todos e não aparecem aqui.</div>
+    <div class="alerta info">Mude só o que for diferente para os contratos desta regra. O que ficar igual às regras do sistema acompanha as do sistema, mesmo se elas mudarem depois. As regras da rotina da empresa (backup, banco, as outras do extrato, dia de gerar os boletos, anexos, ressarcimento na NF) valem para todos e não aparecem aqui.</div>
     ${p2 ? `<div class="cartao"><h2>Contratos que seguem esta regra</h2>${contratos.length ? `<ul>${contratos.map((c) => `<li><a href="#/contrato/${c.id}">${esc(c.inquilino_nome)}</a>${contratoAtivo(c) ? "" : ' <span class="suave">(encerrado)</span>'}</li>`).join("")}</ul>` : '<p class="suave">Nenhum ainda. Escolha a regra no cadastro do contrato (Editar → "Regras deste contrato").</p>'}</div>` : ""}
     <form data-form="perfilRegras" data-id="${p2 ? p2.id : ""}">
       <div class="cartao"><label>Nome<input name="nome" value="${esc(p2 ? p2.nome : "")}" placeholder="Ex.: Regra especial A, Regra 15 dias" maxlength="60" required${des}></label>
@@ -22669,8 +22746,8 @@ ${DICA_DOCUMENTOS}`].join("\n");
       if (cb) {
         if (emAberto(cb)) {
           const pontual = ib ? ib.pontual.get(cb) : totais(cb).a_pagar_pontual;
-          const noPrazo = valor === pontual && data2 <= (pix ? limitePagamento(cb.vencimento) : ultimoCreditoEmDia(cb, false, dias));
-          const minimo = Math.min(...(pix ? [data2] : datasPossiveisDoPagamento(data2, false, dias)).map((x) => previstoNoPagamento(cb, data2, { dataPagou: x }).valor_devido));
+          const noPrazo = valor === pontual && data2 <= (pix ? limitePagamento(cb.vencimento) : ultimoCreditoEmDia(cb, false, diasDo(cb, dias)));
+          const minimo = Math.min(...(pix ? [data2] : datasPossiveisDoPagamento(data2, false, diasDo(cb, dias))).map((x) => previstoNoPagamento(cb, data2, { dataPagou: x }).valor_devido));
           if (!noPrazo && valor < minimo) return [];
           return [{ cobranca: cb, certeza: "exata", previsto: noPrazo ? pontual : previstoNoPagamento(cb, data2).valor_devido, pagouEmDia: noPrazo && data2 > cb.vencimento, peloId: true }];
         }
@@ -22695,11 +22772,12 @@ ${DICA_DOCUMENTOS}`].join("\n");
     const lista3 = [];
     const limite = somarDias(data2, regra("dias_antecipacao_banco"));
     const exato = pix || pagouConhecido;
-    const datas = exato ? [data2] : datasPossiveisDoPagamento(data2, false, dias);
     for (const cb of abertos) {
       if (cb.vencimento > limite) continue;
       const pontual = ib ? ib.pontual.get(cb) : totais(cb).a_pagar_pontual;
-      const noPrazo = valor === pontual && data2 <= (exato ? limitePagamento(cb.vencimento) : ultimoCreditoEmDia(cb, false, dias));
+      const diasCb = diasDo(cb, dias);
+      const datas = exato ? [data2] : datasPossiveisDoPagamento(data2, false, diasCb);
+      const noPrazo = valor === pontual && data2 <= (exato ? limitePagamento(cb.vencimento) : ultimoCreditoEmDia(cb, false, diasCb));
       const comEncargos = !noPrazo && data2 > limitePagamento(cb.vencimento) && datas.some((x) => valor === previstoNoPagamento(cb, x).valor_devido);
       if (noPrazo || comEncargos) lista3.push({ cobranca: cb, certeza: "exata", previsto: noPrazo ? pontual : valor, pagouEmDia: noPrazo && data2 > cb.vencimento });
     }
@@ -22711,7 +22789,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
     return semIdentificacao(lista3);
   }
   function conciliarBoletos(d2, contaId, pagamentosC6, { dias = null } = {}) {
-    const tol = dias ?? regra("tolerancia_boleto_dias");
+    const tol = dias;
     const planos = [];
     for (const x of pagamentosC6 || []) {
       if (Array.isArray(x.payments)) x.payments.forEach((p2, i) => planos.push({ ...p2, external_reference_id: x.external_reference_id || null, status: x.status || null, vezes: x.payments.length, ordem: i }));
@@ -22824,7 +22902,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
     return confirmarPagamentoPeloBanco(d2, cb.id, origem, usuario, { pagouEmDia: pagouEmDia !== void 0 ? pagouEmDia : p2.pagouEmDia || null, pagou: p2.data_pagamento || null, valorNf, justificativa });
   }
   function conciliarMovimentacoes(d2, movs2, { dias = null, indice = null } = {}) {
-    const tol = dias ?? regra("tolerancia_boleto_dias");
+    const tol = dias;
     const out = [];
     for (const m of movs2 || []) {
       if (m.tipo !== "entrada" || m.classificacao || ehDevolucao(m)) continue;
@@ -23767,7 +23845,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
     if (m.observacoes) partes.push(m.observacoes);
     return partes.join(" · ");
   }
-  var CLASSIFICACOES, SO_SAIDA, SO_ENTRADA, destinoServe, SITUACOES_PAGAMENTO, SITUACAO_C6, TRANSICOES, cfg5, hoje2, dataDe, centavosDoC6, reaisParaC6, contasConfiguradas, empresaDaConta, contaDaEmpresa, fonteDe, maiusculaSemAcento, descricaoComparavel, referenciaNoBanco, soDoCsv, CAMPOS_DESTINO, dataOfx, marca, nomeColuna, COLUNAS_CSV, nomesProcurados, pagosNoBancoSemRegistro, DIAS_AGUARDANDO_CREDITO, nomeSemAcento, nomePadraoComprovante, emAberto, semDigitos, ligavel, pagoEntre, ehPix, diasCompensacaoBoleto, idNormal, idUtil, ultimoCreditoEmDia, semIdentificacao, PALAVRAS, textoDaMov, despesasLigadasAoExtrato, podeSerPonta, indiceGuardado, classificacaoDaOrigem, ehDevolucao, idsDePix, DIAS_BUSCA_DEVOLUCAO, quemDoBoleto, pagamentoCitado, carimbo, codigoDeBarras, conteudoComparavel, mesmoConteudo, pagamentosAtivos, ENVIADO_C6, DESTINO_CURTO;
+  var CLASSIFICACOES, SO_SAIDA, SO_ENTRADA, destinoServe, SITUACOES_PAGAMENTO, SITUACAO_C6, TRANSICOES, cfg5, hoje2, dataDe, centavosDoC6, reaisParaC6, contasConfiguradas, empresaDaConta, contaDaEmpresa, fonteDe, maiusculaSemAcento, descricaoComparavel, referenciaNoBanco, soDoCsv, CAMPOS_DESTINO, dataOfx, marca, nomeColuna, COLUNAS_CSV, nomesProcurados, pagosNoBancoSemRegistro, DIAS_AGUARDANDO_CREDITO, nomeSemAcento, nomePadraoComprovante, emAberto, semDigitos, ligavel, pagoEntre, ehPix, diasCompensacaoBoleto, idNormal, idUtil, ultimoCreditoEmDia, diasDo, semIdentificacao, PALAVRAS, textoDaMov, despesasLigadasAoExtrato, podeSerPonta, indiceGuardado, classificacaoDaOrigem, ehDevolucao, idsDePix, DIAS_BUSCA_DEVOLUCAO, quemDoBoleto, pagamentoCitado, carimbo, codigoDeBarras, conteudoComparavel, mesmoConteudo, pagamentosAtivos, ENVIADO_C6, DESTINO_CURTO;
   var init_conciliacao = __esm({
     "docs/js/conciliacao.js"() {
       init_c6_comum();
@@ -23895,6 +23973,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
       };
       idUtil = (x) => x.length >= 6 && /\d/.test(x);
       ultimoCreditoEmDia = (cb, pix, dias) => pix ? limitePagamento(cb.vencimento) : somarDiasUteis(limitePagamento(cb.vencimento), dias);
+      diasDo = (cb, dias) => dias ?? diasCompensacaoBoleto(cb);
       semIdentificacao = (lista3) => {
         for (const x of lista3) {
           x.certeza = "provavel";
@@ -24070,13 +24149,14 @@ ${DICA_DOCUMENTOS}`].join("\n");
     const envio = ligada && gmail;
     const dias = regra("regua_email_dias") || [];
     const tolerancia = regra("tolerancia_boleto_dias");
+    const tolEspeciais = especiaisDiferentes(db, "tolerancia_boleto_dias").map((x) => ` (na regra especial "${esc(x.nome)}": ${x.valor})`).join("");
     const especiais = especiaisDiferentes(db, "regua_email_dias").map((x) => `${esc(x.nome)}: ${(x.valor || []).length ? esc(x.valor.map(nomeDaEtapa).join("; ")) : "nenhum dia"}`);
     const estado2 = !ligada ? 'O envio direto está <b>desligado</b> (Regras do sistema → "Régua de cobrança: botão Autorizar e enviar"): abra cada e-mail no Gmail ou copie o texto.' : !gmail ? "O envio direto está ligado, mas o Gmail da empresa não está ligado nesta nuvem (ou você está sem internet): por enquanto, abra no Gmail ou copie o texto." : 'Marque os e-mails que quer mandar e clique em "Enviar os selecionados": o sistema mostra a lista final e pede a sua confirmação.';
     const recentes = decididosRecentes(db, hoje3);
     return `<h1>E-mails da régua</h1><div class="abas"><a href="#/cobrancas">← Boletos</a></div>
     <div class="cabecalho"><h2>E-mails da régua de cobrança: aguardando sua autorização</h2>${link("#/modelos-email", "Textos dos e-mails")}</div>
     <p class="suave">O sistema prepara os e-mails ${dias.length ? `de cada boleto em aberto: ${esc(dias.map(nomeDaEtapa).join("; "))}` : `(nenhum dia escolhido nas Regras do sistema: nada é preparado${especiais.length ? " para os contratos que as seguem" : ""})`}.${especiais.length ? ` Contratos com regra especial: ${especiais.join(" · ")}.` : ""} <b>Nada é enviado sozinho.</b>
-      Boleto pago, em acordo ou de contrato encerrado sai da lista. A cobrança de atraso só aparece passados ${tolerancia} dia(s) úteis do último dia para pagar (o prazo que o banco leva para creditar o boleto: regra "Extrato: entrada casa com o boleto até quantos dias úteis depois do último dia para pagar"). E-mail enviado ou marcado "Não enviar" não volta.${admin() ? "" : " Só o administrador autoriza."}</p>
+      Boleto pago, em acordo ou de contrato encerrado sai da lista. A cobrança de atraso só aparece passados ${tolerancia} dia(s) úteis${tolEspeciais} do último dia para pagar (o prazo que o banco leva para creditar o boleto: regra "Extrato: entrada casa com o boleto até quantos dias úteis depois do último dia para pagar"). E-mail enviado ou marcado "Não enviar" não volta.${admin() ? "" : " Só o administrador autoriza."}</p>
     <div class="alerta ${envio ? "info" : "aviso"}">${estado2}</div>
     <div class="cartao rolagem regua"><table>
       <tr><th>${admin() && envio && fila2.some((x) => x.para) ? '<input type="checkbox" data-marcar-todas="regua" title="Marcar todos">' : ""}</th><th>Imóvel / inquilino</th><th>Boleto</th><th>Etapa</th><th class="n">Valor hoje</th><th>Para</th><th>Prévia do e-mail</th><th></th></tr>
@@ -32702,6 +32782,11 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       <div class="formulario">
         <div><label>Data da vistoria</label><input type="date" name="data" value="${esc(data2)}" required></div>
         ${tipo === "Saída" ? `<div><label>O inquilino acompanhou?</label><select name="inquilino_presente" required>${["", ...PRESENCA_VISTORIA_SAIDA].map((x) => `<option value="${esc(x)}"${(v ? v.inquilino_presente || "" : "") === x ? " selected" : ""}>${esc(x || "Escolha…")}</option>`).join("")}</select></div>` : ""}
+        ${tipo === "Entrada" ? (() => {
+      const pn = v ? v.pintura_nova === true ? "sim" : v.pintura_nova === false ? "nao" : "" : "";
+      return `<div><label>Pintura nova na entrada?</label><select name="pintura_nova" required>${[["", "Escolha…"], ["sim", "Sim: o imóvel foi pintado para esta entrada"], ["nao", "Não"]].map(([k, t]) => `<option value="${k}"${pn === k ? " selected" : ""}>${t}</option>`).join("")}</select>
+            <span class="suave">Na saída: pintura nova = o inquilino devolve pintado; sem pintura nova, paga só o que faltava da vida da pintura (${Number(regra("pintura_vida_meses", c)) || 36} meses).</span></div>`;
+    })() : ""}
         <div><label>Link das fotos (pasta na nuvem)</label><input name="link_fotos" value="${esc(v ? v.link_fotos || "" : tipo === "Entrada" ? c.vistoria_link || "" : "")}" placeholder="deixe vazio se as fotos vão em anexo"></div>
       </div>
       <p><label>Texto de abertura <span class="suave">(o link das fotos sai na linha de baixo)</span></label><textarea name="texto_abertura" rows="3">${esc(abertura)}</textarea></p>
@@ -33439,7 +33524,7 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
         aviso(`${n.inquilino_nome} assume o contrato de ${r.anterior.inquilino_nome} quando o termo aditivo for assinado. Até lá, os boletos, as correções, a garantia, o seguro e a reserva continuam com ${r.anterior.inquilino_nome}.`, "info");
         return r;
       }
-      aviso(`${n.inquilino_nome} assume o contrato de ${r.anterior.inquilino_nome} em ${dataBr(r.data)}. Até ${dataBr(somarDias(r.data, -1))}, os boletos, a garantia, o seguro e a reserva continuam com ${r.anterior.inquilino_nome} (o último boleto sai proporcional aos dias). A partir de ${dataBr(r.data)}, os boletos saem para ${n.inquilino_nome}: o resto passa ao abrir o Painel nesse dia ou depois.`, "info");
+      aviso(`${n.inquilino_nome} assume o contrato de ${r.anterior.inquilino_nome} em ${dataBr(r.data)}. Até ${dataBr(somarDias(r.data, -1))}, os boletos, a garantia, o seguro e a reserva continuam com ${r.anterior.inquilino_nome} (o último boleto sai proporcional aos dias). A partir de ${dataBr(r.data)}, os boletos saem para ${n.inquilino_nome}${r.boletosMovidos ? ` (${r.boletosMovidos === 1 ? "o boleto já gerado de depois da troca passou" : `os ${r.boletosMovidos} boletos já gerados de depois da troca passaram`} para ${n.inquilino_nome})` : ""}${r.noBanco ? `; ${r.noBanco} boleto(s) de ${r.anterior.inquilino_nome} emitido(s) no banco ficaram com ele: cancele no banco` : ""}: o resto passa ao abrir o Painel nesse dia ou depois.`, "info");
       return r;
     }
     if (r.arquivos.length) {
@@ -40097,14 +40182,52 @@ ${MODELO_COMODOS[comodo].join("\n")}
           const c = v && buscar2("contratos", v.contrato_id);
           if (!c) throw new ErroUsuario("Este inquilino não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.");
           const res = resultadoVistoriaSaida(d(), c);
+          const lerCentavos = (t) => {
+            const x = String(t || "").trim();
+            if (!x) return null;
+            try {
+              return centavos(x);
+            } catch {
+              return void 0;
+            }
+          };
+          const sugestao = (orc) => sugestaoPintura(d(), c, orc);
+          const textoSugestao = (orc) => {
+            const s = sugestao(orc);
+            if (s.caso === "sem_info" || s.caso === "sem_vistoria") return `<span class="alerta aviso" style="display:block;margin:4px 0">${esc(s.texto)} Sem sugestão: digite o valor.</span>`;
+            return `<span class="suave">${esc(s.texto)}${s.valor === null ? " Digite o orçamento inteiro para ver a conta." : ""}</span>${s.valor !== null ? ` <button type="button" class="secundario pequeno" data-usar-pintura>Usar ${esc(reais(s.valor))}</button>` : ""}`;
+          };
           const r = await janela({
             titulo: `Reparos da vistoria de saída - ${c.inquilino_nome}`,
             sim: "Salvar",
             nao: "Cancelar",
             html: `<p>O valor de cada reparo vem do orçamento (melhor dois) ou da nota do serviço. Entra nos débitos do cálculo final, descontado da garantia ou cobrado. Guarde os orçamentos na pasta do inquilino. Item sem reparo a cobrar (ex.: desgaste natural): valor 0,00.</p>
-        ${res.reparos.map((x) => `<fieldset style="margin:8px 0"><legend>${esc(x.pendencia)}</legend>
+        ${res.reparos.map((x, k) => `<fieldset style="margin:8px 0" data-reparo="${k}"><legend>${esc(x.pendencia)}</legend>
+          <p class="check"><label><input type="checkbox" name="pintura_${k}" value="1"${x.pintura ? " checked" : ""} data-pintura> Reparo de pintura (sugerir o valor pela vistoria de entrada)</label></p>
+          <div data-bloco-pintura${x.pintura ? "" : " hidden"}><label>Orçamento inteiro da pintura (R$)</label><input name="orc_pintura_${k}" inputmode="decimal" data-orc-pintura value="${x.orcamento_valor === null ? "" : esc(dinheiroTexto(x.orcamento_valor))}" placeholder="ex.: 2.400,00">
+            <p data-sugestao-pintura>${textoSugestao(x.orcamento_valor)}</p></div>
           <label>Valor (R$)</label><input name="valor" inputmode="decimal" value="${x.valor === null ? "" : esc(dinheiroTexto(x.valor))}" placeholder="ex.: 350,00">
-          <label>Orçamento ou nota <span class="suave">(de quem, data)</span></label><input name="orcamento" value="${esc(x.orcamento)}" placeholder="ex.: Pinturas Silva, 18/11/2026"></fieldset>`).join("")}`
+          <label>Orçamento ou nota <span class="suave">(de quem, data)</span></label><input name="orcamento" value="${esc(x.orcamento)}" placeholder="ex.: Pinturas Silva, 18/11/2026"></fieldset>`).join("")}`,
+            ligar: (dlg) => {
+              for (const fs of dlg.querySelectorAll("[data-reparo]")) {
+                const caixa = fs.querySelector("[data-pintura]");
+                const bloco = fs.querySelector("[data-bloco-pintura]");
+                const orc = fs.querySelector("[data-orc-pintura]");
+                const alvo = fs.querySelector("[data-sugestao-pintura]");
+                caixa.addEventListener("change", () => {
+                  bloco.hidden = !caixa.checked;
+                });
+                orc.addEventListener("input", () => {
+                  const v2 = lerCentavos(orc.value);
+                  alvo.innerHTML = textoSugestao(v2 === void 0 ? null : v2);
+                });
+                alvo.addEventListener("click", (ev) => {
+                  if (!ev.target.closest("[data-usar-pintura]")) return;
+                  const s = sugestao(lerCentavos(orc.value) ?? null);
+                  if (s.valor !== null) fs.querySelector('input[name="valor"]').value = dinheiroTexto(s.valor);
+                });
+              }
+            }
           });
           if (!r) return;
           const lista3 = res.reparos.map((x, k) => {
@@ -40117,7 +40240,10 @@ ${MODELO_COMODOS[comodo].join("\n")}
                 throw new ErroUsuario(`Valor inválido em "${x.pendencia}".`);
               }
             }
-            return { pendencia: x.pendencia, valor, orcamento: String((r.orcamento || [])[k] || "") };
+            const pintura = String((r[`pintura_${k}`] || [])[0] || "") === "1";
+            const ov = pintura ? lerCentavos((r[`orc_pintura_${k}`] || [])[0]) : null;
+            if (ov === void 0) throw new ErroUsuario(`Orçamento da pintura inválido em "${x.pendencia}".`);
+            return { pendencia: x.pendencia, valor, orcamento: String((r.orcamento || [])[k] || ""), pintura, orcamento_valor: ov };
           });
           await alterar((db) => valoresReparos(db, v.id, lista3, login()));
           aviso("Valores dos reparos salvos: entram nos débitos do cálculo final.");
@@ -41696,6 +41822,10 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
             texto_abertura: String(f.texto_abertura || "").trim(),
             texto_final: f.tipo === "Entrada" ? String(f.texto_final || "").trim() : ""
           };
+          if (f.tipo === "Entrada") {
+            if (!["sim", "nao"].includes(f.pintura_nova)) throw new ErroUsuario("Diga se a pintura era nova na entrada (Sim ou Não).");
+            dados.pintura_nova = f.pintura_nova === "sim";
+          }
           if (f.tipo === "Saída") {
             if (!PRESENCA_VISTORIA_SAIDA.includes(f.inquilino_presente)) throw new ErroUsuario("Diga se o inquilino acompanhou a vistoria.");
             dados.inquilino_presente = f.inquilino_presente;

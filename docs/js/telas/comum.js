@@ -299,7 +299,7 @@ export async function trazerHeranca(id) {
       aviso(`${n.inquilino_nome} assume o contrato de ${r.anterior.inquilino_nome} quando o termo aditivo for assinado. Até lá, os boletos, as correções, a garantia, o seguro e a reserva continuam com ${r.anterior.inquilino_nome}.`, 'info');
       return r;
     }
-    aviso(`${n.inquilino_nome} assume o contrato de ${r.anterior.inquilino_nome} em ${dataBr(r.data)}. Até ${dataBr(C.somarDias(r.data, -1))}, os boletos, a garantia, o seguro e a reserva continuam com ${r.anterior.inquilino_nome} (o último boleto sai proporcional aos dias). A partir de ${dataBr(r.data)}, os boletos saem para ${n.inquilino_nome}: o resto passa ao abrir o Painel nesse dia ou depois.`, 'info');
+    aviso(`${n.inquilino_nome} assume o contrato de ${r.anterior.inquilino_nome} em ${dataBr(r.data)}. Até ${dataBr(C.somarDias(r.data, -1))}, os boletos, a garantia, o seguro e a reserva continuam com ${r.anterior.inquilino_nome} (o último boleto sai proporcional aos dias). A partir de ${dataBr(r.data)}, os boletos saem para ${n.inquilino_nome}${r.boletosMovidos ? ` (${r.boletosMovidos === 1 ? 'o boleto já gerado de depois da troca passou' : `os ${r.boletosMovidos} boletos já gerados de depois da troca passaram`} para ${n.inquilino_nome})` : ''}${r.noBanco ? `; ${r.noBanco} boleto(s) de ${r.anterior.inquilino_nome} emitido(s) no banco ficaram com ele: cancele no banco` : ''}: o resto passa ao abrir o Painel nesse dia ou depois.`, 'info');
     return r;
   }
   if (r.arquivos.length) {

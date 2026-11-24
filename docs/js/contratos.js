@@ -1057,9 +1057,44 @@ export function resultadoVistoriaSaida(d, c) {
   // B5 (revisão jurídica, 15/11): o valor de cada reparo, com o orçamento; entra no cálculo final (sem a escolha de o
   // inquilino consertar: depois de devolver as chaves, ele paga o reparo)
   const guardados = vistoria.reparos || {};
-  const reparos = pendencias.map((p) => ({ pendencia: p, valor: guardados[p] ? guardados[p].valor : null, orcamento: guardados[p] ? guardados[p].orcamento || '' : '' }));
+  const reparos = pendencias.map((p) => ({ pendencia: p, valor: guardados[p] ? guardados[p].valor : null, orcamento: guardados[p] ? guardados[p].orcamento || '' : '',
+    pintura: guardados[p] && guardados[p].pintura !== undefined ? !!guardados[p].pintura : ehPintura(p),
+    orcamento_valor: guardados[p] && Number.isInteger(guardados[p].orcamento_valor) ? guardados[p].orcamento_valor : null }));
   const totalReparos = reparos.reduce((s, x) => s + (x.valor || 0), 0);
   return { texto: pendencias.length ? 'Com pendências' : 'Sem pendências', vistoria, pendencias, reparos, totalReparos, semValor: reparos.filter((x) => x.valor === null).length };
+}
+
+/** Pendência que parece ser de pintura (a janela dos reparos já vem marcada; a equipe pode desmarcar ou marcar outra). */
+export const ehPintura = (pendencia) => /pintur/i.test(String(pendencia || ''));
+
+/**
+ * Sugestão do valor do reparo de pintura no cálculo final (decisão do dono, 24/11/2026; regra `pintura_vida_meses`, padrão 36).
+ * Pela vistoria de entrada do contrato (`pintura_nova`): pintura nova → o orçamento inteiro (o inquilino devolve pintado);
+ * sem pintura nova → orçamento × (vida − meses de moradia) ÷ vida, mínimo zero; não informado (vistorias antigas) → sem
+ * sugestão. Meses de moradia pelo mês comercial, da entrada do contrato da vistoria (na troca de titular sem vistoria nova,
+ * a do titular anterior) até a saída. Devolve { caso: 'nova' | 'antiga' | 'sem_info' | 'sem_vistoria', valor, meses, vida, texto }.
+ * Ex.: orçamento R$ 2.400,00, sem pintura nova, 12 meses → "R$ 2.400,00 × 24/36 = R$ 1.600,00".
+ */
+export function sugestaoPintura(d, c, orcamento) {
+  const entrada = vistoriaDeEntrada(d, c);
+  const vida = Number(regra('pintura_vida_meses', c)) || 36;
+  if (!entrada) return { caso: 'sem_vistoria', valor: null, meses: null, vida, texto: 'Sem vistoria de entrada: confira como o imóvel foi entregue antes de cobrar a pintura.' };
+  if (entrada.pintura_nova !== true && entrada.pintura_nova !== false) {
+    return { caso: 'sem_info', valor: null, meses: null, vida, texto: `A vistoria de entrada (${C.dataBr(entrada.data)}) não diz se a pintura era nova: confira a vistoria de entrada e as fotos antes de dar o valor.` };
+  }
+  const dono = d.contratos.find((x) => x.id === entrada.contrato_id) || c;
+  const inicio = dono.data_entrada || dono.vigencia_inicio || entrada.data;
+  const meses = C.mesesDeMoradia(inicio, c.data_saida || C.hojeIso());
+  const temOrcamento = Number.isInteger(orcamento) && orcamento >= 0;
+  if (entrada.pintura_nova) {
+    return { caso: 'nova', valor: temOrcamento ? orcamento : null, meses, vida,
+      texto: `Pintura nova na entrada: o inquilino devolve pintado, pelo orçamento inteiro${temOrcamento ? ` = ${C.reais(orcamento)}` : ''}.` };
+  }
+  const resta = Math.max(0, vida - meses);
+  const valor = temOrcamento ? Math.round((orcamento * resta) / vida) : null;
+  const conta = temOrcamento ? `${C.reais(orcamento)} × ${resta}/${vida} = ${C.reais(valor)}` : `orçamento × ${resta}/${vida}`;
+  return { caso: 'antiga', valor, meses, vida,
+    texto: `Sem pintura nova na entrada: morou ${meses} ${meses === 1 ? 'mês' : 'meses'} (de ${C.dataBr(inicio)} a ${C.dataBr(c.data_saida || C.hojeIso())}); paga só o que faltava dos ${vida} meses da pintura: ${conta}.` };
 }
 
 /** Linha do reparo para o cálculo final e o e-mail. Ex.: "Sala – Porta (Avaria: riscada): R$ 350,00 (orçamento Pinturas Silva)". */
