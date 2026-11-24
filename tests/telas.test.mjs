@@ -283,9 +283,10 @@ test('ressarcimento para o boleto de um mês em acordo é recusado na tela (o bo
   entrarComo(E, 'admin');
   R.buscar(E.d, 'cobrancas', cb.id).situacao = 'Em acordo'; // 07/2026 entrou num acordo
   const rota = { partes: ['novo', 'ressarcimentos'], q: { contrato: String(c.id) } };
-  const campos = (mes) => ({ campos: [['competencia_condominio', '2026-06'], ['descricao', 'Fundo de obras'], ['valor', '150,00'], ['data_pagamento', '2026-06-05'], ['competencia_abatimento', mes]] });
+  // desde 24/11/2026 o formulário pergunta o mês do vencimento do boleto (o da referência 07/2026 vence no mês seguinte)
+  const campos = (mes) => ({ campos: [['competencia_condominio', '2026-06'], ['descricao', 'Fundo de obras'], ['valor', '150,00'], ['data_pagamento', '2026-06-05'], ['vencimento_abatimento', R.mesVencimentoDaCompetencia(c, mes)]] });
   const r = await T.FORMULARIOS.cadastro(campos('2026-07'), rota);
-  assert.match(r.erros.competencia_abatimento, /07\/2026 está em acordo/);
+  assert.match(r.erros.vencimento_abatimento, /referência 07\/2026\) está em acordo/);
   assert.equal(E.d.ressarcimentos.length, 0, 'nada foi gravado');
   // outro mês, em aberto, passa
   const { CADASTROS } = await import('../docs/js/telas/cadastros.js');

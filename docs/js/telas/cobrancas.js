@@ -339,11 +339,25 @@ export function demonstrativo(cb) {
       <tr class="total"><td>Total sem desconto</td><td class="n">${reais(t.total_sem_desconto)}</td></tr>
       ${cb.desconto ? linha('(-) Desconto de pontualidade, se pago até o vencimento', `- ${reais(cb.desconto)}`) : ''}
       ${cb.reserva_utilizada ? linha('(-) Reserva paga na visita, abatida neste mês', `- ${reais(cb.reserva_utilizada)}`) : ''}
-      ${cb.ressarcimento ? linha(`(-) Ressarcimento de taxa do condomínio (${esc(cb.ressarcimento_descricao || '')})`, `- ${reais(cb.ressarcimento)}`) : ''}
+      ${linhasRessarcimento(cb, linha)}
       <tr class="total"><td>Valor a pagar até ${dataBr(cb.vencimento)}${prazoNaoUtil(cb)}</td><td class="n maior">${reais(t.a_pagar_pontual)}</td></tr>
       <tr><td colspan="2" class="suave">Após o vencimento: ${reais(t.a_pagar_sem_desconto)} + multa de ${pct(cb.multa_percentual)} + juros de ${pct(cb.juros_mensal_percentual)} ao mês, pro rata dia${semJuros.length ? ` (sobre ${reais(t.base_multa)}: ${semJuros.join(' e ')} não ${semJuros.length > 1 ? 'têm' : 'tem'} multa nem juros)` : ''}.</td></tr></table>
     ${cb.data_pagamento ? `<p><b>Pago em ${dataBr(cb.data_pagamento)}</b>${cb.pagou_em_dia ? ' (pagou até o vencimento; compensado depois)' : ''}${cb.dias_atraso ? ` com ${C.plural(cb.dias_atraso, 'dia')} de atraso${cb.data_pagou ? ` (pagou em ${dataBr(cb.data_pagou)})` : ''}: multa ${pct(cb.multa_percentual)} = ${reais(cb.multa)}; juros ${pct(cb.juros_mensal_percentual)} a.m. = ${reais(cb.juros)}` : ''} · recebido ${reais(cb.valor_pago)}</p>` : ''}
     ${cb.observacoes ? `<p class="pre">${esc(cb.observacoes)}</p>` : ''}</div>`;
+}
+
+/**
+ * Ressarcimento das taxas do condomínio no demonstrativo: um título e, para cada mês do condomínio, uma linha por taxa.
+ * Ex.: "Condomínio 10/2026" / "Extraordinárias - R$ 353,18" / "Fundo de reserva - R$ 100,92". Boleto antigo (o lançado não
+ * soma o abatido): uma linha só, como antes.
+ */
+function linhasRessarcimento(cb, linha) {
+  if (!cb.ressarcimento) return '';
+  const grupos = R.taxasNoBoleto(d(), cb);
+  if (!grupos.length) return linha(`(-) Ressarcimento de taxa do condomínio (${esc(cb.ressarcimento_descricao || '')})`, `- ${reais(cb.ressarcimento)}`);
+  return `<tr><td colspan="2"><b>(-) Ressarcimento de taxas do condomínio</b> <span class="suave">(pagas pelo inquilino, são do proprietário)</span></td></tr>
+    ${grupos.map((g) => `<tr><td style="padding-left:14px">Condomínio ${compBr(g.mes)}</td><td></td></tr>
+      ${g.itens.map((x) => linha(`<span style="padding-left:28px;display:inline-block">${esc(x.descricao)}</span>`, `- ${reais(x.valor)}`)).join('')}`).join('')}`;
 }
 
 /**

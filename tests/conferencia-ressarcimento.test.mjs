@@ -167,3 +167,21 @@ test('mês antes da entrada também não tem boleto', () => {
   assert.equal(R.semBoletoNoMes(d, c, '2026-10').motivo, 'entrada');
   assert.equal(R.semBoletoNoMes(d, c, '2026-11'), null);
 });
+
+test('formulários perguntam o mês do vencimento: 12/2026 é o boleto de referência 11/2026, que vence em 05/12/2026', () => {
+  const { d, c } = base({ dia_vencimento: 5 });
+  // caso real de 24/11/2026: o dono digitou 12/2026 querendo o boleto que vence em 05/12 (referência 11/2026)
+  assert.equal(R.competenciaDoMesVencimento(c, '2026-12'), '2026-11');
+  assert.equal(R.mesVencimentoDaCompetencia(c, '2026-11'), '2026-12');
+  // aluguel que vence no próprio mês: o mês é o mesmo
+  const proprio = { ...c, cobranca_mes_seguinte: false };
+  assert.equal(R.competenciaDoMesVencimento(proprio, '2026-12'), '2026-12');
+  assert.equal(R.mesVencimentoDaCompetencia(proprio, '2026-12'), '2026-12');
+  assert.equal(R.competenciaDoMesVencimento(c, ''), null, 'em branco continua em branco');
+  // a frase ao lado do campo
+  assert.equal(R.textoBoletoDaCompetencia(d, c, '2026-11'), 'boleto de referência 11/2026, vence 05/12/2026 (ainda não gerado)');
+  R.gerarCobrancas(d, '2026-11', 'j');
+  assert.equal(R.textoBoletoDaCompetencia(d, c, '2026-11'), 'boleto de referência 11/2026, vence 05/12/2026');
+  // ida e volta: o registro gravado aparece no formulário pelo vencimento e volta igual
+  for (const comp of ['2026-01', '2026-11', '2026-12']) assert.equal(R.competenciaDoMesVencimento(c, R.mesVencimentoDaCompetencia(c, comp)), comp);
+});

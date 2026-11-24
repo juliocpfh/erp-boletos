@@ -6960,10 +6960,41 @@ const TAXAS_CONDOMINIO = ['Fundo de obras', 'Constituição do fundo de reserva'
   'Pintura de fachada', 'Equipamento de segurança / incêndio', 'Decoração / paisagismo das áreas comuns', 'Indenização trabalhista anterior à locação'];
 export const taxasCondominioUsadas = (d) => [...new Set([...d.ressarcimentos.map((r) => r.descricao).filter(Boolean).sort((a, b) => a.localeCompare(b, 'pt-BR')), ...TAXAS_CONDOMINIO])];
 
+/**
+ * Mês de referência (competência, "aluguel de") do boleto que vence no mês ``mes`` ('AAAA-MM'), e o contrário. Os formulários
+ * perguntam o mês do vencimento, que é o que a equipe vê no boleto (dados reais de 24/11/2026: "12/2026" digitado para o boleto
+ * que vence em 05/12/2026 caía no boleto de referência 12/2026, que vence em janeiro). Ex.: vence no mês seguinte → vencimento
+ * em 12/2026 = referência 11/2026; vence no próprio mês → 12/2026 = 12/2026.
+ */
+export const competenciaDoMesVencimento = (c, mes) => (mes ? (c && c.cobranca_mes_seguinte === false ? mes : C.somarMeses(mes, -1)) : null);
+export const mesVencimentoDaCompetencia = (c, comp) => (comp ? (c && c.cobranca_mes_seguinte === false ? comp : C.somarMeses(comp, 1)) : null);
+
+/** Texto do boleto de uma competência: "boleto de referência 11/2026, vence 05/12/2026" (e se ainda não foi gerado). */
+export function textoBoletoDaCompetencia(d, c, comp) {
+  if (!c || !comp) return '';
+  const cb = boletoDoMes(d, c.id, comp);
+  const venc = cb ? cb.vencimento : vencimentoDoContrato(d, c, comp);
+  return `boleto de referência ${C.compBr(comp)}, vence ${C.dataBr(venc)}${cb ? (cb.data_pagamento ? ' (já pago)' : '') : ' (ainda não gerado)'}`;
+}
+
 /** Competência do boleto que vence no mês seguinte ao pagamento da taxa pelo inquilino. */
 export function competenciaDoAbatimento(c, dataPagamento) {
   const vence = C.somarMeses(C.competenciaDe(dataPagamento), 1);
   return c.cobranca_mes_seguinte !== false ? C.somarMeses(vence, -1) : vence;
+}
+
+/**
+ * Taxas do condomínio abatidas no boleto, agrupadas pelo mês do condomínio, para o demonstrativo (pedido do dono de 24/11/2026:
+ * uma linha por taxa, como na página do inquilino). Ex.: [{ mes: '2026-10', itens: [{ descricao: 'Extraordinárias', valor: 35318 },
+ * { descricao: 'Fundo de reserva', valor: 10092 }] }]. Vazio se o que está lançado não soma o que o boleto abate (boleto antigo).
+ */
+export function taxasNoBoleto(d, cb) {
+  if (!cb.ressarcimento) return [];
+  const lista = (d.ressarcimentos || []).filter((r) => r.contrato_id === cb.contrato_id && r.competencia_abatimento === cb.competencia);
+  if (lista.reduce((t, r) => t + r.valor, 0) !== cb.ressarcimento) return [];
+  const meses = [...new Set(lista.map((r) => r.competencia_condominio))].sort();
+  return meses.map((mes) => ({ mes, itens: lista.filter((r) => r.competencia_condominio === mes)
+    .map((r) => ({ descricao: r.descricao, valor: r.valor })).sort((a, b) => String(a.descricao).localeCompare(String(b.descricao), 'pt-BR')) }));
 }
 
 function ressarcimentosNoBoleto(d, contratoId, comp) {
