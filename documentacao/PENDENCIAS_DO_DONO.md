@@ -1,5 +1,31 @@
 # O que ainda falta no sistema (e como fazer)
 
+## PEDIDOS DE 24/11/2026 (fazer em seguida, na ordem; marque `[x]` ao concluir)
+
+**Para o Claude:** o dono pediu (24/11) que, com o limite de uso liberado, o trabalho siga sozinho: PR atrás de PR (uma de cada vez, a partir da `main`, sem empilhar), conferindo que uma não trava a outra, com **testes de tela e conferências antes de cada PR**.
+
+### A. Boletos quebrados (urgente)
+1. [ ] **Condomínio, taxas do proprietário (ressarcimento):** lançadas, mas não entraram nos boletos do mês.
+2. [ ] **Seguro obrigatório** lançado para entrar neste mês não entrou no boleto do inquilino.
+3. [ ] **Ajuste do mês em Boletos:** permitir **mais de um abatimento e mais de um ressarcimento** no mesmo boleto (hoje só um de cada).
+4. [ ] **Mandar o boleto feito à mão por e-mail** (enquanto a API do C6 não sai): em Boletos, anexar o PDF do boleto emitido no banco e enviar ao inquilino pelo Gmail um e-mail curto com o descritivo (como no boleto), o mês de competência, o vencimento e o boleto anexado. Hoje a equipe manda sempre esse e-mail por fora; agora quer mandar pelo sistema.
+5. [ ] **Conferir tudo o que entra e sai do boleto** (aluguel, proporcional, IPTU, condomínio, seguro, ressarcimentos, abatimentos, multas da notificação, diferenças, caução, acordo, reserva, NF), com testes automáticos e de tela.
+
+### B. Termo de aceite da reserva (decisões do dono em 24/11)
+1. **Desistência:** em até 7 dias devolve tudo. Depois de 7 dias a empresa fica com **40%** (reserva de R$ 500,00: devolve R$ 300,00 e fica com R$ 200,00); **falta confirmar se 40% é aceitável pela lei** (o Claude explicou os riscos no chat de 24/11). Ficha reprovada: devolve tudo. "Documento falso": o dono quer ficar com tudo, mas perguntou se pode acusar sem prova. **Em aberto até ele responder** (sugestão do Claude: no texto, não falar em "falso"; falar em "informação ou documento que não se confirma na conferência", e tratar como desistência).
+2. **Prazos:** o texto avisa antes que a pessoa tem **3 dias úteis para mandar os documentos, senão a reserva é cancelada** (para ela andar com a documentação). Avisar a equipe a cada dado novo e a cada documento enviado. A pessoa pode **ver o que já mandou e corrigir dados e documentos** (trocar e apagar o anexo errado).
+3. **Onde entra a reserva:** sempre **abatida do 1º aluguel**, com o texto explicando que vai para esse fim.
+
+### C. Outros pedidos de 24/11
+1. [ ] **Assinatura digital: melhorar o visual.** Funcionou (conferido no validar.iti.gov.br), mas o campo de assinatura do documento fica em branco e a última página só tem uma tarja azul. Fazer uma página de assinatura mais bonita e preencher o campo "assinatura" do documento com o selo.
+2. [ ] **Modelos de documentos (PDF):** criar os modelos que faltam para o dono baixar, ler e ajustar.
+3. [ ] **Lista do que conferir:** o dono não sabe o que mudou; montar a lista de tudo que ele precisa conferir de novo (tela por tela, o que fazer e o que deve aparecer).
+4. [ ] **Taxas e cobranças extras:** trazer a lista do que pode ser cobrado do inquilino (com a lei de cada uma) para o dono decidir.
+5. [ ] **Busca geral com vários agentes ao mesmo tempo:** erros, partes quebradas, regras que deixaram de ser usadas; comparar com a memória e a documentação o que foi feito e o que deixou de ser feito, **quando** e **por quê** (o que foi implementado, o que foi tirado e a decisão). Tudo em **PDF** e documentado. Depois, listar o que ainda falta e começar as correções.
+6. [ ] **No fim:** arquivar, salvar e compactar código e documentação para facilitar a consulta de memória (índice de ponta a ponta).
+
+A simulação de todas as etapas (item 5b) fica para depois que o Claude fizer as etapas acima (decisão de 24/11).
+
 ## COMECE POR AQUI (atualizado em 22/11/2026, noite)
 
 **Para o Claude:** na primeira mensagem de cada conversa, retome para o dono esta lista (o que ele precisa fazer), em português simples, antes de qualquer outra coisa. O item 1 é a prioridade do dono: comece por ele.
