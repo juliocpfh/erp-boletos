@@ -10,6 +10,7 @@ import { faxinaDosLinks } from './ficha-publica.mjs';
 import { faxinaDosContatos } from './contatos-publico.mjs';
 import { faxinaDosAceites } from './aceite-reserva.mjs';
 import { faxinaDaLixeira } from './lixeira.mjs';
+import { textoAtualizadoDoModelo } from '../docs/js/modelos-contrato.js';
 import { chaveDoBackupValida, cifrarBackup, resumoDaChave } from './cifrar-backup.mjs';
 
 export const FORMATO = 'imoveis-v1';
@@ -178,6 +179,25 @@ export function juntarSubchaves(antes, depois, atual) {
   }
   return r;
 }
+
+/**
+ * Texto de um modelo de contrato mudado em dois aparelhos (24/11): cada versão do site atualiza sozinha os modelos gravados
+ * (normalizar, ATUALIZACOES_MODELO) e dois aparelhos com versões diferentes mandavam dois textos "novos" para o mesmo texto
+ * antigo, o que abria conflito sem ninguém ter editado. Devolve o texto que fica, ou undefined quando é conflito de verdade:
+ * - este aparelho só atualizou sozinho (o dele, atualizado com a versão da nuvem, dá o mesmo que o antigo atualizado): fica o
+ *   da nuvem com as atualizações de hoje (a edição à mão que estiver lá continua);
+ * - a nuvem só tinha a atualização automática do antigo: vale o deste aparelho (com as atualizações de hoje).
+ * Ex.: texto antigo T0; o aparelho velho grava T0 + resumo; o novo manda T0 + resumo + tarifa: fica T0 + resumo + tarifa.
+ */
+export function textoDoModeloSemConflito(tipo, antes, depois, atual) {
+  if (![antes, depois, atual].every((v) => typeof v === 'string')) return undefined;
+  const atualizado = (t) => String(textoAtualizadoDoModelo({ tipo, texto: t }) ?? '').replace(/\r\n/g, '\n');
+  const base = atualizado(antes);
+  if (atualizado(depois) === base) return atualizado(atual);
+  if (atualizado(atual) === base) return atualizado(depois);
+  return undefined;
+}
+const ehTextoDeModelo = (tabela, campo) => tabela === 'modelos_contrato' && campo === 'texto';
 
 function semSegredos(v) {
   if (!v || typeof v !== 'object') return v;
@@ -685,6 +705,9 @@ export class Cofre {
           mudou = true; continue;
         }
         const aberto = this.q("SELECT id FROM conflitos WHERE resolvido_em IS NULL AND tipo = 'campo' AND tabela = ? AND reg_id = ? AND campo = ?", tabela, String(id), c)[0];
+        // texto de modelo em disputa e este aparelho só o atualizou sozinho: não é mais uma proposta (a escolha continua aberta)
+        if (aberto && ehTextoDeModelo(tabela, c) && typeof antes === 'string' && typeof depois === 'string'
+          && String(textoAtualizadoDoModelo({ tipo: dados.tipo, texto: depois })) === String(textoAtualizadoDoModelo({ tipo: dados.tipo, texto: antes }))) continue;
         if (aberto) { // campo já em disputa: vira mais uma proposta, nada vale até a escolha
           novosConflitos.push(this.abrirConflito('campo', tabela, id, c, dados[c], meta[c]?.por || null, depois, email));
           conflito = true; continue;
@@ -694,6 +717,13 @@ export class Cofre {
           if (!v || !('depois' in v)) delete dados[c]; else dados[c] = depois; // sem "depois" = campo apagado
           meta[c] = { por: email, em: this.agora() };
           mudou = true; continue;
+        }
+        if (ehTextoDeModelo(tabela, c)) {
+          const fica = textoDoModeloSemConflito(dados.tipo, antes, depois, dados[c]);
+          if (fica !== undefined) {
+            if (igual(dados[c], fica)) continue; // a nuvem já tem o mais novo (o aparelho o recebe no puxar)
+            dados[c] = fica; meta[c] = { por: email, em: this.agora() }; mudou = true; continue;
+          }
         }
         const junto = juntarSubchaves(antes, depois, dados[c]);
         if (junto !== undefined) { dados[c] = junto; meta[c] = { por: email, em: this.agora() }; mudou = true; continue; }
