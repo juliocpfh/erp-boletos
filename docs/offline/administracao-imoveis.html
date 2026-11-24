@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-gSuHg/ezJrljzCt/ryPjxiO+bzeWB14esqBKlRY6CpE='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-JokDqs1V6m5GlouZ/2lBe9zISA8B4YYcx3q6vRVm+l8='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="3495ced99f178568">
+<meta name="fontes" content="4096aec03f0c6761">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -21295,7 +21295,8 @@ Ficha "Pagamentos Efetuados", código 70 (Aluguéis de imóveis), um lançamento
 O aluguel de moradia não reduz o imposto; a informação serve para o cruzamento da Receita Federal. Não houve retenção de imposto de renda na fonte.[fim]`
         },
         // Régua de cobrança por e-mail (pedido do dono em 2026-11-16): o sistema prepara (regua-email.js) e só sai com a autorização
-        // do administrador (#/regua). ``boleto``: o e-mail é de um boleto (alvo { contrato, cobranca }); boleto do C6 e QR Code do Pix anexados.
+        // do administrador (#/regua). ``boleto``: o e-mail é de um boleto (alvo { contrato, cobranca }); boleto do C6 e QR Code do Pix anexados,
+        // ou o PDF do boleto feito à mão no banco (``boleto:anexado``, decisão do dono de 24/11/2026, DOC-05).
         {
           chave: "cobranca_antes",
           nome: "Lembrete antes do vencimento",
@@ -21303,7 +21304,7 @@ O aluguel de moradia não reduz o imposto; a informação serve para o cruzament
           boleto: true,
           assunto: "Lembrete: boleto {boleto_referente} ({imovel}) vence em {vencimento_boleto}",
           anexos: "",
-          prontos: ["boleto:pdf", "boleto:pix"],
+          prontos: ["boleto:pdf", "boleto:pix", "boleto:anexado"],
           texto: `Olá, {nome}, tudo bem?
 
 O boleto {boleto_referente} ({imovel}) vence em {vencimento_boleto}[se nao_util], que não é dia útil: sem multa até {limite_pagamento}[fim]. Valor: {valor_em_dia}[se bonificacao_boleto], já com a bonificação[fim]. Depois de {limite_pagamento}: {valor_cheio}, mais multa de {multa_pct} e juros de {juros_pct} ao mês.
@@ -21323,7 +21324,7 @@ Já pagou? Desconsidere esta mensagem.`
           boleto: true,
           assunto: "Lembrete: boleto {boleto_referente} ({imovel}) vence hoje",
           anexos: "",
-          prontos: ["boleto:pdf", "boleto:pix"],
+          prontos: ["boleto:pdf", "boleto:pix", "boleto:anexado"],
           texto: `Olá, {nome}, tudo bem?
 
 [se nao_util]O boleto {boleto_referente} ({imovel}) venceu em {vencimento_boleto}, que não é dia útil: pode pagar sem multa até hoje, {limite_pagamento}[senão]O boleto {boleto_referente} ({imovel}) vence hoje, {vencimento_boleto}[fim]. Valor: {valor_em_dia}[se bonificacao_boleto], já com a bonificação[fim]. A partir de amanhã: {valor_cheio}, mais multa de {multa_pct} e juros de {juros_pct} ao mês.
@@ -21343,7 +21344,7 @@ Já pagou? Desconsidere esta mensagem.`
           boleto: true,
           assunto: "Boleto {boleto_referente} em aberto ({imovel})",
           anexos: "",
-          prontos: ["boleto:pdf", "boleto:pix"],
+          prontos: ["boleto:pdf", "boleto:pix", "boleto:anexado"],
           texto: `Olá, {nome}, tudo bem?
 
 O boleto {boleto_referente} ({imovel}), vencido em {vencimento_boleto}, está em aberto ({dias_atraso} dia(s) de atraso). Para pagar hoje ({data_hoje}): {valor_hoje} ({valor_cheio} + multa de {multa_hoje} + juros de {juros_hoje}). Em outro dia o valor muda: responda que mandamos o atualizado.
@@ -21933,6 +21934,10 @@ ${DICA_DOCUMENTOS}`].join("\n");
       }
     }
     return out;
+  }
+  function avisoBoletoPdfDesatualizado(cb) {
+    const mudou = cb ? boletoPdfDesatualizado(cb) : "";
+    return mudou ? `O boleto mudou depois que o PDF do banco foi anexado: ${mudou}. O PDF anexado pode estar com o valor antigo.` : "";
   }
   function informesPendentes(d2, hoje3 = hojeIso()) {
     const mes = Number(hoje3.slice(5, 7));
@@ -23988,7 +23993,9 @@ ${DICA_DOCUMENTOS}`].join("\n");
   function emailDoItem(db, item3) {
     const modelo = modeloEmail(db, item3.modelo);
     const alvo = { contrato: item3.contrato, cobranca: item3.cobranca };
-    return { modelo, alvo, ...montarEmail(modelo, dadosDoEmail(db, alvo)), prontos: anexosProntos(db, modelo, alvo) };
+    const prontos = anexosProntos(db, modelo, alvo);
+    const pdfVelho = prontos.some((a) => a.tipo === "arquivo") ? avisoBoletoPdfDesatualizado(item3.cobranca) : "";
+    return { modelo, alvo, ...montarEmail(modelo, dadosDoEmail(db, alvo)), prontos, pdfVelho };
   }
   function linhaDaFila(db, item3, envio) {
     const e = emailDoItem(db, item3);
@@ -24003,6 +24010,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
     <td>${item3.para ? esc(item3.para) : '<span class="suave">sem e-mail</span>'}</td>
     <td><details><summary>${esc(e.assunto)}</summary><pre class="previa-email" style="white-space:pre-wrap;font:inherit;margin:6px 0">${esc(e.texto)}</pre>
       ${anexos ? `<p class="suave">Anexos: ${esc(anexos)}</p>` : '<p class="suave">Sem anexo (boleto não emitido no banco).</p>'}</details>
+      ${e.pdfVelho ? `<div class="alerta aviso" style="margin:4px 0">${esc(e.pdfVelho)} Emita de novo no banco e troque o PDF (página do boleto) antes de mandar.</div>` : ""}
       ${item3.avisos.map((a) => `<div class="alerta aviso" style="margin:4px 0">${esc(a)}</div>`).join("")}</td>
     <td class="nw">${admin() ? `${item3.para ? `${botao("abrirReguaGmail", "Abrir no Gmail", { chave: item3.chave }, "secundario mini")} ` : ""}${botao("copiarRegua", "Copiar texto", { chave: item3.chave }, "secundario mini")}
       ${botao("recusarRegua", "Não enviar", { chave: item3.chave }, "secundario mini", `Não enviar este e-mail para ${item3.contrato.inquilino_nome} (${item3.etapa})? Ele sai da lista e não volta.`)}` : ""}</td></tr>`;
@@ -24060,6 +24068,17 @@ ${DICA_DOCUMENTOS}`].join("\n");
     const arquivos = [];
     const faltou = [];
     for (const a of prontos) {
+      if (a.tipo === "arquivo") {
+        let blob = null;
+        try {
+          blob = await abrirArquivo(await pastaDoEscopo(a.escopo, Number(a.id)), a.nome);
+        } catch {
+          blob = null;
+        }
+        if (blob) arquivos.push({ nome: a.nome, blob });
+        else faltou.push(a.rotulo);
+        continue;
+      }
       if (a.tipo !== "boleto") continue;
       if (a.qual === "pdf") {
         const blob = await pdfDoBoletoC6(item3.cobranca);
@@ -24090,6 +24109,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
       init_banco();
       init_calculos();
       init_calculos();
+      init_armazenamento();
       init_email_dados();
       init_formularios();
       init_gmail();
@@ -24140,6 +24160,9 @@ ${e.texto}`) ? 'Assunto e texto copiados: cole no e-mail. Depois de mandar, use 
         async abrirReguaGmail({ chave }) {
           const item3 = itemAtual(chave);
           const e = emailDoItem(d(), item3);
+          if (e.pdfVelho && !await confirmar(`${e.pdfVelho}
+
+Emita de novo no banco e troque o PDF, ou abra o e-mail mesmo assim.`, { titulo: "PDF do boleto desatualizado", sim: "Abrir o e-mail mesmo assim", forte: true })) return;
           const comCorpo = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(item3.para)}&su=${encodeURIComponent(e.assunto)}&body=${encodeURIComponent(e.texto)}`;
           const cabe = comCorpo.length <= LIMITE_ENDERECO;
           const aba = window.open(cabe ? comCorpo : `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(item3.para)}&su=${encodeURIComponent(e.assunto)}`, "_blank");
@@ -24153,7 +24176,7 @@ ${e.texto}`) ? 'Assunto e texto copiados: cole no e-mail. Depois de mandar, use 
           }
           const copiado = cabe || await copiar2(e.texto);
           await decidir(item3, "gmail", { para: item3.para, assunto: e.assunto });
-          aviso(`${cabe ? "Gmail aberto com o texto." : copiado ? "Gmail aberto; o texto é comprido e foi copiado: cole no corpo do e-mail." : "Gmail aberto: copie o texto da prévia e cole no corpo do e-mail."}${e.prontos.length ? " Anexe o boleto e o QR Code (página do boleto) antes de mandar." : ""}`, cabe ? "ok" : "aviso");
+          aviso(`${cabe ? "Gmail aberto com o texto." : copiado ? "Gmail aberto; o texto é comprido e foi copiado: cole no corpo do e-mail." : "Gmail aberto: copie o texto da prévia e cole no corpo do e-mail."}${e.prontos.length ? ` Antes de mandar, anexe (está na página do boleto): ${e.prontos.map((a) => a.rotulo).join(" e ")}.` : ""}`, cabe ? "ok" : "aviso");
           await mostrar();
         },
         /**
@@ -24168,7 +24191,11 @@ ${e.texto}`) ? 'Assunto e texto copiados: cole no e-mail. Depois de mandar, use 
           if (!chaves.length) throw new ErroUsuario("Marque pelo menos um e-mail na lista.");
           const itens = chaves.map((k) => itemDaFila(d(), k)).filter((x) => x && x.para);
           if (!itens.length) throw new ErroUsuario("Os e-mails marcados saíram da lista (pago, em acordo ou já decidido). Atualize a tela.");
-          const lista3 = itens.map((x) => `• ${nomeDo(x)}: boleto ${referente(x.cobranca)}, ${x.etapa}, ${reais(x.valor)} → ${x.para}`).join("\n");
+          const lista3 = itens.map((x) => {
+            const velho = emailDoItem(d(), x).pdfVelho;
+            return `• ${nomeDo(x)}: boleto ${referente(x.cobranca)}, ${x.etapa}, ${reais(x.valor)} → ${x.para}${velho ? `
+   ATENÇÃO: ${velho}` : ""}`;
+          }).join("\n");
           const fora = chaves.length - itens.length;
           if (!await confirmar(`Vou enviar agora ${itens.length} e-mail(s) pelo Gmail da empresa:
 
@@ -24197,7 +24224,7 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
           }
           aviso([
             `${enviados.length} e-mail(s) enviado(s); ficam em "Enviados" no Gmail.`,
-            semAnexo.length ? `Sem o PDF do boleto (a ponte do banco não respondeu neste computador; a linha digitável e o Pix foram no texto): ${semAnexo.join("; ")}.` : "",
+            semAnexo.length ? `Foram sem anexo (a ponte do banco não respondeu neste computador ou o PDF do boleto sumiu da pasta): ${semAnexo.join("; ")}.` : "",
             erros.length ? `Não enviados: ${erros.join("; ")}.` : ""
           ].filter(Boolean).join(" "), erros.length ? "erro" : semAnexo.length ? "aviso" : "ok");
           await mostrar();
@@ -25327,8 +25354,8 @@ Abrir o Gmail mesmo assim? O texto vai com o buraco, e você completa por lá.`,
           if (!cb) throw new ErroUsuario("Este boleto não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.");
           if (!cb.boleto_pdf) throw new ErroUsuario('Anexe antes o PDF do boleto emitido no banco (botão "Anexar o PDF do boleto", nesta página). O e-mail vai com ele.');
           if (arquivoSumiu("contrato", pastaDoBoletoPdf(cb), cb.boleto_pdf)) throw new ErroUsuario(`O PDF do boleto (${cb.boleto_pdf}) sumiu da pasta: anexe de novo antes de enviar.`);
-          const mudou = boletoPdfDesatualizado(cb);
-          if (mudou && !await confirmar(`O boleto mudou depois que o PDF do banco foi anexado: ${mudou}. O PDF anexado pode estar com o valor antigo.
+          const mudou = avisoBoletoPdfDesatualizado(cb);
+          if (mudou && !await confirmar(`${mudou}
 
 Emita de novo no banco e troque o PDF, ou abra o e-mail mesmo assim.`, { titulo: "PDF do boleto desatualizado", sim: "Abrir o e-mail mesmo assim", forte: true })) return;
           await janelaEmail("boleto_envio", { contrato: cb.contrato_id, cobranca: cb.id });
@@ -31880,7 +31907,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     <table><tr><th>Descrição</th><th class="n">Valor</th></tr>
       ${e && (e.garantia_corrigida || e.garantia_valor || 0) - (e.debitos || 0) + (e.creditos || 0) === e.saldo ? `${linha("Garantia corrigida", reais(e.garantia_corrigida || e.garantia_valor || 0))}${linha("(-) Débitos do cálculo final", `- ${reais(e.debitos || 0)}`)}${e.creditos ? linha("(+) Créditos do inquilino", reais(e.creditos)) : ""}` : ""}
       <tr class="total"><td>Saldo a pagar até ${dataBr(cb.vencimento)}${prazoNaoUtil(cb)}</td><td class="n maior">${reais(t.a_pagar_pontual)}</td></tr>
-      <tr><td colspan="2" class="suave">Após o vencimento: sem multa e juros.</td></tr></table>
+      <tr><td colspan="2" class="suave">Após o vencimento: + multa de ${pct(cb.multa_percentual)} + juros de ${pct(cb.juros_mensal_percentual)} ao mês, pro rata dia.</td></tr></table>
     ${e && e.debitos_descricao ? `<p class="pre suave">${esc(e.debitos_descricao)}</p>` : ""}${e && e.creditos_descricao ? `<p class="pre suave">${esc(e.creditos_descricao)}</p>` : ""}
     ${cb.data_pagamento ? `<p><b>Pago em ${dataBr(cb.data_pagamento)}</b>${cb.dias_atraso ? ` com ${plural(cb.dias_atraso, "dia")} de atraso` : ""} · recebido ${reais(cb.valor_pago)}</p>` : ""}</div>`;
     }
@@ -32033,7 +32060,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
         ${semMultaJuros(cb) ? "" : `${item(`Multa (${pct(cb.multa_percentual)})`, reais(cb.multa))}${item(`Juros (${pct(cb.juros_mensal_percentual)} ao mês)`, reais(cb.juros))}`}
         ${item("Valor recebido", reais(cb.valor_pago))}${ehComplementoCaucao(cb) || !geraNf(c) ? "" : item("Valor da nota fiscal", `<span class="maior">${reais(cb.valor_nf)}</span>${cb.nf_manual ? ` ${etiqueta("digitado à mão", "aviso")}` : ""}`)}</div>
         ${pagoAMaisHtml(cb)}
-        ${cb.nf_manual ? '<p class="suave">Valor recebido diferente do previsto: a NF saiu com o valor digitado à mão (a justificativa está no histórico).</p>' : ehSaldoSaida(cb) ? '<p class="suave">Saldo do cálculo final da saída: não gera NF (o aluguel de cada mês tem o boleto e a NF dele) e não tem multa e juros (os débitos do cálculo já os trazem). Depois de pago, marque o saldo como cobrado no roteiro da saída.</p>' : ehComplementoCaucao(cb) ? '<p class="suave">Complemento da caução: não gera NF. Ao confirmar o pagamento, a caução foi corrigida (veja Garantia, na página do inquilino).</p>' : !geraNf(c) ? '<p class="suave">Boleto de controle (inquilino sem NF): o pagamento só fica registrado.</p>' : !(cb.valor_nf > 0) ? '<p class="suave">Sem NF: este boleto não tem aluguel na nota (ex.: mês de carência só com IPTU e seguro).</p>' : `<p class="suave">Nota fiscal = ${cb.dias_atraso ? `aluguel ${reais(cb.aluguel)} + multa ${reais(cb.multa)} + juros ${reais(cb.juros)} (pagou atrasado, sem desconto)` : `aluguel ${reais(cb.aluguel)} - desconto ${reais(cb.desconto)} (pagou em dia)`}. IPTU, seguro, tarifa, FCI e ajuste do mês não entram.</p>`}
+        ${cb.nf_manual ? '<p class="suave">Valor recebido diferente do previsto: a NF saiu com o valor digitado à mão (a justificativa está no histórico).</p>' : ehSaldoSaida(cb) ? '<p class="suave">Saldo do cálculo final da saída: não gera NF (o aluguel de cada mês tem o boleto e a NF dele). Pago depois do vencimento, tem a multa e os juros do contrato, como o aluguel. Depois de pago, marque o saldo como cobrado no roteiro da saída.</p>' : ehComplementoCaucao(cb) ? '<p class="suave">Complemento da caução: não gera NF. Ao confirmar o pagamento, a caução foi corrigida (veja Garantia, na página do inquilino).</p>' : !geraNf(c) ? '<p class="suave">Boleto de controle (inquilino sem NF): o pagamento só fica registrado.</p>' : !(cb.valor_nf > 0) ? '<p class="suave">Sem NF: este boleto não tem aluguel na nota (ex.: mês de carência só com IPTU e seguro).</p>' : `<p class="suave">Nota fiscal = ${cb.dias_atraso ? `aluguel ${reais(cb.aluguel)} + multa ${reais(cb.multa)} + juros ${reais(cb.juros)} (pagou atrasado, sem desconto)` : `aluguel ${reais(cb.aluguel)} - desconto ${reais(cb.desconto)} (pagou em dia)`}. IPTU, seguro, tarifa, FCI e ajuste do mês não entram.</p>`}
         ${opera() ? botao("estornar", "Desfazer pagamento", { id: cb.id }, "perigo pequeno", validas.length ? "Desfazer o pagamento? A NF será cancelada e o número não será reaproveitado." : "Desfazer o pagamento?") : ""}` : emAcordo(cb) ? '<p class="suave">Boleto em acordo: não se cobra mais. O pagamento é registrado nos boletos do acordo.</p>' : `<p>Se for pago hoje (${dataBr(hojeIso())}): <b>${reais(sim2.valor_devido)}</b>${sim2.pontual ? "" : semMultaJuros(cb) ? ` (${plural(sim2.dias_atraso, "dia")} de atraso, sem multa e juros)` : ` (${plural(sim2.dias_atraso, "dia")} de atraso: multa ${pct(cb.multa_percentual)} = ${reais(sim2.multa)}; juros ${pct(cb.juros_mensal_percentual)} a.m. = ${reais(sim2.juros)})`}${ehComplementoCaucao(cb) ? " · sem NF (complemento da caução)" : ehSaldoSaida(cb) ? " · sem NF (saldo da saída)" : !geraNf(c) ? " · sem NF (boleto de controle)" : ` · nota fiscal ${reais(sim2.valor_nf)}`}</p>
         ${segundaVia(d(), cb, hojeIso()) ? `<p class="acoes">${botao("segundaVia", "2ª via com o valor de hoje", { id: cb.id }, "secundario")}<span class="suave">Valor com multa e juros até hoje e o texto pronto para o inquilino (não emite boleto novo no banco).</span></p>` : ""}
         ${opera() && aCobrar(cb) ? formPagamento(cb) : ""}
