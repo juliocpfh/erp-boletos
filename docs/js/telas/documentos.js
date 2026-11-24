@@ -163,8 +163,55 @@ function alturaQueCabe(el) {
   return Math.floor(Math.min(32000, (toque ? 16000000 : 200000000) / larguraPx) / ESCALA_PDF); // em pixels da tela
 }
 
-/** ``alturaMaxima`` (pixels da tela): só para testar o desenho em lotes; o normal é o limite do aparelho. */
-export async function pdfDoDocumento(el, rodape = [], { margemLado = 0, alturaMaxima = 0 } = {}) {
+/**
+ * Logo da empresa em JPEG (fundo branco, até 600 pixels de largura) para a página da assinatura digital: { bin (texto
+ * binário), largura, altura }. Null sem logo ou se a imagem não abrir.
+ */
+async function logoJpeg(src) {
+  if (!src) return null;
+  try {
+    const img = new Image();
+    img.src = src;
+    await img.decode();
+    const larg = Math.min(600, img.naturalWidth || 600);
+    const alt = Math.max(1, Math.round(larg * ((img.naturalHeight || 1) / (img.naturalWidth || 1))));
+    const canvas = document.createElement('canvas');
+    canvas.width = larg; canvas.height = alt;
+    const g = canvas.getContext('2d');
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, larg, alt);
+    g.drawImage(img, 0, 0, larg, alt);
+    return { bin: atob(canvas.toDataURL('image/jpeg', 0.9).split(',')[1]), largura: larg, altura: alt };
+  } catch { return null; }
+}
+
+/**
+ * Para a assinatura digital (24/11/2026): marca no PDF, para o programa do PC, onde fica a linha de assinatura da empresa
+ * (a folha e o retângulo, em pontos do PDF, com a origem embaixo à esquerda) e leva a logo em JPEG. Vai no catálogo, em
+ * /ImoveisAssinatura, que os leitores de PDF ignoram; o programa desenha ali o selo na mesma atualização que assina
+ * (atualizador-pc/assinar-pdf.mjs), então o selo só aparece quando a assinatura existe de verdade e com a hora certa.
+ */
+function marcarAssinatura(pdf, local, logo) {
+  if (!local && !logo) return;
+  let nLogo = 0;
+  if (logo) pdf.internal.events.subscribe('postPutResources', () => {
+    nLogo = pdf.internal.newObject();
+    pdf.internal.write(`<< /Type /XObject /Subtype /Image /Width ${logo.largura} /Height ${logo.altura} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${logo.bin.length} >>`);
+    pdf.internal.write('stream');
+    pdf.internal.write(logo.bin);
+    pdf.internal.write('endstream');
+    pdf.internal.write('endobj');
+  });
+  pdf.internal.events.subscribe('putCatalog', () => {
+    const r = (v) => Math.round(v * 100) / 100;
+    pdf.internal.write(`/ImoveisAssinatura << ${local ? `/Pagina ${local.pagina} /Rect [${local.rect.map(r).join(' ')}]` : ''}${nLogo ? ` /Logo ${nLogo} 0 R` : ''} >>`);
+  });
+}
+
+/**
+ * ``alturaMaxima`` (pixels da tela): só para testar o desenho em lotes; o normal é o limite do aparelho. ``assinatura``: { logo }
+ * para o PDF que vai para a assinatura digital (marcarAssinatura).
+ */
+export async function pdfDoDocumento(el, rodape = [], { margemLado = 0, alturaMaxima = 0, assinatura = null } = {}) {
   const { html2canvas, jsPDF } = await bibliotecasPdf();
   const caixa = el.getBoundingClientRect();
   const topo = caixa.top;
@@ -207,6 +254,23 @@ export async function pdfDoDocumento(el, rodape = [], { margemLado = 0, alturaMa
     }
   }
   const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+  if (assinatura) {
+    // a linha "______" da empresa: a folha onde caiu e o retângulo em pontos (1 mm = 72/25,4 pt; A4 = 841,89 pt de altura)
+    const linha = el.querySelector('[data-assina-empresa] .assina-linha');
+    let local = null;
+    if (linha) {
+      const x = linha.getBoundingClientRect();
+      const yDoc = x.top - topo;
+      const k = fatias.findIndex(([ini, fim]) => yDoc >= ini && yDoc < fim);
+      if (k >= 0) {
+        const pt = (mm) => (mm * 72) / 25.4;
+        const esq = pt(margemLado + (x.left - caixa.left) / pxMm);
+        const cima = pt(topoDa(k) + (yDoc - fatias[k][0]) / pxMm);
+        local = { pagina: k + 1, rect: [esq, 841.89 - cima - pt(x.height / pxMm), esq + pt(x.width / pxMm), 841.89 - cima] };
+      }
+    }
+    marcarAssinatura(pdf, local, await logoJpeg(assinatura.logo));
+  }
   let n = 0;
   for (const lote of lotes) {
     const canvas = await html2canvas(el, lote.inteiro ? opcoes : { ...opcoes, y: lote.ini, height: Math.ceil(lote.fim - lote.ini) });
@@ -356,6 +420,8 @@ export function reciboHtml(r) {
   const linha = ([a, b]) => (b === null ? `<tr><th colspan="2" style="text-align:left">${esc(a)}</th></tr>`
     // texto (proposta) à esquerda e quebrando; valor em reais à direita
     : `<tr><td style="width:34%;white-space:normal">${esc(a).replace(/^ {3}/, '&nbsp;&nbsp;&nbsp;')}</td><td style="white-space:normal${/^R\$ [\d.,]+$/.test(b) ? ';text-align:right' : ''}">${esc(b)}</td></tr>`);
+  // a linha da empresa (a que assina com o certificado): onde o programa do PC põe o selo da assinatura digital
+  const daEmpresa = r.assinaturas.findIndex((a) => a.nome === (e.razao_social || e.nome || 'LOCADORA'));
   return `<div class="carta recibo">
     ${d().logo ? `${K.marcaDagua(d().logo)}<p class="ct-capa"><img src="${esc(d().logo)}" alt="Logo"></p>` : ''}
     <p style="text-align:center"><b>${esc(e.razao_social || e.nome || '')}</b>${e.cnpj ? `<br>CNPJ ${esc(e.cnpj)}` : ''}${e.endereco ? `<br>${esc(e.endereco)}` : ''}</p>
@@ -364,11 +430,11 @@ export function reciboHtml(r) {
     ${r.tabela.length ? `<table class="carta-tabela" style="width:100%">${r.tabela.map(linha).join('')}</table>` : ''}
     ${r.depois.map(par).join('')}
     <p class="carta-data">${esc(r.cidade)}, ${K.dataPorExtenso(r.data, { zero: false })}.</p>
-    ${r.assinaturas.map((a) => `<p style="margin-top:48px;text-align:center">_______________________________________<br><b>${esc(a.nome)}</b>${a.linha ? `<br>${esc(a.linha)}` : ''}</p>`).join('')}</div>`;
+    ${r.assinaturas.map((a, k) => `<p style="margin-top:48px;text-align:center"${k === daEmpresa ? ' data-assina-empresa' : ''}><span class="assina-linha">_______________________________________</span><br><b>${esc(a.nome)}</b>${a.linha ? `<br>${esc(a.linha)}` : ''}</p>`).join('')}</div>`;
 }
 
-/** PDF do recibo ou termo (desenhado fora da tela), para anexar no e-mail: { blob, nome }. */
-export async function pdfDoRecibo(tipo, alvo) {
+/** PDF do recibo ou termo (desenhado fora da tela), para anexar no e-mail: { blob, nome }. ``paraAssinar``: o que vai para a fila da assinatura digital. */
+export async function pdfDoRecibo(tipo, alvo, { paraAssinar = false } = {}) {
   const r = REC.montarRecibo(d(), tipo, alvo);
   const caixa = document.createElement('div');
   caixa.className = 'impressao';
@@ -376,7 +442,7 @@ export async function pdfDoRecibo(tipo, alvo) {
   caixa.innerHTML = reciboHtml(r);
   document.body.append(caixa);
   try {
-    return { blob: await pdfDoDocumento(caixa.querySelector('.carta'), [], { margemLado: 15 }), nome: `${S.limparNome(r.arquivo)}.pdf` };
+    return { blob: await pdfDoDocumento(caixa.querySelector('.carta'), [], { margemLado: 15, ...(paraAssinar ? { assinatura: { logo: d().logo } } : {}) }), nome: `${S.limparNome(r.arquivo)}.pdf` };
   } finally {
     caixa.remove();
   }

@@ -2,12 +2,14 @@
 // 21/11/2026: o certificado fica guardado só neste computador, cifrado pelo Windows, e assina sozinho os documentos que o
 // site põe na fila). Sem biblioteca de fora:
 // - a parte do PDF é JavaScript puro (roda em qualquer sistema, tests/assinar-pdf.test.mjs): uma "atualização incremental"
-//   no fim do arquivo (o PDF original fica intacto) com uma página final de assinatura (o selo "Assinado digitalmente
-//   por …" e como conferir) e o espaço reservado para a assinatura (/Contents), no padrão adbe.pkcs7.detached;
+//   no fim do arquivo (o PDF original fica intacto) com uma página final de assinatura (logo, quadro com os dados do
+//   certificado, o resumo SHA-256 do original e como conferir), o selo "Assinado digitalmente por …" na linha de assinatura
+//   da empresa que o site marcou (24/11/2026) e o espaço reservado para a assinatura (/Contents), no padrão adbe.pkcs7.detached;
 // - a assinatura em si (CMS/PKCS#7 destacada, SHA-256, com a cadeia do certificado e a hora) é feita pelo próprio Windows
 //   (PowerShell, System.Security.Cryptography.Pkcs): o .pfx e a senha vão pela entrada padrão, nunca na linha de comando.
 // Quem confere: o leitor de PDF (Adobe) ou o validador do governo (validar.iti.gov.br).
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 
 const ESPACO_ASSINATURA = 30000; // bytes reservados para a assinatura (o certificado e a cadeia ICP-Brasil cabem com folga)
 const LARGURA_NUMERO = 10; // dígitos de cada número do /ByteRange (preenchido depois, sem mudar o tamanho do arquivo)
@@ -71,31 +73,252 @@ function arvoreDePaginas(texto, root) {
   return { n, dic, count, largura: x1 - x0, altura: y1 - y0 };
 }
 
-/** Quebra um texto em linhas de até ``max`` caracteres (Helvetica 9,5: cabem cerca de 100 por linha na folha A4). */
-function quebrar(texto, max) {
+// --- desenho (pedido do dono de 24/11/2026: a página só com a tarja azul ficou "meio pobre" e o campo da assinatura do
+// documento ficava em branco) ---------------------------------------------------------------------------------------------
+// Larguras das letras das fontes padrão do PDF (Helvetica e Helvetica-Bold, em milésimos do tamanho, ASCII 32 a 126): para
+// centralizar, quebrar e diminuir o texto que não cabe. Letra acentuada mede como a letra sem acento.
+const LARG = {
+  F1: [278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556, 1015, 667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 278, 278, 278, 469, 556, 333, 556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584],
+  F2: [278, 333, 474, 556, 556, 889, 722, 238, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 333, 333, 584, 584, 584, 611, 975, 722, 722, 722, 722, 667, 611, 778, 722, 278, 556, 722, 611, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 333, 278, 333, 584, 556, 333, 556, 611, 556, 611, 556, 333, 611, 611, 278, 278, 556, 278, 889, 611, 611, 611, 611, 389, 556, 333, 611, 556, 778, 556, 556, 500, 389, 280, 389, 584],
+};
+const ESPECIAIS = { '·': 278, 'º': 365, 'ª': 370, '§': 556, '°': 400 };
+
+/** Largura do texto em pontos. F3 é a Courier-Bold (todas as letras com 600). Ex.: ("CNPJ", 'F1', 10) → 26,7. */
+export function larguraTexto(texto, fonte, tamanho) {
+  let soma = 0;
+  for (const c of String(texto)) {
+    if (fonte === 'F3') { soma += 600; continue; }
+    const base = c.normalize('NFD')[0];
+    const k = base.charCodeAt(0);
+    soma += ESPECIAIS[c] || (k >= 32 && k <= 126 ? LARG[fonte][k - 32] : 556);
+  }
+  return (soma * tamanho) / 1000;
+}
+
+/** Quebra o texto em linhas que cabem em ``max`` pontos. */
+function quebrar(texto, fonte, tamanho, max) {
   const out = [];
   let linha = '';
-  for (const p of String(texto).split(/\s+/)) {
-    if (`${linha} ${p}`.trim().length > max) { out.push(linha); linha = p; } else linha = `${linha} ${p}`.trim();
+  for (const p of String(texto).split(/\s+/).filter(Boolean)) {
+    const junto = linha ? `${linha} ${p}` : p;
+    if (linha && larguraTexto(junto, fonte, tamanho) > max) { out.push(linha); linha = p; } else linha = junto;
   }
   if (linha) out.push(linha);
   return out;
 }
 
-/** Põe ``entrada`` (ex.: "/Annots [9 0 R]") num dicionário "<< … >>", juntando ao /Annots que já existir. */
+/** Tamanho da letra para o texto caber em ``max`` pontos (do ``tamanho`` pedido até ``minimo``). */
+const tamanhoQueCabe = (texto, fonte, tamanho, max, minimo = 6) => {
+  let t = tamanho;
+  while (t > minimo && larguraTexto(texto, fonte, t) > max) t -= 0.25;
+  return t;
+};
+
+/** O texto, cortado com "..." no fim se nem no tamanho mínimo couber em ``max`` pontos (nome comprido não sai da caixa). */
+export function cortarQueCabe(texto, fonte, tamanho, max) {
+  const t = String(texto);
+  if (larguraTexto(t, fonte, tamanho) <= max) return t;
+  let n = t.length;
+  while (n > 1 && larguraTexto(`${t.slice(0, n).trimEnd()}...`, fonte, tamanho) > max) n -= 1;
+  return `${t.slice(0, n).trimEnd()}...`;
+}
+
+const n2 = (v) => String(Math.round(v * 100) / 100);
+const cor = ([r, g, b], op) => `${n2(r)} ${n2(g)} ${n2(b)} ${op}`;
+// cores sóbrias: azul-marinho para os títulos e o selo, cinzas para o texto e as linhas
+const MARINHO = [0.11, 0.22, 0.37];
+const TEXTO = [0.16, 0.18, 0.21];
+const CINZA = [0.42, 0.45, 0.5];
+const LINHA = [0.8, 0.82, 0.86];
+const FUNDO = [0.965, 0.972, 0.982];
+const VERDE = [0.12, 0.45, 0.31];
+
+/** Um texto na posição (x, y) da linha de base. */
+const txt = (x, y, fonte, tam, texto, c = TEXTO) => `BT ${cor(c, 'rg')} /${fonte} ${n2(tam)} Tf ${n2(x)} ${n2(y)} Td ${textoPdf(texto)} Tj ET`;
+
+/** Caminho de um retângulo de cantos arredondados. */
+function arredondado(x, y, w, h, r) {
+  const k = r * 0.5523;
+  return [`${n2(x + r)} ${n2(y)} m`, `${n2(x + w - r)} ${n2(y)} l`, `${n2(x + w - r + k)} ${n2(y)} ${n2(x + w)} ${n2(y + r - k)} ${n2(x + w)} ${n2(y + r)} c`,
+    `${n2(x + w)} ${n2(y + h - r)} l`, `${n2(x + w)} ${n2(y + h - r + k)} ${n2(x + w - r + k)} ${n2(y + h)} ${n2(x + w - r)} ${n2(y + h)} c`,
+    `${n2(x + r)} ${n2(y + h)} l`, `${n2(x + r - k)} ${n2(y + h)} ${n2(x)} ${n2(y + h - r + k)} ${n2(x)} ${n2(y + h - r)} c`,
+    `${n2(x)} ${n2(y + r)} l`, `${n2(x)} ${n2(y + r - k)} ${n2(x + r - k)} ${n2(y)} ${n2(x + r)} ${n2(y)} c`, 'h'].join(' ');
+}
+
+/** O emblema: círculo com o sinal de conferido, de raio ``r`` e centro (cx, cy). */
+function emblema(cx, cy, r, c = MARINHO) {
+  const k = r * 0.5523;
+  const circulo = `${n2(cx + r)} ${n2(cy)} m ${n2(cx + r)} ${n2(cy + k)} ${n2(cx + k)} ${n2(cy + r)} ${n2(cx)} ${n2(cy + r)} c ${n2(cx - k)} ${n2(cy + r)} ${n2(cx - r)} ${n2(cy + k)} ${n2(cx - r)} ${n2(cy)} c ${n2(cx - r)} ${n2(cy - k)} ${n2(cx - k)} ${n2(cy - r)} ${n2(cx)} ${n2(cy - r)} c ${n2(cx + k)} ${n2(cy - r)} ${n2(cx + r)} ${n2(cy - k)} ${n2(cx + r)} ${n2(cy)} c h`;
+  const marca = `${n2(cx - r * 0.45)} ${n2(cy + r * 0.02)} m ${n2(cx - r * 0.12)} ${n2(cy - r * 0.32)} l ${n2(cx + r * 0.48)} ${n2(cy + r * 0.36)} l`;
+  return `q ${cor(c, 'rg')} ${circulo} f 1 1 1 RG ${n2(Math.max(1, r * 0.17))} w 1 J 1 j ${marca} S Q`;
+}
+
+/** Data e hora de Brasília. Ex.: 2026-12-05T13:32:00Z → "05/12/2026 às 10:32". */
+const dataHoraBr = (quando) => new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(quando).replace(',', ' às');
+
+/**
+ * O selo que vai na linha de assinatura da empresa (e, sem a linha marcada, na página final): emblema, "Assinado digitalmente
+ * por", o nome, o CNPJ e a data. ``larg`` × ``alt`` em pontos; fundo branco (cobre o "______" da folha).
+ */
+export function desenhoDoSelo(larg, alt, { nome, cnpj, dataBr }) {
+  const r = Math.min(alt * 0.27, 12);
+  const xTexto = 10 + 2 * r + 8;
+  const max = larg - xTexto - 8;
+  const tNome = tamanhoQueCabe(nome, 'F2', 9, max);
+  const meio = [cnpj ? `CNPJ ${cnpj}` : '', dataBr].filter(Boolean).join(' · ');
+  const tMeio = tamanhoQueCabe(meio, 'F1', 7.5, max);
+  const contorno = arredondado(0.45, 0.45, larg - 0.9, alt - 0.9, 4);
+  // fundo branco, a faixa à esquerda (recortada pelo canto arredondado) e o contorno
+  return [`q 1 1 1 rg ${contorno} f Q`, `q ${contorno} W n ${cor(MARINHO, 'rg')} 0 0 3.5 ${n2(alt)} re f Q`, `q ${cor(MARINHO, 'RG')} 0.9 w ${contorno} S Q`,
+    emblema(10 + r, alt / 2, r),
+    txt(xTexto, alt - 12, 'F1', 6.75, 'ASSINADO DIGITALMENTE POR', CINZA),
+    txt(xTexto, alt - 23.5, 'F2', tNome, cortarQueCabe(nome, 'F2', tNome, max), MARINHO),
+    txt(xTexto, alt - 33.5, 'F1', tMeio, cortarQueCabe(meio, 'F1', tMeio, max), TEXTO),
+    txt(xTexto, alt - 42, 'F1', 6.5, 'Certificado ICP-Brasil · confira em validar.iti.gov.br', CINZA)].join('\n');
+}
+
+/** Lê a marca que o site põe no catálogo (/ImoveisAssinatura): { pagina, rect: [x0 y0 x1 y1], logo } (cada parte pode faltar). */
+export function marcaDoSite(cat) {
+  const i = cat.indexOf('/ImoveisAssinatura');
+  if (i < 0) return {};
+  const t = cat.slice(i, cat.indexOf('>>', i) + 2);
+  const pagina = Number((t.match(/\/Pagina\s+(\d+)/) || [])[1]) || 0;
+  const rect = ((t.match(/\/Rect\s*\[([^\]]*)\]/) || [])[1] || '').trim().split(/\s+/).map(Number);
+  const logo = Number((t.match(/\/Logo\s+(\d+)\s+0\s+R/) || [])[1]) || 0;
+  return { ...(pagina && rect.length === 4 && rect.every(Number.isFinite) ? { pagina, rect } : {}), ...(logo ? { logo } : {}) };
+}
+
+/** Referências das páginas, na ordem (só a lista simples, como o jsPDF grava; com subárvores, devolve []). */
+function paginasDaArvore(texto, dic) {
+  const kids = [...(dic.match(/\/Kids\s*\[([^\]]*)\]/) || [])[1]?.matchAll(/(\d+)\s+0\s+R/g) || []].map((m) => Number(m[1]));
+  return kids.every((n) => /\/Type\s*\/Page(?![s\w])/.test(dicionarioDoObjeto(texto, n))) ? kids : [];
+}
+
+/** Junta ``ref`` ao /Annots de uma página (lista na própria página; com colchetes e textos dentro dela também). */
+function comAnotacao(dic, ref) {
+  const i = dic.search(/\/Annots\s*\[/);
+  if (i < 0) {
+    if (/\/Annots\s+\d+\s+0\s+R/.test(dic)) throw new Error('O PDF tem /Annots indireto: este tipo não é assinado aqui.');
+    return `<<${dic.slice(2, -2)} /Annots [${ref}]>>`;
+  }
+  let j = dic.indexOf('[', i) + 1;
+  for (let nivel = 1, emTexto = 0; j < dic.length; j += 1) {
+    const c = dic[j];
+    if (c === '\\' && emTexto) { j += 1; continue; }
+    if (c === '(') emTexto += 1; else if (c === ')' && emTexto) emTexto -= 1;
+    else if (!emTexto && c === '[') nivel += 1; else if (!emTexto && c === ']') { nivel -= 1; if (!nivel) break; }
+  }
+  return `${dic.slice(0, j)} ${ref}${dic.slice(j)}`;
+}
+
+/** Põe ``ref`` na lista /Kids da raiz das páginas. */
 function comEntrada(dic, chave, ref) {
   const corpo = dic.slice(2, -2);
   const re = new RegExp(`/${chave}\\s*\\[([^\\]]*)\\]`);
   if (re.test(corpo)) return `<<${corpo.replace(re, (m, dentro) => `/${chave} [${dentro.trim()} ${ref}]`)}>>`;
-  if (new RegExp(`/${chave}\\s+\\d+\\s+0\\s+R`).test(corpo)) throw new Error(`O PDF tem /${chave} indireto: este tipo não é assinado aqui.`);
-  return `<<${corpo} /${chave} [${ref}]>>`;
+  throw new Error(`O PDF não tem /${chave}: este tipo não é assinado aqui.`);
+}
+
+/** Tamanho do selo, em pontos (240 × 50 pt = 8,5 × 1,8 cm). */
+const SELO = [240, 50];
+
+/** Medidas do selo na linha da assinatura: centrado na linha "______", com a base logo abaixo dela (o fundo branco a cobre). */
+export function retanguloDoSelo([x0, y0, x1], larguraFolha) {
+  const [larg, alt] = SELO;
+  const esq = Math.max(20, Math.min(larguraFolha - 20 - larg, (x0 + x1) / 2 - larg / 2));
+  const base = y0 - 2;
+  return [esq, base, esq + larg, base + alt];
+}
+
+/** Conteúdo da página final: cabeçalho (logo), título, quadro com os dados da assinatura e como conferir. */
+function desenhoDaPagina({ L, H, selo, dataBr, paginas, resumo, logo, comSeloNaFolha }) {
+  const m = 56;
+  const larg = L - 2 * m;
+  const out = [];
+  let y = H - 50;
+  // cabeçalho: a logo (se houver) à esquerda; à direita, de que página se trata
+  if (logo) {
+    const escala = Math.min(150 / logo.largura, 46 / logo.altura);
+    const [w, h] = [logo.largura * escala, logo.altura * escala];
+    out.push(`q ${n2(w)} 0 0 ${n2(h)} ${m} ${n2(y - h)} cm /Logo Do Q`);
+    y -= h;
+  } else {
+    out.push(txt(m, y - 14, 'F2', 11, selo.nome, MARINHO));
+    y -= 18;
+  }
+  const rotulo = 'FOLHA DE ASSINATURA DIGITAL';
+  out.push(txt(L - m - larguraTexto(rotulo, 'F1', 7.5), H - 50 - 10, 'F1', 7.5, rotulo, CINZA));
+  y -= 14;
+  out.push(`q ${cor(LINHA, 'RG')} 0.75 w ${m} ${n2(y)} m ${L - m} ${n2(y)} l S Q`);
+  // título
+  y -= 40;
+  out.push(txt(m, y, 'F2', 20, 'Documento assinado digitalmente', MARINHO));
+  y -= 20;
+  const abertura = `${selo.documento ? `${selo.documento}, com` : 'Documento com'} ${paginas} ${paginas === 1 ? 'página' : 'páginas'} antes desta. Assinado pela empresa abaixo com certificado digital ICP-Brasil (e-CNPJ)${comSeloNaFolha ? '; o selo da assinatura aparece também no lugar da assinatura da empresa' : ''}.`;
+  for (const l of quebrar(abertura, 'F1', 10, larg)) { out.push(txt(m, y, 'F1', 10, l, CINZA)); y -= 14; }
+  // o quadro com os dados
+  y -= 12;
+  const linhas = [['ASSINADO POR', selo.nome], ['CNPJ', selo.cnpj || 'não informado no certificado'], ...(selo.responsavel ? [['RESPONSÁVEL', selo.responsavel]] : []),
+    ['CERTIFICADORA', selo.emissor || 'ICP-Brasil'], ['DATA E HORA', `${dataBr} (horário de Brasília)`]];
+  // cada valor numa linha (a letra diminui até 7); se nem assim couber (nome muito comprido), quebra em mais linhas de 8,5
+  const xValor = m + 140;
+  const maxValor = L - m - 22 - xValor;
+  const valores = linhas.map(([rot, valor]) => {
+    const fonte = rot === 'ASSINADO POR' ? 'F2' : 'F1';
+    const tam = tamanhoQueCabe(valor, fonte, 10.5, maxValor, 7);
+    return larguraTexto(valor, fonte, tam) <= maxValor ? { fonte, tam, partes: [valor] } : { fonte, tam: 8.5, partes: quebrar(valor, fonte, 8.5, maxValor) };
+  });
+  const extra = valores.reduce((s, v) => s + (v.partes.length - 1) * 11, 0);
+  const alturaQuadro = 58 + linhas.length * 30 + 44 + extra;
+  const topoQuadro = y;
+  out.push(`q ${cor(FUNDO, 'rg')} ${cor(LINHA, 'RG')} 0.75 w ${arredondado(m, topoQuadro - alturaQuadro, larg, alturaQuadro, 6)} B Q`);
+  out.push(emblema(m + 30, topoQuadro - 30, 13, VERDE));
+  out.push(txt(m + 52, topoQuadro - 26, 'F2', 12, 'Assinatura digital ICP-Brasil', TEXTO));
+  out.push(txt(m + 52, topoQuadro - 39, 'F1', 8.5, 'Assinatura CMS destacada (SHA-256), com a cadeia do certificado e a hora da assinatura.', CINZA));
+  let yq = topoQuadro - 58;
+  out.push(`q ${cor(LINHA, 'RG')} 0.5 w ${m + 18} ${n2(yq + 8)} m ${L - m - 18} ${n2(yq + 8)} l S Q`);
+  linhas.forEach(([rot], k) => {
+    yq -= 12;
+    out.push(txt(m + 22, yq, 'F1', 7.5, rot, CINZA));
+    const { fonte, tam, partes } = valores[k];
+    partes.forEach((p, j) => out.push(txt(xValor, yq - j * 11, fonte, tam, cortarQueCabe(p, fonte, tam, maxValor), TEXTO)));
+    yq -= 18 + (partes.length - 1) * 11;
+  });
+  out.push(txt(m + 22, yq - 12, 'F1', 7.5, 'RESUMO DO DOCUMENTO', CINZA));
+  out.push(txt(m + 22, yq - 22, 'F1', 7.5, 'ORIGINAL (SHA-256)', CINZA));
+  out.push(txt(xValor, yq - 12, 'F3', 8.75, resumo.slice(0, 32), TEXTO));
+  out.push(txt(xValor, yq - 23, 'F3', 8.75, resumo.slice(32), TEXTO));
+  y = topoQuadro - alturaQuadro - 34;
+  // como conferir
+  out.push(txt(m, y, 'F2', 12, 'Como conferir', MARINHO));
+  y -= 20;
+  const passos = [
+    'Envie este arquivo PDF ao validador oficial do governo, em validar.iti.gov.br, ou abra-o no Adobe Acrobat Reader e veja o painel de assinaturas.',
+    `O validador deve mostrar a assinatura como válida, feita por ${selo.nome}${selo.cnpj ? ` (CNPJ ${selo.cnpj})` : ''}.`,
+    'Qualquer mudança no arquivo depois da assinatura (até numa vírgula) a invalida: por isso, guarde e envie sempre este PDF, sem imprimir e escanear.',
+  ];
+  passos.forEach((p, k) => {
+    out.push(`q ${cor(MARINHO, 'rg')} ${arredondado(m, y - 4, 14, 14, 7)} f Q`, txt(m + 4.6, y, 'F2', 8.5, String(k + 1), [1, 1, 1]));
+    // cada linha 14 pontos abaixo da anterior (antes, da 3ª linha em diante o texto descia em dobro e invadia o passo seguinte)
+    const partes = quebrar(p, 'F1', 10, larg - 24);
+    partes.forEach((l, j) => out.push(txt(m + 24, y - j * 14, 'F1', 10, l, TEXTO)));
+    y -= 24 + (partes.length - 1) * 14;
+  });
+  // base legal, no pé da folha
+  const lei = 'A assinatura digital feita com certificado ICP-Brasil tem a mesma validade jurídica da assinatura de próprio punho (Medida Provisória 2.200-2/2001, artigo 10, e Lei 14.063/2020, artigo 4º, III).';
+  let yp = 72;
+  out.push(`q ${cor(LINHA, 'RG')} 0.5 w ${m} ${yp + 16} m ${L - m} ${yp + 16} l S Q`);
+  for (const l of quebrar(lei, 'F1', 8, larg)) { out.push(txt(m, yp, 'F1', 8, l, CINZA)); yp -= 11; }
+  return { conteudo: out.join('\n'), yLivre: y };
 }
 
 /**
- * Prepara o PDF para a assinatura: atualização incremental (o documento fica intacto) com uma PÁGINA FINAL de assinatura, como
- * fazem os serviços de assinatura (um selo no pé da página ficaria por cima do rodapé dos contratos), e o espaço reservado.
- * ``selo``: { nome, cnpj, responsavel?, emissor?, documento?, quando (Date), motivo?, local? }. Devolve { pdf (Buffer),
- * aAssinar (Buffer: os dois trechos do /ByteRange), inicio, fim } (``inicio``/``fim``: o "<…>" do /Contents).
+ * Prepara o PDF para a assinatura: atualização incremental (o documento fica intacto) com uma PÁGINA FINAL de assinatura e o
+ * espaço reservado. Se o site marcou a linha da assinatura da empresa (/ImoveisAssinatura, `pdfDoDocumento`), o campo da
+ * assinatura fica nela, com o selo "Assinado digitalmente por …"; senão, o selo fica na página final. Tudo entra antes de
+ * calcular a assinatura, e o /ByteRange cobre o arquivo inteiro: o selo e a página fazem parte do que é assinado (o ITI e o
+ * Adobe conferem). ``selo``: { nome, cnpj, responsavel?, emissor?, documento?, quando (Date), motivo?, local? }. Devolve
+ * { pdf (Buffer), aAssinar (Buffer: os dois trechos do /ByteRange), inicio, fim } (``inicio``/``fim``: o "<…>" do /Contents).
  */
 export function prepararPdf(original, selo) {
   const base = Buffer.from(original);
@@ -104,39 +327,39 @@ export function prepararPdf(original, selo) {
   const arv = arvoreDePaginas(texto, tr.root);
   const cat = dicionarioDoObjeto(texto, tr.root);
   if (/\/AcroForm/.test(cat)) throw new Error('O PDF já tem formulário ou assinatura: assine o PDF original, gerado pelo sistema.');
-  const [nFonte, nNegrito, nAparencia, nCampo, nAssin, nConteudo, nPagina] = [0, 1, 2, 3, 4, 5, 6].map((k) => tr.size + k);
+  const [nFonte, nNegrito, nAparencia, nCampo, nAssin, nConteudo, nPagina, nMono] = [0, 1, 2, 3, 4, 5, 6, 7].map((k) => tr.size + k);
   const quando = selo.quando || new Date();
-  const dataBr = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(quando).replace(',', ' às');
+  const dataBr = dataHoraBr(quando);
   const { largura: L, altura: H } = arv;
-  // texto da página: título, o que é a assinatura e como conferir
-  const paragrafos = [
-    `Este documento${selo.documento ? ` (${selo.documento})` : ''}, com ${arv.count} ${arv.count === 1 ? 'página' : 'páginas'} antes desta, foi assinado digitalmente pela empresa abaixo, com certificado digital ICP-Brasil (e-CNPJ). A assinatura digital tem a mesma validade da assinatura de próprio punho (Medida Provisória 2.200-2/2001, artigo 10, e Lei 14.063/2020, artigo 4º, III).`,
-    'Qualquer mudança no arquivo depois da assinatura a invalida. Para conferir, abra o PDF num leitor de PDF (painel de assinaturas) ou envie o arquivo ao validador do governo: validar.iti.gov.br.',
-  ];
-  const corpo = [`BT /F2 13 Tf 56 ${H - 80} Td ${textoPdf('ASSINATURA DIGITAL')} Tj ET`];
-  let y = H - 108;
-  for (const par of paragrafos) {
-    for (const l of quebrar(par, 100)) { corpo.push(`BT /F1 9.5 Tf 56 ${y} Td ${textoPdf(l)} Tj ET`); y -= 13; }
-    y -= 8;
+  const resumo = createHash('sha256').update(base).digest('hex');
+  // o que o site marcou: a linha da assinatura da empresa e a logo (a logo só vale se for uma imagem JPEG de verdade)
+  const marca = marcaDoSite(cat);
+  let logo = null;
+  if (marca.logo) {
+    const d = dicionarioDoObjeto(texto, marca.logo);
+    const [w, h] = [Number((d.match(/\/Width\s+(\d+)/) || [])[1]), Number((d.match(/\/Height\s+(\d+)/) || [])[1])];
+    if (/\/Subtype\s*\/Image/.test(d) && w > 0 && h > 0) logo = { n: marca.logo, largura: w, altura: h };
   }
-  const conteudo = corpo.join('\n');
-  // o selo: a aparência do campo da assinatura
-  const linhas = [['F2', 10.5, `Assinado digitalmente por ${selo.nome}`], ['F1', 9.5, `CNPJ ${selo.cnpj}${selo.responsavel ? ` · responsável: ${selo.responsavel}` : ''}`],
-    ['F1', 9.5, `Data e hora: ${dataBr} (horário de Brasília)`], ['F1', 9.5, `Certificado ICP-Brasil${selo.emissor ? ` emitido por ${selo.emissor}` : ''}`]];
-  const [larg, alt] = [L - 112, 74];
-  const rect = [56, y - alt - 6, 56 + larg, y - 6];
-  const corpoAparencia = [`q 0.95 0.97 1 rg 0 0 ${larg} ${alt} re f 0.12 0.23 0.54 RG 1 w 0.5 0.5 ${larg - 1} ${alt - 1} re S Q`,
-    `BT 0.12 0.23 0.54 rg 12 ${alt - 20} Td`, ...linhas.map(([f, t, l], i) => `${i ? '0 -15 Td ' : ''}/${f} ${t} Tf ${textoPdf(l)} Tj`), 'ET'].join('\n');
-  const fontes = `<< /F1 ${nFonte} 0 R /F2 ${nNegrito} 0 R >>`;
+  const paginas = paginasDaArvore(texto, arv.dic);
+  const folha = marca.pagina && marca.pagina <= paginas.length ? paginas[marca.pagina - 1] : 0;
+  const pagina = desenhoDaPagina({ L, H, selo, dataBr, paginas: arv.count, resumo, logo, comSeloNaFolha: !!folha });
+  // o selo: na linha da assinatura da folha marcada; sem ela, na página final, embaixo de "Como conferir"
+  const rect = folha ? retanguloDoSelo(marca.rect, L) : [(L - SELO[0]) / 2, Math.max(110, pagina.yLivre - SELO[1] - 6), (L + SELO[0]) / 2, Math.max(110, pagina.yLivre - SELO[1] - 6) + SELO[1]];
+  const [larg, alt] = [rect[2] - rect[0], rect[3] - rect[1]];
+  const corpoAparencia = desenhoDoSelo(larg, alt, { nome: selo.nome, cnpj: selo.cnpj, dataBr });
+  const fontes = `<< /F1 ${nFonte} 0 R /F2 ${nNegrito} 0 R /F3 ${nMono} 0 R >>`;
   const objetos = [];
   objetos.push([nFonte, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>']);
   objetos.push([nNegrito, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>']);
-  objetos.push([nAparencia, `<< /Type /XObject /Subtype /Form /BBox [0 0 ${larg} ${alt}] /Resources << /Font ${fontes} >> /Length ${Buffer.byteLength(corpoAparencia, 'latin1')} >>\nstream\n${corpoAparencia}\nendstream`]);
-  objetos.push([nCampo, `<< /Type /Annot /Subtype /Widget /FT /Sig /T ${textoPdf('Assinatura da empresa')} /V ${nAssin} 0 R /P ${nPagina} 0 R /Rect [${rect.join(' ')}] /F 132 /AP << /N ${nAparencia} 0 R >> >>`]);
+  objetos.push([nMono, '<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold /Encoding /WinAnsiEncoding >>']);
+  objetos.push([nAparencia, `<< /Type /XObject /Subtype /Form /BBox [0 0 ${n2(larg)} ${n2(alt)}] /Resources << /Font ${fontes} >> /Length ${Buffer.byteLength(corpoAparencia, 'latin1')} >>\nstream\n${corpoAparencia}\nendstream`]);
+  const naFolha = folha || nPagina;
+  objetos.push([nCampo, `<< /Type /Annot /Subtype /Widget /FT /Sig /T ${textoPdf('Assinatura da empresa')} /V ${nAssin} 0 R /P ${naFolha} 0 R /Rect [${rect.map(n2).join(' ')}] /F 132 /AP << /N ${nAparencia} 0 R >> >>`]);
   const zeros = '0'.repeat(LARGURA_NUMERO);
   objetos.push([nAssin, `<< /Type /Sig /Filter /Adobe.PPKLite /SubFilter /adbe.pkcs7.detached /ByteRange [0 ${zeros} ${zeros} ${zeros}] /Contents <${'0'.repeat(ESPACO_ASSINATURA * 2)}> /M ${textoPdf(dataPdf(quando))} /Name ${textoPdf(selo.nome)} /Reason ${textoPdf(selo.motivo || 'Documento emitido e assinado pela empresa')}${selo.local ? ` /Location ${textoPdf(selo.local)}` : ''} >>`]);
-  objetos.push([nConteudo, `<< /Length ${Buffer.byteLength(conteudo, 'latin1')} >>\nstream\n${conteudo}\nendstream`]);
-  objetos.push([nPagina, `<< /Type /Page /Parent ${arv.n} 0 R /MediaBox [0 0 ${L} ${H}] /Resources << /Font ${fontes} >> /Contents ${nConteudo} 0 R /Annots [${nCampo} 0 R] >>`]);
+  objetos.push([nConteudo, `<< /Length ${Buffer.byteLength(pagina.conteudo, 'latin1')} >>\nstream\n${pagina.conteudo}\nendstream`]);
+  objetos.push([nPagina, `<< /Type /Page /Parent ${arv.n} 0 R /MediaBox [0 0 ${L} ${H}] /Resources << /Font ${fontes}${logo ? ` /XObject << /Logo ${logo.n} 0 R >>` : ''} >> /Contents ${nConteudo} 0 R${folha ? '' : ` /Annots [${nCampo} 0 R]`} >>`]);
+  if (folha) objetos.push([folha, comAnotacao(dicionarioDoObjeto(texto, folha), `${nCampo} 0 R`)]);
   objetos.push([arv.n, comEntrada(arv.dic, 'Kids', `${nPagina} 0 R`).replace(/\/Count\s+\d+/, `/Count ${arv.count + 1}`)]);
   objetos.push([tr.root, `<<${cat.slice(2, -2)} /AcroForm << /Fields [${nCampo} 0 R] /SigFlags 3 >> >>`]);
   // monta a atualização: os objetos, a tabela de referências (só deles) e o trailer apontando para a anterior
@@ -153,12 +376,12 @@ export function prepararPdf(original, selo) {
   const inicioXref = atual;
   const linhasXref = ['xref', '0 1', '0000000000 65535 f '];
   for (const [n, off] of offsets.sort((a, b) => a[0] - b[0])) linhasXref.push(`${n} 1`, `${String(off).padStart(10, '0')} 00000 n `);
-  partes.push(`${linhasXref.join('\n')}\ntrailer\n<< /Size ${tr.size + 7} /Root ${tr.root} 0 R${tr.info ? ` /Info ${tr.info} 0 R` : ''}${tr.id ? ` /ID ${tr.id}` : ''} /Prev ${tr.startxref} >>\nstartxref\n${inicioXref}\n%%EOF\n`);
+  partes.push(`${linhasXref.join('\n')}\ntrailer\n<< /Size ${tr.size + 8} /Root ${tr.root} 0 R${tr.info ? ` /Info ${tr.info} 0 R` : ''}${tr.id ? ` /ID ${tr.id}` : ''} /Prev ${tr.startxref} >>\nstartxref\n${inicioXref}\n%%EOF\n`);
   const pdf = Buffer.concat([base, doTexto(partes.join(''))]);
   // /ByteRange: tudo menos o "<…>" do /Contents
   const t2 = latin1(pdf);
-  const marca = t2.lastIndexOf('/Contents <');
-  const inicio = marca + '/Contents '.length;
+  const marcaContents = t2.lastIndexOf('/Contents <');
+  const inicio = marcaContents + '/Contents '.length;
   const fim = t2.indexOf('>', inicio) + 1;
   const br = [0, inicio, fim, pdf.length - fim].map((x) => String(x).padStart(LARGURA_NUMERO, '0'));
   const posBr = t2.lastIndexOf(`/ByteRange [0 ${zeros} ${zeros} ${zeros}]`);

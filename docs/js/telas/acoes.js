@@ -1187,7 +1187,7 @@ export const ACOES = {
     const alvo = alvoDoRecibo({ contrato, ficha, id, fiador });
     if (!alvo) throw new C.ErroUsuario('Ficha ou inquilino não encontrado.');
     aviso('Montando o PDF para assinar…', 'info');
-    const r = await pdfDoRecibo(tipo, alvo);
+    const r = await pdfDoRecibo(tipo, alvo, { paraAssinar: true });
     await AS.pedirAssinatura(r.blob, { titulo: `${REC.TIPOS_RECIBO[tipo] || 'Documento'} · ${(alvo.ficha || alvo.contrato).inquilino_nome}`, chave: AS.chaveDoRecibo(tipo, alvo), nome: r.nome, contrato: alvo.contrato ? alvo.contrato.id : null });
     aviso('Enviado para assinar: o programa do PC com o certificado assina em cerca de 1 minuto (se estiver ligado).', 'ok');
     await mostrar();
