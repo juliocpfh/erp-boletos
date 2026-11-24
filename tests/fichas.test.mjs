@@ -61,15 +61,18 @@ test('Novo contrato a partir da ficha: dados da pessoa e, só no primeiro contra
   assert.equal(R.dadosDaFicha(d, f).reserva_valor, undefined, 'a reserva vai só para o primeiro contrato');
 });
 
-test('reprovada com reserva: pendência de devolução até registrar; documentos apagados 3 meses depois da decisão', () => {
+test('reprovada com reserva: pendência de devolução até registrar; documentos apagados 3 meses depois da devolução (decisão de 24/11)', () => {
   const { d, ficha } = base();
   const f = ficha({ situacao: 'Reprovada', decisao_data: '2026-11-14', reserva_valor: 50000 });
   assert.ok(R.devolucaoPendente(f));
   assert.ok(R.pendenciasDasFichas(d).some((p) => /devolução da reserva de R\$ 500,00/.test(p.texto)));
-  assert.equal(R.dataApagarDocumentosFicha(f), '2027-02-14', '14/11/2026 + 3 meses');
-  assert.deepEqual(R.fichasComDocumentosVencidos(d, '2027-02-13'), []);
-  assert.equal(R.fichasComDocumentosVencidos(d, '2027-02-14').length, 1);
-  R.atualizar(d, 'fichas', f.id, { devolucao_data: '2026-11-20', devolucao_valor: 50000, documentos_apagados_em: '2027-02-14' }, 'teste');
+  assert.equal(R.dataApagarDocumentosFicha(f), null, 'reserva por devolver: não apaga (FIC-03, 24/11)');
+  assert.deepEqual(R.fichasComDocumentosVencidos(d, '2027-12-31'), []);
+  R.atualizar(d, 'fichas', f.id, { devolucao_data: '2026-11-20', devolucao_valor: 50000 }, 'teste');
+  assert.equal(R.dataApagarDocumentosFicha(R.buscar(d, 'fichas', f.id)), '2027-02-20', '20/11/2026 (devolução) + 3 meses');
+  assert.deepEqual(R.fichasComDocumentosVencidos(d, '2027-02-19'), []);
+  assert.equal(R.fichasComDocumentosVencidos(d, '2027-02-20').length, 1);
+  R.atualizar(d, 'fichas', f.id, { documentos_apagados_em: '2027-02-20' }, 'teste');
   const g = R.buscar(d, 'fichas', f.id);
   assert.ok(!R.devolucaoPendente(g));
   assert.equal(R.dataApagarDocumentosFicha(g), null, 'já apagados: não apaga de novo');
@@ -143,7 +146,7 @@ test('desistência antes de assinar: contrato não assinado cancelado, ficha "De
   assert.ok(!d.cobrancas.some((x) => x.contrato_id === c.id), 'boletos não pagos saem junto');
   assert.ok(R.devolucaoPendente(salva));
   assert.match(R.pendenciasDasFichas(d).map((p) => p.texto).join(), /desistência: registrar a devolução da reserva de R\$ 1\.000,00/);
-  assert.equal(R.dataApagarDocumentosFicha(salva), '2027-02-13', 'documentos apagados 3 meses depois, como na reprovada');
+  assert.equal(R.dataApagarDocumentosFicha(salva), null, 'reserva por devolver: espera a devolução, como na reprovada (FIC-03, 24/11)');
   assert.equal(R.fichaAbertaDoImovel(d, a.id), null, 'o imóvel fica livre');
 });
 

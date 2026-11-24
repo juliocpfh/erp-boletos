@@ -2810,16 +2810,18 @@ test('saida-031: termo aditivo que não valeu (arquivo errado ou sem assinatura 
   assert.equal(c.dia_vencimento, 15);
   const emAberto = () => d.cobrancas.filter((x) => x.contrato_id === c.id && x.vencimento >= '2026-12-01').map((x) => Number(x.vencimento.slice(8)));
   assert.ok(emAberto().every((x) => x === 15));
-  // um boleto alterado à mão fica como está (anotado)
+  // um boleto alterado à mão também volta ao dia antigo, com os valores digitados (decisão do dono de 24/11/2026, BOL-08;
+  // antes ficava no dia novo)
   const manual = d.cobrancas.find((x) => x.contrato_id === c.id && x.vencimento.startsWith('2027-01'));
-  R.atualizar(d, 'cobrancas', manual.id, { editado_manual: true }, 'julio');
+  R.atualizar(d, 'cobrancas', manual.id, { editado_manual: true, outros: 12345 }, 'julio');
   const txt = R.desfazerAditivo(d, a.id, 'julio');
   assert.match(txt, new RegExp(`volta ao dia ${dia}`));
   assert.equal(c.dia_vencimento, dia);
   assert.equal(R.buscar(d, 'aditivos', a.id).arquivo, null, 'o termo volta a aguardar assinatura');
-  assert.equal(Number(manual.vencimento.slice(8)), 15, 'alterado à mão não muda');
-  assert.ok(d.cobrancas.filter((x) => x.contrato_id === c.id && x.vencimento >= '2026-12-01' && x.id !== manual.id).every((x) => Number(x.vencimento.slice(8)) === dia));
-  assert.match(d.historico.map((h) => h.descricao).join('\n'), /alterado à mão: o vencimento continua/);
+  assert.equal(Number(manual.vencimento.slice(8)), dia, 'alterado à mão também volta (BOL-08)');
+  assert.equal(manual.outros, 12345, 'o valor digitado fica');
+  assert.ok(d.cobrancas.filter((x) => x.contrato_id === c.id && x.vencimento >= '2026-12-01').every((x) => Number(x.vencimento.slice(8)) === dia));
+  assert.match(d.historico.map((h) => h.descricao).join('\n'), /alterado à mão: os valores ficam/);
   // novo valor: a renovação sai e os boletos em aberto voltam ao aluguel anterior
   const antes = R.boletoDoMes(d, c.id, '2027-01').aluguel;
   const r = R.registrarRenovacao(d, c.id, { data: '2026-12-01', tipo: 'Novo valor negociado', novo_valor: 150000, vale_desde: '2027-01' }, 'julio');
