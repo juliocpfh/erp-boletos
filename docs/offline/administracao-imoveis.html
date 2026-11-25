@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-rpv1dpC0uPUFP/icbzwSH3SVZkFsYyFzjH1UC2mDVDY=' 'sha256-E8yEIutAyg9mIwxunAamH6xCF9LlfqB/jl2Zq8oDv9A='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-rpv1dpC0uPUFP/icbzwSH3SVZkFsYyFzjH1UC2mDVDY=' 'sha256-w8hrNOzNKHASnzLqEixnYamp8E0BQOiUWrBJaJkpyxg='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="c49a8250b88d3619">
+<meta name="fontes" content="6154581c25e75aca">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1611,18 +1611,20 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           lei: "Sem lei: vale o contrato."
         },
         // decisão do dono, 24/11/2026: pintura nova na entrada → devolve pintado (orçamento inteiro); sem pintura nova → paga só a vida
-        // que faltava da pintura (orçamento × (vida − meses de moradia) ÷ vida, mínimo zero)
+        // que faltava da pintura (orçamento × (vida − meses de moradia) ÷ vida, mínimo zero). Vida de 48 meses desde 24/11/2026 (era 36;
+        // item 3.5 do advogado, confirmado pelo dono): o padrão nunca fica gravado (config_regras e as regras especiais só guardam o que
+        // difere do sistema), então todos passam a 48 sem passo no normalizar
         {
           chave: "pintura_vida_meses",
           grupo: "garantia",
           rotulo: "Pintura na saída: vida da pintura (meses)",
           tipo: "inteiro",
-          padrao: 36,
+          padrao: 48,
           min: 1,
           max: 120,
-          explica: "Sugere o valor do reparo de pintura no cálculo final. Se a vistoria de entrada registrou pintura nova, o inquilino paga o orçamento inteiro (ex.: R$ 2.400,00). Sem pintura nova, paga só o que faltava da vida da pintura: orçamento de R$ 2.400,00, morou 12 meses → R$ 2.400,00 × 24/36 = R$ 1.600,00; 36 meses ou mais → nada.",
+          explica: "Sugere o valor do reparo de pintura no cálculo final. Se a vistoria de entrada registrou pintura nova, o inquilino paga o orçamento inteiro (ex.: R$ 2.400,00). Sem pintura nova, paga só o que faltava da vida da pintura: orçamento de R$ 2.400,00, morou 24 meses → R$ 2.400,00 × 24/48 = R$ 1.200,00; 48 meses ou mais → nada. Bastam as fotos das vistorias e a pintura nova anotada na entrada, salvo contravistoria. O inquilino pode trazer outro orçamento, mas só antes da devolução das chaves.",
           consequencia: "Só muda a sugestão (a equipe sempre pode mudar o valor). Vida maior cobra mais de quem morou pouco; menor cobra menos. O desgaste natural do uso não pode ser cobrado.",
-          lei: LI + ", art. 23, III (devolver o imóvel no estado em que o recebeu, salvo as deteriorações do uso normal)."
+          lei: LI + ", art. 23, III (devolver o imóvel no estado em que o recebeu, salvo as deteriorações do uso normal). Prova: as fotos das vistorias de entrada e de saída e a pintura nova anotada na entrada, salvo contravistoria (orientação do advogado, 24/11/2026)."
         },
         // ------------------------------------------------------------------ contrato
         {
@@ -4800,7 +4802,7 @@ ${RESUMO_CONTRATO}`, "RESUMO DO CONTRATO EM PERGUNTAS E RESPOSTAS"],
   }
   function sugestaoPintura(d2, c, orcamento) {
     const entrada = vistoriaDeEntrada(d2, c);
-    const vida = Number(regra("pintura_vida_meses", c)) || 36;
+    const vida = Number(regra("pintura_vida_meses", c)) || 48;
     if (!entrada) return { caso: "sem_vistoria", valor: null, meses: null, vida, texto: "Sem vistoria de entrada: confira como o imóvel foi entregue antes de cobrar a pintura." };
     if (entrada.pintura_nova !== true && entrada.pintura_nova !== false) {
       return { caso: "sem_info", valor: null, meses: null, vida, texto: `A vistoria de entrada (${dataBr(entrada.data)}) não diz se a pintura era nova: confira a vistoria de entrada e as fotos antes de dar o valor.` };
@@ -13705,7 +13707,9 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       relatorio2 ? `relatório ${comoEnvio(relatorio2)} em ${dataBr(relatorio2.data)}; ele pode contestar até ${dataBr(prazoContestarSaida(relatorio2.data))}` : "falta enviar o relatório ao inquilino (e-mail da devolução das chaves)"
     ] : [
       c.vistoria_saida_data ? `marcada para ${dataBr(c.vistoria_saida_data)}${c.vistoria_saida_hora ? ` às ${c.vistoria_saida_hora}` : ""}` : saiu ? "ainda não registrada; data não marcada" : `a partir de ${dataBr(c.data_saida)}; data não marcada`,
-      c.vistoria_saida_data ? convite && convite.data >= (c.vistoria_saida_marcada_em || "") ? `convite ${comoEnvio(convite)} em ${dataBr(convite.data)}` : "falta mandar o convite ao inquilino" : null
+      c.vistoria_saida_data ? convite && convite.data >= (c.vistoria_saida_marcada_em || "") ? `convite ${comoEnvio(convite)} em ${dataBr(convite.data)}` : "falta mandar o convite ao inquilino" : null,
+      // item 3.5 do advogado (24/11/2026): o outro orçamento do inquilino vem antes das chaves, não depois
+      !saiu && !c.termo_chaves_saida ? `outro orçamento do inquilino: só até a devolução das chaves (${dataBr(c.data_saida)})` : null
     ];
     const termo = c.termo_chaves_saida;
     const semTermoAntigo = !!c.data_saida && c.data_saida < "2026-11-13";
@@ -19876,7 +19880,7 @@ ${t.deposito}`] : []
       ],
       tabela: [["CHAVES E CONTROLES DEVOLVIDOS", null], ...chaves.length ? chaves.map((l) => [l, ""]) : [["______________________________________________", ""], ["______________________________________________", ""]]],
       depois: [
-        `2. VISTORIA DE SAÍDA. ${vistoria}. O LOCATÁRIO está convidado a acompanhá-la, pessoalmente ou por pessoa autorizada por escrito. Se não comparecer, a vistoria é feita com fotos e vídeo de cada cômodo e o relatório lhe é enviado por e-mail, com 5 (cinco) dias úteis para contestar, comparado com a vistoria de entrada.`,
+        `2. VISTORIA DE SAÍDA. ${vistoria}. O LOCATÁRIO está convidado a acompanhá-la, pessoalmente ou por pessoa autorizada por escrito. Se não comparecer, a vistoria é feita com fotos e vídeo de cada cômodo e o relatório lhe é enviado por e-mail, com 5 (cinco) dias úteis para contestar, comparado com a vistoria de entrada. Outro orçamento do LOCATÁRIO para os reparos só podia ser apresentado até esta devolução; os reparos apontados seguem os orçamentos ou notas obtidos pela LOCADORA.`,
         "3. SEM QUITAÇÃO. O recebimento das chaves não dá quitação. Os aluguéis e encargos até esta data, as contas de consumo e os tributos do período da locação e os reparos apontados na vistoria de saída serão apurados no acerto final, descontados da garantia, se houver, ou cobrados do LOCATÁRIO, conforme o contrato (Lei 8.245/91, artigo 23, III).",
         "4. ALUGUEL. O aluguel e os encargos são devidos até esta data, proporcionais aos dias do mês."
       ],
@@ -21520,6 +21524,7 @@ Saída antes do fim do contrato ({fim}): multa de 3 aluguéis, proporcional ao t
 COMO VAI SER
 - O aluguel corre até a devolução das chaves (o último é proporcional)
 - Devolva o imóvel como na vistoria de entrada: vazio, limpo e com os danos reparados (o desgaste natural não conta)
+- Quer trazer outro orçamento para algum reparo? Mande antes da devolução das chaves: depois dela valem os nossos orçamentos
 - Vistoria de saída logo depois das chaves, com fotos e vídeo; você pode acompanhar. Sem você, mandamos o relatório para responder em 5 dias úteis
 - Acerto final: [se dinheiro]{tipo_deposito} corrigida menos o que estiver em aberto[senão]o que estiver em aberto[fim], para você conferir
 [se contas]
@@ -21543,7 +21548,7 @@ Você pode acompanhar (ou mandar alguém com autorização por escrito) e anotar
 
 Deixe pronto: imóvel vazio e limpo, danos reparados e todas as chaves e controles[se contas]; as contas de {contas_texto} pagas, com os protocolos do encerramento e as fotos dos relógios[fim].
 
-Reparo que faltar: você faz antes, com a mesma qualidade, ou [se dinheiro]o valor do orçamento é descontado da {tipo_deposito}[senão]paga o valor do orçamento[fim]. O aluguel corre até a devolução das chaves.`
+Reparo que faltar: você faz antes, com a mesma qualidade, ou [se dinheiro]o valor do orçamento é descontado da {tipo_deposito}[senão]paga o valor do orçamento[fim]. Se quiser apresentar outro orçamento, mande antes da devolução das chaves: depois dela valem os nossos. O aluguel corre até a devolução das chaves.`
         },
         {
           chave: "saida_chaves",
@@ -21560,7 +21565,7 @@ Recebemos as chaves em {data_saida}. Seguem a vistoria de saída e o termo de de
 PENDÊNCIAS (comparadas com a vistoria de entrada)
 {pendencias}
 
-Cada reparo, pelo orçamento ou pela nota, é [se dinheiro]descontado da {tipo_deposito}[senão]cobrado[fim] no acerto final. Discorda de algo? Responda em até 5 dias úteis, com fotos ou documentos.
+Cada reparo, pelo orçamento ou pela nota, é [se dinheiro]descontado da {tipo_deposito}[senão]cobrado[fim] no acerto final. Discorda da vistoria? Responda em até 5 dias úteis, com fotos ou documentos. Outro orçamento só podia ser apresentado até a devolução das chaves: os valores acima são os dos nossos orçamentos.
 
 Receber as chaves não dá quitação: o acerto final vem em seguida.`
         },
@@ -21753,6 +21758,10 @@ Já resolveu? Responda com uma foto ou um documento, para darmos a baixa. Sem is
           "[se dinheiro] Recebemos também a {tipo_deposito} de {valor_deposito} (recibo e comprovante anexos).[fim]",
           "[se dinheiro][se garantia_depositada] Recebemos também a {tipo_deposito} de {valor_deposito} (recibo e comprovante anexos).[senão] Falta o depósito da {tipo_deposito} de {valor_deposito}: mande o comprovante por este e-mail.[fim][fim]"
         ],
+        // outro orçamento do inquilino só antes da devolução das chaves (item 3.5 do advogado, 24/11/2026)
+        ["saida_aviso", "(o desgaste natural não conta)\n- Vistoria", "(o desgaste natural não conta)\n- Quer trazer outro orçamento para algum reparo? Mande antes da devolução das chaves: depois dela valem os nossos orçamentos\n- Vistoria"],
+        ["saida_vistoria", "[senão]paga o valor do orçamento[fim]. O aluguel corre", "[senão]paga o valor do orçamento[fim]. Se quiser apresentar outro orçamento, mande antes da devolução das chaves: depois dela valem os nossos. O aluguel corre"],
+        ["saida_chaves", "Discorda de algo? Responda em até 5 dias úteis, com fotos ou documentos.", "Discorda da vistoria? Responda em até 5 dias úteis, com fotos ou documentos. Outro orçamento só podia ser apresentado até a devolução das chaves: os valores acima são os dos nossos orçamentos."],
         [
           "saida_calculo",
           "[se cobrar]Segue o boleto do saldo, com o vencimento nele.[fim]",
@@ -33184,7 +33193,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
         ${tipo === "Entrada" ? (() => {
       const pn = v ? v.pintura_nova === true ? "sim" : v.pintura_nova === false ? "nao" : "" : "";
       return `<div><label>Pintura nova na entrada?</label><select name="pintura_nova" required>${[["", "Escolha…"], ["sim", "Sim: o imóvel foi pintado para esta entrada"], ["nao", "Não"]].map(([k, t]) => `<option value="${k}"${pn === k ? " selected" : ""}>${t}</option>`).join("")}</select>
-            <span class="suave">Na saída: pintura nova = o inquilino devolve pintado; sem pintura nova, paga só o que faltava da vida da pintura (${Number(regra("pintura_vida_meses", c)) || 36} meses).</span></div>`;
+            <span class="suave">Na saída: pintura nova = o inquilino devolve pintado; sem pintura nova, paga só o que faltava da vida da pintura (${Number(regra("pintura_vida_meses", c)) || 48} meses).</span></div>`;
     })() : ""}
         <div><label>Link das fotos (pasta na nuvem)</label><input name="link_fotos" value="${esc(v ? v.link_fotos || "" : tipo === "Entrada" ? c.vistoria_link || "" : "")}" placeholder="deixe vazio se as fotos vão em anexo"></div>
       </div>
@@ -40622,7 +40631,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
             titulo: `Reparos da vistoria de saída - ${c.inquilino_nome}`,
             sim: "Salvar",
             nao: "Cancelar",
-            html: `<p>O valor de cada reparo vem do orçamento (melhor dois) ou da nota do serviço. Entra nos débitos do cálculo final, descontado da garantia ou cobrado. Guarde os orçamentos na pasta do inquilino. Item sem reparo a cobrar (ex.: desgaste natural): valor 0,00.</p>
+            html: `<p>O valor de cada reparo vem do orçamento (melhor dois) ou da nota do serviço. Entra nos débitos do cálculo final, descontado da garantia ou cobrado. Guarde os orçamentos na pasta do inquilino. Outro orçamento do inquilino só vale se ele o apresentou antes da devolução das chaves${c.data_saida ? ` (${esc(dataBr(c.data_saida))})` : ""}. Item sem reparo a cobrar (ex.: desgaste natural): valor 0,00.</p>
         ${res.reparos.map((x, k) => `<fieldset style="margin:8px 0" data-reparo="${k}"><legend>${esc(x.pendencia)}</legend>
           <p class="check"><label><input type="checkbox" name="pintura_${k}" value="1"${x.pintura ? " checked" : ""} data-pintura> Reparo de pintura (sugerir o valor pela vistoria de entrada)</label></p>
           <div data-bloco-pintura${x.pintura ? "" : " hidden"}><label>Orçamento inteiro da pintura (R$)</label><input name="orc_pintura_${k}" inputmode="decimal" data-orc-pintura value="${x.orcamento_valor === null ? "" : esc(dinheiroTexto(x.orcamento_valor))}" placeholder="ex.: 2.400,00">
