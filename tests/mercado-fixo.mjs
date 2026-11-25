@@ -37,6 +37,9 @@ export function cenario() {
   // contas do banco cadastradas como hoje: a JCK primeiro, sem conta padrão escolhida (cai na "ank")
   d.config_banco.contas = [{ ...R.CONTA_BANCO_PADRAO, id: 'jck', apelido: 'JCK', emitente_id: jck.id }, { ...R.CONTA_BANCO_PADRAO, id: 'ank', apelido: 'ANK', emitente_id: ank.id }];
   d.config_banco.conta_padrao_id = '';
+  // vida da pintura fixa em 48 meses (o número sai no contrato, cláusula da pintura de 24/11/2026): a impressão não muda quando o
+  // padrão da regra muda de 36 para 48 (PR da pintura), entre antes ou depois desta
+  d.config_regras.push({ id: 1, chave: 'pintura_vida_meses', valor: 48 });
   R.normalizar(d);
   return { d, c, c2, f, cb };
 }
