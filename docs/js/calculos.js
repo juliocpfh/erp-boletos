@@ -2,9 +2,9 @@
 // Valores em dinheiro são sempre CENTAVOS inteiros (R$ 1.350,00 = 135000).
 // Percentuais são números comuns (10 = 10%). Datas são textos "AAAA-MM-DD".
 import { feriadosLocais, regra } from './config-regras.js';
-import { dataDeBrasilia, inicioDoPrazo, ultimoDiaDoPrazo, validadeDoLink } from './brasilia.js';
+import { dataDeBrasilia, inicioDoPrazo, proximoHorarioComercial, rotuloDoHorario, ultimoDiaDoPrazo, validadeDoLink } from './brasilia.js';
 
-export { dataDeBrasilia, horaDeBrasilia, inicioDoPrazo, ultimoDiaDoPrazo, validadeDoLink } from './brasilia.js';
+export { dataDeBrasilia, horaDeBrasilia, inicioDoPrazo, proximoHorarioComercial, rotuloDoHorario, ultimoDiaDoPrazo, validadeDoLink } from './brasilia.js';
 
 /**
  * Erro "do usuário": o que ele digitou ou pediu não serve (senha errada, valor acima do limite, código de barras curto).
@@ -111,6 +111,26 @@ export const validadeDoLinkAgora = (dias, agora = new Date()) => validadeDoLink(
 export const dataBrDe = (instante) => dataBr(dataDeBrasilia(instante));
 /** Nome do dia da semana pelo getUTCDay (0 = domingo). */
 export const DIAS_DA_SEMANA = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+/** Data de hoje em Brasília ('AAAA-MM-DD'): a data dos registros de envio (às 21h30 de 24/11 → '2026-11-24'). */
+export const hojeBrasilia = (agora = new Date()) => dataDeBrasilia(agora);
+/** Feriado nacional ou da cidade (regras do sistema): o horário comercial não vale nesse dia. */
+export const ehFeriado = (data) => feriados(Number(data.slice(0, 4))).has(data) || feriadosLocais(Number(data.slice(0, 4))).includes(data);
+/** Horas do horário comercial pelas regras do sistema (inicio_expediente_hora, fim_expediente_hora, fim_expediente_sabado_hora). */
+export const horasComerciais = () => ({ inicio: regra('inicio_expediente_hora'), fim: regra('fim_expediente_hora'), sabadoFim: regra('fim_expediente_sabado_hora'), ehFeriado });
+/**
+ * Situação do horário comercial agora: { dentro, quando (Date), rotulo }. Ex.: sexta 27/11/2026 às 21h30 →
+ * { dentro: false, rotulo: 'amanhã (sábado), 28/11, às 8h' }; quarta às 10h → { dentro: true }.
+ */
+export function horarioComercialAgora(agora = new Date()) {
+  const p = proximoHorarioComercial(agora, horasComerciais());
+  return { dentro: p.dentro, quando: p.quando, rotulo: p.dentro ? '' : rotuloDoHorario(p.data, p.hora, agora) };
+}
+/** Texto curto do horário comercial das regras: "segunda a sexta, das 8h às 18h, e sábado, das 8h às 12h". */
+export function textoHorarioComercial() {
+  const h = horasComerciais();
+  const sab = Number(h.sabadoFim) > Number(h.inicio) ? `, e sábado, das ${h.inicio}h às ${h.sabadoFim}h` : ' (sábado sem expediente)';
+  return `segunda a sexta, das ${h.inicio}h às ${h.fim}h${sab}`;
+}
 
 /** Data e hora locais para nomes de arquivo: 'AAAA-MM-DD-HH-MM' (às 20:57 de 16/11/2026 → '2026-11-16-20-57'; não a hora UTC). */
 export function carimboLocal(agora = new Date()) {

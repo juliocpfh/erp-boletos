@@ -9,7 +9,8 @@ import { dataBr, reais } from '../calculos.js';
 import * as S from '../armazenamento.js';
 import { anexosProntos, avisoBoletoPdfDesatualizado, dadosDoEmail } from '../email-dados.js';
 import { esc } from '../formularios.js';
-import { emailLigado, enviarEmail } from '../gmail.js';
+import { agendarEmail, emailLigado, enviarEmail } from '../gmail.js';
+import { perguntarQuando } from './horario.js';
 import { modeloEmail, montarEmail } from '../modelos-email.js';
 import * as G from '../regua-email.js';
 import * as R from '../regras.js';
@@ -137,14 +138,14 @@ async function anexosDoItem(item, prontos) {
 }
 
 /** Grava a decisão (e, quando o e-mail saiu ou foi aberto no Gmail, o registro em envios_email, como os e-mails das etapas). */
-const decidir = (item, situacao, { para = '', assunto = '', gmailId = '' } = {}) => alterar((db) => {
+const decidir = (item, situacao, { para = '', assunto = '', gmailId = '', quando = '' } = {}) => alterar((db) => {
   let envio = null;
-  if (situacao !== 'recusado') {
+  if (situacao !== 'recusado' && situacao !== 'agendado') {
     const como = situacao === 'enviado' ? 'enviado' : 'aberto no Gmail';
-    envio = R.inserir(db, 'envios_email', { data: C.hojeIso(), chave: item.modelo, contrato_id: item.contrato.id, ficha_id: null, aditivo_id: null, cobranca_id: item.cobranca.id,
+    envio = R.inserir(db, 'envios_email', { data: C.hojeBrasilia(), chave: item.modelo, contrato_id: item.contrato.id, ficha_id: null, aditivo_id: null, cobranca_id: item.cobranca.id,
       para, assunto, como, gmail_id: gmailId || null }, login(), null, { historico: false });
   }
-  return G.registrarDecisao(db, { cobranca_id: item.cobranca.id, contrato_id: item.contrato.id, dias: item.dias, situacao, para, assunto, envio_id: envio ? envio.id : null }, login());
+  return G.registrarDecisao(db, { cobranca_id: item.cobranca.id, contrato_id: item.contrato.id, dias: item.dias, situacao, para, assunto, envio_id: envio ? envio.id : null, quando }, login(), C.hojeBrasilia());
 });
 
 async function copiar(texto) {
@@ -198,7 +199,11 @@ Emita de novo no banco e troque o PDF, ou abra o e-mail mesmo assim.`, { titulo:
     // PDF do banco desatualizado (DOC-05): o mesmo aviso do "Enviar boleto por e-mail", na lista final
     const lista = itens.map((x) => { const velho = emailDoItem(d(), x).pdfVelho; return `• ${nomeDo(x)}: boleto ${referente(x.cobranca)}, ${x.etapa}, ${reais(x.valor)} → ${x.para}${velho ? `\n   ATENÇÃO: ${velho}` : ''}`; }).join('\n');
     const fora = chaves.length - itens.length;
-    if (!(await confirmar(`Vou enviar agora ${itens.length} e-mail(s) pelo Gmail da empresa:\n\n${lista}${fora ? `\n\n${fora} marcado(s) saíram da lista e não vão.` : ''}\n\nConfirma o envio?`, { titulo: 'Enviar os e-mails da régua', sim: `Enviar ${itens.length} e-mail(s)`, nao: 'Cancelar' }))) return;
+    // fora do horário comercial: agendar todos para o próximo horário (sai sozinho pela nuvem) ou enviar agora mesmo
+    const quando = await perguntarQuando({ resumo: `${itens.length} e-mail(s) da régua de cobrança.` });
+    if (!quando) return;
+    const agendar = quando.modo === 'agendar';
+    if (!(await confirmar(`Vou ${agendar ? `agendar para ${quando.rotulo}` : 'enviar agora'} ${itens.length} e-mail(s) pelo Gmail da empresa:\n\n${lista}${fora ? `\n\n${fora} marcado(s) saíram da lista e não vão.` : ''}\n\nConfirma o envio?`, { titulo: 'Enviar os e-mails da régua', sim: `${agendar ? 'Agendar' : 'Enviar'} ${itens.length} e-mail(s)`, nao: 'Cancelar' }))) return;
     const enviados = [];
     const erros = [];
     const semAnexo = [];
@@ -209,15 +214,27 @@ Emita de novo no banco e troque o PDF, ou abra o e-mail mesmo assim.`, { titulo:
         const e = emailDoItem(d(), item);
         if (/\[preencher: /.test(e.texto + e.assunto)) throw new C.ErroUsuario('o texto tem "[preencher: ...]": confira o modelo em Modelos de e-mail');
         const { arquivos, faltou } = await anexosDoItem(item, e.prontos);
-        const r = await enviarEmail({ para: item.para, assunto: e.assunto, texto: e.texto, anexos: arquivos });
-        await decidir(item, 'enviado', { para: item.para, assunto: e.assunto, gmailId: r.id });
+        if (agendar) {
+          // a decisão "agendado" tira da lista já; quando sair, a nuvem grava o envio e o Painel passa a decisão para "enviado"
+          const dec = await decidir(item, 'agendado', { para: item.para, assunto: e.assunto, quando: quando.rotulo });
+          const registro = { chave: item.modelo, contrato_id: item.contrato.id, ficha_id: null, aditivo_id: null, cobranca_id: item.cobranca.id, para: item.para, assunto: e.assunto, usuario: login(), efeito: { tipo: 'regua', decisao_id: dec.id } };
+          try {
+            await agendarEmail({ para: item.para, assunto: e.assunto, texto: e.texto, anexos: arquivos, quando: quando.quando, registro, descricao: `Régua: ${nomeDo(item)}, ${item.etapa}` });
+          } catch (erro) {
+            await alterar((db) => R.excluir(db, 'regua_emails', dec.id, login(), 'Régua de cobrança: o agendamento não deu certo (volta à lista)'));
+            throw erro;
+          }
+        } else {
+          const r = await enviarEmail({ para: item.para, assunto: e.assunto, texto: e.texto, anexos: arquivos });
+          await decidir(item, 'enviado', { para: item.para, assunto: e.assunto, gmailId: r.id });
+        }
         enviados.push(item);
         if (faltou.length) semAnexo.push(`${item.contrato.inquilino_nome} (sem ${faltou.join(', ')})`);
       } catch (erro) {
         erros.push(`${item.contrato.inquilino_nome}: ${erro.message || erro}`);
       }
     }
-    aviso([`${enviados.length} e-mail(s) enviado(s); ficam em "Enviados" no Gmail.`,
+    aviso([agendar ? `${enviados.length} e-mail(s) agendado(s) para ${quando.rotulo}: saem sozinhos pela nuvem (Inquilinos → Comunicações → Envios agendados).` : `${enviados.length} e-mail(s) enviado(s); ficam em "Enviados" no Gmail.`,
       semAnexo.length ? `Foram sem anexo (a ponte do banco não respondeu neste computador ou o PDF do boleto sumiu da pasta): ${semAnexo.join('; ')}.` : '',
       erros.length ? `Não enviados: ${erros.join('; ')}.` : ''].filter(Boolean).join(' '), erros.length ? 'erro' : semAnexo.length ? 'aviso' : 'ok');
     await mostrar();
