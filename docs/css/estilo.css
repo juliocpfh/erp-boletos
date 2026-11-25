@@ -48,6 +48,7 @@ tr.total td { font-weight: 700; border-top: 2px solid var(--texto); }
 .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px 18px; }
 .grade .rotulo { font-size: 12px; color: var(--suave); }
 .grade .valor { font-weight: 600; }
+.grade > .largo { grid-column: 1 / -1; }
 .etiqueta { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
 .etiqueta.ok { background: #dcfce7; color: var(--ok); }
 .etiqueta.aviso { background: #fef3c7; color: var(--aviso); }

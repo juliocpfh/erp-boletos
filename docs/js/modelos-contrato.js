@@ -1,6 +1,6 @@
 // Modelos padrão de contrato, montados a partir dos contratos da ANK/JCK (residencial e não residencial).
 // Linguagem: veja montarContrato em contratos.js. Os modelos podem ser copiados e editados na tela "Modelos de contrato".
-import { modelosDocumentos } from './modelos-documentos.js';
+import { atualizarTextoDocumento, modelosDocumentos } from './modelos-documentos.js';
 
 /**
  * Trechos revisados em 2026-11-12 (documentacao/REVISAO_JURIDICA_CONTRATO.md). Os modelos já gravados recebem cada um
@@ -680,5 +680,7 @@ export function textoAtualizadoDoModelo(m) {
   }
   // termo de troca de inquilino (2026-11-13): contas de consumo trocadas pela empresa
   if (tipo === 'aditivo_troca') texto = trocar(texto);
+  // outros documentos da locação (revisão do advogado de 24/11/2026): as trocas ficam em modelos-documentos.js
+  texto = atualizarTextoDocumento(tipo, texto);
   return texto;
 }

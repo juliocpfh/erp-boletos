@@ -19,8 +19,9 @@ test('os 8 outros documentos estão nos modelos padrão, depois dos antigos (o i
   for (const [tipo, def] of Object.entries(TIPOS_DOCUMENTO)) {
     assert.ok(def.nome && def.explica, tipo);
     for (const [k, , formato] of def.campos) {
-      assert.ok(['data', 'dinheiro', 'numero', 'texto'].includes(formato), `${tipo}.${k}`);
-      assert.match(outros.find((m) => m.tipo === tipo).texto, new RegExp(`\\{${k}\\}`), `o texto de ${tipo} usa {${k}}`);
+      assert.ok(['data', 'dinheiro', 'numero', 'texto', 'marcar'].includes(formato), `${tipo}.${k}`);
+      // a caixa de marcar entra como condição ([se campo]); os outros, como {campo}
+      assert.match(outros.find((m) => m.tipo === tipo).texto, formato === 'marcar' ? new RegExp(`\\[se ${k}\\]`) : new RegExp(`\\{${k}\\}`), `o texto de ${tipo} usa ${k}`);
     }
   }
 });

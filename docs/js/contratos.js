@@ -821,9 +821,12 @@ export function dadosDoDocumento(d, c, tipo, valores = {}, { data, testemunhas =
     data_fim: termino ? dataPorExtenso(termino) : '',
     fiadores_nomes: fiadores.map((f) => String(f.nome || '').toLocaleUpperCase('pt-BR')).join(', '),
   });
-  for (const [chave, , formato] of (def ? def.campos : [])) {
-    const v = String(valores[chave] ?? '').trim();
-    if (formato === 'dinheiro') {
+  for (const [chave, , formato, , quando] of (def ? def.campos : [])) {
+    // campo que não vale para este contrato (ex.: transferência do empregador com empresa locatária) fica vazio
+    const v = quando && !quando(dados.condicoes) ? '' : String(valores[chave] ?? '').trim();
+    if (formato === 'marcar') dados.campos[chave] = v && v !== 'nao' ? 'sim' : '';
+    else if (quando && !quando(dados.condicoes)) dados.campos[chave] = '';
+    else if (formato === 'dinheiro') {
       // número = centavos (valor calculado pelo sistema); texto digitado = reais ("500" = R$ 500,00, como nos outros campos de valor)
       const centavos = typeof valores[chave] === 'number' ? valores[chave] : (C.centavos(v) || 0);
       dados.campos[chave] = centavos > 0 ? valorComExtenso(centavos) : '';
@@ -831,6 +834,11 @@ export function dadosDoDocumento(d, c, tipo, valores = {}, { data, testemunhas =
     else if (formato === 'data') dados.campos[chave] = C.dataValida(v) ? dataPorExtenso(v) : LINHA_EM_BRANCO;
     else if (formato === 'numero') dados.campos[chave] = chave === 'numero_aditivo' ? `${Number(v) || 1}º` : (Number(v) > 0 ? numeroComExtenso(Number(v)) : LINHA_EM_BRANCO);
     else dados.campos[chave] = v;
+  }
+  // notificação para desocupação (advogado, 24/11/2026): a data limite vale para a carta recebida até 30 dias antes dela
+  if (tipo === 'notificacao_desocupacao') {
+    const limite = C.dataValida(String(valores.data_limite ?? '').trim());
+    dados.campos.recebimento_ate = limite ? dataPorExtenso(C.somarDias(limite, -30)) : LINHA_EM_BRANCO;
   }
   if (def && def.assinam) {
     const ordem = (a) => def.assinam.indexOf(a.papel);
