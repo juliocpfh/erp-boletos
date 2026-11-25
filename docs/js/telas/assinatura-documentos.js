@@ -25,11 +25,14 @@ function documentoDaPagina() {
 /** Texto da carta para o resumo da chave, sem a data do dia (a carta sai com a data de hoje; a assinada guarda a dela). */
 const textoDaCarta = (c, comp) => cartaReajuste(c, comp).replace(/<p class="carta-data">[\s\S]*?<\/p>/, '');
 
-/** A LOCADORA que assina com o certificado: a do CNPJ do certificado (se o PC já contou qual é) ou a primeira. */
+/**
+ * A LOCADORA que assina com o certificado: a do CNPJ do certificado (se o PC já contou qual é); sem o CNPJ, só quando o
+ * documento tem uma locadora (com duas, o selo da ANK podia cair na linha da outra empresa: vai só na página final).
+ */
 function locadoraQueAssina(blocos, cert) {
   const locadoras = blocos.filter((b) => b.tipo === 'assinaturas').flatMap((b) => b.pessoas).filter((p) => /^LOCADORA/.test(p.papel || ''));
   const cnpj = String(cert?.cnpj || '').replace(/\D/g, '');
-  if (!cnpj) return { pessoa: locadoras[0] || null, outra: false };
+  if (!cnpj) return { pessoa: locadoras.length === 1 ? locadoras[0] : null, outra: false };
   const pessoa = locadoras.find((p) => String(p.doc || '').replace(/\D/g, '') === cnpj) || null;
   return { pessoa, outra: !pessoa && locadoras.length > 0 };
 }
