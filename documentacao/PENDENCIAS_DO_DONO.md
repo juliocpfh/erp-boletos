@@ -4,7 +4,7 @@
 
 **Para o Claude:** retome esta lista com o dono na primeira mensagem, em português simples. O dono só responde à **conversa principal**. Regras de 24–25/11 continuam: nenhuma PR com conflito (`git merge-tree` com a `main` e as abertas); quem programa testa **só o básico** (`checar` e a tela principal no computador) e o **testador independente** faz os 4 lugares (computador `?teste`, celular 375 px, nuvem local com duas abas, versão PC) e os links antes do "pode aceitar"; sessão pronta é arquivada.
 
-**Situação:** tudo na `main` até a **#422** (#404 a #422 aceitas em 24–25/11), **nenhuma PR aberta** além desta de documentação. As decisões de 24–25/11 já estão em `DECISOES.md` (pintura 48 meses; multa do aviso de 30 dias proporcional e só a maior; honorários; tarifa; termo da reserva; empresa que desiste; reabrir a análise; datas de Brasília e o horário comercial; notificação de atraso sem multa; troca de titular sem reserva; testes).
+**Situação:** tudo na `main` até a **#424** (#404 a #424 aceitas em 24–25/11), **nenhuma PR aberta** além desta de documentação. As decisões de 24–25/11 já estão em `DECISOES.md` (pintura 48 meses; multa do aviso de 30 dias proporcional e só a maior; honorários; tarifa; termo da reserva; empresa que desiste; reabrir a análise; datas de Brasília e o horário comercial; notificação de atraso sem multa; troca de titular sem reserva; testes).
 
 **O que espera o dono:**
 - [ ] As conferências da lista atual: `CONFERIR_O_QUE_MUDOU.md` e as "Conferências do dono" logo abaixo (bloco de 24/11).
@@ -21,7 +21,9 @@
 - A 2ª via mostra "setting 'hidden'" no console do navegador.
 - Também anotadas nos testes: a pergunta 2 do resumo do contrato fala em honorários sem as condições (vale a cláusula); no cálculo final, mudar à mão o valor da multa do aviso não muda o texto da descrição; o CPF da testemunha fica no navegador depois de "Sair" (`assinatura-contrato-<id>`); a ponte do C6 (`emission_date`), `conciliacao.js` e `envios.js` ainda usam a data de antes (das 21h em diante sairia o dia seguinte); a 2ª notificação de atraso não pega o boleto que venceu depois da 1ª (só avisa).
 
-**Em programação (PR separada):** [ ] boleto descontado da garantia no cálculo final fecha a notificação de atraso e precisa ser cancelado no banco: a tela mostra ao operador tudo o que vai acontecer e ele dá o OK (decisão do dono de 25/11).
+**Feito na PR #424 (25/11):** [x] boleto descontado da garantia no cálculo final (ou na devolução da troca de titular): antes de gravar, a janela "Confira o que vai acontecer" mostra o boleto, a notificação de atraso que fecha e o que acontece com a caução, e pede "Já cancelei no banco" quando o boleto foi emitido no banco (PDF ou C6). Desfeito o cálculo final, o boleto volta a "Em aberto" e a notificação reabre. Ex.: caução de R$ 5.400,00 − boleto de 10/2026 de R$ 1.800,00 = R$ 3.600,00 a devolver. Falta conferir (testador): celular de verdade, nuvem com 2 abas, versão PC e a troca de titular com garantia nova.
+
+**Para quando o C6 for ligado:** boleto do C6 com emissão "sem resposta" (situação "erro" e incerto) não pede o cancelamento no banco na janela da #424; acertar junto com a ligação do C6.
 
 **Decidido em 25/11:** [x] o botão "Corrigir caução" fica com esse nome (confirma 14/11; não há mais pendência).
 
