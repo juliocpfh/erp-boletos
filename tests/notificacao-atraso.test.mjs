@@ -122,3 +122,24 @@ test('PDF e e-mails: prazo para pagar, sem "multa do contrato" no lembrete', () 
   assert.match(l, /Se já pagou, desconsidere/);
   assert.doesNotMatch(l, /multa do contrato/);
 });
+
+test('rascunho já pago e marcado como enviado: dá baixa na hora', () => {
+  const { d, c, cb } = base();
+  const n = { data: '2026-11-24', prazo_dias: 10 };
+  const t = NT.textoDoModelo(d, c, n, 'atraso');
+  const x = R.criarNotificacao(d, { contrato_id: c.id, modelo: 'atraso', ...n, assunto: t.assunto, clausula: t.clausula, texto: t.texto }, 'j');
+  R.registrarPagamento(d, cb.id, '2026-11-25', null, 'j');
+  assert.equal(x.situacao, 'Rascunho', 'o rascunho não tem baixa');
+  R.marcarNotificacaoEnviada(d, x.id, { data: '2026-11-26', meio: 'E-mail' }, 'j');
+  assert.equal(x.situacao, 'Resolvida');
+  assert.equal(x.resolvida_em, '2026-11-25');
+});
+
+test('boleto já em outra notificação de atraso aberta: a nova avisa; a da mesma cadeia e a resolvida não contam', () => {
+  const { d, c, cb } = base();
+  const n1 = notificar(d, c);
+  assert.deepEqual(R.boletosEmOutraNotificacao(d, c.id, [cb.id]).map((o) => [o.cobranca.id, o.notificacao.id]), [[cb.id, n1.id]]);
+  assert.deepEqual(R.boletosEmOutraNotificacao(d, c.id, [cb.id], [n1.id]), []);
+  R.registrarPagamento(d, cb.id, '2026-11-30', null, 'j');
+  assert.deepEqual(R.boletosEmOutraNotificacao(d, c.id, [cb.id]), [], 'resolvida não conta');
+});

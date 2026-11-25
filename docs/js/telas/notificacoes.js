@@ -79,6 +79,22 @@ function feriadosNoPrazo(inicio, limite) {
   return out;
 }
 
+/** Nome do boleto nos avisos: "10/2026, vencido em 14/11/2026" ou "acordo 1/2, vencido em …". */
+const nomeBoletoAviso = (cb) => `${R.ehParcelaAcordo(cb) ? `acordo ${cb.acordo_parcela || ''}`.trim() : compBr(cb.competencia)}, vencido em ${dataBr(cb.vencimento)}`;
+
+/**
+ * Avisos dos boletos do aluguel em atraso (teste da PR #420): na 2ª notificação, os vencidos que a 1ª não listou (a regra não
+ * muda: ficam para uma notificação nova); numa nova, os que já estão em outra notificação de atraso aberta.
+ */
+function avisosDosBoletos(c, data, { anterior = null, propria = null } = {}) {
+  const vencidos = R.boletosEmAtraso(d(), c.id, data);
+  if (anterior) {
+    return vencidos.filter((cb) => !(anterior.boletos || []).includes(cb.id)).map((cb) => `O boleto <b>${nomeBoletoAviso(cb)}</b>, não está nesta notificação: faça uma notificação nova de "Aluguel em atraso" para ele.`);
+  }
+  const exceto = propria ? R.cadeiaDaNotificacao(d(), propria).map((x) => x.id) : [];
+  return R.boletosEmOutraNotificacao(d(), c.id, vencidos.map((cb) => cb.id), exceto).map((o) => `O boleto <b>${nomeBoletoAviso(o.cobranca)}</b>, já está na notificação de <a href="#/notificacao/${o.notificacao.id}">${dataBr(o.notificacao.data)}</a> (${esc(o.notificacao.situacao || 'Rascunho')}), ainda aberta.`);
+}
+
 /**
  * Nova notificação (ou o rascunho em edição, ?id=): 1º escolhe o inquilino, o assunto, a data e o prazo ("Montar o texto"),
  * depois confere o texto pronto e salva o rascunho. ?anterior=: outra notificação do mesmo assunto (reiteração).
@@ -108,6 +124,7 @@ export function telaNovaNotificacao(q = {}) {
   return `<p class="suave"><a href="${volta}">← Voltar</a></p><h1>${esc(titulo)}</h1>
     ${ant ? `<div class="alerta info">Reitera a notificação de <b>${dataBr(ant.data)}</b> (${esc(ant.assunto)}), com prazo até ${dataBr(ant.data_limite)}. Ao marcar o envio desta, a anterior fica "Reiterada"; ${R.ehNotificacaoAtraso(ant) ? 'o texto lista os boletos dela ainda em aberto, com a multa e os juros de hoje (sem multa contratual).' : 'a multa pode ser gerada em qualquer uma já vencida.'}</div>` : ''}
     ${NT.modeloNotificacao(tema) && NT.modeloNotificacao(tema).atraso ? `<div class="alerta info">${avisoAtraso}</div>` : ''}
+    ${c && NT.modeloNotificacao(tema) && NT.modeloNotificacao(tema).atraso ? avisosDosBoletos(c, dados.data, { anterior: ant, propria: edicao }).map((a) => `<div class="alerta aviso">${a}</div>`).join('') : ''}
     <form class="cartao formulario" data-form="ir" data-ir="notificacao-nova">
       <h2>1. Inquilino, assunto e prazo</h2>
       ${edicao ? `<input type="hidden" name="id" value="${edicao.id}">` : ''}${ant && !edicao ? `<input type="hidden" name="anterior" value="${ant.id}">` : ''}
@@ -137,6 +154,7 @@ export function telaNovaNotificacao(q = {}) {
 /** Etapas da notificação, como no acordo: [{ feito, titulo, detalhe (HTML) }]. */
 function etapasDaNotificacao(n, c, hoje) {
   const e = R.estadoNotificacao(d(), n, hoje);
+  const atraso = R.ehNotificacaoAtraso(n);
   const alvo = { contrato: c.id, notificacao: n.id };
   const pdf = link(`#/imprimir/recibo?tipo=notificacao&contrato=${c.id}&id=${n.id}`, '🧾 PDF para assinar (imprimir / baixar)', 'botao secundario mini');
   const assinada = linkComprovante(c.id, n.arquivo_assinado || null, { tabela: 'notificacoes', id: n.id, campo: 'arquivo_assinado', tipo: 'notificacao-assinada', data: n.data })
@@ -151,16 +169,16 @@ function etapasDaNotificacao(n, c, hoje) {
   const baixa = n.situacao === 'Resolvida' ? `resolvida em <b>${dataBr(n.resolvida_em)}</b>${n.observacao_baixa ? `: ${esc(n.observacao_baixa)}` : ''} ${n.comprovante_baixa ? linkComprovante(c.id, n.comprovante_baixa, { tabela: 'notificacoes', id: n.id, campo: 'comprovante_baixa', tipo: 'baixa-notificacao', data: n.resolvida_em }) : ''}`
     : e.podeBaixa && opera() ? `<form data-form="baixaNotificacao" data-id="${n.id}" class="acoes" style="margin-top:6px;flex-wrap:wrap">
       <input type="date" name="data" value="${hoje}" aria-label="Resolvido em" style="width:auto">${F.atalhosData()}
-      <input name="observacao" placeholder="O que foi feito (ex.: ar-condicionado reinstalado pelo técnico)" style="flex:1;min-width:220px">
-      <label class="botao secundario pequeno">📎 Foto ou arquivo<input type="file" name="comprovante" accept="${ACEITA_DOCUMENTOS}" hidden></label>
-      <button class="pequeno">Dar baixa (resolvido)</button></form>` : '';
+      <input name="observacao" placeholder="${atraso ? 'Pago por fora / combinado (ex.: pago em dinheiro no escritório)' : 'O que foi feito (ex.: ar-condicionado reinstalado pelo técnico)'}" style="flex:1;min-width:220px">
+      <label class="botao secundario pequeno">📎 ${atraso ? 'Comprovante' : 'Foto ou arquivo'}<input type="file" name="comprovante" accept="${ACEITA_DOCUMENTOS}" hidden></label>
+      <button class="pequeno">${atraso ? 'Dar baixa (pago por fora)' : 'Dar baixa (resolvido)'}</button></form>${atraso ? ' <span class="suave">Pago no sistema, a baixa é automática; use isto só se foi pago por fora ou combinado.</span>' : ''}` : '';
   return [
     { feito: true, titulo: 'Notificação montada', detalhe: `${dataBr(n.data)} · ${esc(n.assunto)} ${pdf}` },
     { feito: !!n.arquivo_assinado, titulo: 'Assinada pelo administrador', detalhe: `${n.arquivo_assinado ? '' : '<span class="suave">assine o PDF no gov.br (assinador.iti.br) e anexe aqui: </span>'}${assinada}` },
     { feito: !!n.enviada_em, titulo: 'Enviada ao inquilino', detalhe: `${enviada}${n.situacao === 'Rascunho' ? `${botaoEmail('notificacao_envio', alvo, '✉ Enviar por e-mail')} <span class="suave">ou entregue à mão (baixe o PDF acima) e marque abaixo. O "Enviar agora" já marca sozinho.</span>${marcar}` : ` ${botaoEmail('notificacao_envio', alvo, '✉ E-mail de novo')}`}` },
     // a etapa só fecha com a notificação enviada e encerrada (cancelada sem envio não conta); o lembrete, só antes de vencer
-    { feito: !e.aberta && !!n.enviada_em && n.situacao !== 'Cancelada', titulo: 'Prazo para resolver', detalhe: `${prazo}${e.aberta && !e.vencida && e.restam >= 0 && !n.multa_valor && n.situacao !== 'Reiterada' ? ` ${botaoEmail('notificacao_lembrete', alvo, '✉ Lembrete do prazo')}` : ''}` },
-    { feito: n.situacao === 'Resolvida', titulo: 'Resolvido (baixa)', detalhe: baixa || (n.situacao === 'Cancelada' ? `cancelada em ${dataBr(n.cancelada_em)}${n.motivo_cancelamento ? `: ${esc(n.motivo_cancelamento)}` : ''}` : '<span class="suave">depois de enviada</span>') },
+    { feito: !e.aberta && !!n.enviada_em && n.situacao !== 'Cancelada', titulo: atraso ? 'Prazo para pagar' : 'Prazo para resolver', detalhe: `${prazo}${e.aberta && !e.vencida && e.restam >= 0 && !n.multa_valor && n.situacao !== 'Reiterada' ? ` ${botaoEmail('notificacao_lembrete', alvo, '✉ Lembrete do prazo')}` : ''}` },
+    { feito: n.situacao === 'Resolvida', titulo: atraso ? 'Pago (baixa)' : 'Resolvido (baixa)', detalhe: baixa || (n.situacao === 'Cancelada' ? `cancelada em ${dataBr(n.cancelada_em)}${n.motivo_cancelamento ? `: ${esc(n.motivo_cancelamento)}` : ''}` : '<span class="suave">depois de enviada</span>') },
   ];
 }
 
@@ -181,6 +199,7 @@ export function telaNotificacao(id) {
   return `<p class="suave"><a href="#/contrato/${c.id}?ir=notificacoes">← ${esc(c.inquilino_nome)}</a> · <a href="#/notificacoes">Todas as notificações</a></p>
     <div class="cabecalho"><h1>${numero > 1 ? `${numero}ª notificação` : 'Notificação'} · ${esc(c.inquilino_nome)}</h1><div class="acoes">${etiquetaNotificacao(n, hoje)}</div></div>
     ${e.vencidaSemMulta && n.situacao !== 'Reiterada' ? `<div class="alerta perigo"><b>Prazo vencido em ${dataBr(n.data_limite)}.</b> ${atraso ? 'Mande outra notificação sobre o mesmo assunto ou faça um acordo. A baixa é automática quando os boletos forem pagos.' : 'Se o inquilino resolveu, dê a baixa; senão, mande outra notificação sobre o mesmo assunto ou gere a multa.'}</div>` : ''}
+    ${atraso && n.anterior_id && ['Rascunho', 'Aguardando resposta'].includes(n.situacao) ? avisosDosBoletos(c, hoje, { anterior: n }).map((a) => `<div class="alerta aviso">${a}</div>`).join('') : ''}
     ${atraso && n.situacao === 'Rascunho' && R.atrasoQuitado(d(), n) ? '<div class="alerta aviso"><b>Os boletos desta notificação já foram pagos.</b> Não envie: exclua o rascunho.</div>' : ''}
     ${proxima ? `<div class="alerta info">${proxima.situacao === 'Rascunho' ? 'Há uma nova notificação sobre o mesmo assunto em preparo' : 'Reiterada pela notificação'} de <a href="#/notificacao/${proxima.id}">${dataBr(proxima.data)}</a> (${esc(proxima.situacao)}).</div>` : ''}
     <div class="cartao"><h2>Etapas</h2><ol style="margin:4px 0 6px 18px">${passos.map((p) => `<li style="margin-bottom:6px">${p.feito ? '✅' : '⬜'} <b>${esc(p.titulo)}</b>: ${p.detalhe}</li>`).join('')}</ol>

@@ -6966,6 +6966,20 @@ export function baixarNotificacoesDeAtraso(d, contratoId, usuario) {
   return n;
 }
 
+/**
+ * Boletos que já estão em outra notificação de aluguel em atraso ainda aberta (rascunho, aguardando, reiterada) do contrato:
+ * [{ cobranca, notificacao }]. ``exceto``: ids das notificações a ignorar (a própria e a cadeia dela). Ex.: a notificação de
+ * 03/11/2026 com o 09/2026 em aberto → uma nova em 25/11 que liste o 09/2026 avisa que ele já está naquela.
+ */
+export function boletosEmOutraNotificacao(d, contratoId, ids, exceto = []) {
+  const out = [];
+  for (const n of (d.notificacoes || []).filter((x) => x.contrato_id === contratoId && ehNotificacaoAtraso(x) && !exceto.includes(x.id)
+    && ['Rascunho', ...NOTIFICACAO_ABERTA].includes(x.situacao || 'Rascunho'))) {
+    for (const id of n.boletos || []) if (ids.includes(id) && !out.some((o) => o.cobranca.id === id)) out.push({ cobranca: buscar(d, 'cobrancas', id), notificacao: n });
+  }
+  return out.filter((o) => o.cobranca);
+}
+
 /** Pagamento desfeito: a notificação de atraso que tinha tido a baixa automática e não está mais paga volta a esperar o pagamento. */
 function reabrirNotificacoesDeAtraso(d, contratoId, usuario) {
   for (const n of (d.notificacoes || []).filter((y) => y.contrato_id === contratoId && ehNotificacaoAtraso(y) && y.situacao === 'Resolvida' && y.baixa_automatica)) {
@@ -7099,6 +7113,8 @@ export function marcarNotificacaoEnviada(d, id, { data, meio }, usuario) {
     `Notificação de ${C.dataBr(n.data)} enviada em ${C.dataBr(data)} (${meio}): prazo até ${C.dataBr(n.data_limite)}`);
   const ant = n.anterior_id ? buscar(d, 'notificacoes', n.anterior_id) : null;
   if (ant && ant.situacao === 'Aguardando resposta') atualizar(d, 'notificacoes', ant.id, { situacao: 'Reiterada' }, usuario, `Notificação de ${C.dataBr(ant.data)} reiterada (nova enviada em ${C.dataBr(data)})`);
+  // aluguel em atraso já pago antes do envio (o aviso "Não envie" foi ignorado): dá baixa na hora (teste da PR #420)
+  if (ehNotificacaoAtraso(n)) baixarNotificacoesDeAtraso(d, n.contrato_id, usuario);
   return n;
 }
 
