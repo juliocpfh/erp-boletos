@@ -1,6 +1,33 @@
 # O que ainda falta no sistema (e como fazer)
 
-## ONDE PARAMOS (24/11/2026, noite: para o Claude retomar depois do /clear)
+## ONDE PARAMOS (25/11/2026: para o Claude retomar depois do /clear)
+
+**Para o Claude:** retome esta lista com o dono na primeira mensagem, em português simples. O dono só responde à **conversa principal**. Regras de 24–25/11 continuam: nenhuma PR com conflito (`git merge-tree` com a `main` e as abertas); quem programa testa **só o básico** (`checar` e a tela principal no computador) e o **testador independente** faz os 4 lugares (computador `?teste`, celular 375 px, nuvem local com duas abas, versão PC) e os links antes do "pode aceitar"; sessão pronta é arquivada.
+
+**Situação:** tudo na `main` até a **#422** (#404 a #422 aceitas em 24–25/11), **nenhuma PR aberta** além desta de documentação. As decisões de 24–25/11 já estão em `DECISOES.md` (pintura 48 meses; multa do aviso de 30 dias proporcional e só a maior; honorários; tarifa; termo da reserva; empresa que desiste; reabrir a análise; datas de Brasília e o horário comercial; notificação de atraso sem multa; troca de titular sem reserva; testes).
+
+**O que espera o dono:**
+- [ ] As conferências da lista atual: `CONFERIR_O_QUE_MUDOU.md` e as "Conferências do dono" logo abaixo (bloco de 24/11).
+- [ ] Levar ao advogado o **texto da confissão de dívida com os honorários** (termo do acordo, `#/imprimir/recibo?tipo=acordo&…`; PR #415).
+- [ ] Se você já tinha editado o e-mail de encerramento: conferir em **Sistema → Modelos de e-mail** o e-mail do cálculo final (o texto novo do saldo, PR #419, só entra nos modelos não editados; "Voltar ao padrão" traz o novo). O mesmo vale para os e-mails de notificação de atraso (PR #420).
+- [ ] Decidir a lista **`Limpeza - para o dono decidir.md`** (raiz do projeto, fora do Git): nada foi apagado.
+- [ ] **Assinatura digital com o certificado real:** programa novo no PC, ligar em Sistema → Empresas, assinar um recibo, um contrato e um termo aditivo de teste e conferir no <https://validar.iti.gov.br> (um contrato assinado pela empresa e depois pelo inquilino no gov.br: as duas assinaturas devem aparecer válidas). Certificado vence em 02/01/2027 (aviso a partir de 03/12).
+- [ ] Também das PRs: ler o termo da reserva com os ajustes do advogado (7 dias corridos, reserva de 7 dias, empresa pode desistir); ler o PDF do contrato com as cláusulas novas (#406) e os documentos da locação (#407: aviso de desocupação com a caixa, notificação com AR e art. 47); perguntar ao advogado sobre a liminar do art. 59, § 1º, VIII no residencial.
+
+**Pequenas observações para depois (não impedem nada):**
+- Boleto coberto inteiro pela reserva aparece "em aberto" com R$ 0,00.
+- Caixa do fiador na troca de titular: a frase "o que devia já foi abatido" aparece também quando ele não devia nada.
+- O termo do 2º acordo (acordo refeito) não cita os honorários do 1º.
+- A 2ª via mostra "setting 'hidden'" no console do navegador.
+- Também anotadas nos testes: a pergunta 2 do resumo do contrato fala em honorários sem as condições (vale a cláusula); no cálculo final, mudar à mão o valor da multa do aviso não muda o texto da descrição; o CPF da testemunha fica no navegador depois de "Sair" (`assinatura-contrato-<id>`); a ponte do C6 (`emission_date`), `conciliacao.js` e `envios.js` ainda usam a data de antes (das 21h em diante sairia o dia seguinte); a 2ª notificação de atraso não pega o boleto que venceu depois da 1ª (só avisa).
+
+**Em programação (PR separada):** [ ] boleto descontado da garantia no cálculo final fecha a notificação de atraso e precisa ser cancelado no banco: a tela mostra ao operador tudo o que vai acontecer e ele dá o OK (decisão do dono de 25/11).
+
+**Decidido em 25/11:** [x] o botão "Corrigir caução" fica com esse nome (confirma 14/11; não há mais pendência).
+
+**Próximo trabalho do Claude:** o **kit de teste automático** (agendado pelo dono): banco com os casos montados e um roteiro que sobe o site e a nuvem local e roda os 4 lugares.
+
+## ONDE PARAMOS em 24/11/2026, noite (histórico; atualizado em 25/11)
 
 **Para o Claude:** o dono só responde à **conversa principal**; as perguntas das outras sessões passam por ela. Confira o estado com `mcp__ccd_session_mgmt__list_sessions {"linked": true}` e `gh pr list`. **Regras do dono (24/11):** (1) nenhuma PR é apresentada com conflito, nem com a `main` nem com as outras abertas (simular com `git merge-tree` na ordem de aceite e, depois de cada aceite, resolver as seguintes); (2) teste de tela em **todos os lugares** (computador `?teste`, celular 375 px, nuvem local `node nuvem/local.mjs` com duas abas, versão PC quando couber) + links quebrados, feito por um **testador independente** antes de dizer "pode aceitar"; (3) sessão que terminou é arquivada. Receita dos testes na memória (`receita-teste-de-tela`). As sessões novas **não editam** `DECISOES.md`, `CLAUDE.md` nem este arquivo: põem "Para a documentação" na PR, e a conversa principal junta tudo numa PR de documentação no fim.
 
@@ -8,7 +35,7 @@
 
 **Feito pelo dono em 24/11:** tarifa conferida em R$ 8,50; Sobrado Almir e Posto com "Não cobrar tarifa"; resposta do advogado colada (cópia em `Resposta do advogado - 24-11.md`, raiz, fora do Git).
 
-**Decisões do dono de 24/11 (noite), ainda a registrar em `DECISOES.md` na PR final de documentação:**
+**Decisões do dono de 24/11 (noite):** [x] registradas em `DECISOES.md` em 25/11 (PR de documentação final).
 - Acordo na troca que não valeu: opção **(b)**, cancela o acordo do novo, o pago fica "a devolver" e o anterior paga o mês cheio (já programado na #393).
 - NF do proporcional pago com atraso: linha única com o total e a conta nas observações (#403); pago em dia continua "16/30 × aluguel bonificado".
 - Pintura: vida útil de **48 meses** (R$ 2.400,00 com 24 meses → R$ 1.200,00); outro orçamento só antes da devolução das chaves.
@@ -17,18 +44,18 @@
 - Tarifa: sem termo aditivo; multa e juros não incidem sobre a tarifa.
 - Números de processo da pesquisa de honorários: **não é preciso conferir** (as cláusulas foram aprovadas pelo advogado); tirar a pendência.
 
-**Sessões trabalhando (24/11, noite), cada uma abre a sua PR e avisa:**
+**Sessões trabalhando (24/11, noite), cada uma abre a sua PR e avisa:** [x] todas terminadas; PRs #404 a #422 na `main` em 25/11.
 - Respostas do advogado: "Advogado: termo de aceite da reserva" (documentos, 2 dias úteis, reprovação justificada, prazo de 7 dias com aviso no 4º e no 7º dia, pequenas divergências, empresa desiste); "Advogado: tarifa sem multa e juros"; "Advogado: pintura em 48 meses"; "Advogado: cláusulas novas e resumo do contrato" (gera `Contrato com clausulas novas - para revisar.pdf`); "Advogado: os 8 documentos da locação" (tira a prorrogação, troca de garantia, aviso de desocupação com dispensa, notificação com justificativa e AR).
 - Trabalho do Claude: "Enviar para assinar" (carta, aditivos, contrato); "Cálculo final: sugerir a multa do aviso de 30 dias" (vai trazer exemplo para o dono confirmar); "Campos de mês: reserva, carência e vale desde"; "Pequenos acertos pendentes"; "Simular todas as etapas com pessoas de teste" (só relatório, `SIMULACAO_ETAPAS_24_11.md`); "Compactação geral" (memória, `documentacao/INDICE.md`, lista `Limpeza - para o dono decidir.md` sem apagar nada); "Honorários e despesas no acordo e no cálculo final".
 - A sessão "Testar cada PR na tela antes do aceite" continua disponível para os testes independentes; abrir outras de teste só com o pedido do dono na conversa principal.
 
-**Esperando o dono (fora as conferências abaixo):** confirmar o exemplo da multa do aviso de 30 dias quando a sessão trouxer; decidir a lista de limpeza quando sair.
+**Esperando o dono (fora as conferências abaixo):** [x] confirmar o exemplo da multa do aviso de 30 dias (confirmado em 24/11: proporcional, só a maior; PR #408); [ ] decidir a lista de limpeza (saiu: `Limpeza - para o dono decidir.md`).
 
 **Conferências do dono:** `CONFERIR_O_QUE_MUDOU.md`; ler o termo da reserva e testar o link com um conhecido (antes, Sistema → Empresas → conta para depósito); boleto feito à mão mandado a si mesmo e um lembrete da régua com o PDF; assinatura digital (ligar e assinar um recibo de teste); PDFs para revisar (resumo do contrato, modelos de documentos, contrato com cláusulas novas); Teste dos PDFs em Sistema (depois o Claude apaga a página); comunicado de contatos com inquilino de teste; ficha pela internet com um conhecido; ícone, "Enviar agora" e páginas de Sistema no celular.
 
 **Fora do sistema:** rever boletos em aberto alterados à mão antes de 24/11; alertas "A verificar" da importação de 2026 (5 contratos); chaves do C6; verificação em duas etapas no GitHub; cópia do OneDrive no HD externo; certificado da ANK vence 02/01/2027 (aviso a partir de 03/12); 16/12/2026: CBS 2027 com o contador.
 
-**Ideia para testes mais rápidos (pergunta do dono, 24/11):** kit de teste pronto (banco com os casos montados e um roteiro que sobe servidor + nuvem local e roda os 4 lugares); fazer quando o dono pedir.
+**Ideia para testes mais rápidos (pergunta do dono, 24/11):** kit de teste pronto (banco com os casos montados e um roteiro que sobe servidor + nuvem local e roda os 4 lugares); fazer quando o dono pedir. **25/11: agendado pelo dono, é o próximo trabalho do Claude.**
 
 ## PEDIDOS DE 24/11/2026 (fazer em seguida, na ordem; marque `[x]` ao concluir)
 
@@ -42,7 +69,7 @@
 3. [x] **Ajuste do mês em Boletos:** (PR #364) permitir **mais de um abatimento e mais de um ressarcimento** no mesmo boleto (hoje só um de cada).
 4. [x] **Mandar o boleto feito à mão por e-mail** (enquanto a API do C6 não sai): em Boletos, anexar o PDF do boleto emitido no banco e enviar ao inquilino pelo Gmail um e-mail curto com o descritivo (como no boleto), o mês de competência, o vencimento e o boleto anexado. Hoje a equipe manda sempre esse e-mail por fora; agora quer mandar pelo sistema. **Feito em 24/11:** na página do boleto, caixa "Boleto emitido no banco (PDF)" (anexar, abrir, trocar, tirar) e botão "Enviar boleto por e-mail" (abre a janela para revisar; vai com o PDF anexado); a lista de Boletos mostra "📎 PDF do banco" e "✉ enviado em ...". **Para conferir:** anexar o PDF de um boleto de verdade e mandar a si mesmo primeiro.
 5. [x] **Conferir tudo o que entra e sai do boleto** (aluguel, proporcional, IPTU, condomínio, seguro, ressarcimentos, abatimentos, multas da notificação, diferenças, caução, acordo, reserva, NF), com testes automáticos e de tela. **Feito em 24/11:** relatório em `CONFERENCIA_BOLETOS_24_11.md` (PRs #365 e #368; 4 decisões suas no fim do relatório).
-6. [x] **Tarifa do boleto no contrato** (pedido de 24/11): os contratos novos dizem que o inquilino reembolsa a tarifa do boleto, com o valor do cadastro. **Falta o dono:** (a) levar ao advogado a minuta do termo aditivo para os contratos já assinados (`documentacao/MINUTA_ADITIVO_TARIFA.md`); (b) decidir se o Novo contrato já vem com a tarifa preenchida (Sistema → Regras do sistema → "Tarifa do boleto cobrada do inquilino que vem preenchida"; hoje em branco). Ex.: R$ 3,50 por boleto, aluguel de R$ 1.900,00 → boleto de R$ 1.903,50.
+6. [x] **Tarifa do boleto no contrato** (pedido de 24/11): os contratos novos dizem que o inquilino reembolsa a tarifa do boleto, com o valor do cadastro. **Falta o dono:** (a) [x] feito: o advogado não aprovou o aditivo (a tarifa vale também nos contratos antigos) e pediu multa e juros fora da tarifa (PR #411); ~~levar ao advogado a minuta do termo aditivo para os contratos já assinados (`documentacao/MINUTA_ADITIVO_TARIFA.md`)~~; (b) decidir se o Novo contrato já vem com a tarifa preenchida (Sistema → Regras do sistema → "Tarifa do boleto cobrada do inquilino que vem preenchida"; hoje em branco). Ex.: R$ 3,50 por boleto, aluguel de R$ 1.900,00 → boleto de R$ 1.903,50.
 
 ### B. Termo de aceite da reserva (decisões do dono em 24/11) — [x] programado em 24/11 (PR #372); falta a leitura e o teste do dono
 
@@ -51,9 +78,10 @@
 **Mudança do mesmo dia (24/11, 2ª decisão):** a empresa fica com **100%** da reserva na desistência depois do depósito (antes 40%), **sem prazo** de devolução total (antes 7 dias), com o aviso em destaque antes do aceite e do pagamento; texto dos documentos com exemplos ("renda diferente da declarada, emprego que a empresa não confirma, documento com dados alterados ou de outra pessoa"). Tudo continua configurável em Regras do sistema, com o risco escrito na explicação.
 
 **Ainda falta o dono:**
+- [ ] Reler o termo com os ajustes do advogado e as correções de 24–25/11 (documentos em 7 dias corridos; reserva de 7 dias; a empresa pode desistir com ou sem justificativa; reabrir a análise dá mais 3 dias).
 - [ ] Ler o termo inteiro (ficha de teste → caixa do termo → "Ver o termo como a pessoa vai ler" ou o PDF), principalmente o aviso em destaque e os itens 6 e 7, e testar o link com um conhecido.
 - [ ] Conferir em Sistema → Empresas o campo "Conta para depósito da caução e da reserva" (vai no termo e no comprovante).
-- [ ] Decidir se o termo diz o que acontece quando **a empresa** desiste (a lei das arras manda devolver em dobro, CC art. 418; hoje o termo não fala nisso; com a retenção de 100%, a reciprocidade ajuda a defender a regra).
+- [x] (Decidido em 24–25/11, PR #413: o termo **não** fala em dobro; no sistema, "A empresa desiste desta reserva" com justificativa = devolução simples, sem justificativa = aviso do dobro, aceitando outro valor com quitação total.) Decidir se o termo diz o que acontece quando **a empresa** desiste (a lei das arras manda devolver em dobro, CC art. 418; hoje o termo não fala nisso; com a retenção de 100%, a reciprocidade ajuda a defender a regra).
 
 Pedido original (histórico):
 1. **Desistência:** em até 7 dias devolve tudo. Depois de 7 dias a empresa fica com **40%** (reserva de R$ 500,00: devolve R$ 300,00 e fica com R$ 200,00); **falta confirmar se 40% é aceitável pela lei** (o Claude explicou os riscos no chat de 24/11). Ficha reprovada: devolve tudo. "Documento falso": o dono quer ficar com tudo, mas perguntou se pode acusar sem prova. **Em aberto até ele responder** (sugestão do Claude: no texto, não falar em "falso"; falar em "informação ou documento que não se confirma na conferência", e tratar como desistência).
@@ -67,7 +95,7 @@ Pedido original (histórico):
 4. [x] **Taxas e cobranças extras:** trazer a lista do que pode ser cobrado do inquilino (com a lei de cada uma) para o dono decidir. **Feito em 24/11:** `TAXAS_COBRAVEIS.md` (e o PDF), com uma pergunta sim/não para cada taxa. **Falta o dono decidir**; depois o Claude escreve as cláusulas para o advogado conferir.
 5. [ ] **Busca geral com vários agentes ao mesmo tempo:** erros, partes quebradas, regras que deixaram de ser usadas; comparar com a memória e a documentação o que foi feito e o que deixou de ser feito, **quando** e **por quê** (o que foi implementado, o que foi tirado e a decisão). Tudo em **PDF** e documentado. Depois, listar o que ainda falta e começar as correções. **Parte feita em 24/11:** `HISTORICO_DO_SISTEMA.md` (e o PDF): o histórico por assunto (feito, tirado e por quê, pela metade) e a lista "O que ainda falta fazer" em ordem de prioridade. Falta a busca de erros e partes quebradas e começar as correções.
    - Busca de erros feita em 24/11: 52 erros confirmados em `BUSCA_24_11.md` (e o PDF "Busca de erros - 24-11.pdf"); correções em 4 lotes; decisões suas no início do relatório.
-6. [ ] **No fim:** arquivar, salvar e compactar código e documentação para facilitar a consulta de memória (índice de ponta a ponta).
+6. [ ] (25/11: índice `INDICE.md` e 1º arquivamento na PR #410; falta o dono decidir a lista de limpeza.) **No fim:** arquivar, salvar e compactar código e documentação para facilitar a consulta de memória (índice de ponta a ponta).
 7. [x] **Resumo do contrato em perguntas e respostas** (pedido de 24/11): última página dos dois modelos de contrato, com as respostas tiradas das cláusulas e os valores de cada contrato (vencimento, atraso com exemplo em reais, reajuste, prazo, saída antes do fim, contas, consertos, reformas, sublocação, animais, garantia, vistoria e o que é cobrado na saída). Entra sozinho nos modelos já gravados (onde o fim do texto não foi mudado à mão). **Falta o dono:** ler `Resumo do contrato - para revisar.pdf` (raiz do projeto, 3 exemplos) e anotar o que mudar. O bloco está pronto para o termo de aceite da reserva (`RESUMO_CONTRATO`).
 
 A simulação de todas as etapas (item 5b) fica para depois que o Claude fizer as etapas acima (decisão de 24/11).
@@ -89,11 +117,11 @@ Tudo o que foi pedido até 22/11 está na `main` (PRs #335 a #361). O que **voc�
    2. Na mesma caixa: **Ligar a assinatura digital**.
    3. Testar: abrir um recibo → **Enviar para assinar** → esperar cerca de 1 minuto → **Baixar PDF assinado** → conferir em <https://validar.iti.gov.br> (e no Adobe). Mandar ao Claude qualquer mensagem de erro.
    4. **Renovar o certificado antes de 02/01/2027:** o aviso aparece na caixa e no Painel a partir de 03/12/2026.
-   5. Ainda sem o botão de assinar: carta de reajuste, termos aditivos e contrato (pedir ao Claude quando quiser).
+   5. [x] ~~Ainda sem o botão de assinar: carta de reajuste, termos aditivos e contrato~~ (feito em 24/11, PR #412; só a empresa assina digitalmente, os outros como antes).
 3. [ ] **Conferir as páginas novas de Sistema** (#358, "Dados e backup" virou Sistema) no computador e no celular: Empresas (com o certificado), Banco, Comunicação E-mail, Modelos de documentos e LGPD.
 4. [ ] **Testar os PDFs** (computador e celular Android): Sistema → **Teste dos PDFs (temporário)**. Baixar um por um, ver se sai certo e anotar os textos a mudar. Depois o Claude apaga essa página (`PENDENCIAS_4000.md`, itens 1 e 6).
 5. [ ] **Conferir as mudanças de 21/11** (na `main`, testadas pelo Claude, falta você ver no dia a dia): troca de titular fecha 30/30 (#337); declaração do IR só do que cada um pagou (#336); comunicado de contatos vai também ao solidário e ao representante (#339); página do inquilino com as duas NFs (#340); "Novo pedido de reserva" (#338); botão "Ir" em Contas do imóvel (#341); PDF comprido no iPhone (#342); link da ficha mandado de novo continua valendo (#343); aviso de endereço com dado errado (#344); ajuste do boleto que entra na NF (#345); pago a mais "a devolver" e botão "Devolvi" (#346); termo aditivo pergunta "valeu?" ao apagar (#347); "Adiar ou mudar a data" da saída (#349); recibo da devolução da garantia (#351). Também: abrir a página de privacidade no endereço de verdade (item nuvem-012).
-6. [ ] **Taxas e cobranças extras (pesquisa de 21/11, resposta no chat):** a lei põe vistoria, contrato e análise de ficha no locador (Lei 8.245/91, arts. 22 VII e 43). Decidir se o Claude prepara o texto das cláusulas novas (despesas de cobrança, visita perdida, serviço extra pedido pelo inquilino) para o advogado conferir, ou se calcula antes quanto cada contrato custa para embutir no aluguel.
+6. [x] (Decidido em 24/11: compilados das taxas, cláusulas aprovadas pelo advogado na PR #406.) **Taxas e cobranças extras (pesquisa de 21/11, resposta no chat):** a lei põe vistoria, contrato e análise de ficha no locador (Lei 8.245/91, arts. 22 VII e 43). Decidir se o Claude prepara o texto das cláusulas novas (despesas de cobrança, visita perdida, serviço extra pedido pelo inquilino) para o advogado conferir, ou se calcula antes quanto cada contrato custa para embutir no aluguel.
 7. [ ] **Pendências antigas que continuam** (detalhes abaixo): comunicado de contatos com um inquilino de teste (4b); conferências 4c a 4f; ficha pela internet com um conhecido (5); simular todas as etapas (5b); C6 quando liberar as chaves (7); **16/12/2026: CBS 2027**.
 8. [ ] **Limpeza das cópias de trabalho** (`PENDENCIAS_4000.md` item 7): só no fim, depois dos itens acima; o Claude pergunta antes de apagar.
 
@@ -120,7 +148,7 @@ Marque com `[x]` o que for concluindo.
 4e. [ ] **Regras especiais (#322):** em Regras do sistema, criar uma regra especial e pôr num contrato de teste; conferir o boleto (entrada em 15/02, aluguel R$ 1.800,00: R$ 900,00 pelos dias reais, R$ 960,00 pelas regras do sistema).
 4f. [ ] **Telas de 19/11 (#323, #324, #326):** Inquilinos sem os botões de Solicitações/Notificações (ficam em Comunicações); "Nova solicitação de reserva" abre o formulário curto; em Solicitações, "abertas" mostra só as abertas. (#325, data de conclusão, conferida em 19/11.)
 5. [ ] Ficha pela internet com um conhecido (item 3). **Próximo** (19/11: o dono vai fazer; começa por "Nova solicitação de reserva").
-5b. [ ] **Simular todas as etapas com pessoas de teste** (pedido do dono, 18/11): ficha, aprovação, contrato, entrada, boletos, notificação, saída e devolução, com os e-mails de cada etapa saindo de verdade para endereços de teste, e ir corrigindo e melhorando os textos dos e-mails e documentos (item 3b).
+5b. [x] (O Claude simulou em 24/11: `SIMULACAO_ETAPAS_24_11.md`, PR #416; erros da troca de titular corrigidos na #422.) **Simular todas as etapas com pessoas de teste** (pedido do dono, 18/11): ficha, aprovação, contrato, entrada, boletos, notificação, saída e devolução, com os e-mails de cada etapa saindo de verdade para endereços de teste, e ir corrigindo e melhorando os textos dos e-mails e documentos (item 3b).
 6. [x] Contador: informe do IR (D5), DIMOB e numeração da NF: **encerrado em 17/11** (resposta do contador; nada muda no sistema; ver item 6).
 7. [ ] Quando o C6 liberar: chaves + boleto de teste (decidir o corte do texto e conferir o desconto) (item 5).
 8. [ ] Depois do C6 no ar: rever a sugestão do tipo de despesa pela descrição (ex.: SANEPAR → Água).
@@ -241,7 +269,7 @@ Foi testado no computador, numa cópia do sistema. Falta um teste completo no en
 
 Ponto que ainda não testei na tela depois das últimas correções: a janela do **Trazer para a ficha**. Se algo estranho aparecer, me mande um print.
 
-### 3b. Simular todas as etapas e melhorar os textos  `[ ]`
+### 3b. Simular todas as etapas e melhorar os textos  `[x]` (simulado pelo Claude em 24/11, `SIMULACAO_ETAPAS_24_11.md`)
 
 **Pedido do dono em 18/11:** são muitas etapas e muitos e-mails; simular o caminho inteiro com pessoas de teste (e-mails de teste da própria equipe, CPF de teste) e ir corrigindo os textos. Roteiro sugerido, uma etapa por vez, o dono lendo cada e-mail e documento que chega e dizendo o que mudar: ficha pela internet (recebemos seus dados, falta documento, pronta para assinar) → aprovação e contrato → entrada (vistoria, recibos da reserva e da garantia) → boletos e NF → notificação ao inquilino → reajuste → saída (devolução das chaves, vistoria de saída, cálculo final, devolução da garantia). Modelos em `modelos-email.js` (e editáveis na tela); textos dos recibos em `recibos.js`. No fim, excluir as pessoas e contratos de teste.
 
