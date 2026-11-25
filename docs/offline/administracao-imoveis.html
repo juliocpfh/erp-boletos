@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-/svYK4wWkxIiW/D4etIGO9xvQqYzVGjO/9WB+1Sc3K0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-Mq04zMZSsCRtIiVZjGczaLybQt4XAqzQz5fbm/UsHNo='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="a0dd16281bd535ad">
+<meta name="fontes" content="dcbc6a47a263b537">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -3560,7 +3560,7 @@ Sem o pagamento, o débito poderá ser cobrado do LOCATÁRIO e {f:do FIADOR|dos 
     texto3 = atualizarTextoDocumento(tipo, texto3);
     return texto3;
   }
-  var VISTORIA_ENTRADA, VISTORIA_ENTRADA_1211, SEM_AVISO, REPRESENTACAO, LGPD, PARTES, ITENS, PRAZO_ANTIGO, PRAZO_PARAGRAFO, TARIFA_BOLETO, DESPESAS_A_QUALQUER_TEMPO, EXTRAORDINARIAS, ALUGUEL, CONSERVACAO, CLAUSULAS_FCI, SEGURO_ANTIGO, SEGURO_INCENDIO, RESTITUICAO, MULTA, RESCISAO, GARANTIA, CONVITE_SAIDA, NEGATIVACAO, FECHO_CONTRATO, TARIFA_RESUMO, TARIFA_RESUMO_ANTIGA, RESUMO_CONTRATO, DIA_NAO_UTIL_ANTIGO, DIA_NAO_UTIL, RESUMO_FIM, RESUMO_FIM_COM_ANIMAIS, FINAIS, CONDOMINIO, ADITIVO_VENCIMENTO, ADITIVO_VALOR, ACERTO_POUPANCA, DEVOLUCAO_POUPANCA, ACERTO_CAUCAO_ANTIGO, ACERTO_DEPOSITO_ANTIGO, DEVOLUCAO_ANTIGA, GARANTIA_NOVA_TROCA, CONTAS_TROCA_ANTIGA, CONTAS_TROCA, ADITIVO_TROCA, MODELOS_PADRAO, ENDERECO_PARAGRAFO, ATUALIZACOES_MODELO;
+  var VISTORIA_ENTRADA, VISTORIA_ENTRADA_1211, SEM_AVISO, REPRESENTACAO, LGPD, PARTES, ITENS, PRAZO_ANTIGO, PRAZO_PARAGRAFO, TARIFA_BOLETO, DESPESAS_A_QUALQUER_TEMPO, EXTRAORDINARIAS, ATRASO_ANTIGO, MARCA_HONORARIOS, ATRASO_E_COBRANCA, SERVICOS_EXTRAS, ALUGUEL, VISTORIA_AGENDADA, VISITA_PERDIDA, CONSERVACAO, CLAUSULAS_FCI, SEGURO_ANTIGO, SEGURO_INCENDIO, ENTREGA, PINTURA_SAIDA, RESTITUICAO, MULTA_ENCARGOS_ANTIGO, MULTA_ENCARGOS, MULTA, RESCISAO, GARANTIA, CONVITE_SAIDA, NEGATIVACAO, FECHO_CONTRATO, TARIFA_RESUMO, TARIFA_RESUMO_ANTIGA, TRANSFERIDO, TRANSFERIDO_PF, RESUMO_CONTRATO, DIA_NAO_UTIL_ANTIGO, DIA_NAO_UTIL, RESUMO_FIM, RESUMO_FIM_COM_ANIMAIS, HONORARIOS_EM_QUALQUER_CASO, FINAIS, CONDOMINIO, ADITIVO_VENCIMENTO, ADITIVO_VALOR, ACERTO_POUPANCA, DEVOLUCAO_POUPANCA, ACERTO_CAUCAO_ANTIGO, ACERTO_DEPOSITO_ANTIGO, DEVOLUCAO_ANTIGA, GARANTIA_NOVA_TROCA, CONTAS_TROCA_ANTIGA, CONTAS_TROCA, ADITIVO_TROCA, MODELOS_PADRAO, ENDERECO_PARAGRAFO, ATUALIZACOES_MODELO;
   var init_modelos_contrato = __esm({
     "docs/js/modelos-contrato.js"() {
       init_modelos_documentos();
@@ -3610,7 +3610,21 @@ Os signatários que contratam nas qualidades indicadas neste contrato têm entre
       TARIFA_BOLETO = "**Parágrafo** – O LOCATÁRIO reembolsará, junto com cada aluguel, a tarifa bancária de emissão do boleto[se tarifa_boleto], hoje de {tarifa_boleto}[fim], pelo valor cobrado pelo banco.";
       DESPESAS_A_QUALQUER_TEMPO = "**Parágrafo** – As despesas de responsabilidade do LOCATÁRIO poderão ser cobradas a qualquer tempo";
       EXTRAORDINARIAS = "[se condominio]**Parágrafo** – As despesas extraordinárias de condomínio, como obras de reforma ou acréscimo à estrutura do prédio, pintura das fachadas e áreas externas, indenizações trabalhistas anteriores ao início da locação, equipamentos de segurança, lazer e esporte e a constituição do fundo de reserva, são de responsabilidade {l:da LOCADORA|das LOCADORAS} (Lei nº 8.245/91, art. 22, X).[fim]\n\n";
-      ALUGUEL = (honorarios) => `## ALUGUEL E ENCARGOS
+      ATRASO_ANTIGO = (honorarios) => `**Parágrafo segundo** – O aluguel não pago no seu vencimento, além de não fazer jus à bonificação de pagamento com pontualidade, estará sujeito a cobrança pelo departamento jurídico, judicial ou extrajudicial, arcando o LOCATÁRIO com as despesas dela decorrentes, multa de {multa}, juros de {juros} ao mês e ${honorarios}.`;
+      MARCA_HONORARIOS = "Passados 30 (trinta) dias de atraso e depois de aviso por escrito ao LOCATÁRIO";
+      ATRASO_E_COBRANCA = `**Parágrafo segundo** – O aluguel não pago no vencimento, além de não fazer jus à bonificação de pontualidade, ficará sujeito a multa de {multa} e juros de {juros} ao mês, contados por dia de atraso.
+
+**Parágrafo terceiro** – Os valores pagos com atraso serão atualizados monetariamente pela variação do IPCA (IBGE), do vencimento até o pagamento, além da multa e dos juros previstos neste contrato.
+
+**Parágrafo quarto** – ${MARCA_HONORARIOS}, {l:a LOCADORA poderá|as LOCADORAS poderão} passar a cobrança a advogado com inscrição ativa na OAB, que pode ser sócio {l:da própria LOCADORA|de uma das LOCADORAS}; nesse caso, e somente se houver efetiva atuação do advogado (notificação assinada por ele, negociação ou preparação de ação), o LOCATÁRIO pagará honorários de 10% (dez por cento) sobre o valor devido. A mesma regra vale em favor do LOCATÁRIO, se ele precisar contratar advogado para cobrar {l:da LOCADORA|das LOCADORAS} obrigação vencida deste contrato.
+
+**Parágrafo quinto** – Se o débito for pago para evitar a rescisão na ação de despejo (Lei nº 8.245/91, art. 62, II), serão devidos também os honorários do advogado {l:da LOCADORA|das LOCADORAS}, de 20% (vinte por cento) sobre o valor devido; nas demais cobranças judiciais, valem os honorários fixados pelo juiz.
+
+**Parágrafo sexto** – Em caso de atraso, o LOCATÁRIO reembolsará as despesas efetivamente pagas a terceiros para a cobrança (como notificação por cartório ou carta registrada, protesto, certidões e custas), pelo valor exato do comprovante, que ficará à sua disposição.
+
+**Parágrafo sétimo** – Pagamento devolvido ou estornado não quita o aluguel; serão devidos a multa, os juros e a tarifa bancária comprovada.`;
+      SERVICOS_EXTRAS = "**Parágrafo** – Serviços pedidos pelo LOCATÁRIO que não sejam obrigação {l:da LOCADORA|das LOCADORAS} (como cópia de chaves, troca de fechadura ou de segredo, controle de portão) serão cobrados pelo custo comprovado, no boleto seguinte.";
+      ALUGUEL = `## ALUGUEL E ENCARGOS
 
 [se indeterminado]**CLÁUSULA #** – A locação é por prazo indeterminado, a contar de {data_inicio}, podendo qualquer das partes encerrá-la mediante notificação por escrito com 30 (trinta) dias de antecedência, devendo o imóvel ser restituído nas mesmas condições em que o LOCATÁRIO o recebeu, conforme relatório de vistoria.[senão]**CLÁUSULA #** – O prazo de locação é de {prazo_meses} meses, a contar de {data_inicio}, com término em {data_fim}, data esta em que cessará de pleno direito a presente locação, independentemente de qualquer aviso ou notificação judicial ou extrajudicial, devendo o imóvel ser restituído nas mesmas condições em que o LOCATÁRIO o recebeu, conforme relatório de vistoria.
 
@@ -3620,17 +3634,21 @@ ${PRAZO_PARAGRAFO}[fim]
 
 **Parágrafo primeiro** – Caso o índice acumulado no período seja negativo, o valor do aluguel permanecerá inalterado, vedada qualquer redução no valor nominal da locação.
 
-**Parágrafo segundo** – O aluguel não pago no seu vencimento, além de não fazer jus à bonificação de pagamento com pontualidade, estará sujeito a cobrança pelo departamento jurídico, judicial ou extrajudicial, arcando o LOCATÁRIO com as despesas dela decorrentes, multa de {multa}, juros de {juros} ao mês e ${honorarios}.
+${ATRASO_E_COBRANCA}
 
 **CLÁUSULA #** – As despesas de {encargos_inquilino}, assim como suas respectivas majorações, ficam a cargo do LOCATÁRIO.[se tem_incluso] O valor do aluguel contempla {encargos_inclusos}, que ficam a cargo {l:da LOCADORA|das LOCADORAS}.[fim]
 
 [se tem_incluso]**Parágrafo** – Tarifas e taxas adicionais além das contas incluídas, como contratações adicionais, serviços solicitados unilateralmente, multas aplicadas pelo condomínio e pelo poder público e a responsabilidade civil e criminal perante o condomínio e terceiros, são de responsabilidade do LOCATÁRIO, que se obriga a ter consumo responsável de energia elétrica, água e gás e a comunicar imediatamente qualquer vazamento.[fim]
+
+${SERVICOS_EXTRAS}
 
 ${EXTRAORDINARIAS}[se iptu_inquilino]**Parágrafo** – Fica estabelecido entre as partes que o Imposto Predial e Territorial Urbano (IPTU) correrá por conta do LOCATÁRIO e será cobrado junto com o vencimento do aluguel[se seguro_inquilino], bem como o seguro incêndio do imóvel[fim].[fim]
 
 ${TARIFA_BOLETO}
 
 **Parágrafo** – As despesas de responsabilidade do LOCATÁRIO poderão ser cobradas a qualquer tempo, mesmo após a rescisão do contrato e a restituição do imóvel, quando forem detectadas despesas, reparações de danos, multas, contas em atraso, execuções judiciais ou extrajudiciais e tudo o mais concernente ao período em que o imóvel foi ocupado pelo LOCATÁRIO.`;
+      VISTORIA_AGENDADA = "{l:à LOCADORA|às LOCADORAS} examinar ou vistoriar o imóvel locado quando entender conveniente, mediante agendamento prévio.";
+      VISITA_PERDIDA = "**Parágrafo único** – Se o LOCATÁRIO não comparecer ou não permitir o acesso na data e hora marcadas com pelo menos 48 (quarenta e oito) horas de aviso por escrito, pagará o custo comprovado da nova visita ou vistoria, cobrado no boleto seguinte.";
       CONSERVACAO = `## UTILIZAÇÃO E CONSERVAÇÃO
 
 **CLÁUSULA #conservacao** – O LOCATÁRIO, salvo as obras que importem na segurança do imóvel, obriga-se por todas as outras, devendo trazer o imóvel locado em boas condições de higiene e limpeza, com os aparelhos sanitários e de iluminação, manutenção e limpeza de telhados e calhas, vidraças, torneiras, pias, banheiros, ralos, trincos, piso, pintura de paredes e demais acessórios em perfeito estado de conservação e funcionamento, para assim restituí-los quando findo ou rescindido este contrato, sem direito a retenção ou indenização por quaisquer benfeitorias, ainda que necessárias ou úteis, as quais ficarão desde logo incorporadas ao imóvel.
@@ -3657,7 +3675,9 @@ ${TARIFA_BOLETO}
 
 **CLÁUSULA #** – Não é permitida a transferência deste contrato, nem a sublocação, cessão ou empréstimo total ou parcial do imóvel, sem o prévio consentimento por escrito {l:da LOCADORA|das LOCADORAS}.
 
-**CLÁUSULA #** – O LOCATÁRIO desde já faculta {l:à LOCADORA|às LOCADORAS} examinar ou vistoriar o imóvel locado quando entender conveniente, mediante agendamento prévio.`;
+**CLÁUSULA #** – O LOCATÁRIO desde já faculta {l:à LOCADORA|às LOCADORAS} examinar ou vistoriar o imóvel locado quando entender conveniente, mediante agendamento prévio.
+
+${VISITA_PERDIDA}`;
       CLAUSULAS_FCI = `[se fci]## FUNDO DE CONSERVAÇÃO DO IMÓVEL (FCI)
 
 **CLÁUSULA #fci** – Além do aluguel, o LOCATÁRIO pagará mensalmente, no mesmo boleto e vencimento do aluguel, a contribuição ao Fundo de Conservação do Imóvel (FCI), correspondente a {fci_percentual} do valor do aluguel com bonificação do mês, calculada proporcionalmente aos dias de ocupação no primeiro e no último mês da locação. Nos meses sem cobrança de aluguel (carência), não há contribuição.
@@ -3679,9 +3699,13 @@ ${TARIFA_BOLETO}
 **Parágrafo oitavo** – Havendo transferência do contrato a novo titular, com a anuência {l:da LOCADORA|das LOCADORAS}, o saldo do FCI acompanha a locação e será acertado com o titular que entregar as chaves, salvo ajuste diverso, por escrito, entre os titulares.[fim]`;
       SEGURO_ANTIGO = "[se residencial]**Parágrafo primeiro** – Diante da responsabilidade acima, o LOCATÁRIO autoriza desde já que seja feito o seguro de incêndio do imóvel locado, sendo seus prêmios e despesas por sua exclusiva conta, cobrados juntamente com o aluguel, já a partir do primeiro a vencer.[senão]**Parágrafo primeiro** – Diante da responsabilidade acima, o LOCATÁRIO deve apresentar apólice de cobertura de incêndio em até 30 (trinta) dias corridos da data de assinatura deste contrato ou contratá-la junto à administradora, sendo os prêmios e despesas por sua exclusiva conta, cobrados juntamente com o aluguel, já a partir do primeiro a vencer.[fim]\r";
       SEGURO_INCENDIO = `[se seguro_incluso]**Parágrafo primeiro** – O seguro contra incêndio do imóvel é contratado {l:pela LOCADORA|pelas LOCADORAS} e o seu custo já está incluído no valor do aluguel, sem cobrança à parte do LOCATÁRIO.[senão]${SEGURO_ANTIGO}[fim]`;
+      ENTREGA = "**CLÁUSULA #** – Na ocasião do encerramento da relação locatícia, seja por término do contrato, rescisão ou despejo, o imóvel deverá ser entregue {l:à LOCADORA|às LOCADORAS} livre e desocupado de pessoas ou coisas, de forma a poder ser imediatamente ocupado por outrem, sem depender de reparos, limpezas ou reformas, na mesma forma e condições de apresentação e conservação em que foi entregue ao LOCATÁRIO.";
+      PINTURA_SAIDA = "**Parágrafo único** – Quanto à pintura, na entrega do imóvel: (a) se o relatório de vistoria de entrada registrar pintura nova, o LOCATÁRIO devolverá o imóvel pintado, nas mesmas cores e com material de qualidade equivalente, ou pagará {l:à LOCADORA|às LOCADORAS} o valor do orçamento da pintura; (b) se o relatório não registrar pintura nova, o LOCATÁRIO pagará a parte do orçamento da pintura proporcional ao tempo que faltar para completar a vida útil da pintura, de {pintura_vida} contados da entrada no imóvel, nada sendo devido a esse título depois de {pintura_vida} de ocupação. O relatório de vistoria de entrada, com fotos, basta para provar o estado da pintura recebida, salvo contravistoria. Em qualquer caso, o LOCATÁRIO responde também pelos danos que não decorram do uso normal (como furos, manchas, riscos, rabiscos, marcas de fita e mofo por falta de ventilação), pelo valor do orçamento ou da nota do serviço. O orçamento ficará à disposição do LOCATÁRIO, que poderá apresentar outro, de profissional da sua escolha, até a devolução das chaves.";
       RESTITUICAO = `${VISTORIA_ENTRADA}
 
-**CLÁUSULA #** – Na ocasião do encerramento da relação locatícia, seja por término do contrato, rescisão ou despejo, o imóvel deverá ser entregue {l:à LOCADORA|às LOCADORAS} livre e desocupado de pessoas ou coisas, de forma a poder ser imediatamente ocupado por outrem, sem depender de reparos, limpezas ou reformas, na mesma forma e condições de apresentação e conservação em que foi entregue ao LOCATÁRIO.
+${ENTREGA}
+
+${PINTURA_SAIDA}
 
 **CLÁUSULA #** – Responderá o LOCATÁRIO pelo incêndio do imóvel, se não provar caso fortuito ou força maior, vício de construção ou propagação de fogo originado de outro prédio.
 
@@ -3700,11 +3724,13 @@ ${CLAUSULAS_FCI}
 **CLÁUSULA #** – O presente contrato poderá ser renovado, desde que haja concordância e interesse de ambas as partes.
 
 **Parágrafo único** – No caso de renovação deste contrato, {l:a LOCADORA poderá|as LOCADORAS poderão} exigir novo contrato escrito e a substituição de garantias, se {l:entender|entenderem} que as anteriormente dadas não são suficientes.`;
-      MULTA = (saida, honorarios) => `## MULTA CONTRATUAL
+      MULTA_ENCARGOS_ANTIGO = (honorarios) => `**Parágrafo primeiro** – Além da multa, a parte infratora arcará com todas as despesas e custas judiciais ou extrajudiciais, juros de mora e ${honorarios}.`;
+      MULTA_ENCARGOS = "**Parágrafo primeiro** – Além da multa, a parte infratora arcará com os juros de mora, as custas e as despesas comprovadas da cobrança e os honorários previstos na cláusula do aluguel e encargos.";
+      MULTA = (saida) => `## MULTA CONTRATUAL
 
 **CLÁUSULA #multa** – Fica estipulada a multa no valor de três meses de aluguel, a ser paga pela parte que infringir qualquer cláusula do contrato[se fiador], obrigando também {f:o FIADOR|os FIADORES} a pagar pelo LOCATÁRIO[fim][se caucao], autorizado o pagamento desta multa com o valor dado em caução[fim], inclusive no caso de despejo por falta de pagamento de aluguel, com a faculdade, para a parte inocente, de considerar simultaneamente rescindida a locação, independentemente de qualquer formalidade.
 
-**Parágrafo primeiro** – Além da multa, a parte infratora arcará com todas as despesas e custas judiciais ou extrajudiciais, juros de mora e ${honorarios}.
+${MULTA_ENCARGOS}
 
 **Parágrafo segundo** – No caso de desocupação do imóvel antes do fim do contrato, será cobrada ${saida}. A desocupação deverá ser comunicada por escrito, com 30 (trinta) dias de antecedência, por e-mail {l:à LOCADORA|às LOCADORAS}.`;
       RESCISAO = (horas) => `## RESCISÃO CONTRATUAL
@@ -3750,6 +3776,8 @@ ${CLAUSULAS_FCI}
       FECHO_CONTRATO = "herdeiros e sucessores a qualquer título.\n\n> {cidade}, {data_assinatura}.\n\n[assinaturas]";
       TARIFA_RESUMO = " O LOCATÁRIO também paga, junto com cada aluguel, a tarifa bancária de emissão do boleto[se tarifa_boleto], hoje de {tarifa_boleto}[fim], pelo valor cobrado pelo banco.";
       TARIFA_RESUMO_ANTIGA = "[se tarifa_boleto] O LOCATÁRIO também paga, junto com cada aluguel, a tarifa bancária de emissão do boleto, hoje de {tarifa_boleto}.[fim]";
+      TRANSFERIDO = " A lei dispensa essa multa quando o LOCATÁRIO é transferido pelo empregador para outra cidade e avisa com 30 (trinta) dias de antecedência (Lei nº 8.245/91, art. 4º).";
+      TRANSFERIDO_PF = `[se não pj]${TRANSFERIDO}[fim]`;
       RESUMO_CONTRATO = `[nova página]
 
 ## RESUMO DO CONTRATO EM PERGUNTAS E RESPOSTAS
@@ -3774,7 +3802,7 @@ A cada 12 (doze) meses, sempre sobre o último valor corrigido, pela variação 
 
 **5. Posso sair antes do fim do contrato?**
 
-Pode. É preciso avisar por escrito, por e-mail, com 30 (trinta) dias de antecedência. Sem esse aviso, paga-se o valor de 1 (um) mês de aluguel e encargos.[se não indeterminado] Saindo antes de {data_fim}, há também a multa de 3 (três) meses de aluguel, proporcional ao tempo que falta para terminar o contrato. {exemplo_saida} A lei dispensa essa multa quando o LOCATÁRIO é transferido pelo empregador para outra cidade e avisa com 30 (trinta) dias de antecedência (Lei nº 8.245/91, art. 4º).[fim]
+Pode. É preciso avisar por escrito, por e-mail, com 30 (trinta) dias de antecedência. Sem esse aviso, paga-se o valor de 1 (um) mês de aluguel e encargos.[se não indeterminado] Saindo antes de {data_fim}, há também a multa de 3 (três) meses de aluguel, proporcional ao tempo que falta para terminar o contrato. {exemplo_saida}${TRANSFERIDO_PF}[fim]
 
 **6. Quem paga as contas e os impostos do imóvel?**
 
@@ -3823,11 +3851,10 @@ Não. Ele só ajuda a entender o contrato. Em caso de dúvida ou de diferença, 
 O contrato não proíbe. O LOCATÁRIO responde pelos danos que os animais causarem ao imóvel e deve respeitar as regras do condomínio, quando houver.
 
 ${RESUMO_FIM.replace(/^\*\*(1[0-5])\./gm, (_, n) => `**${Number(n) + 1}.`)}`;
+      HONORARIOS_EM_QUALQUER_CASO = "**CLÁUSULA #** – Tudo quanto for devido em razão deste contrato e que não comporte o processo executivo será cobrado em ação competente, ficando a cargo do devedor, em qualquer caso, os honorários do advogado que o credor constituir para o ressarcimento de seus débitos.\n\n";
       FINAIS = (extra) => `## DISPOSIÇÕES FINAIS
 
 ${REPRESENTACAO}
-
-**CLÁUSULA #** – Tudo quanto for devido em razão deste contrato e que não comporte o processo executivo será cobrado em ação competente, ficando a cargo do devedor, em qualquer caso, os honorários do advogado que o credor constituir para o ressarcimento de seus débitos.
 ${extra}
 ${NEGATIVACAO}
 
@@ -3989,13 +4016,13 @@ ${PARTES}
 
 ${ITENS}
 
-${ALUGUEL("honorários advocatícios de 20% (vinte por cento)")}
+${ALUGUEL}
 
 ${CONSERVACAO}
 
 ${RESTITUICAO}
 
-${MULTA("a multa de 3 (três) meses de aluguel, proporcional ao tempo restante do contrato", "honorários de advogado de 20% (vinte por cento) sobre o valor da ação")}
+${MULTA("a multa de 3 (três) meses de aluguel, proporcional ao tempo restante do contrato")}
 
 ${RESCISAO("72 (setenta e duas) horas")}
 
@@ -4011,7 +4038,7 @@ ${PARTES}
 
 ${ITENS}
 
-${ALUGUEL("honorários de advogado")}
+${ALUGUEL}
 
 ${CONSERVACAO}
 
@@ -4019,7 +4046,7 @@ ${CONDOMINIO}
 
 ${RESTITUICAO}
 
-${MULTA("a multa de 3 (três) meses de aluguel, proporcional ao tempo restante do contrato", "honorários de advogado")}
+${MULTA("a multa de 3 (três) meses de aluguel, proporcional ao tempo restante do contrato")}
 
 ${RESCISAO("48 (quarenta e oito) horas")}
 
@@ -4093,6 +4120,22 @@ ${DESPESAS_A_QUALQUER_TEMPO}`, "O LOCATÁRIO reembolsará, junto com cada alugue
 **CLÁUSULA #** – O LOCATÁRIO[se fiador] e {f:o FIADOR|os FIADORES} aceitam[senão] aceita[fim] como válidas todas as comunicações`, "depois do aviso prévio feito pelo próprio órgão"],
         ["Contrato de Locação {finalidade} do imóvel {objeto},", "Contrato de Locação {finalidade} que tem por objeto {objeto},"],
         [" úteis para providenciar a vistoria do imóvel. O aluguel e os encargos", ` úteis para providenciar a vistoria do imóvel. ${CONVITE_SAIDA} O aluguel e os encargos`, "convidado por escrito, por e-mail, a acompanhar a vistoria"],
+        // cláusulas aprovadas pelo advogado em 24/11/2026 (itens 3.1 a 3.5 e 4.1 a 4.5): a cláusula dos honorários "em qualquer caso"
+        // sai antes da troca dos parágrafos do atraso (o sinal de feito é o texto novo dos honorários)
+        [HONORARIOS_EM_QUALQUER_CASO, "", MARCA_HONORARIOS],
+        [ATRASO_ANTIGO("honorários advocatícios de 20% (vinte por cento)"), ATRASO_E_COBRANCA, MARCA_HONORARIOS],
+        [ATRASO_ANTIGO("honorários de advogado"), ATRASO_E_COBRANCA, MARCA_HONORARIOS],
+        [MULTA_ENCARGOS_ANTIGO("honorários de advogado de 20% (vinte por cento) sobre o valor da ação"), MULTA_ENCARGOS],
+        [MULTA_ENCARGOS_ANTIGO("honorários de advogado"), MULTA_ENCARGOS],
+        [EXTRAORDINARIAS, `${SERVICOS_EXTRAS}
+
+${EXTRAORDINARIAS}`, "Serviços pedidos pelo LOCATÁRIO que não sejam obrigação"],
+        [VISTORIA_AGENDADA, `${VISTORIA_AGENDADA}
+
+${VISITA_PERDIDA}`, "pagará o custo comprovado da nova visita ou vistoria"],
+        [ENTREGA, `${ENTREGA}
+
+${PINTURA_SAIDA}`, "Quanto à pintura, na entrega do imóvel"],
         // resumo em perguntas e respostas na última página (24/11/2026): só nos contratos, onde o fecho continua igual
         [FECHO_CONTRATO, `${FECHO_CONTRATO}
 
@@ -4105,7 +4148,9 @@ ${RESUMO_CONTRATO}`, "RESUMO DO CONTRATO EM PERGUNTAS E RESPOSTAS"],
 **2. O que acontece se eu pagar atrasado?**`, `${DIA_NAO_UTIL}
 
 **2. O que acontece se eu pagar atrasado?**`],
-        [RESUMO_FIM_COM_ANIMAIS, RESUMO_FIM]
+        [RESUMO_FIM_COM_ANIMAIS, RESUMO_FIM],
+        // resumo: a transferência pelo empregador só para pessoa física (item 5.2 do advogado, 24/11/2026)
+        [`${TRANSFERIDO}[fim]`, `${TRANSFERIDO_PF}[fim]`, "[se não pj] A lei dispensa essa multa"]
       ];
     }
   });
@@ -4310,7 +4355,9 @@ ${RESUMO_CONTRATO}`, "RESUMO DO CONTRATO EM PERGUNTAS E RESPOSTAS"],
       data_assinatura: dataPorExtenso(extra.data || hojeIso()),
       // resumo em perguntas e respostas (RESUMO_CONTRATO): exemplos com os valores do contrato
       exemplo_atraso: exemploAtraso(aluguel, c.multa_percentual ?? 2, c.juros_mensal_percentual ?? 1),
-      exemplo_saida: exemploSaida(aluguel, Number(c.prazo_meses) || mesesDoPrazo(c.data_entrada || c.vigencia_inicio, c.vigencia_fim) || 0)
+      exemplo_saida: exemploSaida(aluguel, Number(c.prazo_meses) || mesesDoPrazo(c.data_entrada || c.vigencia_inicio, c.vigencia_fim) || 0),
+      // pintura na entrega do imóvel (cláusula de 24/11/2026, PINTURA_SAIDA): vida útil da regra do contrato, ex.: "48 (quarenta e oito) meses"
+      pintura_vida: `${numeroComExtenso(Number(regra("pintura_vida_meses", c)))} meses`
     };
     const condicoes = {
       fiador: temFiador2,
@@ -5112,7 +5159,8 @@ Pix (CNPJ): 58.492.818/0001-59`
         "garantia_depositada",
         "garantia_corrigida",
         "exemplo_atraso",
-        "exemplo_saida"
+        "exemplo_saida",
+        "pintura_vida"
       ];
       camposConhecidos = null;
       escDoc = (v) => String(v ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
