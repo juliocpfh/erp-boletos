@@ -26,7 +26,7 @@ export function assuntoDoDocumento(tipo, v = {}) {
     case 'aditivo_prazo': return `Prorrogação do prazo${Number(v.novo_prazo_meses) > 0 ? `: ${Number(v.novo_prazo_meses)} meses,` : ':'} de ${data('nova_data_inicio')} a ${data('nova_data_fim')}`;
     case 'aditivo_garantia': return `Troca de garantia a partir de ${data('data_troca')}${v.garantia_nova ? `: ${curto(v.garantia_nova, 60)}` : ''}`;
     case 'distrato': return `Distrato: entrega das chaves em ${data('data_saida')}${String(v.multa_combinada || '').trim() ? `, multa de R$ ${String(v.multa_combinada).trim()}` : ', multa dispensada'}`;
-    case 'aviso_desocupacao': return `Aviso de desocupação: entrega prevista em ${data('data_saida_prevista')}`;
+    case 'aviso_desocupacao': return `Aviso de desocupação: entrega prevista em ${data('data_saida_prevista')}${v.transferencia_empregador ? ', sem multa (transferência pelo empregador)' : ''}`;
     case 'notificacao_desocupacao': return `Notificação para desocupar até ${data('data_limite')}`;
     case 'autorizacao_obra': return `Autorização de obra${v.descricao_obra ? `: ${curto(v.descricao_obra, 60)}` : ''}${C.dataValida(v.prazo_obra) ? ` (até ${data('prazo_obra')})` : ''}`;
     case 'declaracao_pagamentos': return `Declaração de pagamentos em dia de ${data('periodo_inicio')} a ${data('periodo_fim')}`;
@@ -77,6 +77,26 @@ export function registrarDocumento(d, contratoId, { tipo, modelo, valores = {}, 
   return { tabela: 'documentos_locacao', registro: r };
 }
 
+/** Menor motivo aceito na retomada pelo art. 47 (o advogado pede uma justificativa crível e fundada, não uma palavra). */
+export const MOTIVO_MINIMO = 30;
+
+/** Notificação para desocupação: vai por carta com AR, e o AR devolvido é o arquivo anexado (a data é a do recebimento). */
+export const ehNotificacaoComAr = (x) => !!(x && x.documento === 'notificacao_desocupacao');
+
+/**
+ * Prazos da notificação para desocupação (advogado, 24/11/2026, item 6.5): o prazo de 30 dias conta do recebimento da carta
+ * (a data do AR anexado); a data limite escrita vale para o recebimento até 30 dias antes dela. Para pedir a liminar, a ação de
+ * despejo é proposta em até 30 dias do fim desse prazo (Lei 8.245/91, art. 59, § 1º, VIII). Ex.: data limite 31/12/2026 e
+ * AR de 10/12/2026 → desocupar até 09/01/2027, ação até 08/02/2027. Sem o AR: { recebida: null } e as datas pela data limite.
+ */
+export function prazosDaNotificacao(x) {
+  const limite = C.dataValida((x && x.campos && x.campos.data_limite) || '');
+  const recebida = x && x.arquivo ? C.dataValida(x.assinado_em || '') || null : null;
+  const pelaCarta = recebida ? C.somarDias(recebida, 30) : '';
+  const desocupar = [limite, pelaCarta].filter(Boolean).sort().pop() || '';
+  return { recebida, desocupar: desocupar || null, acaoAte: desocupar ? C.somarDias(desocupar, 30) : null };
+}
+
 /** Anexa a via assinada de um documento (fora os termos aditivos, que passam por "Marcar assinado" dos termos). */
 export function anexarDocumento(d, id, { data, arquivo }, usuario) {
   const x = R.buscar(d, 'documentos_locacao', id);
@@ -84,7 +104,7 @@ export function anexarDocumento(d, id, { data, arquivo }, usuario) {
   if (!C.dataValida(data)) throw new C.ErroUsuario('Informe a data da assinatura.');
   if (!arquivo) throw new C.ErroUsuario('Anexe o arquivo assinado.');
   const c = R.buscar(d, 'contratos', x.contrato_id);
-  R.atualizar(d, 'documentos_locacao', x.id, { arquivo, assinado_em: data }, usuario, `${c ? c.inquilino_nome : 'Contrato'}: ${x.nome} de ${C.dataBr(x.data)} assinado em ${C.dataBr(data)}`);
+  R.atualizar(d, 'documentos_locacao', x.id, { arquivo, assinado_em: data }, usuario, `${c ? c.inquilino_nome : 'Contrato'}: ${x.nome} de ${C.dataBr(x.data)} ${ehNotificacaoComAr(x) ? 'recebida (AR)' : 'assinado'} em ${C.dataBr(data)}`);
   return x;
 }
 

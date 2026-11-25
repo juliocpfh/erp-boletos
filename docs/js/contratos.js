@@ -821,9 +821,12 @@ export function dadosDoDocumento(d, c, tipo, valores = {}, { data, testemunhas =
     data_fim: termino ? dataPorExtenso(termino) : '',
     fiadores_nomes: fiadores.map((f) => String(f.nome || '').toLocaleUpperCase('pt-BR')).join(', '),
   });
-  for (const [chave, , formato] of (def ? def.campos : [])) {
-    const v = String(valores[chave] ?? '').trim();
-    if (formato === 'dinheiro') {
+  for (const [chave, , formato, , quando] of (def ? def.campos : [])) {
+    // campo que não vale para este contrato (ex.: transferência do empregador com empresa locatária) fica vazio
+    const v = quando && !quando(dados.condicoes) ? '' : String(valores[chave] ?? '').trim();
+    if (formato === 'marcar') dados.campos[chave] = v && v !== 'nao' ? 'sim' : '';
+    else if (quando && !quando(dados.condicoes)) dados.campos[chave] = '';
+    else if (formato === 'dinheiro') {
       // número = centavos (valor calculado pelo sistema); texto digitado = reais ("500" = R$ 500,00, como nos outros campos de valor)
       const centavos = typeof valores[chave] === 'number' ? valores[chave] : (C.centavos(v) || 0);
       dados.campos[chave] = centavos > 0 ? valorComExtenso(centavos) : '';
@@ -831,6 +834,11 @@ export function dadosDoDocumento(d, c, tipo, valores = {}, { data, testemunhas =
     else if (formato === 'data') dados.campos[chave] = C.dataValida(v) ? dataPorExtenso(v) : LINHA_EM_BRANCO;
     else if (formato === 'numero') dados.campos[chave] = chave === 'numero_aditivo' ? `${Number(v) || 1}º` : (Number(v) > 0 ? numeroComExtenso(Number(v)) : LINHA_EM_BRANCO);
     else dados.campos[chave] = v;
+  }
+  // notificação para desocupação (advogado, 24/11/2026): a data limite vale para a carta recebida até 30 dias antes dela
+  if (tipo === 'notificacao_desocupacao') {
+    const limite = C.dataValida(String(valores.data_limite ?? '').trim());
+    dados.campos.recebimento_ate = limite ? dataPorExtenso(C.somarDias(limite, -30)) : LINHA_EM_BRANCO;
   }
   if (def && def.assinam) {
     const ordem = (a) => def.assinam.indexOf(a.papel);
@@ -1068,16 +1076,16 @@ export function resultadoVistoriaSaida(d, c) {
 export const ehPintura = (pendencia) => /pintur/i.test(String(pendencia || ''));
 
 /**
- * Sugestão do valor do reparo de pintura no cálculo final (decisão do dono, 24/11/2026; regra `pintura_vida_meses`, padrão 36).
+ * Sugestão do valor do reparo de pintura no cálculo final (decisão do dono, 24/11/2026; regra `pintura_vida_meses`, padrão 48; era 36 até o advogado, 24/11/2026).
  * Pela vistoria de entrada do contrato (`pintura_nova`): pintura nova → o orçamento inteiro (o inquilino devolve pintado);
  * sem pintura nova → orçamento × (vida − meses de moradia) ÷ vida, mínimo zero; não informado (vistorias antigas) → sem
  * sugestão. Meses de moradia pelo mês comercial, da entrada do contrato da vistoria (na troca de titular sem vistoria nova,
  * a do titular anterior) até a saída. Devolve { caso: 'nova' | 'antiga' | 'sem_info' | 'sem_vistoria', valor, meses, vida, texto }.
- * Ex.: orçamento R$ 2.400,00, sem pintura nova, 12 meses → "R$ 2.400,00 × 24/36 = R$ 1.600,00".
+ * Ex.: orçamento R$ 2.400,00, sem pintura nova, 24 meses → "R$ 2.400,00 × 24/48 = R$ 1.200,00".
  */
 export function sugestaoPintura(d, c, orcamento) {
   const entrada = vistoriaDeEntrada(d, c);
-  const vida = Number(regra('pintura_vida_meses', c)) || 36;
+  const vida = Number(regra('pintura_vida_meses', c)) || 48;
   if (!entrada) return { caso: 'sem_vistoria', valor: null, meses: null, vida, texto: 'Sem vistoria de entrada: confira como o imóvel foi entregue antes de cobrar a pintura.' };
   if (entrada.pintura_nova !== true && entrada.pintura_nova !== false) {
     return { caso: 'sem_info', valor: null, meses: null, vida, texto: `A vistoria de entrada (${C.dataBr(entrada.data)}) não diz se a pintura era nova: confira a vistoria de entrada e as fotos antes de dar o valor.` };

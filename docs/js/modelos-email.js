@@ -244,6 +244,7 @@ Saída antes do fim do contrato ({fim}): multa de 3 aluguéis, proporcional ao t
 COMO VAI SER
 - O aluguel corre até a devolução das chaves (o último é proporcional)
 - Devolva o imóvel como na vistoria de entrada: vazio, limpo e com os danos reparados (o desgaste natural não conta)
+- Quer trazer outro orçamento para algum reparo? Mande antes da devolução das chaves: depois dela valem os nossos orçamentos
 - Vistoria de saída logo depois das chaves, com fotos e vídeo; você pode acompanhar. Sem você, mandamos o relatório para responder em 5 dias úteis
 - Acerto final: [se dinheiro]{tipo_deposito} corrigida menos o que estiver em aberto[senão]o que estiver em aberto[fim], para você conferir
 [se contas]
@@ -265,7 +266,7 @@ Você pode acompanhar (ou mandar alguém com autorização por escrito) e anotar
 
 Deixe pronto: imóvel vazio e limpo, danos reparados e todas as chaves e controles[se contas]; as contas de {contas_texto} pagas, com os protocolos do encerramento e as fotos dos relógios[fim].
 
-Reparo que faltar: você faz antes, com a mesma qualidade, ou [se dinheiro]o valor do orçamento é descontado da {tipo_deposito}[senão]paga o valor do orçamento[fim]. O aluguel corre até a devolução das chaves.`,
+Reparo que faltar: você faz antes, com a mesma qualidade, ou [se dinheiro]o valor do orçamento é descontado da {tipo_deposito}[senão]paga o valor do orçamento[fim]. Se quiser apresentar outro orçamento, mande antes da devolução das chaves: depois dela valem os nossos. O aluguel corre até a devolução das chaves.`,
   },
   {
     chave: 'saida_chaves', nome: 'Devolução das chaves e vistoria de saída', etapa: 'Devolução das chaves',
@@ -279,7 +280,7 @@ Recebemos as chaves em {data_saida}. Seguem a vistoria de saída e o termo de de
 PENDÊNCIAS (comparadas com a vistoria de entrada)
 {pendencias}
 
-Cada reparo, pelo orçamento ou pela nota, é [se dinheiro]descontado da {tipo_deposito}[senão]cobrado[fim] no acerto final. Discorda de algo? Responda em até 5 dias úteis, com fotos ou documentos.
+Cada reparo, pelo orçamento ou pela nota, é [se dinheiro]descontado da {tipo_deposito}[senão]cobrado[fim] no acerto final. Discorda da vistoria? Responda em até 5 dias úteis, com fotos ou documentos. Outro orçamento só podia ser apresentado até a devolução das chaves: os valores acima são os dos nossos orçamentos.
 
 Receber as chaves não dá quitação: o acerto final vem em seguida.`,
   },
@@ -447,6 +448,10 @@ export const ATUALIZACOES_EMAIL = [
   ['ficha_aprovada', 'depósito de {valor_deposito} da {tipo_deposito}', 'depósito[se valor_deposito] de {valor_deposito}[fim] da {tipo_deposito}'],
   ['contrato_assinado', '[se dinheiro] Recebemos também a {tipo_deposito} de {valor_deposito} (recibo e comprovante anexos).[fim]',
     '[se dinheiro][se garantia_depositada] Recebemos também a {tipo_deposito} de {valor_deposito} (recibo e comprovante anexos).[senão] Falta o depósito da {tipo_deposito} de {valor_deposito}: mande o comprovante por este e-mail.[fim][fim]'],
+  // outro orçamento do inquilino só antes da devolução das chaves (item 3.5 do advogado, 24/11/2026)
+  ['saida_aviso', '(o desgaste natural não conta)\n- Vistoria', '(o desgaste natural não conta)\n- Quer trazer outro orçamento para algum reparo? Mande antes da devolução das chaves: depois dela valem os nossos orçamentos\n- Vistoria'],
+  ['saida_vistoria', '[senão]paga o valor do orçamento[fim]. O aluguel corre', '[senão]paga o valor do orçamento[fim]. Se quiser apresentar outro orçamento, mande antes da devolução das chaves: depois dela valem os nossos. O aluguel corre'],
+  ['saida_chaves', 'Discorda de algo? Responda em até 5 dias úteis, com fotos ou documentos.', 'Discorda da vistoria? Responda em até 5 dias úteis, com fotos ou documentos. Outro orçamento só podia ser apresentado até a devolução das chaves: os valores acima são os dos nossos orçamentos.'],
   ['saida_calculo', '[se cobrar]Segue o boleto do saldo, com o vencimento nele.[fim]',
     '[se cobrar]Falta pagar o saldo de {saldo}: deposite ou faça o Pix na conta abaixo e responda com o comprovante.\n{conta_deposito}[fim]'],
   // boleto do saldo da saída (decisão do dono, 2026-11-20): com o boleto gerado, o e-mail volta a dizer "Segue o boleto do saldo"

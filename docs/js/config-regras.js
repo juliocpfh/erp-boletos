@@ -89,11 +89,13 @@ export const DEFINICOES_REGRAS = [
     opcoes: [['', 'Escolher em cada contrato', 'O campo vem vazio.'], ['Poupança', 'Poupança', ''], ['IPCA', 'IPCA', ''], ['IGP-M', 'IGP-M', ''], ['INPC', 'INPC', ''], ['IGP-DI', 'IGP-DI', ''], ['SELIC', 'SELIC', '']],
     explica: 'Índice do Banco Central que corrige o saldo do FCI mês a mês.', consequencia: 'Só muda o que vem preenchido no Novo contrato.', lei: 'Sem lei: vale o contrato.' },
   // decisão do dono, 24/11/2026: pintura nova na entrada → devolve pintado (orçamento inteiro); sem pintura nova → paga só a vida
-  // que faltava da pintura (orçamento × (vida − meses de moradia) ÷ vida, mínimo zero)
-  { chave: 'pintura_vida_meses', grupo: 'garantia', rotulo: 'Pintura na saída: vida da pintura (meses)', tipo: 'inteiro', padrao: 36, min: 1, max: 120,
-    explica: 'Sugere o valor do reparo de pintura no cálculo final. Se a vistoria de entrada registrou pintura nova, o inquilino paga o orçamento inteiro (ex.: R$ 2.400,00). Sem pintura nova, paga só o que faltava da vida da pintura: orçamento de R$ 2.400,00, morou 12 meses → R$ 2.400,00 × 24/36 = R$ 1.600,00; 36 meses ou mais → nada.',
+  // que faltava da pintura (orçamento × (vida − meses de moradia) ÷ vida, mínimo zero). Vida de 48 meses desde 24/11/2026 (era 36;
+  // item 3.5 do advogado, confirmado pelo dono): o padrão nunca fica gravado (config_regras e as regras especiais só guardam o que
+  // difere do sistema), então todos passam a 48 sem passo no normalizar
+  { chave: 'pintura_vida_meses', grupo: 'garantia', rotulo: 'Pintura na saída: vida da pintura (meses)', tipo: 'inteiro', padrao: 48, min: 1, max: 120,
+    explica: 'Sugere o valor do reparo de pintura no cálculo final. Se a vistoria de entrada registrou pintura nova, o inquilino paga o orçamento inteiro (ex.: R$ 2.400,00). Sem pintura nova, paga só o que faltava da vida da pintura: orçamento de R$ 2.400,00, morou 24 meses → R$ 2.400,00 × 24/48 = R$ 1.200,00; 48 meses ou mais → nada. Bastam as fotos das vistorias e a pintura nova anotada na entrada, salvo contravistoria. O inquilino pode trazer outro orçamento, mas só antes da devolução das chaves.',
     consequencia: 'Só muda a sugestão (a equipe sempre pode mudar o valor). Vida maior cobra mais de quem morou pouco; menor cobra menos. O desgaste natural do uso não pode ser cobrado.',
-    lei: LI + ', art. 23, III (devolver o imóvel no estado em que o recebeu, salvo as deteriorações do uso normal).' },
+    lei: LI + ', art. 23, III (devolver o imóvel no estado em que o recebeu, salvo as deteriorações do uso normal). Prova: as fotos das vistorias de entrada e de saída e a pintura nova anotada na entrada, salvo contravistoria (orientação do advogado, 24/11/2026).' },
 
   // ------------------------------------------------------------------ contrato
   { chave: 'prazo_residencial_padrao', grupo: 'contrato', rotulo: 'Prazo do contrato residencial (meses)', tipo: 'inteiro', padrao: 30, min: 1, max: 600,

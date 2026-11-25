@@ -32,9 +32,9 @@ const ANTES = {
   'email:vistoria_assinada': 'f20a62fda5dbf4b4',
   'email:novo_valor': 'eab9c789f37c7c93',
   'email:aditivo_assinado': '548ec68b37e2cd44',
-  'email:saida_aviso': 'c026d37a6466c076',
-  'email:saida_vistoria': 'b6f5a0271f6b62c7',
-  'email:saida_chaves': '354d50da0fb6ebba',
+  'email:saida_aviso': '1f53eecc16a39f09', // 24/11 (advogado 3.5): outro orçamento só antes das chaves
+  'email:saida_vistoria': '82b5b1cbb71008ad', // 24/11 (advogado 3.5)
+  'email:saida_chaves': '8049463d6b3cca80', // 24/11 (advogado 3.5)
   'email:saida_calculo': '96b8482be28158a2',
   'email:saida_encerramento': '2d49059fc48148bb',
   'email:informe_ir': '71d02f294fa1f4be',
@@ -47,6 +47,9 @@ const ANTES = {
   lembrete: '8efce35480e4a45e',
   conta_emissora: '30804615d55e104f',
 };
+// 24/11 (advogado 3.5): o termo de devolução das chaves diz que o outro orçamento só vale até a devolução. Fica fora da lista
+// de cima para não encostar na linha da ficha, que a sessão da reserva muda ao mesmo tempo (junte as duas quando as PRs entrarem)
+ANTES['recibo:devolucao_chaves:João Teste'] = 'e7a4ce563c8b6c7f';
 
 test('ANK/JCK de hoje: contratos, e-mails, recibos, lembrete e conta dos boletos saem idênticos aos de antes', () => {
   const agora = resumosGerados();

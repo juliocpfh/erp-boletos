@@ -23,7 +23,8 @@ const programa = process.platform === 'win32'
   ? execSync(['npx', ...argsEsbuild].join(' '), opcoes)
   : execFileSync('npx', argsEsbuild, opcoes);
 const modelo = fs.readFileSync(docs('modelos', 'fatura-modelo.xlsx')).toString('base64');
-const hoje = new Date().toISOString().slice(0, 10);
+// data de Brasília (o GitHub roda no horário de Londres: um merge às 22h saía com a data do dia seguinte)
+const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
 
 // Os scripts ficam dentro do HTML: a política de segurança (CSP) libera cada um pelo resumo (hash) do texto,
 // igual ao index.html libera só os arquivos do próprio site. Qualquer outro script na página não roda.

@@ -9249,7 +9249,9 @@ export function roteiroSaida(d, c, hoje = C.hojeIso()) {
       relatorio ? `relatório ${comoEnvio(relatorio)} em ${C.dataBr(relatorio.data)}; ele pode contestar até ${C.dataBr(prazoContestarSaida(relatorio.data))}`
         : 'falta enviar o relatório ao inquilino (e-mail da devolução das chaves)']
     : [c.vistoria_saida_data ? `marcada para ${C.dataBr(c.vistoria_saida_data)}${c.vistoria_saida_hora ? ` às ${c.vistoria_saida_hora}` : ''}` : saiu ? 'ainda não registrada; data não marcada' : `a partir de ${C.dataBr(c.data_saida)}; data não marcada`,
-      c.vistoria_saida_data ? (convite && convite.data >= (c.vistoria_saida_marcada_em || '') ? `convite ${comoEnvio(convite)} em ${C.dataBr(convite.data)}` : 'falta mandar o convite ao inquilino') : null];
+      c.vistoria_saida_data ? (convite && convite.data >= (c.vistoria_saida_marcada_em || '') ? `convite ${comoEnvio(convite)} em ${C.dataBr(convite.data)}` : 'falta mandar o convite ao inquilino') : null,
+      // item 3.5 do advogado (24/11/2026): o outro orçamento do inquilino vem antes das chaves, não depois
+      !saiu && !c.termo_chaves_saida ? `outro orçamento do inquilino: só até a devolução das chaves (${C.dataBr(c.data_saida)})` : null];
   // B4: a etapa das chaves fecha com o termo de devolução assinado (saídas já acertadas antes do termo: pelo cálculo final)
   const termo = c.termo_chaves_saida;
   // o termo de devolução das chaves existe desde 13/11/2026: só as saídas de antes fecham a etapa pelo cálculo final
