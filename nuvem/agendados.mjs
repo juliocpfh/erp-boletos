@@ -67,6 +67,10 @@ export class EnviosAgendados {
   }
 
   agora() { return this.c.relogio(); }
+  /** As conferências comuns lançam ErroAgendado; no cofre vira ErroCofre (senão o cofre responderia 500 em vez de 400). */
+  conferir(fn) {
+    try { return fn(); } catch (e) { if (e instanceof ErroAgendado) throw new this.Erro(e.status, e.message); throw e; }
+  }
   linha(id) { return this.c.q('SELECT * FROM envios_agendados WHERE id = ?', texto(id))[0] || null; }
 
   /** O que a tela mostra (sem o registro inteiro: só o contrato e a etapa). */
@@ -84,8 +88,8 @@ export class EnviosAgendados {
   novo({ id, quando, para = [], assunto = '', descricao = '', anexos = [], registro, tamanho = 0 } = {}, email) {
     this.c.exigir(email, 'operador');
     if (!RE_ID.test(texto(id))) throw new this.Erro(400, 'Pedido inválido.');
-    const q = quandoValido(quando, this.agora());
-    const reg = registroValido(registro);
+    const q = this.conferir(() => quandoValido(quando, this.agora()));
+    const reg = this.conferir(() => registroValido(registro));
     const abertos = Number(this.c.q("SELECT COUNT(*) AS n FROM envios_agendados WHERE situacao IN ('agendado', 'enviando', 'falhou')")[0].n);
     if (abertos >= MAX_ABERTOS) throw new this.Erro(429, `Já há ${MAX_ABERTOS} e-mails agendados esperando: cancele alguns antes de agendar mais.`);
     this.c.sql.exec('INSERT INTO envios_agendados (id, quando, situacao, por, criado_em, para, assunto, descricao, anexos, registro, tamanho) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -109,8 +113,8 @@ export class EnviosAgendados {
     const l = this.linha(id);
     if (!l) throw new this.Erro(404, 'Este envio agendado não existe mais.');
     if (!['agendado', 'falhou'].includes(l.situacao)) throw new this.Erro(409, l.situacao === 'enviando' ? 'Este e-mail está saindo agora: não dá para mudar.' : `Este e-mail já foi ${l.situacao}.`);
-    const q = quandoValido(quando, this.agora());
-    this.c.sql.exec("UPDATE envios_agendados SET quando = ?, situacao = 'agendado', tentativas = 0, mudado_em = ?, mudado_por = ? WHERE id = ?", q, this.agora().toISOString(), String(email).toLowerCase(), l.id);
+    const q = this.conferir(() => quandoValido(quando, this.agora()));
+    this.c.sql.exec("UPDATE envios_agendados SET quando = ?, situacao = 'agendado', tentativas = 0, erro = NULL, mudado_em = ?, mudado_por = ? WHERE id = ?", q, this.agora().toISOString(), String(email).toLowerCase(), l.id);
     return { ok: true, agendado: this.paraTela(this.linha(l.id)) };
   }
 
@@ -273,7 +277,7 @@ export async function rodarAgendados(env, { agora = new Date(), simular = false,
     const r = await pedirAoCofre(env, 'agendados/resultado', { corpo: { ...resultado, agora: agora.toISOString() } });
     if (resultado.ok) feito.enviados += 1; else if (r.de_novo) feito.de_novo += 1; else feito.falhas += 1;
     if (r.apagar) await env.DADOS.delete(`${PASTA}${x.id}.json`).catch(() => {});
-    console.log(`agendado ${x.id}: ${resultado.ok ? 'enviado' : r.de_novo ? 'tenta de novo' : 'falhou'}`); // sem o conteúdo
+    registrar(`agendado ${x.id}: ${resultado.ok ? 'enviado' : r.de_novo ? 'tenta de novo' : 'falhou'}`); // sem o conteúdo
   }
   return feito;
 }
