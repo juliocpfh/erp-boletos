@@ -526,8 +526,12 @@ function termoDoAcordo(d, c, a, base, x) {
   const multa = String(c.multa_percentual || 0).replace('.', ',');
   const juros = String(c.juros_mensal_percentual || 0).replace('.', ',');
   const nomeBoleto = (cb) => (R.ehParcelaAcordo(cb) ? `parcela ${cb.acordo_parcela || 'única'} de acordo anterior` : `aluguel de ${C.compBr(cb.competencia)}`);
+  const cobranca = [...(a.honorarios ? [{ texto: a.honorarios_texto, valor: a.honorarios }] : []), ...(a.honorarios_judiciais ? [{ texto: a.honorarios_judiciais_texto, valor: a.honorarios_judiciais }] : []),
+    ...(a.despesas_cobranca || []).map((x) => ({ texto: x.texto, valor: x.valor }))].filter((l) => l.valor > 0);
   const tabela = [['BOLETOS VENCIDOS INCLUÍDOS NO ACORDO', null], ...origens.map((cb) => [`${nomeBoleto(cb)} (venceu em ${C.dataBr(cb.vencimento)})`, C.reais(R.totais(cb).a_pagar_sem_desconto)]),
     ['Valor original', C.reais(a.valor_original)], [`Valor em ${C.dataBr(a.data)}, com multa e juros`, C.reais(a.divida_na_data)],
+    // honorários e despesas de cobrança escolhidos no acordo (24/11/2026): linhas próprias, depois do combinado dos aluguéis
+    ...(cobranca.length ? [['Aluguéis e encargos combinados', C.reais(a.valor_combinado)], ['HONORÁRIOS E DESPESAS DE COBRANÇA', null], ...cobranca.map((l) => [l.texto, C.reais(l.valor)])] : []),
     ['PARCELAS DO ACORDO', null], ...parcelas.map((cb, k) => [`${parcelas.length > 1 ? `${k + 1}ª parcela` : 'Parcela única'}, vencimento ${C.dataBr(cb.vencimento)}`, C.reais(R.totais(cb).a_pagar_sem_desconto)]),
     ['Total do acordo', C.reais(a.valor_total)]];
   const nomesFiadores = fiadores.map((f) => pessoa(f.nome, f.cpf ? `CPF ${f.cpf}` : '')).join('; ');
@@ -535,7 +539,7 @@ function termoDoAcordo(d, c, a, base, x) {
     ...base, data: a.data, titulo: 'TERMO DE CONFISSÃO DE DÍVIDA E ACORDO DE PAGAMENTO',
     paragrafos: [
       `CREDORA (LOCADORA): ${x.empresa}${x.e.cnpj ? `, CNPJ ${x.e.cnpj}` : ''}. DEVEDOR (LOCATÁRIO): ${x.quem}${solidario ? `. LOCATÁRIO SOLIDÁRIO: ${solidario}` : ''}${nomesFiadores ? `. FIADOR(ES), como intervenientes anuentes: ${nomesFiadores}` : ''}. IMÓVEL: ${x.endereco}.`,
-      `1. DÍVIDA. O LOCATÁRIO reconhece e confessa dever à LOCADORA a importância de ${K.valorComExtenso(a.valor_total)}, referente aos aluguéis e encargos do contrato de locação do imóvel acima (${a.referente}), vencidos e não pagos, discriminados abaixo. A dívida é líquida, certa e exigível.`,
+      `1. DÍVIDA. O LOCATÁRIO reconhece e confessa dever à LOCADORA a importância de ${K.valorComExtenso(a.valor_total)}, referente aos aluguéis e encargos do contrato de locação do imóvel acima (${a.referente}), vencidos e não pagos${cobranca.length ? `, e ${cobranca.some((l) => l.texto.startsWith('Honorários')) ? `aos honorários de advogado${a.despesas_cobranca && a.despesas_cobranca.length ? ' e ' : ''}` : 'às '}${a.despesas_cobranca && a.despesas_cobranca.length ? 'despesas de cobrança pagas a terceiros, pelo valor exato dos comprovantes' : ''} (Código Civil, artigos 389, 395 e 404)` : ''}, discriminados abaixo. A dívida é líquida, certa e exigível.`,
     ],
     tabela,
     depois: [

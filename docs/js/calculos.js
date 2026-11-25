@@ -396,10 +396,11 @@ export function aluguelVigente(inicial, correcoes, dataRef) {
 // --------------------------------------------------------------------------
 // ``ctx``: o boleto (com contrato_id) ou o contrato, para valer a regra especial do contrato (`regra(chave, ctx)`, config-regras.js)
 export function totaisCobranca(cobranca, reservaDisponivel = 0, ctx = cobranca) {
-  const { aluguel, desconto, iptu = 0, seguro = 0, taxa_boleto = 0, outros = 0, ressarcimento = 0, fci = 0, multas_notificacao = [], diferencas_cobradas = [] } = cobranca;
+  const { aluguel, desconto, iptu = 0, seguro = 0, taxa_boleto = 0, outros = 0, ressarcimento = 0, fci = 0, multas_notificacao = [], diferencas_cobradas = [], encargos_cobranca = [] } = cobranca;
   // multa da notificação ao inquilino (vai em `outros`): sem multa nem juros de atraso sobre ela (decisão do dono, 2026-11-17);
-  // nem sobre a diferença de um pagamento em parte antigo levada a este boleto, que já traz multa e juros dentro (mutirão 19/11)
-  const multaNotif = [...(multas_notificacao || []), ...(diferencas_cobradas || [])].reduce((s, e) => s + (Number(e && e.valor) || 0), 0);
+  // nem sobre a diferença de um pagamento em parte antigo levada a este boleto, que já traz multa e juros dentro (mutirão 19/11);
+  // nem sobre os honorários e as despesas de cobrança da parcela do acordo (`encargos_cobranca`, 24/11/2026)
+  const multaNotif = [...(multas_notificacao || []), ...(diferencas_cobradas || []), ...(encargos_cobranca || [])].reduce((s, e) => s + (Number(e && e.valor) || 0), 0);
   const encargos = iptu + seguro + taxa_boleto + outros + (fci || 0);
   // ressarcimento ao inquilino (ex.: taxa extraordinária do condomínio que ele pagou e é do proprietário)
   const totalSemDesconto = aluguel + encargos - (ressarcimento || 0);
@@ -532,7 +533,7 @@ export function liquidar(cobranca, pagamento) {
  */
 export function ajusteNaNf(cobranca) {
   if (!cobranca.outros_na_nf) return 0;
-  const fixos = [...(cobranca.multas_notificacao || []), ...(cobranca.diferencas_cobradas || [])].reduce((s, e) => s + (e.valor || 0), 0);
+  const fixos = [...(cobranca.multas_notificacao || []), ...(cobranca.diferencas_cobradas || []), ...(cobranca.encargos_cobranca || [])].reduce((s, e) => s + (e.valor || 0), 0);
   return (cobranca.outros || 0) - fixos;
 }
 

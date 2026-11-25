@@ -321,12 +321,15 @@ export function demonstrativo(cb) {
     ${cb.data_pagamento ? `<p><b>Pago em ${dataBr(cb.data_pagamento)}</b>${cb.dias_atraso ? ` com ${C.plural(cb.dias_atraso, 'dia')} de atraso` : ''} · recebido ${reais(cb.valor_pago)}</p>` : ''}</div>`;
   }
   if (R.ehParcelaAcordo(cb)) {
+    // honorários e despesas de cobrança do acordo (24/11/2026): cada um na sua linha
+    const encCob = (cb.encargos_cobranca || []).filter((e) => e.valor);
     return `<div class="demonstrativo"><div class="cabecalho"><div><h2 style="margin:0">Demonstrativo do boleto: acordo${cb.acordo_parcela ? ` (parcela ${esc(cb.acordo_parcela)})` : ''}</h2><div class="suave">Referente a ${esc(cb.acordo_referente || '')}</div></div>
       <div style="text-align:right"><div class="suave">Vencimento</div><div class="maior"><b>${dataBr(cb.vencimento)}</b></div></div></div>
     <div class="endereco">📍 ${esc(i.nome)} · ${esc(endereco(i))}</div>
     <p><b>Inquilino:</b> ${esc(c.inquilino_nome)}${c.inquilino_cpf ? ` · ${rotuloDocumento(c.inquilino_cpf)} ${esc(c.inquilino_cpf)}` : ''}${c.inquilino_telefone ? ` · ${esc(c.inquilino_telefone)}` : ''}</p>
     <table><tr><th>Descrição</th><th class="n">Valor</th></tr>
-      ${linha(`Parcela${cb.acordo_parcela ? ` ${esc(cb.acordo_parcela)}` : ''} do acordo dos boletos em atraso (${esc(cb.acordo_referente || '')})`, reais(t.total_sem_desconto))}
+      ${linha(`Parcela${cb.acordo_parcela ? ` ${esc(cb.acordo_parcela)}` : ''} do acordo dos boletos em atraso (${esc(cb.acordo_referente || '')})`, reais(t.total_sem_desconto - encCob.reduce((s, e) => s + e.valor, 0)))}
+      ${encCob.map((e) => linha(`${esc(e.texto)} <span class="suave">(fora da NF, sem multa e juros)</span>`, reais(e.valor))).join('')}
       <tr class="total"><td>Valor a pagar até ${dataBr(cb.vencimento)}${prazoNaoUtil(cb)}</td><td class="n maior">${reais(t.a_pagar_pontual)}</td></tr>
       <tr><td colspan="2" class="suave">Após o vencimento: + multa de ${pct(cb.multa_percentual)} + juros de ${pct(cb.juros_mensal_percentual)} ao mês, pro rata dia.</td></tr></table>
     ${cb.data_pagamento ? `<p><b>Pago em ${dataBr(cb.data_pagamento)}</b>${cb.dias_atraso ? ` com ${C.plural(cb.dias_atraso, 'dia')} de atraso` : ''} · recebido ${reais(cb.valor_pago)}</p>` : ''}</div>`;

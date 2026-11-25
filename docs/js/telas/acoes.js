@@ -29,7 +29,7 @@ import { ACOES_ICONE } from './icone.js';
 import { alertasAbertos } from './comum.js';
 import { ACOES_PASTA } from './arquivo-impresso.js';
 import { ACOES_NOTIFICACOES } from './notificacoes.js';
-import { ACOES_PROVAS } from './cobranca-provas.js';
+import { ACOES_PROVAS, caixaCobrancaHtml, escolhaDaCobranca } from './cobranca-provas.js';
 import { ACOES_COMUNICACOES } from './comunicacoes.js';
 import { alvoDoRecibo, documentoMontado, guardarCartaNaPasta, logoPng, MODELO_COMODOS, modelosNoBanco, pdfDaCarta, pdfDoDocumento, pdfDoRecibo, roteiroTexto } from './documentos.js';
 import * as AS from '../assinatura.js';
@@ -1719,6 +1719,7 @@ export const ACOES = {
     const proximo = C.vencimentoDaCompetencia(C.competenciaDe(hoje), c.dia_vencimento || 10, false);
     const primeiro = proximo > hoje ? proximo : C.somarMesesData(proximo, 1);
     const nome = (cb) => (R.ehParcelaAcordo(cb) ? `acordo ${cb.acordo_parcela || ''}` : compBr(cb.competencia));
+    const cobranca = caixaCobrancaHtml(c, vencidos, hoje, 'acordo');
     const r = await janela({ titulo: `Acordo · ${c.inquilino_nome}`, sim: 'Fazer o acordo', nao: 'Cancelar',
       html: `<p class="suave">Os boletos marcados ficam "em acordo" (saem da inadimplência) e o sistema cria os boletos novos. Se um boleto do acordo atrasar, o inquilino volta para a lista.</p>
         <p><label>Boletos do acordo</label>${vencidos.map((cb) => `<label class="check-mini"><input type="checkbox" name="boleto" value="${cb.id}" checked data-hoje="${hojeDe(cb)}">
@@ -1727,7 +1728,7 @@ export const ACOES = {
           <p><label>Boletos</label><select name="parcelas">${Array.from({ length: 12 }, (_, k) => `<option value="${k + 1}" ${k === 2 ? 'selected' : ''}>${k + 1}</option>`).join('')}</select></p>
           <p><label>1º vencimento</label><input type="date" name="vencimento" value="${primeiro}" min="${hoje}" required style="width:auto"></p></div>
         <p><label>Observações (opcional)</label><input name="observacoes" placeholder="Ex.: combinado por telefone em ${dataBr(hoje)}"></p>
-        <div data-previa class="suave"></div>`,
+        ${cobranca}<div data-previa class="suave"></div>`,
       ligar(dlg) {
         const total = dlg.querySelector('[name=total]');
         const previa = dlg.querySelector('[data-previa]');
@@ -1735,11 +1736,17 @@ export const ACOES = {
         let mexeu = false;
         const ver = () => {
           if (!mexeu) total.value = dinheiroTexto(marcados().reduce((s, el) => s + Number(el.dataset.hoje), 0));
+          // honorários: a sugestão segue os boletos marcados
+          const hon = dlg.querySelector('[data-hon-texto]');
+          if (hon) {
+            const s = R.sugestaoHonorarios(d(), c, marcados().map((el) => buscar('cobrancas', Number(el.value))), hoje);
+            hon.innerHTML = s.cabe ? `${esc(s.texto)}: <b>${reais(s.valor)}</b>` : `<span class="suave">Honorários do advogado: não cabem nos boletos marcados (${esc(s.faltam.join('; '))}).</span>`;
+          }
           try {
             const p = R.previaAcordo(d(), { contrato_id: c.id, ids: marcados().map((el) => el.value), total: C.centavos(total.value || '0'),
-              parcelas: dlg.querySelector('[name=parcelas]').value, primeiro_vencimento: dlg.querySelector('[name=vencimento]').value }, hoje);
+              parcelas: dlg.querySelector('[name=parcelas]').value, primeiro_vencimento: dlg.querySelector('[name=vencimento]').value, cobranca: escolhaDaCobranca(new FormData(dlg.querySelector('form'))) }, hoje);
             previa.innerHTML = `<b>Boletos novos:</b><br>${p.boletos.map((b) => `${b.parcela || 'único'} · vence ${dataBr(b.vencimento)} · <b>${reais(b.valor)}</b> (NF ${reais(b.nf)})`).join('<br>')}
-              <br>Dívida de hoje ${reais(p.divida)} · combinado ${reais(p.total)}. Na NF vai o aluguel com multa e juros do acordo; ${p.foraDaNf < 0
+              <br>Dívida de hoje ${reais(p.divida)} · combinado ${reais(p.total)}${p.cobranca.total ? ` + honorários e despesas de cobrança ${reais(p.cobranca.total)} (fora da NF e sem multa) = <b>${reais(p.totalComCobranca)}</b>` : ''}. Na NF vai o aluguel com multa e juros do acordo; ${p.foraDaNf < 0
     ? `a reserva (ou o ressarcimento) já abatida no boleto também entra (${reais(-p.foraDaNf)} a mais na NF), como no pagamento normal.`
     : `IPTU, seguro e tarifa (${reais(p.foraDaNf)}) ficam fora, como sempre.`}`;
           } catch (e) { previa.innerHTML = `<span class="texto-perigo">${esc(e.message)}</span>`; }
@@ -1750,7 +1757,7 @@ export const ACOES = {
       } });
     if (!r) return;
     const dados = { contrato_id: c.id, ids: (r.boleto || []).map(Number), total: C.centavos(String((r.total || [])[0] || '0')), parcelas: Number((r.parcelas || [])[0]),
-      primeiro_vencimento: String((r.vencimento || [])[0] || ''), observacoes: String((r.observacoes || [])[0] || '') };
+      primeiro_vencimento: String((r.vencimento || [])[0] || ''), observacoes: String((r.observacoes || [])[0] || ''), cobranca: escolhaDaCobranca(r) };
     const x = await alterar((db) => R.fazerAcordo(db, dados, login(), hoje));
     aviso(`Acordo feito: ${x.parcelas.length} boleto(s) novo(s), o primeiro vence em ${dataBr(x.parcelas[0].vencimento)}. Emita-os no banco como os outros.`, 'ok');
     await mostrar();

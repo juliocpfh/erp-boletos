@@ -13,6 +13,7 @@ import { confirmarAvisos, conferirAvulsa, conferirBoleto, conferirContrato, conf
 import { CAMPOS_GARANTIA_HERDADA, CAMPOS_VALORES_HERDADOS, ENDERECO_DO_IMOVEL, enderecoInquilino } from './campos.js';
 import { ACEITA_DOCUMENTOS, arquivoSumiu, botao, buscar, d, encerrarLinksDaFicha, etiqueta, extensao, guardarGuiasSoltas, levarDocumentosDaFicha, memoria, naoEncontrado, nomePastaContrato, nomePastaFicha, opera, PASTA_FICHAS, pastaFichaLivre, ordenar, pastaDoEscopo, pastaPaiContrato, renomearNoDisco, salvarAssinado, semAcentoArquivo, trazerHeranca, trazerHerancaAssinada, cienciaDaTroca, registrarCiencia } from './comum.js';
 import { confirmarValoresIniciais, inicialBonificado } from './contrato.js';
+import { caixaCobrancaHtml, escolhaDaCobranca } from './cobranca-provas.js';
 
 // --------------------------------------------------------------------------
 // Formulários de cadastro
@@ -76,7 +77,7 @@ function conferirComprovantes(lista, dados, r, form) {
 export const nomeComprovante = (tipo, data, arq) => `comprovante-${tipo}-${data || C.hojeIso()}${extensao(arq.name)}`;
 
 /** Aviso das provas da cobrança: guardar não é cobrar (até o dono decidir, ver HONORARIOS_E_DESPESAS_DE_COBRANCA.md). */
-export const AVISO_PROVAS_COBRANCA = 'Só para guardar a prova da cobrança (para o advogado ou para a Justiça): o valor gasto fica anotado e não entra no boleto, na NF, no acordo nem no cálculo final da saída.';
+export const AVISO_PROVAS_COBRANCA = 'Guarda a prova da cobrança (para o advogado ou para a Justiça). A despesa paga a terceiro (carta registrada, cartório, protesto, certidão), com o comprovante anexado, pode ser cobrada do inquilino pelo valor exato, só no acordo e no cálculo final da saída, quando alguém escolher "Usar": nunca entra no boleto do mês nem na NF. No tipo "Advogado", escreva quem atuou: é o que permite sugerir os honorários.';
 
 /**
  * Opções do "Referente a" do registro da cobrança: cobrança em geral, os boletos vencidos e não pagos (também os em acordo), os
@@ -866,6 +867,9 @@ export const CADASTROS = {
       const a = dados.acordo_id && buscar('acordos', dados.acordo_id);
       if ((dados.cobranca_id && !cb) || (dados.acordo_id && !a)) erros.referente = 'Este boleto ou acordo não existe mais: escolha outro (ou "Cobrança em geral")';
       dados.tipo = R.TIPOS_REGISTRO_COBRANCA.includes(dados.tipo) ? dados.tipo : 'Outro';
+      // quem atuou: só no tipo "Advogado", e obrigatório nele (é o que permite sugerir os honorários, 24/11/2026)
+      dados.advogado = dados.tipo === 'Advogado' ? String(dados.advogado || '').trim() : '';
+      if (dados.tipo === 'Advogado' && !dados.advogado) erros.advogado = 'Informe o advogado que atuou (nome e OAB). Ex.: Dr. Fulano de Tal, OAB/PR 12.345';
       if (!r && !contratoId) erros.referente = 'Abra o registro pela página do inquilino ou do boleto';
     },
     async ajustarAsync(dados, erros, r, form, q) {
@@ -1133,6 +1137,8 @@ export const CADASTROS = {
       const comp = c.data_saida ? C.competenciaDe(c.data_saida) : null;
       return comp && !R.boletoDoMes(d(), c.id, comp) ? [`O boleto do último mês (aluguel de ${compBr(comp)}, proporcional) ainda não foi gerado: o aluguel desse mês fica fora dos débitos. Gere antes o boleto de ${compBr(comp)} (tela Boletos) e refaça o cálculo.`] : [];
     },
+    // honorários e despesas de cobrança (24/11/2026): sugestão com "Usar" / "Não cobrar"; os escolhidos somam aos débitos ao salvar
+    extraHtml: (r, q) => { const c = buscar('contratos', q.contrato); return caixaCobrancaHtml(c, R.cobrancasEmAberto(d(), c.id), C.hojeIso(), 'saida'); },
     // a data de saída é a do contrato (1ª etapa, "Informar data de saída")
     fixos: (r, q) => ({ data_saida: buscar('contratos', q.contrato).data_saida }),
     voltar: (r, q) => `#/contrato/${q.contrato}`,
@@ -1143,6 +1149,13 @@ export const CADASTROS = {
       if (dados.creditos < 0) erros.creditos = 'Informe um valor positivo (débito vai em "Débitos")';
       for (const k of R.relogiosObrigatorios(c)) if (!dados[`leitura_${k}`]) erros[`leitura_${k}`] = 'Informe a leitura na saída';
       dados.vistoria_saida = resultadoVistoriaSaida(d(), c).texto;
+      try {
+        dados.cobranca = escolhaDaCobranca(new FormData(form));
+        R.cobrancaEscolhida(d(), c, R.cobrancasEmAberto(d(), c.id), dados.cobranca, C.hojeIso());
+      } catch (e) {
+        if (!(e instanceof C.ErroUsuario)) throw e;
+        erros.debitos = `${e.message} (caixa "Honorários e despesas de cobrança", no fim)`;
+      }
     },
     salvar: (db, dados, q) => R.encerrarContrato(db, Number(q.contrato), dados, login(), C.hojeIso()),
   },

@@ -147,12 +147,14 @@ export const REFORMA = [
 
 /**
  * Registro da cobrança de um atraso (2026-11-24): cada passo e cada gasto, com os comprovantes (os arquivos vão num campo à parte
- * do formulário, vários de uma vez). Só guarda a prova: não entra no boleto, na NF, no acordo nem no cálculo final.
+ * do formulário, vários de uma vez). A despesa com comprovante e o advogado que atuou são a base do que pode ser cobrado SÓ no
+ * acordo e no cálculo final, por escolha (24/11/2026): nunca no boleto do mês nem na NF.
  */
 export const REGISTRO_COBRANCA = [
   campo('data', 'Data', 'data', { obrig: true, ajuda: 'Dia em que a carta saiu, o e-mail foi mandado, o protesto foi feito ou a despesa foi paga' }),
   campo('tipo', 'O que foi feito', 'opcao', { obrig: true, opcoes: [], ajuda: 'Ex.: Carta (registrada ou não), Protesto do boleto em cartório, Advogado contratado' }),
-  campo('valor', 'Valor gasto', 'dinheiro', { ajuda: 'Quanto custou (ex.: carta registrada R$ 28,50; protesto R$ 45,00). Em branco se não teve custo. Fica só anotado: não é cobrado do inquilino' }),
+  campo('valor', 'Valor gasto', 'dinheiro', { ajuda: 'Quanto custou (ex.: carta registrada R$ 28,50; protesto R$ 45,00). Em branco se não teve custo. Com o comprovante anexado, pode ser cobrado do inquilino pelo valor exato, só no acordo ou no cálculo final da saída (nunca no boleto do mês nem na NF)' }),
+  campo('advogado', 'Advogado que atuou (nome e OAB)', 'texto', { largo: true, max: 200, ajuda: 'Só no tipo "Advogado": quem fez a cobrança (notificação assinada, proposta de acordo, preparação da ação). Pode ser o sócio da ANK ou da JCK com OAB ativa. Ex.: Dr. Fulano de Tal, OAB/PR 12.345. Sem ele, os honorários não são sugeridos' }),
   campo('descricao', 'Descrição', 'area', { obrig: true, largo: true, max: 2000, ajuda: 'Ex.: carta com AR enviada ao endereço do imóvel cobrando os aluguéis de 09 e 10/2026; protesto do boleto de 10/2026 no 2º Tabelionato' }),
 ];
 

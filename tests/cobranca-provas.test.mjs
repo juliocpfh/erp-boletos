@@ -5,8 +5,9 @@ import * as C from '../docs/js/calculos.js';
 import * as R from '../docs/js/regras.js';
 import { TABELAS_CONHECIDAS } from '../nuvem/cofre.mjs';
 
-// Cobrança: registros e provas (pedido do dono em 2026-11-24): guarda os passos e os gastos da cobrança com os comprovantes,
-// sem somar em nada (boleto, NF, acordo, cálculo final). Dados fictícios.
+// Cobrança: registros e provas (pedido do dono em 2026-11-24): guarda os passos e os gastos da cobrança com os comprovantes.
+// Desde a aprovação do advogado e do dono (24/11), honorários e despesas somam SÓ no acordo e no cálculo final, quando
+// escolhidos ("Usar"); nunca no boleto do mês, na NF, na base da multa nem nos débitos sugeridos. Dados fictícios.
 function base() {
   const d = R.bancoVazio();
   R.normalizar(d);
@@ -45,7 +46,7 @@ test('os comprovantes entram nos arquivos do lançamento (rótulo, conferência,
   assert.equal(d.cobranca_registros.length, 0);
 });
 
-test('nada soma: boleto, NF, débitos da saída e o boleto que vence ficam iguais com registros de R$ 545,00', () => {
+test('registro sozinho não soma: boleto, NF, débitos da saída e o boleto que vence ficam iguais com registros de R$ 545,00', () => {
   const { d, c, cb } = base();
   const antes = { total: R.totais(cb), outros: cb.outros, liquido: C.liquidar(cb, '2026-11-20'), saida: JSON.stringify(R.debitosDaSaida(d, c, '2026-11-20')) };
   registro(d, { contrato_id: c.id, cobranca_id: cb.id, tipo: 'Protesto', valor: 4500 });
@@ -84,7 +85,192 @@ test('endereços do registro: ?cobranca= e ?acordo= aceitos só com número', ()
 test('formulário e telas: tipos da lista, campo de vários arquivos com accept, aviso de que nada é cobrado', () => {
   const cad = fs.readFileSync(new URL('../docs/js/telas/cadastros.js', import.meta.url), 'utf8');
   assert.match(cad, /name="arquivos_novos" multiple accept="\$\{ACEITA_DOCUMENTOS\}"/);
-  assert.match(cad, /não entra no boleto, na NF, no acordo nem no cálculo final/);
+  assert.match(cad, /só no acordo e no cálculo final da saída, quando alguém escolher "Usar": nunca entra no boleto do mês nem na NF/);
+  assert.match(cad, /erros\.advogado = 'Informe o advogado que atuou/);
   assert.deepEqual(R.TIPOS_REGISTRO_COBRANCA.slice(0, 2), ['Carta', 'E-mail']);
   for (const t of ['Notificação', 'Protesto', 'Cartório', 'Advogado', 'Outro']) assert.ok(R.TIPOS_REGISTRO_COBRANCA.includes(t), t);
+});
+
+// ---------------------------------------------------------------- honorários e despesas de cobrança (aprovados em 24/11/2026)
+const HOJE = '2026-11-24'; // ago/2026 venceu 10/09 (75 dias), set/2026 venceu 10/10 (45 dias), out/2026 venceu 10/11 (14 dias)
+function comProvas() {
+  const x = base();
+  const { d, c, cb } = x;
+  const ago = R.boletoDoMes(d, c.id, '2026-08');
+  const out = R.boletoDoMes(d, c.id, '2026-10');
+  const carta = registro(d, { contrato_id: c.id, cobranca_id: cb.id, data: '2026-10-20', tipo: 'Carta', valor: 2850, descricao: 'Carta com AR', arquivos: ['cobranca-carta-ar.pdf'] });
+  const protesto = registro(d, { contrato_id: c.id, cobranca_id: cb.id, data: '2026-11-10', tipo: 'Protesto', valor: 4500, descricao: 'Protesto no 2º Tabelionato', arquivos: ['cobranca-protesto.pdf'] });
+  const semComprovante = registro(d, { contrato_id: c.id, data: '2026-11-11', tipo: 'Cartório', valor: 1000, descricao: 'Certidão', arquivos: [] });
+  const adv = registro(d, { contrato_id: c.id, data: '2026-11-12', tipo: 'Advogado', valor: null, advogado: 'Dr. Exemplo Teste, OAB/PR 12.345', descricao: 'Notificação assinada' });
+  return { ...x, ago, out, carta, protesto, semComprovante, adv };
+}
+
+test('honorários: só com mais de 30 dias de atraso, aviso antes e advogado registrado; 10% do valor de hoje dos atrasados', () => {
+  const { d, c, cb } = base();
+  const ago = R.boletoDoMes(d, c.id, '2026-08');
+  const out = R.boletoDoMes(d, c.id, '2026-10');
+  let s = R.sugestaoHonorarios(d, c, [ago, cb, out], HOJE);
+  assert.equal(s.cabe, false);
+  assert.equal(s.faltam.length, 2, 'falta o aviso e o advogado');
+  registro(d, { contrato_id: c.id, cobranca_id: cb.id, data: '2026-10-20', tipo: 'Carta' });
+  const semNome = registro(d, { contrato_id: c.id, data: '2026-11-12', tipo: 'Advogado', advogado: '' });
+  s = R.sugestaoHonorarios(d, c, [ago, cb, out], HOJE);
+  assert.deepEqual(s.faltam, ['falta o nome do advogado no registro "Advogado"']);
+  R.atualizar(d, 'cobranca_registros', semNome.id, { advogado: 'Dr. Exemplo Teste, OAB/PR 12.345' }, 'julio');
+  s = R.sugestaoHonorarios(d, c, [ago, cb, out], HOJE);
+  assert.equal(s.cabe, true);
+  // out/2026 tem só 14 dias de atraso: fica fora da base
+  assert.deepEqual(s.boletos.map((x) => x.competencia), ['2026-08', '2026-09']);
+  const baseHoje = C.liquidar(ago, HOJE).valor_devido + C.liquidar(cb, HOJE).valor_devido;
+  assert.equal(s.base, baseHoje);
+  assert.equal(s.valor, Math.round(baseHoje / 10));
+  assert.match(s.texto, /^Honorários de advogado \(10% de R\$ .+, cobrança fora da Justiça; advogado: Dr\. Exemplo Teste, OAB\/PR 12\.345\)$/);
+  // só o boleto de 14 dias: não cabe
+  assert.equal(R.sugestaoHonorarios(d, c, [out], HOJE).cabe, false);
+  // aviso depois do advogado não conta
+  const d2 = base();
+  registro(d2.d, { contrato_id: d2.c.id, data: '2026-11-15', tipo: 'Carta' });
+  registro(d2.d, { contrato_id: d2.c.id, data: '2026-11-12', tipo: 'Advogado', advogado: 'Dr. Exemplo Teste' });
+  assert.equal(R.sugestaoHonorarios(d2.d, d2.c, [d2.cb], HOJE).cabe, false);
+});
+
+test('exemplo do dono: débito atualizado de R$ 2.000,00 com 45 dias, advogado atuando → honorários de R$ 200,00', () => {
+  const { d, c } = base();
+  const cb = { id: 999, contrato_id: c.id, competencia: '2026-09', vencimento: '2026-10-10', aluguel: 200000, desconto: 0, outros: 0, multa_percentual: 0, juros_mensal_percentual: 0 };
+  registro(d, { contrato_id: c.id, data: '2026-10-20', tipo: 'Notificação' });
+  registro(d, { contrato_id: c.id, data: '2026-11-12', tipo: 'Advogado', advogado: 'Dr. Exemplo Teste, OAB/PR 12.345' });
+  const s = R.sugestaoHonorarios(d, c, [cb], HOJE);
+  assert.equal(s.cabe, true);
+  assert.equal(s.base, 200000);
+  assert.equal(s.valor, 20000);
+});
+
+test('despesas: só com valor E comprovante, pelo valor exato; o advogado não é despesa', () => {
+  const { d, c, carta, protesto, semComprovante } = comProvas();
+  const disp = R.despesasCobraveis(d, c);
+  assert.deepEqual(disp.cobraveis.map((x) => [x.registro.id, x.valor]), [[carta.id, 2850], [protesto.id, 4500]]);
+  assert.deepEqual(disp.semComprovante.map((x) => x.id), [semComprovante.id]);
+  assert.equal(disp.cobraveis[1].texto, 'Despesa de cobrança: protesto de 10/11/2026 (Protesto no 2º Tabelionato), pelo comprovante');
+  assert.throws(() => R.cobrancaEscolhida(d, c, [], { despesas: [semComprovante.id] }, HOJE), /não pode mais ser cobrada/);
+  assert.equal(R.cobrancaEscolhida(d, c, [], {}, HOJE).total, 0, 'nada escolhido = nada cobrado');
+});
+
+test('acordo: honorários e despesas escolhidos somam em linhas próprias, fora da NF e da multa; termo com as linhas', async () => {
+  const { d, c, cb, ago, carta, protesto } = comProvas();
+  const dados = { contrato_id: c.id, ids: [ago.id, cb.id], parcelas: 2, primeiro_vencimento: '2026-12-10' };
+  const divida = C.liquidar(ago, HOJE).valor_devido + C.liquidar(cb, HOJE).valor_devido;
+  const sem = R.previaAcordo(d, { ...dados, total: divida }, HOJE);
+  const hon = R.sugestaoHonorarios(d, c, [ago, cb], HOJE).valor;
+  assert.equal(hon, Math.round(divida / 10));
+  const com = R.previaAcordo(d, { ...dados, total: divida, cobranca: { honorarios: true, despesas: [carta.id, protesto.id] } }, HOJE);
+  assert.equal(com.cobranca.total, hon + 7350);
+  assert.equal(com.totalComCobranca, divida + hon + 7350);
+  assert.deepEqual(com.boletos.map((b) => b.nf), sem.boletos.map((b) => b.nf), 'a NF das parcelas não muda');
+  assert.equal(com.boletos.reduce((s, b) => s + b.valor, 0), divida + hon + 7350);
+  // honorários fora da Justiça + os da ação ao mesmo tempo: não; ação sem processo: não
+  assert.throws(() => R.previaAcordo(d, { ...dados, total: divida, cobranca: { honorarios: true, judicial: 74000, judicial_texto: 'despejo' } }, HOJE), /Escolha um só/);
+  assert.throws(() => R.previaAcordo(d, { ...dados, total: divida, cobranca: { judicial: 74000 } }, HOJE), /informe o processo/);
+
+  const { acordo, parcelas } = R.fazerAcordo(d, { ...dados, total: divida, cobranca: { honorarios: true, despesas: [carta.id, protesto.id] } }, 'julio', HOJE);
+  assert.equal(acordo.valor_total, divida + hon + 7350);
+  assert.equal(acordo.valor_combinado, divida);
+  assert.equal(acordo.honorarios, hon);
+  assert.deepEqual(acordo.despesas_cobranca.map((x) => [x.registro_id, x.valor]), [[carta.id, 2850], [protesto.id, 4500]]);
+  const p1 = parcelas[0];
+  const enc = p1.encargos_cobranca.reduce((s, e) => s + e.valor, 0);
+  assert.ok(enc > 0);
+  assert.deepEqual(R.partesDosOutros(p1).slice(-p1.encargos_cobranca.length).map((x) => x.texto), p1.encargos_cobranca.map((e) => e.texto), 'cada um na sua linha');
+  // base da multa e NF sem os honorários e as despesas
+  const semEnc = { ...p1, outros: p1.outros - enc, encargos_cobranca: [] };
+  assert.equal(R.totais(p1).base_multa, R.totais(semEnc).base_multa);
+  assert.equal(R.totais(p1).a_pagar_sem_desconto, R.totais(semEnc).a_pagar_sem_desconto + enc);
+  const atrasado = C.liquidar(p1, '2027-01-20');
+  assert.equal(atrasado.multa, C.liquidar(semEnc, '2027-01-20').multa);
+  assert.equal(atrasado.juros, C.liquidar(semEnc, '2027-01-20').juros);
+  assert.equal(atrasado.valor_nf, C.liquidar(semEnc, '2027-01-20').valor_nf);
+  assert.equal(C.ajusteNaNf({ ...p1, outros_na_nf: true }), p1.outros - enc, 'nem com "o ajuste entra na NF" os honorários vão à NF');
+  // pago: a NF (e o Excel da NF, que sai dela) fica com o valor sem honorários nem despesas
+  R.registrarPagamento(d, p1.id, '2026-12-10', R.totais(p1).a_pagar_pontual, 'julio');
+  assert.equal(R.buscar(d, 'cobrancas', p1.id).valor_nf, sem.boletos[0].nf);
+  // termo do acordo: linhas separadas e o total com tudo
+  const REC = await import('../docs/js/recibos.js');
+  const t = REC.montarRecibo(d, 'acordo', { contrato: c, acordo: acordo.id }, HOJE);
+  const linhas = t.tabela.map(([a]) => a);
+  assert.ok(linhas.includes('HONORÁRIOS E DESPESAS DE COBRANÇA'));
+  assert.ok(linhas.some((x) => /^Honorários de advogado \(10%/.test(x)));
+  assert.ok(linhas.some((x) => /^Despesa de cobrança: carta de 20\/10\/2026/.test(x)));
+  assert.deepEqual(t.tabela.find(([a]) => a === 'Aluguéis e encargos combinados'), ['Aluguéis e encargos combinados', C.reais(divida)]);
+  assert.deepEqual(t.tabela.find(([a]) => a === 'Total do acordo'), ['Total do acordo', C.reais(divida + hon + 7350)]);
+  assert.match(t.paragrafos[1], /e aos honorários de advogado e despesas de cobrança pagas a terceiros, pelo valor exato dos comprovantes \(Código Civil, artigos 389, 395 e 404\)/);
+  // cobradas no acordo: não aparecem de novo
+  assert.equal(R.despesasCobraveis(d, c).cobraveis.length, 0);
+});
+
+test('acordo desfeito: as despesas voltam a poder ser cobradas', () => {
+  const { d, c, cb, ago, carta } = comProvas();
+  const { acordo } = R.fazerAcordo(d, { contrato_id: c.id, ids: [ago.id, cb.id], total: 400000, parcelas: 1, primeiro_vencimento: '2026-12-10', cobranca: { despesas: [carta.id] } }, 'julio', HOJE);
+  assert.ok(!R.despesasCobraveis(d, c).cobraveis.some((x) => x.registro.id === carta.id));
+  R.desfazerAcordo(d, acordo.id, 'julio', HOJE);
+  assert.ok(R.despesasCobraveis(d, c).cobraveis.some((x) => x.registro.id === carta.id));
+});
+
+test('boleto do mês: nunca leva honorários nem despesas, mesmo depois de um acordo que os cobrou', () => {
+  const { d, c, cb, ago, carta } = comProvas();
+  R.fazerAcordo(d, { contrato_id: c.id, ids: [ago.id, cb.id], total: 400000, parcelas: 1, primeiro_vencimento: '2026-12-10', cobranca: { honorarios: true, despesas: [carta.id] } }, 'julio', HOJE);
+  R.gerarCobrancas(d, '2026-11', 'julio');
+  R.recalcularCobrancas(d, (x) => x.contrato_id === c.id, 'julio');
+  for (const x of d.cobrancas.filter((y) => y.contrato_id === c.id && !R.ehBoletoAvulso(y))) {
+    assert.ok(!(x.encargos_cobranca || []).length, `boleto ${x.competencia}`);
+    assert.ok(!/Honorários|Despesa de cobrança/.test(x.outros_descricao || ''), `boleto ${x.competencia}`);
+  }
+  assert.equal(R.boletoDoMes(d, c.id, '2026-11').outros || 0, 0);
+});
+
+test('cálculo final: os escolhidos somam aos débitos em linhas próprias; os débitos sugeridos (debitosDaSaida) não mudam', () => {
+  const { d, c, carta, protesto } = comProvas();
+  R.atualizar(d, 'contratos', c.id, { data_saida: '2026-11-20' }, 'julio');
+  const deb = R.debitosDaSaida(d, c, HOJE);
+  const antes = JSON.stringify(deb);
+  const sug = R.sugestoesCobrancaDaSaida(d, c, HOJE);
+  assert.equal(sug.honorarios.cabe, true);
+  assert.equal(JSON.stringify(R.debitosDaSaida(d, c, HOJE)), antes, 'a sugestão não entra sozinha nos débitos');
+  const dados = { data_saida: '2026-11-20', leitura_agua: '1', leitura_energia: '2', garantia_valor: 0, indice_percentual: 0, debitos: deb.total,
+    debitos_descricao: deb.itens.map((x) => x.texto).join('\n'), fci_credito: 0, fci_danos: 0, creditos: 0 };
+  assert.throws(() => R.encerrarContrato(d, c.id, { ...dados, cobranca: { honorarios: true, judicial: 50000, judicial_texto: 'despejo' } }, 'julio', HOJE), /Escolha um só/);
+  const e = R.encerrarContrato(d, c.id, { ...dados, cobranca: { honorarios: true, despesas: [protesto.id] } }, 'julio', HOJE);
+  assert.equal(e.honorarios, sug.honorarios.valor);
+  assert.equal(e.debitos, deb.total + sug.honorarios.valor + 4500);
+  assert.equal(e.saldo, -(deb.total + sug.honorarios.valor + 4500));
+  const linhas = e.debitos_descricao.split('\n');
+  assert.equal(linhas.at(-2), `${sug.honorarios.texto}: ${C.reais(sug.honorarios.valor)}`);
+  assert.match(linhas.at(-1), /^Despesa de cobrança: protesto de 10\/11\/2026 .*: R\$ 45,00$/);
+  assert.ok(!('cobranca' in e));
+  assert.deepEqual(e.despesas_cobranca.map((x) => x.registro_id), [protesto.id]);
+  // a carta continua livre; o protesto, não
+  assert.deepEqual(R.despesasCobraveis(d, c).cobraveis.map((x) => x.registro.id), [carta.id]);
+  // os boletos em aberto continuam descontados pelo texto (as linhas novas não atrapalham)
+  assert.equal(d.cobrancas.filter((x) => x.contrato_id === c.id && x.quitado_saida === e.id).length, deb.itens.filter((x) => x.cobranca).length);
+});
+
+test('cálculo final sem escolha: igual a antes (nada entra sozinho)', () => {
+  const { d, c } = comProvas();
+  R.atualizar(d, 'contratos', c.id, { data_saida: '2026-11-20' }, 'julio');
+  const e = R.encerrarContrato(d, c.id, { data_saida: '2026-11-20', leitura_agua: '1', leitura_energia: '2', garantia_valor: 0, indice_percentual: 0, debitos: 1000, fci_credito: 0, fci_danos: 0 }, 'julio', HOJE);
+  assert.equal(e.debitos, 1000);
+  assert.equal(e.honorarios, 0);
+  assert.deepEqual(e.despesas_cobranca, []);
+});
+
+test('regras dos honorários: 10% e 30 dias, por contrato, com explicação, consequência e lei', async () => {
+  const CR = await import('../docs/js/config-regras.js');
+  const p = CR.DEFINICOES_REGRAS.find((x) => x.chave === 'honorarios_percentual');
+  const dias = CR.DEFINICOES_REGRAS.find((x) => x.chave === 'honorarios_dias_atraso');
+  assert.equal(p.padrao, 10);
+  assert.equal(dias.padrao, 30);
+  for (const x of [p, dias]) {
+    assert.ok(x.explica && x.consequencia && x.lei, x.chave);
+    assert.ok(CR.REGRAS_POR_CONTRATO.has(x.chave), x.chave);
+  }
+  assert.match(p.lei, /arts\. 389, 395 e 404/);
+  assert.match(p.lei, /REsp 1\.274\.629/);
 });

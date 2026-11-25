@@ -2749,7 +2749,13 @@ export function ajustesDoBoleto(cb) {
 /** Partes do campo ``outros`` para o demonstrativo e a descrição do boleto: [{ texto, valor }] (cada ajuste, multa e diferença). */
 export function partesDosOutros(cb) {
   if (!cb.outros && !(cb.ajustes || []).length) return [];
-  if (ehBoletoAvulso(cb)) return cb.outros ? [{ texto: cb.outros_descricao || '', valor: cb.outros }] : [];
+  if (ehBoletoAvulso(cb)) {
+    // parcela do acordo com honorários e despesas de cobrança (24/11/2026): cada um na sua linha
+    const enc = (cb.encargos_cobranca || []).filter((e) => e.valor);
+    if (!enc.length) return cb.outros ? [{ texto: cb.outros_descricao || '', valor: cb.outros }] : [];
+    const resto = (cb.outros || 0) - somaValores(enc);
+    return [...(resto ? [{ texto: resto > 0 ? 'Encargos do acordo' : 'Reserva ou ressarcimento já abatido (entra na NF)', valor: resto }] : []), ...enc.map((e) => ({ texto: e.texto, valor: e.valor }))];
+  }
   const partes = [...ajustesDoBoleto(cb).map((a) => ({ texto: a.motivo, valor: a.valor })), ...fixosDoBoleto(cb).map((e) => ({ texto: e.texto, valor: e.valor }))];
   // conta que não fecha (boleto alterado à mão em "Alterar valores"): uma linha só, com o total
   return somaValores(partes) === (cb.outros || 0) ? partes.filter((p) => p.valor) : [{ texto: cb.outros_descricao || '', valor: cb.outros }];
@@ -3522,6 +3528,16 @@ export function encerrarContrato(d, contratoId, dados, usuario, hoje = null) {
   if (hoje && dados.data_saida > hoje) throw new C.ErroUsuario(`O cálculo final é feito depois que o inquilino sai: a saída é em ${C.dataBr(dados.data_saida)}. Volte a partir desse dia.`);
   // a leitura da saída é obrigatória (regra leitura_relogios_obrigatoria; desligada, pode ficar em branco) e é a mesma da
   // vistoria de saída (uma só): sem digitar aqui, vale a da vistoria
+  // honorários e despesas de cobrança escolhidos ("Usar"; 24/11/2026): somam aos débitos, cada um na sua linha da descrição
+  const escolha = dados.cobranca;
+  delete dados.cobranca;
+  const cob = cobrancaEscolhida(d, c, cobrancasEmAberto(d, c.id), escolha, hoje || C.hojeIso());
+  if (cob.total) {
+    dados.debitos = (dados.debitos || 0) + cob.total;
+    dados.debitos_descricao = [String(dados.debitos_descricao || '').trim(), ...cob.linhas.map((l) => `${l.texto}: ${C.reais(l.valor)}`)].filter(Boolean).join('\n');
+  }
+  Object.assign(dados, { honorarios: cob.honorarios, honorarios_texto: cob.honorarios_texto, honorarios_judiciais: cob.judicial,
+    honorarios_judiciais_texto: cob.judicial_texto, despesas_cobranca: cob.despesas });
   if (leitura || !leituraDo(d, c.id, 'Saída do inquilino')) gravarLeitura(d, c, 'Saída do inquilino', dados.data_saida, leitura || {}, usuario);
   const calc = calcularEncerramento(dados.garantia_valor, dados.indice_percentual, dados.debitos, dados.fci_credito, dados.fci_danos, dados.creditos);
   // ressarcimentos do condomínio que entraram como crédito (linha mantida na descrição): o alerta sabe que já foram acertados
@@ -8423,7 +8439,7 @@ const nomeNoAcordo = (cb) => (ehParcelaAcordo(cb) ? `acordo ${cb.acordo_parcela 
  * Ex.: boleto de ago/2026 de R$ 1.350,00 (aluguel R$ 1.200,00 + IPTU R$ 100,00 + seguro R$ 50,00), acordo de
  * R$ 1.500,00 em 3 vencendo 10/12, 10/01 e 10/02: 3 boletos de R$ 500,00, cada um com R$ 450,00 na NF.
  */
-export function previaAcordo(d, { contrato_id, ids, total, parcelas, primeiro_vencimento }, hoje = C.hojeIso()) {
+export function previaAcordo(d, { contrato_id, ids, total, parcelas, primeiro_vencimento, cobranca }, hoje = C.hojeIso()) {
   const c = buscar(d, 'contratos', Number(contrato_id));
   if (!c) throw new Error('Contrato não encontrado.');
   const lista = [...new Set((ids || []).map(Number))].map((id) => buscar(d, 'cobrancas', id));
@@ -8453,17 +8469,24 @@ export function previaAcordo(d, { contrato_id, ids, total, parcelas, primeiro_ve
   const fciOrigem = Math.max(0, Math.min(lista.reduce((s, cb) => s + (cb.fci || 0), 0), foraDaNf, total));
   const fciPorParcela = C.parcelas(fciOrigem, n);
   let fciPendente = 0;
+  // honorários e despesas de cobrança escolhidos ("Usar"; 24/11/2026): somam ao combinado, divididos pelas parcelas, em linhas
+  // próprias (`encargos_cobranca`), fora da NF e da multa. Ex.: combinado R$ 2.000,00 + honorários R$ 200,00 + despesas
+  // R$ 73,50 em 1 boleto → R$ 2.273,50, NF igual à do acordo sem eles
+  const cob = cobrancaEscolhida(d, c, lista, cobranca, hoje);
+  const partesCob = cob.linhas.map((l) => C.parcelas(l.valor, n));
   const mesSeguinte = c.cobranca_mes_seguinte !== false;
   const boletos = valores.map((valor, k) => {
     const vencimento = C.somarMesesData(primeiro_vencimento, k);
     const outros = Math.min(fora[k], valor);
     const fci = Math.max(0, Math.min(fciPorParcela[k] + fciPendente, outros));
     fciPendente += fciPorParcela[k] - fci;
-    return { valor, vencimento, competencia: mesSeguinte ? C.somarMeses(vencimento.slice(0, 7), -1) : vencimento.slice(0, 7), nf: valor - outros, outros: outros - fci, fci, parcela: n > 1 ? `${k + 1}/${n}` : '' };
+    const encargos = cob.linhas.map((l, j) => ({ texto: l.texto, valor: partesCob[j][k] })).filter((x) => x.valor > 0);
+    const extra = somaValores(encargos);
+    return { valor: valor + extra, vencimento, competencia: mesSeguinte ? C.somarMeses(vencimento.slice(0, 7), -1) : vencimento.slice(0, 7), nf: valor - outros, outros: outros - fci + extra, fci, encargos, parcela: n > 1 ? `${k + 1}/${n}` : '' };
   });
   const periodos = lista.map((cb) => (ehParcelaAcordo(cb) && cb.acordo_periodo) || C.periodoServico(cb.competencia, c.data_entrada, c.data_saida));
   const periodo = [periodos.map((x) => x[0]).sort()[0], periodos.map((x) => x[1]).sort().pop()];
-  return { contrato: c, origens: lista, original, divida, total, foraDaNf, boletos, periodo, referente: lista.map(nomeNoAcordo).join(', ') };
+  return { contrato: c, origens: lista, original, divida, total, foraDaNf, boletos, periodo, referente: lista.map(nomeNoAcordo).join(', '), cobranca: cob, totalComCobranca: total + cob.total };
 }
 
 /** Faz o acordo: os boletos vencidos ficam "Em acordo" (fora da inadimplência) e saem os boletos novos das parcelas. */
@@ -8471,14 +8494,16 @@ export function fazerAcordo(d, dados, usuario, hoje = C.hojeIso()) {
   const p = previaAcordo(d, dados, hoje);
   const c = p.contrato;
   const a = inserir(d, 'acordos', { contrato_id: c.id, data: hoje, referente: p.referente, valor_original: p.original, divida_na_data: p.divida,
-    valor_total: p.total, parcelas: p.boletos.length, primeiro_vencimento: p.boletos[0].vencimento, observacoes: String(dados.observacoes || '').trim(), desfeito_em: null },
-    usuario, `Acordo com ${c.inquilino_nome}: ${p.referente} (${C.reais(p.divida)} hoje) em ${p.boletos.length} boleto(s), total ${C.reais(p.total)}`);
+    valor_total: p.totalComCobranca, valor_combinado: p.total, honorarios: p.cobranca.honorarios, honorarios_texto: p.cobranca.honorarios_texto,
+    honorarios_judiciais: p.cobranca.judicial, honorarios_judiciais_texto: p.cobranca.judicial_texto, despesas_cobranca: p.cobranca.despesas,
+    parcelas: p.boletos.length, primeiro_vencimento: p.boletos[0].vencimento, observacoes: String(dados.observacoes || '').trim(), desfeito_em: null },
+    usuario, `Acordo com ${c.inquilino_nome}: ${p.referente} (${C.reais(p.divida)} hoje) em ${p.boletos.length} boleto(s), total ${C.reais(p.totalComCobranca)}${p.cobranca.total ? ` (com ${C.reais(p.cobranca.total)} de honorários e despesas de cobrança)` : ''}`);
   for (const cb of p.origens) atualizar(d, 'cobrancas', cb.id, { situacao: 'Em acordo', acordo_id: a.id }, usuario, `Boleto ${nomeNoAcordo(cb)} entrou no acordo de ${C.dataBr(hoje)}`);
   const parcelas = p.boletos.map((b) => inserir(d, 'cobrancas', {
     contrato_id: c.id, competencia: b.competencia, vencimento: b.vencimento,
     dias_cobrados: C.diasNoMes(b.competencia), dias_mes: C.diasNoMes(b.competencia), aluguel_mensal: 0, aluguel: b.nf, desconto: 0,
-    iptu: 0, iptu_parcela: '', seguro: 0, seguro_parcela: '', taxa_boleto: 0, fci: b.fci || 0, outros: b.outros,
-    outros_descricao: b.outros > 0 ? 'Encargos do acordo' : b.outros < 0 ? 'Reserva ou ressarcimento já abatido (entra na NF)' : '',
+    iptu: 0, iptu_parcela: '', seguro: 0, seguro_parcela: '', taxa_boleto: 0, fci: b.fci || 0, outros: b.outros, encargos_cobranca: b.encargos,
+    outros_descricao: [b.outros - somaValores(b.encargos) > 0 ? 'Encargos do acordo' : b.outros - somaValores(b.encargos) < 0 ? 'Reserva ou ressarcimento já abatido (entra na NF)' : '', ...b.encargos.map((x) => x.texto)].filter(Boolean).join('; '),
     reserva_utilizada: 0, carencia: false, ressarcimento: 0, ressarcimento_descricao: '', ressarcimento_na_nf: false,
     multa_percentual: c.multa_percentual || 0, juros_mensal_percentual: c.juros_mensal_percentual || 0,
     acordo_parcela_de: a.id, acordo_parcela: b.parcela, acordo_referente: p.referente, acordo_periodo: p.periodo,
@@ -9540,10 +9565,11 @@ export function avisosLegaisDoContrato(dados) {
 // Cobrança: registros e provas (2026-11-24)
 // --------------------------------------------------------------------------
 // Cada passo e cada gasto da cobrança de um atraso (carta, e-mail, notificação, protesto, cartório, advogado…), com a data, o
-// valor gasto, a descrição e os comprovantes (vários arquivos, na pasta do inquilino). Só guarda a prova para levar ao
-// advogado: NADA daqui entra no boleto, na NF, no acordo nem no cálculo final da saída (decisão do dono pendente, ver
+// valor gasto, a descrição e os comprovantes (vários arquivos, na pasta do inquilino). Guarda a prova para levar ao advogado e,
+// desde a aprovação de 24/11/2026, é a base dos honorários e das despesas de cobrança que podem ser cobrados SÓ no acordo e
+// no cálculo final da saída, por escolha ("Usar"/"Não cobrar"), nunca no boleto do mês nem na NF (fim deste arquivo;
 // documentacao/HONORARIOS_E_DESPESAS_DE_COBRANCA.md). Tabela `cobranca_registros`: { contrato_id, cobranca_id?, acordo_id?,
-// data, tipo, valor (centavos, opcional), descricao, arquivos: [nomes] }.
+// data, tipo, valor (centavos, opcional), descricao, advogado (nome e OAB, no tipo "Advogado"), arquivos: [nomes] }.
 export const TIPOS_REGISTRO_COBRANCA = ['Carta', 'E-mail', 'WhatsApp / ligação', 'Notificação', 'Protesto', 'Cartório', 'Advogado', 'Outro'];
 
 /** Registros da cobrança de um contrato, do mais antigo para o mais novo (a ordem em que o advogado lê). */
@@ -9578,7 +9604,7 @@ export function referenteDoRegistro(d, r) {
   return 'cobrança em geral';
 }
 
-/** Soma do que foi gasto na cobrança (só para informar: não é cobrado de ninguém). */
+/** Soma do que foi gasto na cobrança (só para informar; o que é cobrado sai de `despesasCobraveis`, com comprovante). */
 export const gastoDaCobranca = (lista) => lista.reduce((s, x) => s + (Number(x.valor) || 0), 0);
 
 /** Tira um arquivo da lista de um registro (o arquivo é apagado por quem chama, alterarApagandoAnexos). */
@@ -9587,4 +9613,123 @@ export function removerArquivoDoRegistro(d, id, nome, usuario) {
   if (!r) throw new C.ErroUsuario('Este registro não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.');
   if (!(r.arquivos || []).includes(nome)) throw new C.ErroUsuario('Este arquivo já foi tirado do registro.');
   atualizar(d, 'cobranca_registros', r.id, { arquivos: r.arquivos.filter((x) => x !== nome) }, usuario, `Cobrança (${r.tipo} de ${C.dataBr(r.data)}): arquivo tirado: ${nome}`);
+}
+
+// --------------------------------------------------------------------------
+// Honorários e despesas de cobrança (aprovados pelo advogado e pelo dono em 2026-11-24)
+// --------------------------------------------------------------------------
+// Só no ACORDO e no CÁLCULO FINAL DA SAÍDA, sempre como sugestão ("Usar" / "Não cobrar"), em linhas próprias: nunca no boleto
+// do mês nem na NF. Na parcela do acordo vão em `encargos_cobranca` [{ texto, valor }] (somam em `outros`, fora da NF e da base
+// da multa e dos juros, `C.totaisCobranca`/`C.ajusteNaNf`).
+// - Honorários fora da Justiça (regras `honorarios_percentual`, 10%, e `honorarios_dias_atraso`, 30): só sobre os boletos com
+//   mais dias de atraso que a regra, com aviso antes e o advogado que atuou registrado (registro "Advogado" com o nome; pode ser
+//   o sócio da ANK ou da JCK com OAB ativa). Ex.: débito atualizado de R$ 2.000,00 com 45 dias → R$ 200,00.
+// - Despesas: só o registro com valor gasto E comprovante anexado, pelo valor exato, uma vez só (o que já entrou num acordo
+//   não desfeito ou num cálculo final não aparece de novo). Ex.: carta com AR R$ 28,50 + protesto R$ 45,00 → R$ 73,50.
+// - Honorários da ação (despejo: 20% quando o inquilino paga para ficar; nas demais, o que o juiz fixar): o sistema não calcula,
+//   só recebe o valor fixado, e nunca somado com os 10% de fora da Justiça.
+// Base legal: Código Civil, arts. 389, 395 e 404; STJ, REsp 1.274.629/AP; Lei 8.245/91, arts. 43, I, e 62, II, "d".
+const AVISOS_COBRANCA = ['Carta', 'E-mail', 'WhatsApp / ligação', 'Notificação'];
+
+/** Ids dos registros de despesa já cobrados (num acordo não desfeito ou num cálculo final). */
+function despesasJaCobradas(d, contratoId) {
+  const ids = new Set();
+  for (const a of (d.acordos || []).filter((x) => x.contrato_id === contratoId && !x.desfeito_em)) for (const e of a.despesas_cobranca || []) ids.add(e.registro_id);
+  for (const e of (d.encerramentos || []).filter((x) => x.contrato_id === contratoId)) for (const x of e.despesas_cobranca || []) ids.add(x.registro_id);
+  return ids;
+}
+
+const textoDespesa = (r) => {
+  const desc = String(r.descricao || '').replace(/\s+/g, ' ').trim();
+  return `Despesa de cobrança: ${String(r.tipo || 'Outro').toLowerCase()} de ${C.dataBr(r.data)}${desc ? ` (${desc.length > 70 ? `${desc.slice(0, 69)}…` : desc})` : ''}, pelo comprovante`;
+};
+
+/**
+ * Despesas de cobrança que podem ser cobradas do inquilino: registro com valor gasto e comprovante anexado, ainda não cobrado
+ * (o advogado entra pelos honorários, não como despesa). Devolve { cobraveis: [{ registro, valor, texto }], semComprovante: [registro] }.
+ */
+export function despesasCobraveis(d, c) {
+  const ja = despesasJaCobradas(d, c.id);
+  const lista = registrosCobrancaDo(d, c.id).filter((r) => r.tipo !== 'Advogado' && Number(r.valor) > 0 && !ja.has(r.id));
+  return {
+    cobraveis: lista.filter((r) => (r.arquivos || []).length).map((r) => ({ registro: r, valor: Number(r.valor), texto: textoDespesa(r) })),
+    semComprovante: lista.filter((r) => !(r.arquivos || []).length),
+  };
+}
+
+/** Registros da cobrança ligados aos boletos (os do boleto e do acordo de que ele faz parte) mais os "em geral" do contrato. */
+function registrosDosBoletos(d, c, boletos) {
+  const ids = new Set(boletos.flatMap((cb) => registrosDoBoleto(d, cb).map((x) => x.id)));
+  return registrosCobrancaDo(d, c.id).filter((x) => ids.has(x.id) || (!x.cobranca_id && !x.acordo_id));
+}
+
+/**
+ * Sugestão dos honorários fora da Justiça sobre ``boletos`` (vencidos e em aberto) na ``data``: base = valor de hoje (com multa e
+ * juros) dos que passaram dos dias da regra, sem os honorários e despesas que uma parcela de acordo já traz. Devolve
+ * { cabe, valor, base, percentual, dias, advogado, boletos, faltam: [motivos], texto }.
+ * Ex.: boleto vencido há 45 dias que hoje vale R$ 2.000,00 com multa e juros, aviso por carta e advogado registrado → R$ 200,00.
+ */
+export function sugestaoHonorarios(d, c, boletos, data = C.hojeIso()) {
+  const percentual = Number(CR.regra('honorarios_percentual', c)) || 0;
+  const dias = Number(CR.regra('honorarios_dias_atraso', c)) || 30;
+  const atrasados = boletos.filter((cb) => cb && !cb.data_pagamento && C.vencido(cb.vencimento, data) && C.diasEntre(cb.vencimento, data) > dias);
+  const base = atrasados.reduce((s, cb) => s + Math.max(0, C.liquidar(cb, data).valor_devido - somaValores(cb.encargos_cobranca || [])), 0);
+  const ligados = registrosDosBoletos(d, c, boletos).filter((x) => !x.data || x.data <= data);
+  const adv = ligados.filter((x) => x.tipo === 'Advogado' && String(x.advogado || '').trim()).pop() || null;
+  const aviso = ligados.some((x) => AVISOS_COBRANCA.includes(x.tipo) && (!adv || String(x.data || '') <= String(adv.data || '')));
+  const faltam = [];
+  if (!percentual) faltam.push('a regra "Honorários do advogado na cobrança fora da Justiça" está em 0%');
+  if (!atrasados.length) faltam.push(`nenhum boleto com mais de ${dias} dias de atraso`);
+  if (!aviso) faltam.push('falta o aviso por escrito antes do advogado (registro de carta, e-mail, WhatsApp ou notificação)');
+  if (!adv) faltam.push(ligados.some((x) => x.tipo === 'Advogado') ? 'falta o nome do advogado no registro "Advogado"' : 'falta o registro do advogado que atuou (tipo "Advogado", com o nome)');
+  const valor = Math.round((base * percentual) / 100);
+  const nome = adv ? String(adv.advogado).trim() : '';
+  return {
+    cabe: !faltam.length && valor > 0, valor, base, percentual, dias, advogado: nome, boletos: atrasados, faltam,
+    texto: `Honorários de advogado (${String(percentual).replace('.', ',')}% de ${C.reais(base)}, cobrança fora da Justiça${nome ? `; advogado: ${nome}` : ''})`,
+  };
+}
+
+/**
+ * O que foi escolhido para cobrar, conferido: ``escolha`` = { honorarios: true/false, despesas: [ids dos registros],
+ * judicial: centavos, judicial_texto }. Nada escolhido = nada cobrado. Devolve { honorarios, honorarios_texto, despesas:
+ * [{ registro_id, valor, texto }], judicial, judicial_texto, linhas: [{ texto, valor }], total }.
+ */
+export function cobrancaEscolhida(d, c, boletos, escolha = {}, data = C.hojeIso()) {
+  const e = escolha || {};
+  const out = { honorarios: 0, honorarios_texto: '', despesas: [], judicial: 0, judicial_texto: '', linhas: [], total: 0 };
+  if (e.honorarios) {
+    const s = sugestaoHonorarios(d, c, boletos, data);
+    if (!s.cabe) throw new C.ErroUsuario(`Os honorários do advogado não cabem aqui: ${s.faltam.join('; ') || 'valor zero'}.`);
+    out.honorarios = s.valor;
+    out.honorarios_texto = s.texto;
+    out.linhas.push({ texto: s.texto, valor: s.valor });
+  }
+  const judicial = Math.trunc(Number(e.judicial) || 0);
+  if (judicial < 0) throw new C.ErroUsuario('Honorários da ação: informe um valor positivo.');
+  if (judicial > 0) {
+    if (e.honorarios) throw new C.ErroUsuario('Escolha um só: os honorários fora da Justiça ou os da ação (despejo ou fixados pelo juiz). Somar os dois não é recomendado na locação residencial.');
+    const t = String(e.judicial_texto || '').replace(/\s+/g, ' ').trim();
+    if (!t) throw new C.ErroUsuario('Honorários da ação: informe o processo e a decisão que os fixou (ex.: "despejo nº 0001234-56.2026.8.16.0001, purgação da mora, 20%").');
+    out.judicial = judicial;
+    out.judicial_texto = `Honorários da ação judicial (${t})`;
+    out.linhas.push({ texto: out.judicial_texto, valor: judicial });
+  }
+  const ids = [...new Set((e.despesas || []).map(Number).filter(Boolean))];
+  if (ids.length) {
+    const disp = despesasCobraveis(d, c).cobraveis;
+    for (const id of ids) {
+      const x = disp.find((y) => y.registro.id === id);
+      if (!x) throw new C.ErroUsuario('Uma despesa escolhida não pode mais ser cobrada (sem comprovante, já cobrada ou excluída). Abra de novo.');
+      out.despesas.push({ registro_id: id, valor: x.valor, texto: x.texto });
+      out.linhas.push({ texto: x.texto, valor: x.valor });
+    }
+  }
+  out.total = out.honorarios + out.judicial + out.despesas.reduce((s, x) => s + x.valor, 0);
+  return out;
+}
+
+/** Sugestões do cálculo final da saída na ``data``: honorários sobre os boletos a cobrar e as despesas com comprovante. */
+export function sugestoesCobrancaDaSaida(d, c, data = C.hojeIso()) {
+  return { honorarios: sugestaoHonorarios(d, c, cobrancasEmAberto(d, c.id), data), ...despesasCobraveis(d, c) };
 }
