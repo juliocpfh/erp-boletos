@@ -350,6 +350,14 @@ export const FORMULARIOS = {
     await mostrar();
   },
 
+  // reserva parada de quem saiu na troca de titular, devolvida à parte (decisão do dono de 25/11/2026)
+  async reservaDevolvida(form) {
+    const f = Object.fromEntries(new FormData(form));
+    const v = await alterar((db) => R.registrarReservaDevolvida(db, Number(f.contrato), f.data, login()));
+    aviso(`Reserva devolvida: ${C.reais(v)} em ${dataBr(f.data)}.`);
+    await mostrar();
+  },
+
   async aditivoVencimento(form) {
     const f = Object.fromEntries(new FormData(form));
     const testemunhas = testemunhasDo(f);

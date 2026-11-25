@@ -1196,12 +1196,76 @@ export function competenciaReserva(contrato) {
 /** ``ignorar``: id de um boleto, ou função (boleto) => true para os boletos que não contam (os que estão sendo recalculados). */
 const ignorados = (ignorar) => (typeof ignorar === 'function' ? ignorar : (cb) => cb.id === ignorar);
 
-/** Saldo da reserva: o valor menos o já usado nos boletos e o marcado como abatido fora do sistema (contratos antigos). */
-export function saldoReserva(d, contrato, ignorarCobranca = null) {
+/**
+ * Saldo da reserva: o valor menos o já usado nos boletos, o marcado como abatido fora do sistema (contratos antigos) e, na
+ * troca de titular, o acertado com quem saiu (crédito na devolução da garantia ou devolvido à parte, `reservaAcertadaNaTroca`).
+ * ``ignorarDevolucao``: id da devolução da garantia que está sendo editada (o crédito dela não conta).
+ */
+export function saldoReserva(d, contrato, ignorarCobranca = null, ignorarDevolucao = null) {
   const fora = ignorados(ignorarCobranca);
   const usado = d.cobrancas.filter((cb) => cb.contrato_id === contrato.id && !fora(cb))
     .reduce((s, cb) => s + (cb.reserva_utilizada || 0), 0);
-  return Math.max((contrato.reserva_valor || 0) - usado - (contrato.reserva_abatida_valor || 0) - (contrato.reserva_usada_anterior || 0), 0);
+  return Math.max((contrato.reserva_valor || 0) - usado - (contrato.reserva_abatida_valor || 0) - (contrato.reserva_usada_anterior || 0)
+    - reservaAcertadaNaTroca(d, contrato, ignorarDevolucao), 0);
+}
+
+/** Reserva de quem saiu na troca acertada fora dos boletos: crédito nas devoluções da garantia + devolvida à parte ("Devolvi"). */
+export function reservaAcertadaNaTroca(d, c, ignorarDevolucao = null) {
+  return (d.devolucoes_garantia || []).filter((x) => x.contrato_id === c.id && x.id !== ignorarDevolucao).reduce((t, x) => t + (x.reserva_creditada || 0), 0)
+    + (c.reserva_devolvida_valor || 0);
+}
+
+/**
+ * Troca de titular já feita (o novo tem o contrato): a reserva é de quem saiu e não passa ao novo (decisão do dono de 25/11/2026,
+ * "Pedro sem reserva"). Troca antiga em que o novo recebeu a reserva (`reserva_usada_anterior` gravado) fica como estava.
+ */
+export function reservaFicaNaTroca(d, a) {
+  const n = continuadoPor(d, a);
+  return !!(n && n.heranca_transferida && n.reserva_usada_anterior === undefined && a.reserva_valor > 0);
+}
+
+/**
+ * Reserva de quem saiu na troca que ainda não foi usada (ex.: troca antes do 1º aluguel dele). Decisão do dono de 25/11/2026,
+ * "abater do que a Maria deve": primeiro abate os boletos em aberto dele (`reservaParaCompetencia`); o resto é crédito dele
+ * no acerto da troca (`creditosDaSaida`, na devolução da garantia) ou, sem esse acerto, fica "a devolver" com o botão "Devolvi".
+ * Ex.: reserva de R$ 500,00 e R$ 300,00 de aluguel em aberto → o boleto abate R$ 300,00 e sobram R$ 200,00 a devolver.
+ */
+export function reservaParadaNaTroca(d, a, ignorarDevolucao = null) {
+  return reservaFicaNaTroca(d, a) ? saldoReserva(d, a, null, ignorarDevolucao) : 0;
+}
+
+/** Linha da reserva nos créditos do acerto da troca (é por ela que a devolução sabe que o crédito entrou). */
+export const textoCreditoReserva = (a, valor) => `Reserva não usada (dada em ${C.dataBr(a.reserva_data) || 'data não informada'}): ${C.reais(valor)}`;
+
+/**
+ * Onde acertar a reserva parada de quem saiu: 'devolucao' (entra nos créditos da devolução da garantia, ainda por registrar)
+ * ou 'devolver' (sem esse acerto, ou feito sem ela: "a devolver" com o botão "Devolvi"); null sem reserva parada.
+ */
+export function acertoDaReservaNaTroca(d, a) {
+  const valor = reservaParadaNaTroca(d, a);
+  if (!(valor > 0)) return null;
+  const ac = acertoDoCredito(d, a);
+  return { valor, onde: ac.possivel && !ac.registro ? 'devolucao' : 'devolver' };
+}
+
+/** "Devolvi" a reserva parada de quem saiu na troca. Ex.: R$ 200,00 devolvidos a Maria em 05/03/2028. */
+export function registrarReservaDevolvida(d, contratoId, data, usuario) {
+  const a = buscar(d, 'contratos', contratoId);
+  const ac = a && acertoDaReservaNaTroca(d, a);
+  if (!ac) throw new C.ErroUsuario('Não há reserva a devolver neste contrato.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(data || ''))) throw new C.ErroUsuario('Informe a data da devolução.');
+  atualizar(d, 'contratos', a.id, { reserva_devolvida_valor: (a.reserva_devolvida_valor || 0) + ac.valor, reserva_devolvida_data: data }, usuario,
+    `${a.inquilino_nome}: reserva não usada de ${C.reais(ac.valor)} devolvida em ${C.dataBr(data)} (troca de titular)`);
+  realocarReserva(d, a, usuario);
+  return ac.valor;
+}
+
+/** Desfaz o "Devolvi" da reserva: ela volta a abater os boletos em aberto e a ficar a devolver. */
+export function desfazerReservaDevolvida(d, contratoId, usuario) {
+  const a = buscar(d, 'contratos', contratoId);
+  if (!a || !(a.reserva_devolvida_valor > 0)) return;
+  atualizar(d, 'contratos', a.id, { reserva_devolvida_valor: null, reserva_devolvida_data: null }, usuario, `${a.inquilino_nome}: registro da reserva devolvida excluído`);
+  realocarReserva(d, a, usuario);
 }
 
 /** Reserva já usada em boletos pagos (não muda com o recálculo). */
@@ -1239,7 +1303,10 @@ export function desmarcarReservaAbatida(d, contratoId, usuario) {
  */
 export function reservaParaCompetencia(d, contrato, comp, ignorar = null) {
   const alvo = competenciaReserva(contrato);
-  if (!alvo || comp < alvo) return 0;
+  if (!alvo) return 0;
+  // quem saiu na troca: a reserva parada abate o que ele deve, em qualquer mês (decisão do dono de 25/11/2026)
+  if (reservaFicaNaTroca(d, contrato)) return saldoReserva(d, contrato, ignorar);
+  if (comp < alvo) return 0;
   if (comp > alvo) {
     const fora = ignorados(ignorar);
     const comecou = d.cobrancas.some((cb) => cb.contrato_id === contrato.id && !fora(cb) && cb.competencia >= alvo && cb.competencia < comp && cb.reserva_utilizada > 0);
@@ -4828,7 +4895,10 @@ export function salvarDevolucaoGarantia(d, contratoId, dados, usuario, id = null
   const { garantia_corrigida, saldo } = calcularEncerramento(dados.garantia_valor, dados.indice_percentual, dados.debitos, 0, 0, dados.creditos);
   // troca de titular: o ressarcimento do condomínio cujo boleto passou ao novo titular volta a quem pagou, como crédito (24/11/2026)
   const creditados = !trocaId && dados.creditos > 0 ? ressarcimentosCreditados(d, a, dados.creditos_descricao) : [];
-  const reg = { ...dados, contrato_id: a.id, troca_id: trocaId, garantia_corrigida, saldo, ressarcimentos_creditados: creditados };
+  // a reserva parada de quem saiu: crédito dele se a linha ficou na descrição dos créditos (25/11/2026)
+  const reserva = !trocaId ? reservaParadaNaTroca(d, a, id) : 0;
+  const reservaCreditada = reserva > 0 && dados.creditos > 0 && String(dados.creditos_descricao || '').includes(textoCreditoReserva(a, reserva)) ? reserva : 0;
+  const reg = { ...dados, contrato_id: a.id, troca_id: trocaId, garantia_corrigida, saldo, ressarcimentos_creditados: creditados, reserva_creditada: reservaCreditada };
   const texto = `${a.inquilino_nome}: garantia devolvida em ${C.dataBr(dados.data)}, ${C.reais(saldo)} (${troca ? `troca de garantia de ${C.dataBr(troca.data)}` : 'troca de titular com garantia nova'})`;
   let r;
   if (id) { atualizar(d, 'devolucoes_garantia', id, reg, usuario, texto); r = buscar(d, 'devolucoes_garantia', id); } else r = inserir(d, 'devolucoes_garantia', reg, usuario, texto);
@@ -6014,6 +6084,12 @@ export function todosAlertas(d, hoje = C.hojeIso()) {
     // troca de titular com garantia nova: devolver a do anterior (o contrato dele já está sem vínculo)
     const dev = alertaDevolucaoGarantia(d, c, hoje);
     if (dev) lista.push({ ...dev, contrato_id: c.id, imovel: imovel ? imovel.nome : '', inquilino: c.inquilino_nome });
+    // troca de titular: reserva de quem saiu que não foi usada e não entra na devolução da garantia (25/11/2026)
+    const res = acertoDaReservaNaTroca(d, c);
+    if (res && res.onde === 'devolver') {
+      lista.push({ nivel: 'aviso', tipo: 'Reserva do imóvel', ancora: 'reserva', contrato_id: c.id, imovel: imovel ? imovel.nome : '', inquilino: c.inquilino_nome,
+        texto: `${(continuadoPor(d, c) || {}).inquilino_nome} assumiu o contrato e a reserva não passa a ele: devolva ${C.reais(res.valor)} da reserva não usada a ${c.inquilino_nome} e marque "Devolvi".` });
+    }
   }
   for (const i of d.imoveis) {
     const a = alertaSeguroImovel(d, i, hoje);
@@ -7652,8 +7728,11 @@ export function ressarcimentosEmCredito(d, c) {
 export const textoCreditoRessarcimento = (r) => `Ressarcimento do condomínio: ${r.descricao} (condomínio ${C.compBr(r.competencia_condominio)}, pago em ${C.dataBr(r.data_pagamento)}): ${C.reais(r.valor)}`;
 
 /** Créditos do inquilino no cálculo final ou na devolução da garantia: { itens: [{ ressarcimento, valor, texto }], total }. */
-export function creditosDaSaida(d, c) {
+export function creditosDaSaida(d, c, ignorarDevolucao = null) {
   const itens = ressarcimentosEmCredito(d, c).map((r) => ({ ressarcimento: r, valor: r.valor, texto: textoCreditoRessarcimento(r) }));
+  // troca de titular: a reserva de quem saiu que não foi usada é crédito dele (decisão do dono de 25/11/2026)
+  const reserva = reservaParadaNaTroca(d, c, ignorarDevolucao);
+  if (reserva > 0) itens.push({ ressarcimento: null, reserva: true, valor: reserva, texto: textoCreditoReserva(c, reserva) });
   return { itens, total: itens.reduce((t, x) => t + x.valor, 0) };
 }
 
