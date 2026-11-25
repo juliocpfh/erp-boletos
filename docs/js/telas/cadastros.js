@@ -1,6 +1,6 @@
 // Cadastros (#/novo/TABELA e #/editar/TABELA/ID): CADASTROS define, para cada tabela, os campos, os ajustes antes de salvar,
 // a conferência (avisos.js), como salvar e para onde voltar. telaFormulario desenha o formulário; o envio é FORMULARIOS.cadastro (envios.js).
-import { alterar, aviso, E, login, podeUsuario, tokenDaSessao } from '../app.js';
+import { alterar, aviso, E, janela, login, podeUsuario, tokenDaSessao } from '../app.js';
 import * as S from '../armazenamento.js';
 import { camposDeSenha, emailDeAcesso, ERRO_SENHA_CURTA, senhaCurta, usuarioComMesmoAcesso } from '../auth.js';
 import * as C from '../calculos.js';
@@ -20,6 +20,49 @@ import { caixaCobrancaHtml, escolhaDaCobranca } from './cobranca-provas.js';
 // --------------------------------------------------------------------------
 /** Opções das listas editáveis (concessionárias, índices) vêm do banco. */
 const comListas = (campos) => campos.map((c) => (c.lista ? { ...c, opcoes: R.lista(d(), c.lista) } : c));
+
+// --------------------------------------------------------------------------
+/**
+ * Boletos descontados da garantia (cálculo final da saída ou devolução da garantia na troca de titular; pedido do dono de
+ * 25/11/2026): antes de gravar, a janela mostra o que vai acontecer com cada boleto (pago com a caução, a notificação de atraso
+ * que fecha, o cancelamento no banco) e com a caução (saldo a devolver ou a cobrar). Boleto emitido no banco (C6 ou PDF anexado)
+ * pede "Já cancelei no banco" para liberar o "Confirmar tudo". Sem boleto descontado não há janela (true). Nada é gravado aqui.
+ */
+async function confirmarDescontoDaGarantia(c, dados, opcoes) {
+  const o = R.oQueAconteceNoDesconto(d(), c, dados, { hoje: C.hojeIso(), ...opcoes });
+  if (!o) return true;
+  const nomeGarantia = opcoes.tipo === 'saida' && R.temCaucao(c) ? 'Caução' : 'Garantia';
+  const boletos = o.boletos.map((b) => `<li style="margin-bottom:10px"><b>${esc(b.nome)}</b>: vence em ${dataBr(b.vencimento)}, ${reais(b.valor)}
+    <ul>${b.acontece.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
+    ${b.avisoBanco ? `<div class="alerta perigo" style="margin-top:6px"><b>${esc(b.avisoBanco)}</b>
+      <label class="check"><input type="checkbox" name="cancelado_banco" value="${b.cobranca.id}" data-cancelado-banco> Já cancelei no banco o boleto ${esc(b.nome)}</label></div>` : ''}</li>`).join('');
+  const contas = [
+    [`${nomeGarantia} recebida`, reais(o.garantia)],
+    o.garantia_corrigida !== o.garantia ? [`${nomeGarantia} corrigida (${String(dados.indice_percentual || 0).replace('.', ',')}%)`, reais(o.garantia_corrigida)] : null,
+    o.fci_devolver > 0 ? ['FCI que volta ao inquilino', reais(o.fci_devolver)] : null,
+    o.creditos > 0 ? ['Créditos do inquilino', `+ ${reais(o.creditos)}`] : null,
+    ['Débitos descontados', `− ${reais(o.debitos)}`],
+    o.danos_alem_do_fci > 0 ? ['Danos além do FCI', `− ${reais(o.danos_alem_do_fci)}`] : null,
+  ].filter(Boolean);
+  const html = `<p>Ao confirmar, o sistema grava ${opcoes.tipo === 'saida' ? 'o cálculo final da saída' : 'a devolução da garantia'} e faz o seguinte:</p>
+    <ol>${boletos}</ol>
+    <p><b>O que acontece com a ${esc(nomeGarantia.toLocaleLowerCase('pt-BR'))}</b></p>
+    <ul>${contas.map(([k, v]) => `<li>${esc(k)}: ${esc(v)}</li>`).join('')}<li><b>${esc(o.textoSaldo)}</b></li></ul>
+    ${o.cancelarNoBanco ? '<p class="suave">Marque "Já cancelei no banco" em cada boleto emitido no banco para liberar o "Confirmar tudo".</p>' : ''}
+    <p class="suave">"Voltar" não grava nada.</p>`;
+  const resposta = await janela({ titulo: 'Confira o que vai acontecer', html, sim: 'Confirmar tudo', nao: 'Voltar',
+    ligar(dlg) {
+      const marcas = [...dlg.querySelectorAll('[data-cancelado-banco]')];
+      const botaoSim = dlg.querySelector('button[value=sim]');
+      const conferir = () => { botaoSim.disabled = marcas.some((m) => !m.checked); };
+      marcas.forEach((m) => m.addEventListener('change', conferir));
+      conferir();
+    } });
+  if (!resposta) return false;
+  const marcados = resposta.cancelado_banco || [];
+  if (o.boletos.some((b) => b.banco && !marcados.includes(String(b.cobranca.id)))) throw new C.ErroUsuario('Nada foi salvo: marque "Já cancelei no banco" em cada boleto emitido no banco.');
+  return true;
+}
 
 // --------------------------------------------------------------------------
 /**
@@ -1090,6 +1133,8 @@ export const CADASTROS = {
       return conferirComprovantes(COMPROVANTE_DEVOLUCAO, dados, r, form);
     },
     ajustarAsync: (dados, erros, r, form, q) => guardarComprovantes(COMPROVANTE_DEVOLUCAO, dados, form, () => pastaDoEscopo('contrato', r ? r.contrato_id : Number(q.contrato))),
+    // troca de titular com boletos descontados da garantia: a mesma janela do cálculo final (a troca de garantia não desconta boleto)
+    confirmar: (dados, r, q) => ((r ? r.troca_id : q.troca) ? true : confirmarDescontoDaGarantia(buscar('contratos', r ? r.contrato_id : q.contrato), dados, { tipo: 'troca', registroId: r ? r.id : null })),
     salvar: (db, dados, q, r) => R.salvarDevolucaoGarantia(db, r ? r.contrato_id : Number(q.contrato), { ...dados, ...(!r && q.troca ? { troca_id: Number(q.troca) } : {}) }, login(), r ? r.id : null),
   },
   trocas_garantia: {
@@ -1254,6 +1299,9 @@ export const CADASTROS = {
     ajustar(dados, erros, r, form, q) {
       const c = buscar('contratos', q.contrato);
       if (!c.data_saida) throw new C.ErroUsuario('Informe antes a data de saída, em "Saída do inquilino".');
+      // saída ainda por vir: recusa antes da janela "Confira o que vai acontecer" (senão o operador cancelava o boleto no banco
+      // e a gravação era recusada depois; a mesma regra de ``R.encerrarContrato``)
+      if (c.data_saida > C.hojeIso()) throw new C.ErroUsuario(`O cálculo final é feito depois que o inquilino sai: a saída é em ${dataBr(c.data_saida)}. Volte a partir desse dia.`);
       for (const k of ['garantia_valor', 'indice_percentual', 'debitos', 'fci_credito', 'fci_danos', 'creditos']) if (!dados[k]) dados[k] = 0;
       if (dados.creditos < 0) erros.creditos = 'Informe um valor positivo (débito vai em "Débitos")';
       for (const k of R.relogiosObrigatorios(c)) if (!dados[`leitura_${k}`]) erros[`leitura_${k}`] = 'Informe a leitura na saída';
@@ -1266,6 +1314,8 @@ export const CADASTROS = {
         erros.debitos = `${e.message} (caixa "Honorários e despesas de cobrança", no fim)`;
       }
     },
+    // boletos descontados da garantia: a janela mostra o que acontece (notificação, cancelar no banco, saldo) e pede o ok (25/11/2026)
+    confirmarNoFim: (dados, r, q) => confirmarDescontoDaGarantia(buscar('contratos', q.contrato), dados, { tipo: 'saida' }),
     salvar: (db, dados, q) => R.encerrarContrato(db, Number(q.contrato), dados, login(), C.hojeIso()),
   },
   avulsas: {
