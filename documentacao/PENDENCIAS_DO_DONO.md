@@ -1,12 +1,15 @@
 # O que ainda falta no sistema (e como fazer)
 
-## ONDE PARAMOS (25/11/2026: para o Claude retomar depois do /clear)
+## ONDE PARAMOS (25/11/2026, noite: para o Claude retomar depois do /clear)
 
-**Para o Claude:** retome esta lista com o dono na primeira mensagem, em português simples. O dono só responde à **conversa principal**. Regras de 24–25/11 continuam: nenhuma PR com conflito (`git merge-tree` com a `main` e as abertas); quem programa testa **só o básico** (`checar` e a tela principal no computador) e o **testador independente** faz os 4 lugares (computador `?teste`, celular 375 px, nuvem local com duas abas, versão PC) e os links antes do "pode aceitar"; sessão pronta é arquivada.
+**Para o Claude:** retome esta lista com o dono na primeira mensagem, em português simples. O dono só responde à **conversa principal**. Regras de 24–25/11 continuam: nenhuma PR com conflito (`git merge-tree` com a `main` e as abertas); **toda PR roda o kit de teste** (`node tools/kit-teste.mjs`, ~4 min: computador, celular, nuvem com 2 abas, versão PC e links), acrescenta o roteiro da tela dela e traz a seção "Kit de teste"; a conversa principal roda o kit de novo na branch antes do "pode aceitar" e **sempre diz ao dono o resultado do kit** (regra de 25/11, `CLAUDE.md`); sessão ou subagente pronto é encerrado.
 
-**Situação:** tudo na `main` até a **#424** (#404 a #424 aceitas em 24–25/11), **nenhuma PR aberta** além desta de documentação. As decisões de 24–25/11 já estão em `DECISOES.md` (pintura 48 meses; multa do aviso de 30 dias proporcional e só a maior; honorários; tarifa; termo da reserva; empresa que desiste; reabrir a análise; datas de Brasília e o horário comercial; notificação de atraso sem multa; troca de titular sem reserva; testes).
+**Situação:** tudo na `main` até a **#431**, **nenhuma PR aberta** além desta de documentação. Em 25/11 à tarde entraram: #427 (kit obrigatório em toda PR e modelo de PR), #428 (acertos: boleto quitado pela reserva, 2ª via, acordo refeito, Sair, conciliação e C6 pela data de Brasília), #429 (ficha pela internet com o que o sistema já tem), #430 (agendador de envios em horário comercial, pela nuvem) e #431 (kit espera a tela nova). As decisões de 24–25/11 estão em `DECISOES.md`.
 
 **O que espera o dono:**
+- [ ] **Agendador (#430):** numa noite, agendar um e-mail para si mesmo e conferir que chega às 8h (o Claude lembra). [x] Cron no Cloudflare conferido pelo dono em 25/11 (`*/5 * * * *`). Recomendado: pôr `tests/agendados-nuvem.test.mjs` no Build command do Worker (o Claude orienta).
+- [ ] **Ficha pela internet (#429):** com um conhecido que já tem cadastro, gerar o link, abrir no celular, mandar, ver "Em análise", "Deixar a pessoa corrigir" e reabrir com tudo preenchido.
+- [ ] **Boleto quitado pela reserva (#428):** conferir no próximo caso real que ele aparece "Quitado pela reserva" no vencimento e a NF vai para a fila (o número da NF só entra quando o dono manda emitir; decisão de 25/11, muda em 2027 com a NF do governo).
 - [ ] As conferências da lista atual: `CONFERIR_O_QUE_MUDOU.md` e as "Conferências do dono" logo abaixo (bloco de 24/11).
 - [ ] Levar ao advogado o **texto da confissão de dívida com os honorários** (termo do acordo, `#/imprimir/recibo?tipo=acordo&…`; PR #415).
 - [ ] Se você já tinha editado o e-mail de encerramento: conferir em **Sistema → Modelos de e-mail** o e-mail do cálculo final (o texto novo do saldo, PR #419, só entra nos modelos não editados; "Voltar ao padrão" traz o novo). O mesmo vale para os e-mails de notificação de atraso (PR #420).
@@ -17,7 +20,6 @@
 **Pequenas observações para depois (não impedem nada):**
 - A pergunta 2 do resumo do contrato fala em honorários sem as condições (vale a cláusula).
 - No cálculo final, mudar à mão o valor da multa do aviso não muda o texto da descrição.
-- `envios.js` ainda usa a data de antes (das 21h em diante sairia o dia seguinte): fica com a PR do agendador de envios.
 - A 2ª notificação de atraso não pega o boleto que venceu depois da 1ª (só avisa).
 
 **Resolvido na PR dos acertos de 25/11 (`claude/acertos-25-11`, #428):** [x] boleto quitado inteiro pela reserva ("Quitado pela reserva", quitação e NF sozinhas no vencimento); [x] o termo do acordo refeito cita os honorários e despesas do 1º; [x] a 2ª via sem o erro "setting 'hidden'" (e com os botões de e-mail, WhatsApp e copiar funcionando); [x] "Sair" apaga do navegador o que ficou da assinatura do contrato (`assinatura-contrato-<id>`, com o CPF da testemunha) e pergunta antes de apagar uma vistoria pela metade; [x] conciliação do banco e ponte do C6 (`emission_date`) pela data de Brasília. A frase da caixa do fiador na troca de titular fica como está (modelo geral, decisão de 25/11).
@@ -28,7 +30,9 @@
 
 **Decidido em 25/11:** [x] o botão "Corrigir caução" fica com esse nome (confirma 14/11; não há mais pendência).
 
-**Kit de teste automático:** [x] feito (PRs #425 e #426): `node tools/kit-teste.mjs` monta o banco com os casos, sobe o site, a nuvem local e a versão PC e roda os 4 lugares e os links (`tools/kit-teste/README.md`).
+**Trabalho do Claude que pode ser feito sem o dono:** corrigir o texto da descrição da multa do aviso no cálculo final quando o valor é mudado à mão; tirar as 7 exportações sem uso achadas na compactação de 24/11 (lista no relatório dela, PR #410); apagar a página "Teste dos PDFs" depois que o dono testar; acertar a pergunta 2 do resumo do contrato (honorários com as condições) junto com a próxima revisão do advogado.
+
+**Kit de teste automático:** [x] feito (PRs #425, #426 e #431; obrigatório em toda PR pela #427): `node tools/kit-teste.mjs` monta o banco com os casos, sobe o site, a nuvem local e a versão PC e roda os 4 lugares e os links (`tools/kit-teste/README.md`).
 
 ## ONDE PARAMOS em 24/11/2026, noite (histórico; atualizado em 25/11)
 
