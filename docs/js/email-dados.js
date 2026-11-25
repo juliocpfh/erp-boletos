@@ -111,6 +111,8 @@ function camposDoTermo(f, hoje) {
     aceite_data: f.aceite_reserva ? C.dataBr(String(f.aceite_reserva.em).slice(0, 10)) : '',
     desistencia: f.aceite_reserva ? REC.textoDesistencia(f) : '',
     prazo_documentos: f.aceite_reserva && pz ? C.dataBr(pz.documentos_ate) : '',
+    // reprovação só com justificativa por escrito (pedido do advogado, 24/11/2026): o motivo da decisão vai no e-mail
+    motivo_reprovacao: f.situacao === 'Reprovada' ? String(f.decisao_motivo || '').trim() : '',
     devolver_reserva: dv ? C.reais(dv.devolver) : '', reter_reserva: dv ? C.reais(dv.reter) : '',
   };
 }
@@ -119,7 +121,11 @@ const condicoesDoTermo = (f) => {
   const c = R.condicoesDaReserva(f);
   const dv = R.fichaSemContrato(f) ? R.devolucaoDaReserva(f) : null;
   return { retencao: R.retencaoDaReserva(R.valorDaReserva(f), c.retencao_pct) > 0, requisitos: !!String(f.requisitos || '').trim(), link_termo: !!TR.urlDoAceite(f.id),
-    termo_aceito: !!f.aceite_reserva, prazo_documentos: !!(f.aceite_reserva && R.prazosDaReserva(f)), retencao_aplicada: !!(dv && !dv.integral), devolve_algo: !!(dv && dv.devolver > 0),
+    termo_aceito: !!f.aceite_reserva, prazo_documentos: !!(f.aceite_reserva && R.prazosDaReserva(f)),
+    motivo_reprovacao: f.situacao === 'Reprovada' && !!String(f.decisao_motivo || '').trim(),
+    // reprovada por informação que não se confirmou conta como desistência: aí não se convida a reapresentar
+    pode_reapresentar: f.situacao === 'Reprovada' && !f.reprovada_conferencia,
+    ultimo_dia_documentos: (R.avisoDosDocumentos(f) || {}).qual === 'ultimo', retencao_aplicada: !!(dv && !dv.integral), devolve_algo: !!(dv && dv.devolver > 0),
     aviso_desistencia: !!REC.avisoDaDesistencia(c, R.valorDaReserva(f)) };
 };
 

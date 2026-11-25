@@ -396,7 +396,9 @@ export const FICHA_INICIO = [
   campo('data_recebida', 'Ficha recebida em', 'data', { obrig: true }),
   campo('situacao', 'Situação', 'opcao', { obrig: true, padrao: 'Em análise', opcoes: ['Em análise', 'Aprovada', 'Reprovada', 'Desistiu'], ajuda: 'Aprovada: na página da ficha aparece o botão para fazer o contrato. Desistiu: o interessado não segue e a reserva é devolvida conforme o termo de aceite (sem termo, por inteiro; com contrato já gerado, use o botão "Desistiu antes de assinar" na página da ficha)' }),
   campo('decisao_data', 'Data da decisão', 'data', { ...quando('situacao', 'Aprovada', 'Reprovada', 'Desistiu'), ajuda: 'Em branco: hoje' }),
-  campo('decisao_motivo', 'Motivo / observação da decisão', 'area', { largo: true, linha: true, ...quando('situacao', 'Aprovada', 'Reprovada', 'Desistiu') }),
+  // reprovação só com justificativa por escrito (pedido do advogado, 24/11/2026): obrigatório ao reprovar e vai no e-mail à pessoa
+  campo('decisao_motivo', 'Motivo / observação da decisão', 'area', { largo: true, linha: true, ...quando('situacao', 'Aprovada', 'Reprovada', 'Desistiu'),
+    ajuda: 'Reprovada: obrigatório; vai no e-mail "Ficha reprovada" para a pessoa ler (escreva como para ela, sem dados de outras pessoas). Ex.: "A renda comprovada (R$ 3.000,00) é menor que 3 vezes o aluguel (R$ 1.200,00)."' }),
   // termo de aceite da reserva (2026-11-24): informação ou documento que não corresponde à realidade conta como desistência
   campo('reprovada_conferencia', 'Encerrada porque alguma informação ou documento não correspondeu à realidade na conferência', 'simnao', { ...quando('situacao', 'Reprovada'), largo: true,
     ajuda: 'Ex.: renda diferente da declarada, emprego que a empresa não confirma, documento com dados alterados ou de outra pessoa. Conta como desistência: vale a regra do termo aceito (padrão: a reserva fica com a empresa). Desmarcado: a reserva volta por inteiro' }),

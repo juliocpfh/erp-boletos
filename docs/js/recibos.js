@@ -81,7 +81,7 @@ export function itensDaProposta(f) {
 const pctTexto = (n) => `${String(Math.round((Number(n) || 0) * 100) / 100).replace('.', ',')}%`;
 
 /** Dados ou documentos que não correspondem à realidade (decisão do dono de 2026-11-24: exemplos claros, sem falar em "falso"). */
-export const TEXTO_CONFERENCIA = 'Se, na conferência, alguma informação ou documento que você enviou não corresponder à realidade (por exemplo: renda diferente da declarada, emprego que a empresa não confirma, documento com dados alterados ou de outra pessoa), a proposta é encerrada e conta como desistência: vale a mesma regra da desistência acima.';
+export const TEXTO_CONFERENCIA = 'Se, na conferência, alguma informação ou documento que você enviou não corresponder à realidade (por exemplo: renda diferente da declarada, emprego que a empresa não confirma, documento com dados alterados ou de outra pessoa), a proposta é encerrada e conta como desistência: vale a mesma regra da desistência acima. Pequenas divergências (por exemplo, um erro de digitação ou um endereço antigo) são verificadas caso a caso, com você: não há motivo para se preocupar.';
 
 /**
  * Regra da desistência, para a pessoa (termo, e-mail). ``c``: condições; ``valor``: a reserva. Ex.: 100% e 0 dias → "Se você
@@ -146,14 +146,15 @@ export function termoDaReserva(d, f) {
     'Seguro fiança': 'seguro fiança aprovado pela seguradora' }[f.garantia_tipo];
   const requisitos = [...(garantia ? [`Garantia: ${garantia}.`] : []), 'Consulta do nome e do CPF (ou do CNPJ) em cadastros de crédito, como Serasa e SPC.',
     ...String(f.requisitos || '').split(/\n+/).map((x) => x.trim()).filter(Boolean)];
-  const documentos = [...R.documentosDaFicha(f), ...(R.temFiador(f) ? ['Do fiador: documento com foto e CPF, comprovante de renda e de residência e a matrícula de um imóvel em nome dele (a lista completa vai no link dele)'] : [])];
+  const documentos = [...R.documentosDaFicha(f), ...(R.temFiador(f) ? ['Do fiador: documento com foto e CPF (RG ou CNH), frente e verso, comprovante de renda e de residência e a matrícula ATUALIZADA (de até 30 dias) de um imóvel em nome dele (a lista completa vai no link dele)'] : [])];
   const valorTexto = valor ? K.valorComExtenso(valor) : 'o valor combinado';
   const clausulas = [
     `1. Para reservar o imóvel, você deposita ${valorTexto} na conta da empresa${deposito ? ' informada no fim deste termo' : ''}. O imóvel fica reservado para você por ${c.dias_validade} dias, contados do depósito, enquanto analisamos a ficha.`,
     '2. A reserva não é aluguel e não forma o contrato: a locação só existe depois do contrato assinado por todos.',
     '3. Aprovada a ficha e assinado o contrato, a reserva é abatida do primeiro aluguel: o primeiro boleto já vem com o desconto. É para isso que ela serve.',
-    `4. Depois do depósito, você tem ${C.plural(c.dias_uteis_documentos, 'dia útil', 'dias úteis')} para preencher a ficha e mandar todos os documentos pelo link que vamos enviar. Sem os documentos nesse prazo, a reserva é cancelada, conta como desistência (item 6) e o imóvel volta a ser oferecido.`,
-    '5. Se a ficha não for aprovada, devolvemos a reserva inteira, sem nenhum desconto.',
+    `4. Depois do depósito, você tem ${C.plural(c.dias_uteis_documentos, 'dia útil', 'dias úteis')} para preencher a ficha e mandar todos os documentos pelo link que vamos enviar. Se ainda faltar algum documento, entramos em contato antes do fim do prazo: continuamos aguardando e à disposição para tirar dúvidas e ajudar no que for preciso. Sem os documentos nesse prazo, a reserva é cancelada, conta como desistência (item 6) e o imóvel volta a ser oferecido.`,
+    // reprovação só por escrito, com a reapresentação de documentos (pedido do advogado, 24/11/2026, item 1.4)
+    '5. Se a ficha não for aprovada, informamos o motivo por escrito e devolvemos a reserva inteira, sem nenhum desconto. Você pode reapresentar documentos que fortaleçam a análise (por exemplo, outro comprovante de renda), e a ficha é analisada de novo.',
     `6. ${regraDaDesistencia(c, valor)}`,
     `7. ${TEXTO_CONFERENCIA}`,
     Math.min(R.retencaoDaReserva(valor, c.retencao_pct), valor) >= valor && !(c.dias_arrependimento > 0)

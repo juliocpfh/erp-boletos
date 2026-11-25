@@ -102,6 +102,11 @@ export function telaFicha(id) {
     if (f.situacao === 'Em análise') return `<li>${esc(i.nome)}</li>`;
     return `<li class="suave">${esc(i.nome)}: sem contrato${f.modo_imoveis !== 'Todos juntos' && Object.keys(feitos).length ? ' (a ficha era para apenas um dos imóveis)' : ''}</li>`;
   }).join('');
+  // prazo dos documentos (pedido do advogado, 24/11/2026): lembrete à pessoa a qualquer hora; no 4º dia útil e no último, o aviso
+  const semDocs = f.situacao === 'Em análise' && f.aceite_reserva && R.fichaSemDocumentos(f) && R.prazosDaReserva(f);
+  const lembreteDocumentos = semDocs && R.prazosDaReserva(f).documentos_ate >= C.hojeIso() ? ` ${botaoEmail('ficha_lembrete_documentos', { ficha: f.id }, '✉ E-mail: lembrete dos documentos')}` : '';
+  const avisoDoc = R.avisoDosDocumentos(f);
+  const avisoDocumentos = avisoDoc ? `<div class="alerta aviso"><b>${avisoDoc.qual === 'ultimo' ? 'Hoje é o último dia para os documentos.' : `Faltam documentos: o prazo vai até ${dataBr(avisoDoc.ate)}.`}</b> Fale com a pessoa: a empresa continua aguardando e à disposição para tirar dúvidas e ajudar (botão "E-mail: lembrete dos documentos").</div>` : '';
   const decisao = f.situacao === 'Em análise' ? '' : `<p>${esc(f.situacao)} em <b>${dataBr(f.decisao_data)}</b>${f.decisao_por ? ` por ${esc(f.decisao_por)}` : ''}${f.decisao_motivo ? `: ${esc(f.decisao_motivo)}` : ''}</p>`;
   const devolucao = !R.fichaSemContrato(f) || !(f.reserva_valor > 0) ? ''
     : f.devolucao_data ? `<p>Reserva devolvida em <b>${dataBr(f.devolucao_data)}</b>: ${reais(f.devolucao_valor || f.reserva_valor)} ${f.comprovante_devolucao ? abrir(f.comprovante_devolucao, 'comprovante da devolução') : etiqueta('sem comprovante da devolução', 'aviso')}
@@ -122,7 +127,9 @@ export function telaFicha(id) {
       ${podeUsuario('admin') ? botao('excluir', 'Excluir', { tabela: 'fichas', id: f.id }, 'perigo pequeno') : ''}</div></div>
     <div class="cartao"><h2>Situação</h2><p>${situacaoDaFicha(f)} <span class="suave">· recebida em ${dataBr(f.data_recebida)}</span></p>
       ${decisao}
-      ${opera() ? `<p class="acoes">${f.situacao !== 'Em análise' ? '' : f.reserva_valor > 0 ? botaoEmail('ficha_envio', { ficha: f.id }, '✉ E-mail: envio da ficha cadastral') : '<span class="suave">O e-mail com a ficha cadastral sai depois do depósito da reserva.</span>'} ${f.situacao === 'Aprovada' ? botaoEmail('ficha_aprovada', { ficha: f.id }, '✉ E-mail: ficha aprovada') : ''} ${f.situacao === 'Reprovada' ? botaoEmail('ficha_reprovada', { ficha: f.id }, '✉ E-mail: ficha reprovada') : ''}</p>` : ''}
+      ${opera() ? `<p class="acoes">${f.situacao !== 'Em análise' ? '' : f.reserva_valor > 0 ? botaoEmail('ficha_envio', { ficha: f.id }, '✉ E-mail: envio da ficha cadastral') : '<span class="suave">O e-mail com a ficha cadastral sai depois do depósito da reserva.</span>'} ${f.situacao === 'Aprovada' ? botaoEmail('ficha_aprovada', { ficha: f.id }, '✉ E-mail: ficha aprovada') : ''} ${f.situacao === 'Reprovada' ? botaoEmail('ficha_reprovada', { ficha: f.id }, '✉ E-mail: ficha reprovada (com o motivo)') : ''}${lembreteDocumentos}</p>` : ''}
+      ${avisoDocumentos}
+      ${f.situacao === 'Reprovada' && opera() && !f.devolucao_data && !(f.devolucao_valor > 0) ? `<p class="acoes">${botao('reabrirFichaReprovada', 'Reabrir a análise (documentos novos)', { id: f.id }, 'pequeno', `Voltar a ficha de ${f.inquilino_nome} para análise? Use quando a pessoa reapresentar documentos que fortaleçam a análise. O motivo da reprovação fica no Histórico.`)}</p>` : ''}
       ${f.situacao === 'Em análise' && opera() ? `<div class="acoes">${botao('decidirFicha', 'Aprovar', { id: f.id, situacao: 'Aprovada' }, 'pequeno', `Aprovar a ficha de ${f.inquilino_nome}? Depois aparece o botão para fazer o contrato.`)}
         ${link(`#/editar/fichas/${f.id}?situacao=Reprovada`, 'Reprovar (com o motivo)', 'botao perigo pequeno')}</div>
         <p class="suave">Para reprovar, escolha "Reprovada" na situação e escreva o motivo. Com reserva paga, registre a devolução (data e comprovante) quando devolver.</p>` : ''}
@@ -830,6 +837,22 @@ export const ACOES_FICHAS = {
     if (!f || f.situacao !== 'Em análise') throw new C.ErroUsuario('Esta ficha já foi decidida (talvez por outra pessoa). Atualize a página.');
     await alterar((db) => R.atualizar(db, 'fichas', f.id, { situacao: 'Aprovada', decisao_data: C.hojeIso(), decisao_por: login() }, login(), `Ficha de ${f.inquilino_nome} aprovada`));
     aviso('Ficha aprovada. Agora faça o contrato.');
+    await mostrar();
+  },
+  /**
+   * Ficha reprovada volta para análise com documentos novos que fortalecem a análise (pedido do advogado, 24/11/2026, item 1.4).
+   * O motivo da reprovação fica no Histórico. Reserva já devolvida: vai pelo "Editar", que explica o que fazer com ela.
+   */
+  async reabrirFichaReprovada({ id }) {
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode reabrir fichas.');
+    const f = buscar('fichas', id);
+    if (!f || f.situacao !== 'Reprovada') throw new C.ErroUsuario('Esta ficha não está reprovada (talvez outra pessoa já mudou). Atualize a página.');
+    if (f.devolucao_data || f.devolucao_valor > 0) throw new C.ErroUsuario('A reserva desta ficha já foi devolvida: para reabrir, use "Editar" (é preciso apagar o valor da reserva já devolvida).');
+    const outra = (f.imoveis_ids || []).map((iid) => R.fichaAbertaDoImovel(d(), iid, f.id)).find(Boolean);
+    if (outra) throw new C.ErroUsuario(`O imóvel já tem a ficha de ${outra.inquilino_nome} em aberto: decida aquela antes.`);
+    await alterar((db) => R.atualizar(db, 'fichas', f.id, { situacao: 'Em análise', decisao_data: null, decisao_por: null, decisao_motivo: null, reprovada_conferencia: null }, login(),
+      `Ficha de ${f.inquilino_nome} reaberta para análise com documentos novos (estava reprovada em ${C.dataBr(f.decisao_data)}${f.decisao_motivo ? `: ${f.decisao_motivo}` : ''})`));
+    aviso('Ficha de volta para análise. Peça os documentos novos pelo link da ficha.');
     await mostrar();
   },
 };

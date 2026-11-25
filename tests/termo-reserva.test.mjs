@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as CR from '../docs/js/config-regras.js';
 import { dadosDoEmail } from '../docs/js/email-dados.js';
-import { modeloEmail, montarEmail } from '../docs/js/modelos-email.js';
+import { atualizarTextoEmail, modeloEmail, montarEmail } from '../docs/js/modelos-email.js';
 import * as REC from '../docs/js/recibos.js';
 import * as R from '../docs/js/regras.js';
 import * as TR from '../docs/js/termo-reserva.js';
@@ -34,9 +34,11 @@ const aceite = (em = '2026-12-09T13:00:00.000Z', condicoes = R.condicoesDaReserv
 const COND_40_7 = { retencao_pct: 40, dias_arrependimento: 7, dias_uteis_documentos: 3, dias_validade: 7, dias_uteis_devolucao: 5 };
 const aceite40 = () => aceite(undefined, COND_40_7);
 
-test('regras novas: padrões do dono (100%, 0 dias, 3 dias úteis, 7 dias, 5 dias úteis), com explicação, consequência, risco e lei', () => {
-  const chaves = ['reserva_retencao_pct', 'reserva_dias_arrependimento', 'reserva_dias_uteis_documentos', 'reserva_dias_validade', 'reserva_dias_uteis_devolucao'];
-  assert.deepEqual(chaves.map((k) => CR.PADRAO_SISTEMA[k]), [100, 0, 3, 7, 5]);
+// ajustes do advogado de 24/11/2026: documentos em 7 dias úteis (antes 3), aviso no 4º dia útil, reserva por 15 dias (antes 7, para
+// não vencer antes dos documentos) e devolução em 2 dias úteis (antes 5)
+test('regras novas: padrões (100%, 0 dias, 7 dias úteis, aviso no 4º, 15 dias, 2 dias úteis), com explicação, consequência, risco e lei', () => {
+  const chaves = ['reserva_retencao_pct', 'reserva_dias_arrependimento', 'reserva_dias_uteis_documentos', 'reserva_dia_aviso_documentos', 'reserva_dias_validade', 'reserva_dias_uteis_devolucao'];
+  assert.deepEqual(chaves.map((k) => CR.PADRAO_SISTEMA[k]), [100, 0, 7, 4, 15, 2]);
   for (const k of chaves) {
     const def = CR.definicaoRegra(k);
     assert.equal(def.grupo, 'reserva');
@@ -49,16 +51,28 @@ test('regras novas: padrões do dono (100%, 0 dias, 3 dias úteis, 7 dias, 5 dia
 });
 
 test('devolução pelo padrão (100%, 0 dias): desistência depois do depósito não devolve nada; reprovada devolve tudo', () => {
-  const { d, f } = base({ reserva_valor: 50000, reserva_data: '2026-12-10' });
-  assert.deepEqual(R.prazosDaReserva(f), { documentos_ate: '2026-12-15', vale_ate: '2026-12-17', arrependimento_ate: null }, 'quinta 10/12 + 3 dias úteis = terça 15/12; sem prazo de devolução total');
-  assert.equal(R.devolucaoDaReserva(f, { data: '2026-12-10' }).devolver, 50000, 'sem o termo aceito: devolve tudo');
+  const { d, f } = base({ reserva_valor: 50000, reserva_data: '2026-12-02' });
+  assert.deepEqual(R.prazosDaReserva(f), { documentos_ate: '2026-12-11', vale_ate: '2026-12-17', aviso_documentos_em: '2026-12-08', arrependimento_ate: null },
+    'quarta 02/12 + 4 dias úteis = terça 08/12 (aviso); + 7 dias úteis = sexta 11/12; reservado 15 dias; sem prazo de devolução total');
+  assert.equal(R.devolucaoDaReserva(f, { data: '2026-12-02' }).devolver, 50000, 'sem o termo aceito: devolve tudo');
   R.guardarAceiteReserva(d, f.id, aceite(), 'j');
-  const dv = R.devolucaoDaReserva(R.buscar(d, 'fichas', f.id), { data: '2026-12-10' });
+  const dv = R.devolucaoDaReserva(R.buscar(d, 'fichas', f.id), { data: '2026-12-02' });
   assert.deepEqual([dv.devolver, dv.reter], [0, 50000], 'no próprio dia do depósito já não devolve');
   assert.match(dv.motivo, /a empresa fica com a reserva inteira \(R\$ 500,00\)/);
-  // sem os documentos em 3 dias úteis: conta como desistência e a reserva fica com a empresa (dono, 24/11)
-  const alerta = R.pendenciasDasFichas(d, '2026-12-16').find((x) => /prazo dos documentos/.test(x.texto));
-  assert.match(alerta.texto, /acabou em 15\/12\/2026 .*pelo termo, conta como desistência \(a reserva fica com a empresa\)/);
+  // avisos para falar com a pessoa (advogado, 24/11): nada até o 3º dia útil; do 4º (08/12) ao 6º, o 1º aviso; no 7º (11/12), o último dia
+  const g = R.buscar(d, 'fichas', f.id);
+  const falar = (hoje) => R.pendenciasDasFichas(d, hoje).find((x) => /fale com a pessoa/.test(x.texto));
+  assert.equal(R.avisoDosDocumentos(g, '2026-12-07'), null);
+  assert.equal(falar('2026-12-07'), undefined);
+  assert.deepEqual(R.avisoDosDocumentos(g, '2026-12-08'), { qual: 'primeiro', ate: '2026-12-11' });
+  assert.match(falar('2026-12-08').texto, /faltam documentos e o prazo vai até 11\/12\/2026: fale com a pessoa .*continuamos aguardando e à disposição para ajudar/);
+  assert.equal(R.avisoDosDocumentos(g, '2026-12-10').qual, 'primeiro');
+  assert.match(falar('2026-12-11').texto, /hoje é o último dia para mandar os documentos/);
+  assert.equal(falar('2026-12-14'), undefined, 'depois do prazo, só o aviso da desistência');
+  assert.equal(R.avisoDosDocumentos({ ...g, doc_pessoais: true, doc_renda: true, doc_residencia: true }, '2026-12-08'), null, 'com os documentos marcados, sem aviso');
+  // sem os documentos em 7 dias úteis: conta como desistência e a reserva fica com a empresa (dono, 24/11)
+  const alerta = R.pendenciasDasFichas(d, '2026-12-14').find((x) => /prazo dos documentos/.test(x.texto));
+  assert.match(alerta.texto, /acabou em 11\/12\/2026 .*pelo termo, conta como desistência \(a reserva fica com a empresa\)/);
   R.atualizar(d, 'fichas', f.id, { situacao: 'Desistiu', decisao_data: '2026-12-11' }, 'j');
   assert.equal(R.devolucaoPendente(R.buscar(d, 'fichas', f.id)), false, 'nada a devolver: não fica "devolver a reserva"');
   assert.ok(!R.pendenciasDasFichas(d, '2026-12-30').some((x) => /devolução/.test(x.texto)));
@@ -116,13 +130,16 @@ test('termo: condições do imóvel, reserva abatida do 1º aluguel, prazos, dev
   assert.match(texto, /Renda de pelo menos 3 vezes o aluguel/);
   assert.match(texto, /Documento com foto e CPF/);
   assert.match(texto, /deposita R\$ 500,00 \(quinhentos reais\)/);
-  assert.match(texto, /reservado para você por 7 dias/);
+  assert.match(texto, /reservado para você por 15 dias/);
   assert.match(texto, /abatida do primeiro aluguel/);
-  assert.match(texto, /3 dias úteis para preencher a ficha e mandar todos os documentos.*a reserva é cancelada/);
-  assert.match(texto, /não for aprovada, devolvemos a reserva inteira/);
+  assert.match(texto, /7 dias úteis para preencher a ficha e mandar todos os documentos.*entramos em contato antes do fim do prazo: continuamos aguardando e à disposição para tirar dúvidas e ajudar.*a reserva é cancelada/);
+  assert.match(texto, /não for aprovada, informamos o motivo por escrito e devolvemos a reserva inteira.*Você pode reapresentar documentos que fortaleçam a análise/);
+  assert.match(texto, /1\. Documento com foto e CPF \(RG ou CNH\), frente e verso\n2\. Comprovante de renda dos 3 últimos meses \(extratos bancários, holerite, folha de pagamento ou comprovante de vínculo empregatício\)\n3\. Comprovante de residência atual/);
+  assert.match(texto, /Do fiador: .*a matrícula ATUALIZADA \(de até 30 dias\)/);
+  assert.match(texto, /Pequenas divergências \(.*\) são verificadas caso a caso, com você: não há motivo para se preocupar\./);
   assert.match(texto, /6\. Se você desistir depois do depósito, a reserva não é devolvida: os R\$ 500,00 ficam com a empresa, como sinal de arrependimento \(Código Civil, artigos 418 e 420\)/);
   assert.match(texto, /7\. Se, na conferência, alguma informação ou documento que você enviou não corresponder à realidade \(por exemplo: renda diferente da declarada, emprego que a empresa não confirma, documento com dados alterados ou de outra pessoa\), a proposta é encerrada e conta como desistência: vale a mesma regra da desistência acima\./);
-  assert.match(texto, /8\. Quando houver devolução \(ficha não aprovada\), ela é feita em até 5 dias úteis da reprovação/);
+  assert.match(texto, /8\. Quando houver devolução \(ficha não aprovada\), ela é feita em até 2 dias úteis da reprovação/);
   // o aviso em destaque vem logo depois da apresentação, antes das condições (antes de aceitar e de pagar)
   assert.ok(texto.indexOf('ATENÇÃO, LEIA ANTES DE ACEITAR E DE PAGAR: se você desistir depois de depositar, você perde a reserva inteira (R$ 500,00)') < texto.indexOf('CONDIÇÕES DA LOCAÇÃO'));
   assert.doesNotMatch(texto, /fraude/i);
@@ -191,7 +208,7 @@ test('pedido do link: termo, condições em números e a conta; WhatsApp com o v
   const p = TR.pedidoDoAceite(d, f);
   assert.equal(p.ficha_id, f.id);
   assert.equal(p.contexto.reserva_valor, 50000);
-  assert.deepEqual(p.contexto.condicoes, { retencao_pct: 100, dias_arrependimento: 0, dias_uteis_documentos: 3, dias_validade: 7, dias_uteis_devolucao: 5 });
+  assert.deepEqual(p.contexto.condicoes, { retencao_pct: 100, dias_arrependimento: 0, dias_uteis_documentos: 7, dias_validade: 15, dias_uteis_devolucao: 2 });
   assert.match(p.contexto.aviso, /^ATENÇÃO, LEIA ANTES DE ACEITAR E DE PAGAR/);
   assert.match(p.contexto.termo, /^TERMO DE ACEITE DA RESERVA DE IMÓVEL\n\n/);
   assert.doesNotThrow(() => AR.contextoValido(p.contexto), 'a nuvem aceita o que o sistema manda');
@@ -329,4 +346,35 @@ test('avisos: a equipe recebe a cada documento, troca, apagamento e correção d
   assert.match(corr.equipe.texto, /Mudou: Profissão/);
   assert.equal(corr.pessoa, null, 'a pessoa só recebe o e-mail no 1º envio');
   assert.match(textosDoAviso(reg, 'desistiu').pessoa.texto, /depois, devolvemos R\$ 300,00/);
+});
+
+// ajustes do advogado (24/11/2026, itens 1.2 e 1.4): reprovação com o motivo por escrito e a reapresentação; lembrete dos documentos;
+// os modelos de e-mail já gravados (editados antes) recebem os trechos novos
+test('advogado 24/11: e-mail da reprovação com o motivo e a reapresentação; lembrete dos documentos; modelos gravados atualizados', () => {
+  const { d, f } = base({ reserva_valor: 50000, reserva_data: '2026-12-02' });
+  R.guardarAceiteReserva(d, f.id, aceite(), 'j');
+  // lembrete no último dia (11/12/2026): diz que é o último dia e que a empresa continua aguardando e à disposição
+  const g = R.buscar(d, 'fichas', f.id);
+  const lem = montarEmail(modeloEmail(d, 'ficha_lembrete_documentos'), dadosDoEmail(d, { ficha: g }, {}, '2026-12-08'));
+  assert.match(lem.assunto, /prazo até 11\/12\/2026/);
+  assert.match(lem.texto, /O prazo vai até 11\/12\/2026\./);
+  assert.match(lem.texto, /Continuamos aguardando e estamos à disposição para tirar dúvidas e ajudar/);
+  // reprovada por renda: o motivo vai no e-mail e a pessoa pode reapresentar documentos
+  R.atualizar(d, 'fichas', f.id, { situacao: 'Reprovada', decisao_data: '2026-12-14', decisao_motivo: 'A renda comprovada é menor que 3 vezes o aluguel.' }, 'j');
+  let rep = montarEmail(modeloEmail(d, 'ficha_reprovada'), dadosDoEmail(d, { ficha: R.buscar(d, 'fichas', f.id) }, {}, '2026-12-14')).texto;
+  assert.match(rep, /neste momento\.\n\nMotivo: A renda comprovada é menor que 3 vezes o aluguel\.\n\nSe tiver documentos que fortaleçam a análise .*a ficha é analisada de novo\.\n\nA reserva de R\$ 500,00 será devolvida em até 2 dias úteis/);
+  assert.equal(R.devolverReservaAte(R.buscar(d, 'fichas', f.id)), '2026-12-16', 'reprovada na segunda 14/12 + 2 dias úteis = quarta 16/12');
+  // informação que não se confirmou (conta como desistência): sem o convite para reapresentar
+  R.atualizar(d, 'fichas', f.id, { reprovada_conferencia: true }, 'j');
+  rep = montarEmail(modeloEmail(d, 'ficha_reprovada'), dadosDoEmail(d, { ficha: R.buscar(d, 'fichas', f.id) }, {}, '2026-12-14')).texto;
+  assert.match(rep, /Motivo: /);
+  assert.doesNotMatch(rep, /fortaleçam a análise/);
+  // modelos editados e gravados com o texto de antes: os trechos novos entram, o resto editado fica
+  const antigoTermo = '- Depois do depósito, você tem {dias_documentos} dias úteis para mandar a ficha e os documentos; sem eles, a reserva é cancelada\n- Ficha não aprovada: devolvemos tudo\nTEXTO EDITADO';
+  const t1 = atualizarTextoEmail('ficha_termo_reserva', antigoTermo);
+  assert.match(t1, /se faltar algum, entramos em contato antes do fim do prazo; sem eles/);
+  assert.match(t1, /Ficha não aprovada: informamos o motivo por escrito e devolvemos tudo; você pode reapresentar documentos/);
+  assert.match(t1, /TEXTO EDITADO$/);
+  const t2 = atualizarTextoEmail('ficha_reprovada', 'Olá. Depois da análise, não foi possível aprovar a ficha neste momento.\n\n[se reserva]Reserva.[fim]');
+  assert.match(t2, /neste momento\.\n\[se motivo_reprovacao\]\nMotivo: \{motivo_reprovacao\}\n\[fim\]\[se pode_reapresentar\]/);
 });

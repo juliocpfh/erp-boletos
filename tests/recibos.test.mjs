@@ -146,7 +146,7 @@ test('ficha cadastral em PDF: dados preenchidos, linhas em branco, documentos pe
   assert.equal(tab.RG, '______________________________', 'o que falta vai em branco para preencher');
   assert.ok(!r.tabela.some((x) => /CÔNJUGE/.test(x[0])), 'solteira: sem cônjuge');
   const docs = r.tabela.filter((x) => /^\d+\.$/.test(x[0])).map((x) => x[1]);
-  assert.deepEqual(docs, ['Documento com foto e CPF (RG ou CNH)', '3 últimos holerites', 'Carteira de trabalho digital (a página do contrato atual), baixada do aplicativo do governo', 'Comprovante de residência atual (conta de água, energia ou telefone)']);
+  assert.deepEqual(docs, ['Documento com foto e CPF (RG ou CNH), frente e verso', '3 últimos holerites', 'Carteira de trabalho digital (a página do contrato atual), baixada do aplicativo do governo', 'Comprovante de residência atual (conta de água, energia ou telefone)']);
   assert.match(r.depois[0], /^DECLARAÇÃO\. Declaro .*podem ser conferidos diretamente com a fonte.*artigos 171, 297, 298, 299 e 304/);
   assert.match(r.depois[1], /do nome e do CPF em cadastros de crédito \(como Serasa e SPC\).*se aprovada, para o contrato \(Lei 13\.709\/2018\)/);
   assert.match(r.depois[2], /reserva de R\$ 4\.150,00 é devolvida por inteiro/);
@@ -168,7 +168,7 @@ test('ficha cadastral em PDF: dados preenchidos, linhas em branco, documentos pe
   assert.deepEqual(prontos.filter((a) => a.recibo === 'ficha_fiador').map((a) => [a.rotulo, a.alvo.fiador]), [['Ficha cadastral do fiador (Ana Lima)', 1]]);
   const e = montarEmail(modeloEmail(d, 'ficha_envio'), dadosDoEmail(d, { ficha: f }, {}, '2026-11-14')).texto;
   assert.match(e, /, a do fiador e os documentos/);
-  assert.match(e, /1\. Documento com foto e CPF \(RG ou CNH\)\n2\. Certidão de casamento/);
+  assert.match(e, /1\. Documento com foto e CPF \(RG ou CNH\), frente e verso\n2\. Certidão de casamento/);
   assert.match(e, /DO FIADOR\n1\. Documento com foto e CPF/);
   assert.doesNotMatch(e, /\[preencher/);
   // empresa: dados da empresa e do representante, documentos da empresa; assina o representante

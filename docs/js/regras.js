@@ -3007,9 +3007,10 @@ export const fichaComConjuge = (f) => f.inquilino_tipo !== PJ && casadoOuUniao(f
 
 /** Partes da lista de documentos da pessoa física (a página da ficha pela internet monta a lista com elas, conforme o que a pessoa escolhe). */
 export const PARTES_DOCUMENTOS_PF = {
-  inicio: ['Documento com foto e CPF (RG ou CNH)'],
+  // lista do termo da reserva conferida pelo advogado (24/11/2026, item 1.0): frente e verso; a renda com os exemplos dele
+  inicio: ['Documento com foto e CPF (RG ou CNH), frente e verso'],
   conjuge: ['Certidão de casamento ou declaração de união estável', 'Documento com foto e CPF do cônjuge ou companheiro(a)'],
-  renda_padrao: ['Comprovante de renda dos 3 últimos meses'],
+  renda_padrao: ['Comprovante de renda dos 3 últimos meses (extratos bancários, holerite, folha de pagamento ou comprovante de vínculo empregatício)'],
   fim: ['Comprovante de residência atual (conta de água, energia ou telefone)'],
 };
 
@@ -3027,7 +3028,7 @@ export function documentosDaFicha(f) {
 export const separacaoTotal = (x = {}) => /^Separação total/.test(x.regime_bens || '');
 
 /** Documentos do fiador (``x``: os dados dele, sem o prefixo fiadorN_). Casado: também os do cônjuge, que assina a fiança. */
-export const documentosDoFiador = (x = {}) => ['Documento com foto e CPF', 'Comprovante de renda dos 3 últimos meses', 'Comprovante de residência atual',
+export const documentosDoFiador = (x = {}) => ['Documento com foto e CPF (RG ou CNH), frente e verso','Comprovante de renda dos 3 últimos meses', 'Comprovante de residência atual',
   'Matrícula atualizada (de até 30 dias) de um imóvel em nome dele',
   ...(casadoOuUniao(x.estado_civil) && separacaoTotal(x) ? ['Certidão de casamento com a anotação do pacto antenupcial (separação total de bens)']
     : casadoOuUniao(x.estado_civil) ? ['Certidão de casamento ou declaração de união estável', 'Documento com foto e CPF do cônjuge ou companheiro(a), que também assina a fiança']
@@ -3098,15 +3099,30 @@ export const valorDaReserva = (f) => (f.reserva_valor > 0 ? f.reserva_valor : f.
 export const retencaoDaReserva = (valor, pct) => Math.round((valor || 0) * (Number(pct) || 0) / 100);
 
 /**
- * Prazos contados do depósito da reserva (null sem a data do depósito). Ex.: depósito na quinta, 10/12/2026 → documentos até
- * 15/12/2026 (3 dias úteis) e reservado até 17/12/2026 (7 dias); desistência com tudo de volta até 17/12/2026 com 7 dias na regra,
- * ou nenhuma (arrependimento_ate null) com 0 dias, o padrão.
+ * Prazos contados do depósito da reserva (null sem a data do depósito). Ex.: depósito na quarta, 02/12/2026 → 1º aviso dos
+ * documentos na terça, 08/12/2026 (4º dia útil, `aviso_documentos_em`), documentos até sexta, 11/12/2026 (7 dias úteis, pedido do
+ * advogado de 24/11/2026) e reservado até 17/12/2026 (15 dias); desistência com tudo de volta até 09/12/2026 com 7 dias na regra,
+ * ou nenhuma (arrependimento_ate null) com 0 dias, o padrão. Aviso no último dia ou depois: `aviso_documentos_em` null (só o do fim).
  */
 export function prazosDaReserva(f) {
   if (!f || !/^\d{4}-\d{2}-\d{2}$/.test(String(f.reserva_data || ''))) return null;
   const c = condicoesDaReserva(f);
+  const aviso = CR.regra('reserva_dia_aviso_documentos');
   return { documentos_ate: C.somarDiasUteis(f.reserva_data, c.dias_uteis_documentos), vale_ate: C.somarDias(f.reserva_data, c.dias_validade),
+    aviso_documentos_em: aviso > 0 && aviso < c.dias_uteis_documentos ? C.somarDiasUteis(f.reserva_data, aviso) : null,
     arrependimento_ate: c.dias_arrependimento > 0 ? C.somarDias(f.reserva_data, c.dias_arrependimento) : null };
+}
+
+/**
+ * Aviso de hoje para a equipe falar com quem ainda não mandou os documentos (pedido do advogado, 24/11/2026, item 1.2): no dia
+ * do 1º aviso e no último dia do prazo, com o termo aceito, a ficha em análise e os documentos não marcados. { qual: 'primeiro' |
+ * 'ultimo', ate } ou null. Ex.: depósito em 02/12/2026 → 'primeiro' de 08/12 a 10/12/2026 e 'ultimo' em 11/12/2026.
+ */
+export function avisoDosDocumentos(f, hoje = C.hojeIso()) {
+  const pz = f && f.situacao === 'Em análise' && f.aceite_reserva && fichaSemDocumentos(f) ? prazosDaReserva(f) : null;
+  if (!pz || hoje > pz.documentos_ate) return null;
+  if (hoje === pz.documentos_ate) return { qual: 'ultimo', ate: pz.documentos_ate };
+  return pz.aviso_documentos_em && hoje >= pz.aviso_documentos_em ? { qual: 'primeiro', ate: pz.documentos_ate } : null;
 }
 
 /**
@@ -3234,6 +3250,8 @@ export function pendenciasDasFichas(d, hoje = C.hojeIso()) {
     }
     // termo aceito (2026-11-24): prazo dos documentos e validade da reserva, contados do depósito
     const pz = f.situacao === 'Em análise' && f.aceite_reserva ? prazosDaReserva(f) : null;
+    const avisoDoc = avisoDosDocumentos(f, hoje);
+    if (avisoDoc) out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome}: ${avisoDoc.qual === 'ultimo' ? 'hoje é o último dia para mandar os documentos' : `faltam documentos e o prazo vai até ${C.dataBr(avisoDoc.ate)}`}: fale com a pessoa (e-mail "Lembrete dos documentos da ficha" na página da ficha): continuamos aguardando e à disposição para ajudar` });
     if (pz && pz.documentos_ate < hoje && fichaSemDocumentos(f)) out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome}: o prazo dos documentos acabou em ${C.dataBr(pz.documentos_ate)} e eles não estão marcados como recebidos: pelo termo, conta como desistência (${devolucaoDaReserva(f, { data: hoje }).devolver ? `devolve ${C.reais(devolucaoDaReserva(f, { data: hoje }).devolver)}` : 'a reserva fica com a empresa'}); registre em "Desistiu antes de assinar"` });
     else if (pz && pz.vale_ate < hoje) out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome}: a reserva segurava o imóvel até ${C.dataBr(pz.vale_ate)} (decida a ficha)` });
   }
