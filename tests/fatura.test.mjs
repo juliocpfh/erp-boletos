@@ -24,6 +24,9 @@ test('linhasObservacoes: respeita 90 caracteres por linha, parágrafos, no máxi
   assert.equal(F.linhasObservacoes(Array(10).fill('x').join('\n')).length, 5);
   assert.deepEqual(F.linhasObservacoes('a'.repeat(100), 10), ['aaaaaaaaaa'], 'palavra maior que a linha é cortada');
   assert.deepEqual(F.linhasObservacoes('um dois tres', 8), ['um dois', 'tres']);
+  // "R$" não fica sozinho no fim da linha (NF do proporcional pago com atraso, PR #403)
+  assert.deepEqual(F.linhasObservacoes('Aluguel proporcional 16/30 × R$ 2.000,00 = R$ 1.066,67 + multa e juros por atraso R$ 115,77 = R$ 1.182,44'),
+    ['Aluguel proporcional 16/30 × R$ 2.000,00 = R$ 1.066,67 + multa e juros por atraso', 'R$ 115,77 = R$ 1.182,44']);
 });
 
 test('faturaHtml: número com 4 dígitos, empresa e tomador em maiúsculas e escapados, valor em reais, período e observações nas linhas certas', () => {

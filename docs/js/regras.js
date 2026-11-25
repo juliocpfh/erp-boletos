@@ -2304,6 +2304,25 @@ export function ultimaFatura(d) {
   return d.faturas.reduce((m, f) => (!m || f.numero > m.numero ? f : m), null);
 }
 
+/**
+ * Conta do aluguel proporcional pago com atraso, para as observações da NF (decisão do dono de 2026-11-24): a NF tem uma linha
+ * só, "1 × total", e a conta fica escrita aqui. Ex.: entrada em 15/11/2026, aluguel de R$ 2.000,00, pago com atraso →
+ * "Aluguel proporcional 16/30 × R$ 2.000,00 = R$ 1.066,67 + multa e juros por atraso R$ 115,77 = R$ 1.182,44".
+ * Só sai quando as partes somam o valor da NF (senão a conta escrita não bateria com o total).
+ */
+export function contaDoProporcionalAtrasado(registro) {
+  const aluguel = registro.aluguel || 0;
+  const mensal = registro.aluguel_mensal || 0;
+  if (!(aluguel > 0) || !(mensal > 0)) return '';
+  const encargos = (registro.multa || 0) + (registro.juros || 0);
+  const ressarcimento = registro.ressarcimento_na_nf && registro.ressarcimento > 0 ? registro.ressarcimento : 0;
+  if (aluguel + encargos + ressarcimento !== registro.valor_nf) return '';
+  const partes = [`Aluguel proporcional ${registro.dias_cobrados}/${registro.dias_mes} × ${C.reais(mensal)} = ${C.reais(aluguel)}`];
+  if (encargos > 0) partes.push(`multa e juros por atraso ${C.reais(encargos)}`);
+  if (ressarcimento > 0) partes.push(`${registro.ressarcimento_descricao || 'ressarcimento'} ${C.reais(ressarcimento)}`);
+  return partes.length > 1 ? `${partes.join(' + ')} = ${C.reais(registro.valor_nf)}` : `${partes[0]} (pago depois do vencimento, sem o desconto de pontualidade)`;
+}
+
 /** Dados da fatura de uma cobrança ou recebimento: imóvel das empresas, tomador, período e valor. */
 export function baseDaFatura(d, tipo, registro) {
   if (tipo === 'cobranca') {
@@ -2321,12 +2340,15 @@ export function baseDaFatura(d, tipo, registro) {
     // dias × aluguel, e a linha sai "1 × total" (decisão do dono de 2026-11-24, BOL-06). Ex.: entrada em 15/11/2026, aluguel de
     // R$ 2.000,00, 16/30 pago com atraso, total R$ 1.182,44 → "1 × R$ 1.182,44"; pago em dia continua "16/30 × R$ 2.000,00"
     const comAcrescimos = registro.dias_atraso > 0 || registro.multa > 0 || registro.juros > 0 || (registro.ressarcimento_na_nf && registro.ressarcimento > 0);
-    const proporcional = !acordo && !ajusteNaNf && !comAcrescimos && registro.dias_cobrados > 0 && registro.dias_cobrados < registro.dias_mes;
+    const mesIncompleto = !acordo && !ajusteNaNf && registro.dias_cobrados > 0 && registro.dias_cobrados < registro.dias_mes;
+    const proporcional = mesIncompleto && !comAcrescimos;
+    // a linha continua uma só, com o total; a conta do proporcional pago com atraso vai nas observações (decisão do dono de 24/11)
+    const contaProporcional = mesIncompleto && comAcrescimos ? contaDoProporcionalAtrasado(registro) : '';
     return {
       imovel, valor: registro.valor_nf, periodo_inicio: ini, periodo_fim: fim,
       ...(proporcional ? { dias: registro.dias_cobrados, dias_mes: registro.dias_mes } : {}),
       descricao: `${contrato.inquilino_nome} · ${imovel.nome} · ${ref || C.compBr(registro.competencia)}`,
-      observacoes: registro.observacoes_nf || [ref ? `Parcela do ${ref}` : '', ajusteNaNf ? `Inclui ${ajustesDoBoleto(registro).map((a) => a.motivo).filter(Boolean).join('; ') || 'ajuste do mês'}: ${C.reais(ajusteNf)}` : ''].filter(Boolean).join('. '),
+      observacoes: registro.observacoes_nf || [ref ? `Parcela do ${ref}` : '', ajusteNaNf ? `Inclui ${ajustesDoBoleto(registro).map((a) => a.motivo).filter(Boolean).join('; ') || 'ajuste do mês'}: ${C.reais(ajusteNf)}` : '', contaProporcional].filter(Boolean).join('. '),
       tomador: { nome: contrato.inquilino_nome, documento: contrato.inquilino_cpf || '',
         telefone: contrato.inquilino_telefone || '', endereco: enderecoCompleto(imovel) },
       partes: participacoesDo(d, imovel.id), origem: `no imóvel "${imovel.nome}"`,
