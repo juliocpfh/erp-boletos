@@ -187,6 +187,7 @@ async function janelaEmail(chave, alvo) {
     <p><label>Texto <span class="suave">(pode alterar antes de enviar)</span></label><textarea name="texto" rows="16" spellcheck="true"></textarea></p>
     <p class="suave" data-editado hidden>Texto alterado à mão: as respostas acima não mudam mais o texto.</p>
     ${ligado ? `<p><label>${prontos.length ? 'Outros anexos' : 'Anexos'} para o "Enviar agora" <span class="suave">(PDF ou foto)</span></label><input type="file" name="anexos" multiple accept="${ACEITA_DOCUMENTOS}"></p>` : ''}
+    ${ligado && modelo.anexoObrigatorio && !prontos.some((a) => a.tipo !== 'digital' || a.ok) ? `<p class="alerta aviso">Falta anexar: ${esc(modelo.anexos)}. Escolha o arquivo acima; sem ele o e-mail não sai.</p>` : ''}
     <p class="suave">${alvo.contrato && /saida_aviso/.test(chave) ? 'Confira no contrato do inquilino a multa da saída antecipada antes de enviar. ' : ''}${ligado ? '' : 'Envio direto ainda não ligado: use "Copiar texto" ou "Abrir no Gmail".'}</p>
   </div><div class="acoes" style="justify-content:flex-end;flex-wrap:wrap">
     <p class="alerta aviso-janela" data-aviso-janela role="status" aria-live="polite" hidden style="flex-basis:100%"></p>
@@ -262,6 +263,8 @@ async function janelaEmail(chave, alvo) {
     try {
       arquivos = [...await arquivosProntos(dlg, prontos, objeto), ...[...(q('[name=anexos]').files || [])].map((f) => ({ nome: f.name, blob: f }))];
     } catch (erro) { aviso(`Não consegui preparar os anexos: ${erro.message}`, 'erro'); return; }
+    // e-mail que só existe para levar o arquivo (contrato para assinar): sem ele, não sai e não fica registrado
+    if (!arquivos.length && modelo.anexoObrigatorio) { avisar(`Falta anexar: ${modelo.anexos}. Escolha o arquivo em "${prontos.length ? 'Outros anexos' : 'Anexos'}" e clique de novo. Nada foi enviado.`, 'aviso'); return; }
     // o que merece destaque na pergunta: texto que fala em anexo sem nenhum arquivo, e notificação sem a assinatura
     const alertas = [];
     if (!arquivos.length && modelo.anexos) alertas.push(`ATENÇÃO: o texto fala em anexo (${modelo.anexos}), mas nenhum arquivo vai junto. Anexe em "${prontos.length ? 'Outros anexos' : 'Anexos'}" antes de enviar.`);

@@ -121,3 +121,9 @@ test('documento assinado por todos vai anexo: contrato, vistoria, chaves, termo 
   const e = R.inserir(d, 'encerramentos', { contrato_id: c.id, data_saida: '2029-06-01', saldo: 0, termo_assinado: 'comprovante-termo-quitacao-assinado-2029-06-01.pdf' }, 'j');
   assert.deepEqual(nomes('saida_encerramento'), [`contrato:${e.termo_assinado}`]);
 });
+
+test('contrato para assinar: só sai com o contrato anexado (simulação de 24/11)', () => {
+  const m = modeloEmail({ modelos_email: [{ chave: 'contrato_assinar', assunto: 'x', texto: 'y' }] }, 'contrato_assinar');
+  assert.equal(m.anexoObrigatorio, true); // vale também no modelo editado
+  assert.ok(!modeloEmail({}, 'contrato_assinado').anexoObrigatorio);
+});

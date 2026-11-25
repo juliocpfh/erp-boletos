@@ -140,6 +140,8 @@ Os documentos da análise serão apagados, conforme a LGPD (Lei 13.709/2018).`,
     chave: 'contrato_assinar', nome: 'Contrato para assinar', etapa: 'Gerar o contrato',
     assunto: 'Contrato de locação para assinatura – {imovel}',
     anexos: 'Contrato (PDF)', prontos: ['digital:contrato'], // assinado digitalmente pela empresa, quando houver (2026-11-24)
+    // sem o contrato o e-mail não faz sentido: o "Enviar agora" recusa e não fica registrado como enviado (simulação de 24/11)
+    anexoObrigatorio: true,
     perguntas: [['prazo_assinatura', 'Devolver assinado até', 'data']],
     texto: `Olá, {nome},
 
