@@ -109,6 +109,8 @@ export const prazoDadoAgora = (dias, agora = new Date()) => ultimoDiaDoPrazo(dia
 export const validadeDoLinkAgora = (dias, agora = new Date()) => validadeDoLink(dias, agora, fimDoExpediente());
 /** Data de Brasília de um instante, em dd/mm/aaaa. Ex.: '2026-11-25T00:47:00Z' → '24/11/2026'. */
 export const dataBrDe = (instante) => dataBr(dataDeBrasilia(instante));
+/** Nome do dia da semana pelo getUTCDay (0 = domingo). */
+export const DIAS_DA_SEMANA = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
 
 /** Data e hora locais para nomes de arquivo: 'AAAA-MM-DD-HH-MM' (às 20:57 de 16/11/2026 → '2026-11-16-20-57'; não a hora UTC). */
 export function carimboLocal(agora = new Date()) {
