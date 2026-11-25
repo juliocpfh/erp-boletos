@@ -221,3 +221,32 @@ test('as rotas internas do cron não passam pelo Worker', async (t) => {
     assert.ok([403, 404, 405].includes(r.status), `${rota}: ${r.status}`);
   }
 });
+
+test('limite diário de e-mails na hora marcada: reagenda para o próximo dia de horário comercial; falha só depois de 3 dias', async (t) => {
+  pararRelogio(t);
+  const n = montar();
+  const id = (await n.agendar('2026-11-25T00:20:00.000Z')).corpo.id;
+  // o limite do Gmail (429) batido no sábado 28/11 às 8h: volta para segunda 30/11 às 8h, com o aviso na lista
+  Object.assign(n.env, SEGREDOS);
+  G.esquecerToken();
+  const buscar = async (url) => (String(url).startsWith('https://oauth2.googleapis.com/token') ? respostaJson(200, { access_token: 'acesso', expires_in: 3599 }) : respostaJson(429, { error: { message: 'limite', errors: [{ reason: 'dailyLimitExceeded' }] } }));
+  const op = { simular: false, buscar };
+  n.dobj.cofre.sql.exec("UPDATE envios_agendados SET quando = '2026-11-28T11:00:00.000Z' WHERE id = ?", id);
+  assert.deepEqual(await n.rodar('2026-11-28T11:00:00.000Z', op), { enviados: 0, falhas: 0, de_novo: 1 });
+  let [l] = await n.lista();
+  assert.equal(l.situacao, 'agendado');
+  assert.equal(l.quando, '2026-11-30T11:00:00.000Z', 'sábado 8h → segunda 8h');
+  assert.equal(l.erro, AG.AVISO_LIMITE);
+  // o limite do próprio sistema (MAX_EMAILS_DIA do cofre) também reagenda: terça 01/12 às 8h
+  n.dobj.cofre.registrarEmail = () => { const e = new Error('Limite de 150 e-mails por dia para este usuário.'); e.status = 429; throw e; };
+  assert.deepEqual(await n.rodar('2026-11-30T11:00:00.000Z', op), { enviados: 0, falhas: 0, de_novo: 0 });
+  [l] = await n.lista();
+  assert.equal(l.situacao, 'agendado');
+  assert.equal(l.quando, '2026-12-01T11:00:00.000Z');
+  // 3 dias depois do primeiro limite (28/11 8h → 01/12 8h): vira falha
+  await n.rodar('2026-12-01T11:00:00.000Z', op);
+  [l] = await n.lista();
+  assert.equal(l.situacao, 'falhou');
+  assert.match(l.erro, /limite diário de e-mails por 3 dias seguidos/);
+  assert.equal(n.envios().length, 0);
+});

@@ -7,6 +7,25 @@ const SABADO_8H05 = '2026-11-28T11:05:00.000Z';
 
 export default [
   {
+    // comunicado com o e-mail de Bruno já agendado: clicar de novo em "E-mail" avisa e oferece "Ver na lista" ou "Agendar outro"
+    nome: 'Comunicado: e-mail já agendado para a pessoa', rota: '#/comunicacoes', lugares: ['nuvem'], // comunicado com link só na nuvem
+    async acoes(t) {
+      // t.app usa eval (barrado pela CSP do site): aqui o evaluate do Playwright, que não passa pela CSP
+      const id = await t.pagina.evaluate(async (bruno) => {
+        const A = await import('/js/app.js');
+        const r = await A.alterar((db) => A.R.inserir(db, 'comunicados', { modelo: 'contatos', titulo: 'Kit comunicado', assunto: 'Confirme seus contatos', texto: 'Olá, {nome}.', whatsapp: 'Olá', lembrete: 'Lembrete', criado_em: '2026-11-25T12:00:00.000Z',
+          destinos: [{ chave: `c${bruno}`, tipo: 'inquilino', contrato_id: bruno, fiador_id: null, nome: 'Bruno Fiador Teste', agendado_id: 'kit0000000000000000000000000000a', agendado_para: '2026-11-28T11:00:00.000Z' }] }, 'kit', 'Comunicado do kit'));
+        return r.id;
+      }, t.ids.bruno);
+      await t.abrir(`#/comunicacoes?id=${id}`);
+      await t.clicar('[data-acao=emailComunicado]');
+      await t.esperarTexto('Já há um e-mail agendado para Bruno Fiador Teste em sábado, 28/11/2026, às 08:00');
+      await t.esperarTexto('Enviar outro mesmo assim'); // 25/11 ao meio-dia: no horário (à noite seria "Agendar outro")
+      await t.clicar('dialog[open] [data-ver-lista]');
+      await t.esperarTexto('Envios agendados');
+    },
+  },
+  {
     // sem a nuvem (?teste, como a versão PC) não há "Enviar agora" do Gmail: a pergunta é aberta direto, para ver "Agendar" desligado
     nome: 'Fora do horário sem a nuvem: "Agendar" desligado, com a explicação', rota: '#/', lugares: ['computador', 'celular'],
     async acoes(t) {

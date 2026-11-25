@@ -7,6 +7,8 @@
 // Rotas do site (com o login do Access): email/agendar (POST, operador), email/agendados (GET), email/agendados/mudar e
 // email/agendados/cancelar (POST, operador). No computador: GET /__agendados/rodar em nuvem/local.mjs roda o cron na hora.
 import { contaGuardada, enviarEmail, MAX_ASSUNTO, validarEnvio } from './gmail.mjs';
+import { proximoHorarioComercial } from '../docs/js/brasilia.js';
+import { feriados } from '../docs/js/calculos.js';
 
 export const PASTA = 'sistema/agendados/';
 export const MAX_ABERTOS = 500; // agendados esperando ao mesmo tempo
@@ -17,6 +19,10 @@ export const ESPERA_NOVA_TENTATIVA = 10 * 60 * 1000;
 export const PRESO_MS = 15 * 60 * 1000; // "saindo" há mais que isso (o Worker caiu no meio): vira falha, sem mandar de novo
 export const GUARDAR_DIAS = 90; // enviados e cancelados saem da lista depois disso
 export const DIAS_NA_LISTA = 7; // enviados e cancelados aparecem na tela por 7 dias
+// limite diário de e-mails (o do sistema, MAX_EMAILS_DIA, ou o do Gmail): reagenda para o próximo dia de horário comercial;
+// só vira falha depois de DIAS_LIMITE dias assim (pedido de 25/11/2026)
+export const DIAS_LIMITE = 3;
+export const AVISO_LIMITE = 'Reagendado: limite diário do Gmail';
 const MAX_REGISTRO = 20000; // o registro de envios_email que o site prepara (sem o texto do e-mail)
 const MAX_DESCRICAO = 300;
 const RE_ID = /^[0-9a-f]{32}$/;
@@ -62,8 +68,10 @@ export class EnviosAgendados {
     cofre.sql.exec(`CREATE TABLE IF NOT EXISTS envios_agendados (id TEXT PRIMARY KEY, quando TEXT NOT NULL, situacao TEXT NOT NULL, por TEXT NOT NULL,
       criado_em TEXT NOT NULL, para TEXT NOT NULL, assunto TEXT, descricao TEXT, anexos TEXT, registro TEXT NOT NULL, tamanho INTEGER,
       tentativas INTEGER NOT NULL DEFAULT 0, erro TEXT, enviando_em TEXT, enviado_em TEXT, gmail_id TEXT, registro_id INTEGER,
-      cancelado_em TEXT, cancelado_por TEXT, mudado_em TEXT, mudado_por TEXT);
+      cancelado_em TEXT, cancelado_por TEXT, mudado_em TEXT, mudado_por TEXT, limite_desde TEXT);
       CREATE INDEX IF NOT EXISTS envios_agendados_quando ON envios_agendados (situacao, quando);`);
+    // cofre criado antes da coluna limite_desde (só na nuvem de teste): acrescenta
+    if (!cofre.q('PRAGMA table_info(envios_agendados)').some((c) => c.name === 'limite_desde')) cofre.sql.exec('ALTER TABLE envios_agendados ADD COLUMN limite_desde TEXT');
   }
 
   agora() { return this.c.relogio(); }
@@ -114,7 +122,7 @@ export class EnviosAgendados {
     if (!l) throw new this.Erro(404, 'Este envio agendado não existe mais.');
     if (!['agendado', 'falhou'].includes(l.situacao)) throw new this.Erro(409, l.situacao === 'enviando' ? 'Este e-mail está saindo agora: não dá para mudar.' : `Este e-mail já foi ${l.situacao}.`);
     const q = this.conferir(() => quandoValido(quando, this.agora()));
-    this.c.sql.exec("UPDATE envios_agendados SET quando = ?, situacao = 'agendado', tentativas = 0, erro = NULL, mudado_em = ?, mudado_por = ? WHERE id = ?", q, this.agora().toISOString(), String(email).toLowerCase(), l.id);
+    this.c.sql.exec("UPDATE envios_agendados SET quando = ?, situacao = 'agendado', tentativas = 0, erro = NULL, limite_desde = NULL, mudado_em = ?, mudado_por = ? WHERE id = ?", q, this.agora().toISOString(), String(email).toLowerCase(), l.id);
     return { ok: true, agendado: this.paraTela(this.linha(l.id)) };
   }
 
@@ -127,6 +135,45 @@ export class EnviosAgendados {
     if (!['agendado', 'falhou'].includes(l.situacao)) throw new this.Erro(409, l.situacao === 'enviando' ? 'Este e-mail está saindo agora: não dá para cancelar.' : 'Este e-mail já foi enviado.');
     this.c.sql.exec("UPDATE envios_agendados SET situacao = 'cancelado', cancelado_em = ?, cancelado_por = ? WHERE id = ?", this.agora().toISOString(), String(email).toLowerCase(), l.id);
     return { ok: true, agendado: this.paraTela(this.linha(l.id)), registro: JSON.parse(l.registro || '{}') };
+  }
+
+  /** Valor de uma regra do sistema (registros de config_regras), ou o padrão. */
+  regra(chave, padrao) {
+    for (const r of this.c.q("SELECT dados FROM registros WHERE tabela = 'config_regras'")) {
+      try { const x = JSON.parse(r.dados); if (x.chave === chave && x.valor !== undefined && x.valor !== null) return x.valor; } catch { /* linha estragada */ }
+    }
+    return padrao;
+  }
+
+  /** Horas do horário comercial pelas regras do sistema (as mesmas de calculos.js horasComerciais) e os feriados. */
+  horas() {
+    const locais = (Array.isArray(this.regra('feriados_locais', [])) ? this.regra('feriados_locais', []) : []).map(String);
+    return {
+      inicio: this.regra('inicio_expediente_hora', 8), fim: this.regra('fim_expediente_hora', 18), sabadoFim: this.regra('fim_expediente_sabado_hora', 12),
+      ehFeriado: (x) => feriados(Number(x.slice(0, 4))).has(x) || locais.some((f) => (f.length === 5 ? x.slice(5) === f : x === f)),
+    };
+  }
+
+  /** Início do próximo dia de horário comercial depois de hoje. Ex.: limite batido no sábado às 8h → segunda às 8h. */
+  proximoDiaComercial(agora) {
+    const amanha = new Date(Date.parse(`${hojeBrasilia(agora)}T00:00:00-03:00`) + 86400000);
+    const p = proximoHorarioComercial(amanha, this.horas());
+    return p.quando || amanha;
+  }
+
+  /**
+   * Limite diário de e-mails batido: volta a "agendado" para o próximo dia de horário comercial, com o aviso na lista.
+   * Depois de DIAS_LIMITE dias nisso, vira falha. Devolve true se reagendou.
+   */
+  limiteDoDia(l, agora, motivo) {
+    const desde = Date.parse(l.limite_desde || '') || agora.getTime();
+    if (agora.getTime() - desde >= DIAS_LIMITE * 86400000) {
+      this.falhar(l.id, `Não saiu: limite diário de e-mails por ${DIAS_LIMITE} dias seguidos (${motivo})`);
+      return false;
+    }
+    this.c.sql.exec("UPDATE envios_agendados SET situacao = 'agendado', quando = ?, erro = ?, limite_desde = ? WHERE id = ?",
+      this.proximoDiaComercial(agora).toISOString(), AVISO_LIMITE, new Date(desde).toISOString(), l.id);
+    return true;
   }
 
   falhar(id, erro) {
@@ -148,7 +195,8 @@ export class EnviosAgendados {
         try { anexos = JSON.parse(l.anexos || '[]'); } catch { /* sem os nomes */ }
         this.c.registrarEmail({ para: l.para.split(', '), assunto: l.assunto, anexos }, l.por);
       } catch (e) {
-        this.falhar(l.id, `Não saiu: ${e.message}`);
+        if (e?.status === 429) this.limiteDoDia(l, agora, e.message);
+        else this.falhar(l.id, `Não saiu: ${e.message}`);
         continue;
       }
       this.c.sql.exec("UPDATE envios_agendados SET situacao = 'enviando', enviando_em = ?, tentativas = tentativas + 1 WHERE id = ?", agora.toISOString(), l.id);
@@ -162,10 +210,11 @@ export class EnviosAgendados {
    * com a data de Brasília do envio. Falhou com o Gmail fora do ar ou no limite (`transitorio`) → tenta de novo em 10 minutos,
    * até MAX_TENTATIVAS; senão fica "falhou" com o motivo (a tela e o Painel mostram). Devolve { apagar } (o e-mail montado sai do R2).
    */
-  resultado({ id, ok, gmail_id = '', erro = '', transitorio = false } = {}, agora = this.agora()) {
+  resultado({ id, ok, gmail_id = '', erro = '', transitorio = false, limite = false } = {}, agora = this.agora()) {
     const l = this.linha(id);
     if (!l || l.situacao !== 'enviando') return { ok: true, ignorado: true, apagar: false };
     if (!ok) {
+      if (limite) return { ok: true, apagar: false, de_novo: this.limiteDoDia(l, agora, erro || 'limite do Gmail') };
       if (transitorio && l.tentativas < MAX_TENTATIVAS) {
         this.c.sql.exec("UPDATE envios_agendados SET situacao = 'agendado', quando = ?, erro = ? WHERE id = ?", new Date(agora.getTime() + ESPERA_NOVA_TENTATIVA).toISOString(), texto(erro).slice(0, 500), l.id);
         return { ok: true, apagar: false, de_novo: true };
@@ -272,7 +321,7 @@ export async function rodarAgendados(env, { agora = new Date(), simular = false,
       resultado = { id: x.id, ok: true, gmail_id: r.id };
     } catch (e) {
       // Gmail fora do ar (502) ou no limite (429): tenta de novo; o resto (Gmail desligado, autorização vencida) fica como falha
-      resultado = { id: x.id, ok: false, erro: e.message || 'Erro no envio.', transitorio: e.status === 502 || e.status === 429 };
+      resultado = { id: x.id, ok: false, erro: e.message || 'Erro no envio.', transitorio: e.status === 502, limite: e.status === 429 };
     }
     const r = await pedirAoCofre(env, 'agendados/resultado', { corpo: { ...resultado, agora: agora.toISOString() } });
     if (resultado.ok) feito.enviados += 1; else if (r.de_novo) feito.de_novo += 1; else feito.falhas += 1;

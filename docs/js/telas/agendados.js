@@ -23,7 +23,7 @@ async function aplicarPendentes() {
 function linhaAgendado(x) {
   const sit = AG.SITUACOES_AGENDADO[x.situacao] || x.situacao || '-';
   const anexos = Array.isArray(x.anexos) && x.anexos.length ? `<br><span class="suave">Anexos: ${x.anexos.map(esc).join(', ')}</span>` : '';
-  const erro = x.situacao === 'falhou' && x.erro ? `<br><span class="suave">${esc(x.erro)}</span>` : '';
+  const erro = (x.situacao === 'falhou' || x.situacao === 'agendado') && x.erro ? `<br><span class="suave">${esc(x.erro)}</span>` : '';
   const quando = x.situacao === 'enviado' && x.enviado_em ? `${AG.quandoBr(x.enviado_em)}<br><span class="suave">marcado para ${AG.quandoBr(x.quando)}</span>`
     : x.situacao === 'cancelado' && x.cancelado_em ? `<s>${AG.quandoBr(x.quando)}</s><br><span class="suave">cancelado em ${C.dataBrDe(x.cancelado_em)}</span>` : AG.quandoBr(x.quando);
   const botoes = opera() && ABERTOS.has(x.situacao)

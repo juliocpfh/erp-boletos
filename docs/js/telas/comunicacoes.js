@@ -14,6 +14,7 @@ import { limiteDeTempo } from '../nuvem.js';
 import * as R from '../regras.js';
 import { botao, buscar, d, etiqueta, link, naoEncontrado, opera } from './comum.js';
 import { avisoForaDoHorario, perguntarQuando } from './horario.js';
+import { quandoBr } from '../agendados.js';
 
 const SO_CONSULTA = 'Seu usuário só consulta: não pode enviar comunicados.';
 const SO_NUVEM = 'O comunicado com link só funciona no sistema pela internet (nuvem).';
@@ -388,6 +389,18 @@ export const ACOES_COMUNICACOES = {
     const com = buscar('comunicados', Number(id));
     const x = com.destinos.find((y) => y.chave === chave);
     if (!(CM.pessoaDoDestino(d(), x) || {}).email) throw new C.ErroUsuario(`${x.nome} não tem e-mail no cadastro. Use o WhatsApp ou copie o link.`);
+    // já há um e-mail agendado para a pessoa (sai sozinho pela nuvem): avisa antes de fazer outro
+    if (x.agendado_id) {
+      let verLista = false;
+      const outro = await janela({
+        titulo: 'E-mail já agendado', sim: C.horarioComercialAgora().dentro ? 'Enviar outro mesmo assim' : 'Agendar outro mesmo assim', nao: 'Cancelar',
+        html: `<p data-ja-agendado>Já há um e-mail agendado para <b>${esc(x.nome)}</b> em <b>${esc(quandoBr(x.agendado_para))}</b>. Ele sai sozinho pela nuvem.</p>
+          <p><button type="button" class="secundario" data-ver-lista>Ver na lista</button></p>`,
+        ligar: (dlg) => dlg.querySelector('[data-ver-lista]').addEventListener('click', () => { verLista = true; dlg.close(); }),
+      });
+      if (verLista) { ir('#/envios-agendados'); return; }
+      if (!outro) return;
+    }
     const { ok, falhas, agendado, cancelado } = await enviarEmails(com, [x], { lembrete: !!x.email_em });
     if (cancelado) return;
     if (falhas.length) throw new C.ErroUsuario(falhas[0]);
