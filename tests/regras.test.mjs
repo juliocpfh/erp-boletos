@@ -1895,6 +1895,15 @@ test('herança: a reserva é de quem sai e não passa ao novo titular (24/11/202
   assert.equal(R.boletoDoMes(d, novo.id, '2026-08').reserva_utilizada, 0, 'não abate de novo');
 });
 
+test('herança: a janela de ciência diz que o saldo da reserva fica com quem sai (24/11/2026)', () => {
+  const { d, c } = base(); // reserva de R$ 500,00 ainda sem boleto: saldo inteiro
+  const { id, ...resto } = c;
+  const novo = R.inserir(d, 'contratos', { ...resto, reserva_valor: 0, inquilino_nome: 'Novo', contrato_anterior_id: c.id, data_entrada: '2026-08-01', vigencia_inicio: '2026-08-01' }, 'julio');
+  const resumo = R.resumoDaHeranca(d, novo).join(' | ');
+  assert.match(resumo, /Reserva: o saldo de R\$ 500,00 não passa para Novo; fica no contrato de /);
+  assert.doesNotMatch(resumo, /passa para Novo(?!;)/);
+});
+
 test('herança do seguro: a apólice em vigência na troca (com os arquivos) passa ao herdeiro; a vencida fica com o anterior', () => {
   const { d, c } = base();
   const velha = R.inserir(d, 'seguros', { imovel_id: c.imovel_id, contrato_id: c.id, vigencia_inicio: '2024-10-16', vigencia_fim: '2025-10-16', arquivo_apolice: 'apolice-velha.pdf' }, 'julio');

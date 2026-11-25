@@ -4607,7 +4607,8 @@ export function resumoDaHeranca(d, n) {
   const g = textoGarantiaNaTroca(d, n, a);
   if (g) out.push(garantiaNova(n) ? g.nova : g.continua);
   const reserva = a.reserva_valor > 0 ? saldoReserva(d, a) : 0;
-  if (reserva > 0) out.push(`Reserva: saldo de ${C.reais(reserva)} passa para ${n.inquilino_nome}`);
+  // a reserva não passa ao novo (24/11/2026): o saldo que sobrar é de quem sai
+  if (reserva > 0) out.push(`Reserva: o saldo de ${C.reais(reserva)} não passa para ${n.inquilino_nome}; fica no contrato de ${a.inquilino_nome}`);
   const seguros = segurosAHerdar(d, n, a);
   if (seguros.length) out.push(`Seguro: apólice em vigência (${seguros.map((s) => `${C.dataBr(s.vigencia_inicio)} a ${C.dataBr(s.vigencia_fim)}`).join('; ')}) passa para ${n.inquilino_nome}; no histórico de ${a.inquilino_nome} ela continua aparecendo`);
   out.push(`${a.inquilino_nome} fica com fim do vínculo em ${data ? C.dataBr(C.somarDias(data, -1)) : 'a véspera da troca'} e continua respondendo pelo período até essa data`);
