@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-rpv1dpC0uPUFP/icbzwSH3SVZkFsYyFzjH1UC2mDVDY=' 'sha256-cNu8nEQvlesaUDgsaJeNciLAPnsL7bt8Lg69nXVGxiM='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-rpv1dpC0uPUFP/icbzwSH3SVZkFsYyFzjH1UC2mDVDY=' 'sha256-d2I6bavskjlVNMWcIomwPeMM6DtQA1wCpyW3gQulm1Y='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="5f99ccbf61484c04">
+<meta name="fontes" content="d95dd9c106a28dc9">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -2022,14 +2022,39 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         {
           chave: "fim_expediente_hora",
           grupo: "rotina",
-          rotulo: "Fim do horário comercial (hora): prazo dado depois dele começa a contar no dia seguinte",
+          rotulo: "Fim do horário comercial, segunda a sexta (hora): prazo dado depois dele começa a contar no dia seguinte",
           tipo: "inteiro",
           padrao: 18,
           min: 12,
           max: 24,
-          explica: "Vale para o prazo que o sistema dá a alguém: a validade do link da ficha e do link do termo da reserva e o prazo que já vem no comunicado a todos. Dado a partir desta hora (de Brasília), o prazo começa a contar no dia seguinte (decisão do dono de 24/11/2026). Ex.: link de 7 dias criado às 10h de 24/11/2026 → vale até 01/12/2026; criado às 21h45 → até 02/12/2026. A data de um fato (aceite, assinatura, envio, recibo) é sempre a data real de Brasília: termo aceito às 21h47 de 24/11 sai datado de 24/11. Com 24, o dia inteiro conta como expediente.",
+          explica: 'Vale para o prazo que o sistema dá a alguém: a validade do link da ficha e do link do termo da reserva e o prazo que já vem no comunicado a todos. Dado a partir desta hora (de Brasília), o prazo começa a contar no dia seguinte (decisão do dono de 24/11/2026). Ex.: link de 7 dias criado às 10h de 24/11/2026 → vale até 01/12/2026; criado às 21h45 → até 02/12/2026. A data de um fato (aceite, assinatura, envio, recibo) é sempre a data real de Brasília: termo aceito às 21h47 de 24/11 sai datado de 24/11. Com 24, o dia inteiro conta como expediente. É também o fim do horário comercial para falar com inquilinos e fiadores, de segunda a sexta (veja "Início do horário comercial").',
           consequencia: "Muda só os links e prazos dados daqui em diante; os já criados continuam com a data que têm. O link, o e-mail, o WhatsApp e a página da pessoa mostram a mesma data final. Sábado, domingo e feriado não mudam a conta (o prazo é de dias corridos).",
           lei: "Sem lei específica: é o combinado com a pessoa (Código Civil, art. 132: na contagem do prazo, exclui-se o dia do começo e inclui-se o do vencimento)."
+        },
+        // pedido do dono de 25/11/2026: fora do horário comercial não se fala com inquilino nem fiador sem querer
+        {
+          chave: "inicio_expediente_hora",
+          grupo: "rotina",
+          rotulo: "Início do horário comercial (hora): antes dele, o envio ao inquilino ou fiador pergunta se agenda",
+          tipo: "inteiro",
+          padrao: 8,
+          min: 5,
+          max: 12,
+          explica: 'O horário comercial para falar com inquilinos e fiadores é de segunda a sexta, desta hora até o "Fim do horário comercial" (padrão 8h às 18h), e sábado desta hora até o "Fim do horário comercial no sábado" (padrão 12h); domingo e feriado (nacional ou da cidade, cadastrado nestas regras) não contam. Fora dele, todo e-mail ao inquilino ou fiador (etapas, boleto, notificação, carta de reajuste, comunicado a todos, régua de cobrança) pergunta: "Agendar para <próximo horário comercial>" (já marcado) ou "Enviar agora mesmo". O agendado sai sozinho pela nuvem na hora marcada, mesmo com os computadores desligados. O WhatsApp só mostra o aviso (não dá para agendar). Ex.: boleto pronto às 21h30 de sexta 27/11/2026 → "Agendar para sábado, 28/11, às 8h"; às 13h de sábado → "segunda, 30/11, às 8h"; às 19h de quinta 19/11/2026 (20/11 é feriado) → "sábado, 21/11, às 8h".',
+          consequencia: 'Mais cedo: os e-mails agendados saem mais cedo e a pergunta aparece menos. Só muda a pergunta e a hora proposta: "Enviar agora mesmo" continua possível a qualquer hora. Os já agendados ficam com a hora que têm. Sem a nuvem (versão PC), a opção de agendar não existe.',
+          lei: "Sem lei que proíba mandar e-mail à noite: é boa prática de cobrança. Cobrar de forma que constranja ou incomode fora de hora pode ser abuso de direito (Código Civil, art. 187); o Código de Defesa do Consumidor (art. 42, cobrança sem constrangimento) não se aplica à locação, segundo o STJ, mas serve de referência."
+        },
+        {
+          chave: "fim_expediente_sabado_hora",
+          grupo: "rotina",
+          rotulo: "Fim do horário comercial no sábado (hora; 0 = sábado sem expediente)",
+          tipo: "inteiro",
+          padrao: 12,
+          min: 0,
+          max: 18,
+          explica: 'No sábado, o horário comercial para falar com inquilinos e fiadores vai do "Início do horário comercial" até esta hora (padrão 8h às 12h). Com 0, o sábado não tem expediente: e-mail pronto na sexta à noite é agendado para segunda às 8h. Ex.: com 12, às 13h de sábado 28/11/2026 → "Agendar para segunda, 30/11, às 8h".',
+          consequencia: 'Só muda a pergunta de agendar e a hora proposta. Não muda os prazos (o "Fim do horário comercial" continua valendo para eles) nem os já agendados.',
+          lei: "Sem lei: rotina da empresa (Código Civil, art. 187, abuso de direito, para cobrança fora de hora)."
         },
         {
           chave: "dias_antecipacao_banco",
@@ -2377,7 +2402,35 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     const hoje3 = dataDeBrasilia(agora);
     return horaDeBrasilia(agora) >= horaDoExpediente(fimExpediente) ? somar(hoje3, 1) : hoje3;
   }
-  var FUSO, MS_DIA, formatoData, formatoHora, horaDeBrasilia, somar, horaDoExpediente, ultimoDiaDoPrazo, fimDoDiaEmBrasilia, validadeDoLink;
+  function janelaDoDia(data2, { inicio = 8, fim = 18, sabadoFim = 12, ehFeriado: ehFeriado2 = () => false } = {}) {
+    const dia = diaDaSemana(data2);
+    if (dia === 0 || ehFeriado2(data2)) return null;
+    const ate = dia === 6 ? Number(sabadoFim) || 0 : horaDoExpediente(fim);
+    return ate > inicio ? [inicio, ate] : null;
+  }
+  function proximoHorarioComercial(agora = /* @__PURE__ */ new Date(), horas = {}) {
+    const inicio = Number.isInteger(Number(horas.inicio)) ? Number(horas.inicio) : 8;
+    const h = { ...horas, inicio };
+    const hoje3 = dataDeBrasilia(agora);
+    const [hh, mm] = formatoMinuto.format(agora).split(":").map(Number);
+    const minutos = hh % 24 * 60 + mm;
+    const j = janelaDoDia(hoje3, h);
+    if (j && minutos >= j[0] * 60 && minutos < j[1] * 60) return { dentro: true, quando: null, data: hoje3, hora: null };
+    if (j && minutos < j[0] * 60) return { dentro: false, quando: instanteEmBrasilia(hoje3, j[0]), data: hoje3, hora: j[0] };
+    for (let n = 1; n <= 31; n += 1) {
+      const dia = somar(hoje3, n);
+      const jd = janelaDoDia(dia, h);
+      if (jd) return { dentro: false, quando: instanteEmBrasilia(dia, jd[0]), data: dia, hora: jd[0] };
+    }
+    return { dentro: true, quando: null, data: hoje3, hora: null };
+  }
+  function rotuloDoHorario(data2, hora, agora = /* @__PURE__ */ new Date()) {
+    const hoje3 = dataDeBrasilia(agora);
+    const [, m, d2] = data2.split("-");
+    const dia = data2 === hoje3 ? "hoje" : data2 === somar(hoje3, 1) ? `amanhã (${DIAS_SEMANA[diaDaSemana(data2)]})` : DIAS_SEMANA[diaDaSemana(data2)];
+    return `${dia}, ${d2}/${m}, às ${hora}h`;
+  }
+  var FUSO, MS_DIA, formatoData, formatoHora, horaDeBrasilia, somar, horaDoExpediente, ultimoDiaDoPrazo, fimDoDiaEmBrasilia, formatoMinuto, DIAS_SEMANA, diaDaSemana, instanteEmBrasilia, validadeDoLink;
   var init_brasilia = __esm({
     "docs/js/brasilia.js"() {
       FUSO = "America/Sao_Paulo";
@@ -2392,6 +2445,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       horaDoExpediente = (h) => Number.isInteger(Number(h)) && Number(h) >= 1 && Number(h) <= 24 ? Number(h) : 18;
       ultimoDiaDoPrazo = (dias, agora = /* @__PURE__ */ new Date(), fimExpediente = 18) => somar(inicioDoPrazo(agora, fimExpediente), dias);
       fimDoDiaEmBrasilia = (data2) => new Date(Date.parse(`${data2}T23:59:59.999-03:00`)).toISOString();
+      formatoMinuto = new Intl.DateTimeFormat("en-GB", { timeZone: FUSO, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+      DIAS_SEMANA = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+      diaDaSemana = (data2) => {
+        const [a, m, d2] = data2.split("-").map(Number);
+        return new Date(Date.UTC(a, m - 1, d2)).getUTCDay();
+      };
+      instanteEmBrasilia = (data2, hora) => new Date(Date.parse(`${data2}T${String(hora).padStart(2, "0")}:00:00-03:00`));
       validadeDoLink = (dias, agora = /* @__PURE__ */ new Date(), fimExpediente = 18) => fimDoDiaEmBrasilia(ultimoDiaDoPrazo(dias, agora, fimExpediente));
     }
   });
@@ -2399,6 +2459,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   // docs/js/calculos.js
   var calculos_exports = {};
   __export(calculos_exports, {
+    DIAS_DA_SEMANA: () => DIAS_DA_SEMANA,
     ErroUsuario: () => ErroUsuario,
     PARCELAS_NOVAS_DESDE: () => PARCELAS_NOVAS_DESDE,
     PRAZO_VISTORIA_ENTRADA: () => PRAZO_VISTORIA_ENTRADA,
@@ -2429,12 +2490,16 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     diasNoMes: () => diasNoMes,
     diasOcupados: () => diasOcupados,
     dividir: () => dividir,
+    ehFeriado: () => ehFeriado,
     faltamDias: () => faltamDias,
     feriados: () => feriados,
     fimDoExpediente: () => fimDoExpediente,
     fimDoPrazo: () => fimDoPrazo,
+    hojeBrasilia: () => hojeBrasilia,
     hojeIso: () => hojeIso,
     horaDeBrasilia: () => horaDeBrasilia,
+    horarioComercialAgora: () => horarioComercialAgora,
+    horasComerciais: () => horasComerciais,
     inicioDoPrazo: () => inicioDoPrazo,
     inicioDoPrazoAgora: () => inicioDoPrazoAgora,
     iso: () => iso,
@@ -2464,7 +2529,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     plural: () => plural,
     prazoDadoAgora: () => prazoDadoAgora,
     proximoDiaUtil: () => proximoDiaUtil,
+    proximoHorarioComercial: () => proximoHorarioComercial,
     reais: () => reais,
+    rotuloDoHorario: () => rotuloDoHorario,
     sanearParametros: () => sanearParametros,
     semAcento: () => semAcento,
     somarAnos: () => somarAnos,
@@ -2473,6 +2540,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     somarMeses: () => somarMeses,
     somarMesesData: () => somarMesesData,
     tamanhoTexto: () => tamanhoTexto,
+    textoHorarioComercial: () => textoHorarioComercial,
     totaisCobranca: () => totaisCobranca,
     ufDoCep: () => ufDoCep,
     ultimoDiaDoPrazo: () => ultimoDiaDoPrazo,
@@ -2531,6 +2599,15 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   function hojeIso() {
     const d2 = /* @__PURE__ */ new Date();
     return `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, "0")}-${String(d2.getDate()).padStart(2, "0")}`;
+  }
+  function horarioComercialAgora(agora = /* @__PURE__ */ new Date()) {
+    const p2 = proximoHorarioComercial(agora, horasComerciais());
+    return { dentro: p2.dentro, quando: p2.quando, rotulo: p2.dentro ? "" : rotuloDoHorario(p2.data, p2.hora, agora) };
+  }
+  function textoHorarioComercial() {
+    const h = horasComerciais();
+    const sab = Number(h.sabadoFim) > Number(h.inicio) ? `, e sábado, das ${h.inicio}h às ${h.sabadoFim}h` : " (sábado sem expediente)";
+    return `segunda a sexta, das ${h.inicio}h às ${h.fim}h${sab}`;
   }
   function carimboLocal(agora = /* @__PURE__ */ new Date()) {
     const p2 = (n) => String(n).padStart(2, "0");
@@ -2864,7 +2941,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     }
     return limpo;
   }
-  var ErroUsuario, faltamDias, FMT_REAIS, FMT_PCT, MS_DIA2, fimDoExpediente, inicioDoPrazoAgora, prazoDadoAgora, validadeDoLinkAgora, dataBrDe, FMT_DATA_HORA, agoraBr, FERIADOS, PRAZO_VISTORIA_ENTRADA, limiteVistoriaEntrada, PARCELAS_NOVAS_DESDE, parcelasDesde, FAIXAS_CEP, maisRecentePrimeiro, maisAntigoPrimeiro, semAcento, paraNomeDeArquivo, COMPETENCIA_RE, DATA_RE, FORMATOS_PARAMETRO;
+  var ErroUsuario, faltamDias, FMT_REAIS, FMT_PCT, MS_DIA2, fimDoExpediente, inicioDoPrazoAgora, prazoDadoAgora, validadeDoLinkAgora, dataBrDe, DIAS_DA_SEMANA, hojeBrasilia, ehFeriado, horasComerciais, FMT_DATA_HORA, agoraBr, FERIADOS, PRAZO_VISTORIA_ENTRADA, limiteVistoriaEntrada, PARCELAS_NOVAS_DESDE, parcelasDesde, FAIXAS_CEP, maisRecentePrimeiro, maisAntigoPrimeiro, semAcento, paraNomeDeArquivo, COMPETENCIA_RE, DATA_RE, FORMATOS_PARAMETRO;
   var init_calculos = __esm({
     "docs/js/calculos.js"() {
       init_config_regras();
@@ -2886,6 +2963,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       prazoDadoAgora = (dias, agora = /* @__PURE__ */ new Date()) => ultimoDiaDoPrazo(dias, agora, fimDoExpediente());
       validadeDoLinkAgora = (dias, agora = /* @__PURE__ */ new Date()) => validadeDoLink(dias, agora, fimDoExpediente());
       dataBrDe = (instante) => dataBr(dataDeBrasilia(instante));
+      DIAS_DA_SEMANA = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+      hojeBrasilia = (agora = /* @__PURE__ */ new Date()) => dataDeBrasilia(agora);
+      ehFeriado = (data2) => feriados(Number(data2.slice(0, 4))).has(data2) || feriadosLocais(Number(data2.slice(0, 4))).includes(data2);
+      horasComerciais = () => ({ inicio: regra("inicio_expediente_hora"), fim: regra("fim_expediente_hora"), sabadoFim: regra("fim_expediente_sabado_hora"), ehFeriado });
       FMT_DATA_HORA = new Intl.DateTimeFormat("pt-BR", { year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric" });
       agoraBr = () => dataHoraBr(Date.now());
       FERIADOS = /* @__PURE__ */ new Map();
@@ -23335,7 +23416,51 @@ ${DICA_DOCUMENTOS}`].join("\n");
     if (!r.ok || !d2.ok) throw new ErroUsuario(d2.erro || `O e-mail não foi enviado (erro ${r.status}).`);
     return { ok: true, id: String(d2.id || "") };
   }
-  var MAX_BYTES_ANEXOS, TEMPO_ESTADO, TEMPO_ENVIO, SEM_INTERNET, cfg4, estadoGuardado, ehJson2, local3, desconectarGmail;
+  async function podeAgendar() {
+    if (local3() || !cfg4.online()) return false;
+    return (await estadoEmail()).ligado;
+  }
+  async function pedirAgendados(rota, { metodo = "POST", corpo, tempo = TEMPO_ESTADO } = {}) {
+    if (local3() || !cfg4.online()) throw new ErroUsuario(SEM_NUVEM);
+    let r;
+    try {
+      r = await cfg4.buscar(`${cfg4.base}email/${rota}`, {
+        method: metodo,
+        cache: "no-store",
+        credentials: "same-origin",
+        signal: limiteDeTempo(tempo),
+        ...metodo === "POST" ? { headers: { "Content-Type": "application/json", "X-Sistema": "imoveis" }, body: JSON.stringify(corpo || {}) } : {}
+      });
+    } catch (e) {
+      if (e?.name === "TimeoutError") throw new ErroUsuario("A nuvem demorou demais para responder. Confira em Envios agendados antes de tentar de novo.");
+      throw new ErroUsuario("Sem internet: tente de novo quando a conexão voltar.");
+    }
+    if (r.redirected || !ehJson2(r)) throw new ErroUsuario("Seu acesso pela internet venceu. Recarregue a página para entrar de novo (código no e-mail).");
+    const d2 = await r.json().catch(() => ({}));
+    if (!r.ok) throw new ErroUsuario(d2.erro || `Erro ${r.status} na nuvem.`);
+    return d2;
+  }
+  async function agendarEmail({ para, cco = "", assunto, texto: texto3, anexos = [], html = "", imagens = [], quando: quando4, registro = {}, descricao: descricao2 = "" } = {}) {
+    if (!String(para || "").trim()) throw new ErroUsuario("Informe o e-mail do destinatário.");
+    const total = anexos.reduce((s, a) => s + (a?.blob?.size || 0), 0);
+    if (total > MAX_BYTES_ANEXOS) throw new ErroUsuario(`Anexos passam de ${MAX_BYTES_ANEXOS / 1048576} MB.`);
+    const lista3 = [];
+    for (const a of anexos) {
+      if (!a?.blob) throw new ErroUsuario(`Anexo sem arquivo: ${a?.nome || ""}`);
+      lista3.push({ nome: String(a.nome || a.blob.name || "anexo"), tipo: a.blob.type || "application/octet-stream", base64: await base64DoBlob(a.blob) });
+    }
+    const d2 = await pedirAgendados("agendar", { tempo: TEMPO_ENVIO, corpo: { para: String(para), cco: String(cco || ""), assunto: String(assunto || ""), texto: String(texto3 || ""), anexos: lista3, ...html ? { html: String(html), imagens } : {}, quando: String(quando4), registro, descricao: String(descricao2 || "") } });
+    return { ok: true, id: String(d2.id || ""), quando: String(d2.quando || quando4) };
+  }
+  async function listaAgendados() {
+    if (local3() || !cfg4.online()) return null;
+    try {
+      return (await pedirAgendados("agendados", { metodo: "GET" })).agendados || [];
+    } catch {
+      return null;
+    }
+  }
+  var MAX_BYTES_ANEXOS, TEMPO_ESTADO, TEMPO_ENVIO, SEM_INTERNET, cfg4, estadoGuardado, ehJson2, local3, desconectarGmail, SEM_NUVEM, mudarAgendado, cancelarAgendado;
   var init_gmail = __esm({
     "docs/js/gmail.js"() {
       init_calculos();
@@ -23349,6 +23474,44 @@ ${DICA_DOCUMENTOS}`].join("\n");
       ehJson2 = (r) => (r.headers.get("content-type") || "").includes("json");
       local3 = () => globalThis.location && !/^https?:$/.test(globalThis.location.protocol);
       desconectarGmail = () => pedirGmail("desconectar");
+      SEM_NUVEM = "Agendar só funciona no sistema na nuvem, com o Gmail ligado.";
+      mudarAgendado = async (id, quando4) => (await pedirAgendados("agendados/mudar", { corpo: { id, quando: quando4 } })).agendado;
+      cancelarAgendado = (id) => pedirAgendados("agendados/cancelar", { corpo: { id } });
+    }
+  });
+
+  // docs/js/telas/horario.js
+  function avisoForaDoHorario(agora = /* @__PURE__ */ new Date()) {
+    const h = horarioComercialAgora(agora);
+    if (h.dentro) return "";
+    return `<p class="alerta aviso" data-fora-do-horario>Agora é fora do horário comercial (${esc(textoHorarioComercial())}). O comum é falar com o inquilino só no horário: o próximo é ${esc(h.rotulo)}.</p>`;
+  }
+  async function perguntarQuando({ resumo: resumo3 = "", alertas = [], agora = /* @__PURE__ */ new Date() } = {}) {
+    const h = horarioComercialAgora(agora);
+    if (h.dentro) return { modo: "agora", perguntou: false };
+    const pode2 = await podeAgendar();
+    const r = await janela({
+      titulo: "Fora do horário comercial",
+      sim: "Confirmar",
+      nao: "Cancelar",
+      forte: alertas.length > 0,
+      html: `${alertas.map((a) => `<p class="alerta aviso">${esc(a)}</p>`).join("")}
+      <p>Agora é fora do horário comercial (${esc(textoHorarioComercial())}).${resumo3 ? ` ${esc(resumo3)}` : ""}</p>
+      <p><label><input type="radio" name="modo" value="agendar"${pode2 ? " checked" : " disabled"}> <b>Agendar para ${esc(h.rotulo)}</b> <span class="suave">(sai sozinho pela nuvem, mesmo com o computador desligado)</span></label></p>
+      ${pode2 ? "" : '<p class="suave" data-sem-agendar>Agendar só funciona no sistema na nuvem (erp.ankjck.com.br), com o Gmail da empresa ligado. Aqui, envie agora ou cancele.</p>'}
+      <p><label><input type="radio" name="modo" value="agora"${pode2 ? "" : " checked"}> Enviar agora mesmo</label></p>
+      <p class="suave">Mesmo enviado mais tarde, o registro fica com a data do dia em que o e-mail sair.</p>`
+    });
+    if (!r) return null;
+    if ((r.modo || [])[0] === "agendar" && pode2) return { modo: "agendar", perguntou: true, quando: h.quando.toISOString(), rotulo: h.rotulo };
+    return { modo: "agora", perguntou: true };
+  }
+  var init_horario = __esm({
+    "docs/js/telas/horario.js"() {
+      init_app();
+      init_calculos();
+      init_formularios();
+      init_gmail();
     }
   });
 
@@ -25206,14 +25369,14 @@ ${DICA_DOCUMENTOS}`].join("\n");
     }
     return out.sort((a, b) => a.cobranca.vencimento.localeCompare(b.cobranca.vencimento) || String(a.contrato.inquilino_nome).localeCompare(String(b.contrato.inquilino_nome), "pt-BR"));
   }
-  function registrarDecisao(d2, { cobranca_id, contrato_id, dias, situacao: situacao2, para = "", assunto = "", envio_id = null }, usuario, hoje3 = hojeIso()) {
+  function registrarDecisao(d2, { cobranca_id, contrato_id, dias, situacao: situacao2, para = "", assunto = "", envio_id = null, quando: quando4 = "" }, usuario, hoje3 = hojeIso()) {
     if (!SITUACOES_REGUA[situacao2]) throw new Error(`Situação desconhecida: ${situacao2}`);
     const ja = decisaoDe(d2, cobranca_id, dias);
     if (ja) throw new ErroUsuario(`Este e-mail já foi decidido em ${dataBr(ja.data)} (${SITUACOES_REGUA[ja.situacao]}).`);
     const cb = buscar(d2, "cobrancas", cobranca_id);
     const c = buscar(d2, "contratos", contrato_id);
     const nome = `${c ? c.inquilino_nome : "inquilino"}, boleto ${cb ? compBr(cb.competencia) : ""} (${nomeDaEtapa(dias)})`;
-    const texto3 = { enviado: `Régua de cobrança: e-mail enviado para ${para} — ${nome}`, gmail: `Régua de cobrança: e-mail aberto no Gmail para ${para} — ${nome}`, recusado: `Régua de cobrança: "Não enviar" — ${nome}` }[situacao2];
+    const texto3 = { enviado: `Régua de cobrança: e-mail enviado para ${para} — ${nome}`, gmail: `Régua de cobrança: e-mail aberto no Gmail para ${para} — ${nome}`, recusado: `Régua de cobrança: "Não enviar" — ${nome}`, agendado: `Régua de cobrança: e-mail agendado para ${para} (${quando4}) — ${nome}` }[situacao2];
     return inserir(d2, "regua_emails", { cobranca_id, contrato_id, dias, situacao: situacao2, data: hoje3, para: para || null, assunto: assunto || null, envio_id: envio_id || null }, usuario, texto3);
   }
   var JANELA_ULTIMA_ETAPA, DIAS_ENTRADA_ANTES, modeloDaEtapa, nomeDaEtapa, inicioDaCobranca, decisaoDe, SITUACOES_REGUA, itemDaFila, decididosRecentes;
@@ -25230,7 +25393,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
       nomeDaEtapa = (dias) => dias < 0 ? `${-dias} dia(s) antes do vencimento` : dias === 0 ? "no dia do vencimento" : `${dias} dia(s) de atraso`;
       inicioDaCobranca = (cb) => somarDiasUteis(limitePagamento(cb.vencimento), diasCompensacaoBoleto(cb) + 1);
       decisaoDe = (d2, cobrancaId, dias) => (d2.regua_emails || []).find((x) => x.cobranca_id === cobrancaId && x.dias === dias) || null;
-      SITUACOES_REGUA = { enviado: "Enviado pelo sistema", gmail: "Aberto no Gmail (enviado à mão)", recusado: "Não enviar" };
+      SITUACOES_REGUA = { enviado: "Enviado pelo sistema", gmail: "Aberto no Gmail (enviado à mão)", recusado: "Não enviar", agendado: "Agendado (sai sozinho pela nuvem)" };
       itemDaFila = (d2, chave, hoje3 = hojeIso()) => filaRegua(d2, hoje3).find((x) => x.chave === chave) || null;
       decididosRecentes = (d2, hoje3 = hojeIso(), dias = 30) => (d2.regua_emails || []).filter((x) => String(x.data) >= somarDias(hoje3, -dias)).sort((a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id);
     }
@@ -25366,6 +25529,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
       init_email_dados();
       init_formularios();
       init_gmail();
+      init_horario();
       init_modelos_email();
       init_regua_email();
       init_regras();
@@ -25375,12 +25539,12 @@ ${DICA_DOCUMENTOS}`].join("\n");
       LIMITE_ENDERECO = 7e3;
       nomeDo = (item3) => `${item3.imovel ? `${item3.imovel.nome} · ` : ""}${item3.contrato.inquilino_nome}`;
       referente = (cb) => ehParcelaAcordo(cb) ? `acordo ${cb.acordo_parcela || ""}`.trim() : compBr(cb.competencia);
-      decidir = (item3, situacao2, { para = "", assunto = "", gmailId = "" } = {}) => alterar((db) => {
+      decidir = (item3, situacao2, { para = "", assunto = "", gmailId = "", quando: quando4 = "" } = {}) => alterar((db) => {
         let envio = null;
-        if (situacao2 !== "recusado") {
+        if (situacao2 !== "recusado" && situacao2 !== "agendado") {
           const como = situacao2 === "enviado" ? "enviado" : "aberto no Gmail";
           envio = inserir(db, "envios_email", {
-            data: hojeIso(),
+            data: hojeBrasilia(),
             chave: item3.modelo,
             contrato_id: item3.contrato.id,
             ficha_id: null,
@@ -25392,7 +25556,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
             gmail_id: gmailId || null
           }, login(), null, { historico: false });
         }
-        return registrarDecisao(db, { cobranca_id: item3.cobranca.id, contrato_id: item3.contrato.id, dias: item3.dias, situacao: situacao2, para, assunto, envio_id: envio ? envio.id : null }, login());
+        return registrarDecisao(db, { cobranca_id: item3.cobranca.id, contrato_id: item3.contrato.id, dias: item3.dias, situacao: situacao2, para, assunto, envio_id: envio ? envio.id : null, quando: quando4 }, login(), hojeBrasilia());
       });
       ACOES_REGUA = {
         /** "Não enviar": sai da lista e não volta. */
@@ -25450,13 +25614,16 @@ Emita de novo no banco e troque o PDF, ou abra o e-mail mesmo assim.`, { titulo:
    ATENÇÃO: ${velho}` : ""}`;
           }).join("\n");
           const fora = chaves.length - itens.length;
-          if (!await confirmar(`Vou enviar agora ${itens.length} e-mail(s) pelo Gmail da empresa:
+          const quando4 = await perguntarQuando({ resumo: `${itens.length} e-mail(s) da régua de cobrança.` });
+          if (!quando4) return;
+          const agendar = quando4.modo === "agendar";
+          if (!await confirmar(`Vou ${agendar ? `agendar para ${quando4.rotulo}` : "enviar agora"} ${itens.length} e-mail(s) pelo Gmail da empresa:
 
 ${lista3}${fora ? `
 
 ${fora} marcado(s) saíram da lista e não vão.` : ""}
 
-Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${itens.length} e-mail(s)`, nao: "Cancelar" })) return;
+Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `${agendar ? "Agendar" : "Enviar"} ${itens.length} e-mail(s)`, nao: "Cancelar" })) return;
           const enviados = [];
           const erros = [];
           const semAnexo = [];
@@ -25467,8 +25634,19 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
               const e = emailDoItem(d(), item3);
               if (/\[preencher: /.test(e.texto + e.assunto)) throw new ErroUsuario('o texto tem "[preencher: ...]": confira o modelo em Modelos de e-mail');
               const { arquivos, faltou } = await anexosDoItem(item3, e.prontos);
-              const r = await enviarEmail({ para: item3.para, assunto: e.assunto, texto: e.texto, anexos: arquivos });
-              await decidir(item3, "enviado", { para: item3.para, assunto: e.assunto, gmailId: r.id });
+              if (agendar) {
+                const dec = await decidir(item3, "agendado", { para: item3.para, assunto: e.assunto, quando: quando4.rotulo });
+                const registro = { chave: item3.modelo, contrato_id: item3.contrato.id, ficha_id: null, aditivo_id: null, cobranca_id: item3.cobranca.id, para: item3.para, assunto: e.assunto, usuario: login(), efeito: { tipo: "regua", decisao_id: dec.id } };
+                try {
+                  await agendarEmail({ para: item3.para, assunto: e.assunto, texto: e.texto, anexos: arquivos, quando: quando4.quando, registro, descricao: `Régua: ${nomeDo(item3)}, ${item3.etapa}` });
+                } catch (erro) {
+                  await alterar((db) => excluir(db, "regua_emails", dec.id, login(), "Régua de cobrança: o agendamento não deu certo (volta à lista)"));
+                  throw erro;
+                }
+              } else {
+                const r = await enviarEmail({ para: item3.para, assunto: e.assunto, texto: e.texto, anexos: arquivos });
+                await decidir(item3, "enviado", { para: item3.para, assunto: e.assunto, gmailId: r.id });
+              }
               enviados.push(item3);
               if (faltou.length) semAnexo.push(`${item3.contrato.inquilino_nome} (sem ${faltou.join(", ")})`);
             } catch (erro) {
@@ -25476,7 +25654,7 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
             }
           }
           aviso([
-            `${enviados.length} e-mail(s) enviado(s); ficam em "Enviados" no Gmail.`,
+            agendar ? `${enviados.length} e-mail(s) agendado(s) para ${quando4.rotulo}: saem sozinhos pela nuvem (Inquilinos → Comunicações → Envios agendados).` : `${enviados.length} e-mail(s) enviado(s); ficam em "Enviados" no Gmail.`,
             semAnexo.length ? `Foram sem anexo (a ponte do banco não respondeu neste computador ou o PDF do boleto sumiu da pasta): ${semAnexo.join("; ")}.` : "",
             erros.length ? `Não enviados: ${erros.join("; ")}.` : ""
           ].filter(Boolean).join(" "), erros.length ? "erro" : semAnexo.length ? "aviso" : "ok");
@@ -27155,6 +27333,7 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
     <p><label>Texto <span class="suave">(pode alterar antes de enviar)</span></label><textarea name="texto" rows="16" spellcheck="true"></textarea></p>
     <p class="suave" data-editado hidden>Texto alterado à mão: as respostas acima não mudam mais o texto.</p>
     ${ligado2 ? `<p><label>${prontos.length ? "Outros anexos" : "Anexos"} para o "Enviar agora" <span class="suave">(PDF ou foto)</span></label><input type="file" name="anexos" multiple accept="${ACEITA_DOCUMENTOS}"></p>` : ""}
+    ${avisoForaDoHorario()}
     ${ligado2 && modelo.anexoObrigatorio && !prontos.some((a) => a.tipo !== "digital" || a.ok) ? `<p class="alerta aviso">Falta anexar: ${esc(modelo.anexos)}. Escolha o arquivo acima; sem ele o e-mail não sai.</p>` : ""}
     <p class="suave">${alvo.contrato && /saida_aviso/.test(chave) ? "Confira no contrato do inquilino a multa da saída antecipada antes de enviar. " : ""}${ligado2 ? "" : 'Envio direto ainda não ligado: use "Copiar texto" ou "Abrir no Gmail".'}</p>
   </div><div class="acoes" style="justify-content:flex-end;flex-wrap:wrap">
@@ -27249,7 +27428,7 @@ Abrir o Gmail mesmo assim? O texto vai com o buraco, e você completa por lá.`,
         return;
       }
       const n = chave === "notificacao_envio" && alvo.notificacao ? buscar2("notificacoes", alvo.notificacao) : null;
-      if (n && n.situacao === "Rascunho" && n.data > hojeIso()) {
+      if (n && n.situacao === "Rascunho" && n.data > hojeBrasilia()) {
         avisar(`A notificação está datada de ${dataBr(n.data)}, no futuro: o envio não poderia ser marcado. Corrija a data no rascunho (hoje ou antes) e mande depois.`, "aviso");
         return;
       }
@@ -27268,10 +27447,31 @@ Abrir o Gmail mesmo assim? O texto vai com o buraco, e você completa por lá.`,
       if (!arquivos.length && modelo.anexos) alertas.push(`ATENÇÃO: o texto fala em anexo (${modelo.anexos}), mas nenhum arquivo vai junto. Anexe em "${prontos.length ? "Outros anexos" : "Anexos"}" antes de enviar.`);
       const marcados = [...dlg.querySelectorAll("[name=pronto]:checked")].map((el) => prontos[Number(el.value)]);
       if (n && !n.arquivo_assinado && !regra("assinatura_digital") && marcados.some((a) => a.tipo === "recibo" && a.recibo === "notificacao")) alertas.push("ATENÇÃO: vai o PDF da notificação SEM a assinatura (a assinada não foi anexada na notificação). Ao enviar, a notificação fica marcada como enviada hoje e o prazo começa a correr.");
-      if (!await confirmar(`${alertas.length ? `${alertas.join("\n\n")}
+      const quando4 = await perguntarQuando({ resumo: `O e-mail vai para ${e.para}${arquivos.length ? `, com ${arquivos.length} anexo(s)` : ", sem anexo"}.`, alertas });
+      if (!quando4) return;
+      if (!quando4.perguntou && !await confirmar(`${alertas.length ? `${alertas.join("\n\n")}
 
 ` : ""}O e-mail vai agora para ${e.para}${arquivos.length ? `, com ${arquivos.length} anexo(s)` : ", sem anexo"}.`, { titulo: alertas.length ? "Enviar mesmo assim?" : "Enviar o e-mail?", sim: "Enviar agora", forte: alertas.length > 0 })) return;
       enviar.disabled = true;
+      if (quando4.modo === "agendar") {
+        try {
+          const registro = {
+            ...dadosDoEnvio(chave, alvo, e.para, e.assunto, "enviado"),
+            usuario: login(),
+            ...n && n.situacao === "Rascunho" ? { efeito: { tipo: "notificacao", notificacao_id: n.id } } : {}
+          };
+          delete registro.data;
+          await agendarEmail({ para: e.para, assunto: e.assunto, texto: e.texto, anexos: arquivos, quando: quando4.quando, registro, descricao: `${modelo.nome} · ${reg.inquilino_nome || ""}` });
+          dlg.close();
+          aviso(`E-mail agendado para ${quando4.rotulo}: sai sozinho pela nuvem. Para mudar a hora ou cancelar: Inquilinos → Comunicações → Envios agendados.`);
+          await mostrar();
+        } catch (erro) {
+          aviso(erro.message || "O e-mail não foi agendado.", "erro");
+        } finally {
+          enviar.disabled = false;
+        }
+        return;
+      }
       try {
         const r = await enviarEmail({ para: e.para, assunto: e.assunto, texto: e.texto, anexos: arquivos });
         await registrar2(chave, alvo, e.para, e.assunto, "enviado", r.id);
@@ -27350,7 +27550,7 @@ Abrir o Gmail mesmo assim? O texto vai com o buraco, e você completa por lá.`,
     return `<div class="alerta info"><b>Informe do Imposto de Renda de ${ano}:</b> enviar a ${contratos.length} inquilino(s) (de preferência até o fim de fevereiro):
     ${contratos.map((c) => `<a href="#/imprimir/declaracao?contrato=${c.id}&ano=${ano}">${esc(c.inquilino_nome)}</a>`).join(", ")}. Na declaração, use o botão ✉ E-mail.</div>`;
   }
-  var LIMITE_ENDERECO2, registrar2, campoPergunta, VOLTA_GMAIL, ACOES_EMAILS, FORMULARIOS_EMAILS, AJUDA;
+  var LIMITE_ENDERECO2, dadosDoEnvio, registrar2, campoPergunta, VOLTA_GMAIL, ACOES_EMAILS, FORMULARIOS_EMAILS, AJUDA;
   var init_emails = __esm({
     "docs/js/telas/emails.js"() {
       init_app();
@@ -27361,6 +27561,7 @@ Abrir o Gmail mesmo assim? O texto vai com o buraco, e você completa por lá.`,
       init_email_dados();
       init_formularios();
       init_gmail();
+      init_horario();
       init_modelos_email();
       init_regras();
       init_comum();
@@ -27368,20 +27569,21 @@ Abrir o Gmail mesmo assim? O texto vai com o buraco, e você completa por lá.`,
       init_assinatura_documentos();
       init_assinatura();
       LIMITE_ENDERECO2 = 7e3;
+      dadosDoEnvio = (chave, alvo, para, assunto, como, id = "") => ({
+        data: hojeBrasilia(),
+        chave,
+        contrato_id: alvo.contrato ? Number(alvo.contrato) : null,
+        ficha_id: alvo.ficha ? Number(alvo.ficha) : null,
+        aditivo_id: alvo.aditivo ? Number(alvo.aditivo) : null,
+        ...alvo.notificacao ? { notificacao_id: Number(alvo.notificacao) } : {},
+        ...alvo.cobranca ? { cobranca_id: Number(alvo.cobranca) } : {},
+        para,
+        assunto,
+        como,
+        gmail_id: id || null
+      });
       registrar2 = (chave, alvo, para, assunto, como, id = "") => alterar((db) => {
-        const dados = {
-          data: hojeIso(),
-          chave,
-          contrato_id: alvo.contrato ? Number(alvo.contrato) : null,
-          ficha_id: alvo.ficha ? Number(alvo.ficha) : null,
-          aditivo_id: alvo.aditivo ? Number(alvo.aditivo) : null,
-          ...alvo.notificacao ? { notificacao_id: Number(alvo.notificacao) } : {},
-          ...alvo.cobranca ? { cobranca_id: Number(alvo.cobranca) } : {},
-          para,
-          assunto,
-          como,
-          gmail_id: id || null
-        };
+        const dados = dadosDoEnvio(chave, alvo, para, assunto, como, id);
         const n = como === "enviado" && chave === "notificacao_envio" && alvo.notificacao ? buscar(db, "notificacoes", alvo.notificacao) : null;
         if (n && n.situacao === "Rascunho") marcarNotificacaoEnviada(db, n.id, { data: dados.data, meio: "E-mail" }, login());
         if (como !== "enviado") {
@@ -28338,7 +28540,7 @@ ${m.texto}
     const ativos = abertos.filter((x) => destinoAtivo(d2, x, hoje3));
     const fora = abertos.length - ativos.length;
     if (canal === "email") {
-      return { alvos: ativos.filter((x) => !x.email_em && (pessoaDoDestino(d2, x) || {}).email), sem: ativos.filter((x) => !(pessoaDoDestino(d2, x) || {}).email), fora };
+      return { alvos: ativos.filter((x) => !x.email_em && !x.agendado_id && (pessoaDoDestino(d2, x) || {}).email), sem: ativos.filter((x) => !(pessoaDoDestino(d2, x) || {}).email), fora };
     }
     return { alvos: ativos.filter((x) => !x.whats_em && pessoaDoDestino(d2, x)), sem: [], fora };
   }
@@ -28420,6 +28622,100 @@ A conta e a chave Pix para pagamento não mudam. Nunca pedimos pagamento em outr
       preencher = (texto3, dados) => preencherEmail(texto3, dados);
       soNumeros = (v) => String(v || "").replace(/\D/g, "");
       escH = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+    }
+  });
+
+  // docs/js/agendados.js
+  function quandoBr(instante) {
+    const t = new Date(instante);
+    if (Number.isNaN(t.getTime())) return "-";
+    const dia = dataDeBrasilia(t);
+    const hora = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(t);
+    return `${DIAS_DA_SEMANA[paraData(dia).getUTCDay()]}, ${dataBr(dia)}, às ${hora}`;
+  }
+  function avisosDoPainel(lista3) {
+    const l = Array.isArray(lista3) ? lista3 : [];
+    const falhas = l.filter((x) => x.situacao === "falhou");
+    const esperando = l.filter((x) => x.situacao === "agendado" || x.situacao === "enviando").sort((a, b) => String(a.quando).localeCompare(String(b.quando)));
+    const out = [];
+    if (falhas.length) {
+      out.push({ tipo: "erro", texto: `${plural(falhas.length, "e-mail agendado não saiu", "e-mails agendados não saíram")}: ${falhas.slice(0, 3).map((x) => `${x.descricao || x.assunto} (para ${x.para}): ${x.erro || "erro no envio"}`).join("; ")}${falhas.length > 3 ? "…" : ""}. Abra Envios agendados para tentar de novo ou cancelar.` });
+    }
+    if (esperando.length) out.push({ tipo: "info", texto: `${plural(esperando.length, "e-mail agendado", "e-mails agendados")}: o próximo sai ${quandoBr(esperando[0].quando)} (${esperando[0].descricao || esperando[0].assunto}, para ${esperando[0].para}).` });
+    return out;
+  }
+  function aplicarEfeitos(d2, usuario) {
+    let n = 0;
+    for (const e of efeitosPendentes(d2)) {
+      const ef = e.efeito;
+      try {
+        if (ef.tipo === "notificacao") {
+          const no = buscar(d2, "notificacoes", ef.notificacao_id);
+          if (no && no.situacao === "Rascunho" && e.data >= no.data) marcarNotificacaoEnviada(d2, no.id, { data: e.data, meio: "E-mail" }, usuario);
+        } else if (ef.tipo === "regua") {
+          const dec = buscar(d2, "regua_emails", ef.decisao_id);
+          if (dec && dec.situacao === "agendado") atualizar(d2, "regua_emails", dec.id, { situacao: "enviado", data: e.data, envio_id: e.id }, usuario, `Régua de cobrança: e-mail agendado enviado pela nuvem para ${e.para || ""}`);
+        } else if (ef.tipo === "comunicado") {
+          const com = buscar(d2, "comunicados", ef.comunicado_id);
+          const campo2 = ef.campo === "lembrete_em" ? "lembrete_em" : "email_em";
+          if (com && (com.destinos || []).some((y) => y.chave === ef.destino && y.agendado_id === e.agendado_id)) {
+            atualizar(
+              d2,
+              "comunicados",
+              com.id,
+              { destinos: com.destinos.map((y) => y.chave === ef.destino ? { ...semAgendado(y), [campo2]: e.enviado_em || `${e.data}T12:00:00.000Z` } : { ...y }) },
+              usuario,
+              `Comunicado "${com.titulo}": ${campo2 === "email_em" ? "e-mail" : "lembrete"} agendado enviado pela nuvem`
+            );
+          }
+        } else if (ef.tipo === "carta") {
+          const c = buscar(d2, "contratos", ef.contrato_id);
+          if (c && !(d2.cartas_reajuste || []).some((x) => x.contrato_id === c.id && x.competencia === ef.comp)) {
+            marcarCartaEnviada(d2, c.id, ef.comp, true, usuario);
+            const carta = d2.cartas_reajuste.find((x) => x.contrato_id === c.id && x.competencia === ef.comp);
+            if (carta) atualizar(d2, "cartas_reajuste", carta.id, { enviada_em: e.data, ...ef.arquivo ? { arquivo: ef.arquivo } : {} }, usuario, "Carta de reajuste enviada pela nuvem (e-mail agendado)");
+          }
+        }
+      } catch (erro) {
+        atualizar(d2, "envios_email", e.id, { efeito_erro: String(erro.message || erro).slice(0, 200) }, usuario, null);
+      }
+      atualizar(d2, "envios_email", e.id, { efeito_feito: true }, usuario, null);
+      n += 1;
+    }
+    return n;
+  }
+  function desfazerAgendamento(d2, registro, agendadoId, usuario) {
+    const ef = registro && registro.efeito;
+    if (!ef) return false;
+    if (ef.tipo === "regua") {
+      const dec = buscar(d2, "regua_emails", ef.decisao_id);
+      if (dec && dec.situacao === "agendado") {
+        excluir(d2, "regua_emails", dec.id, usuario, "Régua de cobrança: e-mail agendado cancelado (volta à lista)");
+        return true;
+      }
+    }
+    if (ef.tipo === "comunicado") {
+      const com = buscar(d2, "comunicados", ef.comunicado_id);
+      if (com && (com.destinos || []).some((y) => y.chave === ef.destino && y.agendado_id === agendadoId)) {
+        atualizar(d2, "comunicados", com.id, { destinos: com.destinos.map((y) => y.chave === ef.destino ? semAgendado(y) : { ...y }) }, usuario, `Comunicado "${com.titulo}": e-mail agendado cancelado`);
+        return true;
+      }
+    }
+    return false;
+  }
+  var SITUACOES_AGENDADO, efeitosPendentes, semAgendado;
+  var init_agendados = __esm({
+    "docs/js/agendados.js"() {
+      init_calculos();
+      init_regras();
+      SITUACOES_AGENDADO = { agendado: "Agendado", enviando: "Saindo agora", enviado: "Enviado", falhou: "Não saiu", cancelado: "Cancelado" };
+      efeitosPendentes = (d2) => (d2.envios_email || []).filter((x) => x.agendado_id && x.efeito && typeof x.efeito === "object" && !x.efeito_feito);
+      semAgendado = (y) => {
+        const z = { ...y };
+        delete z.agendado_id;
+        delete z.agendado_para;
+        return z;
+      };
     }
   });
 
@@ -28510,7 +28806,7 @@ A conta e a chave Pix para pagamento não mudam. Nunca pedimos pagamento em outr
     if (q.ver === "editar" && q.id) return telaNovoComunicado(q, Number(q.id));
     if (q.id) return telaComunicado(Number(q.id));
     const podeCriar = opera() && E.nuvem;
-    return `<div class="cabecalho"><h1>Comunicações</h1>${podeCriar ? link("#/comunicacoes?ver=novo", "Novo comunicado a todos", "botao") : ""}</div>
+    return `<div class="cabecalho"><h1>Comunicações</h1><div class="acoes">${E.nuvem ? link("#/envios-agendados", "Envios agendados") : ""} ${podeCriar ? link("#/comunicacoes?ver=novo", "Novo comunicado a todos", "botao") : ""}</div></div>
     ${atalhosComunicacoes("comunicados")}
     ${lista3.length ? lista3.map((com) => cartaoComunicado(com)).join("") : `<div class="cartao"><p>Nenhum comunicado enviado ainda.</p>
       <p class="suave">O comunicado vai para todos os inquilinos e fiadores com contrato ativo, cada um com um link só dele, por e-mail e por WhatsApp. Ex.: "Atualização de contatos e novo e-mail da empresa".</p>
@@ -28695,6 +28991,9 @@ ${url}
   }
   async function enviarEmails(com, alvos, { lembrete = false } = {}) {
     if (!await emailLigado()) throw new ErroUsuario("O envio pelo Gmail não está ligado (Sistema → Comunicação E-mail → Conectar o Gmail).");
+    const quando4 = await perguntarQuando({ resumo: `${plural(alvos.length, "e-mail", "e-mails")} do comunicado "${com.titulo}".` });
+    if (!quando4) return { ok: 0, falhas: [], cancelado: true };
+    const agendado = quando4.modo === "agendar" ? quando4.rotulo : "";
     let ok = 0;
     const falhas = [];
     for (const [n, x] of alvos.entries()) {
@@ -28704,14 +29003,33 @@ ${url}
         const buraco = /\[preencher: ([a-z_]+)\]/.exec(`${m.assunto}
 ${m.texto}`);
         if (buraco) throw new ErroUsuario(`falta um dado no cadastro (${buraco[1]}): o e-mail não foi enviado`);
-        await enviarEmail(m);
-        await marcar(com.id, x.chave, lembrete ? "lembrete_em" : "email_em");
+        if (agendado) {
+          const registro = {
+            chave: lembrete ? "comunicado_lembrete" : "comunicado",
+            contrato_id: x.contrato_id || null,
+            ficha_id: null,
+            aditivo_id: null,
+            comunicado_id: com.id,
+            para: m.para,
+            assunto: m.assunto,
+            usuario: login(),
+            efeito: { tipo: "comunicado", comunicado_id: com.id, destino: x.chave, campo: lembrete ? "lembrete_em" : "email_em" }
+          };
+          const r = await agendarEmail({ ...m, quando: quando4.quando, registro, descricao: `Comunicado "${com.titulo}" · ${x.nome}` });
+          await alterar((db) => {
+            const c = buscar(db, "comunicados", com.id);
+            atualizar(db, "comunicados", c.id, { destinos: c.destinos.map((y) => y.chave === x.chave ? { ...y, agendado_id: r.id, agendado_para: r.quando } : { ...y }) }, login(), `Comunicado "${c.titulo}": e-mail de ${x.nome} agendado para ${agendado}`);
+          });
+        } else {
+          await enviarEmail(m);
+          await marcar(com.id, x.chave, lembrete ? "lembrete_em" : "email_em");
+        }
         ok += 1;
       } catch (e) {
         falhas.push(`${x.nome}: ${e.message}`);
       }
     }
-    return { ok, falhas };
+    return { ok, falhas, agendado };
   }
   async function filaWhatsapp(comId, fila2, { lembrete = false } = {}) {
     for (let i = 0; i < fila2.length; i += 1) {
@@ -28731,7 +29049,7 @@ ${m.texto}`);
         titulo: `WhatsApp ${i + 1} de ${fila2.length}: ${x.nome}${PAPEIS2[x.tipo] ? ` (${PAPEIS2[x.tipo]})` : ""}`,
         sim: i + 1 < fila2.length ? "Próximo" : "Terminar",
         nao: "Parar",
-        html: `<p><textarea rows="6" readonly data-texto style="width:100%">${esc(texto3)}</textarea></p>
+        html: `${avisoForaDoHorario()}<p><textarea rows="6" readonly data-texto style="width:100%">${esc(texto3)}</textarea></p>
         <p class="acoes">${tel ? `<a class="botao pequeno" target="_blank" rel="noopener noreferrer" href="https://wa.me/${tel}" data-zap>Copiar e abrir o WhatsApp (${esc(telefoneBr(p2.telefone))})</a>` : '<span class="suave">Sem celular no cadastro: copie e mande de outro jeito.</span>'}
         <button type="button" class="secundario pequeno" data-copiar>Copiar a mensagem</button></p>
         <p class="suave">No WhatsApp, cole a mensagem (segure e escolha Colar) e envie. Depois volte aqui e toque em "${i + 1 < fila2.length ? "Próximo" : "Terminar"}".</p>`,
@@ -28774,6 +29092,8 @@ ${m.texto}`);
       init_nuvem();
       init_regras();
       init_comum();
+      init_horario();
+      init_agendados();
       SO_CONSULTA = "Seu usuário só consulta: não pode enviar comunicados.";
       SO_NUVEM = "O comunicado com link só funciona no sistema pela internet (nuvem).";
       DIAS_PRAZO = 10;
@@ -28805,9 +29125,10 @@ ${m.texto}`);
             return;
           }
           if (!await confirmar(`Enviar o e-mail com o link para ${alvos.length} pessoa(s)?${sem.length ? ` ${sem.length} sem e-mail ficam para o WhatsApp.` : ""}${saiu}`, { titulo: "Enviar e-mail a todos", sim: "Enviar" })) return;
-          const { ok, falhas } = await enviarEmails(com, alvos);
-          if (falhas.length) await janela({ titulo: `${ok} enviado(s), ${falhas.length} com problema`, sim: "Fechar", nao: null, html: `<ul>${falhas.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>` });
-          else aviso(`${ok} e-mail(s) enviado(s).`);
+          const { ok, falhas, agendado, cancelado } = await enviarEmails(com, alvos);
+          if (cancelado) return;
+          if (falhas.length) await janela({ titulo: `${ok} ${agendado ? "agendado(s)" : "enviado(s)"}, ${falhas.length} com problema`, sim: "Fechar", nao: null, html: `<ul>${falhas.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>` });
+          else aviso(agendado ? `${ok} e-mail(s) agendado(s) para ${agendado}: saem sozinhos pela nuvem.` : `${ok} e-mail(s) enviado(s).`);
           await mostrar();
         },
         async emailComunicado({ id, chave }) {
@@ -28815,9 +29136,29 @@ ${m.texto}`);
           const com = buscar2("comunicados", Number(id));
           const x = com.destinos.find((y) => y.chave === chave);
           if (!(pessoaDoDestino(d(), x) || {}).email) throw new ErroUsuario(`${x.nome} não tem e-mail no cadastro. Use o WhatsApp ou copie o link.`);
-          const { ok, falhas } = await enviarEmails(com, [x], { lembrete: !!x.email_em });
+          if (x.agendado_id) {
+            let verLista = false;
+            const outro = await janela({
+              titulo: "E-mail já agendado",
+              sim: horarioComercialAgora().dentro ? "Enviar outro mesmo assim" : "Agendar outro mesmo assim",
+              nao: "Cancelar",
+              html: `<p data-ja-agendado>Já há um e-mail agendado para <b>${esc(x.nome)}</b> em <b>${esc(quandoBr(x.agendado_para))}</b>. Ele sai sozinho pela nuvem.</p>
+          <p><button type="button" class="secundario" data-ver-lista>Ver na lista</button></p>`,
+              ligar: (dlg) => dlg.querySelector("[data-ver-lista]").addEventListener("click", () => {
+                verLista = true;
+                dlg.close();
+              })
+            });
+            if (verLista) {
+              ir("#/envios-agendados");
+              return;
+            }
+            if (!outro) return;
+          }
+          const { ok, falhas, agendado, cancelado } = await enviarEmails(com, [x], { lembrete: !!x.email_em });
+          if (cancelado) return;
           if (falhas.length) throw new ErroUsuario(falhas[0]);
-          aviso(ok ? `E-mail enviado para ${x.nome}.` : "Nada enviado.");
+          aviso(ok ? agendado ? `E-mail para ${x.nome} agendado para ${agendado}: sai sozinho pela nuvem.` : `E-mail enviado para ${x.nome}.` : "Nada enviado.");
           await mostrar();
         },
         async whatsTodosComunicado({ id }) {
@@ -28858,8 +29199,8 @@ ${m.texto}`);
           });
           if (!resp) return;
           if (resp.email && porEmail.length) {
-            const { ok, falhas } = await enviarEmails(com, porEmail, { lembrete: true });
-            aviso(`${ok} lembrete(s) por e-mail${falhas.length ? `; ${falhas.length} com problema` : ""}.`, falhas.length ? "aviso" : "ok");
+            const { ok, falhas, agendado, cancelado } = await enviarEmails(com, porEmail, { lembrete: true });
+            if (!cancelado) aviso(`${ok} lembrete(s) por e-mail${agendado ? ` agendado(s) para ${agendado}` : ""}${falhas.length ? `; ${falhas.length} com problema` : ""}.`, falhas.length ? "aviso" : "ok");
           }
           if (resp.whats && await seguirSemGmail()) await filaWhatsapp(com.id, falta, { lembrete: true });
           else await mostrar();
@@ -29362,7 +29703,7 @@ ${m.texto}`);
   async function ligarFichaOnline(raiz) {
     ligarTermoReserva(raiz).catch((e) => console.warn("termo da reserva", e));
     const painel = raiz.querySelector("[data-alertas-ficha-online]");
-    if (painel && E.nuvem) await avisosDoPainel(painel).catch(() => {
+    if (painel && E.nuvem) await avisosDoPainel2(painel).catch(() => {
     });
     const caixa = raiz.querySelector("[data-ficha-online]");
     if (!caixa || !E.nuvem) return;
@@ -29542,14 +29883,14 @@ ${m.texto}`);
   function registroHtml(f, nome, { estado: estado2, reg }) {
     if (!reg) return estado2 === "nova" ? '<span class="suave">conferido agora (seu usuário só consulta: a conferência não fica guardada)</span><br>' : "";
     const quem = reg.conferido_por_nome || reg.conferido_por;
-    const porTexto = `conferido${quem ? ` por ${quem}` : ""}${reg.conferido_em ? ` em ${quandoBr(reg.conferido_em)}` : ""}`;
+    const porTexto = `conferido${quem ? ` por ${quem}` : ""}${reg.conferido_em ? ` em ${quandoBr2(reg.conferido_em)}` : ""}`;
     const por = esc(porTexto);
     if (estado2 === "mudou") {
-      return `${etiqueta("⚠ o arquivo mudou depois da conferência", "perigo")} <span class="suave">${por}${reg.compactado_em ? ` (compactado em ${quandoBr(reg.compactado_em)})` : ""}; o arquivo de hoje não é o que foi conferido, e a conferência guardada não vale para ele. Abaixo, o que se vê no arquivo de agora e no de antes.</span>
-      ${opera() ? botao("conferirDeNovoFicha", "Conferir de novo", { id: f.id, nome }, "secundario mini", `Guardar a conferência do arquivo de agora no lugar da antiga (de ${quandoBr(reg.conferido_em)})?`) : ""}<br>`;
+      return `${etiqueta("⚠ o arquivo mudou depois da conferência", "perigo")} <span class="suave">${por}${reg.compactado_em ? ` (compactado em ${quandoBr2(reg.compactado_em)})` : ""}; o arquivo de hoje não é o que foi conferido, e a conferência guardada não vale para ele. Abaixo, o que se vê no arquivo de agora e no de antes.</span>
+      ${opera() ? botao("conferirDeNovoFicha", "Conferir de novo", { id: f.id, nome }, "secundario mini", `Guardar a conferência do arquivo de agora no lugar da antiga (de ${quandoBr2(reg.conferido_em)})?`) : ""}<br>`;
     }
     if (estado2 === "antiga") return `<span class="suave">${por} (conferência de antes do registro do arquivo: não dá para saber se o arquivo mudou depois)</span><br>`;
-    const compactado = estado2 === "compactado" ? ` · compactado depois${reg.compactado_em ? ` em ${quandoBr(reg.compactado_em)}` : ""} (o resultado abaixo é o do arquivo como chegou)` : "";
+    const compactado = estado2 === "compactado" ? ` · compactado depois${reg.compactado_em ? ` em ${quandoBr2(reg.compactado_em)}` : ""} (o resultado abaixo é o do arquivo como chegou)` : "";
     return `${etiqueta(`✓ ${porTexto}`, "ok")} <span class="suave">${compactado}</span><br>`;
   }
   async function compactarDoLink(pasta, fichaId, nomes) {
@@ -29595,7 +29936,7 @@ ${m.texto}`);
     if (!r.sinais.length) out.push(`<span class="suave">nenhum sinal de edição encontrado${r.programa ? ` (feito em: ${esc(r.programa)})` : ""}: isso não prova que é verdadeiro, confira com a fonte</span>`);
     return out.join("<br>");
   }
-  async function avisosDoPainel(el) {
+  async function avisosDoPainel2(el) {
     const guardada = linksGuardados();
     if (guardada) desenharAvisosDoPainel(el, guardada);
     const links = await linksRecentes();
@@ -29681,7 +30022,7 @@ ${m.texto}`);
       }
     });
   }
-  var COR_SITUACAO, nomesDosImoveis, item2, sim, TEXTO_SITUACAO_LINK, COR_LINK, linkValido, arquivosDoLinkVistos, conferidos, filaConferencia, quandoBr, tamanhoMb, linksVarridos, ACOES_FICHAS;
+  var COR_SITUACAO, nomesDosImoveis, item2, sim, TEXTO_SITUACAO_LINK, COR_LINK, linkValido, arquivosDoLinkVistos, conferidos, filaConferencia, quandoBr2, tamanhoMb, linksVarridos, ACOES_FICHAS;
   var init_fichas = __esm({
     "docs/js/telas/fichas.js"() {
       init_app();
@@ -29719,7 +30060,7 @@ ${m.texto}`);
       arquivosDoLinkVistos = /* @__PURE__ */ new Map();
       conferidos = /* @__PURE__ */ new Map();
       filaConferencia = Promise.resolve();
-      quandoBr = (iso2) => dataHoraBr(iso2).slice(0, 17).replace(", ", " ");
+      quandoBr2 = (iso2) => dataHoraBr(iso2).slice(0, 17).replace(", ", " ");
       tamanhoMb = (b) => `${(b / 1048576).toFixed(1).replace(".", ",")} MB`;
       linksVarridos = /* @__PURE__ */ new Set();
       ACOES_FICHAS = {
@@ -39314,6 +39655,117 @@ ${xref}
     }
   });
 
+  // docs/js/telas/agendados.js
+  async function aplicarPendentes() {
+    if (!opera() || !efeitosPendentes(d()).length) return 0;
+    let n = 0;
+    await alterar((db) => {
+      n = aplicarEfeitos(db, login());
+    });
+    return n;
+  }
+  function linhaAgendado(x) {
+    const sit = SITUACOES_AGENDADO[x.situacao] || x.situacao || "-";
+    const anexos = Array.isArray(x.anexos) && x.anexos.length ? `<br><span class="suave">Anexos: ${x.anexos.map(esc).join(", ")}</span>` : "";
+    const erro = (x.situacao === "falhou" || x.situacao === "agendado") && x.erro ? `<br><span class="suave">${esc(x.erro)}</span>` : "";
+    const quando4 = x.situacao === "enviado" && x.enviado_em ? `${quandoBr(x.enviado_em)}<br><span class="suave">marcado para ${quandoBr(x.quando)}</span>` : x.situacao === "cancelado" && x.cancelado_em ? `<s>${quandoBr(x.quando)}</s><br><span class="suave">cancelado em ${dataBrDe(x.cancelado_em)}</span>` : quandoBr(x.quando);
+    const botoes = opera() && ABERTOS.has(x.situacao) ? `<span class="nw">${botao("mudarHoraAgendado", x.situacao === "falhou" ? "Tentar de novo" : "Mudar a hora", { id: x.id })} ${botao("cancelarAgendado", "Cancelar", { id: x.id })}</span>` : "";
+    return `<tr><td>${quando4}</td><td>${esc(x.para || "-")}</td><td>${esc(x.descricao || x.assunto || "-")}${x.descricao && x.assunto ? `<br><span class="suave">${esc(x.assunto)}</span>` : ""}${anexos}</td>
+    <td>${etiqueta(sit, COR_SITUACAO2[x.situacao] || "neutra")}${erro}</td><td>${esc(x.por || "-")}</td><td>${botoes}</td></tr>`;
+  }
+  async function telaEnviosAgendados() {
+    const topo3 = '<p class="suave"><a href="#/comunicacoes">← Comunicações</a></p><div class="cabecalho"><h1>Envios agendados</h1></div>';
+    if (!E.nuvem) return `${topo3}<div class="alerta info">${SO_NUVEM2}</div>`;
+    const aplicados = await aplicarPendentes().catch((e) => {
+      aviso(`Envios agendados: ${e.message}`, "aviso");
+      return 0;
+    });
+    const lista3 = await listaAgendados();
+    if (lista3 === null) return `${topo3}<div class="alerta aviso">Não foi possível ler a lista na nuvem (sem internet ou acesso vencido). Tente de novo daqui a pouco.</div>`;
+    const abertos = lista3.filter((x) => ["agendado", "enviando", "falhou"].includes(x.situacao)).sort((a, b) => String(a.quando).localeCompare(String(b.quando)));
+    const fechados = lista3.filter((x) => !["agendado", "enviando", "falhou"].includes(x.situacao)).sort((a, b) => String(b.enviado_em || b.cancelado_em || b.quando).localeCompare(String(a.enviado_em || a.cancelado_em || a.quando)));
+    const cab = "<tr><th>Quando</th><th>Para</th><th>O quê</th><th>Situação</th><th>Quem agendou</th><th></th></tr>";
+    const tabela = (l) => `<table>${cab}${l.map(linhaAgendado).join("")}</table>`;
+    const avisos = avisosDoPainel(lista3).filter((a) => a.tipo === "erro").map((a) => `<div class="alerta erro">${esc(a.texto)}</div>`).join("");
+    return `${topo3}
+    <p class="suave">E-mails marcados para sair mais tarde (fora do horário comercial). A nuvem envia sozinha na hora marcada, mesmo com o computador desligado.</p>
+    ${aplicados ? `<div class="alerta ok">${plural(aplicados, "envio já feito pela nuvem foi anotado", "envios já feitos pela nuvem foram anotados")} no sistema.</div>` : ""}
+    ${avisos}
+    ${abertos.length ? `<div class="cartao"><h2>Esperando a hora</h2>${tabela(abertos)}</div>` : '<div class="cartao"><p>Nenhum e-mail agendado esperando a hora.</p></div>'}
+    ${fechados.length ? `<div class="cartao"><h2>Já enviados ou cancelados</h2>${tabela(fechados)}</div>` : ""}
+    ${!lista3.length ? '<p class="suave">Nenhum e-mail agendado ainda. Ex.: um e-mail mandado no sábado às 21h pode ser agendado para segunda às 08:00.</p>' : ""}`;
+  }
+  function preencherAvisoAgendados() {
+    if (!E.nuvem || !opera()) return;
+    aplicarPendentes().catch(() => {
+    });
+    listaAgendados().then((lista3) => {
+      const el = document.getElementById("aviso-agendados");
+      const l = avisosDoPainel(lista3);
+      if (!el || !l.length) return;
+      el.innerHTML = l.map((a) => `<div class="alerta ${a.tipo === "erro" ? "erro" : "info"}">${esc(a.texto)} ${link("#/envios-agendados", "Ver os envios agendados", "botao pequeno")}</div>`).join("");
+    }).catch(() => {
+    });
+  }
+  var SO_NUVEM2, COR_SITUACAO2, ABERTOS, instanteDeBrasilia, campoDeBrasilia, ACOES_AGENDADOS;
+  var init_agendados2 = __esm({
+    "docs/js/telas/agendados.js"() {
+      init_app();
+      init_agendados();
+      init_calculos();
+      init_formularios();
+      init_gmail();
+      init_comum();
+      SO_NUVEM2 = "Agendar e-mails só existe no sistema na nuvem (pela internet, com o Gmail ligado). Nesta versão os e-mails saem na hora, pelo botão de cada tela.";
+      COR_SITUACAO2 = { agendado: "aviso", enviando: "aviso", enviado: "ok", falhou: "perigo", cancelado: "neutra" };
+      ABERTOS = /* @__PURE__ */ new Set(["agendado", "falhou"]);
+      instanteDeBrasilia = (v) => {
+        const t = /* @__PURE__ */ new Date(`${v}:00-03:00`);
+        return Number.isNaN(t.getTime()) ? null : t.toISOString();
+      };
+      campoDeBrasilia = (iso2) => {
+        const t = new Date(new Date(iso2).getTime() - 3 * 3600 * 1e3);
+        return Number.isNaN(t.getTime()) ? "" : t.toISOString().slice(0, 16);
+      };
+      ACOES_AGENDADOS = {
+        async mudarHoraAgendado({ id }) {
+          const lista3 = await listaAgendados() || [];
+          const x = lista3.find((y) => y.id === id);
+          if (!x) throw new ErroUsuario("Este agendado não está mais na lista. Recarregue a tela.");
+          const futuro = Date.now() + 5 * 60 * 1e3;
+          const inicial = x.situacao === "falhou" || new Date(x.quando).getTime() < futuro ? campoDeBrasilia(new Date(futuro).toISOString()) : campoDeBrasilia(x.quando);
+          const r = await janela({
+            titulo: x.situacao === "falhou" ? "Tentar de novo" : "Mudar a hora",
+            html: `<p>${esc(x.descricao || x.assunto || "")} para <b>${esc(x.para || "")}</b>.</p>
+        <label>Novo dia e hora (hora de Brasília)<input type="datetime-local" name="quando" value="${esc(inicial)}" required></label>`,
+            sim: "Salvar"
+          });
+          if (!r) return;
+          const quando4 = instanteDeBrasilia(String((r.quando || [""])[0]));
+          if (!quando4) throw new ErroUsuario("Informe o dia e a hora.");
+          if (new Date(quando4).getTime() <= Date.now()) throw new ErroUsuario("Escolha um dia e hora que ainda não passaram.");
+          const novo = await mudarAgendado(id, quando4);
+          aviso(`E-mail agendado para ${quandoBr(novo && novo.quando || quando4)}.`);
+          await mostrar();
+        },
+        async cancelarAgendado({ id }) {
+          const lista3 = await listaAgendados() || [];
+          const x = lista3.find((y) => y.id === id);
+          const qual = x ? `${x.descricao || x.assunto} para ${x.para}, marcado para ${quandoBr(x.quando)}` : "este e-mail";
+          if (!await confirmar(`Cancelar o envio de ${qual}?
+
+O e-mail não será enviado. Se quiser mandar depois, envie de novo pela tela de origem.`, { titulo: "Cancelar o envio agendado", sim: "Cancelar o envio", nao: "Voltar", forte: true })) return;
+          const r = await cancelarAgendado(id);
+          if (r && r.registro) await alterar((db) => {
+            desfazerAgendamento(db, r.registro, id, login());
+          });
+          aviso("Envio agendado cancelado.");
+          await mostrar();
+        }
+      };
+    }
+  });
+
   // docs/js/telas/consultas.js
   function telaBusca(q) {
     const texto3 = String(q.q || "").trim();
@@ -41180,6 +41632,7 @@ ${xref}
     await alterar((db) => marcarGeradoNaRotina(db, m.c.id, chave, login()));
   }
   function janelaMensagem(titulo2, l, topo3 = "") {
+    topo3 = `${avisoForaDoHorario()}${topo3}`;
     const tel = l.telefone ? l.telefone.length <= 11 ? `55${l.telefone}` : l.telefone : "";
     return janela({
       titulo: titulo2,
@@ -41244,6 +41697,7 @@ ${xref}
       init_termo_reserva2();
       init_emails();
       init_gmail();
+      init_horario();
       init_banco_c6();
       init_cadastros();
       init_campos();
@@ -41255,6 +41709,7 @@ ${xref}
       init_notificacoes2();
       init_cobranca_provas();
       init_comunicacoes();
+      init_agendados2();
       init_documentos();
       init_assinatura();
       init_assinatura_documentos();
@@ -42717,12 +43172,38 @@ ${MODELO_COMODOS[comodo].join("\n")}
           });
           if (!r) return;
           if ((r.por || [])[0] === "agora") {
-            if (!await confirmar(`A carta vai agora para ${para}, com o PDF ${carta.nome} anexado.`, { titulo: "Enviar o e-mail?", sim: "Enviar agora" })) return;
+            const quando4 = await perguntarQuando({ resumo: `A carta vai para ${para}, com o PDF ${carta.nome} anexado.` });
+            if (!quando4) return;
+            if (!quando4.perguntou && !await confirmar(`A carta vai agora para ${para}, com o PDF ${carta.nome} anexado.`, { titulo: "Enviar o e-mail?", sim: "Enviar agora" })) return;
+            if (quando4.modo === "agendar") {
+              let arquivo = null;
+              if ((r.marcar || [])[0] === "1") {
+                try {
+                  arquivo = await guardarCartaNaPasta(c, comp, carta);
+                } catch (e) {
+                  aviso(`Não deu para guardar o PDF na pasta: ${e.message}`, "aviso");
+                }
+              }
+              const registro = {
+                chave: "carta_reajuste",
+                contrato_id: c.id,
+                ficha_id: null,
+                aditivo_id: null,
+                para,
+                assunto,
+                usuario: login(),
+                ...(r.marcar || [])[0] === "1" ? { efeito: { tipo: "carta", contrato_id: c.id, comp, arquivo: arquivo || null } } : {}
+              };
+              await agendarEmail({ para, assunto, texto: carta.texto, anexos: [{ nome: carta.nome, blob: carta.blob }], quando: quando4.quando, registro, descricao: `Carta de reajuste · ${c.inquilino_nome}` });
+              aviso(`Carta agendada para ${quando4.rotulo}: sai sozinha pela nuvem${(r.marcar || [])[0] === "1" ? " e fica marcada como enviada no dia em que sair" : ""}.`);
+              await mostrar();
+              return;
+            }
             const env = await enviarEmail({ para, assunto, texto: carta.texto, anexos: [{ nome: carta.nome, blob: carta.blob }] });
             await alterar((db) => inserir(
               db,
               "envios_email",
-              { data: hojeIso(), chave: "carta_reajuste", contrato_id: c.id, ficha_id: null, aditivo_id: null, para, assunto, como: "enviado", gmail_id: env.id || null },
+              { data: hojeBrasilia(), chave: "carta_reajuste", contrato_id: c.id, ficha_id: null, aditivo_id: null, para, assunto, como: "enviado", gmail_id: env.id || null },
               login(),
               `E-mail "${assunto}" enviado para ${para}`
             ));
@@ -43493,7 +43974,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           await mostrar();
         }
       };
-      Object.assign(ACOES, ACOES_BANCO, ACOES_FICHAS, ACOES_TERMO, ACOES_ICONE, ACOES_EMAILS, ACOES_PASTA, ACOES_NOTIFICACOES, ACOES_COMUNICACOES, ACOES_PROVAS);
+      Object.assign(ACOES, ACOES_BANCO, ACOES_FICHAS, ACOES_TERMO, ACOES_ICONE, ACOES_EMAILS, ACOES_PASTA, ACOES_NOTIFICACOES, ACOES_COMUNICACOES, ACOES_PROVAS, ACOES_AGENDADOS);
       Object.assign(ACOES, adiados("acoes"));
     }
   });
@@ -44432,6 +44913,7 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
       init_cobrancas();
       init_comum();
       init_comunicacoes();
+      init_agendados2();
       init_consultas();
       init_contrato();
       init_notificacoes2();
@@ -44665,6 +45147,7 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
           });
           trazerHerancasPendentes().catch((e) => aviso(`Contratos herdados: ${e.message}`, "aviso")).then(() => acertarNomesUmaVez()).catch((e) => aviso(`Nomes dos comprovantes: ${e.message}`, "aviso"));
           preencherAvisoAssinaturas();
+          preencherAvisoAgendados();
           const hoje3 = hojeIso();
           const todosOsAlertas = alertasDaTela(hoje3);
           const alertas = todosOsAlertas.filter((a) => !a.adiamento && !a.desligado);
@@ -44684,7 +45167,7 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
           const porTipo = {};
           for (const a of alertas) porTipo[a.tipo] = (porTipo[a.tipo] || 0) + 1;
           const [tipoMais, qtdMais] = Object.entries(porTipo).sort((a, b) => b[1] - a[1])[0] || ["", 0];
-          return `${avisoPrimeiraLogo()}<div id="aviso-assinaturas"></div><div class="cabecalho"><h1>Painel</h1>${opera() ? `<div class="acoes">${link("#/cobrancas?filtro=abertos", "Confirmar pagamento", "botao")} ${link("#/cobrancas", "Acompanhar boletos", "botao secundario")}</div>` : ""}</div>
+          return `${avisoPrimeiraLogo()}<div id="aviso-assinaturas"></div><div id="aviso-agendados"></div><div class="cabecalho"><h1>Painel</h1>${opera() ? `<div class="acoes">${link("#/cobrancas?filtro=abertos", "Confirmar pagamento", "botao")} ${link("#/cobrancas", "Acompanhar boletos", "botao secundario")}</div>` : ""}</div>
       ${primeirosPassos()}
       <div class="numeros">
         ${n(d().imoveis.length, "imóveis", "#/imoveis")}
@@ -44839,6 +45322,7 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
         regras: async (rota) => (await parteAdiada("regras")).telaRegras(rota.q),
         inquilinos: (rota) => telaInquilinos(rota.q),
         comunicacoes: (rota) => telaComunicacoes(rota.q),
+        "envios-agendados": () => telaEnviosAgendados(),
         "aceite-contatos": (rota) => telaAceiteContatos(rota.q),
         ficha: (rota) => telaFicha(Number(rota.partes[1])),
         buscar: (rota) => telaBusca(rota.q),
@@ -46084,7 +46568,7 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
       TABELA_DO_PARAMETRO = { contrato: "contratos", imovel: "imoveis", ficha: "fichas", troca: "trocas_garantia", anterior: "notificacoes", perfil: "perfis_regras", regras: "perfis_regras" };
       MENU = [
         ["#/", "Painel", "^$|^fechamento|^pendencias|^alertas"],
-        ["#/inquilinos", "Inquilinos", "^inquilino|^contrato|^vistoria|^solicitacoes|^notificac|^ficha|^comunicacoes|^aceite|^aditivo"],
+        ["#/inquilinos", "Inquilinos", "^inquilino|^contrato|^vistoria|^solicitacoes|^notificac|^ficha|^comunicacoes|^envios-agendados|^aceite|^aditivo"],
         ["#/reajustes", "Reajustes", "reajustes"],
         ["#/cobrancas", "Boletos", "cobranca|^regua"],
         ["#/faturas", "NF", "fatura"],
