@@ -20,6 +20,7 @@ import { crescer, ligarCamposAutomaticos, ligarIndiceBancoCentral } from './tela
 import { telaCobranca, telaCobrancas } from './telas/cobrancas.js';
 import { ACEITA_DOCUMENTOS, acertarNomesUmaVez, apagarDocumentosVencidosDasFichas, alertaAdiado, alertaArquivosFaltando, alertaDesligado, botao, botaoDesligarAlerta, conferirArquivosUmaVez, buscar, caixaHistorico, classeAlerta, classeEstilo, competenciaPadrao, d, etiqueta, gruposDeAlertas, limparSemImovel, link, naoEncontrado, organizarPastasUmaVez, nomeAlerta, listaArquivos, opera, ordenar, PASTA_SEM_IMOVEL, pastasComArquivos, tabelaHistorico, trazerHerancasPendentes, ultimos } from './telas/comum.js';
 import { telaAceiteContatos, telaComunicacoes } from './telas/comunicacoes.js';
+import { preencherAvisoAgendados, telaEnviosAgendados } from './telas/agendados.js';
 import { calendarioDoPainel, SITUACOES_SOLICITACAO, telaBusca, telaInquilinos, telaIptu, telaSolicitacoes } from './telas/consultas.js';
 import { telaContrato, valorBonificado } from './telas/contrato.js';
 import { telaNotificacao, telaNotificacoes, telaNovaNotificacao } from './telas/notificacoes.js';
@@ -295,6 +296,7 @@ export const TELAS = {
     trazerHerancasPendentes().catch((e) => aviso(`Contratos herdados: ${e.message}`, 'aviso'))
       .then(() => acertarNomesUmaVez()).catch((e) => aviso(`Nomes dos comprovantes: ${e.message}`, 'aviso'));
     preencherAvisoAssinaturas();
+    preencherAvisoAgendados();
     const hoje = C.hojeIso();
     // alertas adiados ("adiar 7 dias" / "já estou cuidando") ficam recolhidos no fim da caixa, com quem marcou
     const todosOsAlertas = alertasDaTela(hoje);
@@ -317,7 +319,7 @@ export const TELAS = {
     const porTipo = {};
     for (const a of alertas) porTipo[a.tipo] = (porTipo[a.tipo] || 0) + 1;
     const [tipoMais, qtdMais] = Object.entries(porTipo).sort((a, b) => b[1] - a[1])[0] || ['', 0];
-    return `${avisoPrimeiraLogo()}<div id="aviso-assinaturas"></div><div class="cabecalho"><h1>Painel</h1>${opera() ? `<div class="acoes">${link('#/cobrancas?filtro=abertos', 'Confirmar pagamento', 'botao')} ${link('#/cobrancas', 'Acompanhar boletos', 'botao secundario')}</div>` : ''}</div>
+    return `${avisoPrimeiraLogo()}<div id="aviso-assinaturas"></div><div id="aviso-agendados"></div><div class="cabecalho"><h1>Painel</h1>${opera() ? `<div class="acoes">${link('#/cobrancas?filtro=abertos', 'Confirmar pagamento', 'botao')} ${link('#/cobrancas', 'Acompanhar boletos', 'botao secundario')}</div>` : ''}</div>
       ${primeirosPassos()}
       <div class="numeros">
         ${n(d().imoveis.length, 'imóveis', '#/imoveis')}
@@ -476,6 +478,7 @@ export const TELAS = {
   regras: async (rota) => (await parteAdiada('regras')).telaRegras(rota.q),
   inquilinos: (rota) => telaInquilinos(rota.q),
   comunicacoes: (rota) => telaComunicacoes(rota.q),
+  'envios-agendados': () => telaEnviosAgendados(),
   'aceite-contatos': (rota) => telaAceiteContatos(rota.q),
   ficha: (rota) => telaFicha(Number(rota.partes[1])),
   buscar: (rota) => telaBusca(rota.q),

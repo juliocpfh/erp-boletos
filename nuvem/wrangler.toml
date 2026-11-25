@@ -16,6 +16,10 @@ routes = [
   { pattern = "vendas.ankjck.com.br", custom_domain = true },
 ]
 
+# E-mails agendados (agendados.mjs): a cada 5 minutos o Worker manda os que chegaram na hora, com os aparelhos desligados
+[triggers]
+crons = ["*/5 * * * *"]
+
 [[r2_buckets]]
 binding = "DADOS"
 bucket_name = "imoveis-dados"

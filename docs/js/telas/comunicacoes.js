@@ -13,6 +13,8 @@ import * as GM from '../gmail.js';
 import { limiteDeTempo } from '../nuvem.js';
 import * as R from '../regras.js';
 import { botao, buscar, d, etiqueta, link, naoEncontrado, opera } from './comum.js';
+import { avisoForaDoHorario, perguntarQuando } from './horario.js';
+import { quandoBr } from '../agendados.js';
 
 const SO_CONSULTA = 'Seu usuário só consulta: não pode enviar comunicados.';
 const SO_NUVEM = 'O comunicado com link só funciona no sistema pela internet (nuvem).';
@@ -111,7 +113,7 @@ export async function telaComunicacoes(q = {}) {
   if (q.id) return telaComunicado(Number(q.id));
   // fora da nuvem o comunicado não tem como ser enviado (o link é da nuvem): não oferece criar
   const podeCriar = opera() && E.nuvem;
-  return `<div class="cabecalho"><h1>Comunicações</h1>${podeCriar ? link('#/comunicacoes?ver=novo', 'Novo comunicado a todos', 'botao') : ''}</div>
+  return `<div class="cabecalho"><h1>Comunicações</h1><div class="acoes">${E.nuvem ? link('#/envios-agendados', 'Envios agendados') : ''} ${podeCriar ? link('#/comunicacoes?ver=novo', 'Novo comunicado a todos', 'botao') : ''}</div></div>
     ${atalhosComunicacoes('comunicados')}
     ${lista.length ? lista.map((com) => cartaoComunicado(com)).join('') : `<div class="cartao"><p>Nenhum comunicado enviado ainda.</p>
       <p class="suave">O comunicado vai para todos os inquilinos e fiadores com contrato ativo, cada um com um link só dele, por e-mail e por WhatsApp. Ex.: "Atualização de contatos e novo e-mail da empresa".</p>
@@ -296,6 +298,10 @@ async function emailDe(com, x, { lembrete = false } = {}) {
 
 async function enviarEmails(com, alvos, { lembrete = false } = {}) {
   if (!(await GM.emailLigado())) throw new C.ErroUsuario('O envio pelo Gmail não está ligado (Sistema → Comunicação E-mail → Conectar o Gmail).');
+  // fora do horário comercial: agendar todos para o próximo horário (sai sozinho pela nuvem) ou enviar agora mesmo
+  const quando = await perguntarQuando({ resumo: `${C.plural(alvos.length, 'e-mail', 'e-mails')} do comunicado "${com.titulo}".` });
+  if (!quando) return { ok: 0, falhas: [], cancelado: true };
+  const agendado = quando.modo === 'agendar' ? quando.rotulo : '';
   let ok = 0; const falhas = [];
   for (const [n, x] of alvos.entries()) {
     aviso(`Enviando ${n + 1} de ${alvos.length}: ${x.nome}…`, 'info');
@@ -304,12 +310,23 @@ async function enviarEmails(com, alvos, { lembrete = false } = {}) {
       // dado faltando no cadastro (ex.: contrato "Sem imóvel"): não sai e-mail com buraco
       const buraco = /\[preencher: ([a-z_]+)\]/.exec(`${m.assunto}\n${m.texto}`);
       if (buraco) throw new C.ErroUsuario(`falta um dado no cadastro (${buraco[1]}): o e-mail não foi enviado`);
-      await GM.enviarEmail(m);
-      await marcar(com.id, x.chave, lembrete ? 'lembrete_em' : 'email_em');
+      if (agendado) {
+        // quando sair, o Painel marca o e-mail (ou o lembrete) da pessoa com a hora de verdade (agendados.js, aplicarEfeitos)
+        const registro = { chave: lembrete ? 'comunicado_lembrete' : 'comunicado', contrato_id: x.contrato_id || null, ficha_id: null, aditivo_id: null, comunicado_id: com.id, para: m.para, assunto: m.assunto, usuario: login(),
+          efeito: { tipo: 'comunicado', comunicado_id: com.id, destino: x.chave, campo: lembrete ? 'lembrete_em' : 'email_em' } };
+        const r = await GM.agendarEmail({ ...m, quando: quando.quando, registro, descricao: `Comunicado "${com.titulo}" · ${x.nome}` });
+        await alterar((db) => {
+          const c = R.buscar(db, 'comunicados', com.id);
+          R.atualizar(db, 'comunicados', c.id, { destinos: c.destinos.map((y) => (y.chave === x.chave ? { ...y, agendado_id: r.id, agendado_para: r.quando } : { ...y })) }, login(), `Comunicado "${c.titulo}": e-mail de ${x.nome} agendado para ${agendado}`);
+        });
+      } else {
+        await GM.enviarEmail(m);
+        await marcar(com.id, x.chave, lembrete ? 'lembrete_em' : 'email_em');
+      }
       ok += 1;
     } catch (e) { falhas.push(`${x.nome}: ${e.message}`); }
   }
-  return { ok, falhas };
+  return { ok, falhas, agendado };
 }
 
 /** Janela do WhatsApp: a pessoa da vez, com a mensagem para copiar e o botão que abre a conversa; "Próximo" segue a fila. */
@@ -329,7 +346,7 @@ async function filaWhatsapp(comId, fila, { lembrete = false } = {}) {
     let abriu = false;
     const resp = await janela({
       titulo: `WhatsApp ${i + 1} de ${fila.length}: ${x.nome}${CM.PAPEIS[x.tipo] ? ` (${CM.PAPEIS[x.tipo]})` : ''}`, sim: i + 1 < fila.length ? 'Próximo' : 'Terminar', nao: 'Parar',
-      html: `<p><textarea rows="6" readonly data-texto style="width:100%">${esc(texto)}</textarea></p>
+      html: `${avisoForaDoHorario()}<p><textarea rows="6" readonly data-texto style="width:100%">${esc(texto)}</textarea></p>
         <p class="acoes">${tel ? `<a class="botao pequeno" target="_blank" rel="noopener noreferrer" href="https://wa.me/${tel}" data-zap>Copiar e abrir o WhatsApp (${esc(CM.telefoneBr(p.telefone))})</a>` : '<span class="suave">Sem celular no cadastro: copie e mande de outro jeito.</span>'}
         <button type="button" class="secundario pequeno" data-copiar>Copiar a mensagem</button></p>
         <p class="suave">No WhatsApp, cole a mensagem (segure e escolha Colar) e envie. Depois volte aqui e toque em "${i + 1 < fila.length ? 'Próximo' : 'Terminar'}".</p>`,
@@ -361,9 +378,10 @@ export const ACOES_COMUNICACOES = {
     const saiu = fora ? ` ${fora} pessoa(s) que não confirmaram ficam de fora: já saíram (contrato encerrado, fiador trocado ou excluído).` : '';
     if (!alvos.length) { aviso(`Não há e-mail para enviar: ${sem.length ? `${sem.length} pessoa(s) sem e-mail no cadastro (use o WhatsApp)` : 'todos já receberam'}.${saiu}`, 'info'); return; }
     if (!(await confirmar(`Enviar o e-mail com o link para ${alvos.length} pessoa(s)?${sem.length ? ` ${sem.length} sem e-mail ficam para o WhatsApp.` : ''}${saiu}`, { titulo: 'Enviar e-mail a todos', sim: 'Enviar' }))) return;
-    const { ok, falhas } = await enviarEmails(com, alvos);
-    if (falhas.length) await janela({ titulo: `${ok} enviado(s), ${falhas.length} com problema`, sim: 'Fechar', nao: null, html: `<ul>${falhas.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` });
-    else aviso(`${ok} e-mail(s) enviado(s).`);
+    const { ok, falhas, agendado, cancelado } = await enviarEmails(com, alvos);
+    if (cancelado) return;
+    if (falhas.length) await janela({ titulo: `${ok} ${agendado ? 'agendado(s)' : 'enviado(s)'}, ${falhas.length} com problema`, sim: 'Fechar', nao: null, html: `<ul>${falhas.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` });
+    else aviso(agendado ? `${ok} e-mail(s) agendado(s) para ${agendado}: saem sozinhos pela nuvem.` : `${ok} e-mail(s) enviado(s).`);
     await mostrar();
   },
   async emailComunicado({ id, chave }) {
@@ -371,9 +389,22 @@ export const ACOES_COMUNICACOES = {
     const com = buscar('comunicados', Number(id));
     const x = com.destinos.find((y) => y.chave === chave);
     if (!(CM.pessoaDoDestino(d(), x) || {}).email) throw new C.ErroUsuario(`${x.nome} não tem e-mail no cadastro. Use o WhatsApp ou copie o link.`);
-    const { ok, falhas } = await enviarEmails(com, [x], { lembrete: !!x.email_em });
+    // já há um e-mail agendado para a pessoa (sai sozinho pela nuvem): avisa antes de fazer outro
+    if (x.agendado_id) {
+      let verLista = false;
+      const outro = await janela({
+        titulo: 'E-mail já agendado', sim: C.horarioComercialAgora().dentro ? 'Enviar outro mesmo assim' : 'Agendar outro mesmo assim', nao: 'Cancelar',
+        html: `<p data-ja-agendado>Já há um e-mail agendado para <b>${esc(x.nome)}</b> em <b>${esc(quandoBr(x.agendado_para))}</b>. Ele sai sozinho pela nuvem.</p>
+          <p><button type="button" class="secundario" data-ver-lista>Ver na lista</button></p>`,
+        ligar: (dlg) => dlg.querySelector('[data-ver-lista]').addEventListener('click', () => { verLista = true; dlg.close(); }),
+      });
+      if (verLista) { ir('#/envios-agendados'); return; }
+      if (!outro) return;
+    }
+    const { ok, falhas, agendado, cancelado } = await enviarEmails(com, [x], { lembrete: !!x.email_em });
+    if (cancelado) return;
     if (falhas.length) throw new C.ErroUsuario(falhas[0]);
-    aviso(ok ? `E-mail enviado para ${x.nome}.` : 'Nada enviado.');
+    aviso(ok ? (agendado ? `E-mail para ${x.nome} agendado para ${agendado}: sai sozinho pela nuvem.` : `E-mail enviado para ${x.nome}.`) : 'Nada enviado.');
     await mostrar();
   },
   async whatsTodosComunicado({ id }) {
@@ -407,8 +438,8 @@ export const ACOES_COMUNICACOES = {
     });
     if (!resp) return;
     if (resp.email && porEmail.length) {
-      const { ok, falhas } = await enviarEmails(com, porEmail, { lembrete: true });
-      aviso(`${ok} lembrete(s) por e-mail${falhas.length ? `; ${falhas.length} com problema` : ''}.`, falhas.length ? 'aviso' : 'ok');
+      const { ok, falhas, agendado, cancelado } = await enviarEmails(com, porEmail, { lembrete: true });
+      if (!cancelado) aviso(`${ok} lembrete(s) por e-mail${agendado ? ` agendado(s) para ${agendado}` : ''}${falhas.length ? `; ${falhas.length} com problema` : ''}.`, falhas.length ? 'aviso' : 'ok');
     }
     if (resp.whats && (await seguirSemGmail())) await filaWhatsapp(com.id, falta, { lembrete: true });
     else await mostrar();

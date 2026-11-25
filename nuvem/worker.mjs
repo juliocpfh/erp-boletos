@@ -7,6 +7,8 @@
 //   email/google/conectar (POST, administrador: devolve o endereço da permissão do Google), email/google/retorno (GET: a volta
 //   do Google, no mesmo navegador já logado no Access; troca o código e guarda a autorização cifrada no cofre) e
 //   email/google/desconectar (POST, administrador: apaga e revoga). gmail-conta.mjs guarda.
+//   email/agendar (POST, operador), email/agendados (GET), email/agendados/mudar e email/agendados/cancelar (POST, operador):
+//   e-mails agendados para o próximo horário comercial (agendados.mjs); o cron (`scheduled`, a cada 5 min) manda na hora marcada.
 // · aparelho/… (sem o login do Access: política Bypass só neste caminho): o programa do PC entra com e-mail e senha
 //   (aparelho/entrar) e depois só LÊ com o crachá do aparelho (Authorization: Bearer ap1_…): saude, dados/tudo, dados/mudancas,
 //   lista/, lista-tudo/, arquivos/, modelos/, backups/ e programa (a versão PC). aparelhos.mjs; atualizador-pc/README.md.
@@ -37,6 +39,7 @@ import {
 } from './gmail.mjs';
 import { atenderVendas, ehEnderecoDeVendas } from './painel-vendas.mjs';
 import { guardarVersaoAnterior, paraLixeira } from './lixeira.mjs';
+import { ErroAgendado, agendar, cancelarAgendado, listaDeAgendados, mudarAgendado, rodarAgendados } from './agendados.mjs';
 export { CofreDO } from './cofre.mjs'; // o Cloudflare exige a classe do Durable Object no arquivo principal
 export { CofreLicencasDO } from './cofre-licencas.mjs'; // licenças (painel de vendas, HOST_VENDAS): separado dos dados
 const RAIZES = ['arquivos', 'modelos', 'backups']; // pastas que existem na pasta de hoje
@@ -204,6 +207,7 @@ export function rotaDoRegistro(rota, metodo) {
   if (/^lista(-tudo)?\/backups(\/|$)/.test(rota)) return [rota, false];
   if (rota === 'mover' || rota === 'apagar') return [rota, true];
   if (rota === 'email/enviar') return [rota, true];
+  if (rota === 'email/agendar' || rota.startsWith('email/agendados/')) return [rota, true];
   if (rota.startsWith('email/google/')) return [rota, true]; // ligar e desligar o Gmail (só o caminho: o código do Google não entra)
   if (rota.startsWith('ficha-online/')) return [`${metodo === 'GET' ? '' : `${metodo} `}${rota}`, metodo !== 'GET'];
   if (rota.startsWith('contatos/')) return [`${metodo === 'GET' ? '' : `${metodo} `}${rota}`, metodo !== 'GET'];
@@ -568,6 +572,26 @@ async function rotaEnviarEmail(request, env, email, url, buscar) {
   return json(200, r);
 }
 
+/** E-mail agendado (agendados.mjs): conferido como o "Enviar agora" e guardado pronto até a hora marcada. */
+async function rotaAgendar(request, env, email, url) {
+  conferirGravacao(request, env);
+  const simular = simularGmail(env, url);
+  const conta = simular ? null : await contaGuardada(env);
+  if (!estadoEmail(env, { simular, conta }).ligado) throw new ErroHttp(503, 'O envio pelo Gmail ainda não foi ligado.');
+  const corpo = await lerAteLimite(request, MAX_PEDIDO);
+  if (!corpo) throw new ErroHttp(413, `Anexos passam de ${MAX_BYTES_ANEXOS / 1048576} MB.`);
+  let pedido;
+  try { pedido = JSON.parse(new TextDecoder().decode(corpo)); } catch { throw new ErroHttp(400, 'Pedido inválido.'); }
+  return json(200, await agendar(env, pedido, email));
+}
+
+/** Corpo JSON pequeno (mudar a hora, cancelar). */
+async function corpoJson(request) {
+  const corpo = await lerAteLimite(request, 64 * 1024);
+  if (!corpo) throw new ErroHttp(413, 'Pedido grande demais.');
+  try { return JSON.parse(new TextDecoder().decode(corpo)); } catch { throw new ErroHttp(400, 'Pedido inválido.'); }
+}
+
 /** Situação do envio (todos os papéis): ligado, remetente, de onde vem (botão ou segredo antigo), a conta e o endereço de retorno. */
 async function rotaEstadoEmail(env, url) {
   const simular = simularGmail(env, url);
@@ -672,6 +696,7 @@ export async function atender(request, env, buscar = fetch, ctx = null) {
 function respostaDoErro(e) {
   if (e instanceof ErroHttp) return json(e.status, { erro: e.message, ...e.extra });
   if (e instanceof ErroEmail) return json(e.status, { erro: e.message });
+  if (e instanceof ErroAgendado) return json(e.status, { erro: e.message });
   if (e instanceof ErroAssinatura) return json(e.status, { erro: e.message });
   console.error(e);
   return json(500, { erro: 'Erro no servidor da nuvem.' });
@@ -688,6 +713,10 @@ async function atenderComLogin(request, env, rota, email, url, buscar, ctx) {
   if (rota === 'icone' && m === 'DELETE') { await exigirPapel(env, email, 'admin'); return await apagarIcone(request, env); }
   if (rota === 'email/estado' && m === 'GET') { await exigirPapel(env, email, 'consulta'); return await rotaEstadoEmail(env, url); }
   if (rota === 'email/enviar' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await rotaEnviarEmail(request, env, email, url, buscar); }
+  if (rota === 'email/agendar' && m === 'POST') { await exigirPapel(env, email, 'operador'); return await rotaAgendar(request, env, email, url); }
+  if (rota === 'email/agendados' && m === 'GET') { await exigirPapel(env, email, 'consulta'); return json(200, await listaDeAgendados(env, email)); }
+  if (rota === 'email/agendados/mudar' && m === 'POST') { conferirGravacao(request, env); await exigirPapel(env, email, 'operador'); return json(200, await mudarAgendado(env, await corpoJson(request), email)); }
+  if (rota === 'email/agendados/cancelar' && m === 'POST') { conferirGravacao(request, env); await exigirPapel(env, email, 'operador'); return json(200, await cancelarAgendado(env, await corpoJson(request), email)); }
   if (rota === 'email/google/conectar' && m === 'POST') { conferirGravacao(request, env); await exigirPapel(env, email, 'admin'); return await conectarGmail(env, email, url); }
   if (rota === 'email/google/retorno' && m === 'GET') return await retornoDoGoogle(env, email, url, buscar);
   if (rota === 'email/google/desconectar' && m === 'POST') { conferirGravacao(request, env); await exigirPapel(env, email, 'admin'); return await desconectarGmail(env, email, buscar); }
@@ -726,6 +755,8 @@ async function atenderComLogin(request, env, rota, email, url, buscar, ctx) {
 export const ehEnderecoDaFicha = (request, env) => new URL(request.url).hostname === String(env.HOST_FICHA || 'ficha.ankjck.com.br');
 
 export default {
+  // Cron Trigger (wrangler.toml, a cada 5 minutos): manda os e-mails agendados que chegaram na hora (agendados.mjs)
+  scheduled: (evento, env, ctx) => { ctx.waitUntil(rodarAgendados(env, { agora: new Date(evento.scheduledTime || Date.now()) }).catch((e) => console.error('agendados', e))); },
   fetch: (request, env, ctx) => (ehEnderecoDaFicha(request, env) ? atenderFicha(request, env, { avisar: avisador(ctx) })
     : ehEnderecoDeVendas(request, env) ? atenderVendas(request, env, { conferirLogin })
       : atender(request, env, fetch, ctx)),

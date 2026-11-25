@@ -293,7 +293,8 @@ export function filaDoEnvio(d, com, canal, hoje = C.hojeIso()) {
   const ativos = abertos.filter((x) => destinoAtivo(d, x, hoje));
   const fora = abertos.length - ativos.length;
   if (canal === 'email') {
-    return { alvos: ativos.filter((x) => !x.email_em && (pessoaDoDestino(d, x) || {}).email), sem: ativos.filter((x) => !(pessoaDoDestino(d, x) || {}).email), fora };
+    // e-mail já agendado (sai sozinho pela nuvem, agendados.js) não entra de novo
+    return { alvos: ativos.filter((x) => !x.email_em && !x.agendado_id && (pessoaDoDestino(d, x) || {}).email), sem: ativos.filter((x) => !(pessoaDoDestino(d, x) || {}).email), fora };
   }
   return { alvos: ativos.filter((x) => !x.whats_em && pessoaDoDestino(d, x)), sem: [], fora };
 }
