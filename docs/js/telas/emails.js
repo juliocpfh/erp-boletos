@@ -13,6 +13,7 @@ import { MODELOS_EMAIL, modeloEmail, montarEmail } from '../modelos-email.js';
 import * as R from '../regras.js';
 import { ACEITA_DOCUMENTOS, arquivoSumiu, botao, buscar, d, etiqueta, link, naoEncontrado, opera, pastaDoEscopo } from './comum.js';
 import { pdfDoRecibo } from './documentos.js';
+import { documentoParaAssinar } from './assinatura-documentos.js';
 import * as AS from '../assinatura.js';
 
 /** Endereço do Gmail para escrever: com o texto, enquanto couber no endereço (o navegador corta endereços muito longos). */
@@ -58,9 +59,9 @@ async function copiar(texto) {
 /** Lista dos anexos do sistema na janela: recibo (PDF) e comprovantes, marcados; recibo que ainda não pode sair diz o motivo. */
 function listaProntos(prontos, ligado) {
   if (!prontos.length) return '';
-  const linha = (a, k) => (a.tipo === 'recibo' && !a.ok ? `<p class="suave">🧾 ${esc(a.rotulo)}: ${esc(a.motivo)}</p>`
-    : `<p><label class="check"><input type="checkbox" name="pronto" value="${k}" checked> ${a.tipo === 'recibo' ? `🧾 ${esc(a.rotulo)} (PDF)` : `📎 ${esc(a.rotulo)}`}</label></p>`);
-  const algum = prontos.some((a) => a.tipo !== 'recibo' || a.ok);
+  const linha = (a, k) => ((a.tipo === 'recibo' || a.tipo === 'digital') && !a.ok ? `<p class="suave">🧾 ${esc(a.rotulo)}: ${esc(a.motivo)}</p>`
+    : `<p><label class="check"><input type="checkbox" name="pronto" value="${k}" checked> ${a.tipo === 'recibo' || a.tipo === 'digital' ? `🧾 ${esc(a.rotulo)} (PDF)` : `📎 ${esc(a.rotulo)}`}</label></p>`);
+  const algum = prontos.some((a) => (a.tipo !== 'recibo' && a.tipo !== 'digital') || a.ok);
   return `<div class="cartao" style="margin:0 0 8px"><p><b>Anexos do sistema</b></p>${prontos.map(linha).join('')}
     ${algum ? `<p><button type="button" class="secundario mini" data-baixar-prontos>Baixar os marcados</button> <span class="suave">${ligado ? 'Vão juntos no "Enviar agora".' : 'Para o Gmail: baixe e anexe por lá.'}</span></p>` : ''}</div>`;
 }
@@ -77,12 +78,38 @@ async function reciboParaEnviar(a, alvo) {
   return { nome: `${String(p.nome || 'documento.pdf').replace(/\.pdf$/i, '')} - assinado.pdf`, blob: await AS.baixarAssinado(p.id) };
 }
 
+/**
+ * Contrato e termo aditivo assinados digitalmente pela empresa (``digital`` de anexosProntos, 2026-11-24): procura na fila.
+ * Aditivo: a versão do texto de agora (pela chave); contrato: a mais nova (o e-mail não sabe o modelo e as testemunhas
+ * escolhidos na página). Sem versão na fila (ou fora da nuvem), sai da lista: o contrato é anexado à mão, como antes.
+ */
+async function assinadosDaFila(prontos) {
+  if (!prontos.some((a) => a.tipo === 'digital')) return prontos;
+  let fila = null;
+  try { if (E.nuvem) fila = await AS.fila({ fresca: true }); } catch { fila = null; }
+  const out = [];
+  for (const a of prontos) {
+    if (a.tipo !== 'digital') { out.push(a); continue; }
+    const c = fila && buscar('contratos', a.contrato);
+    if (!c) continue;
+    const doc = a.doc === 'aditivo' ? await documentoParaAssinar('aditivo', { id: a.id }) : null;
+    if (a.doc === 'aditivo' && !doc) continue;
+    const r = AS.assinadoParaEmail(fila, AS.prefixoDoDocumento(a.doc, { contrato: c, id: a.id }), doc ? doc.chave : null);
+    if (!r.pedido) continue;
+    out.push({ ...a, pedido: r.pedido.id, ok: r.ok, motivo: r.motivo, nome: `${String(r.pedido.nome || 'documento.pdf').replace(/\.pdf$/i, '')} - assinado.pdf`,
+      // a data no horário daqui (assinado às 22h de 24/11 é 01h de 25/11 no horário universal)
+      rotulo: r.ok && r.pedido.assinado_em ? `${a.rotulo} em ${C.dataHoraBr(r.pedido.assinado_em).split(',')[0]}` : a.rotulo });
+  }
+  return out;
+}
+
 /** Arquivos dos anexos marcados: o recibo vira PDF na hora; o comprovante é lido da pasta. [{ nome, blob }] */
 async function arquivosProntos(dlg, prontos, objeto) {
   const out = [];
   for (const el of dlg.querySelectorAll('[name=pronto]:checked')) {
     const a = prontos[Number(el.value)];
     if (a.tipo === 'recibo') out.push(await reciboParaEnviar(a, a.alvo || objeto));
+    else if (a.tipo === 'digital') out.push({ nome: a.nome, blob: await AS.baixarAssinado(a.pedido) });
     else if (a.tipo === 'boleto') {
       // boleto emitido no C6 (ex.: o do saldo da saída, 2026-11-20): o PDF vem pela ponte; o QR Code do Pix já está guardado
       const cb = buscar('cobrancas', a.id);
@@ -147,7 +174,7 @@ async function janelaEmail(chave, alvo) {
   const inicio = dadosDoEmail(d(), objeto);
   const ligado = await emailLigado();
   const perguntas = (modelo.perguntas || []).map((p) => campoPergunta(p, inicio.perguntas[p[0]] ?? '')).join('');
-  const prontos = anexosProntos(d(), modelo, objeto);
+  const prontos = await assinadosDaFila(anexosProntos(d(), modelo, objeto));
   const dlg = document.createElement('dialog');
   dlg.className = 'janela-erro janela-pergunta janela-email';
   dlg.innerHTML = `<form method="dialog"><h3><span>${esc(modelo.nome)} · ${esc(reg.inquilino_nome || '')}</span><button type="button" class="fechar-janela" data-fechar title="Fechar" aria-label="Fechar">✕</button></h3><div class="corpo">

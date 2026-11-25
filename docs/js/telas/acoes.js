@@ -33,6 +33,7 @@ import { ACOES_PROVAS } from './cobranca-provas.js';
 import { ACOES_COMUNICACOES } from './comunicacoes.js';
 import { alvoDoRecibo, documentoMontado, guardarCartaNaPasta, logoPng, MODELO_COMODOS, modelosNoBanco, pdfDaCarta, pdfDoDocumento, pdfDoRecibo, roteiroTexto } from './documentos.js';
 import * as AS from '../assinatura.js';
+import { assinadoDoDocumento, baixarAssinaturaDoc, pedirAssinaturaDoc } from './assinatura-documentos.js';
 import * as REC from '../recibos.js';
 import { confirmarPagamentoBoleto } from './envios.js';
 import { siglaEmpresa } from './faturas.js';
@@ -1251,6 +1252,10 @@ export const ACOES = {
     await mostrar();
   },
 
+  /** Assinatura digital do contrato, do termo aditivo e da carta de reajuste da página aberta (telas/assinatura-documentos.js). */
+  assinaturaDocPedir: () => pedirAssinaturaDoc(),
+  assinaturaDocBaixar: ({ pedido }) => baixarAssinaturaDoc(pedido),
+
   /** Rotina de entrada: etapa que não se aplica a este inquilino (ex.: sem reserva) ou volta a pendente. */
   async pularEtapaEntrada({ contrato, chave }) {
     await alterar((db) => R.marcarEtapaEntrada(db, Number(contrato), chave, { pular: true }, login()));
@@ -2019,28 +2024,32 @@ export const ACOES = {
   async enviarCartaEmail({ contrato, comp }) {
     const c = buscar('contratos', contrato);
     if (!c) throw new C.ErroUsuario('Este inquilino não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.');
-    const carta = await pdfDaCarta(c, comp);
+    let carta = await pdfDaCarta(c, comp);
     if (!carta) throw new C.ErroUsuario('A carta ainda não sai: falta o índice ou a correção aplicada (tela Reajustes).');
+    // assinatura digital ligada (2026-11-24): vai a carta assinada pela empresa, quando houver; senão, a de sempre, com o aviso
+    const assinada = await assinadoDoDocumento('carta_reajuste', { contrato: c.id, comp });
+    if (assinada && assinada.blob) carta = { ...carta, blob: assinada.blob, nome: assinada.nome };
     const assunto = `Reajuste do aluguel a partir de ${compBr(comp)} · ${(buscar('imoveis', c.imovel_id) || {}).nome || ''}`.trim();
     const para = c.inquilino_email || '';
     const gmail = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(para)}&su=${encodeURIComponent(assunto)}&body=${encodeURIComponent(carta.texto)}`;
     const mailto = `mailto:${encodeURIComponent(para)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(carta.texto)}`;
     const r = await janela({ titulo: `Enviar carta de reajuste · ${c.inquilino_nome}`, sim: 'Abrir o e-mail e marcar como enviada',
       html: `<p>${para ? `Para: <b>${esc(para)}</b>.` : '<b>Este inquilino não tem e-mail no cadastro:</b> o e-mail abre sem destinatário.'} O PDF <b>${esc(carta.nome)}</b> é baixado agora: <b>anexe-o no e-mail</b> (arraste da pasta Downloads). O texto da carta já vai no corpo.</p>
+        ${assinada && assinada.motivo ? `<p class="alerta aviso">Carta sem a assinatura digital da empresa (${esc(assinada.motivo)}): para mandar a assinada, abra a carta e use "Enviar para assinar".</p>` : ''}
         <p><label><input type="radio" name="por" value="gmail" checked> Abrir no Gmail (conta do Google da empresa)</label><br><label><input type="radio" name="por" value="mailto"> Abrir no programa de e-mail do computador</label></p>
         <p><label><input type="checkbox" name="marcar" value="1" checked> Marcar a carta como enviada hoje (guarda o PDF na pasta do inquilino)</label></p>` });
     if (!r) return;
     baixar(carta.blob, carta.nome);
     window.open((r.por || [])[0] === 'mailto' ? mailto : gmail, '_blank', 'noopener');
     if ((r.marcar || [])[0] === '1') {
-      await ACOES.cartaEnviada({ contrato: c.id, comp, enviada: '1' });
+      await ACOES.cartaEnviada({ contrato: c.id, comp, enviada: '1', pronta: carta });
       return;
     }
     aviso('PDF baixado e e-mail aberto. A carta não foi marcada como enviada.');
   },
 
   /** Marca a carta como enviada e guarda o PDF dela na pasta do inquilino; desfazer apaga o PDF. */
-  async cartaEnviada({ contrato, comp, enviada }) {
+  async cartaEnviada({ contrato, comp, enviada, pronta = null }) {
     if (enviada !== '1') {
       await alterarApagandoAnexos((db) => R.marcarCartaEnviada(db, Number(contrato), comp, false, login()));
       await mostrar();
@@ -2049,7 +2058,7 @@ export const ACOES = {
     await alterar((db) => R.marcarCartaEnviada(db, Number(contrato), comp, true, login()));
     try {
       const c = buscar('contratos', contrato);
-      const nome = await guardarCartaNaPasta(c, comp);
+      const nome = await guardarCartaNaPasta(c, comp, pronta);
       const carta = d().cartas_reajuste.find((x) => x.contrato_id === c.id && x.competencia === comp);
       if (nome && carta) await alterar((db) => R.atualizar(db, 'cartas_reajuste', carta.id, { arquivo: nome }, login(), 'Carta de reajuste guardada na pasta do inquilino'));
       if (nome) aviso(`Carta guardada na pasta do inquilino: ${nome}.`);

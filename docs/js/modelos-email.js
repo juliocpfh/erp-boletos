@@ -139,7 +139,7 @@ Os documentos da análise serão apagados, conforme a LGPD (Lei 13.709/2018).`,
   {
     chave: 'contrato_assinar', nome: 'Contrato para assinar', etapa: 'Gerar o contrato',
     assunto: 'Contrato de locação para assinatura – {imovel}',
-    anexos: 'Contrato (PDF)',
+    anexos: 'Contrato (PDF)', prontos: ['digital:contrato'], // assinado digitalmente pela empresa, quando houver (2026-11-24)
     perguntas: [['prazo_assinatura', 'Devolver assinado até', 'data']],
     texto: `Olá, {nome},
 
@@ -196,7 +196,7 @@ LEMBRETES
     // novo valor negociado (pedido do dono, 2026-11-13): o termo aditivo vai para assinar; a assinatura é o aceite, anexado no sistema
     chave: 'novo_valor', nome: 'Novo valor do aluguel: termo para assinar', etapa: 'Novo valor negociado',
     assunto: 'Novo valor do aluguel: termo para assinatura – {imovel}',
-    anexos: 'Termo aditivo do novo valor (PDF)',
+    anexos: 'Termo aditivo do novo valor (PDF)', prontos: ['digital:aditivo'],
     perguntas: [['prazo_assinatura', 'Devolver assinado até', 'data']],
     texto: `Olá, {nome},
 

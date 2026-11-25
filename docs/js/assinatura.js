@@ -52,6 +52,42 @@ export function chaveDoRecibo(tipo, alvo) {
   return `recibo:${tipo}:${quem}${extra ? `:${extra}` : ''}`;
 }
 
+/**
+ * Documentos de texto longo (pedido de 24/11/2026): contrato, termo aditivo e carta de reajuste. A chave tem o começo fixo
+ * do documento (``prefixoDoDocumento``) e um resumo do texto: mudou o texto, muda a chave (o assinado antes não vale mais para
+ * a página). Ex.: contrato 12 → "doc:contrato:c12:v1a2b3c4d"; aditivo 5 do contrato 12 → "doc:aditivo:c12:a5:v…";
+ * carta de reajuste de 11/2026 → "doc:carta_reajuste:c12:2026-11:v…".
+ */
+export const DOCUMENTOS_ASSINAVEIS = { contrato: 'Contrato de locação', aditivo: 'Termo aditivo', carta_reajuste: 'Carta de reajuste' };
+
+export function prefixoDoDocumento(tipo, { contrato, id, comp } = {}) {
+  return `doc:${tipo}:c${contrato.id}${id ? `:a${id}` : ''}${comp ? `:${comp}` : ''}:`;
+}
+
+/** Resumo curto (FNV-1a, 32 bits) do texto do documento. Ex.: 'abc' → '1a47e90b'. */
+export function resumoDoTexto(s) {
+  let h = 0x811c9dc5;
+  for (const ch of String(s)) { h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(16).padStart(8, '0');
+}
+
+export const chaveDoDocumento = (tipo, alvo, conteudo) => `${prefixoDoDocumento(tipo, alvo)}v${resumoDoTexto(conteudo)}`;
+
+/** Pedidos de todas as versões do documento (pelo começo da chave), o mais novo primeiro. */
+export const pedidosDoDocumento = (dados, prefixo) => (dados?.pedidos || []).filter((p) => String(p.chave || '').startsWith(prefixo))
+  .sort((a, b) => String(b.pedido_em).localeCompare(String(a.pedido_em)));
+
+/**
+ * O que vai no e-mail: o pedido desta versão (``chave``) ou, sem como saber a versão (o contrato no e-mail não sabe o modelo
+ * nem as testemunhas escolhidas na página), o mais novo de qualquer versão. { pedido, ok, motivo }; pedido null = nada a anexar.
+ */
+export function assinadoParaEmail(dados, prefixo, chave = null) {
+  const p = chave ? pedidoDe(dados, chave) : pedidosDoDocumento(dados, prefixo)[0] || null;
+  if (!p) return { pedido: null, ok: false, motivo: '' };
+  if (p.situacao === 'assinado') return { pedido: p, ok: true, motivo: '' };
+  return { pedido: p, ok: false, motivo: p.situacao === 'erro' ? `o PC não conseguiu assinar (${p.erro})` : 'ainda na fila do PC para assinar' };
+}
+
 const ehJson = (r) => (r.headers.get('content-type') || '').includes('json');
 const local = () => globalThis.location && !/^https?:$/.test(globalThis.location.protocol);
 

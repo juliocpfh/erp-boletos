@@ -18,6 +18,7 @@ import * as R from '../regras.js';
 import { demonstrativo } from './cobrancas.js';
 import { botao, buscar, d, link, naoEncontrado, opera, ordenar, pastaDoEscopo, urls } from './comum.js';
 import { botoesReajuste, cartaReajuste } from './reajustes.js';
+import { caixaAssinaturaDoc } from './assinatura-documentos.js';
 
 export async function telaImprimir(rota) {
   const tipo = rota.partes[1];
@@ -32,7 +33,7 @@ export async function telaImprimir(rota) {
     // sem o índice, não há carta (só o aviso): sem botão de PDF
     return `<div class="impressao">${voltar(carta.includes('class="carta"') ? { seletor: '.impressao .carta', nome: nomeArquivoDoc('Carta reajuste', c, rota.q.comp) } : null)}
       ${r && opera() ? `<div class="acoes nao-imprimir" style="margin-bottom:12px">${botoesReajuste(c, r, true)}</div>` : ''}
-      ${carta}</div>`;
+      ${await caixaAssinaturaDoc('carta_reajuste', rota.q)}${carta}</div>`;
   }
   if (['contrato', 'vistoria', 'chaves', 'aditivo', 'documento'].includes(tipo)) {
     const m = await documentoMontado(tipo, rota.q);
@@ -50,6 +51,7 @@ export async function telaImprimir(rota) {
       ${m.semCampos ? `<div class="alerta aviso nao-imprimir">Os campos deste documento saíram em branco (linha para preencher à mão). ${link(volta, 'Preencher os campos', '')}</div>` : ''}
       ${falta.length ? `<div class="alerta aviso nao-imprimir"><b>Faltam dados no cadastro:</b> ${falta.map(esc).join('; ')}.</div>` : ''}
       ${tipo === 'vistoria' && m.semSituacao ? `<div class="alerta aviso nao-imprimir">${m.semSituacao} item(ns) do modelo ficaram sem situação e não saem no documento.</div>` : ''}
+      ${tipo === 'contrato' || tipo === 'aditivo' ? await caixaAssinaturaDoc(tipo, rota.q) : ''}
       ${tipo === 'chaves' && !m.temChaves ? `<div class="alerta aviso nao-imprimir">Sem a relação de chaves: o recibo sai com linhas em branco. Informe as chaves no imóvel (Editar) ou na vistoria de entrada.</div>` : ''}
       ${K.contratoHtml(m.blocos, { logo: d().logo, rodape: m.rodape })}</div>`;
   }
@@ -268,7 +270,8 @@ export async function pdfDoDocumento(el, rodape = [], { margemLado = 0, alturaMa
   const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
   if (assinatura) {
     // a linha "______" da empresa: a folha onde caiu e o retângulo em pontos (1 mm = 72/25,4 pt; A4 = 841,89 pt de altura)
-    const linha = el.querySelector('[data-assina-empresa] .assina-linha');
+    // (recibos: .assina-linha; contrato e termo aditivo: a .ct-linha do quadro de assinaturas, 2026-11-24)
+    const linha = el.querySelector('[data-assina-empresa] .assina-linha, [data-assina-empresa] .ct-linha');
     let local = null;
     if (linha) {
       const x = linha.getBoundingClientRect();
@@ -318,8 +321,9 @@ export async function pdfDoDocumento(el, rodape = [], { margemLado = 0, alturaMa
  * Carta de reajuste enviada: PDF gravado na pasta "Aditivos, correções e comunicação" do inquilino (desenhada fora da tela).
  * Devolve o nome do arquivo, ou null se a carta não sai (falta o índice). Ex.: "Carta reajuste Casa 01 - Maria - 2026-11.pdf".
  */
-export async function guardarCartaNaPasta(c, comp) {
-  const carta = await pdfDaCarta(c, comp);
+export async function guardarCartaNaPasta(c, comp, pronta = null) {
+  // pronta: a carta que foi no e-mail (a assinada digitalmente, quando houver)
+  const carta = pronta || await pdfDaCarta(c, comp);
   if (!carta) return null;
   await S.escreverTexto(await pastaDoEscopo('aditivos', c.id), carta.nome, carta.blob);
   return carta.nome;
@@ -329,7 +333,7 @@ export async function guardarCartaNaPasta(c, comp) {
  * PDF da carta de reajuste (desenhada fora da tela) com o nome do arquivo e o texto puro da carta (corpo do e-mail, D4).
  * Null quando a carta não sai (falta o índice).
  */
-export async function pdfDaCarta(c, comp) {
+export async function pdfDaCarta(c, comp, { paraAssinar = false } = {}) {
   const html = cartaReajuste(c, comp);
   if (!html.includes('class="carta"')) return null;
   const caixa = document.createElement('div');
@@ -339,7 +343,7 @@ export async function pdfDaCarta(c, comp) {
   document.body.append(caixa);
   try {
     const el = caixa.querySelector('.carta');
-    const blob = await pdfDoDocumento(el, [], { margemLado: 15 });
+    const blob = await pdfDoDocumento(el, [], { margemLado: 15, ...(paraAssinar ? { assinatura: { logo: d().logo } } : {}) });
     // texto puro: parágrafos e linhas da tabela, sem a logo
     el.querySelectorAll('.ct-capa, .ct-marca, .ct-marcas').forEach((x) => x.remove());
     const texto = [...el.querySelectorAll('p, tr')].map((x) => (x.tagName === 'TR' ? [...x.children].map((td) => td.textContent.trim()).filter(Boolean).join(' · ') : x.innerText.replace(/\s*\n\s*/g, '\n').trim())).filter(Boolean).join('\n\n');
