@@ -3155,7 +3155,7 @@ export const retencaoDaReserva = (valor, pct) => Math.round((valor || 0) * (Numb
 
 /**
  * Prazos contados do depósito da reserva (null sem a data do depósito). Ex.: depósito na quarta, 02/12/2026 → 1º aviso dos
- * documentos no sábado, 06/12/2026 (4º dia, `aviso_documentos_em`), documentos até quarta, 09/12/2026 (7 dias corridos: pedido do
+ * documentos na segunda, 07/12/2026 (o 4º dia, domingo 06/12, passa ao dia útil seguinte; `aviso_documentos_em`), documentos até quarta, 09/12/2026 (7 dias corridos: pedido do
  * advogado e correção do dono, 24/11/2026; termo aceito antes, em dias úteis) e reservado até 09/12/2026 (7 dias); desistência com
  * tudo de volta até 09/12/2026 com 7 dias na regra, ou nenhuma (arrependimento_ate null) com 0 dias, o padrão. Aviso no último dia
  * ou depois: `aviso_documentos_em` null (só o do fim).

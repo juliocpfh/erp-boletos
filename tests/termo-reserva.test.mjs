@@ -53,7 +53,7 @@ test('regras novas: padrões (100%, 0 dias, 7 dias corridos, aviso no 4º, 7 dia
 test('devolução pelo padrão (100%, 0 dias): desistência depois do depósito não devolve nada; reprovada devolve tudo', () => {
   const { d, f } = base({ reserva_valor: 50000, reserva_data: '2026-12-02' });
   assert.deepEqual(R.prazosDaReserva(f), { documentos_ate: '2026-12-09', vale_ate: '2026-12-09', aviso_documentos_em: '2026-12-07', arrependimento_ate: null },
-    'quarta 02/12 + 4 dias corridos = sábado 06/12, aviso no dia útil seguinte, segunda 07/12 (dono, 25/11); + 7 dias corridos = quarta 09/12; reservado 7 dias');
+    'quarta 02/12 + 4 dias corridos = domingo 06/12, aviso no dia útil seguinte, segunda 07/12 (dono, 25/11); + 7 dias corridos = quarta 09/12; reservado 7 dias');
   assert.equal(R.devolucaoDaReserva(f, { data: '2026-12-02' }).devolver, 50000, 'sem o termo aceito: devolve tudo');
   R.guardarAceiteReserva(d, f.id, aceite(), 'j');
   const dv = R.devolucaoDaReserva(R.buscar(d, 'fichas', f.id), { data: '2026-12-02' });
@@ -63,7 +63,7 @@ test('devolução pelo padrão (100%, 0 dias): desistência depois do depósito 
   // no 7º dia (09/12), o último dia
   const g = R.buscar(d, 'fichas', f.id);
   const falar = (hoje) => R.pendenciasDasFichas(d, hoje).find((x) => /fale com a pessoa/.test(x.texto));
-  assert.equal(R.avisoDosDocumentos(g, '2026-12-06'), null, 'sábado 06/12: o aviso passou para segunda');
+  assert.equal(R.avisoDosDocumentos(g, '2026-12-06'), null, 'domingo 06/12: o aviso passou para segunda');
   assert.equal(falar('2026-12-06'), undefined);
   assert.deepEqual(R.avisoDosDocumentos(g, '2026-12-07'), { qual: 'primeiro', ate: '2026-12-09' });
   assert.match(falar('2026-12-07').texto, /faltam documentos e o prazo vai até 09\/12\/2026: fale com a pessoa .*continuamos aguardando e à disposição para ajudar/);
