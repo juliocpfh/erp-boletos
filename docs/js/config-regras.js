@@ -128,6 +128,16 @@ export const DEFINICOES_REGRAS = [
     explica: 'Contados por dia, como no banco. Ex.: R$ 2.000,00 com 1% ao mês, 10 dias → R$ 0,66 por dia × 10 = R$ 6,60. Acima de 1% ao mês, o sistema avisa ao salvar.',
     consequencia: 'Só muda o que vem preenchido. Com inquilino pessoa física, acima de 1% ao mês pode ser reduzido (Lei de Usura, art. 1º; Código Civil, art. 406).',
     lei: 'Código Civil, art. 406 (com a Lei 14.905/2024); Decreto 22.626/33, art. 1º.' },
+  // pendência antiga do Claude (24/11/2026): sugerir no cálculo final a multa pela falta do aviso de 30 dias (só sugestão, botão "Usar")
+  { chave: 'falta_aviso_saida', grupo: 'contrato', rotulo: 'Saída sem o aviso de 30 dias: multa sugerida no cálculo final', tipo: 'opcao', padrao: 'proporcional',
+    opcoes: [
+      ['proporcional', '1 mês de aluguel e encargos, proporcional aos dias que faltaram (padrão do sistema)', 'Aluguel R$ 1.800,00, avisou em 10/11 e saiu em 25/11 (15 dias antes): faltaram 15 dias → R$ 1.800,00 × 15/30 = R$ 900,00. Sem aviso nenhum → R$ 1.800,00. Legal e com risco baixo: o juiz pode reduzir a multa quando a obrigação foi cumprida em parte (Código Civil, art. 413), e quem avisou 15 dias antes cumpriu metade.'],
+      ['mes_inteiro', '1 mês inteiro sempre que avisar com menos de 30 dias (como está escrito no contrato)', 'Mesmo exemplo: R$ 1.800,00, tanto faz ter avisado 15 dias ou 29 dias antes. É o texto do contrato, mas quem avisou parte do prazo pode pedir a redução ao juiz (Código Civil, art. 413).'],
+      ['nao_sugerir', 'Não sugerir', 'O cálculo final não mostra a multa; a equipe soma à mão se quiser.'],
+    ],
+    explica: 'O contrato manda o inquilino avisar por escrito 30 dias antes de sair; sem o aviso, ele paga 1 mês de aluguel e encargos (IPTU e seguro do boleto). A data do aviso é informada em "Saída do inquilino" (ou "Adiar ou mudar a data"). No cálculo final aparece a multa sugerida com o botão "Usar": nada entra sozinho.',
+    consequencia: 'Só muda a sugestão do cálculo final; a equipe sempre pode mudar ou dispensar. Se o inquilino sair antes do fim do contrato, a multa da saída antecipada (3 aluguéis proporcionais) também aparece: o sistema sugere só a maior das duas, porque cobrar as duas pelo mesmo fato pode ser visto como multa em dobro.',
+    lei: LI + ', art. 6º, parágrafo único (falta do aviso: um mês de aluguel e encargos); Código Civil, art. 413 (redução da multa).' },
   { chave: 'mes_seguinte_padrao', grupo: 'contrato', rotulo: 'O aluguel do mês vence no mês seguinte', tipo: 'simnao', padrao: true,
     explica: 'Sim: o aluguel de julho vence em agosto (paga-se depois de usar).',
     consequencia: 'Não: o aluguel de julho vence em julho. Cobrar antes de usar é proibido quando há garantia (art. 20; só é permitido sem garantia, art. 42, ou na temporada) e é contravenção (art. 43, III).',

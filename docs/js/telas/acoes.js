@@ -1475,20 +1475,28 @@ export const ACOES = {
     const r = await janela({ titulo: `${c.data_saida ? 'Adiar ou mudar a saída' : 'Data de saída'} - ${c.inquilino_nome}`, sim: 'Salvar', nao: 'Cancelar',
       html: `<p>Dia em que o inquilino sai (devolve as chaves). O boleto do último mês sai proporcional aos dias. O cálculo final vem depois.</p>
         ${c.data_saida ? `<p>Hoje a saída está em <b>${esc(dataBr(c.data_saida))}</b>. Adiando (ex.: precisa de mais dias para arrumar o imóvel), o boleto do último mês, ainda em aberto, é recalculado pelos dias novos${c.vistoria_saida_data ? ` e a vistoria marcada (${esc(dataBr(c.vistoria_saida_data))}) anda os mesmos dias` : ''}. O acerto do que faltar fica para o cálculo final.</p>` : ''}
-        <label>Data de saída</label><input type="date" name="data" value="${esc(c.data_saida || C.hojeIso())}" required>` });
+        <label>Data de saída</label><input type="date" name="data" value="${esc(c.data_saida || C.hojeIso())}" required>
+        <label>Data em que o inquilino avisou, por escrito <span class="suave">(o contrato pede ${R.DIAS_AVISO_SAIDA} dias antes)</span></label><input type="date" name="aviso" value="${esc(c.aviso_saida_sem ? '' : c.aviso_saida_data || (c.data_saida ? '' : C.hojeIso()))}">
+        <p class="check"><label><input type="checkbox" name="sem_aviso" value="1"${c.aviso_saida_sem ? ' checked' : ''}> Saiu sem avisar por escrito</label></p>
+        <p class="suave">Com menos de ${R.DIAS_AVISO_SAIDA} dias de aviso, o cálculo final sugere a multa do contrato (1 mês de aluguel e encargos; Lei 8.245/91, art. 6º). Ela só entra se você usar a sugestão.</p>` });
     if (!r) return;
     const data = String((r.data || [])[0] || '');
+    const semAviso = String((r.sem_aviso || [])[0] || '') === '1';
+    const avisoData = semAviso ? '' : String((r.aviso || [])[0] || '');
+    if (avisoData && !C.dataValida(avisoData)) throw new C.ErroUsuario('Data do aviso inválida.');
     // data muito longe de hoje costuma ser erro de digitação do ano (2026-11-20)
     if (C.dataValida(data) && Math.abs(C.diasEntre(C.hojeIso(), data)) > 365 && !(await confirmar(`A data de saída (${dataBr(data)}) está a mais de um ano de hoje. Confira o ano antes de salvar.`, { titulo: 'Confira a data de saída', sim: 'Salvar assim mesmo', nao: 'Voltar' }))) return;
     const antes = { saida: c.data_saida, vistoria: c.vistoria_saida_data, boleto: c.data_saida ? R.boletoDoMes(d(), c.id, c.data_saida.slice(0, 7)) : null };
     const valorAntes = antes.boleto && !antes.boleto.data_pagamento ? R.totais(antes.boleto).a_pagar_pontual : null;
-    await mudarContrato(c.id, (db) => R.informarSaida(db, c.id, data, login()));
+    await mudarContrato(c.id, (db) => R.informarSaida(db, c.id, data, login(), C.hojeIso(), { data: avisoData, sem: semAviso }));
     const agora = buscar('contratos', c.id);
     const cb = antes.boleto && buscar('cobrancas', antes.boleto.id);
     const boleto = valorAntes !== null && cb && !cb.data_pagamento && R.totais(cb).a_pagar_pontual !== valorAntes
       ? ` O boleto de ${compBr(cb.competencia)} foi recalculado: ${reais(valorAntes)} → ${reais(R.totais(cb).a_pagar_pontual)} (${cb.dias_cobrados}/${cb.dias_mes} dias).` : '';
     const vistoria = antes.vistoria && agora.vistoria_saida_data !== antes.vistoria ? ` A vistoria de saída passou para ${dataBr(agora.vistoria_saida_data)}: mande o convite de novo (botão de e-mail da etapa).` : '';
-    aviso(`Saída em ${dataBr(data)}.${boleto}${vistoria} Depois que ele sair: vistoria de saída e cálculo final.${textoPagosComMenosDias(c.id)}`, R.pagosComMenosDias(d(), agora).length || vistoria ? 'aviso' : 'ok');
+    const antecedencia = !semAviso && avisoData ? C.diasEntre(avisoData, data) : null;
+    const textoAviso = R.regra('falta_aviso_saida', c) === 'nao_sugerir' ? '' : semAviso ? ' Saiu sem o aviso por escrito: o cálculo final sugere a multa.' : antecedencia !== null && antecedencia < R.DIAS_AVISO_SAIDA ? ` Avisou ${antecedencia} dia(s) antes (faltaram ${R.DIAS_AVISO_SAIDA - antecedencia}): o cálculo final sugere a multa.` : '';
+    aviso(`Saída em ${dataBr(data)}.${textoAviso}${boleto}${vistoria} Depois que ele sair: vistoria de saída e cálculo final.${textoPagosComMenosDias(c.id)}`, R.pagosComMenosDias(d(), agora).length || vistoria ? 'aviso' : 'ok');
     await mostrar();
   },
 
