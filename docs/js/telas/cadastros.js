@@ -1299,6 +1299,9 @@ export const CADASTROS = {
     ajustar(dados, erros, r, form, q) {
       const c = buscar('contratos', q.contrato);
       if (!c.data_saida) throw new C.ErroUsuario('Informe antes a data de saída, em "Saída do inquilino".');
+      // saída ainda por vir: recusa antes da janela "Confira o que vai acontecer" (senão o operador cancelava o boleto no banco
+      // e a gravação era recusada depois; a mesma regra de ``R.encerrarContrato``)
+      if (c.data_saida > C.hojeIso()) throw new C.ErroUsuario(`O cálculo final é feito depois que o inquilino sai: a saída é em ${dataBr(c.data_saida)}. Volte a partir desse dia.`);
       for (const k of ['garantia_valor', 'indice_percentual', 'debitos', 'fci_credito', 'fci_danos', 'creditos']) if (!dados[k]) dados[k] = 0;
       if (dados.creditos < 0) erros.creditos = 'Informe um valor positivo (débito vai em "Débitos")';
       for (const k of R.relogiosObrigatorios(c)) if (!dados[`leitura_${k}`]) erros[`leitura_${k}`] = 'Informe a leitura na saída';
