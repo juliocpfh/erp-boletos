@@ -126,6 +126,10 @@ export const DEFINICOES_REGRAS = [
     explica: 'Contados por dia, como no banco. Ex.: R$ 2.000,00 com 1% ao mês, 10 dias → R$ 0,66 por dia × 10 = R$ 6,60. Acima de 1% ao mês, o sistema avisa ao salvar.',
     consequencia: 'Só muda o que vem preenchido. Com inquilino pessoa física, acima de 1% ao mês pode ser reduzido (Lei de Usura, art. 1º; Código Civil, art. 406).',
     lei: 'Código Civil, art. 406 (com a Lei 14.905/2024); Decreto 22.626/33, art. 1º.' },
+  { chave: 'mes_seguinte_padrao', grupo: 'contrato', rotulo: 'O aluguel do mês vence no mês seguinte', tipo: 'simnao', padrao: true,
+    explica: 'Sim: o aluguel de julho vence em agosto (paga-se depois de usar).',
+    consequencia: 'Não: o aluguel de julho vence em julho. Cobrar antes de usar é proibido quando há garantia (art. 20; só é permitido sem garantia, art. 42, ou na temporada) e é contravenção (art. 43, III).',
+    lei: LI + ', arts. 20, 42 e 43, III.' },
   // honorários da cobrança fora da Justiça (aprovados pelo advogado e pelo dono em 24/11/2026): só sugestão no acordo e no
   // cálculo final da saída, nunca no boleto do mês nem na NF
   { chave: 'honorarios_percentual', grupo: 'contrato', rotulo: 'Honorários do advogado na cobrança fora da Justiça (%)', tipo: 'pct', padrao: 10, min: 0, max: 20,
@@ -136,10 +140,6 @@ export const DEFINICOES_REGRAS = [
     explica: 'Os honorários só são sugeridos sobre os boletos atrasados há mais destes dias (contados do vencimento). Ex.: 30 → boleto que venceu em 10/10/2026 entra a partir de 10/11/2026.',
     consequencia: 'Só muda a sugestão. Menos de 30 dias não está na lei, mas aumenta o risco de o juiz ver os honorários como uma segunda multa (Código Civil, art. 413).',
     lei: 'Código Civil, arts. 395 e 413; STJ, REsp 1.274.629/AP (antes, tentar a solução amigável).' },
-  { chave: 'mes_seguinte_padrao', grupo: 'contrato', rotulo: 'O aluguel do mês vence no mês seguinte', tipo: 'simnao', padrao: true,
-    explica: 'Sim: o aluguel de julho vence em agosto (paga-se depois de usar).',
-    consequencia: 'Não: o aluguel de julho vence em julho. Cobrar antes de usar é proibido quando há garantia (art. 20; só é permitido sem garantia, art. 42, ou na temporada) e é contravenção (art. 43, III).',
-    lei: LI + ', arts. 20, 42 e 43, III.' },
   // decisão do dono de 24/11/2026: a tarifa é sempre cobrada; o contrato sem valor próprio cobra esta (antes ela só vinha preenchida)
   { chave: 'tarifa_padrao', grupo: 'aluguel', rotulo: 'Tarifa do boleto cobrada do inquilino (R$)', tipo: 'dinheiro', padrao: null, min: 0,
     explica: 'Vale para todo contrato sem valor próprio da tarifa. No contrato dá para pôr outro valor ou marcar "Não cobrar tarifa do boleto". Em branco: sem tarifa. Ex.: R$ 8,50 por boleto.',
