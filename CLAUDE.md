@@ -13,6 +13,7 @@ Código em `docs/` (é também a pasta publicada pelo GitHub Pages: não ponha d
 | Rodar a ponte em modo simulado | `cd ponte-c6 && SIMULADO=1 PONTE_SENHA=<frase com 20+ caracteres> CONTAS=ank,jck node servidor.mjs` → `http://127.0.0.1:8765` (ou copie `.env.exemplo` para `.env`); nada vai ao banco |
 | Testar os dados na nuvem (Cloudflare) | `node nuvem/local.mjs` → `http://localhost:8787` (site + `/api` com o cofre em SQLite; `/__internet?ligar=0` simula a queda); detalhes em `nuvem/README.md` e `documentacao/ESTUDO_DADOS_NUVEM.md` |
 | Rodar no navegador | `cd docs && python3 -m http.server 8000` → `http://localhost:8000/?teste` (pasta interna, sem escolher pasta; em `?teste` a ponte é simulada dentro do site, `banco-fase2.js` + `simulado-banco.js`) |
+| Teste de tela automático (kit) | `node tools/kit-teste.mjs` (computador, celular, nuvem com 2 abas, versão PC e links, ~3 min; `--rapido`, `--lugares`, `--telas`, `--manter`, `--textos`): banco fictício `tests/kit/banco.mjs` em 25/11/2026, roteiros em `tests/kit/roteiros/` (PR nova acrescenta os da tela dela); detalhes em `tools/kit-teste/README.md`. Fora do `checar` |
 
 ## Leia por partes (economia de contexto)
 - "Sistema" no menu é a antiga "Dados e backup" (nome trocado em 22/11; o endereço continua `#/dados`, por causa da ordem das caixas e dos favoritos). Páginas de dentro em `telas/sistema.js`: `#/sistema-banco`, `#/sistema-email`, `#/sistema-modelos`, `#/lgpd` (`#/banco` é outra coisa: o extrato); caixa que mudar de página ganha o endereço antigo em `enderecoMudado`.

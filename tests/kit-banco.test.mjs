@@ -1,0 +1,24 @@
+// O banco fictício do kit de teste (tests/kit/banco.mjs, usado por node tools/kit-teste.mjs) continua sendo montado pelas
+// regras e com os valores que os roteiros esperam nas telas. Se uma regra mudou de propósito, atualize o banco e os roteiros.
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import * as C from '../docs/js/calculos.js';
+import * as R from '../docs/js/regras.js';
+import { HOJE, montarBanco } from './kit/banco.mjs';
+
+test('banco do kit: monta pelas regras, só com os documentos de teste, e com os casos que os roteiros abrem', async () => {
+  const { banco: d, ids } = await montarBanco();
+  const cpfs = new Set(JSON.stringify(d).match(/\d{3}\.\d{3}\.\d{3}-\d{2}/g));
+  assert.deepEqual([...cpfs], ['529.982.247-25']);
+  const cb = (id) => R.buscar(d, 'cobrancas', id);
+  assert.equal(R.totais(cb(ids.anaBoleto)).a_pagar_sem_desconto, 180850, 'R$ 1.800,00 + tarifa de R$ 8,50');
+  assert.equal(cb(ids.anaBoleto).boleto_pdf, 'boleto-11-2026.pdf');
+  assert.deepEqual(C.liquidar(cb(ids.brunoAtrasado), HOJE).valor_devido, 204990, 'multa R$ 40,00 + juros R$ 9,90');
+  assert.equal(R.totais(cb(ids.diegoBoleto)).a_pagar_sem_desconto, 90000, '15 de 30 dias');
+  assert.ok(R.buscar(d, 'acordos', ids.acordo).honorarios > 0);
+  assert.equal(R.buscar(d, 'contratos', ids.fabio).heranca_transferida, '2026-11-01');
+  assert.equal(R.buscar(d, 'encerramentos', ids.encerramento).saldo, 340000);
+  assert.equal(R.buscar(d, 'notificacoes', ids.notificacao).situacao, 'Aguardando resposta');
+  assert.ok(R.buscar(d, 'fichas', ids.ficha).aceite_reserva);
+  assert.equal(d.usuarios.filter((u) => u.papel === 'admin' && u.ativo).length, 1);
+});
