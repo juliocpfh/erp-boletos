@@ -180,7 +180,7 @@ test('vencimento no sábado: pago até o 1º dia útil é em dia; depois, o atra
   const terca = R.previstoNoPagamento(cb, '2026-10-13');
   assert.deepEqual([terca.dias_atraso, terca.multa, terca.juros, terca.valor_devido, terca.valor_nf, terca.pontual], [0, 0, 0, 121850, 121500, true], 'em dia, com a bonificação');
   const quarta = R.previstoNoPagamento(cb, '2026-10-14');
-  assert.deepEqual([quarta.dias_atraso, quarta.multa, quarta.juros, quarta.valor_devido], [4, 13535, 180, 135350 + 13535 + 180], '4 dias desde 10/10');
+  assert.deepEqual([quarta.dias_atraso, quarta.multa, quarta.juros, quarta.valor_devido], [4, 13500, 180, 135350 + 13500 + 180], '4 dias desde 10/10 (multa sobre R$ 1.350,00: a tarifa de R$ 3,50 fica fora, 24/11)');
   // inadimplência, lembrete, acordo e fechamento seguem o mesmo prazo
   for (const dia of ['2026-10-11', '2026-10-12', '2026-10-13']) assert.equal(R.inadimplencia(d, dia).devedores.length, 0, dia);
   assert.equal(R.inadimplencia(d, '2026-10-14').devedores[0].diasMax, 4);

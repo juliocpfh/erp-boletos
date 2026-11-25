@@ -74,7 +74,9 @@ const PRAZO_PARAGRAFO = `[se retomada_livre]${PRAZO_ANTIGO}[senão]**Parágrafo 
  * de emissão do boleto, com o valor de hoje tirado do contrato (`taxa_boleto`); sem valor no contrato, a cláusula fica sem o "hoje de".
  * Modelos gravados recebem por ATUALIZACOES_MODELO, antes do parágrafo das despesas cobradas a qualquer tempo.
  */
-export const TARIFA_BOLETO = '**Parágrafo** – O LOCATÁRIO reembolsará, junto com cada aluguel, a tarifa bancária de emissão do boleto[se tarifa_boleto], hoje de {tarifa_boleto}[fim], pelo valor cobrado pelo banco.';
+export const TARIFA_BOLETO = '**Parágrafo** – O LOCATÁRIO reembolsará, junto com cada aluguel, a tarifa bancária de emissão do boleto[se tarifa_boleto], hoje de {tarifa_boleto}[fim], pelo valor cobrado pelo banco. A multa e os juros por atraso não incidem sobre a tarifa.';
+/** Cláusula da tarifa antes do ajuste do advogado (24/11/2026, item 2.1): os modelos gravados com ela recebem a frase da multa. */
+const TARIFA_BOLETO_SEM_MULTA = '**Parágrafo** – O LOCATÁRIO reembolsará, junto com cada aluguel, a tarifa bancária de emissão do boleto[se tarifa_boleto], hoje de {tarifa_boleto}[fim], pelo valor cobrado pelo banco.';
 const DESPESAS_A_QUALQUER_TEMPO = '**Parágrafo** – As despesas de responsabilidade do LOCATÁRIO poderão ser cobradas a qualquer tempo';
 
 /** Despesas extraordinárias do condomínio são da locadora (A20; Lei 8.245/91, art. 22, X e parágrafo único). */
@@ -659,6 +661,10 @@ export const ATUALIZACOES_MODELO = [
   [ENDERECO_PARAGRAFO, `${ENDERECO_PARAGRAFO}\n\n${LGPD}`, 'DOS DADOS PESSOAIS'],
   // tarifa do boleto de volta ao contrato (24/11/2026): antes do parágrafo das despesas cobradas a qualquer tempo
   [DESPESAS_A_QUALQUER_TEMPO, `${TARIFA_BOLETO}\n\n${DESPESAS_A_QUALQUER_TEMPO}`, 'O LOCATÁRIO reembolsará, junto com cada aluguel, a tarifa bancária'], // marca só da cláusula (o resumo também fala da tarifa)
+  // advogado (24/11/2026, item 2.1): multa e juros não incidem sobre a tarifa (o ponto final antigo vira o do fim da frase nova)
+  [`${TARIFA_BOLETO_SEM_MULTA}
+`, `${TARIFA_BOLETO}
+`, 'A multa e os juros por atraso não incidem sobre a tarifa.'],
   // revisão de 2026-11-13 (respostas do dono no artefato da revisão jurídica)
   [VISTORIA_ENTRADA_1211, VISTORIA_ENTRADA],
   [`${PRAZO_ANTIGO}[fim]`, `${PRAZO_PARAGRAFO}[fim]`, '[se retomada_livre]'],
