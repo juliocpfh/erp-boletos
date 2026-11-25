@@ -35,7 +35,7 @@ const ANTES = {
   'email:saida_vistoria': '82b5b1cbb71008ad', // 24/11 (advogado 3.5)
   'email:saida_chaves': '8049463d6b3cca80', // 24/11 (advogado 3.5)
   'email:saida_calculo': '96b8482be28158a2',
-  'email:saida_encerramento': '2d49059fc48148bb',
+  'email:saida_encerramento': 'a6f0923be9cb5b7d', // 2026-11-24: saldo ainda a devolver não diz mais "Não há valores pendentes"
   'email:informe_ir': '71d02f294fa1f4be',
   'recibo:reserva:ficha': 'f488d655e0e2e151',
   'recibo:reserva:Maria Souza': '372d9a9245e9cb11',

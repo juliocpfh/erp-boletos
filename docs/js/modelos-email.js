@@ -287,12 +287,20 @@ Discorda de algum item? Responda em até 5 dias úteis com o motivo.`,
   {
     chave: 'saida_encerramento', nome: 'Encerramento do contrato', etapa: 'Devolução da garantia',
     assunto: 'Contrato encerrado – {imovel}',
-    anexos: '', prontos: ['assinado:quitacao', 'recibo:quitacao', 'comprovante:saida'],
+    anexos: '', prontos: ['assinado:quitacao', 'recibo:quitacao', 'comprovante:saida', 'boleto:pdf', 'boleto:pix'], // boleto: o do saldo, se ainda em aberto
     texto: `Olá, {nome},
 
-[se devolver]Devolvemos {saldo} em {data_devolucao} e [fim]encerramos o contrato do imóvel da {imovel}. Segue o termo de entrega, acerto final e quitação[se devolver], com o comprovante[fim]: responda com ele assinado, por favor (pode ser pelo gov.br).
+[se saldo_pendente]Encerramos o contrato do imóvel da {imovel}. Segue o acerto final:
 
-Não há valores pendentes, salvo contas de consumo e tributos do período que ainda cheguem: mandaremos com a conta ou a guia.
+{acerto}[senão][se devolver]Devolvemos {saldo} em {data_devolucao} e encerramos[senão][se cobrar]Recebemos em {data_devolucao} o pagamento do saldo de {saldo} e encerramos[senão]Encerramos[fim][fim] o contrato do imóvel da {imovel}. Segue o termo de entrega, acerto final e quitação[se devolver], com o comprovante[fim]: responda com ele assinado, por favor (pode ser pelo gov.br).[fim]
+
+[se saldo_pendente][se cobrar]Fica pendente o saldo a pagar de {saldo}.[se boleto_saldo] Segue o boleto, com vencimento em {boleto_saldo_vencimento}.[se boleto_saldo_linha]
+Linha digitável: {boleto_saldo_linha}[fim][se boleto_saldo_pix]
+Pix copia e cola: {boleto_saldo_pix}[fim][senão] Deposite ou faça o Pix na conta abaixo e responda com o comprovante.
+{conta_deposito}[fim]
+Com o pagamento, mandamos o termo de quitação para assinar.[senão]Temos a devolver a você o saldo de {saldo}: informe a chave Pix ou a conta em seu nome, se ainda não informou; devolvemos em até 5 dias úteis da sua resposta. Com a devolução, mandamos o termo de quitação para assinar.[fim]
+
+Fora isso, não há valores pendentes, salvo as contas de consumo e os tributos do período que ainda cheguem: mandaremos com a conta ou a guia.[senão]Não há valores pendentes, salvo as contas de consumo e os tributos do período que ainda cheguem: mandaremos com a conta ou a guia.[fim]
 
 Em fevereiro enviamos o informe de {ano_saida} para o Imposto de Renda. Seus dados ficam guardados pelo prazo da lei e depois são apagados (LGPD).
 
@@ -434,6 +442,11 @@ export const ATUALIZACOES_EMAIL = [
   // boleto do saldo da saída (decisão do dono, 2026-11-20): com o boleto gerado, o e-mail volta a dizer "Segue o boleto do saldo"
   ['saida_calculo', '[se cobrar]Falta pagar o saldo de {saldo}: deposite ou faça o Pix na conta abaixo e responda com o comprovante.\n{conta_deposito}[fim]',
     '[se cobrar][se boleto_saldo]Segue o boleto do saldo de {saldo}, com vencimento em {boleto_saldo_vencimento}.[se boleto_saldo_linha]\nLinha digitável: {boleto_saldo_linha}[fim][se boleto_saldo_pix]\nPix copia e cola: {boleto_saldo_pix}[fim][senão]Falta pagar o saldo de {saldo}: deposite ou faça o Pix na conta abaixo e responda com o comprovante.\n{conta_deposito}[fim][fim]'],
+  // encerramento com saldo ainda em aberto (24/11/2026): o e-mail dizia "Não há valores pendentes" mesmo com saldo a pagar
+  ['saida_encerramento', '[se devolver]Devolvemos {saldo} em {data_devolucao} e [fim]encerramos o contrato do imóvel da {imovel}. Segue o termo de entrega, acerto final e quitação[se devolver], com o comprovante[fim]: responda com ele assinado, por favor (pode ser pelo gov.br).',
+    '[se saldo_pendente]Encerramos o contrato do imóvel da {imovel}. Segue o acerto final:\n\n{acerto}[senão][se devolver]Devolvemos {saldo} em {data_devolucao} e encerramos[senão][se cobrar]Recebemos em {data_devolucao} o pagamento do saldo de {saldo} e encerramos[senão]Encerramos[fim][fim] o contrato do imóvel da {imovel}. Segue o termo de entrega, acerto final e quitação[se devolver], com o comprovante[fim]: responda com ele assinado, por favor (pode ser pelo gov.br).[fim]'],
+  ['saida_encerramento', 'Não há valores pendentes, salvo contas de consumo e tributos do período que ainda cheguem: mandaremos com a conta ou a guia.',
+    '[se saldo_pendente][se cobrar]Fica pendente o saldo a pagar de {saldo}.[se boleto_saldo] Segue o boleto, com vencimento em {boleto_saldo_vencimento}.[se boleto_saldo_linha]\nLinha digitável: {boleto_saldo_linha}[fim][se boleto_saldo_pix]\nPix copia e cola: {boleto_saldo_pix}[fim][senão] Deposite ou faça o Pix na conta abaixo e responda com o comprovante.\n{conta_deposito}[fim]\nCom o pagamento, mandamos o termo de quitação para assinar.[senão]Temos a devolver a você o saldo de {saldo}: informe a chave Pix ou a conta em seu nome, se ainda não informou; devolvemos em até 5 dias úteis da sua resposta. Com a devolução, mandamos o termo de quitação para assinar.[fim]\n\nFora isso, não há valores pendentes, salvo as contas de consumo e os tributos do período que ainda cheguem: mandaremos com a conta ou a guia.[senão]Não há valores pendentes, salvo as contas de consumo e os tributos do período que ainda cheguem: mandaremos com a conta ou a guia.[fim]'],
 ];
 
 /** Aplica ATUALIZACOES_EMAIL num texto gravado do modelo ``chave``. */
