@@ -104,7 +104,7 @@ export function telaFicha(id) {
     return `<li class="suave">${esc(i.nome)}: sem contrato${f.modo_imoveis !== 'Todos juntos' && Object.keys(feitos).length ? ' (a ficha era para apenas um dos imóveis)' : ''}</li>`;
   }).join('');
   // prazo dos documentos (pedido do advogado, 24/11/2026): lembrete à pessoa a qualquer hora; no 4º dia útil e no último, o aviso
-  const semDocs = f.situacao === 'Em análise' && f.aceite_reserva && R.fichaSemDocumentos(f) && R.prazosDaReserva(f);
+  const semDocs = f.situacao === 'Em análise' && f.aceite_reserva && !f.reaberta_em && R.fichaSemDocumentos(f) && R.prazosDaReserva(f);
   const lembreteDocumentos = semDocs && R.prazosDaReserva(f).documentos_ate >= C.hojeIso() ? ` ${botaoEmail('ficha_lembrete_documentos', { ficha: f.id }, '✉ E-mail: lembrete dos documentos')}` : '';
   const avisoDoc = R.avisoDosDocumentos(f);
   const avisoDocumentos = avisoDoc ? `<div class="alerta aviso"><b>${avisoDoc.qual === 'ultimo' ? 'Hoje é o último dia para os documentos.' : `Faltam documentos: o prazo vai até ${dataBr(avisoDoc.ate)}.`}</b> Fale com a pessoa: a empresa continua aguardando e à disposição para tirar dúvidas e ajudar (botão "E-mail: lembrete dos documentos").</div>` : '';

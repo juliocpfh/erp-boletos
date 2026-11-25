@@ -28,6 +28,8 @@ function prazosHtml(f) {
   const pz = R.prazosDaReserva(f);
   if (!pz) return `<div class="alerta info"><b>Falta o depósito da reserva de ${reais(R.valorDaReserva(f))}.</b> Quando chegar, registre o valor, a data e o comprovante em "Editar". Os prazos do termo contam do depósito.</div>`;
   if (R.fichaSemContrato(f) || f.situacao === 'Aprovada') return '';
+  // ficha reaberta (dono, 25/11/2026): os prazos do depósito deixam de valer; vale o guia da reabertura (alerta em "Situação")
+  if (f.reaberta_em) return '<p class="suave">Ficha reaberta para nova análise: os prazos contados do depósito não valem mais (vale o guia da reabertura, em "Situação").</p>';
   const hoje = C.hojeIso();
   const dv = R.devolucaoDaReserva(f, { data: hoje });
   const c = R.condicoesDaReserva(f);
