@@ -878,6 +878,17 @@ export function renovarUsuario() {
   gravarSessao(u && u.login);
 }
 
+/** Chaves do localStorage com dado pessoal que saem ao Sair (testemunhas com CPF, anexos vistos, envio do contrato para assinar). */
+export const GUARDADOS_DO_LOGIN = (k) => k === 'testemunhas_contrato' || k === CLIPES_GUARDADOS || /^assinatura-contrato-/.test(k);
+/** Apaga do navegador o que `GUARDADOS_DO_LOGIN` aponta (navegador sem armazenamento: nada a apagar). */
+export function esquecerDadosDoNavegador(armazem = globalThis.localStorage) {
+  try {
+    const chaves = [];
+    for (let i = 0; i < armazem.length; i += 1) { const k = armazem.key(i); if (k && GUARDADOS_DO_LOGIN(k)) chaves.push(k); }
+    for (const k of chaves) armazem.removeItem(k);
+  } catch { /* sem armazenamento */ }
+}
+
 export async function sair() {
   const s = lerSessao();
   const u = E.usuario;
@@ -896,9 +907,10 @@ export async function sair() {
     if (nada) { await E.cofrinho.cru.apagar('base'); await E.cofrinho.cru.apagar('base-seq'); }
   }
   // o que fica neste navegador e não é para o próximo que entrar: a senha da ponte do banco (o endereço fica), as testemunhas
-  // do contrato (nome e CPF) e os nomes dos anexos vistos
+  // do contrato (nome e CPF), o que foi escolhido no envio de cada contrato para assinar (modelo, data e as testemunhas com o
+  // CPF, `assinatura-contrato-<id>`; decisão do dono de 25/11/2026) e os nomes dos anexos vistos
   await esquecerSenhaDaPonte().catch(() => {});
-  try { for (const k of ['testemunhas_contrato', CLIPES_GUARDADOS]) localStorage.removeItem(k); } catch { /* sem armazenamento */ }
+  esquecerDadosDoNavegador();
   // na nuvem, sair também encerra o login da internet (Cloudflare Access): senão, no mesmo navegador, o /api continuaria aberto
   if (E.nuvem && typeof location !== 'undefined' && location.protocol === 'https:' && !['localhost', '127.0.0.1'].includes(location.hostname)) location.href = '/cdn-cgi/access/logout';
 }

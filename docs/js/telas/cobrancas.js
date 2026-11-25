@@ -71,6 +71,16 @@ function formPagamento(cb) {
     : `<p class="suave">${R.geraNf(contrato) ? 'O dia em que o dinheiro entrou na conta é a data de emissão da NF, e pode ser alguns dias depois do pagamento.' : 'Boleto de controle (inquilino sem NF): o pagamento só fica registrado.'} Marque "pagou em dia" quando o inquilino pagou até o vencimento (${dataBr(cb.vencimento)}${C.limitePagamento(cb.vencimento) !== cb.vencimento ? `, que não é dia útil: vale até ${dataBr(C.limitePagamento(cb.vencimento))}` : ''}) e o banco compensou depois: sem multa e juros. Se atrasou de verdade, o banco já cobra multa e juros no boleto${R.geraNf(contrato) ? ' e a NF sai com esse valor a mais' : ''}; informe o dia em que pagou para os juros baterem com o banco. Valor menor que o devido não é aceito: não existe pagamento em parte (para quitar, faça um acordo).</p>`}`;
 }
 
+/**
+ * Boleto quitado inteiro pela reserva (25/11/2026): nada a pagar no banco. A NF continua saindo como antes: ao registrar a
+ * quitação (a data dela é a data da NF), pelo aluguel em dia. Usa o mesmo formulário do pagamento, sem valor (R$ 0,00).
+ */
+function caixaQuitadoPelaReserva(cb, contrato) {
+  const nf = R.geraNf(contrato);
+  return `<div class="alerta info"><b>Quitado pela reserva.</b> A reserva de ${reais(cb.reserva_utilizada)} cobre o boleto inteiro: não há nada a pagar no banco, nem multa, juros, notificação ou lembrete.${nf ? ` A nota fiscal sai pelo aluguel em dia (${reais(C.liquidar(cb, cb.vencimento).valor_nf)}) quando a quitação for registrada.` : ''}</div>
+    ${opera() ? `<form data-form="pagamento" data-id="${cb.id}" class="pagamento"><div class="campo-pagamento"><label>${nf ? 'Data da quitação (data da NF)' : 'Data da quitação'}</label> <input type="date" name="data" value="${C.hojeIso()}">${F.atalhosData()}</div><button>Registrar a quitação pela reserva</button></form>` : ''}`;
+}
+
 /** Valor recebido diferente do previsto: descritivo do cálculo, justificativa e o valor da NF (vem o calculado, em vermelho, e precisa ser alterado). */
 function formNfDivergente(cb, p) {
   const r = R.previstoNoPagamento(cb, p.data, p);
@@ -262,7 +272,7 @@ function tabelaBoletos(lista, hoje, ordem, url, opcoes = {}) {
           ${resumoBancoLinha(cb) ? `<br>${resumoBancoLinha(cb)}` : ''}${seloPdfEmail(cb, envios)}</td>
         <td class="n">${reais(t.a_pagar_pontual)}<span class="so-celular suave"> · após o vencimento ${reais(t.a_pagar_sem_desconto)}</span></td>
         <td class="n suave so-pc">${reais(t.a_pagar_sem_desconto)}<br>${R.semMultaJuros(cb) ? 'sem multa e juros' : `+ multa ${pct(cb.multa_percentual)}<br>+ juros ${pct(cb.juros_mensal_percentual)} a.m.`}</td>
-        <td>${situacaoBoleto(cb, hoje)}${R.aCobrar(cb) && opera() ? `<br>${botao('pagarBoleto', 'Confirmar pagamento', { id: cb.id }, 'pequeno')}<br>${botao('lembrete', C.vencido(cb.vencimento, hoje) ? 'Cobrar' : 'Lembrete', { id: cb.id }, 'secundario pequeno')}` : ''}</td>
+        <td>${situacaoBoleto(cb, hoje)}${R.cobertoPelaReserva(cb) && opera() ? `<br>${link(`#/cobranca/${cb.id}`, 'Registrar a quitação', 'botao pequeno secundario')}` : ''}${R.aCobrar(cb) && opera() ? `<br>${botao('pagarBoleto', 'Confirmar pagamento', { id: cb.id }, 'pequeno')}<br>${botao('lembrete', C.vencido(cb.vencimento, hoje) ? 'Cobrar' : 'Lembrete', { id: cb.id }, 'secundario pequeno')}` : ''}</td>
         <td>${multaJurosTexto(cb)}</td>
         <td class="n">${cb.valor_nf !== null ? reais(cb.valor_nf) : ''}</td>
         <td>${fs.length ? link(`#/imprimir/faturas?numero=${fs[0].numero}`, `Nº ${R.numeroFatura(fs[0].numero)}`) : !R.geraNf(c) || R.ehComplementoCaucao(cb) || R.ehSaldoSaida(cb) || (cb.data_pagamento && !(cb.valor_nf > 0)) ? etiqueta('sem NF', 'controle') : (cb.data_pagamento ? '<span class="suave">aguardando nº</span>' : '')}
@@ -510,10 +520,11 @@ export function telaCobranca(cb) {
         ${cb.nf_manual ? '<p class="suave">Valor recebido diferente do previsto: a NF saiu com o valor digitado à mão (a justificativa está no histórico).</p>' : R.ehSaldoSaida(cb) ? '<p class="suave">Saldo do cálculo final da saída: não gera NF (o aluguel de cada mês tem o boleto e a NF dele). Pago depois do vencimento, tem a multa e os juros do contrato, como o aluguel. Depois de pago, marque o saldo como cobrado no roteiro da saída.</p>' : R.ehComplementoCaucao(cb) ? '<p class="suave">Complemento da caução: não gera NF. Ao confirmar o pagamento, a caução foi corrigida (veja Garantia, na página do inquilino).</p>' : !R.geraNf(c) ? '<p class="suave">Boleto de controle (inquilino sem NF): o pagamento só fica registrado.</p>' : !(cb.valor_nf > 0) ? '<p class="suave">Sem NF: este boleto não tem aluguel na nota (ex.: mês de carência só com IPTU e seguro).</p>' : `<p class="suave">Nota fiscal = ${cb.dias_atraso ? `aluguel ${reais(cb.aluguel)} + multa ${reais(cb.multa)} + juros ${reais(cb.juros)} (pagou atrasado, sem desconto)` : `aluguel ${reais(cb.aluguel)} - desconto ${reais(cb.desconto)} (pagou em dia)`}. IPTU, seguro, tarifa, FCI e ajuste do mês não entram.</p>`}
         ${opera() ? botao('estornar', 'Desfazer pagamento', { id: cb.id }, 'perigo pequeno', validas.length ? 'Desfazer o pagamento? A NF será cancelada e o número não será reaproveitado.' : 'Desfazer o pagamento?') : ''}`
       : R.emAcordo(cb) ? '<p class="suave">Boleto em acordo: não se cobra mais. O pagamento é registrado nos boletos do acordo.</p>'
+      : R.cobertoPelaReserva(cb) ? caixaQuitadoPelaReserva(cb, c)
       : `<p>Se for pago hoje (${dataBr(C.hojeIso())}): <b>${reais(sim.valor_devido)}</b>${sim.pontual ? '' : R.semMultaJuros(cb) ? ` (${C.plural(sim.dias_atraso, 'dia')} de atraso, sem multa e juros)` : ` (${C.plural(sim.dias_atraso, 'dia')} de atraso: multa ${pct(cb.multa_percentual)} = ${reais(sim.multa)}; juros ${pct(cb.juros_mensal_percentual)} a.m. = ${reais(sim.juros)})`}${R.ehComplementoCaucao(cb) ? ' · sem NF (complemento da caução)' : R.ehSaldoSaida(cb) ? ' · sem NF (saldo da saída)' : !R.geraNf(c) ? ' · sem NF (boleto de controle)' : ` · nota fiscal ${reais(sim.valor_nf)}`}</p>
         ${R.segundaVia(d(), cb, C.hojeIso()) ? `<p class="acoes">${botao('segundaVia', '2ª via com o valor de hoje', { id: cb.id }, 'secundario')}<span class="suave">Valor com multa e juros até hoje e o texto pronto para o inquilino (não emite boleto novo no banco).</span></p>` : ''}
         ${opera() && R.aCobrar(cb) ? formPagamento(cb) : ''}
-        ${opera() ? `<p class="acoes" style="margin-top:10px">${botao('lembrete', C.vencido(cb.vencimento, C.hojeIso()) ? 'Cobrar o inquilino (texto pronto)' : 'Lembrar o inquilino (texto pronto)', { id: cb.id }, 'secundario')}<span class="suave">E-mail, WhatsApp ou copiar; o texto muda se já venceu.</span></p>` : ''}`}</div>
+        ${opera() && !R.cobertoPelaReserva(cb) ? `<p class="acoes" style="margin-top:10px">${botao('lembrete', C.vencido(cb.vencimento, C.hojeIso()) ? 'Cobrar o inquilino (texto pronto)' : 'Lembrar o inquilino (texto pronto)', { id: cb.id }, 'secundario')}<span class="suave">E-mail, WhatsApp ou copiar; o texto muda se já venceu.</span></p>` : ''}`}</div>
     ${caixaProvasBoleto(cb)}
     ${R.emAcordo(cb) ? '' : caixaBancoC6(cb)}
     ${R.emAcordo(cb) ? '' : caixaPdfBanco(cb)}

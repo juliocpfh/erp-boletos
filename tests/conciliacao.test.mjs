@@ -788,3 +788,22 @@ test('sugestão pela memória: o índice montado uma vez dá a mesma sugestão q
   assert.notEqual(Z.indiceDaTela(depois), ind);
   assert.equal(Z.sugerirDestino(depois, novaDescricao, Z.indiceDaTela(depois)).classificacao, 'outro'); // agora a de 05/09
 });
+
+test('data do movimento: a do banco, de Brasília, nunca a de Londres; depois do horário bancário segue a data informada (25/11/2026)', () => {
+  // 24/11 às 22h30 em Brasília (01h30 de 25/11 em Londres): fica 24/11
+  assert.equal(Z.dataDoBanco('2026-11-25T01:30:00Z'), '2026-11-24');
+  assert.equal(Z.dataDoBanco('2026-11-24T22:30:00-03:00'), '2026-11-24');
+  // hora sem fuso é o horário do banco: o dia escrito; só a data: igual
+  assert.equal(Z.dataDoBanco('2026-11-24T22:30:00'), '2026-11-24');
+  assert.equal(Z.dataDoBanco('2026-11-24'), '2026-11-24');
+  assert.equal(Z.dataDoBanco(''), '');
+  // extrato pela API: created_at às 22h30 de Brasília (sem entry_date) fica no dia 24
+  const m = Z.movimentacaoDoC6('ank', { reference: 'r1', created_at: '2026-11-25T01:30:00Z', amount: 100, operation_type: 'INCOMING', description: 'PIX' });
+  assert.equal(m.data, '2026-11-24');
+  // OFX com fuso de Londres: 23:30 GMT de 10/10 = 20h30 em Brasília, dia 10
+  const ofx = OFX_TESTE.replace('<DTPOSTED>20260930205632[-3:BRT]', '<DTPOSTED>20261010233000[0:GMT]');
+  assert.ok(Z.lerOfx(ofx).lancamentos.some((l) => l.data === '2026-10-10'));
+  // e 02:30 GMT de 11/10 = 23h30 de 10/10 em Brasília
+  const ofx2 = OFX_TESTE.replace('<DTPOSTED>20260930205632[-3:BRT]', '<DTPOSTED>20261011023000[0:GMT]');
+  assert.ok(Z.lerOfx(ofx2).lancamentos.some((l) => l.data === '2026-10-10'));
+});

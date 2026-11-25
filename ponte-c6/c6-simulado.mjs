@@ -20,7 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { diasEntre, hoje, somarDias } from './c6-datas.mjs';
+import { diasEntre, hoje, hojeEmBrasilia, somarDias } from './c6-datas.mjs';
 import { gerarPdf } from './pdf-minimo.mjs';
 // extrato redatado e leitura de um item: c6-comum.mjs, iguais aos do simulador do site (docs/js/banco-fase2.js, modo ?teste)
 import { lancamentosNoPeriodo, itemLidoSimulado } from './c6-comum.mjs';
@@ -68,7 +68,7 @@ export function criarC6Simulado({ conta = 'ank', agora = () => new Date() } = {}
       external_reference_id: corpo.external_reference_id || idSimulado(),
       amount: corpo.amount,
       due_date: corpo.due_date,
-      emission_date: hoje(),
+      emission_date: corpo.emission_date || hojeEmBrasilia(),
       description: corpo.description,
       days_after_due_date: corpo.days_after_due_date ?? 30,
       status: 'CREATED',

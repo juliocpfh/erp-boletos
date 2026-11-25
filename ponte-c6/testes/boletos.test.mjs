@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { listarPagos, listarPaginas, DIAS_JANELA_BOLETOS, TAMANHO_PAGINA } from '../c6-boletos-listar.mjs';
-import { diasEntre } from '../c6-datas.mjs';
+import { diasEntre, hojeEmBrasilia } from '../c6-datas.mjs';
 import { criarC6Simulado } from '../c6-simulado.mjs';
 
 test('listarPagos: janelas de até 60 dias e paginação até total_pages, size 100 desde page 0', async () => {
@@ -77,4 +77,12 @@ test('listarPaginas (a listagem única da ponte, usada também por GET /contas/:
   const solta = await listarPaginas({ async chamar() { return { status: 200, corpo: [{ id: 'x' }] }; } }, { due_date_from: '2026-03-01' });
   assert.deepEqual(solta.map((b) => b.id), ['x']);
   await assert.rejects(listarPaginas({ async chamar() { return { status: 400, corpo: { message: 'intervalo' } }; } }, {}), /respondeu 400/);
+});
+
+test('emission_date pela data de Brasília, à noite inclusive (25/11/2026)', () => {
+  // 24/11 às 21h47 em Brasília = 00h47 de 25/11 em Londres: a emissão é de 24/11
+  assert.equal(hojeEmBrasilia(new Date('2026-11-25T00:47:00Z')), '2026-11-24');
+  assert.equal(hojeEmBrasilia(new Date('2026-11-24T13:00:00Z')), '2026-11-24');
+  assert.equal(hojeEmBrasilia('2026-11-25T03:00:00Z'), '2026-11-25'); // meia-noite em Brasília
+  assert.match(hojeEmBrasilia(), /^\d{4}-\d{2}-\d{2}$/);
 });

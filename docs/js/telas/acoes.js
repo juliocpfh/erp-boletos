@@ -719,7 +719,8 @@ function janelaMensagem(titulo, l, topo = '') {
           <a class="botao secundario" data-enviar="whatsapp" href="#" target="_blank" rel="noopener">WhatsApp${tel ? '' : ' (sem telefone)'}</a>
           <button type="button" class="secundario" data-copiar-lembrete>Copiar texto</button></div>`,
       ligar(dlg) {
-        dlg.querySelector('[data-nao]').hidden = true;
+        // sem o botão Cancelar (nao: ''): a janela não o cria. Antes, esconder o que não existe dava erro ("setting 'hidden'")
+        // e o resto desta função não rodava: o e-mail e o WhatsApp ficavam em '#' e o Copiar texto não fazia nada (25/11/2026)
         const assunto = dlg.querySelector('[name=assunto]');
         const texto = dlg.querySelector('[name=texto]');
         const email = dlg.querySelector('[data-enviar=email]');

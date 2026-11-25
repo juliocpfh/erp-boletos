@@ -563,6 +563,7 @@ function geradoresDocumentos(c, cls = 'botao secundario pequeno') {
 /** Marca única da situação do boleto: paga em dia, paga com atraso, vencida, em aberto ou carência. */
 export function situacaoBoleto(cb, hoje = C.hojeIso()) {
   if (R.aCobrar(cb) && C.vencido(cb.vencimento, hoje)) return etiqueta('Vencida', 'perigo');
+  if (R.cobertoPelaReserva(cb)) return situacao(R.QUITADO_RESERVA);
   return cb.pagou_em_dia ? `<span title="Pagou até o vencimento; o banco compensou depois">${situacao(cb.situacao)}</span>` : situacao(cb.situacao);
 }
 

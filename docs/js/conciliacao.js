@@ -9,6 +9,7 @@ import {
   buscar, inserir, atualizar, excluir, registrar, registrarPagamento, previstoNoPagamento, totais, marcarIptuPago, parcelasIptu,
   lancarDespesas, lancarGanhoAirbnb, contasPermitidas, participacoesDo, TIPOS_DESPESA, contaBancaria, apelidoDaConta, pastaDoComprovante, pastaContador,
   CONFIG_BANCO_FASE2, mesDoDinheiro, contaDeOrigem, extratoImportadoAte, contasDoExtrato, contaSoArquivo, conferirValorRecebido, ehComplementoCaucao, devidoDoPago, pagoAMaisDo, devolucaoPendente,
+  cobertoPelaReserva,
 } from './regras.js';
 
 export { pastaDoComprovante as escopoDoComprovante, pastaContador as escopoContador, apelidoDaConta, mesDoDinheiro, contaDeOrigem };
@@ -72,7 +73,17 @@ const TRANSICOES = {
 
 const cfg = (d) => d.config_banco || {};
 const hoje = () => C.hojeIso();
-const dataDe = (x) => String(x || '').slice(0, 10);
+/**
+ * Data do movimento: a do banco (a do extrato), sem mudar de dia pelo horário (decisão do dono, 25/11/2026: o lançado depois do
+ * horário bancário segue a data que o banco informou; a tolerância em dias úteis continua a de antes). Com hora e fuso, a data
+ * de Brasília, nunca a de Londres (`toISOString`): '2026-11-25T01:30:00Z' (24/11 às 22h30 em Brasília) → '2026-11-24'. Só a
+ * data, ou hora sem fuso (é o horário do banco): o dia escrito. Ex.: '2026-11-24T22:30:00' → '2026-11-24'.
+ */
+export const dataDoBanco = (x) => {
+  const s = String(x || '').trim();
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/i.test(s) ? C.dataDeBrasilia(s) : s.slice(0, 10);
+};
+const dataDe = dataDoBanco;
 
 // --------------------------------------------------------------------------
 // Dinheiro e datas no formato do C6
@@ -272,7 +283,7 @@ const dataOfx = (t) => {
   const dia = `${m[1]}-${m[2]}-${m[3]}`;
   if (m[4] === undefined || m[7] === undefined) return dia;
   const utc = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6] || 0)) - Number(m[7]) * 3600000;
-  return new Date(utc - 3 * 3600000).toISOString().slice(0, 10);
+  return C.dataDeBrasilia(utc);
 };
 /** Valor do OFX ("-215.00", "3298.53", ou "1.234,56" em arquivos antigos) → centavos com sinal (o mesmo leitor do C6, em c6-comum; vazio = 0). */
 export function centavosDoOfx(t) {
@@ -662,7 +673,8 @@ export const nomePadraoComprovante = (d, mov) => nomeComprovante(d, mov);
 // --------------------------------------------------------------------------
 // Conciliação de boletos
 // --------------------------------------------------------------------------
-const emAberto = (cb) => !cb.data_pagamento && cb.situacao !== 'Carência' && cb.situacao !== 'Em acordo';
+// (o quitado inteiro pela reserva, 25/11/2026, não espera dinheiro no banco)
+const emAberto = (cb) => !cb.data_pagamento && cb.situacao !== 'Carência' && cb.situacao !== 'Em acordo' && !cobertoPelaReserva(cb);
 const semDigitos = (t) => maiusculaSemAcento(t).replace(/\d+/g, '').replace(/\s+/g, ' ').trim();
 
 /**
@@ -845,7 +857,7 @@ export function conciliarBoletos(d, contaId, pagamentosC6, { dias = null } = {})
     if (conhecido && !emAberto(conhecido)) {
       out.push({ cobranca_id: conhecido.id, conta_id: contaId, data_credito: credito, data_pagamento: pagou, valor, certeza: 'exata', previsto: totais(conhecido).a_pagar_pontual, pagouEmDia: false,
         external_reference_id: p.external_reference_id, external_payment_id: p.external_payment_id || null, payment_type: p.payment_type || null, jaPago: false, alternativas: 1, pagamento: n, aguardandoCredito,
-        alerta: `o boleto de ${C.compBr(conhecido.competencia)} está ${conhecido.situacao === 'Em acordo' ? 'em acordo' : 'em carência'} e recebeu este pagamento no banco: confira (ex.: devolver ou abater no acordo)` });
+        alerta: `o boleto de ${C.compBr(conhecido.competencia)} está ${conhecido.situacao === 'Em acordo' ? 'em acordo' : cobertoPelaReserva(conhecido) ? 'quitado pela reserva' : 'em carência'} e recebeu este pagamento no banco: confira (ex.: devolver ou abater no acordo)` });
       return;
     }
     let achados = conhecido ? casarBoletos(d, valor, pagou, tol, { idExterno: p.external_reference_id, dataCredito: credito }) : [];
