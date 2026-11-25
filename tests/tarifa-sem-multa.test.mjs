@@ -109,3 +109,18 @@ test('contrato: a cláusula da tarifa diz que multa e juros não incidem sobre e
   const semTarifa = MC.atualizarTextoModelo('**CLÁUSULA 1** – Texto.\n\n**Parágrafo** – As despesas de responsabilidade do LOCATÁRIO poderão ser cobradas a qualquer tempo.');
   assert.equal(semTarifa.split('não incidem sobre a tarifa').length - 1, 1);
 });
+
+test('contratos da ANK/JCK (cenário do mercado): a frase da tarifa sai uma vez em cada contrato, e só ela é tirada do resumo', async () => {
+  const MF = await import('./mercado-fixo.mjs');
+  const { d, c, c2 } = MF.cenario();
+  const K = await import('../docs/js/contratos.js');
+  let n = 0;
+  for (const cc of [c, c2]) for (const m of K.modelosDe(d)) {
+    if (!/contrato/i.test(m.tipo || 'contrato') || !m.texto.includes('reembolsará, junto com cada aluguel')) continue;
+    const t = JSON.stringify(K.montarContrato(m.texto, K.dadosDoContrato(d, cc, { data: '2026-11-20' })));
+    assert.equal(t.split(MF.FRASES_NOVAS_CONTRATO[0]).length - 1, 1, `${m.nome}: ${cc.inquilino_nome}`);
+    n += 1;
+  }
+  assert.equal(n, 4, 'dois contratos (residencial e comercial) para os dois inquilinos');
+  assert.equal(MF.FRASES_NOVAS_CONTRATO[0], ' A multa e os juros por atraso não incidem sobre a tarifa.');
+});

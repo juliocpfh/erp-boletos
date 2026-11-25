@@ -11,13 +11,13 @@ import { resumosGerados, textosGerados } from './mercado-fixo.mjs';
 
 /** Resumo de cada texto gerado pelo cenário ANK/JCK com o código de ANTES da mudança (2026-11-16). */
 const ANTES = {
-  'contrato:Residencial:Maria Souza': '348c9f83a68e3723', // 24/11: + resumo em perguntas e respostas (#374) + tarifa do boleto (#376) + multa e juros fora da tarifa (advogado, 24/11): só esses trechos mudam
-  'contrato:Não residencial (comercial):Maria Souza': 'bbbeb104a913736e', // 24/11: + resumo em perguntas e respostas (#374) + tarifa do boleto (#376) + multa e juros fora da tarifa (advogado, 24/11): só esses trechos mudam
+  'contrato:Residencial:Maria Souza': 'cacdf38c56495cfa', // 24/11: + resumo em perguntas e respostas (#374) + tarifa do boleto (#376): só esses trechos mudam
+  'contrato:Não residencial (comercial):Maria Souza': 'b47c975a0d744f63', // 24/11: + resumo em perguntas e respostas (#374) + tarifa do boleto (#376): só esses trechos mudam
   'locadoras:Maria Souza': 'c85480966d9c7b25',
   'representacao:Maria Souza': '264e192c61a07b4d',
   'cidade:Maria Souza': '377621052857a5ab',
-  'contrato:Residencial:João Teste': '783d8a993ebff4c6', // 24/11: + resumo em perguntas e respostas (#374) + tarifa do boleto (#376) + multa e juros fora da tarifa (advogado, 24/11): só esses trechos mudam
-  'contrato:Não residencial (comercial):João Teste': 'e0d421f0d0d67481', // 24/11: + resumo em perguntas e respostas (#374) + tarifa do boleto (#376) + multa e juros fora da tarifa (advogado, 24/11): só esses trechos mudam
+  'contrato:Residencial:João Teste': 'ace9c1b6ecb39cdc', // 24/11: + resumo em perguntas e respostas (#374) + tarifa do boleto (#376): só esses trechos mudam
+  'contrato:Não residencial (comercial):João Teste': 'a3bb7aeb5b05bd23', // 24/11: + resumo em perguntas e respostas (#374) + tarifa do boleto (#376): só esses trechos mudam
   'locadoras:João Teste': 'c85480966d9c7b25',
   'representacao:João Teste': '661b724dffaa2bb9',
   'cidade:João Teste': '377621052857a5ab',

@@ -43,12 +43,20 @@ export function cenario() {
 
 const resumo = (x) => createHash('sha256').update(typeof x === 'string' ? x : JSON.stringify(x)).digest('hex').slice(0, 16);
 
+/**
+ * Frases novas dos contratos conferidas em teste próprio, tiradas do texto antes do resumo: assim duas PRs que mexem no texto
+ * do contrato ao mesmo tempo não brigam pelas mesmas linhas de ANTES (mercado.test.mjs). Cada frase está numa lista e no teste dela.
+ * - multa e juros fora da tarifa do boleto (advogado, 24/11/2026): tests/tarifa-sem-multa.test.mjs
+ */
+export const FRASES_NOVAS_CONTRATO = [' A multa e os juros por atraso não incidem sobre a tarifa.'];
+const semFrasesNovas = (t) => JSON.parse(FRASES_NOVAS_CONTRATO.reduce((x, f) => x.split(f).join(''), JSON.stringify(t)));
+
 /** Tudo o que o cenário gera, pelo nome: { 'contrato:...': texto, ... }. */
 export function textosGerados() {
   const { d, c, c2, f, cb } = cenario();
   const out = {};
   for (const cc of [c, c2]) {
-    for (const m of K.modelosDe(d)) out[`contrato:${m.nome}:${cc.inquilino_nome}`] = K.montarContrato(m.texto, K.dadosDoContrato(d, cc, { data: '2026-11-20' }));
+    for (const m of K.modelosDe(d)) out[`contrato:${m.nome}:${cc.inquilino_nome}`] = semFrasesNovas(K.montarContrato(m.texto, K.dadosDoContrato(d, cc, { data: '2026-11-20' })));
     out[`locadoras:${cc.inquilino_nome}`] = K.locadorasDoContrato(d, cc).map((e) => e.nome);
     out[`representacao:${cc.inquilino_nome}`] = K.representacaoDoContrato(d, cc, R.buscar(d, 'imoveis', cc.imovel_id));
     out[`cidade:${cc.inquilino_nome}`] = K.dadosDoContrato(d, cc).campos.cidade;
