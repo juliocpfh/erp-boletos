@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-rpv1dpC0uPUFP/icbzwSH3SVZkFsYyFzjH1UC2mDVDY=' 'sha256-X8E2py521LThcCiQBvMtdFwl1mG9vntLt1+dcJPL3ZE='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-rpv1dpC0uPUFP/icbzwSH3SVZkFsYyFzjH1UC2mDVDY=' 'sha256-E8yEIutAyg9mIwxunAamH6xCF9LlfqB/jl2Zq8oDv9A='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="6c9ad6852ecfca3f">
+<meta name="fontes" content="c49a8250b88d3619">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -6506,6 +6506,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     marcarReservaAbatida: () => marcarReservaAbatida,
     marcarVistoriaSaida: () => marcarVistoriaSaida,
     mesBoletoDaParcela: () => mesBoletoDaParcela,
+    mesCobertoPorAcordoDoNovo: () => mesCobertoPorAcordoDoNovo,
     mesDeAniversario: () => mesDeAniversario,
     mesDoDinheiro: () => mesDoDinheiro,
     mesDoPeriodoGuia: () => mesDoPeriodoGuia,
@@ -7961,6 +7962,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     return recalcularCobrancas(d2, (cb) => ids.has(cb.contrato_id) && !emitidoNoBanco(cb) && !cb.boleto_pdf, usuario);
   }
   function montarCobranca(d2, contrato, comp) {
+    const cobertoPor = !contrato.data_saida || contrato.data_saida >= `${comp}-01` ? mesCobertoPorAcordoDoNovo(d2, contrato, comp) : null;
+    if (cobertoPor) contrato = { ...contrato, data_saida: somarDias(cobertoPor.data_entrada || cobertoPor.vigencia_inicio, -1) };
     const dias = diasOcupados(comp, contrato.data_entrada, contrato.data_saida);
     if (dias === 0 || trocaAguardaAditivo(d2, contrato)) return null;
     const diasMes = diasNoMes(comp);
@@ -8160,6 +8163,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   }
   function devidoDoPago(cb) {
     if (!cb || !cb.data_pagamento) return 0;
+    if (cb.troca_nao_valeu) return 0;
     const v = previstoNoPagamento(cb, cb.data_pagamento, { pagouEmDia: !!cb.pagou_em_dia, dataPagou: cb.data_pagou || null }).valor_devido;
     return Number.isFinite(v) ? v : 0;
   }
@@ -8368,6 +8372,14 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         ...m.comprovante || m.comprovante_contador || m.comprovante_origem || m.nome_arquivo ? { comprovante: null, comprovante_contador: null, comprovante_origem: null, nome_arquivo: null } : {},
         ...m.pago_a_mais ? { pago_a_mais: false } : {}
       }, usuario, "Pagamento do boleto desfeito: movimentação volta a ficar sem destino");
+    }
+    if (cb && cb.troca_nao_valeu) {
+      const n = buscar(d2, "contratos", cb.contrato_id);
+      if (n && trocaAguardaAditivo(d2, n) && !emitidoNoBanco(cb) && !emAcordo(cb)) {
+        excluir(d2, "cobrancas", cb.id, usuario, `Boleto ${compBr(cb.competencia)} de ${n.inquilino_nome} excluído com o pagamento desfeito: o termo da troca de titular não valeu e o mês é cobrado do titular anterior`);
+      } else {
+        atualizar(d2, "cobrancas", cb.id, { troca_nao_valeu: null }, usuario, `Boleto ${compBr(cb.competencia)}: pagamento desfeito${n && trocaAguardaAditivo(d2, n) ? " (emitido no banco: cancele lá, porque o mês é cobrado do titular anterior)" : ""}`);
+      }
     }
   }
   function indiceFaturas(d2) {
@@ -9658,34 +9670,125 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return "";
   }
+  function mesCobertoPorAcordoDoNovo(d2, c, comp) {
+    if (!c || !comp) return null;
+    for (const n of d2.contratos) {
+      if (n.contrato_anterior_id !== c.id || !trocaAguardaAditivo(d2, n)) continue;
+      const cb = boletoDoMes(d2, n.id, comp);
+      if (cb && emAcordo(cb)) return n;
+    }
+    return null;
+  }
+  function cancelarAcordosDoNovo(d2, n, a, usuario) {
+    const quem = a ? a.inquilino_nome : "o titular anterior";
+    const textos = [];
+    for (const ac of (d2.acordos || []).filter((x) => x.contrato_id === n.id && !x.desfeito_em)) {
+      const origens = origensDoAcordo(d2, ac);
+      const parcelas2 = parcelasDoAcordo(d2, ac);
+      const fora = origens.some((cb) => cb.contrato_id !== n.id || ehBoletoAvulso(cb)) || acordoPosterior(d2, ac) || parcelas2.some((cb) => cb.quitado_saida || cb.quitado_devolucao);
+      if (fora) continue;
+      const devolver = [];
+      const noBanco = [];
+      for (const p2 of parcelas2) {
+        const nome = `Parcela ${p2.acordo_parcela || "única"} do acordo de ${dataBr(ac.data)}`;
+        if (p2.data_pagamento) {
+          atualizar(
+            d2,
+            "cobrancas",
+            p2.id,
+            { troca_nao_valeu: true, valor_a_mais: p2.valor_pago || null },
+            usuario,
+            `${nome}, paga em ${dataBr(p2.data_pagamento)}: o termo da troca de titular não valeu e o acordo foi cancelado; ${reais(p2.valor_pago || 0)} a devolver a ${n.inquilino_nome}`
+          );
+          devolver.push(p2);
+        } else if (emitidoNoBanco(p2)) {
+          registrar(d2, usuario, "Alteração", "cobrancas", p2.id, `${nome} emitida no banco: o acordo foi cancelado (o termo da troca de titular não valeu). Cancele no banco e depois exclua`, null, { contrato_id: n.id, imovel_id: n.imovel_id });
+          noBanco.push(p2);
+        } else {
+          excluir(d2, "cobrancas", p2.id, usuario, `${nome} excluída: o acordo foi cancelado (o termo da troca de titular não valeu)`);
+        }
+      }
+      for (const cb of origens) atualizar(d2, "cobrancas", cb.id, { situacao: "Em aberto", acordo_id: null }, usuario, `Boleto ${nomeNoAcordo(cb)} sai do acordo (acordo cancelado: o termo da troca de titular não valeu)`);
+      atualizar(
+        d2,
+        "acordos",
+        ac.id,
+        { desfeito_em: hojeIso(), cancelado_troca: true },
+        usuario,
+        `Acordo de ${dataBr(ac.data)} com ${n.inquilino_nome} cancelado: o termo da troca de titular não valeu e ${quem} volta a ser cobrado pelo mês`
+      );
+      const pago = devolver.reduce((t, p2) => t + (p2.valor_pago || 0), 0);
+      textos.push(`O acordo de ${n.inquilino_nome} de ${dataBr(ac.data)} (${ac.referente}) foi cancelado${pago ? `: ${reais(pago)} já pagos ficam "a devolver" a ${n.inquilino_nome} (botão "Devolvi" na parcela paga)` : ""}${parcelas2.length > devolver.length + noBanco.length ? "; as parcelas em aberto saíram" : ""}.`);
+      if (noBanco.length) textos.push(`Atenção: ${noBanco.length === 1 ? "a parcela" : "as parcelas"} ${noBanco.map((p2) => p2.acordo_parcela || "única").join(", ")} do acordo ${noBanco.length === 1 ? "está emitida" : "estão emitidas"} no banco: cancele no banco e depois exclua.`);
+    }
+    return textos.map((t) => ` ${t}`).join("");
+  }
   function tirarBoletosDoNovoTitular(d2, n, a, usuario) {
+    const textoAcordos = cancelarAcordosDoNovo(d2, n, a, usuario);
     const doNovo = d2.cobrancas.filter((cb) => cb.contrato_id === n.id && !ehBoletoAvulso(cb)).sort((x, y) => x.competencia.localeCompare(y.competencia));
-    if (!doNovo.length) return "";
+    if (!doNovo.length) return textoAcordos;
+    const quem = a ? a.inquilino_nome : "o titular anterior";
     const tirados = [];
-    const ficam = [];
+    const pagos = [];
+    const noBanco = [];
+    const acordos = [];
+    const cobrarDoAnterior = [];
+    const anotar = (cb, texto3) => registrar(d2, usuario, "Alteração", "cobrancas", cb.id, texto3, null, { contrato_id: n.id, imovel_id: n.imovel_id });
     for (const cb of doNovo) {
-      const motivo = cb.data_pagamento ? `pago em ${dataBr(cb.data_pagamento)}` : emitidoNoBanco(cb) ? "emitido no banco" : emAcordo(cb) ? "em acordo" : "";
-      if (motivo) {
-        ficam.push(`${compBr(cb.competencia)} (${motivo})`);
-        registrar(d2, usuario, "Alteração", "cobrancas", cb.id, `Boleto ${compBr(cb.competencia)} de ${n.inquilino_nome} ${motivo}: fica, mas o termo da troca de titular não valeu e ${a ? a.inquilino_nome : "o titular anterior"} volta a ser cobrado neste mês (confira este boleto)`, null, { contrato_id: n.id, imovel_id: n.imovel_id });
+      if (emAcordo(cb)) {
+        acordos.push(compBr(cb.competencia));
+        anotar(cb, `Boleto ${compBr(cb.competencia)} de ${n.inquilino_nome} em acordo: o termo da troca de titular não valeu, mas o acordo tem boletos de fora da troca e não foi cancelado sozinho. Decida: desfaça o acordo (e ${quem} passa a ser cobrado pelo mês) ou mantenha`);
+        continue;
+      }
+      if (cb.data_pagamento) {
+        const devolver = cb.valor_pago || 0;
+        atualizar(
+          d2,
+          "cobrancas",
+          cb.id,
+          { troca_nao_valeu: true, valor_a_mais: devolver || null },
+          usuario,
+          `Boleto ${compBr(cb.competencia)} de ${n.inquilino_nome}, pago em ${dataBr(cb.data_pagamento)}: o termo da troca de titular não valeu e o mês é cobrado de ${quem}; ${reais(devolver)} a devolver a ${n.inquilino_nome}`
+        );
+        pagos.push({ cb, devolver });
+        cobrarDoAnterior.push(cb.competencia);
+        continue;
+      }
+      if (emitidoNoBanco(cb)) {
+        anotar(cb, `Boleto ${compBr(cb.competencia)} de ${n.inquilino_nome} emitido no banco: o termo da troca de titular não valeu e o mês é cobrado de ${quem}. Cancele este boleto no banco e depois exclua`);
+        noBanco.push(compBr(cb.competencia));
+        cobrarDoAnterior.push(cb.competencia);
         continue;
       }
       excluir(d2, "cobrancas", cb.id, usuario, `Boleto ${compBr(cb.competencia)} de ${n.inquilino_nome} excluído: o termo da troca de titular não valeu (o boleto do novo titular só existe com o termo assinado)`);
       tirados.push(cb.competencia);
+      cobrarDoAnterior.push(cb.competencia);
     }
-    if (a) {
-      for (const comp of tirados) {
-        if (boletoDoMes(d2, a.id, comp) || a.ativo === false || !a.imovel_id) continue;
+    const gerados = [];
+    if (a && a.ativo !== false && a.imovel_id) {
+      for (const comp of cobrarDoAnterior) {
+        if (boletoDoMes(d2, a.id, comp)) continue;
         const dados = montarCobranca(d2, a, comp);
-        if (dados) inserir(d2, "cobrancas", dados, usuario, `Boleto ${compBr(comp)} gerado para ${a.inquilino_nome} (o termo da troca de titular não valeu)`);
+        if (dados) {
+          inserir(d2, "cobrancas", dados, usuario, `Boleto ${compBr(comp)} gerado para ${a.inquilino_nome} (o termo da troca de titular não valeu)`);
+          gerados.push(comp);
+        }
       }
-      if (tirados.length) {
+      if (cobrarDoAnterior.length) recalcularCobrancas(d2, (cb) => cb.contrato_id === a.id && cobrarDoAnterior.includes(cb.competencia), usuario);
+      if (cobrarDoAnterior.length) {
         aplicarDiferencasPendentes(d2, a.id, usuario);
         sincronizarMultas(d2, a.id, usuario);
         realocarReserva(d2, a, usuario);
       }
     }
-    return `${tirados.length ? ` ${tirados.length === 1 ? "O boleto" : "Os boletos"} de ${n.inquilino_nome} (${tirados.map(compBr).join(", ")}) ${tirados.length === 1 ? "saiu" : "saíram"} e ${a ? a.inquilino_nome : "o titular anterior"} volta a ser cobrado pelo mês cheio.` : ""}${ficam.length ? ` Atenção: ${ficam.length === 1 ? "o boleto" : "os boletos"} de ${n.inquilino_nome} ${ficam.join(", ")} ${ficam.length === 1 ? "ficou" : "ficaram"}: confira, porque o mês pode estar cobrado dos dois.` : ""}`;
+    const lista3 = (x) => x.join(", ");
+    return [
+      tirados.length ? `${tirados.length === 1 ? "O boleto" : "Os boletos"} de ${n.inquilino_nome} (${lista3(tirados.map(compBr))}) ${tirados.length === 1 ? "saiu" : "saíram"}.` : "",
+      cobrarDoAnterior.length ? `${quem} volta a ser cobrado pelo mês cheio (${lista3(cobrarDoAnterior.map(compBr))}).` : "",
+      pagos.length ? `${n.inquilino_nome} já tinha pago ${lista3(pagos.map((x) => `${compBr(x.cb.competencia)} (${reais(x.devolver)})`))}: o valor fica "a devolver" a ${n.inquilino_nome} (no boleto de ${n.inquilino_nome}, botão "Devolvi" depois de devolver). A NF desse pagamento saiu em nome de ${n.inquilino_nome}: confira com o contador.` : "",
+      noBanco.length ? `Atenção: ${noBanco.length === 1 ? "o boleto" : "os boletos"} de ${n.inquilino_nome} ${lista3(noBanco)} ${noBanco.length === 1 ? "está emitido" : "estão emitidos"} no banco: cancele no banco e depois exclua aqui, senão o mês fica cobrado dos dois.` : "",
+      acordos.length ? `Atenção: ${lista3(acordos)} de ${n.inquilino_nome} está num acordo que também tem boletos de fora da troca e não foi cancelado sozinho. Decida: desfaça o acordo (e ${quem} passa a ser cobrado pelo mês) ou mantenha; enquanto o acordo existir, ${quem} não é cobrado por ${acordos.length === 1 ? "esse mês" : "esses meses"}.` : ""
+    ].filter(Boolean).map((t) => ` ${t}`).join("") + textoAcordos;
   }
   function removerArquivoAditivo(d2, id, usuario) {
     const a = buscar(d2, "aditivos", id);
@@ -9861,6 +9964,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     const out = { anterior: a, data: data2, arquivos: [], correcoes: 0, garantia: false, boletosMovidos: 0, boletosApagados: 0, comNf: 0, noBanco: 0 };
     const passa = (tabela, x, texto3) => atualizar(d2, tabela, x.id, { contrato_id: n.id }, usuario, `${texto3} passa de ${a.inquilino_nome} para ${n.inquilino_nome} (troca de titular)`);
     const assinado = !!aditivoDaTroca(d2, n);
+    if (assinado) out.pagamentosDevolvidos = voltarPagamentosDoNovo(d2, n, usuario);
     if (data2 > hoje3 || !assinado) {
       if (!assinado && a.data_saida === fim) atualizar(d2, "contratos", a.id, { data_saida: null }, usuario, `${a.inquilino_nome}: continua no contrato até o termo aditivo ser assinado`);
       if (assinado && a.data_saida !== fim) atualizar(d2, "contratos", a.id, { data_saida: fim }, usuario, `${a.inquilino_nome}: fim do vínculo em ${dataBr(fim)} (o contrato continua com ${n.inquilino_nome} a partir de ${dataBr(data2)})`);
@@ -9923,6 +10027,28 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         out.boletosMovidos += 1;
       }
     }
+  }
+  function voltarPagamentosDoNovo(d2, n, usuario) {
+    const devolvidos = [];
+    for (const cb of d2.cobrancas.filter((x) => x.contrato_id === n.id && x.troca_nao_valeu)) {
+      if (cb.acordo_parcela_de && (buscar(d2, "acordos", cb.acordo_parcela_de) || {}).cancelado_troca) continue;
+      if (cb.valor_devolvido > 0) {
+        registrar(d2, usuario, "Alteração", "cobrancas", cb.id, `Boleto ${compBr(cb.competencia)} de ${n.inquilino_nome}: o termo da troca de titular foi anexado, mas o pagamento (${reais(cb.valor_devolvido)}) já tinha sido devolvido. Cobre o mês de novo de ${n.inquilino_nome} (desfaça o pagamento do boleto e registre quando ele pagar)`, null, { contrato_id: n.id, imovel_id: n.imovel_id });
+        devolvidos.push({ cobranca: cb, valor: cb.valor_devolvido });
+        continue;
+      }
+      const devido = devidoDoPago({ ...cb, troca_nao_valeu: false });
+      const aMais = Math.max(0, (cb.valor_pago || 0) - devido);
+      atualizar(
+        d2,
+        "cobrancas",
+        cb.id,
+        { troca_nao_valeu: null, valor_a_mais: aMais || null },
+        usuario,
+        `Boleto ${compBr(cb.competencia)} de ${n.inquilino_nome}: o termo da troca de titular foi anexado e o pagamento de ${dataBr(cb.data_pagamento)} volta a ser dele (não há mais o que devolver${aMais ? `, salvo ${reais(aMais)} pagos a mais` : ""})`
+      );
+    }
+    return devolvidos;
   }
   function herdarReserva(d2, n, a, usuario, forcar = false) {
     if (!(a.reserva_valor > 0) || n.reserva_usada_anterior !== void 0 && !forcar) return [];
@@ -32060,7 +32186,12 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     if (!linhas2.length && !cb.valor_a_mais && !cb.valor_devolvido) return "";
     const falta = cb.valor_a_mais ? pagoAMaisDo(cb) : 0;
     const lista3 = linhas2.sort((a, b) => String(a.data).localeCompare(String(b.data))).map((m) => `<li><a href="#/banco?conta=${esc(m.conta_id)}&mes=${String(m.data).slice(0, 7)}">${dataBr(m.data)} · ${m.pago_a_mais ? "entrou de novo (a mais)" : "devolvido ao inquilino"} · ${reais(m.valor)}</a></li>`).join("");
-    return `<div class="alerta ${falta ? "aviso" : "info"}"><b>${falta ? `Pago a mais: falta devolver ${reais(falta)} ao inquilino` : "Pago a mais e devolvido"}</b> (devido ${reais(devidoDoPago(cb))}). A NF não muda.
+    const troca = cb.troca_nao_valeu ? (() => {
+      const c = buscar2("contratos", cb.contrato_id);
+      const a = c && contratoHerdado(d(), c);
+      return ` O termo da troca de titular não valeu${ehParcelaAcordo(cb) ? " e o acordo foi cancelado: o aluguel do mês do acordo" : `: o aluguel de ${compBr(cb.competencia)}`} é cobrado de ${esc(a ? a.inquilino_nome : "o titular anterior")} e tudo o que ${esc(c ? c.inquilino_nome : "o inquilino")} pagou é devolvido. A NF deste pagamento já saiu: confira com o contador.`;
+    })() : " A NF não muda.";
+    return `<div class="alerta ${falta ? "aviso" : "info"}"><b>${falta ? `${cb.troca_nao_valeu ? "Termo da troca não valeu" : "Pago a mais"}: falta devolver ${reais(falta)} ao inquilino` : cb.troca_nao_valeu ? "Termo da troca não valeu: valor devolvido" : "Pago a mais e devolvido"}</b> (devido ${reais(devidoDoPago(cb))}).${troca}
     ${lista3 ? `<ul style="margin:6px 0 0">${lista3}</ul>` : ""}${falta ? `<p class="suave">Quando devolver, dê à saída do extrato o destino "Devolução ao inquilino" (tela Banco). Devolveu por fora do extrato (outra conta, dinheiro)? Marque aqui:</p>
     ${opera() ? `<form data-form="devolvidoAMao" data-id="${cb.id}" class="acoes"><input type="date" name="data" value="${hojeIso()}" aria-label="Dia da devolução"><button class="secundario pequeno">Devolvi ${reais(falta)}</button></form>` : ""}` : ""}</div>`;
   }
@@ -32161,7 +32292,8 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     }
     const semBoleto = d().contratos.filter((c) => c.ativo !== false && c.imovel_id && diasOcupados(comp, c.data_entrada, c.data_saida) > 0 && !doMes.some((x) => x.c.id === c.id && !ehBoletoAvulso(x.cb)));
     const aguardaTermo = semBoleto.filter((c) => trocaAguardaAditivo(d(), c));
-    const faltando = semBoleto.filter((c) => !trocaAguardaAditivo(d(), c));
+    const cobertos = semBoleto.filter((c) => !trocaAguardaAditivo(d(), c)).map((c) => [c, mesCobertoPorAcordoDoNovo(d(), c, comp)]).filter(([, n]) => n);
+    const faltando = semBoleto.filter((c) => !trocaAguardaAditivo(d(), c) && !cobertos.some(([x]) => x === c));
     const caucoes = complementosCaucaoPendentes(d(), comp);
     const pend = pendentesDeFatura(d(), nfs).filter((p2) => p2.tipo === "cobranca" && p2.registro.competencia === comp);
     const soma = (f) => lista3.filter((x) => geraNf(x.c) && !emAcordo(x.cb)).reduce((s, x) => s + f(x), 0);
@@ -32177,6 +32309,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     <p class="suave">O mês de referência é o mês do aluguel (o boleto do aluguel de novembro vence em dezembro). Ao receber, clique em "Confirmar pagamento" na linha e informe a data. Depois, numere as NFs: a numeração segue a ordem das datas de pagamento.</p>
     ${filtros}
     ${reajustes2.size ? `<div class="alerta aviso"><b>Reajuste</b> ${reajustes2.size} inquilino(s) têm o aluguel de ${compBr(comp)} corrigido: envie a carta de reajuste junto com o boleto deste mês (botão "Gerar carta" na linha).${semCorrecao ? ` <b>${semCorrecao} ainda sem a correção aplicada</b>: informe o índice e aplique a correção (os boletos em aberto são recalculados).` : ""} ${link("#/reajustes", "Ver reajustes")}</div>` : ""}
+    ${cobertos.length ? `<div class="alerta info">${cobertos.map(([c, n]) => `${esc(c.inquilino_nome)}: sem boleto em ${compBr(comp)}. O termo da troca para ${esc(n.inquilino_nome)} não valeu, mas o acordo de ${esc(n.inquilino_nome)} (que também tem boletos de fora da troca) cobre este mês: desfaça o acordo para cobrar ${esc(c.inquilino_nome)}.`).join(" ")}</div>` : ""}
     ${faltando.length && opera() ? `<div class="alerta aviso">${plural(faltando.length, "contrato", "contratos")} ainda sem boleto neste mês: ${faltando.map((c) => esc(c.inquilino_nome)).join(", ")}. ${botao("gerarCobrancas", `Gerar boletos de ${compBr(comp)}`, { comp }, "pequeno")}</div>` : ""}
     ${aguardaTermo.length && opera() ? `<div class="alerta aviso">${aguardaTermo.map((c) => `${link(`#/contrato/${c.id}?ir=aditivos`, esc(c.inquilino_nome))}: falta anexar o termo da troca de titular assinado para gerar o boleto (até lá, o contrato é de ${esc((contratoHerdado(d(), c) || {}).inquilino_nome || "quem sai")}).`).join("<br>")}</div>` : ""}
     ${caucoes.length && opera() ? `<div class="alerta aviso"><b>Complemento da caução</b> (aluguel corrigido) ainda sem boleto: gere na tela Reajustes, em "Caução a completar" (boleto separado, sem tarifa e sem NF).
@@ -33786,6 +33919,10 @@ ${ROTEIROS[comodo].map((x) => `- ${x}: `).join("\n")}
       r = transferirHeranca(db, Number(id), login());
     });
     if (!r) return null;
+    if (r.pagamentosDevolvidos && r.pagamentosDevolvidos.length) {
+      const nome = buscar2("contratos", id).inquilino_nome;
+      aviso(`Atenção: ${r.pagamentosDevolvidos.map((x) => `o pagamento de ${compBr(x.cobranca.competencia)} (${reais(x.valor)})`).join(", ")} de ${nome} já tinha sido devolvido: cobre de novo (desfaça o pagamento do boleto e registre quando pagar).`, "aviso");
+    }
     if (r.agendada) {
       await arquivosParaHerdeiro(r.anterior.id, id, r.arquivosReserva, false);
       const n = buscar2("contratos", id);
