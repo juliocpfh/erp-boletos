@@ -123,3 +123,66 @@ export async function enviarEmail({ para, cco = '', assunto, texto, anexos = [],
   if (!r.ok || !d.ok) throw new C.ErroUsuario(d.erro || `O e-mail não foi enviado (erro ${r.status}).`);
   return { ok: true, id: String(d.id || '') };
 }
+
+// ---------------------------------------------------------------------------
+// E-mails agendados (nuvem/agendados.mjs): fora do horário comercial o e-mail fica guardado na nuvem e sai sozinho na hora
+// marcada (cron do Worker), mesmo com os aparelhos desligados. Só existe na nuvem com o Gmail ligado (podeAgendar).
+// ---------------------------------------------------------------------------
+const SEM_NUVEM = 'Agendar só funciona no sistema na nuvem, com o Gmail ligado.';
+
+/** Dá para agendar aqui? (nuvem com o Gmail ligado; na versão PC, no ?teste e sem internet, não) */
+export async function podeAgendar() {
+  if (local() || !cfg.online()) return false;
+  return (await estadoEmail()).ligado;
+}
+
+async function pedirAgendados(rota, { metodo = 'POST', corpo, tempo = TEMPO_ESTADO } = {}) {
+  if (local() || !cfg.online()) throw new C.ErroUsuario(SEM_NUVEM);
+  let r;
+  try {
+    r = await cfg.buscar(`${cfg.base}email/${rota}`, {
+      method: metodo, cache: 'no-store', credentials: 'same-origin', signal: limiteDeTempo(tempo),
+      ...(metodo === 'POST' ? { headers: { 'Content-Type': 'application/json', 'X-Sistema': 'imoveis' }, body: JSON.stringify(corpo || {}) } : {}),
+    });
+  } catch (e) {
+    if (e?.name === 'TimeoutError') throw new C.ErroUsuario('A nuvem demorou demais para responder. Confira em Envios agendados antes de tentar de novo.');
+    throw new C.ErroUsuario('Sem internet: tente de novo quando a conexão voltar.');
+  }
+  if (r.redirected || !ehJson(r)) throw new C.ErroUsuario('Seu acesso pela internet venceu. Recarregue a página para entrar de novo (código no e-mail).');
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new C.ErroUsuario(d.erro || `Erro ${r.status} na nuvem.`);
+  return d;
+}
+
+/**
+ * Agenda um e-mail. Os mesmos campos de `enviarEmail` e mais: `quando` (instante ISO), `registro` (o que vai para
+ * envios_email quando sair: chave, contrato_id, cobranca_id…, `usuario`, `efeito`) e `descricao` (para a lista).
+ * Devolve { ok, id, quando }.
+ */
+export async function agendarEmail({ para, cco = '', assunto, texto, anexos = [], html = '', imagens = [], quando, registro = {}, descricao = '' } = {}) {
+  if (!String(para || '').trim()) throw new C.ErroUsuario('Informe o e-mail do destinatário.');
+  const total = anexos.reduce((s, a) => s + (a?.blob?.size || 0), 0);
+  if (total > MAX_BYTES_ANEXOS) throw new C.ErroUsuario(`Anexos passam de ${MAX_BYTES_ANEXOS / 1048576} MB.`);
+  const lista = [];
+  for (const a of anexos) {
+    if (!a?.blob) throw new C.ErroUsuario(`Anexo sem arquivo: ${a?.nome || ''}`);
+    lista.push({ nome: String(a.nome || a.blob.name || 'anexo'), tipo: a.blob.type || 'application/octet-stream', base64: await base64DoBlob(a.blob) });
+  }
+  const d = await pedirAgendados('agendar', { tempo: TEMPO_ENVIO, corpo: { para: String(para), cco: String(cco || ''), assunto: String(assunto || ''), texto: String(texto || ''), anexos: lista, ...(html ? { html: String(html), imagens } : {}), quando: String(quando), registro, descricao: String(descricao || '') } });
+  return { ok: true, id: String(d.id || ''), quando: String(d.quando || quando) };
+}
+
+/**
+ * Lista da nuvem: [{ id, quando, situacao ('agendado' | 'enviando' | 'enviado' | 'falhou' | 'cancelado'), por, criado_em, para,
+ * assunto, descricao, anexos, tentativas, erro, enviado_em, cancelado_em, registro_id, contrato_id, chave }]. Sem a nuvem: null.
+ */
+export async function listaAgendados() {
+  if (local() || !cfg.online()) return null;
+  try { return (await pedirAgendados('agendados', { metodo: 'GET' })).agendados || []; } catch { return null; }
+}
+
+/** Muda a hora (também "Tentar de novo" de um que falhou). Devolve o agendado como na lista. */
+export const mudarAgendado = async (id, quando) => (await pedirAgendados('agendados/mudar', { corpo: { id, quando } })).agendado;
+
+/** Cancela. Devolve { agendado, registro } (o registro preparado ao agendar, para desfazer o que foi marcado). */
+export const cancelarAgendado = (id) => pedirAgendados('agendados/cancelar', { corpo: { id } });

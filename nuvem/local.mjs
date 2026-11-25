@@ -1,6 +1,8 @@
 // Nuvem de teste no próprio computador (imita o Cloudflare): o site (docs/) e a /api/ do Worker, com o cofre num SQLite local.
 // Uso: node nuvem/local.mjs  →  http://localhost:8787  (sem login do Access: MODO_TESTE só vale em localhost)
 //      PORTA=8787 EMAIL_TESTE=dono@exemplo.com.br NUVEM_DB=nuvem/.local/cofre.sqlite
+//      GET /__agendados/rodar (só aqui) roda na hora a rodada do cron dos e-mails agendados (?agora=<ISO> para outra hora);
+//      sozinha, ela roda a cada minuto (no Cloudflare, a cada 5).
 //      SIMULAR_GMAIL=1 → o envio de e-mail aparece ligado e só escreve aqui no console (nada vai ao Google);
 //      com GMAIL_CLIENT_ID e GMAIL_CLIENT_SECRET (credencial "Aplicativo da Web" com o retorno http://localhost:8787/api/email/google/retorno),
 //      o botão "Conectar o Gmail" (Sistema → Comunicação E-mail) liga de verdade e envia; GMAIL_REFRESH_TOKEN (jeito antigo) também vale.
@@ -15,6 +17,7 @@ import { CofreDO } from './cofre.mjs';
 import { r2EmDisco } from './r2-disco.mjs';
 import { atenderFicha } from './ficha-publica.mjs';
 import { atender, avisador } from './worker.mjs';
+import { rodarAgendados } from './agendados.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const DOCS = path.join(AQUI, '..', 'docs');
@@ -46,6 +49,11 @@ http.createServer(async (req, res) => {
   // Host dele e é recusado (aqui o login é de mentira, MODO_TESTE)
   if (![`localhost:${PORTA}`, `127.0.0.1:${PORTA}`].includes(String(req.headers.host || '').toLowerCase())) { res.writeHead(421); res.end('endereço não reconhecido'); return; }
   try {
+    if (url.pathname === '/__agendados/rodar') {
+      const agora = Number.isFinite(Date.parse(url.searchParams.get('agora') || '')) ? new Date(url.searchParams.get('agora')) : new Date();
+      const feito = await rodarAgendados(env, { agora, simular: env.SIMULAR_GMAIL === '1' });
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(feito)); return;
+    }
     if (url.pathname === '/__internet') { semInternet = url.searchParams.get('ligar') === '0'; res.end(semInternet ? 'sem internet' : 'com internet'); return; }
     // ficha pela internet: a página (/ficha) e as rotas públicas, como no endereço da ficha
     if (url.pathname === '/ficha' || url.pathname === '/contatos' || url.pathname === '/reserva' || url.pathname.startsWith('/api/publico/')) {
@@ -73,3 +81,6 @@ http.createServer(async (req, res) => {
     res.writeHead(500); res.end('erro');
   }
 }).listen(PORTA, '127.0.0.1', () => console.log(`Nuvem de teste em http://localhost:${PORTA} (e-mail ${env.EMAIL_TESTE}; dados em ${arquivoDb})`));
+
+// o cron dos e-mails agendados (no Cloudflare, Cron Trigger de 5 em 5 minutos): aqui, a cada minuto
+setInterval(() => { rodarAgendados(env, { simular: env.SIMULAR_GMAIL === '1' }).catch((e) => console.error('agendados', e)); }, 60000).unref();

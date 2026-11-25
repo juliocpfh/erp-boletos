@@ -8,7 +8,8 @@ import * as C from '../calculos.js';
 import { dataBr } from '../calculos.js';
 import { anexosProntos, avisoBoletoPdfDesatualizado, dadosDoEmail, informesPendentes } from '../email-dados.js';
 import { esc } from '../formularios.js';
-import { desconectarGmail, emailLigado, enderecoParaConectar, enviarEmail, situacaoGmail } from '../gmail.js';
+import { agendarEmail, desconectarGmail, emailLigado, enderecoParaConectar, enviarEmail, situacaoGmail } from '../gmail.js';
+import { avisoForaDoHorario, perguntarQuando } from './horario.js';
 import { MODELOS_EMAIL, modeloEmail, montarEmail } from '../modelos-email.js';
 import * as R from '../regras.js';
 import { ACEITA_DOCUMENTOS, arquivoSumiu, botao, buscar, d, etiqueta, link, naoEncontrado, opera, pastaDoEscopo } from './comum.js';
@@ -37,9 +38,12 @@ export function botaoEmail(chave, alvo, texto = '✉ E-mail') {
  * Guarda o envio. E-mail só aberto no Gmail (sem envio): um registro por etapa, alvo e dia, sem linha no histórico; abrir de
  * novo no mesmo dia não grava outro (antes, cada clique era uma linha a mais, para sempre: item 48).
  */
+/** O registro de envios_email de uma etapa (data de Brasília: enviado às 21h30 de 24/11 fica 24/11). */
+const dadosDoEnvio = (chave, alvo, para, assunto, como, id = '') => ({ data: C.hojeBrasilia(), chave, contrato_id: alvo.contrato ? Number(alvo.contrato) : null, ficha_id: alvo.ficha ? Number(alvo.ficha) : null, aditivo_id: alvo.aditivo ? Number(alvo.aditivo) : null,
+  ...(alvo.notificacao ? { notificacao_id: Number(alvo.notificacao) } : {}), ...(alvo.cobranca ? { cobranca_id: Number(alvo.cobranca) } : {}), para, assunto, como, gmail_id: id || null });
+
 const registrar = (chave, alvo, para, assunto, como, id = '') => alterar((db) => {
-  const dados = { data: C.hojeIso(), chave, contrato_id: alvo.contrato ? Number(alvo.contrato) : null, ficha_id: alvo.ficha ? Number(alvo.ficha) : null, aditivo_id: alvo.aditivo ? Number(alvo.aditivo) : null,
-    ...(alvo.notificacao ? { notificacao_id: Number(alvo.notificacao) } : {}), ...(alvo.cobranca ? { cobranca_id: Number(alvo.cobranca) } : {}), para, assunto, como, gmail_id: id || null };
+  const dados = dadosDoEnvio(chave, alvo, para, assunto, como, id);
   // notificação mandada pelo "Enviar agora": fica marcada como enviada por e-mail nesse dia (o prazo passa a correr)
   const n = como === 'enviado' && chave === 'notificacao_envio' && alvo.notificacao ? R.buscar(db, 'notificacoes', alvo.notificacao) : null;
   if (n && n.situacao === 'Rascunho') R.marcarNotificacaoEnviada(db, n.id, { data: dados.data, meio: 'E-mail' }, login());
@@ -192,6 +196,7 @@ async function janelaEmail(chave, alvo) {
     <p><label>Texto <span class="suave">(pode alterar antes de enviar)</span></label><textarea name="texto" rows="16" spellcheck="true"></textarea></p>
     <p class="suave" data-editado hidden>Texto alterado à mão: as respostas acima não mudam mais o texto.</p>
     ${ligado ? `<p><label>${prontos.length ? 'Outros anexos' : 'Anexos'} para o "Enviar agora" <span class="suave">(PDF ou foto)</span></label><input type="file" name="anexos" multiple accept="${ACEITA_DOCUMENTOS}"></p>` : ''}
+    ${avisoForaDoHorario()}
     ${ligado && modelo.anexoObrigatorio && !prontos.some((a) => a.tipo !== 'digital' || a.ok) ? `<p class="alerta aviso">Falta anexar: ${esc(modelo.anexos)}. Escolha o arquivo acima; sem ele o e-mail não sai.</p>` : ''}
     <p class="suave">${alvo.contrato && /saida_aviso/.test(chave) ? 'Confira no contrato do inquilino a multa da saída antecipada antes de enviar. ' : ''}${ligado ? '' : 'Envio direto ainda não ligado: use "Copiar texto" ou "Abrir no Gmail".'}</p>
   </div><div class="acoes" style="justify-content:flex-end;flex-wrap:wrap">
@@ -263,7 +268,7 @@ async function janelaEmail(chave, alvo) {
     if (pendente()) { avisar(pendente(), 'aviso'); return; }
     // notificação: confere antes de mandar se o envio poderá ser marcado (senão o e-mail sairia e o prazo não correria)
     const n = chave === 'notificacao_envio' && alvo.notificacao ? buscar('notificacoes', alvo.notificacao) : null;
-    if (n && n.situacao === 'Rascunho' && n.data > C.hojeIso()) { avisar(`A notificação está datada de ${dataBr(n.data)}, no futuro: o envio não poderia ser marcado. Corrija a data no rascunho (hoje ou antes) e mande depois.`, 'aviso'); return; }
+    if (n && n.situacao === 'Rascunho' && n.data > C.hojeBrasilia()) { avisar(`A notificação está datada de ${dataBr(n.data)}, no futuro: o envio não poderia ser marcado. Corrija a data no rascunho (hoje ou antes) e mande depois.`, 'aviso'); return; }
     let arquivos;
     try {
       arquivos = [...await arquivosProntos(dlg, prontos, objeto), ...[...(q('[name=anexos]').files || [])].map((f) => ({ nome: f.name, blob: f }))];
@@ -276,8 +281,26 @@ async function janelaEmail(chave, alvo) {
     const marcados = [...dlg.querySelectorAll('[name=pronto]:checked')].map((el) => prontos[Number(el.value)]);
     // com a assinatura digital ligada, o PDF que vai é o assinado pelo PC (reciboParaEnviar): o alerta seria falso
     if (n && !n.arquivo_assinado && !R.regra('assinatura_digital') && marcados.some((a) => a.tipo === 'recibo' && a.recibo === 'notificacao')) alertas.push('ATENÇÃO: vai o PDF da notificação SEM a assinatura (a assinada não foi anexada na notificação). Ao enviar, a notificação fica marcada como enviada hoje e o prazo começa a correr.');
-    if (!(await confirmar(`${alertas.length ? `${alertas.join('\n\n')}\n\n` : ''}O e-mail vai agora para ${e.para}${arquivos.length ? `, com ${arquivos.length} anexo(s)` : ', sem anexo'}.`, { titulo: alertas.length ? 'Enviar mesmo assim?' : 'Enviar o e-mail?', sim: 'Enviar agora', forte: alertas.length > 0 }))) return;
+    // fora do horário comercial (regras inicio/fim_expediente): "Agendar para <próximo horário>" ou "Enviar agora mesmo"
+    const quando = await perguntarQuando({ resumo: `O e-mail vai para ${e.para}${arquivos.length ? `, com ${arquivos.length} anexo(s)` : ', sem anexo'}.`, alertas });
+    if (!quando) return;
+    if (!quando.perguntou && !(await confirmar(`${alertas.length ? `${alertas.join('\n\n')}\n\n` : ''}O e-mail vai agora para ${e.para}${arquivos.length ? `, com ${arquivos.length} anexo(s)` : ', sem anexo'}.`, { titulo: alertas.length ? 'Enviar mesmo assim?' : 'Enviar o e-mail?', sim: 'Enviar agora', forte: alertas.length > 0 }))) return;
     enviar.disabled = true;
+    if (quando.modo === 'agendar') {
+      try {
+        // o registro e o efeito (a notificação marcada como enviada) entram quando o e-mail sair de verdade, com a data desse dia
+        const registro = { ...dadosDoEnvio(chave, alvo, e.para, e.assunto, 'enviado'), usuario: login(),
+          ...(n && n.situacao === 'Rascunho' ? { efeito: { tipo: 'notificacao', notificacao_id: n.id } } : {}) };
+        delete registro.data;
+        await agendarEmail({ para: e.para, assunto: e.assunto, texto: e.texto, anexos: arquivos, quando: quando.quando, registro, descricao: `${modelo.nome} · ${reg.inquilino_nome || ''}` });
+        dlg.close();
+        aviso(`E-mail agendado para ${quando.rotulo}: sai sozinho pela nuvem. Para mudar a hora ou cancelar: Inquilinos → Comunicações → Envios agendados.`);
+        await mostrar();
+      } catch (erro) {
+        aviso(erro.message || 'O e-mail não foi agendado.', 'erro');
+      } finally { enviar.disabled = false; }
+      return;
+    }
     try {
       const r = await enviarEmail({ para: e.para, assunto: e.assunto, texto: e.texto, anexos: arquivos });
       await registrar(chave, alvo, e.para, e.assunto, 'enviado', r.id);

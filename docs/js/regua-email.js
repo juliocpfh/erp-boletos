@@ -63,7 +63,7 @@ export function etapaDoBoleto(cb, hoje, dias = regra('regua_email_dias', cb) || 
 export const decisaoDe = (d, cobrancaId, dias) => (d.regua_emails || []).find((x) => x.cobranca_id === cobrancaId && x.dias === dias) || null;
 
 /** O que cada situação quer dizer, para a tela. */
-export const SITUACOES_REGUA = { enviado: 'Enviado pelo sistema', gmail: 'Aberto no Gmail (enviado à mão)', recusado: 'Não enviar' };
+export const SITUACOES_REGUA = { enviado: 'Enviado pelo sistema', gmail: 'Aberto no Gmail (enviado à mão)', recusado: 'Não enviar', agendado: 'Agendado (sai sozinho pela nuvem)' };
 
 /**
  * Fila "Aguardando sua autorização": um e-mail por boleto a cobrar (fora complemento da caução, em acordo, pago, carência e
@@ -115,14 +115,14 @@ export const itemDaFila = (d, chave, hoje = C.hojeIso()) => filaRegua(d, hoje).f
  * Grava a decisão do administrador sobre um e-mail da fila: 'enviado' (pelo sistema), 'gmail' (aberto no Gmail para mandar à mão) ou
  * 'recusado' ("Não enviar"). Recusa repetir: o mesmo boleto e etapa decididos duas vezes (outra aba, outro aparelho) dá erro.
  */
-export function registrarDecisao(d, { cobranca_id, contrato_id, dias, situacao, para = '', assunto = '', envio_id = null }, usuario, hoje = C.hojeIso()) {
+export function registrarDecisao(d, { cobranca_id, contrato_id, dias, situacao, para = '', assunto = '', envio_id = null, quando = '' }, usuario, hoje = C.hojeIso()) {
   if (!SITUACOES_REGUA[situacao]) throw new Error(`Situação desconhecida: ${situacao}`);
   const ja = decisaoDe(d, cobranca_id, dias);
   if (ja) throw new C.ErroUsuario(`Este e-mail já foi decidido em ${C.dataBr(ja.data)} (${SITUACOES_REGUA[ja.situacao]}).`);
   const cb = R.buscar(d, 'cobrancas', cobranca_id);
   const c = R.buscar(d, 'contratos', contrato_id);
   const nome = `${c ? c.inquilino_nome : 'inquilino'}, boleto ${cb ? C.compBr(cb.competencia) : ''} (${nomeDaEtapa(dias)})`;
-  const texto = { enviado: `Régua de cobrança: e-mail enviado para ${para} — ${nome}`, gmail: `Régua de cobrança: e-mail aberto no Gmail para ${para} — ${nome}`, recusado: `Régua de cobrança: "Não enviar" — ${nome}` }[situacao];
+  const texto = { enviado: `Régua de cobrança: e-mail enviado para ${para} — ${nome}`, gmail: `Régua de cobrança: e-mail aberto no Gmail para ${para} — ${nome}`, recusado: `Régua de cobrança: "Não enviar" — ${nome}`, agendado: `Régua de cobrança: e-mail agendado para ${para} (${quando}) — ${nome}` }[situacao];
   return R.inserir(d, 'regua_emails', { cobranca_id, contrato_id, dias, situacao, data: hoje, para: para || null, assunto: assunto || null, envio_id: envio_id || null }, usuario, texto);
 }
 

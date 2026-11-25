@@ -20,7 +20,8 @@ import { ACOES_BANCO } from './banco.js';
 import { ACOES_FICHAS } from './fichas.js';
 import { ACOES_TERMO } from './termo-reserva.js';
 import { ACOES_EMAILS } from './emails.js';
-import { emailLigado, enviarEmail } from '../gmail.js';
+import { agendarEmail, emailLigado, enviarEmail } from '../gmail.js';
+import { avisoForaDoHorario, perguntarQuando } from './horario.js';
 import { htmlSaude } from './banco-c6.js';
 import { ANEXOS_COM_X, CADASTROS, nomeComprovante } from './cadastros.js';
 import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria, indicesMensaisFci } from './campos.js';
@@ -32,6 +33,7 @@ import { ACOES_PASTA } from './arquivo-impresso.js';
 import { ACOES_NOTIFICACOES } from './notificacoes.js';
 import { ACOES_PROVAS, caixaCobrancaHtml, escolhaDaCobranca } from './cobranca-provas.js';
 import { ACOES_COMUNICACOES } from './comunicacoes.js';
+import { ACOES_AGENDADOS } from './agendados.js';
 import { alvoDoRecibo, documentoMontado, guardarCartaNaPasta, logoPng, MODELO_COMODOS, modelosNoBanco, pdfDaCarta, pdfDoDocumento, pdfDoRecibo, roteiroTexto } from './documentos.js';
 import * as AS from '../assinatura.js';
 import { assinadoDoDocumento, baixarAssinaturaDoc, pedirAssinaturaDoc } from './assinatura-documentos.js';
@@ -710,6 +712,7 @@ async function marcarGeradoNaRotina(tipo, m) {
 
 /** Janela do texto pronto ao inquilino (lembrete e 2ª via): assunto e mensagem editáveis, e-mail (canal oficial), WhatsApp e copiar. */
 function janelaMensagem(titulo, l, topo = '') {
+  topo = `${avisoForaDoHorario()}${topo}`; // fora do horário comercial: só o aviso (o WhatsApp e o e-mail abrem por fora)
   const tel = l.telefone ? (l.telefone.length <= 11 ? `55${l.telefone}` : l.telefone) : '';
   return janela({ titulo, sim: 'Fechar', nao: '',
       html: `${topo}<p class="suave" style="margin-bottom:6px">Confira o texto (pode editar) e escolha por onde enviar. O e-mail é o canal oficial da empresa.</p>
@@ -2065,9 +2068,23 @@ export const ACOES = {
         <p><label><input type="checkbox" name="marcar" value="1" checked> Marcar a carta como enviada hoje (guarda o PDF na pasta do inquilino)</label></p>` });
     if (!r) return;
     if ((r.por || [])[0] === 'agora') {
-      if (!(await confirmar(`A carta vai agora para ${para}, com o PDF ${carta.nome} anexado.`, { titulo: 'Enviar o e-mail?', sim: 'Enviar agora' }))) return;
+      // fora do horário comercial: "Agendar para <próximo horário>" ou "Enviar agora mesmo"
+      const quando = await perguntarQuando({ resumo: `A carta vai para ${para}, com o PDF ${carta.nome} anexado.` });
+      if (!quando) return;
+      if (!quando.perguntou && !(await confirmar(`A carta vai agora para ${para}, com o PDF ${carta.nome} anexado.`, { titulo: 'Enviar o e-mail?', sim: 'Enviar agora' }))) return;
+      if (quando.modo === 'agendar') {
+        // o PDF já vai para a pasta do inquilino; a carta fica "enviada" com a data em que o e-mail sair (agendados.js, aplicarEfeitos)
+        let arquivo = null;
+        if ((r.marcar || [])[0] === '1') { try { arquivo = await guardarCartaNaPasta(c, comp, carta); } catch (e) { aviso(`Não deu para guardar o PDF na pasta: ${e.message}`, 'aviso'); } }
+        const registro = { chave: 'carta_reajuste', contrato_id: c.id, ficha_id: null, aditivo_id: null, para, assunto, usuario: login(),
+          ...((r.marcar || [])[0] === '1' ? { efeito: { tipo: 'carta', contrato_id: c.id, comp, arquivo: arquivo || null } } : {}) };
+        await agendarEmail({ para, assunto, texto: carta.texto, anexos: [{ nome: carta.nome, blob: carta.blob }], quando: quando.quando, registro, descricao: `Carta de reajuste · ${c.inquilino_nome}` });
+        aviso(`Carta agendada para ${quando.rotulo}: sai sozinha pela nuvem${(r.marcar || [])[0] === '1' ? ' e fica marcada como enviada no dia em que sair' : ''}.`);
+        await mostrar();
+        return;
+      }
       const env = await enviarEmail({ para, assunto, texto: carta.texto, anexos: [{ nome: carta.nome, blob: carta.blob }] });
-      await alterar((db) => R.inserir(db, 'envios_email', { data: C.hojeIso(), chave: 'carta_reajuste', contrato_id: c.id, ficha_id: null, aditivo_id: null, para, assunto, como: 'enviado', gmail_id: env.id || null },
+      await alterar((db) => R.inserir(db, 'envios_email', { data: C.hojeBrasilia(), chave: 'carta_reajuste', contrato_id: c.id, ficha_id: null, aditivo_id: null, para, assunto, como: 'enviado', gmail_id: env.id || null },
         login(), `E-mail "${assunto}" enviado para ${para}`));
       aviso(`Carta enviada para ${para}. Fica em "Enviados" no Gmail.`);
       if ((r.marcar || [])[0] === '1') await ACOES.cartaEnviada({ contrato: c.id, comp, enviada: '1', pronta: carta });
@@ -2776,6 +2793,6 @@ export const ACOES = {
 };
 
 // Banco (extrato, comprovantes e pagamentos pelo C6): botões em telas/banco.js
-Object.assign(ACOES, ACOES_BANCO, ACOES_FICHAS, ACOES_TERMO, ACOES_ICONE, ACOES_EMAILS, ACOES_PASTA, ACOES_NOTIFICACOES, ACOES_COMUNICACOES, ACOES_PROVAS);
+Object.assign(ACOES, ACOES_BANCO, ACOES_FICHAS, ACOES_TERMO, ACOES_ICONE, ACOES_EMAILS, ACOES_PASTA, ACOES_NOTIFICACOES, ACOES_COMUNICACOES, ACOES_PROVAS, ACOES_AGENDADOS);
 // telas raras (nuvem, regras do sistema, régua, dados de uma pessoa): carregadas no 1º clique (PARTES_ADIADAS, telas/comum.js)
 Object.assign(ACOES, adiados('acoes'));
