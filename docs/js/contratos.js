@@ -368,6 +368,8 @@ export function dadosDoContrato(d, c, extra = {}) {
     // resumo em perguntas e respostas (RESUMO_CONTRATO): exemplos com os valores do contrato
     exemplo_atraso: exemploAtraso(aluguel, c.multa_percentual ?? 2, c.juros_mensal_percentual ?? 1),
     exemplo_saida: exemploSaida(aluguel, Number(c.prazo_meses) || C.mesesDoPrazo(c.data_entrada || c.vigencia_inicio, c.vigencia_fim) || 0),
+    // pintura na entrega do imóvel (cláusula de 24/11/2026, PINTURA_SAIDA): vida útil da regra do contrato, ex.: "48 (quarenta e oito) meses"
+    pintura_vida: `${numeroComExtenso(Number(regra('pintura_vida_meses', c)))} meses`,
   };
   const condicoes = {
     fiador: temFiador, caucao: c.garantia_tipo === 'Caução', deposito: ['Depósito garantia', 'Fiador + depósito'].includes(c.garantia_tipo),
@@ -510,7 +512,7 @@ const CAMPOS_EXTRAS = ['locadoras', 'locatarios', 'solidario', 'fiadores', 'fiad
   'indice', 'multa', 'juros', 'tarifa_boleto', 'fci_percentual', 'fci_indice', 'encargos_inquilino', 'encargos_inclusos', 'representacao', 'caucao_valor',
   'caucao_meses', 'caucao_meses_aluguel', 'deposito_valor', 'deposito_uso', 'cidade', 'data_assinatura', 'numero_aditivo', 'data_contrato',
   'dia_vencimento_anterior', 'dia_vencimento_novo', 'primeiro_vencimento', 'mes_referencia', 'data_troca', 'data_vespera', 'saintes', 'entrantes',
-  'aluguel_atual', 'garantia_anterior', 'garantia_depositada', 'garantia_corrigida', 'exemplo_atraso', 'exemplo_saida'];
+  'aluguel_atual', 'garantia_anterior', 'garantia_depositada', 'garantia_corrigida', 'exemplo_atraso', 'exemplo_saida', 'pintura_vida'];
 let camposConhecidos = null;
 /**
  * Avisos ao salvar um modelo: {campo} que não existe (sai "[campo?]" no contrato). Ex.: ["{locatario}"].
