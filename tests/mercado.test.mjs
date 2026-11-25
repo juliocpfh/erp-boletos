@@ -31,16 +31,16 @@ const ANTES = {
   'email:vistoria_assinada': 'f20a62fda5dbf4b4',
   'email:novo_valor': 'eab9c789f37c7c93',
   'email:aditivo_assinado': '548ec68b37e2cd44',
-  'email:saida_aviso': 'c026d37a6466c076',
-  'email:saida_vistoria': 'b6f5a0271f6b62c7',
-  'email:saida_chaves': '354d50da0fb6ebba',
+  'email:saida_aviso': '1f53eecc16a39f09', // 24/11 (advogado 3.5): outro orçamento só antes das chaves
+  'email:saida_vistoria': '82b5b1cbb71008ad', // 24/11 (advogado 3.5)
+  'email:saida_chaves': '8049463d6b3cca80', // 24/11 (advogado 3.5)
   'email:saida_calculo': '96b8482be28158a2',
   'email:saida_encerramento': '2d49059fc48148bb',
   'email:informe_ir': '71d02f294fa1f4be',
   'recibo:reserva:ficha': 'f488d655e0e2e151',
   'recibo:reserva:Maria Souza': '372d9a9245e9cb11',
   'recibo:reserva:João Teste': '5816468f00fd38ad',
-  'recibo:devolucao_chaves:João Teste': '354c41db31cdeb74',
+  'recibo:devolucao_chaves:João Teste': 'e7a4ce563c8b6c7f', // 24/11 (advogado 3.5)
   'recibo:ficha:ficha': 'c1fb1b26d3b7215f',
   'recibo:termo_reserva:ficha': '3f9a3f0623886a01', // 2026-11-24 (novo)
   lembrete: '8efce35480e4a45e',

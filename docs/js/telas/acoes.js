@@ -1525,7 +1525,7 @@ export const ACOES = {
       return `<span class="suave">${esc(s.texto)}${s.valor === null ? ' Digite o orçamento inteiro para ver a conta.' : ''}</span>${s.valor !== null ? ` <button type="button" class="secundario pequeno" data-usar-pintura>Usar ${esc(reais(s.valor))}</button>` : ''}`;
     };
     const r = await janela({ titulo: `Reparos da vistoria de saída - ${c.inquilino_nome}`, sim: 'Salvar', nao: 'Cancelar',
-      html: `<p>O valor de cada reparo vem do orçamento (melhor dois) ou da nota do serviço. Entra nos débitos do cálculo final, descontado da garantia ou cobrado. Guarde os orçamentos na pasta do inquilino. Item sem reparo a cobrar (ex.: desgaste natural): valor 0,00.</p>
+      html: `<p>O valor de cada reparo vem do orçamento (melhor dois) ou da nota do serviço. Entra nos débitos do cálculo final, descontado da garantia ou cobrado. Guarde os orçamentos na pasta do inquilino. Outro orçamento do inquilino só vale se ele o apresentou antes da devolução das chaves${c.data_saida ? ` (${esc(C.dataBr(c.data_saida))})` : ''}. Item sem reparo a cobrar (ex.: desgaste natural): valor 0,00.</p>
         ${res.reparos.map((x, k) => `<fieldset style="margin:8px 0" data-reparo="${k}"><legend>${esc(x.pendencia)}</legend>
           <p class="check"><label><input type="checkbox" name="pintura_${k}" value="1"${x.pintura ? ' checked' : ''} data-pintura> Reparo de pintura (sugerir o valor pela vistoria de entrada)</label></p>
           <div data-bloco-pintura${x.pintura ? '' : ' hidden'}><label>Orçamento inteiro da pintura (R$)</label><input name="orc_pintura_${k}" inputmode="decimal" data-orc-pintura value="${x.orcamento_valor === null ? '' : esc(dinheiroTexto(x.orcamento_valor))}" placeholder="ex.: 2.400,00">
