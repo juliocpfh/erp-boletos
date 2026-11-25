@@ -2975,11 +2975,14 @@ export function multasDaSaida(d, c) {
 /** Nome do boleto na lista de débitos do cálculo final ("Aluguel 10/2026","Parcela 2/3 do acordo (vence 10/12/2026)"). */
 const nomeDebitoSaida = (cb) => (ehParcelaAcordo(cb) ? `Parcela ${cb.acordo_parcela || 'única'} do acordo (vence ${C.dataBr(cb.vencimento)})` : `Aluguel ${C.compBr(cb.competencia)}`);
 
+/** Valor do boleto nos débitos da saída na data: vencido = cheio + multa + juros (``C.liquidar``); não vencido = o valor em dia. */
+const valorDebitoSaida = (cb, data) => (C.vencido(cb.vencimento, data) ? C.liquidar(cb, data).valor_devido : totais(cb).a_pagar_pontual);
+
 export function debitosDaSaida(d, c, data = C.hojeIso()) {
   const itens = cobrancasEmAberto(d, c.id).sort((a, b) => (a.vencimento || '').localeCompare(b.vencimento || '')).map((cb) => {
     const venceu = C.vencido(cb.vencimento, data);
     const l = venceu ? C.liquidar(cb, data) : null;
-    const valor = venceu ? l.valor_devido : totais(cb).a_pagar_pontual;
+    const valor = valorDebitoSaida(cb, data);
     const nome = nomeDebitoSaida(cb);
     const conta = venceu && (l.multa || l.juros) ? ` (com multa de ${C.reais(l.multa)} e juros de ${C.reais(l.juros)} até ${C.dataBr(data)})` : !venceu ? ' (ainda não venceu: valor em dia)' : '';
     return { cobranca: cb, valor, texto: `${nome} em aberto: ${C.reais(valor)}${conta}` };
@@ -3763,6 +3766,8 @@ export function encerrarContrato(d, contratoId, dados, usuario, hoje = null) {
     atualizar(d, 'cobrancas', cb.id, { quitado_saida: r.id, situacao: 'Descontado da garantia' }, usuario,
       `Boleto ${C.compBr(cb.competencia)} descontado da garantia no cálculo final da saída`);
   }
+  // a notificação de aluguel em atraso desses boletos se fecha (Resolvida), como no pagamento (pedido do dono de 25/11/2026)
+  baixarNotificacoesDeAtraso(d, c.id, usuario, 'descontado(s) da garantia');
   return r;
 }
 
@@ -3774,12 +3779,66 @@ export function boletosDescontadosNaSaida(d, c, descricao) {
   return cobrancasEmAberto(d, c.id).filter((cb) => texto.includes(`${nomeDebitoSaida(cb)} em aberto`));
 }
 
-/** Cálculo final desfeito: os boletos que ele descontava voltam a ser cobrados. */
+/**
+ * O que acontece ao gravar o cálculo final da saída (``tipo`` 'saida') ou a devolução da garantia na troca de titular ('troca')
+ * quando há boletos descontados da garantia (pedido do dono de 25/11/2026: a tela mostra tudo e o operador dá o ok antes de
+ * gravar). Função pura: não muda nada. Devolve null sem boleto descontado; senão { boletos, cancelarNoBanco, garantia,
+ * garantia_corrigida, debitos, creditos, fci_devolver, danos_alem_do_fci, saldo, textoSaldo }. Cada boleto: { cobranca, nome, mes,
+ * vencimento, valor, banco ('c6' | 'pdf' | null), notificacoes: [{ id, data, fecha, faltam }], acontece: [textos], avisoBanco }.
+ * ``registroId``: a devolução da troca já gravada que se está editando (os boletos que ela já descontava contam de novo).
+ * Ex.: caução R$ 5.400,00 e o boleto 10/2026 de R$ 1.800,00 em aberto, com PDF do banco e notificação de 03/11/2026 →
+ * "será marcado como pago com a caução", "a notificação de 03/11/2026 será fechada (Resolvida)", "CANCELE este boleto no
+ * banco…" e saldo R$ 3.600,00 a devolver.
+ */
+export function oQueAconteceNoDesconto(d, c, dados, { tipo = 'saida', hoje = C.hojeIso(), registroId = null } = {}) {
+  const texto = String(dados.debitos_descricao || '');
+  if (!texto) return null;
+  const jaDesta = registroId ? d.cobrancas.filter((cb) => cb.contrato_id === c.id && cb.quitado_devolucao === Number(registroId)) : [];
+  const descontados = [...cobrancasEmAberto(d, c.id), ...jaDesta].filter((cb) => texto.includes(`${nomeDebitoSaida(cb)} em aberto`))
+    .sort((a, b) => (a.vencimento || '').localeCompare(b.vencimento || '') || a.id - b.id);
+  if (!descontados.length) return null;
+  const ids = new Set(descontados.map((cb) => cb.id));
+  const nomeBoleto = (cb) => (ehParcelaAcordo(cb) ? `parcela ${cb.acordo_parcela || 'única'} do acordo` : C.compBr(cb.competencia));
+  // notificações de aluguel em atraso ainda abertas: fecham se todos os boletos delas ficam quitados (pagos ou descontados agora)
+  const abertas = (d.notificacoes || []).filter((n) => n.contrato_id === c.id && ehNotificacaoAtraso(n) && NOTIFICACAO_ABERTA.includes(n.situacao));
+  const boletos = descontados.map((cb) => {
+    const banco = cb.banco && cb.banco.situacao === 'emitido' ? 'c6' : cb.boleto_pdf ? 'pdf' : null;
+    const notificacoes = abertas.filter((n) => (n.boletos || []).includes(cb.id)).map((n) => {
+      const faltam = boletosDaNotificacao(d, n).filter((b) => !b.quitado && !ids.has(b.cobranca.id)).map((b) => nomeBoleto(b.cobranca));
+      return { id: n.id, data: n.data, fecha: !faltam.length, faltam };
+    });
+    const acontece = [`Será marcado como pago com a ${tipo === 'saida' && temCaucao(c) ? 'caução' : 'garantia'} (situação "Descontado da garantia") e não é mais cobrado.`,
+      ...notificacoes.map((n) => (n.fecha ? `A notificação de ${C.dataBr(n.data)} será fechada (Resolvida).`
+        : `A notificação de ${C.dataBr(n.data)} continua aberta: ainda falta o boleto ${n.faltam.join(', ')}.`))];
+    const avisoBanco = banco ? `CANCELE este boleto no banco (C6) antes de confirmar, senão o inquilino pode pagar de novo (${banco === 'c6' ? 'emitido no C6 pelo sistema: botão "Cancelar no banco" na página do boleto' : 'feito à mão no site do banco, com o PDF anexado'}).` : '';
+    return { cobranca: cb, nome: nomeDebitoSaida(cb), mes: cb.competencia, vencimento: cb.vencimento, valor: valorDebitoSaida(cb, hoje), banco, notificacoes, acontece, avisoBanco };
+  });
+  // o mesmo cálculo que vai ser gravado (na saída, os honorários e despesas de cobrança escolhidos somam aos débitos)
+  let cobranca = 0;
+  if (tipo === 'saida' && dados.cobranca) {
+    try { cobranca = cobrancaEscolhida(d, c, cobrancasEmAberto(d, c.id), dados.cobranca, hoje).total || 0; } catch (e) { if (!(e instanceof C.ErroUsuario)) throw e; }
+  }
+  const debitos = (dados.debitos || 0) + cobranca;
+  const calc = tipo === 'saida'
+    ? calcularEncerramento(dados.garantia_valor, dados.indice_percentual, debitos, dados.fci_credito, dados.fci_danos, dados.creditos)
+    : calcularEncerramento(dados.garantia_valor, dados.indice_percentual, debitos, 0, 0, dados.creditos);
+  const quem = tipo === 'saida' ? 'ao inquilino' : `a ${c.inquilino_nome}`;
+  const textoSaldo = calc.saldo > 0 ? `Saldo a devolver ${quem}: ${C.reais(calc.saldo)}`
+    : calc.saldo < 0 ? `Saldo a cobrar ${tipo === 'saida' ? 'do inquilino' : `de ${c.inquilino_nome}`}: ${C.reais(-calc.saldo)}${tipo === 'saida' ? ' (boleto do saldo, no roteiro da saída)' : ''}`
+    : 'Saldo zerado: nada a devolver nem a cobrar';
+  return { boletos, cancelarNoBanco: boletos.some((b) => b.banco), garantia: dados.garantia_valor || 0, garantia_corrigida: calc.garantia_corrigida,
+    debitos, danos_alem_do_fci: tipo === 'saida' ? (dados.fci_danos || 0) - calc.fci_usado : 0, creditos: dados.creditos || 0, fci_devolver: calc.fci_devolver || 0, saldo: calc.saldo, textoSaldo };
+}
+
+/** Cálculo final desfeito: os boletos que ele descontava voltam a ser cobrados (e a notificação de atraso fechada por eles reabre). */
 export function liberarBoletosDaSaida(d, encerramentoId, usuario) {
+  const contratos = new Set();
   for (const cb of d.cobrancas.filter((x) => x.quitado_saida === Number(encerramentoId))) {
     atualizar(d, 'cobrancas', cb.id, { quitado_saida: null, situacao: cb.data_pagamento ? cb.situacao : 'Em aberto' }, usuario,
       `Boleto ${C.compBr(cb.competencia)} volta a ser cobrado (cálculo final desfeito)`);
+    contratos.add(cb.contrato_id);
   }
+  for (const id of contratos) reabrirNotificacoesDeAtraso(d, id, usuario, 'cálculo final desfeito');
 }
 
 export const encerramentoDo = (d, contratoId) => d.encerramentos.find((e) => e.contrato_id === contratoId) || null;
@@ -5008,19 +5067,26 @@ export function salvarDevolucaoGarantia(d, contratoId, dados, usuario, id = null
   // troca de titular: os boletos em aberto descontados nos débitos (linha "Aluguel MM/AAAA em aberto" mantida) não se cobram mais,
   // como no cálculo final da saída; excluir a devolução os libera. Na troca de garantia o inquilino continua (os boletos seguem).
   if (!trocaId) {
-    liberarBoletosDaDevolucao(d, r.id, usuario);
+    liberarBoletosDaDevolucao(d, r.id, usuario, false);
     for (const cb of boletosDescontadosNaSaida(d, a, dados.debitos_descricao)) {
       atualizar(d, 'cobrancas', cb.id, { quitado_devolucao: r.id, situacao: 'Descontado da garantia' }, usuario, `Boleto ${C.compBr(cb.competencia)} descontado da garantia devolvida na troca de titular`);
     }
+    // notificação de aluguel em atraso: fecha a dos boletos descontados e reabre a do boleto que saiu dos débitos (25/11/2026)
+    reabrirNotificacoesDeAtraso(d, a.id, usuario, 'boleto fora da devolução da garantia');
+    baixarNotificacoesDeAtraso(d, a.id, usuario, 'descontado(s) da garantia');
   }
   return r;
 }
 
 /** Devolução da garantia da troca de titular excluída (ou refeita): os boletos que ela descontava voltam a ser cobrados. */
-export function liberarBoletosDaDevolucao(d, devolucaoId, usuario) {
+export function liberarBoletosDaDevolucao(d, devolucaoId, usuario, reabrir = true) {
+  const contratos = new Set();
   for (const cb of d.cobrancas.filter((x) => x.quitado_devolucao === Number(devolucaoId))) {
     atualizar(d, 'cobrancas', cb.id, { quitado_devolucao: null, situacao: cb.data_pagamento ? cb.situacao : 'Em aberto' }, usuario, `Boleto ${C.compBr(cb.competencia)} volta a ser cobrado (devolução da garantia desfeita)`);
+    contratos.add(cb.contrato_id);
   }
+  // a notificação de atraso fechada pelo desconto volta a esperar o pagamento (``reabrir`` false: a devolução está sendo refeita)
+  if (reabrir) for (const id of contratos) reabrirNotificacoesDeAtraso(d, id, usuario, 'devolução da garantia desfeita');
 }
 
 /**
@@ -7111,7 +7177,7 @@ export function atrasoQuitado(d, n) {
  * Baixa sozinha das notificações de aluguel em atraso do contrato já pagas (a mais nova aberta de cada assunto; as anteriores se
  * resolvem com ela, como na baixa à mão). A data da baixa é a do último pagamento (não antes da notificação). Devolve quantas.
  */
-export function baixarNotificacoesDeAtraso(d, contratoId, usuario) {
+export function baixarNotificacoesDeAtraso(d, contratoId, usuario, como = 'pago(s)') {
   let n = 0;
   for (const x of (d.notificacoes || []).filter((y) => y.contrato_id === contratoId && ehNotificacaoAtraso(y) && NOTIFICACAO_ABERTA.includes(y.situacao))) {
     const atual = buscar(d, 'notificacoes', x.id);
@@ -7121,8 +7187,8 @@ export function baixarNotificacoesDeAtraso(d, contratoId, usuario) {
     const pago = atrasoQuitado(d, atual);
     if (!pago) continue;
     const nomes = boletosDaNotificacao(d, atual).map((b) => (ehParcelaAcordo(b.cobranca) ? `acordo ${b.cobranca.acordo_parcela || ''}`.trim() : C.compBr(b.cobranca.competencia))).join(', ');
-    darBaixaNotificacao(d, atual.id, { data: pago < atual.data ? atual.data : pago, observacao: `Baixa automática: boleto(s) ${nomes} pago(s)` }, usuario);
-    atualizar(d, 'notificacoes', atual.id, { baixa_automatica: true }, usuario, `Notificação de ${C.dataBr(atual.data)}: baixa automática (pagamento)`);
+    darBaixaNotificacao(d, atual.id, { data: pago < atual.data ? atual.data : pago, observacao: `Baixa automática: boleto(s) ${nomes} ${como}` }, usuario);
+    atualizar(d, 'notificacoes', atual.id, { baixa_automatica: true }, usuario, `Notificação de ${C.dataBr(atual.data)}: baixa automática (${como === 'pago(s)' ? 'pagamento' : como})`);
     n += 1;
   }
   return n;
@@ -7143,14 +7209,14 @@ export function boletosEmOutraNotificacao(d, contratoId, ids, exceto = []) {
 }
 
 /** Pagamento desfeito: a notificação de atraso que tinha tido a baixa automática e não está mais paga volta a esperar o pagamento. */
-function reabrirNotificacoesDeAtraso(d, contratoId, usuario) {
+function reabrirNotificacoesDeAtraso(d, contratoId, usuario, motivo = 'pagamento desfeito') {
   for (const n of (d.notificacoes || []).filter((y) => y.contrato_id === contratoId && ehNotificacaoAtraso(y) && y.situacao === 'Resolvida' && y.baixa_automatica)) {
     if (atrasoQuitado(d, n)) continue;
     const quando = n.resolvida_em;
     atualizar(d, 'notificacoes', n.id, { situacao: 'Aguardando resposta', resolvida_em: null, observacao_baixa: '', baixa_automatica: false }, usuario,
-      `Notificação de ${C.dataBr(n.data)} volta a esperar o pagamento (pagamento desfeito)`);
+      `Notificação de ${C.dataBr(n.data)} volta a esperar o pagamento (${motivo})`);
     for (const a of cadeiaDaNotificacao(d, n).slice(0, -1).filter((x) => x.situacao === 'Resolvida' && x.resolvida_em === quando)) {
-      atualizar(d, 'notificacoes', a.id, { situacao: 'Reiterada', resolvida_em: null }, usuario, `Notificação de ${C.dataBr(a.data)} volta a "Reiterada" (pagamento desfeito)`);
+      atualizar(d, 'notificacoes', a.id, { situacao: 'Reiterada', resolvida_em: null }, usuario, `Notificação de ${C.dataBr(a.data)} volta a "Reiterada" (${motivo})`);
     }
   }
 }

@@ -559,10 +559,12 @@ export const FORMULARIOS = {
       try { cfg.ajustar({ ...dados }, mais, registro, form, rota.q); } catch { /* conferência que depende de campo errado */ }
       for (const [k, v] of Object.entries(mais)) if (!erros[k]) erros[k] = v;
     }
-    if (cfg.confirmar && !Object.keys(erros).length && !(await cfg.confirmar(dados, registro))) throw new C.ErroUsuario('Nada foi salvo. Corrija o que precisar e salve de novo.');
+    if (cfg.confirmar && !Object.keys(erros).length && !(await cfg.confirmar(dados, registro, rota.q))) throw new C.ErroUsuario('Nada foi salvo. Corrija o que precisar e salve de novo.');
     if (cfg.ajustarAsync && !Object.keys(erros).length) await cfg.ajustarAsync(dados, erros, registro, form, rota.q);
     if (Object.keys(erros).length) return { erros, valores: Object.fromEntries(new FormData(form)) };
     await confirmarAvisos(cfg.conferir ? cfg.conferir(dados, registro, rota.q) : []);
+    // a última pergunta antes de gravar (ex.: cálculo final com boleto descontado da caução, 25/11/2026), depois dos avisos
+    if (cfg.confirmarNoFim && !(await cfg.confirmarNoFim(dados, registro, rota.q))) throw new C.ErroUsuario('Nada foi salvo. Corrija o que precisar e salve de novo.');
     Object.assign(dados, cfg.fixos ? cfg.fixos(registro, rota.q) : {});
     const descricao = cfg.descricao ? cfg.descricao(dados, registro, rota.q) : null;
     let recalculados = 0;
