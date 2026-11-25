@@ -21,6 +21,10 @@
 - A 2ª via mostra "setting 'hidden'" no console do navegador.
 - Também anotadas nos testes: a pergunta 2 do resumo do contrato fala em honorários sem as condições (vale a cláusula); no cálculo final, mudar à mão o valor da multa do aviso não muda o texto da descrição; o CPF da testemunha fica no navegador depois de "Sair" (`assinatura-contrato-<id>`); a ponte do C6 (`emission_date`), `conciliacao.js` e `envios.js` ainda usam a data de antes (das 21h em diante sairia o dia seguinte); a 2ª notificação de atraso não pega o boleto que venceu depois da 1ª (só avisa).
 
+**Em programação (PR separada):** [ ] boleto descontado da garantia no cálculo final fecha a notificação de atraso e precisa ser cancelado no banco: a tela mostra ao operador tudo o que vai acontecer e ele dá o OK (decisão do dono de 25/11).
+
+**Decidido em 25/11:** [x] o botão "Corrigir caução" fica com esse nome (confirma 14/11; não há mais pendência).
+
 **Próximo trabalho do Claude:** o **kit de teste automático** (agendado pelo dono): banco com os casos montados e um roteiro que sobe o site e a nuvem local e roda os 4 lugares.
 
 ## ONDE PARAMOS em 24/11/2026, noite (histórico; atualizado em 25/11)
