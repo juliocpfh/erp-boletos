@@ -1761,7 +1761,7 @@ export const ACOES = {
             previa.innerHTML = `<b>Boletos novos:</b><br>${p.boletos.map((b) => `${b.parcela || 'único'} · vence ${dataBr(b.vencimento)} · <b>${reais(b.valor)}</b> (NF ${reais(b.nf)})`).join('<br>')}
               <br>Dívida de hoje ${reais(p.divida)} · combinado ${reais(p.total)}${p.cobranca.total ? ` + honorários e despesas de cobrança ${reais(p.cobranca.total)} (fora da NF e sem multa) = <b>${reais(p.totalComCobranca)}</b>` : ''}. Na NF vai o aluguel com multa e juros do acordo; ${p.foraDaNf < 0
     ? `a reserva (ou o ressarcimento) já abatida no boleto também entra (${reais(-p.foraDaNf)} a mais na NF), como no pagamento normal.`
-    : `IPTU, seguro e tarifa (${reais(p.foraDaNf)}) ficam fora, como sempre.`}`;
+    : `${p.foraDaNf - p.herdadoTotal > 0 || !p.herdadoTotal ? `IPTU, seguro e tarifa (${reais(p.foraDaNf - p.herdadoTotal)}) ficam fora, como sempre` : ''}${p.herdadoTotal ? `${p.foraDaNf - p.herdadoTotal > 0 ? '; ' : ''}os honorários e despesas de cobrança do acordo anterior (${reais(p.herdadoTotal)}) continuam fora da NF e sem multa nem juros` : ''}.`}`;
           } catch (e) { previa.innerHTML = `<span class="texto-perigo">${esc(e.message)}</span>`; }
         };
         total.addEventListener('input', () => { mexeu = true; });

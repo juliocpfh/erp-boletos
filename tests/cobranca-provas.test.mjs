@@ -312,3 +312,34 @@ test('cálculo final depois do acordo quebrado: a parcela com honorários fica f
   const out = R.boletoDoMes(d, c.id, '2026-10');
   assert.deepEqual(s.boletos.map((x) => x.id), [out.id]);
 });
+
+test('acordo quebrado refeito: honorários e despesas da parcela antiga passam à nova em encargos_cobranca (sem multa e juros, fora da NF)', () => {
+  const { d, c, cb, ago, carta } = comProvas();
+  const a1 = R.fazerAcordo(d, { contrato_id: c.id, ids: [ago.id, cb.id], total: 400000, parcelas: 1, primeiro_vencimento: '2026-12-10', cobranca: { honorarios: true, despesas: [carta.id] } }, 'julio', HOJE);
+  const velha = a1.parcelas[0];
+  const encVelha = velha.encargos_cobranca.reduce((s, e) => s + e.valor, 0);
+  assert.equal(encVelha, a1.acordo.honorarios + 2850);
+  const dia = '2027-01-20';
+  const divida = C.liquidar(velha, dia).valor_devido;
+  // em 1 boleto: leva os mesmos honorários e a mesma despesa, com o mesmo texto
+  const p1 = R.previaAcordo(d, { contrato_id: c.id, ids: [velha.id], total: divida, parcelas: 1, primeiro_vencimento: '2027-02-10' }, dia);
+  assert.equal(p1.herdadoTotal, encVelha);
+  assert.deepEqual(p1.boletos[0].encargos.map((e) => [e.texto, e.valor]), velha.encargos_cobranca.map((e) => [e.texto, e.valor]));
+  assert.equal(p1.boletos[0].valor, divida, 'o total não muda: os herdados já estão na dívida');
+  // em 3 boletos: divididos na proporção, a soma fecha
+  const p3 = R.previaAcordo(d, { contrato_id: c.id, ids: [velha.id], total: divida, parcelas: 3, primeiro_vencimento: '2027-02-10' }, dia);
+  assert.equal(p3.boletos.reduce((s, b) => s + b.encargos.reduce((x, e) => x + e.valor, 0), 0), encVelha);
+  assert.ok(p3.boletos.every((b) => b.encargos.length === 2));
+  // gravado: a multa e os juros do boleto novo não contam sobre os herdados
+  const a2 = R.fazerAcordo(d, { contrato_id: c.id, ids: [velha.id], total: divida, parcelas: 1, primeiro_vencimento: '2027-02-10' }, 'julio', dia);
+  const nova = a2.parcelas[0];
+  assert.equal(nova.encargos_cobranca.reduce((s, e) => s + e.valor, 0), encVelha);
+  assert.equal(a2.acordo.honorarios, 0, 'não são honorários novos');
+  const semEnc = { ...nova, outros: nova.outros - encVelha, encargos_cobranca: [] };
+  assert.equal(R.totais(nova).base_multa, R.totais(semEnc).base_multa);
+  const atraso = C.liquidar(nova, '2027-03-12');
+  assert.equal(atraso.multa, C.liquidar(semEnc, '2027-03-12').multa);
+  assert.equal(atraso.juros, C.liquidar(semEnc, '2027-03-12').juros);
+  assert.equal(atraso.valor_nf, C.liquidar(semEnc, '2027-03-12').valor_nf);
+  assert.ok(!/^Encargos do acordo/.test(nova.outros_descricao) || nova.outros > encVelha, 'sem "Encargos do acordo" vazio');
+});

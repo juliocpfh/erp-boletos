@@ -8532,19 +8532,32 @@ export function previaAcordo(d, { contrato_id, ids, total, parcelas, primeiro_ve
   // R$ 73,50 em 1 boleto → R$ 2.273,50, NF igual à do acordo sem eles
   const cob = cobrancaEscolhida(d, c, lista, cobranca, hoje);
   const partesCob = cob.linhas.map((l) => C.parcelas(l.valor, n));
+  // acordo quebrado refeito: os honorários e despesas que as parcelas antigas traziam (já dentro da dívida e do combinado) passam
+  // às parcelas novas, na proporção, continuando em `encargos_cobranca` (fora da NF, da multa e dos juros; regra de 24/11/2026).
+  // Ex.: parcela antiga de R$ 2.200,00 com R$ 200,00 de honorários refeita em 1 boleto → o novo leva os R$ 200,00 como honorários
+  const herdadosPorTexto = new Map();
+  for (const cb of lista) for (const e of cb.encargos_cobranca || []) if (e.valor > 0) herdadosPorTexto.set(e.texto, (herdadosPorTexto.get(e.texto) || 0) + e.valor);
+  let livreHerdado = Math.max(0, foraDaNf - fciOrigem);
+  const herdados = [...herdadosPorTexto].map(([texto, valor]) => { const v = Math.min(valor, livreHerdado); livreHerdado -= v; return { texto, valor: v }; }).filter((x) => x.valor > 0);
+  const partesHerdadas = herdados.map((h) => C.parcelas(h.valor, n));
+  const pendentesHerdados = herdados.map(() => 0);
   const mesSeguinte = c.cobranca_mes_seguinte !== false;
   const boletos = valores.map((valor, k) => {
     const vencimento = C.somarMesesData(primeiro_vencimento, k);
     const outros = Math.min(fora[k], valor);
     const fci = Math.max(0, Math.min(fciPorParcela[k] + fciPendente, outros));
     fciPendente += fciPorParcela[k] - fci;
-    const encargos = cob.linhas.map((l, j) => ({ texto: l.texto, valor: partesCob[j][k] })).filter((x) => x.valor > 0);
-    const extra = somaValores(encargos);
+    // o herdado cabe no que sobra do "fora da NF" desta parcela depois do FCI (o que não couber passa à seguinte)
+    let livre = outros - fci;
+    const daHeranca = herdados.map((h, j) => { const v = Math.max(0, Math.min(partesHerdadas[j][k] + pendentesHerdados[j], livre)); pendentesHerdados[j] += partesHerdadas[j][k] - v; livre -= v; return { texto: h.texto, valor: v }; });
+    const encargos = [...daHeranca, ...cob.linhas.map((l, j) => ({ texto: l.texto, valor: partesCob[j][k] }))].filter((x) => x.valor > 0);
+    const extra = somaValores(cob.linhas.map((l, j) => ({ valor: partesCob[j][k] })));
     return { valor: valor + extra, vencimento, competencia: mesSeguinte ? C.somarMeses(vencimento.slice(0, 7), -1) : vencimento.slice(0, 7), nf: valor - outros, outros: outros - fci + extra, fci, encargos, parcela: n > 1 ? `${k + 1}/${n}` : '' };
   });
+  const herdadoTotal = somaValores(herdados);
   const periodos = lista.map((cb) => (ehParcelaAcordo(cb) && cb.acordo_periodo) || C.periodoServico(cb.competencia, c.data_entrada, c.data_saida));
   const periodo = [periodos.map((x) => x[0]).sort()[0], periodos.map((x) => x[1]).sort().pop()];
-  return { contrato: c, origens: lista, original, divida, total, foraDaNf, boletos, periodo, referente: lista.map(nomeNoAcordo).join(', '), cobranca: cob, totalComCobranca: total + cob.total };
+  return { contrato: c, origens: lista, original, divida, total, foraDaNf, boletos, periodo, referente: lista.map(nomeNoAcordo).join(', '), cobranca: cob, totalComCobranca: total + cob.total, herdados, herdadoTotal };
 }
 
 /** Faz o acordo: os boletos vencidos ficam "Em acordo" (fora da inadimplência) e saem os boletos novos das parcelas. */
