@@ -141,7 +141,7 @@ function telaNovoComunicado(q, editarId = null) {
   const m = { ...(CM.MODELOS[chave] || CM.MODELOS.contatos), ...(editado ? Object.fromEntries(['titulo', 'assunto', 'texto', 'whatsapp', 'lembrete', 'aviso', 'ciencia'].map((k) => [k, editado[k] || ''])) : {}) };
   const pessoas = editado ? editado.destinos : CM.destinatarios(d());
   if (!pessoas.length) return `${voltar}<h1>Novo comunicado a todos</h1><div class="alerta aviso">Não há inquilino com contrato ativo hoje: o comunicado não teria para quem ir.</div>`;
-  const prazo = editado ? editado.prazo : C.somarDias(C.hojeIso(), DIAS_PRAZO); // ex.: hoje 18/11 → 28/11
+  const prazo = editado ? editado.prazo : C.somarDias(C.inicioDoPrazoAgora(), DIAS_PRAZO); // ex.: 18/11 às 10h → 28/11; às 21h → 29/11 (regra fim_expediente_hora)
   const email = editado ? editado.email_empresa : K.dadoDaEmpresa(d(), {}, 'email_contato') || 'administracao@ankjck.com.br';
   // telefone: o do comunicado editado ou o do último comunicado gravado (não precisa digitar toda vez)
   const ultimo = [...(d().comunicados || [])].sort((a, b) => b.id - a.id).find((x) => x.telefone_empresa);

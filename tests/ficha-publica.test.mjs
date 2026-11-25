@@ -97,7 +97,7 @@ test('documentos: só PDF, JPG ou PNG pelos bytes, até 10 MB, com nome dado pel
   const chave = await criar(ctx);
   const r = await ctx.publico(chave, 'PUT', `ficha/arquivo?documento=${encodeURIComponent('3 últimos holerites')}&nome=holerite%20outubro.pdf`, PDF);
   assert.equal(r.status, 200);
-  const doDia = (k) => k.startsWith(PASTA + '/link-3-ultimos-holerites-' + new Date().toISOString().slice(0, 10) + '-') && /-[0-9a-f]{6}\.pdf$/.test(k);
+  const doDia = (k) => k.startsWith(PASTA + '/link-3-ultimos-holerites-' + new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()) + '-') && /-[0-9a-f]{6}\.pdf$/.test(k);
   assert.equal([...ctx.env.DADOS.m.keys()].filter(doDia).length, 1);
   assert.equal((await ctx.publico(chave, 'PUT', `ficha/arquivo?documento=${encodeURIComponent('3 últimos holerites')}&nome=b.pdf`, PDF)).status, 200);
   assert.equal([...ctx.env.DADOS.m.keys()].filter(doDia).length, 2, 'não apaga o anterior');
@@ -258,4 +258,14 @@ test('entrada-007: mandar de novo (manter) deixa o link antigo valendo e não mu
   assert.equal((await ctx.publico(quarta, 'GET', 'ficha')).status, 404);
   assert.equal((await ctx.publico(quinta, 'GET', 'ficha')).status, 404);
   assert.ok(![...ctx.env.DADOS.m.keys()].some((k) => k.startsWith('publico/tokens/')), 'sem ponteiros sobrando');
+});
+
+test('validade do link: fim do 7º dia em Brasília; depois do expediente conta de amanhã (decisão de 24/11/2026)', async () => {
+  const ctx = ambiente();
+  const r = await ctx.equipe('POST', 'link', { ficha_id: 8, pessoa: 'interessado', pasta: PASTA, formulario: FORMULARIO, valores: {}, contexto: { nome: 'Maria' }, fim_expediente: 24 });
+  const { vence_em } = await r.json();
+  const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+  const [a, m, d] = hoje.split('-').map(Number);
+  const ultimo = new Date(Date.UTC(a, m - 1, d) + 7 * 86400000).toISOString().slice(0, 10);
+  assert.equal(vence_em, new Date(`${ultimo}T23:59:59.999-03:00`).toISOString());
 });

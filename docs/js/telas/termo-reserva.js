@@ -67,7 +67,7 @@ export function caixaTermoReserva(f) {
     <p class="suave">Reserva de <b>${reais(valor)}</b>, abatida do 1º aluguel · documentos em ${R.prazoDosDocumentosTexto(c)} do depósito · reservado por ${c.dias_validade} dias · ficha não aprovada: devolve tudo · ${esc(desistenciaResumo(c, valor))} (o termo avisa em destaque antes do aceite e do pagamento) · devolução (quando houver) em ${C.plural(c.dias_uteis_devolucao, 'dia útil', 'dias úteis')}. <a href="#/regras">Regras do sistema</a></p>
     <details><summary class="suave">Ver o termo como a pessoa vai ler</summary><pre class="texto-modelo">${esc(REC.textoDoTermo(REC.termoDaReserva(d(), f)))}</pre></details>
     <p class="acoes">${botoes} ${botaoEmail('ficha_termo_reserva', { ficha: f.id }, '✉ E-mail: condições e termo da reserva')} ${pdf}</p>
-    <p class="suave" data-situacao-aceite>${vale ? `Link até ${dataBr(String(vale.vence_em).slice(0, 10))}.${naAba ? '' : ' Para mandar de novo, gere outro (o endereço só aparece na hora em que é gerado).'}` : ''}</p></div>`;
+    <p class="suave" data-situacao-aceite>${vale ? `Link até ${C.dataBrDe(vale.vence_em)}.${naAba ? '' : ' Para mandar de novo, gere outro (o endereço só aparece na hora em que é gerado).'}` : ''}</p></div>`;
 }
 
 /** Depois de desenhar a ficha: lê o link na nuvem; aceite novo vai para a ficha (e a página é desenhada de novo). */
@@ -89,7 +89,7 @@ export async function ligarTermoReserva(raiz) {
   const s = caixa.querySelector('[data-situacao-aceite]');
   if (s && !l.resposta && caixa.isConnected) {
     s.innerHTML = `${l.encerrado_em ? etiqueta('link encerrado', 'neutra') : Date.parse(l.vence_em) < Date.now() ? etiqueta('link vencido', 'aviso') : etiqueta(l.aberto_em ? 'aberto, sem aceite ainda' : 'ainda não aberto', 'info')}
-      <span class="suave">${l.aberto_em ? ` · aberto em ${esc(quando(l.aberto_em))}` : ''}${l.codigo_enviado_para ? ` · código pedido para ${esc(l.codigo_enviado_para)}` : ''} · link até ${dataBr(String(l.vence_em).slice(0, 10))}</span>`;
+      <span class="suave">${l.aberto_em ? ` · aberto em ${esc(quando(l.aberto_em))}` : ''}${l.codigo_enviado_para ? ` · código pedido para ${esc(l.codigo_enviado_para)}` : ''} · link até ${C.dataBrDe(l.vence_em)}</span>`;
   }
 }
 
@@ -98,7 +98,7 @@ async function janelaDoAceite(f, l) {
   const tel = FO.telefoneWhatsapp(f, 'interessado');
   await janela({
     titulo: `Termo da reserva: ${f.inquilino_nome}`, sim: 'Fechar', nao: 'Voltar',
-    html: `<p>Vale até <b>${dataBr(String(l.vence_em).slice(0, 10))}</b>. É só desta pessoa: não publique.</p>
+    html: `<p>Vale até <b>${C.dataBrDe(l.vence_em)}</b>. É só desta pessoa: não publique.</p>
       <p class="texto-aviso"><b>Copie agora:</b> por segurança, este link não fica guardado no sistema. Se você mandar agora o e-mail "Condições e termo da reserva" (botão na ficha), ele já leva o link.</p>
       <p><textarea rows="5" readonly data-texto-link style="width:100%">${esc(TR.textoWhatsappAceite(f, l))}</textarea></p>
       <p class="acoes"><button type="button" class="secundario pequeno" data-copiar-link>Copiar a mensagem</button>
@@ -124,7 +124,7 @@ export const ACOES_TERMO = {
     const l = await TR.criarLinkDoAceite(TR.pedidoDoAceite(d(), f, await logoReduzida()));
     TR.lembrarUrlDoAceite(f.id, l);
     await alterar((db) => R.atualizar(db, 'fichas', f.id, { link_aceite: { vence_em: l.vence_em, criado_em: new Date().toISOString(), por: login() } }, login(),
-      `Link do termo da reserva de ${f.inquilino_nome} gerado (vale até ${dataBr(String(l.vence_em).slice(0, 10))})`));
+      `Link do termo da reserva de ${f.inquilino_nome} gerado (vale até ${C.dataBrDe(l.vence_em)})`));
     await mostrar();
     await janelaDoAceite(buscar('fichas', id), l);
   },

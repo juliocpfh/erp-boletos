@@ -114,7 +114,7 @@ export function textoWhatsapp(f, pessoa, link, { lembrete = false, faltando = []
   const nome = String(nomeDaPessoa(f, pessoa) || '').trim().split(/\s+/)[0];
   const fiador = pessoa !== 'interessado';
   const qual = fiador ? `da ficha do fiador${f.inquilino_nome ? ` (locação de ${f.inquilino_nome})` : ''}` : 'da sua ficha cadastral';
-  const validade = C.dataBr(String(link.vence_em).slice(0, 10));
+  const validade = C.dataBrDe(link.vence_em);
   if (lembrete) {
     return `Olá${nome ? `, ${nome}` : ''}! Passando para lembrar ${qual}${faltando.length ? `. Falta: ${faltando.join('; ')}` : ''}. O link vale até ${validade}: ${link.url}
 Se preferir não seguir, é só avisar por lá${!fiador && f.reserva_valor > 0 ? `. ${REC.textoDesistencia(f)}` : ''}.`.replace(/\.\.$/, '.');
@@ -222,7 +222,8 @@ const chaveDosLinks = (fichaId) => (fichaId ? String(Number(fichaId)) : '');
 export function esquecerLinks() { geracaoDosLinks += 1; linksGuardadosPorFicha.clear(); }
 const esquecendo = (promessa) => promessa.finally(esquecerLinks);
 
-export const criarLinkNaNuvem = (corpo) => esquecendo(pedir('link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) }));
+// fim_expediente: a nuvem conta a validade de amanhã quando o link é criado depois do horário comercial (regra fim_expediente_hora)
+export const criarLinkNaNuvem = (corpo) => esquecendo(pedir('link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...corpo, fim_expediente: C.fimDoExpediente() }) }));
 export const guardarPdfNaNuvem = (fichaId, pessoa, blob) => esquecendo(pedir(`pdf?ficha=${Number(fichaId)}&pessoa=${encodeURIComponent(pessoa)}`, { method: 'PUT', headers: { 'Content-Type': 'application/pdf' }, body: blob }));
 /** Sempre vai à nuvem (as ações de conferir usam esta); o que veio fica guardado para os desenhos seguintes. */
 export const linksNaNuvem = (fichaId = null) => {

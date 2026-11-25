@@ -12,6 +12,7 @@
 
 import { chamarPonte } from './banco.js';
 import * as K from './c6-comum.js';
+import { hojeIso } from './calculos.js';
 
 let SIM = null; // dados fictícios do `?teste` (simulado-banco.js): só carregam no modo de teste
 
@@ -159,7 +160,7 @@ async function ponteSimulada(contaId, metodo, caminho, corpo) {
   const m = String(metodo).toUpperCase();
   if (!SIM.EXTRATO[contaId]) erroTeste(`A conta "${contaId}" não está configurada na ponte (no modo de teste só existem ank e jck).`);
   if (m === 'GET' && partes[0] === 'extrato') return { conta_id: contaId, de: q.de, ate: q.ate, lancamentos: extratoTeste(contaId, q.de, q.ate) };
-  if (m === 'GET' && partes[0] === 'saldo') return { ...(SIM.SALDO[contaId] || SIM.SALDO.ank), conta_id: contaId, date: new Date().toISOString().slice(0, 10) };
+  if (m === 'GET' && partes[0] === 'saldo') return { ...(SIM.SALDO[contaId] || SIM.SALDO.ank), conta_id: contaId, date: hojeIso() };
   if (m === 'GET' && partes[0] === 'boletos' && partes[1] === 'pagos') return { conta_id: contaId, de: q.de, ate: q.ate, por: q.por || 'payment_date', boletos: boletosPagosTeste(contaId, q.de, q.ate, q.por || 'payment_date') };
   if (m === 'GET' && partes[0] === 'dda') return { conta_id: contaId, ...(SIM.DDA[contaId] || { items: [] }) };
   if (partes[0] === 'pagamentos') {
@@ -167,7 +168,7 @@ async function ponteSimulada(contaId, metodo, caminho, corpo) {
       const group_id = idTeste();
       // como a ponte: cada item é conferido antes (validarItem, c6-comum) e um item ruim recusa o pedido inteiro
       const items = Array.isArray(corpo && corpo.items) && corpo.items.length ? corpo.items.map((it, i) => K.validarItem(it, i + 1)) : erroTeste('Informe pelo menos um pagamento.');
-      gruposTeste.set(group_id, items.map((it) => K.itemLidoSimulado(contaId, it, { id: idTeste(), group_id, hoje: new Date().toISOString().slice(0, 10) })));
+      gruposTeste.set(group_id, items.map((it) => K.itemLidoSimulado(contaId, it, { id: idTeste(), group_id, hoje: hojeIso() })));
       return { conta_id: contaId, group_id };
     }
     const grupoId = decodeURIComponent(partes[1] || '');
@@ -183,7 +184,7 @@ async function ponteSimulada(contaId, metodo, caminho, corpo) {
   }
   if (m === 'GET' && partes[0] === 'comprovante') {
     const ref = decodeURIComponent(partes[1] || '');
-    const dia = q.data || new Date().toISOString().slice(0, 10);
+    const dia = q.data || hojeIso();
     const l = extratoTeste(contaId, `${dia.slice(0, 7)}-01`, `${dia.slice(0, 7)}-31`).find((x) => x.reference === ref || (x.local_reference && x.local_reference === ref));
     if (!l) erroTeste(`Não achei o lançamento ${ref} no extrato (modo de teste).`);
     const pdf = pdfDeTexto(['Comprovante de movimentacao bancaria (TESTE, sem valor)', `Conta: ${contaId.toUpperCase()} (C6 Bank)`, `Data do lancamento: ${l.entry_date}`,
