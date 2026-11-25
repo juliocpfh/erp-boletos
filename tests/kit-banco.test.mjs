@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as C from '../docs/js/calculos.js';
+import * as FO from '../docs/js/ficha-online.js';
 import * as R from '../docs/js/regras.js';
 import { HOJE, montarBanco } from './kit/banco.mjs';
 
@@ -20,5 +21,10 @@ test('banco do kit: monta pelas regras, só com os documentos de teste, e com os
   assert.equal(R.buscar(d, 'encerramentos', ids.encerramento).saldo, 340000);
   assert.equal(R.buscar(d, 'notificacoes', ids.notificacao).situacao, 'Aguardando resposta');
   assert.ok(R.buscar(d, 'fichas', ids.ficha).aceite_reserva);
+  // o link da ficha de Igor vem com a profissão da ficha antiga dele; nada dos outros cadastros com o mesmo CPF de teste
+  const v = FO.valoresDoLink(d, R.buscar(d, 'fichas', ids.ficha), 'interessado');
+  assert.equal(v.inquilino_profissao, 'Analista de testes');
+  assert.equal(v.inquilino_email, 'ficha@exemplo.com.br');
+  assert.equal(v.inquilino_telefone, undefined, 'o telefone é dos contratos de Ana, Bruno…: outra pessoa');
   assert.equal(d.usuarios.filter((u) => u.papel === 'admin' && u.ativo).length, 1);
 });

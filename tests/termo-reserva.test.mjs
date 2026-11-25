@@ -301,16 +301,13 @@ const FORM = [{ secao: 'Dados' }, { nome: 'inquilino_nome', rotulo: 'Nome comple
 const PDF = new TextEncoder().encode('%PDF-1.4 teste');
 const PDF2 = new TextEncoder().encode('%PDF-1.4 outro');
 
-test('correção pela pessoa: troca e apaga documento, reenvia dados com o que mudou; conferido trava; a equipe é avisada a cada passo', async () => {
+test('correção pela pessoa: antes de mandar troca e apaga documento; mandou, fica em análise; devolvida, corrige com o que mudou; a equipe é avisada', async () => {
   const ctx = ambiente();
   const r = await ctx.equipe('POST', 'link', { ficha_id: 9, pessoa: 'interessado', pasta: PASTA, formulario: FORM, valores: { inquilino_nome: 'Maria Souza' },
     contexto: { empresa: 'ANK', nome: 'Maria Souza', imovel: 'Rua das Flores, 120', reserva: 'R$ 500,00', devolucao: 'Se desistir até 17/12/2026, a reserva de R$ 500,00 volta por inteiro.', documentos: ['Documento com foto e CPF (RG ou CNH)', '3 últimos holerites'], dica: 'PDF' } }, 'ficha-online');
   const chave = (await r.json()).url.split('#')[1];
   const env = ctx.env;
-  // dados: 1º envio e a correção (guarda o que mudou)
-  assert.equal((await ctx.publico(chave, 'POST', 'ficha/enviar', { valores: { inquilino_nome: 'Maria Souza', inquilino_profissao: 'Professora' }, declaracao: true })).status, 200);
-  assert.equal((await ctx.publico(chave, 'POST', 'ficha/enviar', { valores: { inquilino_nome: 'Maria Souza', inquilino_profissao: 'Engenheira' }, declaracao: true })).status, 200);
-  // documentos: manda dois, troca um, apaga o outro
+  // documentos antes de mandar os dados: manda dois, troca um, apaga o outro
   const um = await (await ctx.publico(chave, 'PUT', 'ficha/arquivo?documento=3%20%C3%BAltimos%20holerites&nome=errado.pdf', PDF)).json();
   const dois = await (await ctx.publico(chave, 'PUT', 'ficha/arquivo?documento=outro&nome=sem-querer.pdf', PDF)).json();
   assert.match(um.arquivo, /^link-3-ultimos-holerites-\d{4}-\d{2}-\d{2}-[0-9a-f]{6}\.pdf$/);
@@ -320,25 +317,42 @@ test('correção pela pessoa: troca e apaga documento, reenvia dados com o que m
   assert.equal((await ctx.publico(chave, 'POST', 'ficha/apagar', { arquivo: dois.arquivo })).status, 200);
   assert.equal((await ctx.publico(chave, 'POST', 'ficha/apagar', { arquivo: dois.arquivo })).status, 404, 'já apagado');
   assert.equal((await ctx.publico(chave, 'POST', 'ficha/apagar', { arquivo: '../../x.pdf' })).status, 404, 'nome fora do padrão');
-  const lido = await (await ctx.publico(chave, 'GET', 'ficha')).json();
-  assert.deepEqual(lido.arquivos.map((a) => a.nome_original), ['certo.pdf']);
+  // dados: o 1º envio; depois, em análise, não muda mais nada (só documento novo)
+  assert.equal((await ctx.publico(chave, 'POST', 'ficha/enviar', { valores: { inquilino_nome: 'Maria Souza', inquilino_profissao: 'Professora' }, declaracao: true })).status, 200);
+  let lido = await (await ctx.publico(chave, 'GET', 'ficha')).json();
+  assert.ok(lido.em_analise_em, 'em análise depois de mandar');
+  const certo = lido.arquivos[0].arquivo;
+  const segundo = await ctx.publico(chave, 'POST', 'ficha/enviar', { valores: { inquilino_nome: 'Maria Souza', inquilino_profissao: 'Engenheira' }, declaracao: true });
+  assert.equal(segundo.status, 409);
+  assert.match((await segundo.json()).erro, /em análise pela nossa equipe/);
+  assert.equal((await ctx.publico(chave, 'POST', 'ficha/apagar', { arquivo: certo })).status, 409);
+  assert.equal((await ctx.publico(chave, 'PUT', `ficha/arquivo?documento=outro&nome=x.pdf&troca=${certo}`, PDF)).status, 409);
+  assert.equal((await ctx.publico(chave, 'PUT', 'ficha/arquivo?documento=outro&nome=novo.pdf', PDF)).status, 200, 'documento novo, sim');
+  // a equipe devolve: volta com o que a ficha tem agora; a pessoa corrige e o envio guarda o que mudou
+  assert.equal((await ctx.equipe('POST', 'atualizar', { ficha_id: 9, pessoa: 'interessado', liberar: true, valores: { inquilino_nome: 'Maria Souza', inquilino_profissao: 'Professora' } }, 'ficha-online')).status, 200);
+  lido = await (await ctx.publico(chave, 'GET', 'ficha')).json();
+  assert.equal(lido.em_analise_em, null);
+  assert.ok(lido.devolvido_em);
+  assert.equal(lido.valores.inquilino_profissao, 'Professora', 'volta preenchida');
+  assert.equal(lido.ja_temos.inquilino_profissao, 'Professora');
+  assert.deepEqual(lido.arquivos.map((a) => a.nome_original), ['certo.pdf', 'novo.pdf'], 'e com os documentos');
+  assert.equal((await ctx.publico(chave, 'POST', 'ficha/enviar', { valores: { inquilino_nome: 'Maria Souza', inquilino_profissao: 'Engenheira' }, declaracao: true })).status, 200);
+  lido = await (await ctx.publico(chave, 'GET', 'ficha')).json();
   assert.equal(lido.apagados, 2);
   assert.equal(lido.envios, 2);
   assert.equal(lido.valores.inquilino_profissao, 'Engenheira');
-  assert.deepEqual(ctx.avisos.map((x) => x[0]), ['enviou', 'enviou', 'documento', 'documento', 'trocou', 'apagou']);
-  // a equipe vê o registro do que foi trocado e o que mudou nos dados
+  assert.deepEqual(ctx.avisos.map((x) => x[0]), ['documento', 'documento', 'trocou', 'apagou', 'enviou', 'documento', 'enviou']);
+  // a equipe vê o registro do que foi trocado, o que mudou nos dados e o que mudou do que já tínhamos
   const l = (await (await ctx.equipe('GET', 'lista?ficha=9', undefined, 'ficha-online')).json()).links[0];
   assert.deepEqual(l.respostas.at(-1).mudou, ['inquilino_profissao']);
+  assert.deepEqual(l.respostas.at(-1).corrigiu, ['inquilino_profissao']);
+  assert.deepEqual(l.respostas.at(-1).ja_tinhamos, { inquilino_profissao: 'Professora' });
   assert.equal(l.arquivos.find((a) => a.arquivo === um.arquivo).substituido_por.startsWith('link-3-ultimos-holerites'), true);
   assert.ok(l.arquivos.find((a) => a.arquivo === dois.arquivo).apagado_em);
   assert.ok(l.eventos.some((e) => /documento trocado pelo link: 3 últimos holerites \(errado\.pdf → certo\.pdf\)/.test(e.texto)));
-  // conferido pela equipe: não troca mais; documento novo ainda entra; "Deixar corrigir" libera
+  // conferido pela equipe: trava também; "Deixar corrigir" libera
   assert.equal((await ctx.equipe('POST', 'atualizar', { ficha_id: 9, pessoa: 'interessado', conferido: true }, 'ficha-online')).status, 200);
-  const certo = (await (await ctx.publico(chave, 'GET', 'ficha')).json()).arquivos[0].arquivo;
   assert.equal((await ctx.publico(chave, 'POST', 'ficha/apagar', { arquivo: certo })).status, 409);
-  assert.equal((await ctx.publico(chave, 'POST', 'ficha/enviar', { valores: { inquilino_nome: 'Maria' }, declaracao: true })).status, 409);
-  assert.equal((await ctx.publico(chave, 'PUT', `ficha/arquivo?documento=outro&nome=x.pdf&troca=${certo}`, PDF)).status, 409);
-  assert.equal((await ctx.publico(chave, 'PUT', 'ficha/arquivo?documento=outro&nome=novo.pdf', PDF)).status, 200, 'documento novo, sim');
   assert.equal((await ctx.equipe('POST', 'atualizar', { ficha_id: 9, pessoa: 'interessado', liberar: true }, 'ficha-online')).status, 200);
   assert.equal((await ctx.publico(chave, 'POST', 'ficha/apagar', { arquivo: certo })).status, 200);
 });
