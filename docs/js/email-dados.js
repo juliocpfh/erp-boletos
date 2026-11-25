@@ -245,6 +245,9 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
     inclusos: inclusos.length > 0, iptu_valor: !!(f && f.iptu_estimado > 0), seguro_valor: !!(f && f.seguro_estimado > 0),
     saida_antecipada: !!(c && c.data_saida && c.prazo_tipo !== 'Indeterminado' && fim && c.data_saida < fim),
     devolver: !!(e && e.saldo > 0), cobrar: !!(e && e.saldo < 0), boleto_saldo: !!boletoSaldo,
+    // saldo do cálculo final ainda não devolvido nem pago (24/11/2026): o e-mail do encerramento não diz "Não há valores pendentes".
+    // Ex.: débitos de R$ 3.070,60 e caução de R$ 1.800,00 → saldo −R$ 1.270,60, sem pagamento marcado → true
+    saldo_pendente: !!(e && Number.isFinite(e.saldo) && e.saldo !== 0 && !e.garantia_devolvida_em),
     boleto_saldo_linha: !!(boletoSaldo && boletoSaldo.banco && R.emitidoNoBanco(boletoSaldo) && boletoSaldo.banco.linha_digitavel),
     boleto_saldo_pix: !!(boletoSaldo && boletoSaldo.banco && R.emitidoNoBanco(boletoSaldo) && boletoSaldo.banco.pix_copia_cola),
     link: !!linkDaFicha(f, 'interessado', hoje).url, link_fiador: fiadoresLink.length > 0,
