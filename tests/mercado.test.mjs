@@ -40,12 +40,15 @@ const ANTES = {
   'recibo:reserva:ficha': 'f488d655e0e2e151',
   'recibo:reserva:Maria Souza': '372d9a9245e9cb11',
   'recibo:reserva:João Teste': '5816468f00fd38ad',
-  'recibo:devolucao_chaves:João Teste': 'e7a4ce563c8b6c7f', // 24/11 (advogado 3.5)
+  'recibo:devolucao_chaves:João Teste': '354c41db31cdeb74',
   'recibo:ficha:ficha': 'c1fb1b26d3b7215f',
   'recibo:termo_reserva:ficha': '3f9a3f0623886a01', // 2026-11-24 (novo)
   lembrete: '8efce35480e4a45e',
   conta_emissora: '30804615d55e104f',
 };
+// 24/11 (advogado 3.5): o termo de devolução das chaves diz que o outro orçamento só vale até a devolução. Fica fora da lista
+// de cima para não encostar na linha da ficha, que a sessão da reserva muda ao mesmo tempo (junte as duas quando as PRs entrarem)
+ANTES['recibo:devolucao_chaves:João Teste'] = 'e7a4ce563c8b6c7f';
 
 test('ANK/JCK de hoje: contratos, e-mails, recibos, lembrete e conta dos boletos saem idênticos aos de antes', () => {
   const agora = resumosGerados();
