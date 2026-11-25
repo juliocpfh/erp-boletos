@@ -128,12 +128,15 @@ export function montarBanco() {
 
     // 8. Ficha em análise com o termo da reserva aceito (reserva combinada de R$ 500,00), num imóvel vago
     const vago = imovel('Kit Ficha');
+    // ficha antiga de Igor (reprovada há 15 dias: com 3 meses os dados pessoais saem, LGPD), com dados que a ficha nova não tem: o link da nova vem com eles ("Já temos", 25/11)
+    const antiga = R.inserir(d, 'fichas', { inquilino_nome: 'Igor Ficha Teste', inquilino_cpf: CPF, inquilino_tipo: 'Pessoa física', inquilino_profissao: 'Analista de testes',
+      inquilino_rg: '12.345.678-9', imoveis_ids: [], situacao: 'Reprovada', data_recebida: '2026-11-03', decisao_data: '2026-11-10', decisao_motivo: 'Renda abaixo do pedido (kit)' }, u);
     const ficha = R.inserir(d, 'fichas', { inquilino_nome: 'Igor Ficha Teste', inquilino_cpf: CPF, inquilino_tipo: 'Pessoa física', inquilino_email: 'ficha@exemplo.com.br',
       imoveis_ids: [vago.id], situacao: 'Em análise', data_recebida: '2026-11-23', aluguel_inicial: 190000, dia_vencimento: 10, garantia_tipo: 'Fiador', prazo_meses: 30,
       reserva_combinada: 50000, requisitos: 'Renda de pelo menos 3 vezes o aluguel' }, u);
     R.guardarAceiteReserva(d, ficha.id, { em: '2026-11-24T13:00:00.000Z', email: 'ficha@exemplo.com.br', ip: '203.0.113.7', aparelho: 'Kit/1.0',
       texto_aceito: 'TERMO DE ACEITE DA RESERVA DE IMÓVEL (kit de teste)', texto_sha256: 'a'.repeat(64), condicoes: R.condicoesDaReservaAgora(), reserva_valor: 50000 }, u);
-    Object.assign(ids, { ficha: ficha.id, imovelVago: vago.id });
+    Object.assign(ids, { ficha: ficha.id, imovelVago: vago.id, fichaAntiga: antiga.id });
 
     R.normalizar(d);
     d.revisao = (d.revisao || 0) + 1;

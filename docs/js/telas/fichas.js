@@ -377,8 +377,15 @@ function blocoDoLink(f, l) {
   }
   if (ultimo && !trazido) {
     const dif = diferencasDoEnvio(f, l);
-    partes.push(`<p><b>Dados enviados em ${C.dataHoraBr(ultimo.em)}</b> <span class="suave">(com a declaração marcada)</span></p>
-      ${dif.length ? `<table><tr><th>Campo</th><th>Na ficha</th><th>Enviado</th></tr>${dif.map((x) => `<tr><td>${esc(x.campo.rotulo)}</td><td>${valorDoCampo(x.campo, x.na_ficha)}</td><td><b>${valorDoCampo(x.campo, x.enviado)}</b></td></tr>`).join('')}</table>` : '<p class="suave">Os dados enviados já estão na ficha.</p>'}
+    // o que a pessoa mudou do que já tínhamos no sistema e foi no link (dono, 25/11/2026: "Já temos: … corrija se mudou")
+    const corrigiu = new Set(Array.isArray(ultimo.corrigiu) ? ultimo.corrigiu : []);
+    const ja = ultimo.ja_tinhamos || {};
+    const campoDe = (n) => (l.formulario || []).find((c) => c.nome === n) || { nome: n, rotulo: n, tipo: 'texto' };
+    const marca = (x) => (corrigiu.has(x.campo.nome) ? ` ${etiqueta('mudou o que tínhamos', 'aviso')}` : '');
+    const resumoCorrigiu = !Array.isArray(ultimo.corrigiu) ? ''
+      : `<p class="suave">${corrigiu.size ? `<b>Mudou do que já tínhamos:</b> ${[...corrigiu].map((n) => `${esc(campoDe(n).rotulo)} (tínhamos ${valorDoCampo(campoDe(n), ja[n])})`).join('; ')}.` : 'Confirmou o que já tínhamos (não mudou nenhum dado que o link mostrou preenchido).'}</p>`;
+    partes.push(`<p><b>Dados enviados em ${C.dataHoraBr(ultimo.em)}</b> <span class="suave">(com a declaração marcada)</span></p>${resumoCorrigiu}
+      ${dif.length ? `<table><tr><th>Campo</th><th>Na ficha</th><th>Enviado</th></tr>${dif.map((x) => `<tr><td>${esc(x.campo.rotulo)}${marca(x)}</td><td>${valorDoCampo(x.campo, x.na_ficha)}</td><td><b>${valorDoCampo(x.campo, x.enviado)}</b></td></tr>`).join('')}</table>` : '<p class="suave">Os dados enviados já estão na ficha.</p>'}
       <p class="acoes">${botao('trazerRespostaFicha', dif.length ? 'Trazer para a ficha…' : 'Marcar como conferido…', { id: f.id, pessoa: p }, 'pequeno')}</p>`);
   } else if (ultimo) partes.push(`<p class="suave">Dados enviados em ${C.dataHoraBr(ultimo.em)} já trazidos para a ficha.</p>`);
   // correções feitas pela pessoa (decisão do dono de 2026-11-24): cada envio guarda os campos que mudaram
@@ -398,9 +405,12 @@ function blocoDoLink(f, l) {
   if (l.faltando && l.faltando.length && l.situacao === 'Falta documento') partes.push(`<p class="suave">Pedido à pessoa: ${esc(l.faltando.join('; '))}.</p>`);
   const ativo = !['Encerrado', 'Desistiu'].includes(l.situacao) && !R.fichaSemContrato(f) && !f.documentos_no_contrato;
   if (ativo && (ultimo || (l.arquivos || []).length)) {
+    // mandou os dados: em análise, a pessoa não muda mais nada até vocês devolverem (decisão do dono, 25/11/2026)
+    const devolver = botao('liberarCorrecaoFicha', 'Deixar a pessoa corrigir', { id: f.id, pessoa: p }, 'secundario mini', `Devolver a ficha para ${nome} conferir? O link volta com os dados e os documentos preenchidos (e o que a ficha tem agora), para ela corrigir e enviar de novo.`);
     partes.push(l.conferido_em
-      ? `<p class="suave">${etiqueta('✓ conferido', 'ok')} em ${C.dataHoraBr(l.conferido_em)}: a pessoa não troca mais dados nem documentos (só manda documento novo). ${botao('liberarCorrecaoFicha', 'Deixar a pessoa corrigir', { id: f.id, pessoa: p }, 'secundario mini', `Deixar ${nome} trocar os dados e os documentos de novo pelo link?`)}</p>`
-      : '<p class="suave">Até vocês trazerem os dados para a ficha (ou marcarem como conferido), a pessoa pode corrigir os dados e trocar ou apagar o documento mandado por engano. Cada mudança avisa vocês e fica registrada.</p>');
+      ? `<p class="suave">${etiqueta('✓ conferido', 'ok')} em ${C.dataHoraBr(l.conferido_em)}: a pessoa não troca mais dados nem documentos (só manda documento novo). ${devolver}</p>`
+      : l.em_analise_em ? `<p class="suave">${etiqueta('em análise', 'info')} desde ${C.dataHoraBr(l.em_analise_em)}: a pessoa mandou os dados e não troca mais nada pelo link (só manda documento novo) até vocês devolverem. ${devolver}</p>`
+        : `<p class="suave">Antes de mandar os dados${l.devolvido_em ? ` (ficha devolvida em ${C.dataHoraBr(l.devolvido_em)})` : ''}, a pessoa pode trocar ou apagar o documento mandado por engano. Depois de mandar, fica em análise. Cada mudança avisa vocês e fica registrada.</p>`);
   }
   if (ativo) {
     partes.push(`<p class="acoes">${botao('pedirDocumentoFicha', 'Pedir o que falta', { id: f.id, pessoa: p })}
@@ -690,8 +700,12 @@ export const ACOES_FICHAS = {
   /** A pessoa volta a poder corrigir os dados e trocar ou apagar documentos pelo link. */
   async liberarCorrecaoFicha({ id, pessoa }) {
     if (!opera()) throw new C.ErroUsuario('Seu usuário não pode mudar o link.');
-    await FO.atualizarLinkNaNuvem({ ficha_id: Number(id), pessoa, liberar: true });
-    aviso('Pronto: a pessoa pode corrigir de novo pelo link.');
+    // o link volta com o que a ficha tem agora ("Já temos"), pelo formulário gravado no link
+    const f = buscar('fichas', id);
+    const l = f && (await FO.linksNaNuvem(id)).find((x) => x.pessoa === pessoa);
+    const valores = f && l && Array.isArray(l.formulario) ? FO.valoresDoLink(d(), f, pessoa, l.formulario) : undefined;
+    await FO.atualizarLinkNaNuvem({ ficha_id: Number(id), pessoa, liberar: true, ...(valores ? { valores } : {}) });
+    aviso('Pronto: a ficha voltou para a pessoa conferir, com os dados e os documentos preenchidos.');
     await mostrar();
   },
   /** Marca na nuvem o que falta (a pessoa vê no link) e abre a mensagem para avisar. */

@@ -77,6 +77,70 @@ export function formularioDaFicha(f, pessoa) {
 /** O que já se sabe da pessoa (para vir preenchido no link). */
 export const valoresDaFicha = (f, formulario) => Object.fromEntries(formulario.filter((c) => c.nome && f[c.nome] !== undefined && f[c.nome] !== null && f[c.nome] !== '').map((c) => [c.nome, f[c.nome]]));
 
+// Dados da mesma pessoa em outros cadastros (pedido do dono, 25/11/2026: "eu já tinha os dados do sistema e o link estava em
+// branco"): o link só levava o que estava digitado na própria ficha. Agora, os campos vazios da ficha vêm do contrato, do
+// fiador ou de outra ficha com o mesmo CPF/CNPJ (e o mesmo primeiro nome, para um CPF digitado errado não mostrar os dados de
+// outra pessoa no link). Os nomes são os mesmos do Novo contrato (inquilino_…, fiadorN_…); o fiador do cadastro, sem prefixo.
+const PESSOA_SUFIXOS = ['nome', 'rg', 'telefone', 'email', 'endereco', 'genero', 'nacionalidade', 'estado_civil', 'profissao', 'nascimento'];
+const preenchido = (v) => v !== undefined && v !== null && v !== '';
+const primeiroNome = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase().split(/\s+/)[0] || '';
+/** O valor serve para o campo do link? (opção da lista, centavos inteiros, data e mês no formato): senão o link seria recusado. */
+function valorDoTipo(c, v) {
+  if (!preenchido(v)) return false;
+  if (c.tipo === 'opcao') return (c.opcoes || []).includes(v);
+  if (c.tipo === 'dinheiro' || c.tipo === 'inteiro') return Number.isInteger(v) && v >= 0;
+  if (c.tipo === 'simnao') return typeof v === 'boolean';
+  if (c.tipo === 'data') return /^\d{4}-\d{2}-\d{2}$/.test(String(v));
+  if (c.tipo === 'mes') return /^\d{4}-\d{2}$/.test(String(v));
+  return typeof v === 'string' || typeof v === 'number';
+}
+
+/**
+ * Outros cadastros da pessoa ``pessoa`` da ficha, já com os nomes dos campos do link: [{ campo: valor }], o mais novo primeiro.
+ * Ex.: ficha de Maria (CPF 529.982.247-25) que já foi inquilina → [{ inquilino_rg: '12.345.678-9', inquilino_profissao: … }].
+ */
+export function cadastrosDaPessoa(d, f, pessoa) {
+  const pre = pessoa === 'interessado' ? 'inquilino_' : `${pessoa}_`;
+  const cpf = F.soDigitos(f[`${pre}cpf`]);
+  if (cpf.length < 11) return [];
+  const nome = primeiroNome(f[`${pre}nome`]);
+  const mesma = (doc, outroNome) => F.soDigitos(doc) === cpf && (!nome || !primeiroNome(outroNome) || primeiroNome(outroNome) === nome);
+  // de um registro com prefixo ``de`` para o prefixo do link; ``todos``: todos os campos (mesmo papel), senão só os da pessoa
+  const copiar = (r, de, todos) => Object.fromEntries(Object.entries(r).filter(([k, v]) => k.startsWith(de) && preenchido(v)
+    && (todos || PESSOA_SUFIXOS.includes(k.slice(de.length)))).map(([k, v]) => [pre + k.slice(de.length), v]));
+  const achados = [];
+  const doInquilino = pessoa === 'interessado';
+  for (const c of [...(d.contratos || [])].sort((a, b) => b.id - a.id)) {
+    if (mesma(c.inquilino_cpf, c.inquilino_nome)) achados.push(copiar(c, 'inquilino_', doInquilino));
+  }
+  for (const x of [...(d.fiadores || [])].sort((a, b) => b.id - a.id)) {
+    if (mesma(x.cpf, x.nome)) achados.push(copiar(x, '', !doInquilino));
+  }
+  for (const o of [...(d.fichas || [])].sort((a, b) => b.id - a.id)) {
+    if (o.id === f.id) continue;
+    if (mesma(o.inquilino_cpf, o.inquilino_nome)) achados.push({ ...copiar(o, 'inquilino_', doInquilino), ...(doInquilino ? copiar(o, '', true) : {}) });
+    for (let n = 1; n <= R.VAGAS_FIADOR_FICHA; n += 1) if (mesma(o[`fiador${n}_cpf`], o[`fiador${n}_nome`])) achados.push(copiar(o, `fiador${n}_`, !doInquilino));
+  }
+  return achados;
+}
+
+/** O que vai preenchido no link: o da ficha e, nos campos vazios, o dos outros cadastros da mesma pessoa. */
+export function valoresDoLink(d, f, pessoa, formulario = formularioDaFicha(f, pessoa)) {
+  const out = valoresDaFicha(f, formulario);
+  const campos = formulario.filter((c) => c.nome);
+  for (const r of cadastrosDaPessoa(d, f, pessoa)) {
+    for (const c of campos) if (!preenchido(out[c.nome]) && valorDoTipo(c, r[c.nome])) out[c.nome] = r[c.nome];
+  }
+  for (const c of campos) if (preenchido(out[c.nome]) && !valorDoTipo(c, out[c.nome])) delete out[c.nome]; // valor antigo fora da lista
+  return out;
+}
+
+/** Documentos que a equipe já marcou como recebidos na ficha (aparecem no link como "já recebemos"). Só os do interessado. */
+export function recebidosDaFicha(f, pessoa) {
+  if (pessoa !== 'interessado') return [];
+  return [['doc_pessoais', 'Documentos pessoais'], ['doc_renda', 'Comprovante de renda'], ['doc_residencia', 'Comprovante de residência']].filter(([k]) => f[k]).map(([, t]) => t);
+}
+
 /** Contexto do link: empresa, nome, imóvel, proposta, reserva e a lista de documentos da pessoa. */
 export function contextoDaFicha(d, f, pessoa) {
   const r = REC.montarRecibo(d, 'ficha', { ficha: f });
@@ -94,6 +158,7 @@ export function contextoDaFicha(d, f, pessoa) {
     // pessoa física: a página refaz a lista quando a pessoa escolhe o tipo de renda e o estado civil
     ...(!fiador && f.inquilino_tipo !== PJ ? { listas: { ...R.PARTES_DOCUMENTOS_PF, renda: R.DOCUMENTOS_RENDA } } : {}),
     dica: R.DICA_DOCUMENTOS,
+    recebidos: recebidosDaFicha(f, pessoa),
   };
 }
 
@@ -103,7 +168,7 @@ export const pastaNaNuvem = (f, nomePasta) => `arquivos/Fichas em analise/${nome
 /** Corpo do pedido que cria o link. */
 export function pedidoDoLink(d, f, pessoa, nomePasta) {
   const formulario = formularioDaFicha(f, pessoa);
-  return { ficha_id: f.id, pessoa, pasta: pastaNaNuvem(f, nomePasta), formulario, valores: valoresDaFicha(f, formulario), contexto: contextoDaFicha(d, f, pessoa) };
+  return { ficha_id: f.id, pessoa, pasta: pastaNaNuvem(f, nomePasta), formulario, valores: valoresDoLink(d, f, pessoa, formulario), contexto: contextoDaFicha(d, f, pessoa) };
 }
 
 /**
