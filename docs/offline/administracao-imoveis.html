@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-rpv1dpC0uPUFP/icbzwSH3SVZkFsYyFzjH1UC2mDVDY=' 'sha256-DXHECTzxsy75XTm5aQKAY1aMeSE1qYHJhhsbCztMLeQ='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-rpv1dpC0uPUFP/icbzwSH3SVZkFsYyFzjH1UC2mDVDY=' 'sha256-1cKuSf6o2mRib+JBOocUCQj2xHdJYyOisl3V0eqodeQ='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="c0294f82077c20c3">
+<meta name="fontes" content="b3971ebc41e7ca51">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -21795,12 +21795,21 @@ Discorda de algum item? Responda em até 5 dias úteis com o motivo.`
           etapa: "Devolução da garantia",
           assunto: "Contrato encerrado – {imovel}",
           anexos: "",
-          prontos: ["assinado:quitacao", "recibo:quitacao", "comprovante:saida"],
+          prontos: ["assinado:quitacao", "recibo:quitacao", "comprovante:saida", "boleto:pdf", "boleto:pix"],
+          // boleto: o do saldo, se ainda em aberto
           texto: `Olá, {nome},
 
-[se devolver]Devolvemos {saldo} em {data_devolucao} e [fim]encerramos o contrato do imóvel da {imovel}. Segue o termo de entrega, acerto final e quitação[se devolver], com o comprovante[fim]: responda com ele assinado, por favor (pode ser pelo gov.br).
+[se saldo_pendente]Encerramos o contrato do imóvel da {imovel}. Segue o acerto final:
 
-Não há valores pendentes, salvo contas de consumo e tributos do período que ainda cheguem: mandaremos com a conta ou a guia.
+{acerto}[senão][se devolver]Devolvemos {saldo} em {data_devolucao} e encerramos[senão][se cobrar]Recebemos em {data_devolucao} o pagamento do saldo de {saldo} e encerramos[senão]Encerramos[fim][fim] o contrato do imóvel da {imovel}. Segue o termo de entrega, acerto final e quitação[se devolver], com o comprovante[fim]: responda com ele assinado, por favor (pode ser pelo gov.br).[fim]
+
+[se saldo_pendente][se cobrar]Fica pendente o saldo a pagar de {saldo}.[se boleto_saldo] Segue o boleto, com vencimento em {boleto_saldo_vencimento}.[se boleto_saldo_linha]
+Linha digitável: {boleto_saldo_linha}[fim][se boleto_saldo_pix]
+Pix copia e cola: {boleto_saldo_pix}[fim][senão] Deposite ou faça o Pix na conta abaixo e responda com o comprovante.
+{conta_deposito}[fim]
+Com o pagamento, mandamos o termo de quitação para assinar.[senão]Temos a devolver a você o saldo de {saldo}: informe a chave Pix ou a conta em seu nome, se ainda não informou; devolvemos em até 5 dias úteis da sua resposta. Com a devolução, mandamos o termo de quitação para assinar.[fim]
+
+Fora isso, não há valores pendentes, salvo as contas de consumo e os tributos do período que ainda cheguem: mandaremos com a conta ou a guia.[senão]Não há valores pendentes, salvo as contas de consumo e os tributos do período que ainda cheguem: mandaremos com a conta ou a guia.[fim]
 
 Em fevereiro enviamos o informe de {ano_saida} para o Imposto de Renda. Seus dados ficam guardados pelo prazo da lei e depois são apagados (LGPD).
 
@@ -21971,6 +21980,17 @@ Já resolveu? Responda com uma foto ou um documento, para darmos a baixa. Sem is
           "saida_calculo",
           "[se cobrar]Falta pagar o saldo de {saldo}: deposite ou faça o Pix na conta abaixo e responda com o comprovante.\n{conta_deposito}[fim]",
           "[se cobrar][se boleto_saldo]Segue o boleto do saldo de {saldo}, com vencimento em {boleto_saldo_vencimento}.[se boleto_saldo_linha]\nLinha digitável: {boleto_saldo_linha}[fim][se boleto_saldo_pix]\nPix copia e cola: {boleto_saldo_pix}[fim][senão]Falta pagar o saldo de {saldo}: deposite ou faça o Pix na conta abaixo e responda com o comprovante.\n{conta_deposito}[fim][fim]"
+        ],
+        // encerramento com saldo ainda em aberto (24/11/2026): o e-mail dizia "Não há valores pendentes" mesmo com saldo a pagar
+        [
+          "saida_encerramento",
+          "[se devolver]Devolvemos {saldo} em {data_devolucao} e [fim]encerramos o contrato do imóvel da {imovel}. Segue o termo de entrega, acerto final e quitação[se devolver], com o comprovante[fim]: responda com ele assinado, por favor (pode ser pelo gov.br).",
+          "[se saldo_pendente]Encerramos o contrato do imóvel da {imovel}. Segue o acerto final:\n\n{acerto}[senão][se devolver]Devolvemos {saldo} em {data_devolucao} e encerramos[senão][se cobrar]Recebemos em {data_devolucao} o pagamento do saldo de {saldo} e encerramos[senão]Encerramos[fim][fim] o contrato do imóvel da {imovel}. Segue o termo de entrega, acerto final e quitação[se devolver], com o comprovante[fim]: responda com ele assinado, por favor (pode ser pelo gov.br).[fim]"
+        ],
+        [
+          "saida_encerramento",
+          "Não há valores pendentes, salvo contas de consumo e tributos do período que ainda cheguem: mandaremos com a conta ou a guia.",
+          "[se saldo_pendente][se cobrar]Fica pendente o saldo a pagar de {saldo}.[se boleto_saldo] Segue o boleto, com vencimento em {boleto_saldo_vencimento}.[se boleto_saldo_linha]\nLinha digitável: {boleto_saldo_linha}[fim][se boleto_saldo_pix]\nPix copia e cola: {boleto_saldo_pix}[fim][senão] Deposite ou faça o Pix na conta abaixo e responda com o comprovante.\n{conta_deposito}[fim]\nCom o pagamento, mandamos o termo de quitação para assinar.[senão]Temos a devolver a você o saldo de {saldo}: informe a chave Pix ou a conta em seu nome, se ainda não informou; devolvemos em até 5 dias úteis da sua resposta. Com a devolução, mandamos o termo de quitação para assinar.[fim]\n\nFora isso, não há valores pendentes, salvo as contas de consumo e os tributos do período que ainda cheguem: mandaremos com a conta ou a guia.[senão]Não há valores pendentes, salvo as contas de consumo e os tributos do período que ainda cheguem: mandaremos com a conta ou a guia.[fim]"
         ]
       ];
     }
@@ -22355,6 +22375,9 @@ ${DICA_DOCUMENTOS}`].join("\n");
       devolver: !!(e && e.saldo > 0),
       cobrar: !!(e && e.saldo < 0),
       boleto_saldo: !!boletoSaldo,
+      // saldo do cálculo final ainda não devolvido nem pago (24/11/2026): o e-mail do encerramento não diz "Não há valores pendentes".
+      // Ex.: débitos de R$ 3.070,60 e caução de R$ 1.800,00 → saldo −R$ 1.270,60, sem pagamento marcado → true
+      saldo_pendente: !!(e && Number.isFinite(e.saldo) && e.saldo !== 0 && !e.garantia_devolvida_em),
       boleto_saldo_linha: !!(boletoSaldo && boletoSaldo.banco && emitidoNoBanco(boletoSaldo) && boletoSaldo.banco.linha_digitavel),
       boleto_saldo_pix: !!(boletoSaldo && boletoSaldo.banco && emitidoNoBanco(boletoSaldo) && boletoSaldo.banco.pix_copia_cola),
       link: !!linkDaFicha(f, "interessado", hoje3).url,
