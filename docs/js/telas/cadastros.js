@@ -448,7 +448,8 @@ export const CADASTROS = {
       const ficha = r ? null : fichaDoNovoContrato(q);
       const guardado = ficha && { acao: 'apagarArquivoDaFicha', dados: { ficha: ficha.id }, abrir: { escopo: 'ficha', id: ficha.id } };
       const perfis = ordenar(d().perfis_regras || [], 'nome');
-      return comListas(F.CONTRATO.flatMap((c) => (c.fiador ? (c.fiador === 1 && c.secao ? F.fiadoresNoCadastro(fiadores) : []) : [c]))
+      // reserva e carência perguntadas pelo mês do vencimento do boleto (24/11/2026); gravada continua a referência
+      return comListas(F.comPerguntaPeloVencimento(F.CONTRATO).flatMap((c) => (c.fiador ? (c.fiador === 1 && c.secao ? F.fiadoresNoCadastro(fiadores) : []) : [c]))
         .filter((c) => (r ? !c.soNovo : !c.soEditar))
         .filter((c) => c.nome !== 'perfil_regras_id' || perfis.length || (r && r.perfil_regras_id))
         .map((c) => (c.nome === 'perfil_regras_id' ? { ...c, opcoes: perfis.map((p) => [String(p.id), p.nome]) } : c.nome === 'contrato_anterior_id' ? { ...c, opcoes: ops } : c.nome === 'imovel_id' ? { ...c, opcoes: imoveis }
@@ -474,6 +475,7 @@ export const CADASTROS = {
       conta_iptu: r.conta_iptu || (r.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1]), conta_seguro: r.conta_seguro || (r.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0]),
       inquilino_tipo: r.inquilino_tipo || 'Pessoa física', prazo_meses: R.prazoDoContrato(d(), r),
       aluguel_bonificado: r.bonificacao === false ? null : inicialBonificado(r),
+      vencimento_reserva: R.mesVencimentoDaCompetencia(r, r.reserva_competencia), vencimento_carencia: R.mesVencimentoDaCompetencia(r, r.carencia_inicio),
       ...Object.fromEntries(R.fiadoresDoContrato(d(), r.id).flatMap((f, k) => F.CAMPOS_FIADOR.map((x) => [`fiador${k + 1}_${x.nome}`, f[x.nome] ?? null]))) }),
     conferir: conferirContrato,
     aviso: (r, q) => (!r && q && fichaDoNovoContrato(q) ? avisoDaFicha(fichaDoNovoContrato(q))
@@ -482,6 +484,14 @@ export const CADASTROS = {
     voltar: (r, q) => (r ? `#/contrato/${r.id}` : q.imovel ? `#/imovel/${q.imovel}` : '#/inquilinos'),
     descricao: (dados, r) => dados.inquilino_nome || (r && r.inquilino_nome),
     ajustar(dados, erros, r, form, q = {}) {
+      // a tela pergunta o mês do vencimento; gravada é a referência, pelo "vence no mês seguinte" que está no formulário.
+      // Ex.: vence no mês seguinte, reserva no boleto que vence em 01/2027 = referência 12/2026 (no próprio mês: 01/2027)
+      const vencimento = { cobranca_mes_seguinte: 'cobranca_mes_seguinte' in dados ? dados.cobranca_mes_seguinte : !r || r.cobranca_mes_seguinte !== false };
+      for (const [gravado, tela] of [['reserva_competencia', 'vencimento_reserva'], ['carencia_inicio', 'vencimento_carencia']]) {
+        if (!(tela in dados)) continue;
+        dados[gravado] = erros[tela] ? null : R.competenciaDoMesVencimento(vencimento, dados[tela]);
+        delete dados[tela];
+      }
       // troca de titular: garantia, aluguel, bonificação, boleto e reserva são os do contrato (travados no formulário)
       const anteriorHerdado = r ? R.contratoHerdado(d(), r) : dados.contrato_anterior_id && buscar('contratos', dados.contrato_anterior_id);
       const herdado = !!anteriorHerdado;
@@ -1105,7 +1115,9 @@ export const CADASTROS = {
   },
   renovacoes: {
     titulo: (r, q) => `Renovação / novo valor - ${buscar('contratos', q.contrato).inquilino_nome}`,
-    campos: () => F.RENOVACAO,
+    // o novo valor é perguntado pelo mês do vencimento do boleto (24/11/2026); gravada continua a referência (vale_desde)
+    campos: () => F.comPerguntaPeloVencimento(F.RENOVACAO),
+    valores: (r) => ({ ...r, vencimento_vale_desde: R.mesVencimentoDaCompetencia(buscar('contratos', r.contrato_id), r.vale_desde) }),
     padrao: (q) => { const c = buscar('contratos', q.contrato); return { data: c.vigencia_fim || C.hojeIso(), tipo: 'Renovado com nova data de término', novo_percentual: R.percentualBonificacao(c) || null }; },
     aviso: (r, q) => { const c = buscar('contratos', q.contrato); return `Aluguel atual ${reais(R.aluguelAtual(d(), c))}. Contrato ${c.prazo_tipo === 'Indeterminado' ? 'por prazo indeterminado' : `até ${dataBr(c.vigencia_fim)}`}.`; },
     voltar: (r, q) => `#/contrato/${q.contrato}`,
@@ -1130,9 +1142,14 @@ export const CADASTROS = {
         if (!Number.isFinite(v) || v < 0 || v > dados.novo_valor) erros.novo_bonificado = `Informe um valor entre R$ 0,00 e ${reais(dados.novo_valor)} (aluguel cheio)`;
         else dados.novo_percentual = C.percentualPorBonificado(dados.novo_valor, v);
       }
+      // a tela pergunta o mês do vencimento; gravada é a referência. Ex.: vence no mês seguinte, 01/2027 = referência 12/2026
+      if ('vencimento_vale_desde' in dados) {
+        dados.vale_desde = erros.vencimento_vale_desde ? null : R.competenciaDoMesVencimento(c, dados.vencimento_vale_desde);
+        delete dados.vencimento_vale_desde;
+      }
       if (!(dados.novo_valor > 0)) { dados.novo_percentual = null; dados.vale_desde = null; }
-      else if (dados.vale_desde && !C.competenciaValida(dados.vale_desde, '')) erros.vale_desde = 'Informe o mês (ex.: 12/2026)';
-      else if (dados.vale_desde && dados.vale_desde < String(buscar('contratos', q.contrato).data_entrada || '').slice(0, 7)) erros.vale_desde = 'O mês é anterior à entrada do inquilino';
+      else if (dados.vale_desde && !C.competenciaValida(dados.vale_desde, '')) erros.vencimento_vale_desde = 'Informe o mês (ex.: 12/2026)';
+      else if (dados.vale_desde && dados.vale_desde < String(c.data_entrada || '').slice(0, 7)) erros.vencimento_vale_desde = `O boleto de referência ${compBr(dados.vale_desde)} é anterior à entrada do inquilino`;
       else dados.vale_desde = R.valeDesdeDaRenovacao(dados);
       if (dados.novo_percentual !== null && dados.novo_percentual !== undefined && (dados.novo_percentual < 0 || dados.novo_percentual > 100)) erros.novo_percentual = 'Informe um percentual entre 0 e 100';
     },

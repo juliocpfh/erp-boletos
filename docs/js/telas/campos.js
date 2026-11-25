@@ -174,8 +174,8 @@ function ligarContinuacaoDeContrato(raiz) {
     const cond = R.condicoesDoContrato(d(), anterior, data);
     const feitos = preencherVazios(sel.form, F.paraFormulario(campos, cond), F.paraFormulario(campos, null));
     // aluguel, bonificado, boleto e reserva: iguais aos do anterior (sobrescreve o que estiver digitado) e travados
-    travarValoresHerdados(sel.form, F.paraFormulario(F.CONTRATO.filter((c) => c.nome), { bonificacao: anterior.bonificacao !== false,
-      cobranca_mes_seguinte: anterior.cobranca_mes_seguinte !== false, ...cond }));
+    travarValoresHerdados(sel.form, { ...F.paraFormulario(F.CONTRATO.filter((c) => c.nome), { bonificacao: anterior.bonificacao !== false,
+      cobranca_mes_seguinte: anterior.cobranca_mes_seguinte !== false, ...cond }), vencimento_reserva: R.mesVencimentoDaCompetencia(anterior, cond.reserva_competencia) || '' });
     if (temGarantia && garantia === 'continua') travarGarantiaHerdada(sel.form, anterior, anterior.inquilino_nome);
     if (garantia === 'nova') liberarGarantiaNova(sel.form, anterior.inquilino_nome, dinheiro);
     // a data da alteração é o novo início do contrato e da vigência (mesmo se já havia outra data no formulário)
@@ -216,7 +216,8 @@ function travarCampos(form, nomes, valores = {}) {
 
 /** Troca de titular: aluguel, bonificado, vencimento, tarifa, multa, juros e reserva iguais aos do contrato anterior. */
 function travarValoresHerdados(form, valores = {}) {
-  travarCampos(form, CAMPOS_VALORES_HERDADOS, valores);
+  // a reserva aparece na tela pelo mês do vencimento (``vencimento_reserva``); gravada é a referência (``reserva_competencia``)
+  travarCampos(form, [...CAMPOS_VALORES_HERDADOS, 'vencimento_reserva'], valores);
   const ajuda = (form.querySelector('[name=reserva_valor]') || { closest: () => null }).closest('div');
   const texto = ajuda && (ajuda.querySelector('.ajuda') || ajuda.appendChild(Object.assign(document.createElement('div'), { className: 'ajuda' })));
   if (texto) texto.textContent = 'Reserva do contrato (herdada do titular anterior); o que ele já usou não abate de novo.';
@@ -708,11 +709,13 @@ export function ligarCamposAutomaticos(raiz) {
 }
 
 // --------------------------------------------------------------------------
-// Campos de mês que escolhem um boleto: referência e vencimento juntos
+// Campos de mês que escolhem um boleto: perguntados pelo mês do vencimento
 // --------------------------------------------------------------------------
 // Pedido do dono de 24/11/2026: o mês de referência (o "aluguel de") era digitado como se fosse o do vencimento e a reserva,
-// a carência ou o novo valor caíam no boleto errado. Debaixo de cada campo aparece o boleto escolhido, com o vencimento pelo
-// cadastro que está no formulário (dia e "vence no mês seguinte" ainda não salvos já contam). O que é gravado não muda.
+// a carência ou o novo valor caíam no boleto errado. Como no ressarcimento e no seguro, a tela pergunta o mês em que o boleto
+// vence (``F.PERGUNTA_PELO_VENCIMENTO``) e debaixo de cada campo aparece a frase padrão "Boleto de referência 11/2026, vence
+// 05/12/2026", com o vencimento pelo cadastro que está no formulário (dia e "vence no mês seguinte" ainda não salvos já contam).
+// Gravada continua a referência (``R.competenciaDoMesVencimento``, no ``ajustar`` de cada cadastro).
 
 /** Valor de um campo do formulário (caixa de marcar: marcada ou não); undefined se o campo não está nele. */
 function valorDoFormulario(form, nome) {
@@ -721,33 +724,38 @@ function valorDoFormulario(form, nome) {
   return el.type === 'checkbox' ? el.checked : String(el.value || '').trim();
 }
 
-const minuscula = (t) => t.charAt(0).toLowerCase() + t.slice(1);
+const maiuscula = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+/** "boleto de referência 11/2026, vence 05/12/2026" (o mesmo texto do ressarcimento e do seguro). */
+const boletoDe = (c, comp) => (C.competenciaValida(comp, '') ? R.textoBoletoDaCompetencia(d(), c, comp) : '');
 
-/** Texto debaixo de cada campo, a partir do contrato com os valores do formulário (``c``). */
+/** Texto debaixo de cada campo (chave: o campo da tela), a partir do contrato com os valores do formulário (``c``, já na referência). */
 const MESES_DO_BOLETO = {
-  reserva_competencia(c) {
+  vencimento_reserva(c) {
     const comp = R.competenciaReserva({ ...c, reserva_valor: 1 });
-    const t = R.referenciaEVencimento(d(), c, comp);
+    const t = boletoDe(c, comp);
     if (!t) return '';
-    if (!C.competenciaValida(c.reserva_competencia, '')) return `Em branco: o primeiro aluguel, ${minuscula(t)}.`;
-    return comp !== c.reserva_competencia ? `O mês ${compBr(c.reserva_competencia)} é de carência: a reserva vai para o boleto seguinte, ${minuscula(t)}.` : `${t}.`;
+    if (!C.competenciaValida(c.reserva_competencia, '')) return `Em branco: o primeiro aluguel, ${t}.`;
+    return comp !== c.reserva_competencia ? `O boleto que vence em ${compBr(R.mesVencimentoDaCompetencia(c, c.reserva_competencia))} é de carência: a reserva vai para o seguinte, ${t}.` : `${maiuscula(t)}.`;
   },
-  carencia_inicio(c) {
-    const ini = C.competenciaValida(c.carencia_inicio, '') || C.competenciaValida(c.data_entrada.slice(0, 7), '');
-    const t = R.referenciaEVencimento(d(), c, ini);
+  vencimento_carencia(c) {
+    const marcado = C.competenciaValida(c.carencia_inicio, '');
+    const ini = marcado || C.competenciaValida(c.data_entrada.slice(0, 7), '');
+    const t = boletoDe(c, ini);
     if (!t) return '';
     const meses = Number(c.carencia_meses) > 0 ? Number(c.carencia_meses) : 0;
-    const fim = meses > 1 ? ` até a ${minuscula(R.referenciaEVencimento(d(), c, C.somarMeses(ini, meses - 1)))}` : '';
-    return `${C.competenciaValida(c.carencia_inicio, '') ? '' : 'Em branco: mês de entrada, '}${C.competenciaValida(c.carencia_inicio, '') ? t : minuscula(t)}${fim}${meses ? '' : ' (sem carência enquanto "Meses de carência" estiver em branco)'}.`;
+    const fim = meses > 1 ? ` até o ${boletoDe(c, C.somarMeses(ini, meses - 1))}` : '';
+    return `${marcado ? maiuscula(t) : `Em branco: mês de entrada, ${t}`}${fim}${meses ? '' : ' (sem carência enquanto "Meses de carência" estiver em branco)'}.`;
   },
-  vale_desde(c, form) {
+  vencimento_vale_desde(c, form) {
     const data = C.dataValida(valorDoFormulario(form, 'data') || '', '') || C.hojeIso();
     const comp = R.valeDesdeDaRenovacao({ vale_desde: c.vale_desde, data });
-    const t = R.referenciaEVencimento(d(), c, comp);
+    const t = boletoDe(c, comp);
     if (!t) return '';
-    return C.competenciaValida(c.vale_desde, '') ? `${t}.` : `Em branco: ${minuscula(t)}.`;
+    return C.competenciaValida(c.vale_desde, '') ? `${maiuscula(t)}.` : `Em branco: ${t}.`;
   },
 };
+/** Campo da tela → campo gravado (referência). */
+const GRAVADO_DO_CAMPO = { vencimento_reserva: 'reserva_competencia', vencimento_carencia: 'carencia_inicio', vencimento_vale_desde: 'vale_desde' };
 
 function ligarMesesDoBoleto(raiz) {
   for (const form of raiz.querySelectorAll('form')) {
@@ -756,9 +764,10 @@ function ligarMesesDoBoleto(raiz) {
     const base = (form.dataset.contratoRef && buscar('contratos', Number(form.dataset.contratoRef))) || null;
     // sem contrato salvo nem dia no formulário (ex.: renovação aberta sem o contrato) não há vencimento para mostrar
     if (!base && !form.querySelector('[name="dia_vencimento"]')) continue;
+    const mostrados = {};
     const mostrar = () => {
       const c = { ...(base || {}) };
-      for (const k of ['data_entrada', 'reserva_competencia', 'carencia_inicio', 'carencia_meses', 'vale_desde']) {
+      for (const k of ['data_entrada', 'carencia_meses']) {
         const v = valorDoFormulario(form, k);
         if (v !== undefined) c[k] = v;
       }
@@ -767,9 +776,17 @@ function ligarMesesDoBoleto(raiz) {
       const seguinte = valorDoFormulario(form, 'cobranca_mes_seguinte');
       if (seguinte !== undefined) c.cobranca_mes_seguinte = seguinte;
       c.data_entrada = String(c.data_entrada || '');
+      // o mês digitado é o do vencimento: a referência sai pelo "vence no mês seguinte" do formulário
+      for (const [tela, gravado] of Object.entries(GRAVADO_DO_CAMPO)) {
+        const v = valorDoFormulario(form, tela);
+        if (v !== undefined) c[gravado] = C.competenciaValida(v, '') ? R.competenciaDoMesVencimento(c, v) : '';
+      }
       for (const n of nomes) {
-        const el = form.querySelector(`input[name="${n}"]`);
-        mensagemAuto(el, esc(MESES_DO_BOLETO[n](c, form)));
+        const texto = esc(MESES_DO_BOLETO[n](c, form));
+        // texto igual: não redesenha (o "change" do blur não pode trocar a mensagem debaixo do clique)
+        if (mostrados[n] === texto) continue;
+        mostrados[n] = texto;
+        mensagemAuto(form.querySelector(`input[name="${n}"]`), texto);
       }
     };
     form.addEventListener('input', mostrar);
