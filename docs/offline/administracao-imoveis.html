@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-rpv1dpC0uPUFP/icbzwSH3SVZkFsYyFzjH1UC2mDVDY=' 'sha256-d2I6bavskjlVNMWcIomwPeMM6DtQA1wCpyW3gQulm1Y='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-rpv1dpC0uPUFP/icbzwSH3SVZkFsYyFzjH1UC2mDVDY=' 'sha256-l2R/GQCuNoj8O2Qeox7qCQ1iZ+jSIAX0NaPM9K4sDXg='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="d95dd9c106a28dc9">
+<meta name="fontes" content="03f46af89444d0cd">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -5713,19 +5713,19 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       if (c.secao) atual = c.recolher ? `g${k}` : null;
       return atual;
     });
-    const preenchido = (c) => {
+    const preenchido2 = (c) => {
       const v = valores[c.nome];
       return ![void 0, null, "", false, 0, "0"].includes(v) && String(v) !== String(c.padrao ?? "");
     };
     const doGrupo = (g) => campos.filter((c, k) => c.nome && grupoDe[k] === g);
-    const aberto = Object.fromEntries([...new Set(grupoDe.filter(Boolean))].map((g) => [g, doGrupo(g).some((c) => erros[c.nome] || preenchido(c))]));
+    const aberto = Object.fromEntries([...new Set(grupoDe.filter(Boolean))].map((g) => [g, doGrupo(g).some((c) => erros[c.nome] || preenchido2(c))]));
     const partes = campos.map((c, k) => {
       const se = c.mostrarSe ? `data-mostrar-se="${esc([c.mostrarSe.campo, ...c.mostrarSe.valores].join("|"))}"` : "";
       const g = grupoDe[k];
       if (c.quebra) return '<div class="quebra"></div>';
       if (c.secao) {
         if (!c.recolher) return `<h3 ${se}>${esc(c.secao)}</h3>`;
-        const texto3 = doGrupo(g).some(preenchido) ? "Expanda para ver ou alterar" : c.recolher;
+        const texto3 = doGrupo(g).some(preenchido2) ? "Expanda para ver ou alterar" : c.recolher;
         return `<h3 ${se}>${esc(c.secao)} <button type="button" class="link-botao" data-expandir="${g}" data-texto="${esc(texto3)}" ${aberto[g] ? 'data-aberto="1"' : ""}>${esc(aberto[g] ? "Recolher" : texto3)}</button></h3>`;
       }
       const grupo2 = g ? ` data-grupo="${g}"` : "";
@@ -21013,6 +21013,50 @@ ${t.deposito}`] : []
       ...campos.filter((c) => /_imovel_garantia$/.test(c.nome)).map((c) => paraLink(c))
     ];
   }
+  function valorDoTipo(c, v) {
+    if (!preenchido(v)) return false;
+    if (c.tipo === "opcao") return (c.opcoes || []).includes(v);
+    if (c.tipo === "dinheiro" || c.tipo === "inteiro") return Number.isInteger(v) && v >= 0;
+    if (c.tipo === "simnao") return typeof v === "boolean";
+    if (c.tipo === "data") return /^\d{4}-\d{2}-\d{2}$/.test(String(v));
+    if (c.tipo === "mes") return /^\d{4}-\d{2}$/.test(String(v));
+    return typeof v === "string" || typeof v === "number";
+  }
+  function cadastrosDaPessoa(d2, f, pessoa2) {
+    const pre = pessoa2 === "interessado" ? "inquilino_" : `${pessoa2}_`;
+    const cpf = soDigitos(f[`${pre}cpf`]);
+    if (cpf.length < 11) return [];
+    const nome = primeiroNome(f[`${pre}nome`]);
+    const mesma = (doc2, outroNome) => soDigitos(doc2) === cpf && (!nome || !primeiroNome(outroNome) || primeiroNome(outroNome) === nome);
+    const copiar4 = (r, de, todos) => Object.fromEntries(Object.entries(r).filter(([k, v]) => k.startsWith(de) && preenchido(v) && (todos || PESSOA_SUFIXOS.includes(k.slice(de.length)))).map(([k, v]) => [pre + k.slice(de.length), v]));
+    const achados = [];
+    const doInquilino = pessoa2 === "interessado";
+    for (const c of [...d2.contratos || []].sort((a, b) => b.id - a.id)) {
+      if (mesma(c.inquilino_cpf, c.inquilino_nome)) achados.push(copiar4(c, "inquilino_", doInquilino));
+    }
+    for (const x of [...d2.fiadores || []].sort((a, b) => b.id - a.id)) {
+      if (mesma(x.cpf, x.nome)) achados.push(copiar4(x, "", !doInquilino));
+    }
+    for (const o of [...d2.fichas || []].sort((a, b) => b.id - a.id)) {
+      if (o.id === f.id) continue;
+      if (mesma(o.inquilino_cpf, o.inquilino_nome)) achados.push({ ...copiar4(o, "inquilino_", doInquilino), ...doInquilino ? copiar4(o, "", true) : {} });
+      for (let n = 1; n <= VAGAS_FIADOR_FICHA; n += 1) if (mesma(o[`fiador${n}_cpf`], o[`fiador${n}_nome`])) achados.push(copiar4(o, `fiador${n}_`, !doInquilino));
+    }
+    return achados;
+  }
+  function valoresDoLink(d2, f, pessoa2, formulario = formularioDaFicha(f, pessoa2)) {
+    const out = valoresDaFicha(f, formulario);
+    const campos = formulario.filter((c) => c.nome);
+    for (const r of cadastrosDaPessoa(d2, f, pessoa2)) {
+      for (const c of campos) if (!preenchido(out[c.nome]) && valorDoTipo(c, r[c.nome])) out[c.nome] = r[c.nome];
+    }
+    for (const c of campos) if (preenchido(out[c.nome]) && !valorDoTipo(c, out[c.nome])) delete out[c.nome];
+    return out;
+  }
+  function recebidosDaFicha(f, pessoa2) {
+    if (pessoa2 !== "interessado") return [];
+    return [["doc_pessoais", "Documentos pessoais"], ["doc_renda", "Comprovante de renda"], ["doc_residencia", "Comprovante de residência"]].filter(([k]) => f[k]).map(([, t]) => t);
+  }
   function contextoDaFicha(d2, f, pessoa2) {
     const r = montarRecibo(d2, "ficha", { ficha: f });
     const e = r.emitente || {};
@@ -21031,12 +21075,13 @@ ${t.deposito}`] : []
       documentos: fiador ? documentosDoFiador(fiadorDaFicha(f, pessoa2.slice(6))) : documentosDaFicha(f),
       // pessoa física: a página refaz a lista quando a pessoa escolhe o tipo de renda e o estado civil
       ...!fiador && f.inquilino_tipo !== PJ4 ? { listas: { ...PARTES_DOCUMENTOS_PF, renda: DOCUMENTOS_RENDA } } : {},
-      dica: DICA_DOCUMENTOS
+      dica: DICA_DOCUMENTOS,
+      recebidos: recebidosDaFicha(f, pessoa2)
     };
   }
   function pedidoDoLink(d2, f, pessoa2, nomePasta) {
     const formulario = formularioDaFicha(f, pessoa2);
-    return { ficha_id: f.id, pessoa: pessoa2, pasta: pastaNaNuvem(f, nomePasta), formulario, valores: valoresDaFicha(f, formulario), contexto: contextoDaFicha(d2, f, pessoa2) };
+    return { ficha_id: f.id, pessoa: pessoa2, pasta: pastaNaNuvem(f, nomePasta), formulario, valores: valoresDoLink(d2, f, pessoa2, formulario), contexto: contextoDaFicha(d2, f, pessoa2) };
   }
   function textoWhatsapp(f, pessoa2, link2, { lembrete = false, faltando = [] } = {}) {
     const nome = String(nomeDaPessoa(f, pessoa2) || "").trim().split(/\s+/)[0];
@@ -21175,7 +21220,7 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
     });
     await inscricao.unsubscribe();
   }
-  var PJ4, PESSOAS_LINK, nomeDaPessoa, FORA_DO_LINK, PARTES_DO_LINK, SEMPRE_OBRIGATORIOS, paraLink, valoresDaFicha, pastaNaNuvem, urlsDestaAba, cfg2, VALIDADE_LINKS, linksGuardadosPorFicha, geracaoDosLinks, chaveDosLinks, esquecendo, criarLinkNaNuvem, guardarPdfNaNuvem, linksNaNuvem, linksGuardados, atualizarLinkNaNuvem, chaveDoServidor, temPush, mesmaChave;
+  var PJ4, PESSOAS_LINK, nomeDaPessoa, FORA_DO_LINK, PARTES_DO_LINK, SEMPRE_OBRIGATORIOS, paraLink, valoresDaFicha, PESSOA_SUFIXOS, preenchido, primeiroNome, pastaNaNuvem, urlsDestaAba, cfg2, VALIDADE_LINKS, linksGuardadosPorFicha, geracaoDosLinks, chaveDosLinks, esquecendo, criarLinkNaNuvem, guardarPdfNaNuvem, linksNaNuvem, linksGuardados, atualizarLinkNaNuvem, chaveDoServidor, temPush, mesmaChave;
   var init_ficha_online = __esm({
     "docs/js/ficha-online.js"() {
       init_calculos();
@@ -21200,6 +21245,9 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
         ...c.mostrarSe ? { mostrarSe: c.mostrarSe } : {}
       };
       valoresDaFicha = (f, formulario) => Object.fromEntries(formulario.filter((c) => c.nome && f[c.nome] !== void 0 && f[c.nome] !== null && f[c.nome] !== "").map((c) => [c.nome, f[c.nome]]));
+      PESSOA_SUFIXOS = ["nome", "rg", "telefone", "email", "endereco", "genero", "nacionalidade", "estado_civil", "profissao", "nascimento"];
+      preenchido = (v) => v !== void 0 && v !== null && v !== "";
+      primeiroNome = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase().split(/\s+/)[0] || "";
       pastaNaNuvem = (f, nomePasta) => `arquivos/Fichas em analise/${nomePasta}`;
       urlsDestaAba = /* @__PURE__ */ new Map();
       cfg2 = { base: "api/ficha-online/", buscar: (...a) => fetch(...a) };
@@ -23057,7 +23105,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
     const data2 = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || "")) ? dataBr(v) : v;
     const ano = /^\d{4}$/.test(String(r.ano)) ? Number(r.ano) : Number(hoje3.slice(0, 4)) - 1;
     const campos = {
-      nome: primeiroNome(pj ? p2.representante_nome || p2.inquilino_nome : p2.inquilino_nome),
+      nome: primeiroNome2(pj ? p2.representante_nome || p2.inquilino_nome : p2.inquilino_nome),
       locatario: p2.inquilino_nome || "",
       documento: p2.inquilino_cpf ? `${pj ? "CNPJ" : "CPF"} ${p2.inquilino_cpf}` : "",
       imovel: imoveis.map(curto3).join(" ou "),
@@ -23278,7 +23326,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
     const contratos = [...ids].filter((id) => !avisados.has(id)).map((id) => buscar(d2, "contratos", id)).filter(Boolean).sort((a, b) => String(a.inquilino_nome).localeCompare(String(b.inquilino_nome), "pt-BR"));
     return { ano: Number(ano), contratos };
   }
-  var PJ5, NOMES_CONTA, CONTAS_FICHA, primeiroNome, juntar, condicoesDaGarantia, condicoesDoTermo;
+  var PJ5, NOMES_CONTA, CONTAS_FICHA, primeiroNome2, juntar, condicoesDaGarantia, condicoesDoTermo;
   var init_email_dados = __esm({
     "docs/js/email-dados.js"() {
       init_calculos();
@@ -23292,7 +23340,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
       PJ5 = "Pessoa jurídica (empresa)";
       NOMES_CONTA = { conta_agua: "água", conta_energia: "energia", conta_gas: "gás", conta_internet: "internet", conta_condominio: "condomínio" };
       CONTAS_FICHA = Object.keys(NOMES_CONTA);
-      primeiroNome = (n) => String(n || "").trim().split(/\s+/)[0] || "";
+      primeiroNome2 = (n) => String(n || "").trim().split(/\s+/)[0] || "";
       juntar = (itens) => itens.length <= 1 ? itens.join("") : `${itens.slice(0, -1).join(", ")} e ${itens.at(-1)}`;
       condicoesDaGarantia = (tipo) => ({
         caucao: tipo === "Caução",
@@ -29795,8 +29843,13 @@ ${m.texto}`);
     }
     if (ultimo && !trazido) {
       const dif = diferencasDoEnvio(f, l);
-      partes.push(`<p><b>Dados enviados em ${dataHoraBr(ultimo.em)}</b> <span class="suave">(com a declaração marcada)</span></p>
-      ${dif.length ? `<table><tr><th>Campo</th><th>Na ficha</th><th>Enviado</th></tr>${dif.map((x) => `<tr><td>${esc(x.campo.rotulo)}</td><td>${valorDoCampo(x.campo, x.na_ficha)}</td><td><b>${valorDoCampo(x.campo, x.enviado)}</b></td></tr>`).join("")}</table>` : '<p class="suave">Os dados enviados já estão na ficha.</p>'}
+      const corrigiu = new Set(Array.isArray(ultimo.corrigiu) ? ultimo.corrigiu : []);
+      const ja = ultimo.ja_tinhamos || {};
+      const campoDe = (n) => (l.formulario || []).find((c) => c.nome === n) || { nome: n, rotulo: n, tipo: "texto" };
+      const marca2 = (x) => corrigiu.has(x.campo.nome) ? ` ${etiqueta("mudou o que tínhamos", "aviso")}` : "";
+      const resumoCorrigiu = !Array.isArray(ultimo.corrigiu) ? "" : `<p class="suave">${corrigiu.size ? `<b>Mudou do que já tínhamos:</b> ${[...corrigiu].map((n) => `${esc(campoDe(n).rotulo)} (tínhamos ${valorDoCampo(campoDe(n), ja[n])})`).join("; ")}.` : "Confirmou o que já tínhamos (não mudou nenhum dado que o link mostrou preenchido)."}</p>`;
+      partes.push(`<p><b>Dados enviados em ${dataHoraBr(ultimo.em)}</b> <span class="suave">(com a declaração marcada)</span></p>${resumoCorrigiu}
+      ${dif.length ? `<table><tr><th>Campo</th><th>Na ficha</th><th>Enviado</th></tr>${dif.map((x) => `<tr><td>${esc(x.campo.rotulo)}${marca2(x)}</td><td>${valorDoCampo(x.campo, x.na_ficha)}</td><td><b>${valorDoCampo(x.campo, x.enviado)}</b></td></tr>`).join("")}</table>` : '<p class="suave">Os dados enviados já estão na ficha.</p>'}
       <p class="acoes">${botao("trazerRespostaFicha", dif.length ? "Trazer para a ficha…" : "Marcar como conferido…", { id: f.id, pessoa: p2 }, "pequeno")}</p>`);
     } else if (ultimo) partes.push(`<p class="suave">Dados enviados em ${dataHoraBr(ultimo.em)} já trazidos para a ficha.</p>`);
     const rotulo3 = (n) => ((l.formulario || []).find((c) => c.nome === n) || {}).rotulo || n;
@@ -29815,7 +29868,8 @@ ${m.texto}`);
     if (l.faltando && l.faltando.length && l.situacao === "Falta documento") partes.push(`<p class="suave">Pedido à pessoa: ${esc(l.faltando.join("; "))}.</p>`);
     const ativo = !["Encerrado", "Desistiu"].includes(l.situacao) && !fichaSemContrato(f) && !f.documentos_no_contrato;
     if (ativo && (ultimo || (l.arquivos || []).length)) {
-      partes.push(l.conferido_em ? `<p class="suave">${etiqueta("✓ conferido", "ok")} em ${dataHoraBr(l.conferido_em)}: a pessoa não troca mais dados nem documentos (só manda documento novo). ${botao("liberarCorrecaoFicha", "Deixar a pessoa corrigir", { id: f.id, pessoa: p2 }, "secundario mini", `Deixar ${nome} trocar os dados e os documentos de novo pelo link?`)}</p>` : '<p class="suave">Até vocês trazerem os dados para a ficha (ou marcarem como conferido), a pessoa pode corrigir os dados e trocar ou apagar o documento mandado por engano. Cada mudança avisa vocês e fica registrada.</p>');
+      const devolver = botao("liberarCorrecaoFicha", "Deixar a pessoa corrigir", { id: f.id, pessoa: p2 }, "secundario mini", `Devolver a ficha para ${nome} conferir? O link volta com os dados e os documentos preenchidos (e o que a ficha tem agora), para ela corrigir e enviar de novo.`);
+      partes.push(l.conferido_em ? `<p class="suave">${etiqueta("✓ conferido", "ok")} em ${dataHoraBr(l.conferido_em)}: a pessoa não troca mais dados nem documentos (só manda documento novo). ${devolver}</p>` : l.em_analise_em ? `<p class="suave">${etiqueta("em análise", "info")} desde ${dataHoraBr(l.em_analise_em)}: a pessoa mandou os dados e não troca mais nada pelo link (só manda documento novo) até vocês devolverem. ${devolver}</p>` : `<p class="suave">Antes de mandar os dados${l.devolvido_em ? ` (ficha devolvida em ${dataHoraBr(l.devolvido_em)})` : ""}, a pessoa pode trocar ou apagar o documento mandado por engano. Depois de mandar, fica em análise. Cada mudança avisa vocês e fica registrada.</p>`);
     }
     if (ativo) {
       partes.push(`<p class="acoes">${botao("pedirDocumentoFicha", "Pedir o que falta", { id: f.id, pessoa: p2 })}
@@ -30120,8 +30174,11 @@ ${m.texto}`);
         /** A pessoa volta a poder corrigir os dados e trocar ou apagar documentos pelo link. */
         async liberarCorrecaoFicha({ id, pessoa: pessoa2 }) {
           if (!opera()) throw new ErroUsuario("Seu usuário não pode mudar o link.");
-          await atualizarLinkNaNuvem({ ficha_id: Number(id), pessoa: pessoa2, liberar: true });
-          aviso("Pronto: a pessoa pode corrigir de novo pelo link.");
+          const f = buscar2("fichas", id);
+          const l = f && (await linksNaNuvem(id)).find((x) => x.pessoa === pessoa2);
+          const valores = f && l && Array.isArray(l.formulario) ? valoresDoLink(d(), f, pessoa2, l.formulario) : void 0;
+          await atualizarLinkNaNuvem({ ficha_id: Number(id), pessoa: pessoa2, liberar: true, ...valores ? { valores } : {} });
+          aviso("Pronto: a ficha voltou para a pessoa conferir, com os dados e os documentos preenchidos.");
           await mostrar();
         },
         /** Marca na nuvem o que falta (a pessoa vê no link) e abre a mensagem para avisar. */
