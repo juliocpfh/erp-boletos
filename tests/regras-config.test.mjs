@@ -188,16 +188,19 @@ test('avisos legais ao salvar o contrato (avisam, não proíbem)', () => {
 });
 
 test('boleto do C6: multa em % sobre o boleto (padrão) ou em reais quando é só sobre o aluguel', () => {
-  const montar = () => {
+  const montar = (taxa = 350) => {
     const d = R.bancoVazio();
     const casa = R.inserir(d, 'imoveis', { tipo: 'normal', nome: 'Casa 9', endereco: 'Rua X, 10', cidade: 'Curitiba' }, 'j');
     const c = R.inserir(d, 'contratos', { imovel_id: casa.id, inquilino_nome: 'Inquilino Teste', inquilino_cpf: '529.982.247-25', data_entrada: '2026-09-01',
       vigencia_inicio: '2026-09-01', aluguel_inicial: 200000, desconto_pontualidade_percentual: 10, bonificacao: true, dia_vencimento: 5,
-      cobranca_mes_seguinte: true, taxa_boleto: 350, multa_percentual: 2, juros_mensal_percentual: 1, cobrar_iptu: false, conta_seguro: 'Não tem', cobrar_seguro: false }, 'j');
+      cobranca_mes_seguinte: true, taxa_boleto: taxa, nao_cobrar_tarifa: !taxa, multa_percentual: 2, juros_mensal_percentual: 1, cobrar_iptu: false, conta_seguro: 'Não tem', cobrar_seguro: false }, 'j');
     R.gerarCobrancas(d, '2026-10', 'j');
     return R.dadosBoleto(d, R.boletoDoMes(d, c.id, '2026-10'));
   };
-  assert.equal(montar().multa_valor, null); // padrão: 2% sobre o boleto todo (R$ 2.003,50)
+  // sem tarifa: 2% sobre o boleto todo, em % no C6
+  assert.equal(montar(0).multa_valor, null);
+  // com tarifa (advogado e dono, 24/11/2026): multa e juros sem a tarifa, então em reais no C6: 2% de R$ 2.000,00 (não de R$ 2.003,50)
+  assert.deepEqual([montar().valor, montar().multa_valor, montar().juros_ao_dia], [200350, 4000, 66]);
   comRegras({ base_multa: 'aluguel' }, () => {
     const b = montar();
     assert.equal(b.multa_valor, 4000); // 2% de R$ 2.000,00, sem a tarifa

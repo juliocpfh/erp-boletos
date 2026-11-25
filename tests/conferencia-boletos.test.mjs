@@ -126,9 +126,10 @@ test('pagamento: em dia com desconto; a menos é recusado; atrasado soma multa e
   assert.equal(out.valor_pago, 180350);
   const nov = boleto('2026-11');
   const previsto = R.previstoNoPagamento(nov, '2026-12-20');
-  // R$ 2.003,50 + 10% de multa (sobre R$ 2.003,50) + juros de 1% ao mês por 10 dias
-  assert.equal(previsto.multa, Math.round(200350 * 0.10));
-  assert.ok(previsto.juros > 0);
+  // R$ 2.003,50 + 10% de multa (sobre R$ 2.000,00: a tarifa de R$ 3,50 fica fora, advogado e dono 24/11/2026) + juros de 1% ao mês
+  // por 10 dias (R$ 0,66 ao dia × 10, também sem a tarifa)
+  assert.equal(previsto.multa, 20000);
+  assert.equal(previsto.juros, 660);
   assert.equal(previsto.valor_devido, 200350 + previsto.multa + previsto.juros);
 });
 

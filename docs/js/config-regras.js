@@ -36,10 +36,10 @@ export const DEFINICOES_REGRAS = [
     lei: 'Código Civil, art. 132, §1º (prazo que vence em feriado passa ao dia útil seguinte). A prorrogação em si não é opção: o banco sempre aceita sem multa no dia útil seguinte.' },
   { chave: 'base_multa', grupo: 'aluguel', rotulo: 'Sobre o que incidem multa e juros do atraso', tipo: 'opcao', padrao: 'boleto',
     opcoes: [
-      ['boleto', 'Sobre o boleto inteiro: aluguel cheio, IPTU, seguro e tarifa (padrão do sistema)', 'Boleto de R$ 2.300,00 (aluguel R$ 2.000,00 + IPTU R$ 200,00 + seguro R$ 100,00), multa de 2% = R$ 46,00. Legal: IPTU e seguro são encargos do inquilino e também ficam em atraso (Lei 8.245/91, art. 23, I, e art. 25); o contrato deve dizer que a multa é sobre o total.'],
+      ['boleto', 'Sobre o boleto inteiro: aluguel cheio, IPTU e seguro (padrão do sistema)', 'Boleto de R$ 2.300,00 (aluguel R$ 2.000,00 + IPTU R$ 200,00 + seguro R$ 100,00), multa de 2% = R$ 46,00; com a tarifa de R$ 8,50, o boleto vai a R$ 2.308,50 e a multa continua R$ 46,00. Legal: IPTU e seguro são encargos do inquilino e também ficam em atraso (Lei 8.245/91, art. 23, I, e art. 25); o contrato deve dizer que a multa é sobre o total.'],
       ['aluguel', 'Só sobre o aluguel cheio', 'Mesmo boleto: multa de 2% sobre R$ 2.000,00 = R$ 40,00. Legal e mais conservador. No C6 a multa e os juros vão em reais (valor fixo), não em %.'],
     ],
-    explica: 'O FCI fica sempre fora da multa e dos juros.',
+    explica: 'O FCI e a tarifa do boleto ficam sempre fora da multa e dos juros (a tarifa: advogado e dono, 24/11/2026).',
     consequencia: 'Vale para os pagamentos registrados e os boletos emitidos no banco daqui em diante. Boleto já emitido no C6 continua com a multa com que saiu.',
     lei: LI + ', arts. 23, I, e 25; Código Civil, art. 395 (o devedor em atraso responde pelos prejuízos, juros e multa).' },
   { chave: 'proporcional', grupo: 'aluguel', rotulo: 'Aluguel proporcional (mês de entrada e de saída)', tipo: 'opcao', padrao: 'mes_30',

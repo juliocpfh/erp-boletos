@@ -40,11 +40,11 @@ test('pagamento em atraso guarda multa e juros separados e valor da nota', () =>
   R.gerarCobrancas(d, '2026-07', 'julio');
   const r = R.registrarPagamento(d, 2, '2026-08-20', null, 'julio');
   const cb = d.cobrancas[1];
-  // aberto sem desconto: 1350 + 100 + 3,50 = 1453,50; multa 145,35; juros 0,48 ao dia × 10
+  // aberto sem desconto: 1350 + 100 + 3,50 = 1453,50; multa e juros sem a tarifa (24/11/2026), sobre 1450,00: multa 145,00; juros 0,48 ao dia × 10
   assert.equal(cb.situacao, 'Paga com atraso');
-  assert.equal(cb.multa, 14535);
+  assert.equal(cb.multa, 14500);
   assert.equal(cb.juros, 480);
-  assert.equal(cb.valor_nf, 135000 + 14535 + 480);
+  assert.equal(cb.valor_nf, 135000 + 14500 + 480);
   assert.equal(r.dias_atraso, 10);
 });
 
@@ -301,10 +301,11 @@ test('atraso de verdade: banco cobra multa e juros no boleto e a NF sai com o va
   // venceu 10/08, pagou 15/08, entrou na conta 18/08: juros até o dia em que pagou, NF com a data contábil
   const r = R.registrarPagamento(d, 1, '2026-08-18', null, 'julio', { dataPagou: '2026-08-15' });
   const cb = d.cobrancas[0];
-  // julho abate a reserva de R$ 500,00: valor cheio 1.453,50 - 500,00 = 953,50; multa 10% e juros 1% a.m. × 5 dias
-  assert.deepEqual([cb.dias_atraso, cb.multa, cb.juros, cb.data_pagou], [5, 9535, 155, '2026-08-15']);
-  assert.equal(cb.valor_pago, 95350 + 9535 + 155);
-  assert.equal(cb.valor_nf, 135000 + 9535 + 155);
+  // julho abate a reserva de R$ 500,00: valor cheio 1.453,50 - 500,00 = 953,50; multa 10% e juros 1% a.m. × 5 dias sobre
+  // R$ 950,00 (sem a tarifa de R$ 3,50, 24/11/2026)
+  assert.deepEqual([cb.dias_atraso, cb.multa, cb.juros, cb.data_pagou], [5, 9500, 155, '2026-08-15']);
+  assert.equal(cb.valor_pago, 95350 + 9500 + 155);
+  assert.equal(cb.valor_nf, 135000 + 9500 + 155);
   assert.equal(r.pontual, false);
   assert.equal(d.cobrancas[1].iptu, 10000); // nada vai para o boleto seguinte
   assert.equal(R.totais(d.cobrancas[1]).a_pagar_pontual, 135000 - 13500 + 10000 + 350);

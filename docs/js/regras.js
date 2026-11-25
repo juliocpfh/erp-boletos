@@ -6146,7 +6146,7 @@ export function dadosBoleto(d, cb, { moeda = '' } = {}) {
     numero_documento: ((imovel && imovel.nome) || '').toLocaleUpperCase('pt-BR').replace(/[^A-Z0-9]/g, '').slice(0, 15),
     vencimento: cb.vencimento, valor, desconto: Math.min(cb.desconto, valor),
     valor_com_desconto: t.a_pagar_pontual, multa_percentual: cb.multa_percentual,
-    // com FCI, multa e juros são sobre o boleto sem o FCI: a multa vai em valor (R$), não em %
+    // com FCI ou tarifa (24/11/2026), multa e juros são sobre o boleto sem eles: a multa vai em valor (R$), não em %
     multa_valor: t.base_multa !== valor ? C.arred((t.base_multa * (cb.multa_percentual || 0)) / 100) : null,
     juros_ao_dia: C.jurosAoDia(t.base_multa, cb.juros_mensal_percentual), descricao: linhas.join('\n'),
     // letras a mais que o C6 corta no fim da descrição (0 = cabe)
@@ -6536,7 +6536,7 @@ export function pedidoBoletoC6(d, cb, conta, referencia = referenciaExterna(cb))
 export function encargosDoBoletoC6(d, cb, conta, b = dadosBoleto(d, cb)) {
   const K = M.CAMPOS;
   const fees = {};
-  // base da multa diferente do valor do boleto (FCI, ou regra `base_multa` = só o aluguel): multa e juros em reais
+  // base da multa diferente do valor do boleto (FCI, tarifa do boleto, ou regra `base_multa` = só o aluguel): multa e juros em reais
   if (cb.fci || b.multa_valor !== null) {
     if (b.multa_valor > 0) Object.assign(fees, { [K.multa_tipo]: M.TIPOS_ENCARGO.multa.valor, [K.multa_valor]: centavosParaReais(b.multa_valor), [K.multa_prazo]: 0 });
     if (b.juros_ao_dia > 0) Object.assign(fees, { [K.juros_tipo]: M.TIPOS_ENCARGO.juros.valor_dia, [K.juros_valor]: centavosParaReais(b.juros_ao_dia), [K.juros_prazo]: 0 });
