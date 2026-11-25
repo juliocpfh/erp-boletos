@@ -787,11 +787,20 @@ function caixaDocumentos(c) {
 function caixaOutrosDocumentos(c) {
   const lista = DL.documentosDo(d(), c.id);
   const abrir = (x) => `<a href="#" data-acao="abrirArquivo" data-escopo="aditivos" data-id="${x.contrato_id}" data-nome="${esc(x.arquivo)}">📎 ${esc(x.arquivo)}</a>`;
-  const assinatura = (x) => (x.arquivo ? `${etiqueta(`assinado em ${dataBr(x.assinado_em)}`, 'ok')}<br>${abrir(x)}${xAnexo('tirarArquivoDocumento', { id: x.id })}`
-    : `${etiqueta('aguardando a via assinada', 'aviso')}${opera() ? `<form data-form="anexarDocumentoLocacao" class="acoes" style="margin-top:4px"><input type="hidden" name="id" value="${x.id}">
-      <input type="date" name="data" value="${C.hojeIso()}" style="width:auto" title="Data da assinatura">${F.atalhosData()}
-      <label class="botao secundario pequeno enviar" title="Via assinada (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}" data-arquivo-doc></label>
-      <button class="pequeno">Anexar assinado</button></form>` : ''}`);
+  // notificação para desocupação (advogado, 24/11/2026): vai por carta com AR; o anexo é o AR, com a data do recebimento
+  const prazos = (x) => {
+    if (!DL.ehNotificacaoComAr(x)) return '';
+    const p = DL.prazosDaNotificacao(x);
+    return p.desocupar ? `<div class="suave">Desocupar até ${dataBr(p.desocupar)}${p.recebida ? '' : ' (pela data limite; confira quando o AR voltar)'}; sem a saída, ação de despejo com pedido de liminar até <b>${dataBr(p.acaoAte)}</b>.</div>` : '';
+  };
+  const assinatura = (x) => {
+    const ar = DL.ehNotificacaoComAr(x);
+    return x.arquivo ? `${etiqueta(`${ar ? 'recebida (AR) em' : 'assinado em'} ${dataBr(x.assinado_em)}`, 'ok')}<br>${abrir(x)}${xAnexo('tirarArquivoDocumento', { id: x.id })}${prazos(x)}`
+      : `${etiqueta(ar ? 'aguardando o AR (carta com aviso de recebimento)' : 'aguardando a via assinada', 'aviso')}${opera() ? `<form data-form="anexarDocumentoLocacao" class="acoes" style="margin-top:4px"><input type="hidden" name="id" value="${x.id}">
+      <input type="date" name="data" value="${C.hojeIso()}" style="width:auto" title="${ar ? 'Data do recebimento (a do AR)' : 'Data da assinatura'}">${F.atalhosData()}
+      <label class="botao secundario pequeno enviar" title="${ar ? 'AR devolvido pelos Correios (PDF ou foto)' : 'Via assinada (PDF ou foto)'}"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}" data-arquivo-doc></label>
+      <button class="pequeno">${ar ? 'Anexar o AR' : 'Anexar assinado'}</button></form>` : ''}${prazos(x)}`;
+  };
   return `<div class="cabecalho"><h3 id="outros-documentos">Outros documentos da locação</h3>${opera() ? link(`#/documento-gerar?contrato=${c.id}`, 'Gerar documento', 'botao secundario') : ''}</div>
     ${lista.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Documento</th><th>Via assinada</th><th></th></tr>${lista.map((x) => `<tr><td class="nw">${dataBr(x.data)}</td>
       <td><b>${esc(x.nome)}</b><br><span class="suave">${esc(x.assunto || '')}</span></td><td>${assinatura(x)}</td>

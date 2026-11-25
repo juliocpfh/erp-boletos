@@ -286,7 +286,7 @@ export function demonstrativo(cb) {
   const t = R.totais(cb);
   const linha = (txt, v) => `<tr><td>${txt}</td><td class="n">${v}</td></tr>`;
   // o que fica fora da base de multa e juros: o FCI, a multa da notificação e a diferença de um pagamento em parte antigo
-  const semJuros = [cb.fci && 'o FCI', (cb.multas_notificacao || []).length && 'a multa da notificação', (cb.diferencas_cobradas || []).length && 'a diferença do boleto anterior'].filter(Boolean);
+  const semJuros = [cb.fci && 'o FCI', cb.taxa_boleto && 'a tarifa do boleto', (cb.multas_notificacao || []).length && 'a multa da notificação', (cb.diferencas_cobradas || []).length && 'a diferença do boleto anterior'].filter(Boolean);
   if (R.ehComplementoCaucao(cb)) {
     // em aberto: a caução de hoje (parcela paga fora da ordem já está nela); paga: o que estava antes dela
     const caucaoAntes = cb.data_pagamento ? cb.caucao_anterior : R.valorGarantia(d(), c);

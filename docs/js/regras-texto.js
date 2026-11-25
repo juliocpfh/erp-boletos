@@ -51,7 +51,7 @@ export const REGRAS_TEXTO = `REGRAS DO SISTEMA - ADMINISTRAÇÃO DE IMÓVEIS
 - Aluguel com bonificação vale quando pago em dia; atrasado, paga o aluguel cheio mais multa e juros.
 - Vencimento em sábado, domingo ou feriado nacional: pode pagar no próximo dia útil sem multa e juros, com a bonificação. Pago depois dele, o atraso conta desde o vencimento, como no banco (ex.: vence sábado 10/10/2026, 12/10 é feriado: em dia até terça 13/10; pago na quarta 14/10 = 4 dias de atraso). Só então o boleto aparece como vencido e na inadimplência.
 - Troca de titular: o contrato só passa ao novo inquilino com o termo aditivo da troca assinado (outro termo assinado, como o de troca do vencimento, não conta); até lá, boletos e correções continuam no anterior.
-- Multa e juros são cobrados pelo banco no próprio boleto. Juros ao dia são truncados, como no banco. Boleto do complemento da caução nunca tem multa nem juros.
+- Multa e juros são cobrados pelo banco no próprio boleto. Juros ao dia são truncados, como no banco. Boleto do complemento da caução nunca tem multa nem juros. A tarifa do boleto fica fora da multa e dos juros (advogado e dono, 24/11/2026: aluguel R$ 1.900,00 + tarifa R$ 8,50, multa de 2% = R$ 38,00).
 - Boleto pago não é excluído (desfaça o pagamento antes). Boleto com valor editado à mão não é refeito no recálculo.
 - A baixa em lote é separada por vencimento.
 - Boleto de controle (inquilino sem NF) fica fora das somas e dos resultados.

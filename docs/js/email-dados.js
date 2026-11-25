@@ -309,6 +309,15 @@ export function anexosProntos(d, modelo, alvo) {
       }
       continue;
     }
+    if (tipo === 'digital') {
+      // contrato e termo aditivo assinados digitalmente pela empresa (2026-11-24): o PDF vem da fila da assinatura na hora de
+      // abrir o e-mail (telas/emails.js, assinadosDaFila); sem a versão assinada, sai da lista (anexa-se à mão, como antes)
+      const a = qual === 'aditivo' ? alvo.aditivo || null : null;
+      if (!R.regra('assinatura_digital') || !c || (qual === 'aditivo' && !a)) continue;
+      out.push({ tipo: 'digital', doc: qual, contrato: c.id, ...(a ? { id: a.id } : {}), ok: true, motivo: '',
+        rotulo: a ? `termo aditivo de ${C.dataBr(a.data)} assinado digitalmente pela empresa` : 'contrato assinado digitalmente pela empresa' });
+      continue;
+    }
     if (tipo === 'notificacao') {
       // a notificação assinada (anexada na notificação); sem ela, o PDF para assinar que o sistema monta
       const n = alvo.notificacao || null;

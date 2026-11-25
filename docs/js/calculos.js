@@ -416,10 +416,12 @@ export function totaisCobranca(cobranca, reservaDisponivel = 0, ctx = cobranca) 
     a_pagar_sem_desconto: Math.max(totalSemDesconto - reserva, 0),
     // multa e juros por atraso não incidem sobre o FCI (fundo de conservação do imóvel) nem sobre a multa da notificação (nem a diferença antiga)
     // (boleto de R$ 2.000,00 + multa da notificação de R$ 1.500,00 → base R$ 2.000,00); regra `base_multa`: boleto inteiro
-    // (padrão) ou só o aluguel cheio (ex.: aluguel R$ 2.000,00 + IPTU R$ 200,00 → base R$ 2.200,00 ou R$ 2.000,00)
+    // (padrão) ou só o aluguel cheio (ex.: aluguel R$ 2.000,00 + IPTU R$ 200,00 → base R$ 2.200,00 ou R$ 2.000,00).
+    // Nem sobre a tarifa do boleto (advogado e dono, 24/11/2026, item 2.1): aluguel R$ 1.900,00 + tarifa R$ 8,50 = boleto de
+    // R$ 1.908,50; multa de 2% sobre R$ 1.900,00 = R$ 38,00 (e não R$ 38,17), juros também sobre R$ 1.900,00
     base_multa: regra('base_multa', ctx) === 'aluguel'
-      ? Math.max(Math.min(aluguel - (ressarcimento || 0), totalSemDesconto - (fci || 0) - multaNotif) - reserva, 0)
-      : Math.max(totalSemDesconto - reserva - (fci || 0) - multaNotif, 0),
+      ? Math.max(Math.min(aluguel - (ressarcimento || 0), totalSemDesconto - (fci || 0) - taxa_boleto - multaNotif) - reserva, 0)
+      : Math.max(totalSemDesconto - reserva - (fci || 0) - taxa_boleto - multaNotif, 0),
   };
 }
 

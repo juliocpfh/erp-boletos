@@ -212,6 +212,19 @@ test('termo de devolução das chaves (B4): só com a data de saída; chaves, vi
   assert.equal(r.tabela.length, 3); // título + 2 linhas em branco (sem relação de chaves)
   assert.match(r.depois[0], /em até 72 \(setenta e duas\) horas/);
   assert.match(r.depois[1], /não dá quitação.*artigo 23, III/);
+  // item 3.5 do advogado (24/11/2026): outro orçamento do inquilino só até a devolução das chaves (não 5 dias úteis depois)
+  assert.match(r.depois[0], /Outro orçamento do LOCATÁRIO para os reparos só podia ser apresentado até esta devolução/);
+  assert.match(R.roteiroSaida(d, R.buscar(d, 'contratos', c.id), '2029-05-01').find((x) => x.chave === 'vistoria').detalhe,
+    /outro orçamento do inquilino: só até a devolução das chaves \(14\/05\/2029\)/);
+  for (const [chave, trecho] of [['saida_aviso', /outro orçamento.*antes da devolução das chaves/], ['saida_vistoria', /outro orçamento, mande antes da devolução das chaves/],
+    ['saida_chaves', /Outro orçamento só podia ser apresentado até a devolução das chaves/]]) {
+    assert.match(modeloEmail(d, chave).texto, trecho, chave);
+    assert.doesNotMatch(modeloEmail(d, chave).texto, /orçamento[^.]*5 dias úteis/, chave);
+  }
+  // modelo editado e gravado com o texto antigo também recebe o trecho novo (ATUALIZACOES_EMAIL)
+  d.modelos_email = [{ id: 1, chave: 'saida_chaves', texto: 'Oi.\nDiscorda de algo? Responda em até 5 dias úteis, com fotos ou documentos.' }];
+  assert.match(modeloEmail(d, 'saida_chaves').texto, /Discorda da vistoria\?.*Outro orçamento só podia/);
+  d.modelos_email = [];
   R.inserir(d, 'vistorias', { contrato_id: c.id, imovel_id: c.imovel_id, tipo: 'Entrada', data: '2026-11-14', itens: [], chaves: '02 Chaves da porta\n01 Controle do portão' }, 'j');
   R.marcarVistoriaSaida(d, c.id, '2029-05-16', '14:00', 'j');
   r = montarRecibo(d, 'devolucao_chaves', { contrato: R.buscar(d, 'contratos', c.id) }, '2029-05-14');

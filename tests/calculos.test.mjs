@@ -88,10 +88,11 @@ test('liquidação e valor da nota fiscal', () => {
   assert.equal(emDia.valor_devido, 135000);
   assert.equal(emDia.valor_nf, 121500);
   const atraso = C.liquidar(cb, '2026-08-20');
-  assert.equal(atraso.multa, 14850);
+  // multa e juros sem a tarifa (advogado e dono, 24/11/2026): base R$ 1.485,00 − R$ 5,00 = R$ 1.480,00 → multa de 10% = R$ 148,00
+  assert.equal(atraso.multa, 14800);
   assert.equal(atraso.juros, 490);
-  assert.equal(atraso.valor_devido, 148500 + 14850 + 490);
-  assert.equal(atraso.valor_nf, 135000 + 14850 + 490);
+  assert.equal(atraso.valor_devido, 148500 + 14800 + 490);
+  assert.equal(atraso.valor_nf, 135000 + 14800 + 490);
 });
 
 test('valores digitados com milhar sem centavos e prazo em meses', () => {

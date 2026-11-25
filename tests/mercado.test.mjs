@@ -11,13 +11,13 @@ import { resumosGerados, textosGerados } from './mercado-fixo.mjs';
 
 /** Resumo de cada texto gerado pelo cenário ANK/JCK com o código de ANTES da mudança (2026-11-16). */
 const ANTES = {
-  'contrato:Residencial:Maria Souza': 'cacdf38c56495cfa', // 24/11: + resumo em perguntas e respostas (#374) + tarifa do boleto (#376): só esses trechos mudam
-  'contrato:Não residencial (comercial):Maria Souza': 'b47c975a0d744f63', // 24/11: + resumo em perguntas e respostas (#374) + tarifa do boleto (#376): só esses trechos mudam
+  'contrato:Residencial:Maria Souza': 'bd1a514a70ff75e2', // 24/11: + resumo em perguntas e respostas (#374) + tarifa do boleto (#376) + cláusulas aprovadas pelo advogado (honorários, IPCA, visita perdida, serviços extras, estorno, pintura, art. 4º só para PF; pintura com 48 meses, fixo no cenário): só esses trechos mudam
+  'contrato:Não residencial (comercial):Maria Souza': '4ef609faf2d37c91', // 24/11: + resumo em perguntas e respostas (#374) + tarifa do boleto (#376) + cláusulas aprovadas pelo advogado (honorários, IPCA, visita perdida, serviços extras, estorno, pintura, art. 4º só para PF; pintura com 48 meses, fixo no cenário): só esses trechos mudam
   'locadoras:Maria Souza': 'c85480966d9c7b25',
   'representacao:Maria Souza': '264e192c61a07b4d',
   'cidade:Maria Souza': '377621052857a5ab',
-  'contrato:Residencial:João Teste': 'ace9c1b6ecb39cdc', // 24/11: + resumo em perguntas e respostas (#374) + tarifa do boleto (#376): só esses trechos mudam
-  'contrato:Não residencial (comercial):João Teste': 'a3bb7aeb5b05bd23', // 24/11: + resumo em perguntas e respostas (#374) + tarifa do boleto (#376): só esses trechos mudam
+  'contrato:Residencial:João Teste': '8e19dcccd2562069', // 24/11: + resumo em perguntas e respostas (#374) + tarifa do boleto (#376) + cláusulas aprovadas pelo advogado (honorários, IPCA, visita perdida, serviços extras, estorno, pintura, art. 4º só para PF; pintura com 48 meses, fixo no cenário): só esses trechos mudam
+  'contrato:Não residencial (comercial):João Teste': '05f8ee16f4091c9f', // 24/11: + resumo em perguntas e respostas (#374) + tarifa do boleto (#376) + cláusulas aprovadas pelo advogado (honorários, IPCA, visita perdida, serviços extras, estorno, pintura, art. 4º só para PF; pintura com 48 meses, fixo no cenário): só esses trechos mudam
   'locadoras:João Teste': 'c85480966d9c7b25',
   'representacao:João Teste': '661b724dffaa2bb9',
   'cidade:João Teste': '377621052857a5ab',
@@ -31,9 +31,9 @@ const ANTES = {
   'email:vistoria_assinada': 'f20a62fda5dbf4b4',
   'email:novo_valor': 'eab9c789f37c7c93',
   'email:aditivo_assinado': '548ec68b37e2cd44',
-  'email:saida_aviso': 'c026d37a6466c076',
-  'email:saida_vistoria': 'b6f5a0271f6b62c7',
-  'email:saida_chaves': '354d50da0fb6ebba',
+  'email:saida_aviso': '1f53eecc16a39f09', // 24/11 (advogado 3.5): outro orçamento só antes das chaves
+  'email:saida_vistoria': '82b5b1cbb71008ad', // 24/11 (advogado 3.5)
+  'email:saida_chaves': '8049463d6b3cca80', // 24/11 (advogado 3.5)
   'email:saida_calculo': '96b8482be28158a2',
   'email:saida_encerramento': '2d49059fc48148bb',
   'email:informe_ir': '71d02f294fa1f4be',
@@ -46,6 +46,9 @@ const ANTES = {
   lembrete: '8efce35480e4a45e',
   conta_emissora: '30804615d55e104f',
 };
+// 24/11 (advogado 3.5): o termo de devolução das chaves diz que o outro orçamento só vale até a devolução. Fica fora da lista
+// de cima para não encostar na linha da ficha, que a sessão da reserva muda ao mesmo tempo (junte as duas quando as PRs entrarem)
+ANTES['recibo:devolucao_chaves:João Teste'] = 'e7a4ce563c8b6c7f';
 
 test('ANK/JCK de hoje: contratos, e-mails, recibos, lembrete e conta dos boletos saem idênticos aos de antes', () => {
   const agora = resumosGerados();

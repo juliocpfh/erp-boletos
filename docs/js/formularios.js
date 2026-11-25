@@ -596,6 +596,24 @@ export const RENOVACAO = [
   campo('observacoes', 'Observações', 'area'),
 ];
 
+/**
+ * Campos de mês que escolhem um boleto: na tela são perguntados pelo mês em que o boleto vence, como o ressarcimento e o seguro
+ * (pedido do dono de 24/11/2026: "12/2026" digitado para o boleto que vence em 05/12 ia para o de janeiro). Gravado continua o
+ * mês de referência (``R.competenciaDoMesVencimento``); os dados já gravados não mudam. As listas acima (exportação, histórico)
+ * continuam com o nome e o rótulo da referência. Chave: o campo gravado; valor: o campo da tela.
+ */
+const EX_VENCIMENTO = 'ex.: 12/2026 = o boleto que vence em dezembro';
+export const PERGUNTA_PELO_VENCIMENTO = {
+  reserva_competencia: campo('vencimento_reserva', 'Usar a reserva no boleto que vence em (mês do vencimento)', 'mes', { autoMsg: true,
+    ajuda: `O mês em que vence o boleto do aluguel (${EX_VENCIMENTO}). Em branco: usa no primeiro aluguel` }),
+  carencia_inicio: campo('vencimento_carencia', 'Carência a partir do boleto que vence em (mês do vencimento)', 'mes', { autoMsg: true,
+    ajuda: `O mês em que vence o primeiro boleto da carência (${EX_VENCIMENTO}). Em branco: o boleto do mês de entrada` }),
+  vale_desde: campo('vencimento_vale_desde', 'O novo valor vale a partir do boleto que vence em (mês do vencimento)', 'mes', { autoMsg: true,
+    ajuda: `O mês em que vence o primeiro boleto com o novo valor (${EX_VENCIMENTO}). Os boletos em aberto deste em diante são refeitos com o novo valor (os pagos e os de antes ficam como estão). Em branco: o aluguel do mês da data acima, se for dia 1º, ou o do mês seguinte` }),
+};
+/** Troca na lista os campos de referência pelos que perguntam o mês do vencimento. */
+export const comPerguntaPeloVencimento = (lista) => lista.map((c) => PERGUNTA_PELO_VENCIMENTO[c.nome] || c);
+
 // a data de saída vem do contrato ("Informar data de saída"); a leitura dos relógios na saída é a mesma da vistoria de saída
 // (vem preenchida e, se mudar aqui, muda lá também). O "Vistoria de saída" (sem/com pendências, não feita) não é digitado:
 // sai da vistoria de saída registrada (contratos.js, resultadoVistoriaSaida) e é guardado em vistoria_saida ao salvar

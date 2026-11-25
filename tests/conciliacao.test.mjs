@@ -166,8 +166,8 @@ test('conciliação de boletos pela listagem do C6: por external_reference_id e 
   let sug = Z.conciliarBoletos(d, 'ank', [{ external_reference_id: null, payments: [{ amount: '1318.50', external_payment_id: 'p1', payment_date: '2026-08-10', credit_date: '2026-08-11', payment_type: 'PIX' }] }]);
   assert.equal(sug.length, 1);
   assert.deepEqual([sug[0].cobranca_id, sug[0].data_credito, sug[0].valor, sug[0].certeza, sug[0].pagouEmDia, sug[0].external_payment_id], [cb2.id, '2026-08-11', 131850, 'provavel', true, 'p1']); // só pelo valor e pela data: provável (desmarcado)
-  // atrasado: valor cheio + multa + juros em 20/08 (R$ 1.603,65) casa pelo previsto
-  sug = Z.conciliarBoletos(d, 'ank', [{ amount: '1603.65', payment_date: '2026-08-20', credit_date: '2026-08-20' }]);
+  // atrasado: valor cheio + multa + juros em 20/08 (R$ 1.603,30: multa e juros sobre R$ 1.450,00, sem a tarifa de R$ 3,50, 24/11) casa pelo previsto
+  sug = Z.conciliarBoletos(d, 'ank', [{ amount: '1603.30', payment_date: '2026-08-20', credit_date: '2026-08-20' }]);
   assert.deepEqual([sug[0].cobranca_id, sug[0].certeza, sug[0].pagouEmDia], [cb2.id, 'provavel', false]);
   // valor em dia mas pago 5 dias depois do vencimento: não casa (com o dia do pagamento informado pelo banco não há tolerância)
   assert.equal(Z.conciliarBoletos(d, 'ank', [{ amount: '1318.50', payment_date: '2026-08-15', credit_date: '2026-08-15' }]).length, 0);
@@ -221,9 +221,9 @@ test('confirmar pagamento pelo banco: grava data de crédito, liga os dois lados
   R.estornarPagamento(d, cb2.id, 'julio');
   // divergente: devolve sem gravar; com valor da NF e justificativa grava nf_manual
   // creditado em 12/08 (depois do vencimento) com valor estranho: o previsto é com multa e juros até 12/08; se o inquilino pagou em dia, a tela marca
-  // R$ 1.350,00 creditado em 12/08: sem "pagou em dia" o devido é R$ 1.599,81 (com multa e juros): menor que o devido é
+  // R$ 1.350,00 creditado em 12/08: sem "pagou em dia" o devido é R$ 1.599,46 (com multa e juros, sem a tarifa na base): menor que o devido é
   // RECUSADO (não existe pagamento em parte, decisão de 2026-11-20) e nada é gravado; pagou em dia, é R$ 31,50 a mais
-  assert.throws(() => Z.vincularMovimentacao(d, ent2.id, { classificacao: 'boleto', cobranca_id: cb2.id }, 'julio'), (e) => e instanceof C.ErroUsuario && /menor que o devido \(R\$ 1\.599,81\)\. Não existe pagamento em parte.*sem destino/.test(e.message));
+  assert.throws(() => Z.vincularMovimentacao(d, ent2.id, { classificacao: 'boleto', cobranca_id: cb2.id }, 'julio'), (e) => e instanceof C.ErroUsuario && /menor que o devido \(R\$ 1\.599,46\)\. Não existe pagamento em parte.*sem destino/.test(e.message));
   let dv = Z.vincularMovimentacao(d, ent2.id, { classificacao: 'boleto', cobranca_id: cb2.id, pagouEmDia: true }, 'julio');
   assert.deepEqual([dv.divergente, dv.previsto, dv.recebido], [true, 131850, 135000]);
   assert.equal(R.buscar(d, 'cobrancas', cb2.id).data_pagamento, null);
@@ -249,9 +249,9 @@ test('confirmar pagamento pela listagem do Bolepix (sem extrato): usa credit_dat
   R.estornarPagamento(d, cb2.id, 'julio');
   assert.equal(R.buscar(d, 'cobrancas', cb2.id).pagamento_c6, null);
   // atrasado: pagou em 20/08 (multa e juros até lá), creditado em 21/08
-  const r2 = Z.confirmarPagamentoPeloBanco(d, cb2.id, { amount: '1603.65', payment_date: '2026-08-20', credit_date: '2026-08-21' }, 'julio');
+  const r2 = Z.confirmarPagamentoPeloBanco(d, cb2.id, { amount: '1603.30', payment_date: '2026-08-20', credit_date: '2026-08-21' }, 'julio');
   assert.equal(r2.divergente, false);
-  assert.deepEqual([R.buscar(d, 'cobrancas', cb2.id).data_pagou, R.buscar(d, 'cobrancas', cb2.id).situacao, R.buscar(d, 'cobrancas', cb2.id).multa], ['2026-08-20', 'Paga com atraso', 14535]);
+  assert.deepEqual([R.buscar(d, 'cobrancas', cb2.id).data_pagou, R.buscar(d, 'cobrancas', cb2.id).situacao, R.buscar(d, 'cobrancas', cb2.id).multa], ['2026-08-20', 'Paga com atraso', 14500]); // multa sem a tarifa (24/11)
 });
 
 test('destino "conta do imóvel": cria a conta ligada, respeita quem paga pelo contrato e o desfazer exclui a conta e devolve os arquivos', () => {

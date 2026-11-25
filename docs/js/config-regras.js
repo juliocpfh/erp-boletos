@@ -36,10 +36,10 @@ export const DEFINICOES_REGRAS = [
     lei: 'Código Civil, art. 132, §1º (prazo que vence em feriado passa ao dia útil seguinte). A prorrogação em si não é opção: o banco sempre aceita sem multa no dia útil seguinte.' },
   { chave: 'base_multa', grupo: 'aluguel', rotulo: 'Sobre o que incidem multa e juros do atraso', tipo: 'opcao', padrao: 'boleto',
     opcoes: [
-      ['boleto', 'Sobre o boleto inteiro: aluguel cheio, IPTU, seguro e tarifa (padrão do sistema)', 'Boleto de R$ 2.300,00 (aluguel R$ 2.000,00 + IPTU R$ 200,00 + seguro R$ 100,00), multa de 2% = R$ 46,00. Legal: IPTU e seguro são encargos do inquilino e também ficam em atraso (Lei 8.245/91, art. 23, I, e art. 25); o contrato deve dizer que a multa é sobre o total.'],
+      ['boleto', 'Sobre o boleto inteiro: aluguel cheio, IPTU e seguro (padrão do sistema)', 'Boleto de R$ 2.300,00 (aluguel R$ 2.000,00 + IPTU R$ 200,00 + seguro R$ 100,00), multa de 2% = R$ 46,00; com a tarifa de R$ 8,50, o boleto vai a R$ 2.308,50 e a multa continua R$ 46,00. Legal: IPTU e seguro são encargos do inquilino e também ficam em atraso (Lei 8.245/91, art. 23, I, e art. 25); o contrato deve dizer que a multa é sobre o total.'],
       ['aluguel', 'Só sobre o aluguel cheio', 'Mesmo boleto: multa de 2% sobre R$ 2.000,00 = R$ 40,00. Legal e mais conservador. No C6 a multa e os juros vão em reais (valor fixo), não em %.'],
     ],
-    explica: 'O FCI fica sempre fora da multa e dos juros.',
+    explica: 'O FCI e a tarifa do boleto ficam sempre fora da multa e dos juros (a tarifa: advogado e dono, 24/11/2026).',
     consequencia: 'Vale para os pagamentos registrados e os boletos emitidos no banco daqui em diante. Boleto já emitido no C6 continua com a multa com que saiu.',
     lei: LI + ', arts. 23, I, e 25; Código Civil, art. 395 (o devedor em atraso responde pelos prejuízos, juros e multa).' },
   { chave: 'proporcional', grupo: 'aluguel', rotulo: 'Aluguel proporcional (mês de entrada e de saída)', tipo: 'opcao', padrao: 'mes_30',
@@ -89,11 +89,13 @@ export const DEFINICOES_REGRAS = [
     opcoes: [['', 'Escolher em cada contrato', 'O campo vem vazio.'], ['Poupança', 'Poupança', ''], ['IPCA', 'IPCA', ''], ['IGP-M', 'IGP-M', ''], ['INPC', 'INPC', ''], ['IGP-DI', 'IGP-DI', ''], ['SELIC', 'SELIC', '']],
     explica: 'Índice do Banco Central que corrige o saldo do FCI mês a mês.', consequencia: 'Só muda o que vem preenchido no Novo contrato.', lei: 'Sem lei: vale o contrato.' },
   // decisão do dono, 24/11/2026: pintura nova na entrada → devolve pintado (orçamento inteiro); sem pintura nova → paga só a vida
-  // que faltava da pintura (orçamento × (vida − meses de moradia) ÷ vida, mínimo zero)
-  { chave: 'pintura_vida_meses', grupo: 'garantia', rotulo: 'Pintura na saída: vida da pintura (meses)', tipo: 'inteiro', padrao: 36, min: 1, max: 120,
-    explica: 'Sugere o valor do reparo de pintura no cálculo final. Se a vistoria de entrada registrou pintura nova, o inquilino paga o orçamento inteiro (ex.: R$ 2.400,00). Sem pintura nova, paga só o que faltava da vida da pintura: orçamento de R$ 2.400,00, morou 12 meses → R$ 2.400,00 × 24/36 = R$ 1.600,00; 36 meses ou mais → nada.',
+  // que faltava da pintura (orçamento × (vida − meses de moradia) ÷ vida, mínimo zero). Vida de 48 meses desde 24/11/2026 (era 36;
+  // item 3.5 do advogado, confirmado pelo dono): o padrão nunca fica gravado (config_regras e as regras especiais só guardam o que
+  // difere do sistema), então todos passam a 48 sem passo no normalizar
+  { chave: 'pintura_vida_meses', grupo: 'garantia', rotulo: 'Pintura na saída: vida da pintura (meses)', tipo: 'inteiro', padrao: 48, min: 1, max: 120,
+    explica: 'Sugere o valor do reparo de pintura no cálculo final. Se a vistoria de entrada registrou pintura nova, o inquilino paga o orçamento inteiro (ex.: R$ 2.400,00). Sem pintura nova, paga só o que faltava da vida da pintura: orçamento de R$ 2.400,00, morou 24 meses → R$ 2.400,00 × 24/48 = R$ 1.200,00; 48 meses ou mais → nada. Bastam as fotos das vistorias e a pintura nova anotada na entrada, salvo contravistoria. O inquilino pode trazer outro orçamento, mas só antes da devolução das chaves.',
     consequencia: 'Só muda a sugestão (a equipe sempre pode mudar o valor). Vida maior cobra mais de quem morou pouco; menor cobra menos. O desgaste natural do uso não pode ser cobrado.',
-    lei: LI + ', art. 23, III (devolver o imóvel no estado em que o recebeu, salvo as deteriorações do uso normal).' },
+    lei: LI + ', art. 23, III (devolver o imóvel no estado em que o recebeu, salvo as deteriorações do uso normal). Prova: as fotos das vistorias de entrada e de saída e a pintura nova anotada na entrada, salvo contravistoria (orientação do advogado, 24/11/2026).' },
 
   // ------------------------------------------------------------------ contrato
   { chave: 'prazo_residencial_padrao', grupo: 'contrato', rotulo: 'Prazo do contrato residencial (meses)', tipo: 'inteiro', padrao: 30, min: 1, max: 600,
@@ -126,6 +128,16 @@ export const DEFINICOES_REGRAS = [
     explica: 'Contados por dia, como no banco. Ex.: R$ 2.000,00 com 1% ao mês, 10 dias → R$ 0,66 por dia × 10 = R$ 6,60. Acima de 1% ao mês, o sistema avisa ao salvar.',
     consequencia: 'Só muda o que vem preenchido. Com inquilino pessoa física, acima de 1% ao mês pode ser reduzido (Lei de Usura, art. 1º; Código Civil, art. 406).',
     lei: 'Código Civil, art. 406 (com a Lei 14.905/2024); Decreto 22.626/33, art. 1º.' },
+  // pendência antiga do Claude (24/11/2026): sugerir no cálculo final a multa pela falta do aviso de 30 dias (só sugestão, botão "Usar")
+  { chave: 'falta_aviso_saida', grupo: 'contrato', rotulo: 'Saída sem o aviso de 30 dias: multa sugerida no cálculo final', tipo: 'opcao', padrao: 'proporcional',
+    opcoes: [
+      ['proporcional', '1 mês de aluguel e encargos, proporcional aos dias que faltaram (padrão do sistema)', 'Aluguel R$ 1.800,00, avisou em 10/11 e saiu em 25/11 (15 dias antes): faltaram 15 dias → R$ 1.800,00 × 15/30 = R$ 900,00. Sem aviso nenhum → R$ 1.800,00. Legal e com risco baixo: o juiz pode reduzir a multa quando a obrigação foi cumprida em parte (Código Civil, art. 413), e quem avisou 15 dias antes cumpriu metade.'],
+      ['mes_inteiro', '1 mês inteiro sempre que avisar com menos de 30 dias (como está escrito no contrato)', 'Mesmo exemplo: R$ 1.800,00, tanto faz ter avisado 15 dias ou 29 dias antes. É o texto do contrato, mas quem avisou parte do prazo pode pedir a redução ao juiz (Código Civil, art. 413).'],
+      ['nao_sugerir', 'Não sugerir', 'O cálculo final não mostra a multa; a equipe soma à mão se quiser.'],
+    ],
+    explica: 'O contrato manda o inquilino avisar por escrito 30 dias antes de sair; sem o aviso, ele paga 1 mês de aluguel e encargos (IPTU e seguro do boleto). A data do aviso é informada em "Saída do inquilino" (ou "Adiar ou mudar a data"). No cálculo final aparece a multa sugerida com o botão "Usar": nada entra sozinho.',
+    consequencia: 'Só muda a sugestão do cálculo final; a equipe sempre pode mudar ou dispensar. Se o inquilino sair antes do fim do contrato, a multa da saída antecipada (3 aluguéis proporcionais) também aparece: o sistema sugere só a maior das duas, porque cobrar as duas pelo mesmo fato pode ser visto como multa em dobro.',
+    lei: LI + ', art. 6º, parágrafo único (falta do aviso: um mês de aluguel e encargos); Código Civil, art. 413 (redução da multa).' },
   { chave: 'mes_seguinte_padrao', grupo: 'contrato', rotulo: 'O aluguel do mês vence no mês seguinte', tipo: 'simnao', padrao: true,
     explica: 'Sim: o aluguel de julho vence em agosto (paga-se depois de usar).',
     consequencia: 'Não: o aluguel de julho vence em julho. Cobrar antes de usar é proibido quando há garantia (art. 20; só é permitido sem garantia, art. 42, ou na temporada) e é contravenção (art. 43, III).',

@@ -37,18 +37,29 @@ export function cenario() {
   // contas do banco cadastradas como hoje: a JCK primeiro, sem conta padrão escolhida (cai na "ank")
   d.config_banco.contas = [{ ...R.CONTA_BANCO_PADRAO, id: 'jck', apelido: 'JCK', emitente_id: jck.id }, { ...R.CONTA_BANCO_PADRAO, id: 'ank', apelido: 'ANK', emitente_id: ank.id }];
   d.config_banco.conta_padrao_id = '';
+  // vida da pintura fixa em 48 meses (o número sai no contrato, cláusula da pintura de 24/11/2026): a impressão não muda quando o
+  // padrão da regra muda de 36 para 48 (PR da pintura), entre antes ou depois desta
+  d.config_regras.push({ id: 1, chave: 'pintura_vida_meses', valor: 48 });
   R.normalizar(d);
   return { d, c, c2, f, cb };
 }
 
 const resumo = (x) => createHash('sha256').update(typeof x === 'string' ? x : JSON.stringify(x)).digest('hex').slice(0, 16);
 
+/**
+ * Frases novas dos contratos conferidas em teste próprio, tiradas do texto antes do resumo: assim duas PRs que mexem no texto
+ * do contrato ao mesmo tempo não brigam pelas mesmas linhas de ANTES (mercado.test.mjs). Cada frase está numa lista e no teste dela.
+ * - multa e juros fora da tarifa do boleto (advogado, 24/11/2026): tests/tarifa-sem-multa.test.mjs
+ */
+export const FRASES_NOVAS_CONTRATO = [' A multa e os juros por atraso não incidem sobre a tarifa.'];
+const semFrasesNovas = (t) => JSON.parse(FRASES_NOVAS_CONTRATO.reduce((x, f) => x.split(f).join(''), JSON.stringify(t)));
+
 /** Tudo o que o cenário gera, pelo nome: { 'contrato:...': texto, ... }. */
 export function textosGerados() {
   const { d, c, c2, f, cb } = cenario();
   const out = {};
   for (const cc of [c, c2]) {
-    for (const m of K.modelosDe(d)) out[`contrato:${m.nome}:${cc.inquilino_nome}`] = K.montarContrato(m.texto, K.dadosDoContrato(d, cc, { data: '2026-11-20' }));
+    for (const m of K.modelosDe(d)) out[`contrato:${m.nome}:${cc.inquilino_nome}`] = semFrasesNovas(K.montarContrato(m.texto, K.dadosDoContrato(d, cc, { data: '2026-11-20' })));
     out[`locadoras:${cc.inquilino_nome}`] = K.locadorasDoContrato(d, cc).map((e) => e.nome);
     out[`representacao:${cc.inquilino_nome}`] = K.representacaoDoContrato(d, cc, R.buscar(d, 'imoveis', cc.imovel_id));
     out[`cidade:${cc.inquilino_nome}`] = K.dadosDoContrato(d, cc).campos.cidade;

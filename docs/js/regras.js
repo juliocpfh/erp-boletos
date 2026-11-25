@@ -2856,7 +2856,54 @@ export function multaSaidaAntecipada(d, c) {
   return { valor: Math.round((3 * aluguel * restam) / total), aluguel, inicio, fim, restam, total, herdado: original !== c };
 }
 
-/** Nome do boleto na lista de débitos do cálculo final ("Aluguel 10/2026", "Parcela 2/3 do acordo (vence 10/12/2026)"). */
+/** Aviso de saída: o contrato pede 30 dias por escrito (cláusula da rescisão; Lei 8.245/91, art. 6º). */
+export const DIAS_AVISO_SAIDA = 30;
+
+/**
+ * Multa pela falta do aviso de 30 dias (contrato: "1 mês de aluguel e encargos vigentes na data da desocupação"; Lei 8.245/91,
+ * art. 6º, parágrafo único), só como sugestão para o cálculo final (botão "Usar"; nada entra sozinho). Dias de antecedência =
+ * da data do aviso (`aviso_saida_data`) à data de saída; `aviso_saida_sem` = saiu sem avisar (0 dias). Encargos = IPTU e seguro
+ * do último boleto de mês inteiro. Regra `falta_aviso_saida`: proporcional aos dias que faltaram (padrão), mês inteiro ou não
+ * sugerir. Ex.: aluguel R$ 1.800,00 (sem IPTU nem seguro), aviso em 10/11 e saída em 25/11 → 15 dias de aviso, faltaram 15 →
+ * R$ 900,00 (mês inteiro: R$ 1.800,00); aviso 30 dias antes ou mais → null; sem a data do aviso registrada → null.
+ * Devolve { valor, mes, aluguel, encargos, antecedencia, faltaram, sem_aviso, modo }.
+ */
+export function multaFaltaAviso(d, c) {
+  if (!c || !c.data_saida || fimDeVinculo(d, c)) return null;
+  const modo = CR.regra('falta_aviso_saida', c);
+  if (modo === 'nao_sugerir') return null;
+  const semAviso = !!c.aviso_saida_sem;
+  if (!semAviso && !C.dataValida(c.aviso_saida_data || '')) return null;
+  const antecedencia = semAviso ? 0 : Math.max(0, C.diasEntre(c.aviso_saida_data, c.data_saida));
+  if (antecedencia >= DIAS_AVISO_SAIDA) return null;
+  const faltaram = DIAS_AVISO_SAIDA - antecedencia;
+  const aluguel = aluguelAtual(d, c, c.data_saida);
+  // encargos do mês: IPTU e seguro do último aluguel de mês inteiro (o do mês da saída costuma ser proporcional)
+  const ref = d.cobrancas.filter((x) => x.contrato_id === c.id && !ehBoletoAvulso(x) && x.competencia <= C.competenciaDe(c.data_saida) && !(x.dias_cobrados < x.dias_mes))
+    .sort((a, b) => b.competencia.localeCompare(a.competencia))[0];
+  const encargos = ref ? (ref.iptu || 0) + (ref.seguro || 0) : 0;
+  const mes = (aluguel || 0) + encargos;
+  if (!(mes > 0)) return null;
+  const valor = modo === 'mes_inteiro' ? mes : Math.round((mes * faltaram) / DIAS_AVISO_SAIDA);
+  return { valor, mes, aluguel, encargos, antecedencia, faltaram, sem_aviso: semAviso, modo };
+}
+
+/**
+ * As duas multas que o cálculo final pode sugerir na saída: a da saída antecipada (3 aluguéis proporcionais, `multaSaidaAntecipada`)
+ * e a da falta do aviso (`multaFaltaAviso`). Se couberem as duas, vale só a maior (o contrato prevê as duas, mas cobrar as duas
+ * pelo mesmo fato, a saída, pode ser visto como multa em dobro; Código Civil, art. 413). Ex.: aluguel R$ 2.000,00, faltam 10 de 30
+ * meses (antecipada R$ 2.000,00) e saiu sem avisar (aviso R$ 2.000,00) → vale a antecipada (empate fica com ela); faltam 2 meses
+ * (antecipada R$ 400,00) e avisou 10 dias antes (aviso R$ 1.333,33) → vale a do aviso. Devolve { antecipada, aviso, vale }
+ * ('antecipada' | 'aviso' | null).
+ */
+export function multasDaSaida(d, c) {
+  const antecipada = multaSaidaAntecipada(d, c);
+  const aviso = multaFaltaAviso(d, c);
+  const vale = antecipada && aviso ? (aviso.valor > antecipada.valor ? 'aviso' : 'antecipada') : antecipada ? 'antecipada' : aviso ? 'aviso' : null;
+  return { antecipada, aviso, vale };
+}
+
+/** Nome do boleto na lista de débitos do cálculo final ("Aluguel 10/2026","Parcela 2/3 do acordo (vence 10/12/2026)"). */
 const nomeDebitoSaida = (cb) => (ehParcelaAcordo(cb) ? `Parcela ${cb.acordo_parcela || 'única'} do acordo (vence ${C.dataBr(cb.vencimento)})` : `Aluguel ${C.compBr(cb.competencia)}`);
 
 export function debitosDaSaida(d, c, data = C.hojeIso()) {
@@ -3452,9 +3499,19 @@ export const leituraDo = (d, contratoId, momento) => d.leituras.find((l) => l.co
  * ficado inativo pela data antiga volta a ativo se, pela nova, ainda não deve sair (ex.: saída 15/10 mudada para 15/11, hoje
  * 09/11: ativo de novo, para o boleto de 01 a 15/11 sair).
  */
-export function informarSaida(d, contratoId, data, usuario, hoje = C.hojeIso()) {
+export function informarSaida(d, contratoId, data, usuario, hoje = C.hojeIso(), aviso = undefined) {
   const c = buscar(d, 'contratos', contratoId);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data || '')) throw new Error('Informe a data de saída.');
+  // data do aviso de saída (24/11/2026, multa pela falta do aviso de 30 dias: `multaFaltaAviso`); sem `aviso`, fica a gravada.
+  // { data: 'AAAA-MM-DD' | '', sem: true } (saiu sem avisar por escrito)
+  const avisoMuda = aviso !== undefined;
+  const avisoData = avisoMuda && !aviso.sem && aviso.data ? aviso.data : null;
+  if (avisoData && !/^\d{4}-\d{2}-\d{2}$/.test(avisoData)) throw new C.ErroUsuario('Data do aviso inválida.');
+  if (avisoData && avisoData > data) throw new C.ErroUsuario('O aviso de saída não pode ser depois da data de saída.');
+  if (avisoData && c.data_entrada && avisoData < c.data_entrada) throw new C.ErroUsuario('O aviso de saída não pode ser antes da entrada.');
+  const camposAviso = avisoMuda ? { aviso_saida_data: avisoData, aviso_saida_sem: !!(aviso && aviso.sem) } : {};
+  const textoAviso = !avisoMuda ? '' : camposAviso.aviso_saida_sem ? '; saiu sem o aviso por escrito'
+    : avisoData ? `; avisou em ${C.dataBr(avisoData)} (${C.diasEntre(avisoData, data)} dias antes)` : '';
   if (encerramentoDo(d, c.id)) throw new Error('A saída já tem o cálculo final: desfaça o cálculo antes de mudar a data.');
   if (c.data_entrada && data < c.data_entrada) throw new C.ErroUsuario('A saída não pode ser antes da entrada.');
   const reativar = c.ativo === false && !fimDeVinculo(d, c) && !deveDesativar(d, { ...c, ativo: true, data_saida: data }, hoje);
@@ -3463,8 +3520,8 @@ export function informarSaida(d, contratoId, data, usuario, hoje = C.hojeIso()) 
   // saida-007; a tela avisa para mandar o convite de novo). Ex.: saída 10/12 → 15/12 e vistoria 11/12 às 10:00 → 16/12 às 10:00.
   // O último boleto (ainda em aberto) é recalculado pelos dias novos e o acerto final fica para o cálculo final.
   const vistoria = antes && antes !== data && c.vistoria_saida_data ? C.somarDias(c.vistoria_saida_data, C.diasEntre(antes, data)) : null;
-  atualizar(d, 'contratos', c.id, { data_saida: data, ...(reativar ? { ativo: true } : {}), ...(vistoria ? { vistoria_saida_data: vistoria, vistoria_saida_marcada_em: hoje } : {}) }, usuario,
-    `Saída do inquilino em ${C.dataBr(data)}${antes && antes !== data ? ` (era ${C.dataBr(antes)})` : ''}${reativar ? ' (ativo de novo até a saída)' : ''}${vistoria ? `; vistoria de saída passa a ${C.dataBr(vistoria)}` : ''}`);
+  atualizar(d, 'contratos', c.id, { data_saida: data, ...camposAviso, ...(reativar ? { ativo: true } : {}), ...(vistoria ? { vistoria_saida_data: vistoria, vistoria_saida_marcada_em: hoje } : {}) }, usuario,
+    `Saída do inquilino em ${C.dataBr(data)}${antes && antes !== data ? ` (era ${C.dataBr(antes)})` : ''}${textoAviso}${reativar ? ' (ativo de novo até a saída)' : ''}${vistoria ? `; vistoria de saída passa a ${C.dataBr(vistoria)}` : ''}`);
   desativarSeSaiu(d, c, usuario, hoje);
   return c;
 }
@@ -3482,7 +3539,8 @@ export function desfazerSaida(d, contratoId, usuario) {
   if (leitura) sobras.push(`a leitura dos relógios da saída${leitura.data ? ` de ${C.dataBr(leitura.data)}` : ''}`);
   if (sobras.length) throw new C.ErroUsuario(`Exclua antes ${sobras.join(' e ')} (na página do inquilino): com a saída desfeita, elas fechariam as etapas da próxima saída. Se quiser guardar, baixe o PDF antes de excluir.`);
   // a data marcada da vistoria e o termo de devolução das chaves eram desta saída: saem junto
-  atualizar(d, 'contratos', c.id, { data_saida: null, ativo: true, vistoria_saida_data: null, vistoria_saida_hora: null, vistoria_saida_marcada_em: null, termo_chaves_saida: null },
+  atualizar(d, 'contratos', c.id, { data_saida: null, ativo: true, vistoria_saida_data: null, vistoria_saida_hora: null, vistoria_saida_marcada_em: null, termo_chaves_saida: null,
+    aviso_saida_data: null, aviso_saida_sem: false },
     usuario, 'Saída desfeita: inquilino ativo de novo');
   return c;
 }
@@ -6162,7 +6220,7 @@ export function dadosBoleto(d, cb, { moeda = '' } = {}) {
     numero_documento: ((imovel && imovel.nome) || '').toLocaleUpperCase('pt-BR').replace(/[^A-Z0-9]/g, '').slice(0, 15),
     vencimento: cb.vencimento, valor, desconto: Math.min(cb.desconto, valor),
     valor_com_desconto: t.a_pagar_pontual, multa_percentual: cb.multa_percentual,
-    // com FCI, multa e juros são sobre o boleto sem o FCI: a multa vai em valor (R$), não em %
+    // com FCI ou tarifa (24/11/2026), multa e juros são sobre o boleto sem eles: a multa vai em valor (R$), não em %
     multa_valor: t.base_multa !== valor ? C.arred((t.base_multa * (cb.multa_percentual || 0)) / 100) : null,
     juros_ao_dia: C.jurosAoDia(t.base_multa, cb.juros_mensal_percentual), descricao: linhas.join('\n'),
     // letras a mais que o C6 corta no fim da descrição (0 = cabe)
@@ -6552,7 +6610,7 @@ export function pedidoBoletoC6(d, cb, conta, referencia = referenciaExterna(cb))
 export function encargosDoBoletoC6(d, cb, conta, b = dadosBoleto(d, cb)) {
   const K = M.CAMPOS;
   const fees = {};
-  // base da multa diferente do valor do boleto (FCI, ou regra `base_multa` = só o aluguel): multa e juros em reais
+  // base da multa diferente do valor do boleto (FCI, tarifa do boleto, ou regra `base_multa` = só o aluguel): multa e juros em reais
   if (cb.fci || b.multa_valor !== null) {
     if (b.multa_valor > 0) Object.assign(fees, { [K.multa_tipo]: M.TIPOS_ENCARGO.multa.valor, [K.multa_valor]: centavosParaReais(b.multa_valor), [K.multa_prazo]: 0 });
     if (b.juros_ao_dia > 0) Object.assign(fees, { [K.juros_tipo]: M.TIPOS_ENCARGO.juros.valor_dia, [K.juros_valor]: centavosParaReais(b.juros_ao_dia), [K.juros_prazo]: 0 });
@@ -9219,7 +9277,9 @@ export function roteiroSaida(d, c, hoje = C.hojeIso()) {
       relatorio ? `relatório ${comoEnvio(relatorio)} em ${C.dataBr(relatorio.data)}; ele pode contestar até ${C.dataBr(prazoContestarSaida(relatorio.data))}`
         : 'falta enviar o relatório ao inquilino (e-mail da devolução das chaves)']
     : [c.vistoria_saida_data ? `marcada para ${C.dataBr(c.vistoria_saida_data)}${c.vistoria_saida_hora ? ` às ${c.vistoria_saida_hora}` : ''}` : saiu ? 'ainda não registrada; data não marcada' : `a partir de ${C.dataBr(c.data_saida)}; data não marcada`,
-      c.vistoria_saida_data ? (convite && convite.data >= (c.vistoria_saida_marcada_em || '') ? `convite ${comoEnvio(convite)} em ${C.dataBr(convite.data)}` : 'falta mandar o convite ao inquilino') : null];
+      c.vistoria_saida_data ? (convite && convite.data >= (c.vistoria_saida_marcada_em || '') ? `convite ${comoEnvio(convite)} em ${C.dataBr(convite.data)}` : 'falta mandar o convite ao inquilino') : null,
+      // item 3.5 do advogado (24/11/2026): o outro orçamento do inquilino vem antes das chaves, não depois
+      !saiu && !c.termo_chaves_saida ? `outro orçamento do inquilino: só até a devolução das chaves (${C.dataBr(c.data_saida)})` : null];
   // B4: a etapa das chaves fecha com o termo de devolução assinado (saídas já acertadas antes do termo: pelo cálculo final)
   const termo = c.termo_chaves_saida;
   // o termo de devolução das chaves existe desde 13/11/2026: só as saídas de antes fecham a etapa pelo cálculo final
