@@ -581,7 +581,7 @@ function termoDevolucaoChaves(d, c, base, x) {
     ],
     tabela: [['CHAVES E CONTROLES DEVOLVIDOS', null], ...(chaves.length ? chaves.map((l) => [l, '']) : [['______________________________________________', ''], ['______________________________________________', '']])],
     depois: [
-      `2. VISTORIA DE SAÍDA. ${vistoria}. O LOCATÁRIO está convidado a acompanhá-la, pessoalmente ou por pessoa autorizada por escrito. Se não comparecer, a vistoria é feita com fotos e vídeo de cada cômodo e o relatório lhe é enviado por e-mail, com 5 (cinco) dias úteis para contestar, comparado com a vistoria de entrada.`,
+      `2. VISTORIA DE SAÍDA. ${vistoria}. O LOCATÁRIO está convidado a acompanhá-la, pessoalmente ou por pessoa autorizada por escrito. Se não comparecer, a vistoria é feita com fotos e vídeo de cada cômodo e o relatório lhe é enviado por e-mail, com 5 (cinco) dias úteis para contestar, comparado com a vistoria de entrada. Outro orçamento do LOCATÁRIO para os reparos só podia ser apresentado até esta devolução; os reparos apontados seguem os orçamentos ou notas obtidos pela LOCADORA.`,
       '3. SEM QUITAÇÃO. O recebimento das chaves não dá quitação. Os aluguéis e encargos até esta data, as contas de consumo e os tributos do período da locação e os reparos apontados na vistoria de saída serão apurados no acerto final, descontados da garantia, se houver, ou cobrados do LOCATÁRIO, conforme o contrato (Lei 8.245/91, artigo 23, III).',
       '4. ALUGUEL. O aluguel e os encargos são devidos até esta data, proporcionais aos dias do mês.',
     ],

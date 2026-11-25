@@ -1068,16 +1068,16 @@ export function resultadoVistoriaSaida(d, c) {
 export const ehPintura = (pendencia) => /pintur/i.test(String(pendencia || ''));
 
 /**
- * Sugestão do valor do reparo de pintura no cálculo final (decisão do dono, 24/11/2026; regra `pintura_vida_meses`, padrão 36).
+ * Sugestão do valor do reparo de pintura no cálculo final (decisão do dono, 24/11/2026; regra `pintura_vida_meses`, padrão 48; era 36 até o advogado, 24/11/2026).
  * Pela vistoria de entrada do contrato (`pintura_nova`): pintura nova → o orçamento inteiro (o inquilino devolve pintado);
  * sem pintura nova → orçamento × (vida − meses de moradia) ÷ vida, mínimo zero; não informado (vistorias antigas) → sem
  * sugestão. Meses de moradia pelo mês comercial, da entrada do contrato da vistoria (na troca de titular sem vistoria nova,
  * a do titular anterior) até a saída. Devolve { caso: 'nova' | 'antiga' | 'sem_info' | 'sem_vistoria', valor, meses, vida, texto }.
- * Ex.: orçamento R$ 2.400,00, sem pintura nova, 12 meses → "R$ 2.400,00 × 24/36 = R$ 1.600,00".
+ * Ex.: orçamento R$ 2.400,00, sem pintura nova, 24 meses → "R$ 2.400,00 × 24/48 = R$ 1.200,00".
  */
 export function sugestaoPintura(d, c, orcamento) {
   const entrada = vistoriaDeEntrada(d, c);
-  const vida = Number(regra('pintura_vida_meses', c)) || 36;
+  const vida = Number(regra('pintura_vida_meses', c)) || 48;
   if (!entrada) return { caso: 'sem_vistoria', valor: null, meses: null, vida, texto: 'Sem vistoria de entrada: confira como o imóvel foi entregue antes de cobrar a pintura.' };
   if (entrada.pintura_nova !== true && entrada.pintura_nova !== false) {
     return { caso: 'sem_info', valor: null, meses: null, vida, texto: `A vistoria de entrada (${C.dataBr(entrada.data)}) não diz se a pintura era nova: confira a vistoria de entrada e as fotos antes de dar o valor.` };

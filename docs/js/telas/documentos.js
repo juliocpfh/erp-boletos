@@ -727,7 +727,7 @@ export function telaVistoria(rota) {
           // pintura nova na entrada (decisão do dono, 24/11/2026): decide o que o inquilino paga de pintura na saída (K.sugestaoPintura)
           const pn = v ? (v.pintura_nova === true ? 'sim' : v.pintura_nova === false ? 'nao' : '') : '';
           return `<div><label>Pintura nova na entrada?</label><select name="pintura_nova" required>${[['', 'Escolha…'], ['sim', 'Sim: o imóvel foi pintado para esta entrada'], ['nao', 'Não']].map(([k, t]) => `<option value="${k}"${pn === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
-            <span class="suave">Na saída: pintura nova = o inquilino devolve pintado; sem pintura nova, paga só o que faltava da vida da pintura (${Number(R.regra('pintura_vida_meses', c)) || 36} meses).</span></div>`;
+            <span class="suave">Na saída: pintura nova = o inquilino devolve pintado; sem pintura nova, paga só o que faltava da vida da pintura (${Number(R.regra('pintura_vida_meses', c)) || 48} meses).</span></div>`;
         })() : ''}
         <div><label>Link das fotos (pasta na nuvem)</label><input name="link_fotos" value="${esc(v ? v.link_fotos || '' : (tipo === 'Entrada' ? c.vistoria_link || '' : ''))}" placeholder="deixe vazio se as fotos vão em anexo"></div>
       </div>
