@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-Mq04zMZSsCRtIiVZjGczaLybQt4XAqzQz5fbm/UsHNo='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-w/oP7DQi7l0sNDItZ+fQ66WL2Knnpj++XGMrfy+aRyg='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="dcbc6a47a263b537">
+<meta name="fontes" content="36b2ecb2eba74805">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1497,10 +1497,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           tipo: "opcao",
           padrao: "boleto",
           opcoes: [
-            ["boleto", "Sobre o boleto inteiro: aluguel cheio, IPTU, seguro e tarifa (padrão do sistema)", "Boleto de R$ 2.300,00 (aluguel R$ 2.000,00 + IPTU R$ 200,00 + seguro R$ 100,00), multa de 2% = R$ 46,00. Legal: IPTU e seguro são encargos do inquilino e também ficam em atraso (Lei 8.245/91, art. 23, I, e art. 25); o contrato deve dizer que a multa é sobre o total."],
+            ["boleto", "Sobre o boleto inteiro: aluguel cheio, IPTU e seguro (padrão do sistema)", "Boleto de R$ 2.300,00 (aluguel R$ 2.000,00 + IPTU R$ 200,00 + seguro R$ 100,00), multa de 2% = R$ 46,00; com a tarifa de R$ 8,50, o boleto vai a R$ 2.308,50 e a multa continua R$ 46,00. Legal: IPTU e seguro são encargos do inquilino e também ficam em atraso (Lei 8.245/91, art. 23, I, e art. 25); o contrato deve dizer que a multa é sobre o total."],
             ["aluguel", "Só sobre o aluguel cheio", "Mesmo boleto: multa de 2% sobre R$ 2.000,00 = R$ 40,00. Legal e mais conservador. No C6 a multa e os juros vão em reais (valor fixo), não em %."]
           ],
-          explica: "O FCI fica sempre fora da multa e dos juros.",
+          explica: "O FCI e a tarifa do boleto ficam sempre fora da multa e dos juros (a tarifa: advogado e dono, 24/11/2026).",
           consequencia: "Vale para os pagamentos registrados e os boletos emitidos no banco daqui em diante. Boleto já emitido no C6 continua com a multa com que saiu.",
           lei: LI + ", arts. 23, I, e 25; Código Civil, art. 395 (o devedor em atraso responde pelos prejuízos, juros e multa)."
         },
@@ -2604,8 +2604,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       a_pagar_sem_desconto: Math.max(totalSemDesconto - reserva, 0),
       // multa e juros por atraso não incidem sobre o FCI (fundo de conservação do imóvel) nem sobre a multa da notificação (nem a diferença antiga)
       // (boleto de R$ 2.000,00 + multa da notificação de R$ 1.500,00 → base R$ 2.000,00); regra `base_multa`: boleto inteiro
-      // (padrão) ou só o aluguel cheio (ex.: aluguel R$ 2.000,00 + IPTU R$ 200,00 → base R$ 2.200,00 ou R$ 2.000,00)
-      base_multa: regra("base_multa", ctx) === "aluguel" ? Math.max(Math.min(aluguel - (ressarcimento || 0), totalSemDesconto - (fci || 0) - multaNotif) - reserva, 0) : Math.max(totalSemDesconto - reserva - (fci || 0) - multaNotif, 0)
+      // (padrão) ou só o aluguel cheio (ex.: aluguel R$ 2.000,00 + IPTU R$ 200,00 → base R$ 2.200,00 ou R$ 2.000,00).
+      // Nem sobre a tarifa do boleto (advogado e dono, 24/11/2026, item 2.1): aluguel R$ 1.900,00 + tarifa R$ 8,50 = boleto de
+      // R$ 1.908,50; multa de 2% sobre R$ 1.900,00 = R$ 38,00 (e não R$ 38,17), juros também sobre R$ 1.900,00
+      base_multa: regra("base_multa", ctx) === "aluguel" ? Math.max(Math.min(aluguel - (ressarcimento || 0), totalSemDesconto - (fci || 0) - taxa_boleto - multaNotif) - reserva, 0) : Math.max(totalSemDesconto - reserva - (fci || 0) - taxa_boleto - multaNotif, 0)
     };
   }
   function diasComerciais(comp, entrada, saida, { continuacao = false } = {}) {
@@ -3560,7 +3562,7 @@ Sem o pagamento, o débito poderá ser cobrado do LOCATÁRIO e {f:do FIADOR|dos 
     texto3 = atualizarTextoDocumento(tipo, texto3);
     return texto3;
   }
-  var VISTORIA_ENTRADA, VISTORIA_ENTRADA_1211, SEM_AVISO, REPRESENTACAO, LGPD, PARTES, ITENS, PRAZO_ANTIGO, PRAZO_PARAGRAFO, TARIFA_BOLETO, DESPESAS_A_QUALQUER_TEMPO, EXTRAORDINARIAS, ATRASO_ANTIGO, MARCA_HONORARIOS, ATRASO_E_COBRANCA, SERVICOS_EXTRAS, ALUGUEL, VISTORIA_AGENDADA, VISITA_PERDIDA, CONSERVACAO, CLAUSULAS_FCI, SEGURO_ANTIGO, SEGURO_INCENDIO, ENTREGA, PINTURA_SAIDA, RESTITUICAO, MULTA_ENCARGOS_ANTIGO, MULTA_ENCARGOS, MULTA, RESCISAO, GARANTIA, CONVITE_SAIDA, NEGATIVACAO, FECHO_CONTRATO, TARIFA_RESUMO, TARIFA_RESUMO_ANTIGA, TRANSFERIDO, TRANSFERIDO_PF, RESUMO_CONTRATO, DIA_NAO_UTIL_ANTIGO, DIA_NAO_UTIL, RESUMO_FIM, RESUMO_FIM_COM_ANIMAIS, HONORARIOS_EM_QUALQUER_CASO, FINAIS, CONDOMINIO, ADITIVO_VENCIMENTO, ADITIVO_VALOR, ACERTO_POUPANCA, DEVOLUCAO_POUPANCA, ACERTO_CAUCAO_ANTIGO, ACERTO_DEPOSITO_ANTIGO, DEVOLUCAO_ANTIGA, GARANTIA_NOVA_TROCA, CONTAS_TROCA_ANTIGA, CONTAS_TROCA, ADITIVO_TROCA, MODELOS_PADRAO, ENDERECO_PARAGRAFO, ATUALIZACOES_MODELO;
+  var VISTORIA_ENTRADA, VISTORIA_ENTRADA_1211, SEM_AVISO, REPRESENTACAO, LGPD, PARTES, ITENS, PRAZO_ANTIGO, PRAZO_PARAGRAFO, TARIFA_BOLETO, TARIFA_BOLETO_SEM_MULTA, DESPESAS_A_QUALQUER_TEMPO, EXTRAORDINARIAS, ATRASO_ANTIGO, MARCA_HONORARIOS, ATRASO_E_COBRANCA, SERVICOS_EXTRAS, ALUGUEL, VISTORIA_AGENDADA, VISITA_PERDIDA, CONSERVACAO, CLAUSULAS_FCI, SEGURO_ANTIGO, SEGURO_INCENDIO, ENTREGA, PINTURA_SAIDA, RESTITUICAO, MULTA_ENCARGOS_ANTIGO, MULTA_ENCARGOS, MULTA, RESCISAO, GARANTIA, CONVITE_SAIDA, NEGATIVACAO, FECHO_CONTRATO, TARIFA_RESUMO, TARIFA_RESUMO_ANTIGA, TRANSFERIDO, TRANSFERIDO_PF, RESUMO_CONTRATO, DIA_NAO_UTIL_ANTIGO, DIA_NAO_UTIL, RESUMO_FIM, RESUMO_FIM_COM_ANIMAIS, HONORARIOS_EM_QUALQUER_CASO, FINAIS, CONDOMINIO, ADITIVO_VENCIMENTO, ADITIVO_VALOR, ACERTO_POUPANCA, DEVOLUCAO_POUPANCA, ACERTO_CAUCAO_ANTIGO, ACERTO_DEPOSITO_ANTIGO, DEVOLUCAO_ANTIGA, GARANTIA_NOVA_TROCA, CONTAS_TROCA_ANTIGA, CONTAS_TROCA, ADITIVO_TROCA, MODELOS_PADRAO, ENDERECO_PARAGRAFO, ATUALIZACOES_MODELO;
   var init_modelos_contrato = __esm({
     "docs/js/modelos-contrato.js"() {
       init_modelos_documentos();
@@ -3607,7 +3609,8 @@ O pagamento dos aluguéis será feito mediante boleto bancário, que será envia
 Os signatários que contratam nas qualidades indicadas neste contrato têm entre si ajustada a presente locação, mediante as seguintes cláusulas e condições, celebrada conforme a Lei nº 8.245/91, na qual as partes contratadas se obrigam mutuamente:`;
       PRAZO_ANTIGO = "**Parágrafo único** – Findo o prazo acima, se o LOCATÁRIO continuar na posse do imóvel sem que seja assinado novo contrato, a locação passará a vigorar por prazo indeterminado, podendo {l:a LOCADORA|as LOCADORAS} rescindi-la a qualquer tempo, mediante notificação por escrito ao LOCATÁRIO, que ficará obrigado a desocupar o imóvel no prazo de 30 (trinta) dias, a contar do recebimento da notificação, continuando em vigor as demais cláusulas e condições do presente contrato.";
       PRAZO_PARAGRAFO = `[se retomada_livre]${PRAZO_ANTIGO}[senão]**Parágrafo único** – Findo o prazo acima, se o LOCATÁRIO continuar na posse do imóvel por mais de 30 (trinta) dias sem oposição {l:da LOCADORA|das LOCADORAS}, a locação prorroga-se por prazo indeterminado, mantidas as demais cláusulas e condições do presente contrato, e o imóvel só poderá ser retomado nas hipóteses do art. 47 da Lei nº 8.245/91.[fim]`;
-      TARIFA_BOLETO = "**Parágrafo** – O LOCATÁRIO reembolsará, junto com cada aluguel, a tarifa bancária de emissão do boleto[se tarifa_boleto], hoje de {tarifa_boleto}[fim], pelo valor cobrado pelo banco.";
+      TARIFA_BOLETO = "**Parágrafo** – O LOCATÁRIO reembolsará, junto com cada aluguel, a tarifa bancária de emissão do boleto[se tarifa_boleto], hoje de {tarifa_boleto}[fim], pelo valor cobrado pelo banco. A multa e os juros por atraso não incidem sobre a tarifa.";
+      TARIFA_BOLETO_SEM_MULTA = "**Parágrafo** – O LOCATÁRIO reembolsará, junto com cada aluguel, a tarifa bancária de emissão do boleto[se tarifa_boleto], hoje de {tarifa_boleto}[fim], pelo valor cobrado pelo banco.";
       DESPESAS_A_QUALQUER_TEMPO = "**Parágrafo** – As despesas de responsabilidade do LOCATÁRIO poderão ser cobradas a qualquer tempo";
       EXTRAORDINARIAS = "[se condominio]**Parágrafo** – As despesas extraordinárias de condomínio, como obras de reforma ou acréscimo à estrutura do prédio, pintura das fachadas e áreas externas, indenizações trabalhistas anteriores ao início da locação, equipamentos de segurança, lazer e esporte e a constituição do fundo de reserva, são de responsabilidade {l:da LOCADORA|das LOCADORAS} (Lei nº 8.245/91, art. 22, X).[fim]\n\n";
       ATRASO_ANTIGO = (honorarios) => `**Parágrafo segundo** – O aluguel não pago no seu vencimento, além de não fazer jus à bonificação de pagamento com pontualidade, estará sujeito a cobrança pelo departamento jurídico, judicial ou extrajudicial, arcando o LOCATÁRIO com as despesas dela decorrentes, multa de {multa}, juros de {juros} ao mês e ${honorarios}.`;
@@ -4089,6 +4092,10 @@ ${LGPD}`, "DOS DADOS PESSOAIS"],
 
 ${DESPESAS_A_QUALQUER_TEMPO}`, "O LOCATÁRIO reembolsará, junto com cada aluguel, a tarifa bancária"],
         // marca só da cláusula (o resumo também fala da tarifa)
+        // advogado (24/11/2026, item 2.1): multa e juros não incidem sobre a tarifa (o ponto final antigo vira o do fim da frase nova)
+        [`${TARIFA_BOLETO_SEM_MULTA}
+`, `${TARIFA_BOLETO}
+`, "A multa e os juros por atraso não incidem sobre a tarifa."],
         // revisão de 2026-11-13 (respostas do dono no artefato da revisão jurídica)
         [VISTORIA_ENTRADA_1211, VISTORIA_ENTRADA],
         [`${PRAZO_ANTIGO}[fim]`, `${PRAZO_PARAGRAFO}[fim]`, "[se retomada_livre]"],
@@ -11366,7 +11373,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       desconto: Math.min(cb.desconto, valor),
       valor_com_desconto: t.a_pagar_pontual,
       multa_percentual: cb.multa_percentual,
-      // com FCI, multa e juros são sobre o boleto sem o FCI: a multa vai em valor (R$), não em %
+      // com FCI ou tarifa (24/11/2026), multa e juros são sobre o boleto sem eles: a multa vai em valor (R$), não em %
       multa_valor: t.base_multa !== valor ? arred(t.base_multa * (cb.multa_percentual || 0) / 100) : null,
       juros_ao_dia: jurosAoDia(t.base_multa, cb.juros_mensal_percentual),
       descricao: linhas2.join("\n"),
@@ -32498,7 +32505,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     const i = buscar2("imoveis", c.imovel_id);
     const t = totais(cb);
     const linha = (txt, v) => `<tr><td>${txt}</td><td class="n">${v}</td></tr>`;
-    const semJuros = [cb.fci && "o FCI", (cb.multas_notificacao || []).length && "a multa da notificação", (cb.diferencas_cobradas || []).length && "a diferença do boleto anterior"].filter(Boolean);
+    const semJuros = [cb.fci && "o FCI", cb.taxa_boleto && "a tarifa do boleto", (cb.multas_notificacao || []).length && "a multa da notificação", (cb.diferencas_cobradas || []).length && "a diferença do boleto anterior"].filter(Boolean);
     if (ehComplementoCaucao(cb)) {
       const caucaoAntes = cb.data_pagamento ? cb.caucao_anterior : valorGarantia(d(), c);
       return `<div class="demonstrativo"><div class="cabecalho"><div><h2 style="margin:0">Demonstrativo do boleto: complemento da caução</h2><div class="suave">Aluguel corrigido a partir de ${compBr(cb.competencia)}</div></div>
@@ -39177,7 +39184,7 @@ ${xref}
 - Aluguel com bonificação vale quando pago em dia; atrasado, paga o aluguel cheio mais multa e juros.
 - Vencimento em sábado, domingo ou feriado nacional: pode pagar no próximo dia útil sem multa e juros, com a bonificação. Pago depois dele, o atraso conta desde o vencimento, como no banco (ex.: vence sábado 10/10/2026, 12/10 é feriado: em dia até terça 13/10; pago na quarta 14/10 = 4 dias de atraso). Só então o boleto aparece como vencido e na inadimplência.
 - Troca de titular: o contrato só passa ao novo inquilino com o termo aditivo da troca assinado (outro termo assinado, como o de troca do vencimento, não conta); até lá, boletos e correções continuam no anterior.
-- Multa e juros são cobrados pelo banco no próprio boleto. Juros ao dia são truncados, como no banco. Boleto do complemento da caução nunca tem multa nem juros.
+- Multa e juros são cobrados pelo banco no próprio boleto. Juros ao dia são truncados, como no banco. Boleto do complemento da caução nunca tem multa nem juros. A tarifa do boleto fica fora da multa e dos juros (advogado e dono, 24/11/2026: aluguel R$ 1.900,00 + tarifa R$ 8,50, multa de 2% = R$ 38,00).
 - Boleto pago não é excluído (desfaça o pagamento antes). Boleto com valor editado à mão não é refeito no recálculo.
 - A baixa em lote é separada por vencimento.
 - Boleto de controle (inquilino sem NF) fica fora das somas e dos resultados.
