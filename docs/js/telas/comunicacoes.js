@@ -111,7 +111,7 @@ export async function telaComunicacoes(q = {}) {
   if (q.id) return telaComunicado(Number(q.id));
   // fora da nuvem o comunicado não tem como ser enviado (o link é da nuvem): não oferece criar
   const podeCriar = opera() && E.nuvem;
-  return `<div class="cabecalho"><h1>Comunicações</h1>${podeCriar ? link('#/comunicacoes?ver=novo', 'Novo comunicado a todos', 'botao') : ''}</div>
+  return `<div class="cabecalho"><h1>Comunicações</h1><div class="acoes">${E.nuvem ? link('#/envios-agendados', 'Envios agendados') : ''} ${podeCriar ? link('#/comunicacoes?ver=novo', 'Novo comunicado a todos', 'botao') : ''}</div></div>
     ${atalhosComunicacoes('comunicados')}
     ${lista.length ? lista.map((com) => cartaoComunicado(com)).join('') : `<div class="cartao"><p>Nenhum comunicado enviado ainda.</p>
       <p class="suave">O comunicado vai para todos os inquilinos e fiadores com contrato ativo, cada um com um link só dele, por e-mail e por WhatsApp. Ex.: "Atualização de contatos e novo e-mail da empresa".</p>
