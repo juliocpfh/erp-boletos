@@ -27,7 +27,7 @@ export function atalhosComunicacoes(atual) {
   const abertasSol = (sol.Aberta || 0) + (sol['Em andamento'] || 0);
   const notAbertas = (d().notificacoes || []).filter(R.notificacaoEmAberto);
   const abertasNot = notAbertas.length;
-  const vencidasNot = notAbertas.filter((n) => R.estadoNotificacao(d(), n).podeMulta).length;
+  const vencidasNot = notAbertas.filter((n) => R.estadoNotificacao(d(), n).vencidaSemMulta).length;
   const b = (hash, texto, chave) => link(hash, texto, `botao ${atual === chave ? '' : 'secundario '}pequeno`);
   // (os comunicados a todos são a própria aba "Comunicações": sem botão repetido aqui)
   return `${abasInquilinos('comunicacoes')}<div class="acoes" style="margin-bottom:12px;flex-wrap:wrap">
