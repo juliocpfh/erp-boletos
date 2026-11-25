@@ -20,6 +20,7 @@ import { ACOES_BANCO } from './banco.js';
 import { ACOES_FICHAS } from './fichas.js';
 import { ACOES_TERMO } from './termo-reserva.js';
 import { ACOES_EMAILS } from './emails.js';
+import { emailLigado, enviarEmail } from '../gmail.js';
 import { htmlSaude } from './banco-c6.js';
 import { ANEXOS_COM_X, CADASTROS, nomeComprovante } from './cadastros.js';
 import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria, indicesMensaisFci } from './campos.js';
@@ -2027,7 +2028,8 @@ export const ACOES = {
   /**
    * Carta de reajuste por e-mail (D4; o e-mail é o canal oficial): baixa o PDF da carta, abre o Gmail (ou o programa de e-mail)
    * já com destinatário, assunto e o texto da carta, e marca a carta como enviada (guardando o PDF na pasta do inquilino).
-   * O PDF baixado precisa ser anexado à mão (o navegador não anexa arquivo num e-mail sozinho).
+   * O PDF baixado precisa ser anexado à mão (o navegador não anexa arquivo num e-mail sozinho). Com o Gmail da empresa
+   * conectado (nuvem), também "Enviar agora", com a carta anexada e o envio em ``envios_email`` (chave carta_reajuste).
    */
   async enviarCartaEmail({ contrato, comp }) {
     const c = buscar('contratos', contrato);
@@ -2041,12 +2043,24 @@ export const ACOES = {
     const para = c.inquilino_email || '';
     const gmail = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(para)}&su=${encodeURIComponent(assunto)}&body=${encodeURIComponent(carta.texto)}`;
     const mailto = `mailto:${encodeURIComponent(para)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(carta.texto)}`;
-    const r = await janela({ titulo: `Enviar carta de reajuste · ${c.inquilino_nome}`, sim: 'Abrir o e-mail e marcar como enviada',
-      html: `<p>${para ? `Para: <b>${esc(para)}</b>.` : '<b>Este inquilino não tem e-mail no cadastro:</b> o e-mail abre sem destinatário.'} O PDF <b>${esc(carta.nome)}</b> é baixado agora: <b>anexe-o no e-mail</b> (arraste da pasta Downloads). O texto da carta já vai no corpo.</p>
+    // Gmail da empresa conectado (nuvem): "Enviar agora" com a carta já anexada, como os outros e-mails (simulação de 24/11)
+    const ligado = !!para && await emailLigado();
+    const r = await janela({ titulo: `Enviar carta de reajuste · ${c.inquilino_nome}`, sim: ligado ? 'Continuar' : 'Abrir o e-mail e marcar como enviada',
+      html: `<p>${para ? `Para: <b>${esc(para)}</b>.` : '<b>Este inquilino não tem e-mail no cadastro:</b> o e-mail abre sem destinatário.'} O texto da carta já vai no corpo. ${ligado ? `No "Enviar agora", o PDF <b>${esc(carta.nome)}</b> vai anexado sozinho; abrindo no Gmail ou no programa, ele é baixado e você <b>anexa no e-mail</b> (arraste da pasta Downloads).` : `O PDF <b>${esc(carta.nome)}</b> é baixado agora: <b>anexe-o no e-mail</b> (arraste da pasta Downloads).`}</p>
         ${assinada && assinada.motivo ? `<p class="alerta aviso">Carta sem a assinatura digital da empresa (${esc(assinada.motivo)}): para mandar a assinada, abra a carta e use "Enviar para assinar".</p>` : ''}
-        <p><label><input type="radio" name="por" value="gmail" checked> Abrir no Gmail (conta do Google da empresa)</label><br><label><input type="radio" name="por" value="mailto"> Abrir no programa de e-mail do computador</label></p>
+        <p>${ligado ? '<label><input type="radio" name="por" value="agora" checked> Enviar agora pelo Gmail da empresa, com a carta anexada</label><br>' : ''}<label><input type="radio" name="por" value="gmail"${ligado ? '' : ' checked'}> Abrir no Gmail (conta do Google da empresa)</label><br><label><input type="radio" name="por" value="mailto"> Abrir no programa de e-mail do computador</label></p>
         <p><label><input type="checkbox" name="marcar" value="1" checked> Marcar a carta como enviada hoje (guarda o PDF na pasta do inquilino)</label></p>` });
     if (!r) return;
+    if ((r.por || [])[0] === 'agora') {
+      if (!(await confirmar(`A carta vai agora para ${para}, com o PDF ${carta.nome} anexado.`, { titulo: 'Enviar o e-mail?', sim: 'Enviar agora' }))) return;
+      const env = await enviarEmail({ para, assunto, texto: carta.texto, anexos: [{ nome: carta.nome, blob: carta.blob }] });
+      await alterar((db) => R.inserir(db, 'envios_email', { data: C.hojeIso(), chave: 'carta_reajuste', contrato_id: c.id, ficha_id: null, aditivo_id: null, para, assunto, como: 'enviado', gmail_id: env.id || null },
+        login(), `E-mail "${assunto}" enviado para ${para}`));
+      aviso(`Carta enviada para ${para}. Fica em "Enviados" no Gmail.`);
+      if ((r.marcar || [])[0] === '1') await ACOES.cartaEnviada({ contrato: c.id, comp, enviada: '1', pronta: carta });
+      else await mostrar();
+      return;
+    }
     baixar(carta.blob, carta.nome);
     window.open((r.por || [])[0] === 'mailto' ? mailto : gmail, '_blank', 'noopener');
     if ((r.marcar || [])[0] === '1') {
