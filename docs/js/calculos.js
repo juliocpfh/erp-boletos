@@ -2,7 +2,7 @@
 // Valores em dinheiro são sempre CENTAVOS inteiros (R$ 1.350,00 = 135000).
 // Percentuais são números comuns (10 = 10%). Datas são textos "AAAA-MM-DD".
 import { feriadosLocais, regra } from './config-regras.js';
-import { dataDeBrasilia, inicioDoPrazo, proximoHorarioComercial, rotuloDoHorario, ultimoDiaDoPrazo, validadeDoLink } from './brasilia.js';
+import { dataDeBrasilia, inicioDoPrazo, proximoHorarioComercial, rotuloDoHorario } from './brasilia.js';
 
 export { dataDeBrasilia, horaDeBrasilia, inicioDoPrazo, proximoHorarioComercial, rotuloDoHorario, ultimoDiaDoPrazo, validadeDoLink } from './brasilia.js';
 
@@ -103,10 +103,6 @@ export function hojeIso() {
 export const fimDoExpediente = () => regra('fim_expediente_hora');
 /** Dia em que começa um prazo dado agora, pela regra do expediente. Ex.: 24/11 às 21h45 → '2026-11-25'; às 10h → '2026-11-24'. */
 export const inicioDoPrazoAgora = (agora = new Date()) => inicioDoPrazo(agora, fimDoExpediente());
-/** Último dia de um prazo de `dias` corridos dado agora (regra do expediente). Ex.: 7 dias às 21h45 de 24/11 → '2026-12-02'. */
-export const prazoDadoAgora = (dias, agora = new Date()) => ultimoDiaDoPrazo(dias, agora, fimDoExpediente());
-/** Validade (ISO, fim do último dia em Brasília) de um link de `dias` criado agora. */
-export const validadeDoLinkAgora = (dias, agora = new Date()) => validadeDoLink(dias, agora, fimDoExpediente());
 /** Data de Brasília de um instante, em dd/mm/aaaa. Ex.: '2026-11-25T00:47:00Z' → '24/11/2026'. */
 export const dataBrDe = (instante) => dataBr(dataDeBrasilia(instante));
 /** Nome do dia da semana pelo getUTCDay (0 = domingo). */

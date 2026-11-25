@@ -169,6 +169,13 @@ export function montarBanco() {
     const a2 = R.fazerAcordo(d, { contrato_id: lia.id, ids: [velha.id], total: C.liquidar(velha, HOJE).valor_devido, parcelas: 2, primeiro_vencimento: '2026-12-15' }, u, HOJE);
     Object.assign(ids, { lia: lia.id, acordoAntigo: a1.acordo.id, acordoRefeito: a2.acordo.id });
 
+    // 11. Saída hoje com aviso de só 15 dias (10/11 → 25/11/2026), prazo indeterminado: multa sugerida pela falta do aviso de
+    // R$ 1.800,00 × 15/30 = R$ 900,00 (o roteiro muda à mão para R$ 600,00 e confere a descrição)
+    const mario = contrato(imovel('Kit Aviso de Saída'), { inquilino_nome: 'Mário Aviso Teste', data_entrada: '2026-01-01', vigencia_inicio: '2026-01-01', prazo_tipo: 'Indeterminado' });
+    for (const m of ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10']) pagar(boleto(mario, m));
+    R.informarSaida(d, mario.id, HOJE, u, HOJE, { data: '2026-11-10' });
+    Object.assign(ids, { mario: mario.id });
+
     R.normalizar(d);
     d.revisao = (d.revisao || 0) + 1;
     return { banco: d, ids };

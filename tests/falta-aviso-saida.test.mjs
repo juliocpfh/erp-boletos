@@ -105,3 +105,26 @@ test('contrato ainda no prazo: antecipada e falta do aviso não se somam, vale a
   assert.equal(m.aviso, null);
   assert.equal(m.vale, 'antecipada');
 });
+
+test('descrição da multa acompanha o valor gravado: sugerida R$ 900,00, gravada R$ 600,00 (25/11)', () => {
+  const { d, c } = base();
+  const x = sair(d, c, '2026-11-25', { data: '2026-11-10' });
+  const sugerida = R.linhaDaMultaSaida(d, x, 'aviso');
+  assert.equal(sugerida, 'Multa pela falta do aviso de 30 dias: R$ 900,00 (avisou em 10/11/2026, 15 dia(s) antes da saída; R$ 1.800,00 × 15/30 dias que faltaram)');
+  assert.equal(R.linhaDaMultaSaida(d, x, 'aviso', 90000), sugerida, 'pelo valor sugerido, a conta inteira');
+  const ajustada = R.linhaDaMultaSaida(d, x, 'aviso', 60000);
+  assert.equal(ajustada, 'Multa pela falta do aviso de 30 dias (valor ajustado à mão: R$ 600,00; sugerido R$ 900,00)');
+  assert.equal(R.linhaDaMultaSaida(d, x, 'antecipada', 60000), '', 'contrato sem prazo: sem multa da saída antecipada');
+  // a troca na descrição: só a linha da multa muda; sem a linha (o operador mudou o texto), fica como está
+  const desc = `Aluguel 11/2026: R$ 1.500,00\n${sugerida}`;
+  assert.equal(R.trocarLinhaDaMulta(desc, sugerida, ajustada), `Aluguel 11/2026: R$ 1.500,00\n${ajustada}`);
+  assert.equal(R.trocarLinhaDaMulta(desc, sugerida, ''), 'Aluguel 11/2026: R$ 1.500,00', 'multa tirada dos débitos: some a linha');
+  assert.equal(R.trocarLinhaDaMulta('Multa combinada com o inquilino: R$ 500,00', sugerida, ajustada), null);
+});
+
+test('saída antecipada mudada à mão: a descrição também acompanha', () => {
+  const { d, c } = base({ data_entrada: '2026-01-01', vigencia_inicio: '2026-01-01', prazo_tipo: 'Determinado' });
+  const x = sair(d, c, '2027-09-01', { data: '2027-08-02' }, '2027-08-02');
+  assert.match(R.linhaDaMultaSaida(d, x, 'antecipada'), /^Multa pela saída antecipada: R\$ 1\.800,00 \(3 aluguéis de R\$ 1\.800,00, proporcional aos \d+ de \d+ dias que faltavam para 01\/07\/2028\)$/);
+  assert.equal(R.linhaDaMultaSaida(d, x, 'antecipada', 120000), 'Multa pela saída antecipada (valor ajustado à mão: R$ 1.200,00; sugerido R$ 1.800,00)');
+});

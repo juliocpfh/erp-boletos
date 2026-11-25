@@ -322,18 +322,16 @@ function sugestoesMultaSaida(c) {
   if (!c || !c.data_saida) return '';
   const { antecipada: m, aviso: a, vale } = R.multasDaSaida(d(), c);
   const linhas = [];
-  const usar = (valor, texto) => ` <button type="button" class="secundario pequeno" data-usar-multa data-valor="${valor}" data-texto="${esc(texto)}">Usar ${esc(reais(valor))}</button>`;
+  const usar = (valor, tipo) => ` <button type="button" class="secundario pequeno" data-usar-multa data-contrato="${c.id}" data-tipo="${tipo}" data-valor="${valor}" data-texto="${esc(R.linhaDaMultaSaida(d(), c, tipo))}">Usar ${esc(reais(valor))}</button>`;
   const deixar = ' <span class="suave">(não some as duas: vale só a maior)</span>';
   if (m) {
-    const texto = `Multa pela saída antecipada: ${reais(m.valor)} (3 aluguéis de ${reais(m.aluguel)}, proporcional aos ${m.restam} de ${m.total} dias que faltavam para ${dataBr(m.fim)})`;
-    linhas.push(`<li><b>Saída antes do fim do contrato (${esc(dataBr(m.fim))})</b>: ${esc(reais(m.valor))} (3 aluguéis de ${esc(reais(m.aluguel))}, proporcional aos ${m.restam} de ${m.total} dias que faltavam${m.herdado ? `, contados desde o início do contrato original, em ${esc(dataBr(m.inicio))}: na troca de titular o prazo não recomeça` : ''}; confira a cláusula no contrato assinado). A lei dispensa esta multa se o inquilino foi transferido pelo empregador e avisou com 30 dias (Lei 8.245/91, art. 4º): nesse caso, deixe de fora e anote o motivo na descrição.${vale === 'antecipada' ? usar(m.valor, texto) : deixar}</li>`);
+    linhas.push(`<li><b>Saída antes do fim do contrato (${esc(dataBr(m.fim))})</b>: ${esc(reais(m.valor))} (3 aluguéis de ${esc(reais(m.aluguel))}, proporcional aos ${m.restam} de ${m.total} dias que faltavam${m.herdado ? `, contados desde o início do contrato original, em ${esc(dataBr(m.inicio))}: na troca de titular o prazo não recomeça` : ''}; confira a cláusula no contrato assinado). A lei dispensa esta multa se o inquilino foi transferido pelo empregador e avisou com 30 dias (Lei 8.245/91, art. 4º): nesse caso, deixe de fora e anote o motivo na descrição.${vale === 'antecipada' ? usar(m.valor, 'antecipada') : deixar}</li>`);
   }
   if (a) {
     const conta = a.modo === 'mes_inteiro' ? `1 mês de ${reais(a.mes)}` : `${reais(a.mes)} × ${a.faltaram}/${R.DIAS_AVISO_SAIDA} dias que faltaram`;
     const quando = a.sem_aviso ? 'saiu sem avisar por escrito' : `avisou em ${dataBr(c.aviso_saida_data)}, ${a.antecedencia} dia(s) antes da saída`;
     const mes = `aluguel de ${reais(a.aluguel)}${a.encargos ? ` + encargos de ${reais(a.encargos)} (IPTU e seguro do boleto)` : ''}`;
-    const texto = `Multa pela falta do aviso de ${R.DIAS_AVISO_SAIDA} dias: ${reais(a.valor)} (${quando}; ${conta})`;
-    linhas.push(`<li><b>Falta do aviso de ${R.DIAS_AVISO_SAIDA} dias</b>: ${esc(reais(a.valor))} (${esc(quando)}; ${esc(mes)}; ${esc(conta)}). O contrato e a lei (Lei 8.245/91, art. 6º) cobram 1 mês de aluguel e encargos de quem não avisa.${vale === 'aviso' ? usar(a.valor, texto) : deixar}</li>`);
+    linhas.push(`<li><b>Falta do aviso de ${R.DIAS_AVISO_SAIDA} dias</b>: ${esc(reais(a.valor))} (${esc(quando)}; ${esc(mes)}; ${esc(conta)}). O contrato e a lei (Lei 8.245/91, art. 6º) cobram 1 mês de aluguel e encargos de quem não avisa.${vale === 'aviso' ? usar(a.valor, 'aviso') : deixar}</li>`);
   }
   const semData = !c.aviso_saida_data && !c.aviso_saida_sem && R.regra('falta_aviso_saida', c) !== 'nao_sugerir';
   if (!linhas.length && !semData) return '';
@@ -343,6 +341,8 @@ function sugestoesMultaSaida(c) {
     ${semData ? `<p class="suave">A data em que o inquilino avisou da saída não foi registrada: informe em "Adiar ou mudar a data" (página do inquilino, caixa da saída) para o sistema conferir os ${R.DIAS_AVISO_SAIDA} dias de aviso.</p>` : ''}</div>`;
 }
 
+/** A multa sugerida que o "Usar" pôs nos débitos do formulário aberto (ou null). */
+let multaUsada = null;
 // "Usar" da multa sugerida: soma em "Débitos" e acrescenta a linha na descrição (uma vez só)
 if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
   document.addEventListener('click', (ev) => {
@@ -357,13 +357,40 @@ if (typeof document !== 'undefined' && typeof document.addEventListener === 'fun
     if (desc.value.includes(texto)) { aviso('Esta multa já está nos débitos.', 'info'); return; }
     let atual = 0;
     try { atual = campo.value.trim() ? C.centavos(campo.value) : 0; } catch { atual = 0; }
-    campo.value = F.dinheiroTexto(atual + Number(b.dataset.valor || 0));
+    const valor = Number(b.dataset.valor || 0);
+    campo.value = F.dinheiroTexto(atual + valor);
     desc.value = desc.value.trim() ? `${desc.value.replace(/\s+$/, '')}\n${texto}` : texto;
+    // a multa usada fica guardada no formulário: se "Débitos" mudar depois, a diferença é da multa e a linha acompanha
+    multaUsada = { form, botao: b, contrato: Number(b.dataset.contrato), tipo: b.dataset.tipo, base: atual, valor, linha: texto };
     for (const el of [campo, desc]) el.dispatchEvent(new Event('input', { bubbles: true }));
     form.dataset.alterado = '1';
     b.disabled = true;
     b.textContent = 'Incluída nos débitos';
   });
+  // multa mudada à mão em "Débitos" depois do "Usar" (25/11/2026): a descrição acompanha o valor gravado. Ex.: sugerida R$ 900,00,
+  // "Débitos" de R$ 900,00 para R$ 600,00 → "Multa pela falta do aviso de 30 dias (valor ajustado à mão: R$ 600,00; sugerido R$ 900,00)"
+  const acompanhar = (ev) => {
+    const u = multaUsada;
+    if (!u || ev.target?.name !== 'debitos' || ev.target.form !== u.form || !u.form.isConnected) return;
+    const desc = u.form.querySelector('[name="debitos_descricao"]');
+    let total;
+    try { total = ev.target.value.trim() ? C.centavos(ev.target.value) : 0; } catch { return; }
+    const valor = total - u.base;
+    if (valor === u.valor) return;
+    const c = buscar('contratos', u.contrato);
+    const nova = valor > 0 && c ? R.linhaDaMultaSaida(d(), c, u.tipo, valor) : '';
+    const texto = desc && R.trocarLinhaDaMulta(desc.value, u.linha, nova);
+    if (typeof texto !== 'string') { multaUsada = null; return; } // o operador mudou a linha: fica como ele deixou
+    desc.value = texto;
+    if (nova) Object.assign(u, { valor, linha: nova });
+    else { // multa tirada dos débitos: volta o botão "Usar"
+      multaUsada = null;
+      u.botao.disabled = false;
+      u.botao.textContent = `Usar ${reais(Number(u.botao.dataset.valor || 0))}`;
+    }
+  };
+  document.addEventListener('input', acompanhar);
+  document.addEventListener('change', acompanhar);
 }
 
 export const CADASTROS = {

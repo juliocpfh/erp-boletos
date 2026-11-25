@@ -45,4 +45,8 @@ test('banco do kit: casos de 25/11 (reserva que quita o boleto e acordo refeito)
   assert.ok(a1.honorarios > 0 && a1.despesas_cobranca[0].valor === 7350);
   const enc = R.parcelasDoAcordo(d, R.buscar(d, 'acordos', ids.acordoRefeito)).flatMap((x) => x.encargos_cobranca || []).reduce((s, e) => s + e.valor, 0);
   assert.equal(enc, a1.honorarios + 7350);
+  // Mário: avisou 15 dias antes da saída → multa sugerida de R$ 900,00 (o roteiro muda à mão para R$ 600,00)
+  const mario = R.buscar(d, 'contratos', ids.mario);
+  assert.equal(R.multaFaltaAviso(d, mario).valor, 90000);
+  assert.equal(R.multasDaSaida(d, mario).vale, 'aviso');
 });
