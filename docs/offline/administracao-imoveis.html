@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-M6S/uaDGz29zQEiWnDIbcaf1zHfMKftZhHg+VmRRAYQ='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-9ZxVuN+rMtyOnt2rfEnG+6bWEZqLyBGhoveY/j8vguY='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="7b6aa32e958fba69">
+<meta name="fontes" content="7f831571ab5881bf">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -5271,6 +5271,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     LEITURAS: () => LEITURAS,
     LIMITES: () => LIMITES,
     NOVOS_FIADORES_TROCA: () => NOVOS_FIADORES_TROCA,
+    PERGUNTA_PELO_VENCIMENTO: () => PERGUNTA_PELO_VENCIMENTO,
     REFORMA: () => REFORMA,
     REGIMES_BENS: () => REGIMES_BENS,
     REGISTRO_COBRANCA: () => REGISTRO_COBRANCA,
@@ -5289,6 +5290,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     camposHtml: () => camposHtml,
     chipDaLista: () => chipDaLista,
     cnpjValido: () => cnpjValido,
+    comPerguntaPeloVencimento: () => comPerguntaPeloVencimento,
     conferirDocumento: () => conferirDocumento,
     contaPadrao: () => contaPadrao,
     cpfValido: () => cpfValido,
@@ -5556,7 +5558,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     }
     return `<div class="formulario${compacto ? " compacto" : ""}">${partes.join("")}</div>`;
   }
-  var ACEITA_DOCUMENTOS, esc, campo, atalhosData, DATAS_COM_ATALHO, secao, QUEBRA, DOCUMENTOS, PREENCHE_CEP, PREENCHE_CNPJ, CEP_DA_PESSOA, quando, GARANTIA_FIADOR, LIMITES, IMOVEL, SOLICITACAO, REFORMA, REGISTRO_COBRANCA, RESSARCIMENTO, CONTAS, SITUACOES_CONTA, SITUACOES_SEGURO, contaPadrao, INDICES_FCI, LEITURAS, LEITURA, GENEROS, ESTADOS_CIVIS, REGIMES_BENS, qualificacao, FIADOR, FORM_FIADOR, CAMPOS_FIADOR, vagasFiador, EXPANDIR_PARTE, fiadoresNoCadastro, SEM_COMPROVANTE, comprovante, GARANTIAS, PJ, rotuloPJ, CONTRATO, PARTES_DA_PESSOA, RENOMEAR_PARTE, FICHA_INICIO, RENDAS_FICHA, PF, CASADO, FICHA_RENDA, SO_NO_CONTRATO, CAMPOS_FIADOR_FICHA, FICHA_FIADORES, FICHA_FIM, CORRECAO, SEGURO, IPTU, TITULARIDADE, FORM_FIADOR_TROCA, CAMPOS_FIADOR_TROCA, NOVOS_FIADORES_TROCA, trocaGarantia, APLICACAO, DEPOSITO_GARANTIA, CORRECAO_GARANTIA, DEVOLUCAO_GARANTIA, RENOVACAO, ENCERRAMENTO, AVULSA, EMITENTE, USUARIO, COBRANCA, FMT_DINHEIRO, FMT_PCT2, mesmoValor2, chipDaLista;
+  var ACEITA_DOCUMENTOS, esc, campo, atalhosData, DATAS_COM_ATALHO, secao, QUEBRA, DOCUMENTOS, PREENCHE_CEP, PREENCHE_CNPJ, CEP_DA_PESSOA, quando, GARANTIA_FIADOR, LIMITES, IMOVEL, SOLICITACAO, REFORMA, REGISTRO_COBRANCA, RESSARCIMENTO, CONTAS, SITUACOES_CONTA, SITUACOES_SEGURO, contaPadrao, INDICES_FCI, LEITURAS, LEITURA, GENEROS, ESTADOS_CIVIS, REGIMES_BENS, qualificacao, FIADOR, FORM_FIADOR, CAMPOS_FIADOR, vagasFiador, EXPANDIR_PARTE, fiadoresNoCadastro, SEM_COMPROVANTE, comprovante, GARANTIAS, PJ, rotuloPJ, CONTRATO, PARTES_DA_PESSOA, RENOMEAR_PARTE, FICHA_INICIO, RENDAS_FICHA, PF, CASADO, FICHA_RENDA, SO_NO_CONTRATO, CAMPOS_FIADOR_FICHA, FICHA_FIADORES, FICHA_FIM, CORRECAO, SEGURO, IPTU, TITULARIDADE, FORM_FIADOR_TROCA, CAMPOS_FIADOR_TROCA, NOVOS_FIADORES_TROCA, trocaGarantia, APLICACAO, DEPOSITO_GARANTIA, CORRECAO_GARANTIA, DEVOLUCAO_GARANTIA, RENOVACAO, EX_VENCIMENTO, PERGUNTA_PELO_VENCIMENTO, comPerguntaPeloVencimento, ENCERRAMENTO, AVULSA, EMITENTE, USUARIO, COBRANCA, FMT_DINHEIRO, FMT_PCT2, mesmoValor2, chipDaLista;
   var init_formularios = __esm({
     "docs/js/formularios.js"() {
       init_c6_comum();
@@ -6010,6 +6012,22 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         campo("vale_desde", "O novo valor vale a partir do aluguel de (mês de referência)", "mes", { autoMsg: true, ajuda: "O mês do aluguel, não o do vencimento. Os boletos em aberto deste mês em diante são refeitos com o novo valor (os pagos e os de antes ficam como estão). Em branco: o mês da data acima, se for dia 1º, ou o mês seguinte" }),
         campo("observacoes", "Observações", "area")
       ];
+      EX_VENCIMENTO = "ex.: 12/2026 = o boleto que vence em dezembro";
+      PERGUNTA_PELO_VENCIMENTO = {
+        reserva_competencia: campo("vencimento_reserva", "Usar a reserva no boleto que vence em (mês do vencimento)", "mes", {
+          autoMsg: true,
+          ajuda: `O mês em que vence o boleto do aluguel (${EX_VENCIMENTO}). Em branco: usa no primeiro aluguel`
+        }),
+        carencia_inicio: campo("vencimento_carencia", "Carência a partir do boleto que vence em (mês do vencimento)", "mes", {
+          autoMsg: true,
+          ajuda: `O mês em que vence o primeiro boleto da carência (${EX_VENCIMENTO}). Em branco: o boleto do mês de entrada`
+        }),
+        vale_desde: campo("vencimento_vale_desde", "O novo valor vale a partir do boleto que vence em (mês do vencimento)", "mes", {
+          autoMsg: true,
+          ajuda: `O mês em que vence o primeiro boleto com o novo valor (${EX_VENCIMENTO}). Os boletos em aberto deste em diante são refeitos com o novo valor (os pagos e os de antes ficam como estão). Em branco: o aluguel do mês da data acima, se for dia 1º, ou o do mês seguinte`
+        })
+      };
+      comPerguntaPeloVencimento = (lista3) => lista3.map((c) => PERGUNTA_PELO_VENCIMENTO[c.nome] || c);
       ENCERRAMENTO = [
         ...LEITURAS.map(([nome, rotulo3]) => campo(`leitura_${nome}`, `${rotulo3} na saída`, "texto", { teclado: "decimal" })),
         campo("garantia_valor", "Valor da garantia a devolver (caução ou depósito)", "dinheiro"),
@@ -29507,11 +29525,11 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       const campos = CONTRATO.filter((c) => c.nome && c.tipo !== "simnao");
       const cond = condicoesDoContrato(d(), anterior, data2);
       const feitos = preencherVazios(sel.form, paraFormulario(campos, cond), paraFormulario(campos, null));
-      travarValoresHerdados(sel.form, paraFormulario(CONTRATO.filter((c) => c.nome), {
+      travarValoresHerdados(sel.form, { ...paraFormulario(CONTRATO.filter((c) => c.nome), {
         bonificacao: anterior.bonificacao !== false,
         cobranca_mes_seguinte: anterior.cobranca_mes_seguinte !== false,
         ...cond
-      }));
+      }), vencimento_reserva: mesVencimentoDaCompetencia(anterior, cond.reserva_competencia) || "" });
       if (temGarantia && garantia === "continua") travarGarantiaHerdada(sel.form, anterior, anterior.inquilino_nome);
       if (garantia === "nova") liberarGarantiaNova(sel.form, anterior.inquilino_nome, dinheiro);
       for (const nome of ["vigencia_inicio", "data_entrada"]) {
@@ -29543,7 +29561,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     }
   }
   function travarValoresHerdados(form, valores = {}) {
-    travarCampos(form, CAMPOS_VALORES_HERDADOS, valores);
+    travarCampos(form, [...CAMPOS_VALORES_HERDADOS, "vencimento_reserva"], valores);
     const ajuda = (form.querySelector("[name=reserva_valor]") || { closest: () => null }).closest("div");
     const texto3 = ajuda && (ajuda.querySelector(".ajuda") || ajuda.appendChild(Object.assign(document.createElement("div"), { className: "ajuda" })));
     if (texto3) texto3.textContent = "Reserva do contrato (herdada do titular anterior); o que ele já usou não abate de novo.";
@@ -30004,9 +30022,10 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       if (!nomes.length) continue;
       const base = form.dataset.contratoRef && buscar2("contratos", Number(form.dataset.contratoRef)) || null;
       if (!base && !form.querySelector('[name="dia_vencimento"]')) continue;
+      const mostrados = {};
       const mostrar2 = () => {
         const c = { ...base || {} };
-        for (const k of ["data_entrada", "reserva_competencia", "carencia_inicio", "carencia_meses", "vale_desde"]) {
+        for (const k of ["data_entrada", "carencia_meses"]) {
           const v = valorDoFormulario(form, k);
           if (v !== void 0) c[k] = v;
         }
@@ -30015,9 +30034,15 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
         const seguinte = valorDoFormulario(form, "cobranca_mes_seguinte");
         if (seguinte !== void 0) c.cobranca_mes_seguinte = seguinte;
         c.data_entrada = String(c.data_entrada || "");
+        for (const [tela, gravado] of Object.entries(GRAVADO_DO_CAMPO)) {
+          const v = valorDoFormulario(form, tela);
+          if (v !== void 0) c[gravado] = competenciaValida(v, "") ? competenciaDoMesVencimento(c, v) : "";
+        }
         for (const n of nomes) {
-          const el = form.querySelector(`input[name="${n}"]`);
-          mensagemAuto(el, esc(MESES_DO_BOLETO[n](c, form)));
+          const texto3 = esc(MESES_DO_BOLETO[n](c, form));
+          if (mostrados[n] === texto3) continue;
+          mostrados[n] = texto3;
+          mensagemAuto(form.querySelector(`input[name="${n}"]`), texto3);
         }
       };
       form.addEventListener("input", mostrar2);
@@ -30025,7 +30050,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       mostrar2();
     }
   }
-  var CAMPOS_PESSOA_FORM, titulo, CAMPOS_GARANTIA_HERDADA, CAMPOS_VALORES_HERDADOS, ENDERECO_DO_IMOVEL, enderecoInquilino, lerRascunho, SERIES_BC, acumuladosTrazidos, SERIES_FCI, faltaPoupanca, minuscula, MESES_DO_BOLETO;
+  var CAMPOS_PESSOA_FORM, titulo, CAMPOS_GARANTIA_HERDADA, CAMPOS_VALORES_HERDADOS, ENDERECO_DO_IMOVEL, enderecoInquilino, lerRascunho, SERIES_BC, acumuladosTrazidos, SERIES_FCI, faltaPoupanca, maiuscula, boletoDe, MESES_DO_BOLETO, GRAVADO_DO_CAMPO;
   var init_campos = __esm({
     "docs/js/telas/campos.js"() {
       init_app();
@@ -30071,31 +30096,34 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       acumuladosTrazidos = /* @__PURE__ */ new Map();
       SERIES_FCI = { ...SERIES_BC, Poupança: 196, SELIC: 4390 };
       faltaPoupanca = (r) => `A poupança a partir de ${dataBr(r.falta[0])} ainda não saiu no Banco Central (data futura): refaça mais perto da data ou digite o valor.`;
-      minuscula = (t) => t.charAt(0).toLowerCase() + t.slice(1);
+      maiuscula = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+      boletoDe = (c, comp) => competenciaValida(comp, "") ? textoBoletoDaCompetencia(d(), c, comp) : "";
       MESES_DO_BOLETO = {
-        reserva_competencia(c) {
+        vencimento_reserva(c) {
           const comp = competenciaReserva({ ...c, reserva_valor: 1 });
-          const t = referenciaEVencimento(d(), c, comp);
+          const t = boletoDe(c, comp);
           if (!t) return "";
-          if (!competenciaValida(c.reserva_competencia, "")) return `Em branco: o primeiro aluguel, ${minuscula(t)}.`;
-          return comp !== c.reserva_competencia ? `O mês ${compBr(c.reserva_competencia)} é de carência: a reserva vai para o boleto seguinte, ${minuscula(t)}.` : `${t}.`;
+          if (!competenciaValida(c.reserva_competencia, "")) return `Em branco: o primeiro aluguel, ${t}.`;
+          return comp !== c.reserva_competencia ? `O boleto que vence em ${compBr(mesVencimentoDaCompetencia(c, c.reserva_competencia))} é de carência: a reserva vai para o seguinte, ${t}.` : `${maiuscula(t)}.`;
         },
-        carencia_inicio(c) {
-          const ini = competenciaValida(c.carencia_inicio, "") || competenciaValida(c.data_entrada.slice(0, 7), "");
-          const t = referenciaEVencimento(d(), c, ini);
+        vencimento_carencia(c) {
+          const marcado2 = competenciaValida(c.carencia_inicio, "");
+          const ini = marcado2 || competenciaValida(c.data_entrada.slice(0, 7), "");
+          const t = boletoDe(c, ini);
           if (!t) return "";
           const meses = Number(c.carencia_meses) > 0 ? Number(c.carencia_meses) : 0;
-          const fim = meses > 1 ? ` até a ${minuscula(referenciaEVencimento(d(), c, somarMeses(ini, meses - 1)))}` : "";
-          return `${competenciaValida(c.carencia_inicio, "") ? "" : "Em branco: mês de entrada, "}${competenciaValida(c.carencia_inicio, "") ? t : minuscula(t)}${fim}${meses ? "" : ' (sem carência enquanto "Meses de carência" estiver em branco)'}.`;
+          const fim = meses > 1 ? ` até o ${boletoDe(c, somarMeses(ini, meses - 1))}` : "";
+          return `${marcado2 ? maiuscula(t) : `Em branco: mês de entrada, ${t}`}${fim}${meses ? "" : ' (sem carência enquanto "Meses de carência" estiver em branco)'}.`;
         },
-        vale_desde(c, form) {
+        vencimento_vale_desde(c, form) {
           const data2 = dataValida(valorDoFormulario(form, "data") || "", "") || hojeIso();
           const comp = valeDesdeDaRenovacao({ vale_desde: c.vale_desde, data: data2 });
-          const t = referenciaEVencimento(d(), c, comp);
+          const t = boletoDe(c, comp);
           if (!t) return "";
-          return competenciaValida(c.vale_desde, "") ? `${t}.` : `Em branco: ${minuscula(t)}.`;
+          return competenciaValida(c.vale_desde, "") ? `${maiuscula(t)}.` : `Em branco: ${t}.`;
         }
       };
+      GRAVADO_DO_CAMPO = { vencimento_reserva: "reserva_competencia", vencimento_carencia: "carencia_inicio", vencimento_vale_desde: "vale_desde" };
     }
   });
 
@@ -30128,13 +30156,13 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     const hoje3 = hojeIso();
     const atual = r ? r.cobranca_id : Number(q.cobranca) || null;
     const acordoAtual = r ? r.acordo_id : Number(q.acordo) || null;
-    const maiuscula = (t) => t.charAt(0).toLocaleUpperCase("pt-BR") + t.slice(1);
+    const maiuscula2 = (t) => t.charAt(0).toLocaleUpperCase("pt-BR") + t.slice(1);
     const boletos = d().cobrancas.filter((cb) => cb.contrato_id === contratoId && (cb.id === atual || !cb.data_pagamento && vencido(cb.vencimento, hoje3))).sort((a, b) => String(b.vencimento).localeCompare(String(a.vencimento)));
     const acordos = (d().acordos || []).filter((a) => a.contrato_id === contratoId || a.id === acordoAtual).sort((a, b) => String(b.data).localeCompare(String(a.data)));
     return [
       ["geral", "Cobrança em geral"],
-      ...boletos.map((cb) => [`b${cb.id}`, maiuscula(referenteDoRegistro(d(), { cobranca_id: cb.id }))]),
-      ...acordos.map((a) => [`a${a.id}`, maiuscula(referenteDoRegistro(d(), { acordo_id: a.id }))])
+      ...boletos.map((cb) => [`b${cb.id}`, maiuscula2(referenteDoRegistro(d(), { cobranca_id: cb.id }))]),
+      ...acordos.map((a) => [`a${a.id}`, maiuscula2(referenteDoRegistro(d(), { acordo_id: a.id }))])
     ];
   }
   async function guardarComprovantes(lista3, dados, form, pasta) {
@@ -30493,7 +30521,7 @@ ${texto3}` : texto3;
             const ficha = r ? null : fichaDoNovoContrato(q);
             const guardado = ficha && { acao: "apagarArquivoDaFicha", dados: { ficha: ficha.id }, abrir: { escopo: "ficha", id: ficha.id } };
             const perfis2 = ordenar(d().perfis_regras || [], "nome");
-            return comListas(CONTRATO.flatMap((c) => c.fiador ? c.fiador === 1 && c.secao ? fiadoresNoCadastro(fiadores) : [] : [c]).filter((c) => r ? !c.soNovo : !c.soEditar).filter((c) => c.nome !== "perfil_regras_id" || perfis2.length || r && r.perfil_regras_id).map((c) => c.nome === "perfil_regras_id" ? { ...c, opcoes: perfis2.map((p2) => [String(p2.id), p2.nome]) } : c.nome === "contrato_anterior_id" ? { ...c, opcoes: ops } : c.nome === "imovel_id" ? { ...c, opcoes: imoveis } : c.nome === "comprovante_reserva" && guardado ? { ...c, guardado } : c));
+            return comListas(comPerguntaPeloVencimento(CONTRATO).flatMap((c) => c.fiador ? c.fiador === 1 && c.secao ? fiadoresNoCadastro(fiadores) : [] : [c]).filter((c) => r ? !c.soNovo : !c.soEditar).filter((c) => c.nome !== "perfil_regras_id" || perfis2.length || r && r.perfil_regras_id).map((c) => c.nome === "perfil_regras_id" ? { ...c, opcoes: perfis2.map((p2) => [String(p2.id), p2.nome]) } : c.nome === "contrato_anterior_id" ? { ...c, opcoes: ops } : c.nome === "imovel_id" ? { ...c, opcoes: imoveis } : c.nome === "comprovante_reserva" && guardado ? { ...c, guardado } : c));
           },
           // cada contrato é único: nada vem do inquilino anterior do imóvel, todas as condições são escolhidas de novo
           // a mesma pessoa em outro imóvel (q.pessoa): só os dados da pessoa vêm preenchidos
@@ -30521,6 +30549,8 @@ ${texto3}` : texto3;
             inquilino_tipo: r.inquilino_tipo || "Pessoa física",
             prazo_meses: prazoDoContrato(d(), r),
             aluguel_bonificado: r.bonificacao === false ? null : inicialBonificado(r),
+            vencimento_reserva: mesVencimentoDaCompetencia(r, r.reserva_competencia),
+            vencimento_carencia: mesVencimentoDaCompetencia(r, r.carencia_inicio),
             ...Object.fromEntries(fiadoresDoContrato(d(), r.id).flatMap((f, k) => CAMPOS_FIADOR.map((x) => [`fiador${k + 1}_${x.nome}`, f[x.nome] ?? null])))
           }),
           conferir: conferirContrato,
@@ -30528,6 +30558,12 @@ ${texto3}` : texto3;
           voltar: (r, q) => r ? `#/contrato/${r.id}` : q.imovel ? `#/imovel/${q.imovel}` : "#/inquilinos",
           descricao: (dados, r) => dados.inquilino_nome || r && r.inquilino_nome,
           ajustar(dados, erros, r, form, q = {}) {
+            const vencimento = { cobranca_mes_seguinte: "cobranca_mes_seguinte" in dados ? dados.cobranca_mes_seguinte : !r || r.cobranca_mes_seguinte !== false };
+            for (const [gravado, tela] of [["reserva_competencia", "vencimento_reserva"], ["carencia_inicio", "vencimento_carencia"]]) {
+              if (!(tela in dados)) continue;
+              dados[gravado] = erros[tela] ? null : competenciaDoMesVencimento(vencimento, dados[tela]);
+              delete dados[tela];
+            }
             const anteriorHerdado = r ? contratoHerdado(d(), r) : dados.contrato_anterior_id && buscar2("contratos", dados.contrato_anterior_id);
             const herdado = !!anteriorHerdado;
             if (!r && herdado) dados.garantia_na_troca = garantiaDevolvidaNaTroca(anteriorHerdado) ? "nova" : memoria.continuacao && memoria.continuacao.garantia || "continua";
@@ -31191,7 +31227,9 @@ ${texto3}` : texto3;
         },
         renovacoes: {
           titulo: (r, q) => `Renovação / novo valor - ${buscar2("contratos", q.contrato).inquilino_nome}`,
-          campos: () => RENOVACAO,
+          // o novo valor é perguntado pelo mês do vencimento do boleto (24/11/2026); gravada continua a referência (vale_desde)
+          campos: () => comPerguntaPeloVencimento(RENOVACAO),
+          valores: (r) => ({ ...r, vencimento_vale_desde: mesVencimentoDaCompetencia(buscar2("contratos", r.contrato_id), r.vale_desde) }),
           padrao: (q) => {
             const c = buscar2("contratos", q.contrato);
             return { data: c.vigencia_fim || hojeIso(), tipo: "Renovado com nova data de término", novo_percentual: percentualBonificacao(c) || null };
@@ -31222,11 +31260,15 @@ ${texto3}` : texto3;
               if (!Number.isFinite(v) || v < 0 || v > dados.novo_valor) erros.novo_bonificado = `Informe um valor entre R$ 0,00 e ${reais(dados.novo_valor)} (aluguel cheio)`;
               else dados.novo_percentual = percentualPorBonificado(dados.novo_valor, v);
             }
+            if ("vencimento_vale_desde" in dados) {
+              dados.vale_desde = erros.vencimento_vale_desde ? null : competenciaDoMesVencimento(c, dados.vencimento_vale_desde);
+              delete dados.vencimento_vale_desde;
+            }
             if (!(dados.novo_valor > 0)) {
               dados.novo_percentual = null;
               dados.vale_desde = null;
-            } else if (dados.vale_desde && !competenciaValida(dados.vale_desde, "")) erros.vale_desde = "Informe o mês (ex.: 12/2026)";
-            else if (dados.vale_desde && dados.vale_desde < String(buscar2("contratos", q.contrato).data_entrada || "").slice(0, 7)) erros.vale_desde = "O mês é anterior à entrada do inquilino";
+            } else if (dados.vale_desde && !competenciaValida(dados.vale_desde, "")) erros.vencimento_vale_desde = "Informe o mês (ex.: 12/2026)";
+            else if (dados.vale_desde && dados.vale_desde < String(c.data_entrada || "").slice(0, 7)) erros.vencimento_vale_desde = `O boleto de referência ${compBr(dados.vale_desde)} é anterior à entrada do inquilino`;
             else dados.vale_desde = valeDesdeDaRenovacao(dados);
             if (dados.novo_percentual !== null && dados.novo_percentual !== void 0 && (dados.novo_percentual < 0 || dados.novo_percentual > 100)) erros.novo_percentual = "Informe um percentual entre 0 e 100";
           },
