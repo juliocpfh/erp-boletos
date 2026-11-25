@@ -1764,6 +1764,9 @@ export function recalcularTarifaPadrao(d, usuario, filtroContrato = () => true) 
 }
 
 export function montarCobranca(d, contrato, comp) {
+  // mês coberto pelo acordo do novo titular (termo da troca que não valeu): o anterior paga só até a véspera da troca
+  const cobertoPor = !contrato.data_saida || contrato.data_saida >= `${comp}-01` ? mesCobertoPorAcordoDoNovo(d, contrato, comp) : null;
+  if (cobertoPor) contrato = { ...contrato, data_saida: C.somarDias(cobertoPor.data_entrada || cobertoPor.vigencia_inicio, -1) };
   const dias = C.diasOcupados(comp, contrato.data_entrada, contrato.data_saida);
   if (dias === 0 || trocaAguardaAditivo(d, contrato)) return null;
   const diasMes = C.diasNoMes(comp);
@@ -1997,6 +2000,8 @@ export const previstoNoPagamento = (cb, dataContabil, { pagouEmDia = false, data
  */
 export function devidoDoPago(cb) {
   if (!cb || !cb.data_pagamento) return 0;
+  // termo da troca de titular que não valeu (24/11/2026): o mês é cobrado do anterior e tudo o que o novo pagou volta a ele
+  if (cb.troca_nao_valeu) return 0;
   const v = previstoNoPagamento(cb, cb.data_pagamento, { pagouEmDia: !!cb.pagou_em_dia, dataPagou: cb.data_pagou || null }).valor_devido;
   return Number.isFinite(v) ? v : 0;
 }
@@ -2202,6 +2207,17 @@ export function estornarPagamento(d, cobrancaId, usuario) {
     atualizar(d, 'movimentacoes_banco', m.id, { cobranca_id: null, classificacao: null, imovel_id: null, classificada_em: null, classificada_por: null,
       ...(m.comprovante || m.comprovante_contador || m.comprovante_origem || m.nome_arquivo ? { comprovante: null, comprovante_contador: null, comprovante_origem: null, nome_arquivo: null } : {}),
       ...(m.pago_a_mais ? { pago_a_mais: false } : {}) }, usuario, 'Pagamento do boleto desfeito: movimentação volta a ficar sem destino');
+  }
+  // boleto do novo titular depois do termo da troca que não valeu (2º teste de tela da PR #393): sem o pagamento, ele é como o
+  // boleto em aberto do novo, que não existe sem o termo assinado: sai (o anterior já é cobrado pelo mês cheio). Antes ficava em
+  // aberto ao lado do de João: R$ 3.600,00 a cobrar no mês. Emitido no banco: fica, para cancelar lá. Termo válido de novo: só a marca sai.
+  if (cb && cb.troca_nao_valeu) {
+    const n = buscar(d, 'contratos', cb.contrato_id);
+    if (n && trocaAguardaAditivo(d, n) && !emitidoNoBanco(cb) && !emAcordo(cb)) {
+      excluir(d, 'cobrancas', cb.id, usuario, `Boleto ${C.compBr(cb.competencia)} de ${n.inquilino_nome} excluído com o pagamento desfeito: o termo da troca de titular não valeu e o mês é cobrado do titular anterior`);
+    } else {
+      atualizar(d, 'cobrancas', cb.id, { troca_nao_valeu: null }, usuario, `Boleto ${C.compBr(cb.competencia)}: pagamento desfeito${n && trocaAguardaAditivo(d, n) ? ' (emitido no banco: cancele lá, porque o mês é cobrado do titular anterior)' : ''}`);
+    }
   }
 }
 
@@ -3959,38 +3975,135 @@ export function desfazerAditivo(d, id, usuario, { excluirTermo = false } = {}) {
 }
 
 /**
+ * Termo da troca de titular que não valeu com um acordo do novo titular que NÃO foi cancelado sozinho (o acordo também tem boletos
+ * de fora da troca: ``cancelarAcordosDoNovo`` avisa e a equipe decide): enquanto o acordo existir, ele cobre o mês e o anterior não é
+ * cobrado por ele (só pelos dias até a véspera da troca), para o mês não ficar cobrado dos dois. O acordo só com os meses da troca é
+ * cancelado (decisão do dono de 24/11/2026) e não passa por aqui. Devolve o contrato do novo titular cujo acordo cobre ``comp`` (ou null).
+ */
+export function mesCobertoPorAcordoDoNovo(d, c, comp) {
+  if (!c || !comp) return null;
+  for (const n of d.contratos) {
+    if (n.contrato_anterior_id !== c.id || !trocaAguardaAditivo(d, n)) continue;
+    const cb = boletoDoMes(d, n.id, comp);
+    if (cb && emAcordo(cb)) return n;
+  }
+  return null;
+}
+
+/**
+ * Termo da troca que não valeu com um acordo do novo titular (decisão do dono de 24/11/2026, opção (b): "cancelar acordo com
+ * Maria e devolver o valor pago e cobrar João"): o acordo é cancelado; as parcelas já pagas viram "a devolver" (``troca_nao_valeu``,
+ * botão "Devolvi"); as em aberto saem (emitidas no banco ficam, com aviso para cancelar lá); os boletos de origem voltam a ser boletos
+ * comuns do novo (``tirarBoletosDoNovoTitular`` os tira e o anterior é cobrado pelo mês cheio). Ex.: troca em 01/12, acordo de
+ * dezembro em 2 × R$ 900,00 com a 1ª paga → R$ 900,00 a devolver a Maria, a 2ª parcela sai e João recebe dezembro, R$ 1.800,00.
+ * Acordo com boletos de fora da troca (outro contrato, boleto avulso ou outro acordo depois dele): não cancela sozinho, avisa.
+ * Devolve o texto do aviso.
+ */
+function cancelarAcordosDoNovo(d, n, a, usuario) {
+  const quem = a ? a.inquilino_nome : 'o titular anterior';
+  const textos = [];
+  for (const ac of (d.acordos || []).filter((x) => x.contrato_id === n.id && !x.desfeito_em)) {
+    const origens = origensDoAcordo(d, ac);
+    const parcelas = parcelasDoAcordo(d, ac);
+    const fora = origens.some((cb) => cb.contrato_id !== n.id || ehBoletoAvulso(cb)) || acordoPosterior(d, ac)
+      || parcelas.some((cb) => cb.quitado_saida || cb.quitado_devolucao);
+    if (fora) continue; // fica (tirarBoletosDoNovoTitular avisa e mesCobertoPorAcordoDoNovo evita cobrar o mês dos dois)
+    const devolver = [];
+    const noBanco = [];
+    for (const p of parcelas) {
+      const nome = `Parcela ${p.acordo_parcela || 'única'} do acordo de ${C.dataBr(ac.data)}`;
+      if (p.data_pagamento) {
+        atualizar(d, 'cobrancas', p.id, { troca_nao_valeu: true, valor_a_mais: p.valor_pago || null }, usuario,
+          `${nome}, paga em ${C.dataBr(p.data_pagamento)}: o termo da troca de titular não valeu e o acordo foi cancelado; ${C.reais(p.valor_pago || 0)} a devolver a ${n.inquilino_nome}`);
+        devolver.push(p);
+      } else if (emitidoNoBanco(p)) {
+        registrar(d, usuario, 'Alteração', 'cobrancas', p.id, `${nome} emitida no banco: o acordo foi cancelado (o termo da troca de titular não valeu). Cancele no banco e depois exclua`, null, { contrato_id: n.id, imovel_id: n.imovel_id });
+        noBanco.push(p);
+      } else {
+        excluir(d, 'cobrancas', p.id, usuario, `${nome} excluída: o acordo foi cancelado (o termo da troca de titular não valeu)`);
+      }
+    }
+    for (const cb of origens) atualizar(d, 'cobrancas', cb.id, { situacao: 'Em aberto', acordo_id: null }, usuario, `Boleto ${nomeNoAcordo(cb)} sai do acordo (acordo cancelado: o termo da troca de titular não valeu)`);
+    atualizar(d, 'acordos', ac.id, { desfeito_em: C.hojeIso(), cancelado_troca: true }, usuario,
+      `Acordo de ${C.dataBr(ac.data)} com ${n.inquilino_nome} cancelado: o termo da troca de titular não valeu e ${quem} volta a ser cobrado pelo mês`);
+    const pago = devolver.reduce((t, p) => t + (p.valor_pago || 0), 0);
+    textos.push(`O acordo de ${n.inquilino_nome} de ${C.dataBr(ac.data)} (${ac.referente}) foi cancelado${pago ? `: ${C.reais(pago)} já pagos ficam "a devolver" a ${n.inquilino_nome} (botão "Devolvi" na parcela paga)` : ''}${parcelas.length > devolver.length + noBanco.length ? '; as parcelas em aberto saíram' : ''}.`);
+    if (noBanco.length) textos.push(`Atenção: ${noBanco.length === 1 ? 'a parcela' : 'as parcelas'} ${noBanco.map((p) => p.acordo_parcela || 'única').join(', ')} do acordo ${noBanco.length === 1 ? 'está emitida' : 'estão emitidas'} no banco: cancele no banco e depois exclua.`);
+  }
+  return textos.map((t) => ` ${t}`).join('');
+}
+
+/**
  * Termo da troca de titular que não valeu: o boleto do novo titular só existe depois do termo assinado (decisão do dono de
- * 24/11/2026). Os do novo ainda não pagos nem emitidos no banco saem; no mês deles o anterior volta a ser cobrado pelo mês cheio
- * (o boleto dele é recalculado em ``soltarSaidaDoAnterior`` ou gerado aqui, se o mês já tinha boleto só do novo). Pago, emitido
- * no banco ou em acordo: fica, anotado no Histórico, e o texto devolvido avisa (o mês pode estar cobrado dos dois).
- * Ex.: troca em 15/12, boletos de dezembro gerados (anterior 14/30, novo 16/30 = R$ 960,00) e termo apagado → o do novo sai e o
- * do anterior volta a R$ 1.800,00. Troca em 01/12 → o boleto de dezembro do novo sai e o anterior ganha o de dezembro, cheio.
+ * 24/11/2026). No mês de cada boleto do novo, o anterior volta a ser cobrado pelo mês cheio (o boleto dele é recalculado em
+ * ``soltarSaidaDoAnterior`` ou gerado aqui, se o mês só tinha o do novo). O boleto do novo:
+ * - em aberto e fora do banco: sai;
+ * - já pago (opção (a) do dono, 24/11): fica, e tudo o que o novo pagou vira "a devolver", como o pago a mais (botão "Devolvi",
+ *   ``troca_nao_valeu``: o devido passa a R$ 0,00, ``devidoDoPago``). Ex.: Maria pagou R$ 1.800,00 de dezembro → João paga o
+ *   boleto de dezembro cheio (R$ 1.800,00) e a empresa devolve R$ 1.800,00 a Maria;
+ * - emitido no banco e não pago: fica, com aviso para cancelar no banco e depois excluir;
+ * - em acordo: fica como está (o acordo foi assinado), e o anterior não ganha boleto no mês.
+ * Tudo anotado no Histórico; o texto devolvido aparece na tela.
  */
 function tirarBoletosDoNovoTitular(d, n, a, usuario) {
+  // decisão do dono de 24/11/2026 (opção b): o acordo do novo com os meses da troca é cancelado antes; os boletos dele voltam a ser
+  // boletos comuns do novo (saem abaixo) e o anterior passa a ser cobrado pelo mês cheio
+  const textoAcordos = cancelarAcordosDoNovo(d, n, a, usuario);
   const doNovo = d.cobrancas.filter((cb) => cb.contrato_id === n.id && !ehBoletoAvulso(cb)).sort((x, y) => x.competencia.localeCompare(y.competencia));
-  if (!doNovo.length) return '';
+  if (!doNovo.length) return textoAcordos;
+  const quem = a ? a.inquilino_nome : 'o titular anterior';
   const tirados = [];
-  const ficam = [];
+  const pagos = [];
+  const noBanco = [];
+  const acordos = [];
+  const cobrarDoAnterior = [];
+  const anotar = (cb, texto) => registrar(d, usuario, 'Alteração', 'cobrancas', cb.id, texto, null, { contrato_id: n.id, imovel_id: n.imovel_id });
   for (const cb of doNovo) {
-    const motivo = cb.data_pagamento ? `pago em ${C.dataBr(cb.data_pagamento)}` : emitidoNoBanco(cb) ? 'emitido no banco' : emAcordo(cb) ? 'em acordo' : '';
-    if (motivo) {
-      ficam.push(`${C.compBr(cb.competencia)} (${motivo})`);
-      registrar(d, usuario, 'Alteração', 'cobrancas', cb.id, `Boleto ${C.compBr(cb.competencia)} de ${n.inquilino_nome} ${motivo}: fica, mas o termo da troca de titular não valeu e ${a ? a.inquilino_nome : 'o titular anterior'} volta a ser cobrado neste mês (confira este boleto)`, null, { contrato_id: n.id, imovel_id: n.imovel_id });
+    if (emAcordo(cb)) {
+      // acordo que não foi cancelado sozinho (tem boletos de fora da troca): fica até a equipe decidir; enquanto existir, cobre
+      // o mês e o anterior não é cobrado por ele (mesCobertoPorAcordoDoNovo), para o mês não ficar cobrado dos dois
+      acordos.push(C.compBr(cb.competencia));
+      anotar(cb, `Boleto ${C.compBr(cb.competencia)} de ${n.inquilino_nome} em acordo: o termo da troca de titular não valeu, mas o acordo tem boletos de fora da troca e não foi cancelado sozinho. Decida: desfaça o acordo (e ${quem} passa a ser cobrado pelo mês) ou mantenha`);
+      continue;
+    }
+    if (cb.data_pagamento) {
+      const devolver = cb.valor_pago || 0;
+      atualizar(d, 'cobrancas', cb.id, { troca_nao_valeu: true, valor_a_mais: devolver || null }, usuario,
+        `Boleto ${C.compBr(cb.competencia)} de ${n.inquilino_nome}, pago em ${C.dataBr(cb.data_pagamento)}: o termo da troca de titular não valeu e o mês é cobrado de ${quem}; ${C.reais(devolver)} a devolver a ${n.inquilino_nome}`);
+      pagos.push({ cb, devolver });
+      cobrarDoAnterior.push(cb.competencia);
+      continue;
+    }
+    if (emitidoNoBanco(cb)) {
+      anotar(cb, `Boleto ${C.compBr(cb.competencia)} de ${n.inquilino_nome} emitido no banco: o termo da troca de titular não valeu e o mês é cobrado de ${quem}. Cancele este boleto no banco e depois exclua`);
+      noBanco.push(C.compBr(cb.competencia));
+      cobrarDoAnterior.push(cb.competencia);
       continue;
     }
     excluir(d, 'cobrancas', cb.id, usuario, `Boleto ${C.compBr(cb.competencia)} de ${n.inquilino_nome} excluído: o termo da troca de titular não valeu (o boleto do novo titular só existe com o termo assinado)`);
     tirados.push(cb.competencia);
+    cobrarDoAnterior.push(cb.competencia);
   }
-  if (a) {
+  const gerados = [];
+  if (a && a.ativo !== false && a.imovel_id) {
     // mês que só tinha o boleto do novo (troca no dia 1º): o anterior passa a ter o dele, como teria se o termo não existisse
-    for (const comp of tirados) {
-      if (boletoDoMes(d, a.id, comp) || a.ativo === false || !a.imovel_id) continue;
+    for (const comp of cobrarDoAnterior) {
+      if (boletoDoMes(d, a.id, comp)) continue;
       const dados = montarCobranca(d, a, comp);
-      if (dados) inserir(d, 'cobrancas', dados, usuario, `Boleto ${C.compBr(comp)} gerado para ${a.inquilino_nome} (o termo da troca de titular não valeu)`);
+      if (dados) { inserir(d, 'cobrancas', dados, usuario, `Boleto ${C.compBr(comp)} gerado para ${a.inquilino_nome} (o termo da troca de titular não valeu)`); gerados.push(comp); }
     }
-    if (tirados.length) { aplicarDiferencasPendentes(d, a.id, usuario); sincronizarMultas(d, a.id, usuario); realocarReserva(d, a, usuario); }
+    // o boleto do anterior foi recalculado antes (soltarSaidaDoAnterior) com o acordo do novo ainda valendo: refaz agora, sem ele
+    if (cobrarDoAnterior.length) recalcularCobrancas(d, (cb) => cb.contrato_id === a.id && cobrarDoAnterior.includes(cb.competencia), usuario);
+    if (cobrarDoAnterior.length) { aplicarDiferencasPendentes(d, a.id, usuario); sincronizarMultas(d, a.id, usuario); realocarReserva(d, a, usuario); }
   }
-  return `${tirados.length ? ` ${tirados.length === 1 ? 'O boleto' : 'Os boletos'} de ${n.inquilino_nome} (${tirados.map(C.compBr).join(', ')}) ${tirados.length === 1 ? 'saiu' : 'saíram'} e ${a ? a.inquilino_nome : 'o titular anterior'} volta a ser cobrado pelo mês cheio.` : ''}${ficam.length ? ` Atenção: ${ficam.length === 1 ? 'o boleto' : 'os boletos'} de ${n.inquilino_nome} ${ficam.join(', ')} ${ficam.length === 1 ? 'ficou' : 'ficaram'}: confira, porque o mês pode estar cobrado dos dois.` : ''}`;
+  const lista = (x) => x.join(', ');
+  return [
+    tirados.length ? `${tirados.length === 1 ? 'O boleto' : 'Os boletos'} de ${n.inquilino_nome} (${lista(tirados.map(C.compBr))}) ${tirados.length === 1 ? 'saiu' : 'saíram'}.` : '',
+    cobrarDoAnterior.length ? `${quem} volta a ser cobrado pelo mês cheio (${lista(cobrarDoAnterior.map(C.compBr))}).` : '',
+    pagos.length ? `${n.inquilino_nome} já tinha pago ${lista(pagos.map((x) => `${C.compBr(x.cb.competencia)} (${C.reais(x.devolver)})`))}: o valor fica "a devolver" a ${n.inquilino_nome} (no boleto de ${n.inquilino_nome}, botão "Devolvi" depois de devolver). A NF desse pagamento saiu em nome de ${n.inquilino_nome}: confira com o contador.` : '',
+    noBanco.length ? `Atenção: ${noBanco.length === 1 ? 'o boleto' : 'os boletos'} de ${n.inquilino_nome} ${lista(noBanco)} ${noBanco.length === 1 ? 'está emitido' : 'estão emitidos'} no banco: cancele no banco e depois exclua aqui, senão o mês fica cobrado dos dois.` : '',
+    acordos.length ? `Atenção: ${lista(acordos)} de ${n.inquilino_nome} está num acordo que também tem boletos de fora da troca e não foi cancelado sozinho. Decida: desfaça o acordo (e ${quem} passa a ser cobrado pelo mês) ou mantenha; enquanto o acordo existir, ${quem} não é cobrado por ${acordos.length === 1 ? 'esse mês' : 'esses meses'}.` : '',
+  ].filter(Boolean).map((t) => ` ${t}`).join('') + textoAcordos;
 }
 
 /** Termo aditivo assinado: apaga só o arquivo; o termo volta a "aguardando assinatura". */
@@ -4296,6 +4409,8 @@ export function transferirHeranca(d, novoId, usuario, hoje = C.hojeIso()) {
   // troca numa data futura ou sem o termo assinado: o contrato (boletos, garantia, seguro, reserva) continua com o anterior;
   // agora só a data-base do reajuste e, com o termo assinado, o fim do vínculo dele (o último boleto sai proporcional). O resto passa depois.
   const assinado = !!aditivoDaTroca(d, n);
+  // termo válido anexado depois de um "não valeu": o pagamento do novo volta a ser dele (não fica mais "a devolver")
+  if (assinado) out.pagamentosDevolvidos = voltarPagamentosDoNovo(d, n, usuario);
   if (data > hoje || !assinado) {
     if (!assinado && a.data_saida === fim) atualizar(d, 'contratos', a.id, { data_saida: null }, usuario, `${a.inquilino_nome}: continua no contrato até o termo aditivo ser assinado`);
     if (assinado && a.data_saida !== fim) atualizar(d, 'contratos', a.id, { data_saida: fim }, usuario, `${a.inquilino_nome}: fim do vínculo em ${C.dataBr(fim)} (o contrato continua com ${n.inquilino_nome} a partir de ${C.dataBr(data)})`);
@@ -4371,6 +4486,32 @@ function passarBoletosAoNovo(d, n, a, fim, usuario, out, { soAluguel = false } =
       out.boletosMovidos += 1;
     }
   }
+}
+
+/**
+ * Termo da troca marcado "não valeu" e depois o termo certo anexado (achado no teste de tela da PR #393): o boleto do novo que
+ * ele já tinha pago tinha virado "a devolver" (``troca_nao_valeu``). Com a troca valendo de novo, o pagamento volta a ser do
+ * boleto dele: a marca sai e o pago a mais volta à conta normal. O boleto do anterior do mesmo mês volta ao proporcional ou sai
+ * (``transferirHeranca``). Ex.: troca em 15/12, Maria pagou R$ 960,00 → continua paga; João volta a R$ 840,00.
+ * Já devolvido (botão "Devolvi" ou pelo extrato): fica como está, anotado no Histórico, e volta na lista (a equipe cobra de novo
+ * o novo titular). Devolve [{ cobranca, valor }] dos já devolvidos.
+ */
+function voltarPagamentosDoNovo(d, n, usuario) {
+  const devolvidos = [];
+  for (const cb of d.cobrancas.filter((x) => x.contrato_id === n.id && x.troca_nao_valeu)) {
+    // parcela de um acordo cancelado pelo termo que não valeu: o acordo não volta sozinho; o pago continua a devolver
+    if (cb.acordo_parcela_de && (buscar(d, 'acordos', cb.acordo_parcela_de) || {}).cancelado_troca) continue;
+    if (cb.valor_devolvido > 0) {
+      registrar(d, usuario, 'Alteração', 'cobrancas', cb.id, `Boleto ${C.compBr(cb.competencia)} de ${n.inquilino_nome}: o termo da troca de titular foi anexado, mas o pagamento (${C.reais(cb.valor_devolvido)}) já tinha sido devolvido. Cobre o mês de novo de ${n.inquilino_nome} (desfaça o pagamento do boleto e registre quando ele pagar)`, null, { contrato_id: n.id, imovel_id: n.imovel_id });
+      devolvidos.push({ cobranca: cb, valor: cb.valor_devolvido });
+      continue;
+    }
+    const devido = devidoDoPago({ ...cb, troca_nao_valeu: false });
+    const aMais = Math.max(0, (cb.valor_pago || 0) - devido);
+    atualizar(d, 'cobrancas', cb.id, { troca_nao_valeu: null, valor_a_mais: aMais || null }, usuario,
+      `Boleto ${C.compBr(cb.competencia)} de ${n.inquilino_nome}: o termo da troca de titular foi anexado e o pagamento de ${C.dataBr(cb.data_pagamento)} volta a ser dele (não há mais o que devolver${aMais ? `, salvo ${C.reais(aMais)} pagos a mais` : ''})`);
+  }
+  return devolvidos;
 }
 
 /**

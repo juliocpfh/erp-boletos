@@ -3,7 +3,7 @@
 import { alterar, aviso, E, janela, login, mostrar, podeUsuario } from '../app.js';
 import * as S from '../armazenamento.js';
 import * as C from '../calculos.js';
-import { dataBr, pct, reais } from '../calculos.js';
+import { compBr, dataBr, pct, reais } from '../calculos.js';
 import { ACEITA_DOCUMENTOS, esc } from '../formularios.js';
 import { rotuloCampo, valorTexto } from '../exportar.js';
 import * as P from '../poupanca.js';
@@ -292,6 +292,11 @@ export async function trazerHeranca(id) {
     r = R.transferirHeranca(db, Number(id), login());
   });
   if (!r) return null;
+  // termo certo anexado depois de um "não valeu": pagamento do novo titular que já tinha sido devolvido (voltarPagamentosDoNovo)
+  if (r.pagamentosDevolvidos && r.pagamentosDevolvidos.length) {
+    const nome = buscar('contratos', id).inquilino_nome;
+    aviso(`Atenção: ${r.pagamentosDevolvidos.map((x) => `o pagamento de ${compBr(x.cobranca.competencia)} (${reais(x.valor)})`).join(', ')} de ${nome} já tinha sido devolvido: cobre de novo (desfaça o pagamento do boleto e registre quando pagar).`, 'aviso');
+  }
   if (r.agendada) {
     await arquivosParaHerdeiro(r.anterior.id, id, r.arquivosReserva, false);
     const n = buscar('contratos', id);
