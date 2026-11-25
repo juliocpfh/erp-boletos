@@ -399,6 +399,15 @@ export function guardarRascunhoVistoria() {
 
 export function apagarRascunhoVistoria(chave) { try { localStorage.removeItem(chave); } catch { /* nada */ } }
 
+/** Chaves dos rascunhos de vistoria guardados neste navegador (`vistoria-<contrato>-<entrada|saida>-<id|nova>`). */
+export function rascunhosDeVistoria(armazem = globalThis.localStorage) {
+  const chaves = [];
+  try {
+    for (let i = 0; i < armazem.length; i += 1) { const k = armazem.key(i); if (k && /^vistoria-\d+-(entrada|saida)-/.test(k)) chaves.push(k); }
+  } catch { /* sem armazenamento */ }
+  return chaves;
+}
+
 function ligarRascunhoVistoria(raiz) {
   const form = raiz.querySelector('form[data-rascunho]');
   if (!form) return;

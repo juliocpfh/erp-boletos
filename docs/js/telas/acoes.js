@@ -23,7 +23,7 @@ import { ACOES_EMAILS } from './emails.js';
 import { emailLigado, enviarEmail } from '../gmail.js';
 import { htmlSaude } from './banco-c6.js';
 import { ANEXOS_COM_X, CADASTROS, nomeComprovante } from './cadastros.js';
-import { CAMPOS_PESSOA_FORM, guardarRascunhoVistoria, indicesMensaisFci } from './campos.js';
+import { CAMPOS_PESSOA_FORM, apagarRascunhoVistoria, guardarRascunhoVistoria, indicesMensaisFci, rascunhosDeVistoria } from './campos.js';
 import { oQueContinuaDoAditivo } from './contrato.js';
 import { adiados, alterarApagandoAnexos, anexosEmUso, botao, apagarAnexos, apagarPastaDaFicha, nomePastaFicha, arquivoApagadoNoFormulario, buscar, carregarParte, chavePasta, parteAdiada, conferirArquivos, conferirHerancas, d, ehMatricula, encerrarLinksDaFicha, extensao, memoria, nomePastaContrato, opera, ordenar, pastaDoEscopo, pastaPaiContrato, salvarAssinado, semAcentoArquivo, SO_ADMIN_NUMERACAO, vinculoDoEscopo } from './comum.js';
 import { ACOES_ICONE } from './icone.js';
@@ -755,6 +755,12 @@ export const ACOES = {
       const n = E.nuvem.pendentesQtd() + (E.anexos?.fila?.length || 0);
       if (n && !(await confirmar(`Há ${n} alteração(ões) feitas neste aparelho que ainda não foram enviadas (sem internet).\n\n`
         + 'Elas ficam guardadas aqui e sobem sozinhas quando você entrar de novo com internet, mas o mais seguro é esperar a internet voltar e sair depois.', { titulo: 'Sair mesmo assim?', sim: 'Sair mesmo assim', nao: 'Esperar a internet' }))) return;
+    }
+    // vistoria pela metade neste aparelho (decisão do dono de 25/11/2026, "guarda e avisa"): pergunta; fechar a janela guarda
+    const rascunhos = rascunhosDeVistoria();
+    if (rascunhos.length && await confirmar('Há uma vistoria pela metade neste aparelho. Apagar ou guardar para continuar depois?',
+      { titulo: 'Vistoria pela metade', sim: 'Apagar', nao: 'Guardar para continuar depois', forte: true })) {
+      for (const k of rascunhos) apagarRascunhoVistoria(k);
     }
     await sair();
   },

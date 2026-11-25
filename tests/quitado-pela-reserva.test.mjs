@@ -87,3 +87,25 @@ test('banco antigo: boleto "Em aberto" com R$ 0,00 a pagar pela reserva vira "Qu
   R.normalizar(d);
   assert.equal(R.boletoDoMes(d, c.id, '2026-07').situacao, 'Quitado pela reserva');
 });
+
+test('no vencimento a quitação pela reserva é registrada sozinha, com a data do vencimento, uma vez só', () => {
+  const { d, c } = base();
+  R.gerarCobrancas(d, '2026-07', 'j');
+  R.gerarCobrancas(d, '2026-08', 'j');
+  const jul = R.boletoDoMes(d, c.id, '2026-07');
+  // antes do vencimento (10/07): nada
+  assert.deepEqual(R.registrarQuitacoesPelaReserva(d, '2026-07-09', 'sistema'), []);
+  assert.equal(R.buscar(d, 'cobrancas', jul.id).data_pagamento, null);
+  // no dia ou depois: registrada com a data do vencimento, NF do aluguel em dia na fila; agosto (R$ 1.600,00 a pagar) não entra
+  const feitos = R.registrarQuitacoesPelaReserva(d, '2026-07-15', 'sistema');
+  assert.deepEqual(feitos.map((x) => x.id), [jul.id]);
+  const x = R.buscar(d, 'cobrancas', jul.id);
+  assert.equal(x.data_pagamento, '2026-07-10');
+  assert.equal(x.situacao, 'Quitado pela reserva');
+  assert.equal(x.valor_nf, 180000);
+  assert.equal(x.multa, 0);
+  assert.ok(R.pendentesDeFatura(d).some((p) => p.registro.id === jul.id && p.data === '2026-07-10'));
+  // de novo (outra aba, outro aparelho, outra abertura): nada mais
+  assert.deepEqual(R.registrarQuitacoesPelaReserva(d, '2026-08-20', 'sistema'), []);
+  assert.equal(d.cobrancas.filter((cb) => cb.data_pagamento).length, 1);
+});

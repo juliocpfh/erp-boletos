@@ -30,6 +30,10 @@ test('banco do kit: casos de 25/11 (reserva que quita o boleto e acordo refeito)
   assert.equal(cb(ids.juliaBoleto).situacao, 'Quitado pela reserva');
   assert.equal(cb(ids.juliaBoleto).reserva_utilizada, 180000);
   assert.equal(R.aCobrar(cb(ids.juliaBoleto)), false);
+  // Kauã: venceu em 10/11 e a quitação fica para o Painel registrar sozinho
+  assert.equal(cb(ids.kauaBoleto).vencimento, '2026-11-10');
+  assert.equal(cb(ids.kauaBoleto).data_pagamento, null);
+  assert.deepEqual(R.quitacoesPelaReservaAte(d, HOJE).map((x) => x.id), [ids.kauaBoleto]);
   // acordo refeito: as parcelas novas trazem os honorários e a carta de R$ 73,50 do 1º acordo
   const a1 = R.buscar(d, 'acordos', ids.acordoAntigo);
   assert.ok(a1.honorarios > 0 && a1.despesas_cobranca[0].valor === 7350);

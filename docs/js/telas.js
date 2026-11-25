@@ -18,7 +18,7 @@ import { lerAvisosAoAbrir, telaBanco } from './telas/banco.js';
 import { telaFormulario } from './telas/cadastros.js';
 import { crescer, ligarCamposAutomaticos, ligarIndiceBancoCentral } from './telas/campos.js';
 import { telaCobranca, telaCobrancas } from './telas/cobrancas.js';
-import { ACEITA_DOCUMENTOS, acertarNomesUmaVez, apagarDocumentosVencidosDasFichas, alertaAdiado, alertaArquivosFaltando, alertaDesligado, botao, botaoDesligarAlerta, conferirArquivosUmaVez, buscar, caixaHistorico, classeAlerta, classeEstilo, competenciaPadrao, d, etiqueta, gruposDeAlertas, limparSemImovel, link, naoEncontrado, organizarPastasUmaVez, nomeAlerta, listaArquivos, opera, ordenar, PASTA_SEM_IMOVEL, pastasComArquivos, tabelaHistorico, trazerHerancasPendentes, ultimos } from './telas/comum.js';
+import { ACEITA_DOCUMENTOS, acertarNomesUmaVez, apagarDocumentosVencidosDasFichas, alertaAdiado, alertaArquivosFaltando, alertaDesligado, botao, botaoDesligarAlerta, conferirArquivosUmaVez, buscar, caixaHistorico, classeAlerta, classeEstilo, competenciaPadrao, d, etiqueta, gruposDeAlertas, limparSemImovel, link, naoEncontrado, organizarPastasUmaVez, nomeAlerta, listaArquivos, opera, ordenar, PASTA_SEM_IMOVEL, pastasComArquivos, quitarPelaReservaNoVencimento, tabelaHistorico, trazerHerancasPendentes, ultimos } from './telas/comum.js';
 import { telaAceiteContatos, telaComunicacoes } from './telas/comunicacoes.js';
 import { calendarioDoPainel, SITUACOES_SOLICITACAO, telaBusca, telaInquilinos, telaIptu, telaSolicitacoes } from './telas/consultas.js';
 import { telaContrato, valorBonificado } from './telas/contrato.js';
@@ -294,6 +294,8 @@ export const TELAS = {
     // depois das heranças (que trazem comprovantes do contrato anterior), os nomes dos comprovantes
     trazerHerancasPendentes().catch((e) => aviso(`Contratos herdados: ${e.message}`, 'aviso'))
       .then(() => acertarNomesUmaVez()).catch((e) => aviso(`Nomes dos comprovantes: ${e.message}`, 'aviso'));
+    // boletos quitados pela reserva que venceram: a quitação é registrada sozinha, com a data do vencimento (25/11/2026)
+    quitarPelaReservaNoVencimento().catch((e) => aviso(`Quitação pela reserva: ${e.message}`, 'aviso'));
     preencherAvisoAssinaturas();
     const hoje = C.hojeIso();
     // alertas adiados ("adiar 7 dias" / "já estou cuidando") ficam recolhidos no fim da caixa, com quem marcou

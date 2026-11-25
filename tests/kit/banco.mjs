@@ -143,6 +143,14 @@ export function montarBanco() {
     R.realocarReserva(d, R.buscar(d, 'contratos', julia.id), u);
     Object.assign(ids, { julia: julia.id, juliaBoleto: juliaNov.id });
 
+    // 9b. Reserva que quita o boleto 10/2026 (venceu em 10/11): ao abrir o Painel, a quitação é registrada sozinha com a data
+    // do vencimento e a NF entra na fila (decisão do dono de 25/11/2026, "sozinha, no vencimento")
+    const kaua = contrato(imovel('Kit Quitação'), { inquilino_nome: 'Kauã Quitação Teste', data_entrada: '2026-10-01', vigencia_inicio: '2026-10-01', vigencia_fim: '2029-03-31',
+      reserva_valor: 200000, reserva_data: '2026-09-25' });
+    const kauaOut = boleto(kaua, '2026-10');
+    R.realocarReserva(d, R.buscar(d, 'contratos', kaua.id), u);
+    Object.assign(ids, { kaua: kaua.id, kauaBoleto: kauaOut.id });
+
     // 10. Acordo refeito (25/11/2026): 1º acordo em 24/08/2026 com honorários e a carta de R$ 73,50, parcela vencida em 10/09;
     // o 2º acordo, hoje, refaz a parcela e o termo dele cita os honorários e a despesa do 1º
     const lia = contrato(imovel('Kit Acordo Refeito'), { inquilino_nome: 'Lia Acordo Refeito Teste', data_entrada: '2026-05-01', vigencia_inicio: '2026-05-01', vigencia_fim: '2028-10-31' });

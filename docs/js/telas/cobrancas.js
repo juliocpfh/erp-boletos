@@ -77,7 +77,7 @@ function formPagamento(cb) {
  */
 function caixaQuitadoPelaReserva(cb, contrato) {
   const nf = R.geraNf(contrato);
-  return `<div class="alerta info"><b>Quitado pela reserva.</b> A reserva de ${reais(cb.reserva_utilizada)} cobre o boleto inteiro: não há nada a pagar no banco, nem multa, juros, notificação ou lembrete.${nf ? ` A nota fiscal sai pelo aluguel em dia (${reais(C.liquidar(cb, cb.vencimento).valor_nf)}) quando a quitação for registrada.` : ''}</div>
+  return `<div class="alerta info"><b>Quitado pela reserva.</b> A reserva de ${reais(cb.reserva_utilizada)} cobre o boleto inteiro: não há nada a pagar no banco, nem multa, juros, notificação ou lembrete.${nf ? ` A nota fiscal sai pelo aluguel em dia (${reais(C.liquidar(cb, cb.vencimento).valor_nf)}).` : ''} No vencimento (${dataBr(cb.vencimento)}) a quitação é registrada sozinha${nf ? ', com a data do vencimento, e a NF entra na fila da tela NF' : ''}. Para antecipar, registre aqui.</div>
     ${opera() ? `<form data-form="pagamento" data-id="${cb.id}" class="pagamento"><div class="campo-pagamento"><label>${nf ? 'Data da quitação (data da NF)' : 'Data da quitação'}</label> <input type="date" name="data" value="${C.hojeIso()}">${F.atalhosData()}</div><button>Registrar a quitação pela reserva</button></form>` : ''}`;
 }
 

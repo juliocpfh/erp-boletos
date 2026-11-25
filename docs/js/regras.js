@@ -966,6 +966,28 @@ export const cobertoPelaReserva = (cb) => !cb.data_pagamento && cb.reserva_utili
 export const QUITADO_RESERVA = 'Quitado pela reserva';
 /** Quitado pela reserva: ainda sem a quitação registrada (``cobertoPelaReserva``) ou já registrada (situação gravada). */
 export const quitadoPelaReserva = (cb) => (cb.data_pagamento ? cb.situacao === QUITADO_RESERVA : cobertoPelaReserva(cb));
+/**
+ * Boletos quitados pela reserva com o vencimento já chegado (até ``hoje``) e ainda sem a quitação registrada. Decisão do dono
+ * de 25/11/2026 ("sozinha, no vencimento"): a quitação é registrada sozinha, com a data do vencimento, e a NF entra na fila.
+ */
+export const quitacoesPelaReservaAte = (d, hoje) => d.cobrancas.filter((cb) => cb.vencimento && cb.vencimento <= hoje && cobertoPelaReserva(cb))
+  .sort((a, b) => a.vencimento.localeCompare(b.vencimento) || a.id - b.id);
+
+/**
+ * Registra sozinha a quitação pela reserva dos boletos que já venceram (``quitacoesPelaReservaAte``), com a data do
+ * vencimento (a data da NF), pelo aluguel em dia. Ex.: boleto de 12/2026 (vence 05/12) coberto pela reserva → no 1º acesso
+ * de 05/12 em diante, "Quitado pela reserva" com pagamento em 05/12 e a NF na fila. Roda dentro de ``alterar`` (relê o banco):
+ * boleto já registrado (em outra aba ou aparelho) não volta, então nunca registra duas vezes. Devolve os boletos registrados.
+ */
+export function registrarQuitacoesPelaReserva(d, hoje, usuario) {
+  const feitos = [];
+  for (const cb of quitacoesPelaReservaAte(d, hoje)) {
+    registrarPagamento(d, cb.id, cb.vencimento, null, usuario);
+    feitos.push(cb);
+  }
+  return feitos;
+}
+
 /** Situação gravada do boleto não pago (fora de carência e de acordo): "Quitado pela reserva" ou "Em aberto". */
 export const situacaoSemPagamento = (cb) => (cobertoPelaReserva(cb) ? QUITADO_RESERVA : 'Em aberto');
 
