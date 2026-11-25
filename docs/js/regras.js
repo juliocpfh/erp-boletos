@@ -2976,7 +2976,8 @@ export const CAMPOS_PESSOA = ['inquilino_tipo', 'inquilino_nome', 'inquilino_ape
 /** Condições do contrato que servem de ponto de partida para o contrato no outro imóvel (são conferidas depois). */
 const CAMPOS_CONDICOES = ['prazo_tipo', 'prazo_meses', 'renovacao_automatica', 'indice_correcao', 'aluguel_inicial', 'dia_vencimento',
   'cobranca_mes_seguinte', 'bonificacao', 'desconto_pontualidade_percentual', 'taxa_boleto', 'nao_cobrar_tarifa', 'multa_percentual', 'juros_mensal_percentual',
-  'cobrar_iptu', 'cobrar_seguro', 'conta_iptu', 'conta_seguro', 'fci_percentual', 'fci_indice', 'gerar_nf', 'garantia_tipo', 'finalidade', 'atividade', 'perfil_regras_id'];
+  'cobrar_iptu', 'cobrar_seguro', 'conta_iptu', 'conta_seguro', 'fci_percentual', 'fci_indice', 'gerar_nf', 'garantia_tipo', 'finalidade', 'atividade', 'perfil_regras_id',
+  'descricao_objeto', 'contas_adicionais'];
 
 /** Dados da pessoa (sem as condições do contrato): a mesma pessoa alugando outro imóvel começa um contrato novo com eles. */
 export const dadosDaPessoa = (c) => Object.fromEntries(CAMPOS_PESSOA.filter((k) => c[k] !== undefined && c[k] !== null).map((k) => [k, c[k]]));
@@ -2992,8 +2993,7 @@ export function condicoesDoContrato(d, anterior, data = null) {
   out.aluguel_inicial = aluguelAtual(d, anterior, data ? C.somarDias(data, -1) : C.hojeIso());
   // aluguel com bonificação sobre o aluguel atual (o % do contrato continua)
   if (anterior.bonificacao !== false && percentualBonificacao(anterior) > 0) out.aluguel_bonificado = out.aluguel_inicial - C.descontoPorPercentual(out.aluguel_inicial, percentualBonificacao(anterior));
-  // reserva dada na visita: é do contrato (o que o anterior já usou é descontado ao salvar)
-  for (const k of ['reserva_valor', 'reserva_data', 'reserva_competencia']) if (anterior[k]) out[k] = anterior[k];
+  // a reserva não vem: é de quem sai (já abatida nos boletos dele; pedido de 24/11/2026, antes vinha copiada)
   // o reajuste continua no aniversário do contrato original
   out.data_base_correcao = dataBaseCorrecao(anterior);
   return out;
@@ -4478,8 +4478,8 @@ export function transferirHeranca(d, novoId, usuario, hoje = C.hojeIso()) {
     // Ex.: troca em 01/12, boleto de dezembro de João gerado em 20/11, termo anexado em 22/11 → o boleto passa a Maria (R$ 1.800,00)
     if (assinado) passarBoletosAoNovo(d, n, a, fim, usuario, out, { soAluguel: true });
     recalcularCobrancas(d, (cb) => cb.contrato_id === a.id || (assinado && cb.contrato_id === n.id), usuario);
-    // a reserva já aparece no novo (valor, comprovante e o que foi usado), para não abater de novo; no dia, confere o uso outra vez
-    return { ...out, agendada: true, aguardaAditivo: !assinado, arquivosReserva: herdarReserva(d, n, a, usuario) };
+    // a reserva não passa ao novo: é de quem sai (pedido de 24/11/2026)
+    return { ...out, agendada: true, aguardaAditivo: !assinado, arquivosReserva: [] };
   }
   encerrarVinculoPorContinuacao(d, a.id, data, n.inquilino_nome, usuario);
   // aluguel e reajuste
@@ -4511,7 +4511,7 @@ export function transferirHeranca(d, novoId, usuario, hoje = C.hojeIso()) {
   if (out.garantia) sincronizarGarantiaHerdeiro(d, a.id, usuario);
   // boletos a partir do mês seguinte ao fim do vínculo
   passarBoletosAoNovo(d, n, a, fim, usuario, out);
-  out.arquivosReserva = herdarReserva(d, n, a, usuario, true);
+  out.arquivosReserva = []; // a reserva é de quem sai: não passa (pedido de 24/11/2026)
   out.arquivosSeguro = herdarSeguros(d, n, a, usuario);
   recalcularCobrancas(d, (cb) => cb.contrato_id === a.id || cb.contrato_id === n.id, usuario);
   desativarSeSaiu(d, a, usuario);
@@ -4572,21 +4572,11 @@ function voltarPagamentosDoNovo(d, n, usuario) {
   return devolvidos;
 }
 
-/**
- * Reserva dada na visita na troca de titular: é do contrato. O novo titular recebe o valor, a data e o mês de uso; o que
- * o anterior já usou (nos boletos que ficaram com ele, ou abatido fora do sistema) não volta a abater. Ex.: reserva de
- * R$ 500,00 já usada no 1º aluguel do anterior → saldo R$ 0,00 no novo. Devolve o comprovante a copiar ([nome] ou []).
+/*
+ * Reserva na troca de titular: não passa ao novo (pedido de 24/11/2026). Ela é de quem sai e já foi abatida nos boletos
+ * dele. Antes (decisão de 30/10/2026) o novo recebia o valor, a data, o comprovante e o já usado (`reserva_usada_anterior`):
+ * as trocas antigas continuam com o que foi gravado.
  */
-export function herdarReserva(d, n, a, usuario, forcar = false) {
-  if (!(a.reserva_valor > 0) || (n.reserva_usada_anterior !== undefined && !forcar)) return [];
-  const usada = d.cobrancas.filter((cb) => cb.contrato_id === a.id).reduce((t, cb) => t + (cb.reserva_utilizada || 0), 0) + (a.reserva_abatida_valor || 0) + (a.reserva_usada_anterior || 0);
-  const res = { reserva_valor: a.reserva_valor, reserva_data: a.reserva_data || null, reserva_competencia: a.reserva_competencia || null,
-    reserva_usada_anterior: Math.min(usada, a.reserva_valor), reserva_abatida_comp: null, reserva_abatida_valor: null };
-  const copiar = !n.comprovante_reserva && a.comprovante_reserva ? [a.comprovante_reserva] : [];
-  if (copiar.length) res.comprovante_reserva = a.comprovante_reserva;
-  atualizar(d, 'contratos', n.id, res, usuario, `${n.inquilino_nome}: reserva de ${C.reais(a.reserva_valor)} do contrato (já usada ${C.reais(res.reserva_usada_anterior)} por ${a.inquilino_nome})`);
-  return copiar;
-}
 
 /** Meses em que a reserva foi usada nos contratos anteriores até ``a`` (boletos ou abatida fora do sistema). Ex.: ['2026-06']. */
 export function mesesUsoReserva(d, a) {
@@ -4694,15 +4684,14 @@ function boletosNoAnterior(d, n, a) {
 }
 
 /**
- * Herança já feita em que ficou faltando a garantia (ou lançamentos dela), a reserva (valor, comprovante ou o já usado) ou o
- * seguro do contrato anterior. Troca com data futura: só a reserva; o resto passa no dia.
+ * Herança já feita em que ficou faltando a garantia (ou lançamentos dela) ou o seguro do contrato anterior. Troca com data
+ * futura: nada (passa no dia). `reserva` é sempre false: desde 24/11/2026 a reserva não passa ao novo.
  */
 export function herancaIncompleta(d, c) {
   const feita = !!c.heranca_transferida;
-  const a = (feita || herancaAgendada(d, c)) && contratoHerdado(d, c);
+  const a = feita && contratoHerdado(d, c);
   if (!a) return null;
-  const reserva = a.reserva_valor > 0 && (!(c.reserva_valor > 0) || (a.comprovante_reserva && !c.comprovante_reserva) || c.reserva_usada_anterior === undefined);
-  if (!feita) return reserva ? { garantia: false, reserva, seguro: false, lancamentos: 0, anterior: false } : null;
+  const reserva = false; // a reserva não passa ao novo (24/11/2026); a chave fica para quem lê o resultado
   const garantia = !garantiaNova(c) && garantiaAHerdar(d, a) && continuadoPor(d, a) && continuadoPor(d, a).id === c.id;
   const seguro = segurosAHerdar(d, c, a).length > 0 && continuadoPor(d, a) && continuadoPor(d, a).id === c.id;
   const lancamentos = lancamentosNoAnterior(d, c, a).length;
@@ -4713,8 +4702,8 @@ export function herancaIncompleta(d, c) {
 
 /**
  * Completa uma herança já feita: traz do contrato anterior a garantia em dinheiro que ficou nele (valores, comprovantes,
- * depósitos, correções, aplicações, trocas e fiadores atuais), somando ao que o herdeiro já tiver registrado, e a reserva
- * (se o herdeiro ficou sem). Devolve { arquivos (comprovantes a mudar de pasta), arquivosReserva (a copiar), garantia, reserva }.
+ * depósitos, correções, aplicações, trocas e fiadores atuais), somando ao que o herdeiro já tiver registrado (a reserva não
+ * passa, 24/11/2026). Devolve { arquivos (comprovantes a mudar de pasta), arquivosReserva (sempre vazio), garantia, reserva }.
  */
 export function completarHeranca(d, novoId, usuario) {
   const n = buscar(d, 'contratos', novoId);
@@ -4773,11 +4762,6 @@ export function completarHeranca(d, novoId, usuario) {
     out.garantia = true;
   }
   if (falta.anterior) out.comprovanteAnterior = restaurarPagamentoDoAnterior(d, n, a, usuario);
-  if (falta.reserva) {
-    out.arquivosReserva = herdarReserva(d, n, a, usuario, true);
-    recalcularCobrancas(d, (cb) => cb.contrato_id === n.id, usuario);
-    out.reserva = true;
-  }
   out.arquivos = [...new Set(out.arquivos)];
   return out;
 }
