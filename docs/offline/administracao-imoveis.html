@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-rpv1dpC0uPUFP/icbzwSH3SVZkFsYyFzjH1UC2mDVDY=' 'sha256-1cKuSf6o2mRib+JBOocUCQj2xHdJYyOisl3V0eqodeQ='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-rpv1dpC0uPUFP/icbzwSH3SVZkFsYyFzjH1UC2mDVDY=' 'sha256-ODZpVAPs8P4AL0bRd+P4gmEPXLspqczOu8wKCKaRS8E='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="b3971ebc41e7ca51">
+<meta name="fontes" content="5f5eb27ab8206dba">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -1813,17 +1813,41 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           consequencia: "O prazo de 7 dias do Código do Consumidor (art. 49) é para compra feita fora do estabelecimento (internet, telefone). Aqui o interessado vê o imóvel pessoalmente antes de reservar, por isso o padrão é 0. Há decisões isoladas que aplicam o art. 49 à reserva feita ou aceita pela internet; com 7 dias aqui, esse risco some. Muda o prazo dos termos aceitos daqui em diante.",
           lei: "Código de Defesa do Consumidor, art. 49 (direito de arrependimento de 7 dias na compra fora do estabelecimento)."
         },
+        // a chave diz "uteis" por ser a de antes (está nos termos já aceitos, `dias_uteis_documentos`); o tipo de dia é a regra seguinte
         {
           chave: "reserva_dias_uteis_documentos",
           grupo: "reserva",
-          rotulo: "Prazo para mandar os documentos depois do depósito (dias úteis)",
+          rotulo: "Prazo para mandar os documentos depois do depósito (dias)",
           tipo: "inteiro",
-          padrao: 3,
+          padrao: 7,
           min: 1,
           max: 15,
-          explica: "O termo avisa: sem os documentos neste prazo, a reserva é cancelada e conta como desistência (com o padrão, a reserva fica com a empresa; decisão do dono de 24/11/2026). Passado o prazo sem os documentos marcados na ficha, o Painel avisa a equipe. Ex.: depósito na quinta, 10/12/2026, e 3 dias úteis → documentos até terça, 15/12/2026.",
-          consequencia: 'Muda o prazo dos termos aceitos daqui em diante e o aviso do Painel. A desistência não é registrada sozinha: a equipe registra em "Desistiu antes de assinar". Se alguém reclamar do prazo curto, o recuo combinado pelo dono é dar 7 dias (aqui ou em "Dias para desistir com devolução total").',
+          // 7 (pedido do advogado, 24/11/2026, item 1.2, com aviso no 4º e no 7º dia); dias corridos (correção do dono, 24/11/2026)
+          explica: 'O termo avisa: sem os documentos neste prazo, a reserva é cancelada e conta como desistência (com o padrão, a reserva fica com a empresa; decisão do dono de 24/11/2026). No dia do aviso (abaixo) e no último dia, se faltarem documentos, o Painel pede para a equipe falar com a pessoa, com o e-mail "Lembrete dos documentos da ficha" pronto (a empresa continua aguardando e à disposição para ajudar). Passado o prazo, o Painel avisa que conta como desistência. Ex.: depósito na quarta, 02/12/2026, e 7 dias corridos → aviso na segunda, 07/12/2026 (o 4º dia, domingo 06/12, passa para o dia útil seguinte), e documentos até quarta, 09/12/2026.',
+          consequencia: 'Muda o prazo dos termos aceitos daqui em diante e os avisos do Painel. A desistência não é registrada sozinha: a equipe registra em "Desistiu antes de assinar". Era 3 dias úteis até 24/11/2026; o advogado pediu 7, com os dois avisos, e o dono decidiu que são dias corridos.',
           lei: "Sem lei específica: é o combinado no termo (Código Civil, art. 421)."
+        },
+        {
+          chave: "reserva_documentos_dias_corridos",
+          grupo: "reserva",
+          rotulo: "O prazo dos documentos e o dia do aviso contam em dias corridos",
+          tipo: "simnao",
+          padrao: true,
+          explica: "Sim (padrão, decisão do dono de 24/11/2026): conta todos os dias, também sábado, domingo e feriado. Ex.: depósito em 02/12/2026 e 7 dias → documentos até 09/12/2026. Não: conta só os dias úteis (o mesmo exemplo vai até 11/12/2026).",
+          consequencia: 'Muda o prazo dos termos aceitos daqui em diante (o termo diz "dias corridos" ou "dias úteis"). Os termos aceitos antes de 24/11/2026 continuam em dias úteis, como foi aceito.',
+          lei: "Sem lei específica: é o combinado no termo (Código Civil, arts. 132 e 421)."
+        },
+        {
+          chave: "reserva_dia_aviso_documentos",
+          grupo: "reserva",
+          rotulo: "Dia do 1º aviso dos documentos que faltam (contado do depósito)",
+          tipo: "inteiro",
+          padrao: 4,
+          min: 1,
+          max: 15,
+          explica: "Neste dia depois do depósito (corrido ou útil, como o prazo dos documentos), se a ficha ainda não tem os documentos marcados como recebidos, o Painel pede para a equipe falar com a pessoa; o 2º aviso é no último dia do prazo dos documentos. Ex.: depósito na quarta, 02/12/2026, com 4 → o 4º dia é domingo, 06/12/2026, e o aviso passa para o dia útil seguinte, segunda, 07/12/2026 (aparece no Painel desse dia até o último; dono, 25/11/2026). Igual ou maior que o prazo: só o aviso do último dia.",
+          consequencia: "Só muda quando o Painel avisa a equipe (o termo diz que a empresa entra em contato antes do fim do prazo). Vale para todas as fichas, inclusive as já aceitas.",
+          lei: "Sem lei específica: pedido do advogado (24/11/2026) para mostrar boa-fé antes de contar a desistência (Código Civil, art. 422)."
         },
         {
           chave: "reserva_dias_validade",
@@ -1833,19 +1857,34 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           padrao: 7,
           min: 1,
           max: 60,
-          explica: "Enquanto a ficha é analisada, o imóvel fica reservado para a pessoa. Passado o prazo sem decisão, o Painel avisa. Ex.: depósito em 10/12/2026 e 7 dias → reservado até 17/12/2026.",
+          // 7 dias corridos (confirmado pelo dono em 24/11/2026): termina no mesmo dia do prazo dos documentos
+          explica: "Enquanto a ficha é analisada, o imóvel fica reservado para a pessoa. Passado o prazo sem decisão, o Painel avisa. Ex.: depósito em 02/12/2026 e 7 dias → reservado até 09/12/2026, o mesmo dia do fim do prazo dos documentos.",
           consequencia: "Muda o prazo dos termos aceitos daqui em diante e o aviso do Painel.",
           lei: "Sem lei específica: é o combinado no termo (Código Civil, art. 421)."
+        },
+        {
+          chave: "reserva_dias_reapresentacao",
+          grupo: "reserva",
+          rotulo: "Ficha reaberta: prazo para reapresentar os documentos (dias corridos)",
+          tipo: "inteiro",
+          padrao: 3,
+          min: 1,
+          max: 30,
+          // decisão do dono de 25/11/2026: os prazos de documentos e análise são flexíveis; reabrir dá mais 3 dias corridos
+          explica: 'Quando a ficha reprovada é reaberta para nova análise ("Reabrir a análise"), a pessoa tem estes dias corridos para reapresentar os documentos. É só guia: aparece na ficha e no Painel, junto com o que foi combinado com a pessoa, e nada se cancela sozinho. Ex.: reaberta em 07/12/2026 com 3 → documentos novos até 10/12/2026.',
+          consequencia: "Só muda o prazo de guia das fichas reabertas daqui em diante.",
+          lei: "Sem lei específica: combinado com a pessoa (Código Civil, art. 421)."
         },
         {
           chave: "reserva_dias_uteis_devolucao",
           grupo: "reserva",
           rotulo: "Prazo para devolver a reserva (dias úteis)",
           tipo: "inteiro",
-          padrao: 5,
+          padrao: 2,
           min: 1,
           max: 30,
-          explica: "Contado da reprovação ou da desistência. Ex.: ficha reprovada na segunda, 14/12/2026, e 5 dias úteis → devolver até segunda, 21/12/2026. O Painel avisa quando o prazo passa.",
+          // 2 (pedido do advogado, 24/11/2026, itens 1.0 e 1.4; antes 5)
+          explica: "Contado da reprovação ou da desistência. Ex.: ficha reprovada na segunda, 14/12/2026, e 2 dias úteis → devolver até quarta, 16/12/2026. O Painel avisa quando o prazo passa. Era 5 dias até 24/11/2026; o advogado pediu 2.",
           consequencia: "Muda o prazo dos termos aceitos daqui em diante, o e-mail da ficha reprovada e o aviso do Painel.",
           lei: "Código de Defesa do Consumidor, art. 49, parágrafo único (devolução imediata no arrependimento); Código Civil, art. 418."
         },
@@ -5834,7 +5873,13 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         campo("data_recebida", "Ficha recebida em", "data", { obrig: true }),
         campo("situacao", "Situação", "opcao", { obrig: true, padrao: "Em análise", opcoes: ["Em análise", "Aprovada", "Reprovada", "Desistiu"], ajuda: 'Aprovada: na página da ficha aparece o botão para fazer o contrato. Desistiu: o interessado não segue e a reserva é devolvida conforme o termo de aceite (sem termo, por inteiro; com contrato já gerado, use o botão "Desistiu antes de assinar" na página da ficha)' }),
         campo("decisao_data", "Data da decisão", "data", { ...quando("situacao", "Aprovada", "Reprovada", "Desistiu"), ajuda: "Em branco: hoje" }),
-        campo("decisao_motivo", "Motivo / observação da decisão", "area", { largo: true, linha: true, ...quando("situacao", "Aprovada", "Reprovada", "Desistiu") }),
+        // reprovação só com justificativa por escrito (pedido do advogado, 24/11/2026): obrigatório ao reprovar e vai no e-mail à pessoa
+        campo("decisao_motivo", "Motivo / observação da decisão", "area", {
+          largo: true,
+          linha: true,
+          ...quando("situacao", "Aprovada", "Reprovada", "Desistiu"),
+          ajuda: 'Reprovada: obrigatório; vai no e-mail "Ficha reprovada" para a pessoa ler (escreva como para ela, sem dados de outras pessoas). Ex.: "A renda comprovada (R$ 3.000,00) é menor que 3 vezes o aluguel (R$ 1.200,00)."'
+        }),
         // termo de aceite da reserva (2026-11-24): informação ou documento que não corresponde à realidade conta como desistência
         campo("reprovada_conferencia", "Encerrada porque alguma informação ou documento não correspondeu à realidade na conferência", "simnao", {
           ...quando("situacao", "Reprovada"),
@@ -5899,7 +5944,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         comprovante("comprovante_reserva", "Comprovante da reserva", { ajuda: "PDF ou foto do comprovante da reserva. Ao fazer o contrato, ele vai junto para a pasta do inquilino" }),
         { secao: "Devolução da reserva (ficha reprovada ou desistência)", ...quando("situacao", "Reprovada", "Desistiu") },
         campo("devolucao_data", "Reserva devolvida em", "data", quando("situacao", "Reprovada", "Desistiu")),
-        campo("devolucao_valor", "Valor devolvido", "dinheiro", { ...quando("situacao", "Reprovada", "Desistiu"), ajuda: "Em branco: o valor do termo de aceite (a reserva inteira, ou menos a parte que fica com a empresa na desistência); sem termo, a reserva inteira" }),
+        campo("devolucao_valor", "Valor devolvido", "dinheiro", { ...quando("situacao", "Reprovada", "Desistiu"), ajuda: "Em branco: o valor do termo de aceite (a reserva inteira, ou menos a parte que fica com a empresa na desistência); sem termo, a reserva inteira; se a empresa desistiu sem justificativa, o dobro da reserva" }),
         comprovante("comprovante_devolucao", "Comprovante da devolução", { ...quando("situacao", "Reprovada", "Desistiu"), ajuda: "PDF ou foto do comprovante da devolução" }),
         secao("Observações"),
         campo("observacoes", "Observações da análise", "area")
@@ -6358,6 +6403,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     assinarAditivo: () => assinarAditivo,
     assinaturaLembrete: () => assinaturaLembrete,
     atualizar: () => atualizar,
+    avisoDosDocumentos: () => avisoDosDocumentos,
     avisosLegaisDoContrato: () => avisosLegaisDoContrato,
     baixarEmLote: () => baixarEmLote,
     bancoAtivo: () => bancoAtivo,
@@ -6515,6 +6561,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     emAcordo: () => emAcordo,
     emCarencia: () => emCarencia,
     emitidoNoBanco: () => emitidoNoBanco,
+    empresaDesisteDaReserva: () => empresaDesisteDaReserva,
     encargosDoBoletoC6: () => encargosDoBoletoC6,
     encerramentoDo: () => encerramentoDo,
     encerrarContrato: () => encerrarContrato,
@@ -6710,6 +6757,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     podeRemoverComprovanteGarantia: () => podeRemoverComprovanteGarantia,
     prazoContestarSaida: () => prazoContestarSaida,
     prazoDoContrato: () => prazoDoContrato,
+    prazoDosDocumentosTexto: () => prazoDosDocumentosTexto,
     prazoPadraoNovoContrato: () => prazoPadraoNovoContrato,
     prazosDaReserva: () => prazosDaReserva,
     previaAcordo: () => previaAcordo,
@@ -6720,6 +6768,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     proximoNumeroAditivo: () => proximoNumeroAditivo,
     quebrarLinhas: () => quebrarLinhas,
     quitadoNaSaida: () => quitadoNaSaida,
+    reaberturaDaFicha: () => reaberturaDaFicha,
+    reabrirFichaReprovada: () => reabrirFichaReprovada,
     reaisParaCentavos: () => reaisParaCentavos,
     reajusteNaCompetencia: () => reajusteNaCompetencia,
     reajustePendente: () => reajustePendente,
@@ -9138,16 +9188,29 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
   function prazosDaReserva(f) {
     if (!f || !/^\d{4}-\d{2}-\d{2}$/.test(String(f.reserva_data || ""))) return null;
     const c = condicoesDaReserva(f);
+    const aviso2 = regra("reserva_dia_aviso_documentos");
+    const somar = c.documentos_corridos ? somarDias : somarDiasUteis;
+    const documentosAte = somar(f.reserva_data, c.dias_uteis_documentos);
+    const avisoEm = aviso2 > 0 && aviso2 < c.dias_uteis_documentos ? proximoDiaUtil(somar(f.reserva_data, aviso2)) : null;
     return {
-      documentos_ate: somarDiasUteis(f.reserva_data, c.dias_uteis_documentos),
+      documentos_ate: documentosAte,
       vale_ate: somarDias(f.reserva_data, c.dias_validade),
+      aviso_documentos_em: avisoEm && avisoEm < documentosAte ? avisoEm : null,
       arrependimento_ate: c.dias_arrependimento > 0 ? somarDias(f.reserva_data, c.dias_arrependimento) : null
     };
+  }
+  function avisoDosDocumentos(f, hoje3 = hojeIso()) {
+    const pz = f && f.situacao === "Em análise" && f.aceite_reserva && !f.reaberta_em && fichaSemDocumentos(f) ? prazosDaReserva(f) : null;
+    if (!pz || hoje3 > pz.documentos_ate) return null;
+    if (hoje3 === pz.documentos_ate) return { qual: "ultimo", ate: pz.documentos_ate };
+    return pz.aviso_documentos_em && hoje3 >= pz.aviso_documentos_em ? { qual: "primeiro", ate: pz.documentos_ate } : null;
   }
   function devolucaoDaReserva(f, { data: data2 = null, hoje: hoje3 = hojeIso() } = {}) {
     const reserva = f && f.reserva_valor > 0 ? f.reserva_valor : 0;
     const tudo = (motivo) => ({ reserva, devolver: reserva, reter: 0, integral: true, motivo });
     if (!reserva) return { reserva: 0, devolver: 0, reter: 0, integral: true, motivo: "sem reserva" };
+    if (f.desistencia_empresa === "sem_justificativa") return { reserva, devolver: reserva * 2, reter: 0, integral: true, dobro: true, motivo: "a empresa desistiu sem justificativa: devolve o dobro da reserva (Código Civil, art. 418, arras)" };
+    if (f.desistencia_empresa === "com_justificativa") return tudo("a empresa desistiu com justificativa: devolve tudo");
     if (!f.aceite_reserva) return tudo("sem o termo de aceite da reserva: devolve tudo");
     if (f.situacao === "Reprovada" && !f.reprovada_conferencia) return tudo("ficha não aprovada: devolve tudo");
     const c = condicoesDaReserva(f);
@@ -9164,6 +9227,64 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       integral: reter === 0,
       motivo: `${porque}${prazo}: a empresa fica com ${reter >= reserva ? "a reserva inteira" : pct(c.retencao_pct)} (${reais(reter)}), como no termo aceito em ${dataBr(String(f.aceite_reserva.em).slice(0, 10))}`
     };
+  }
+  function empresaDesisteDaReserva(d2, fichaId, { justificada, externa = "", interna = "", motivo = "", data: data2 = hojeIso() }, usuario, hoje3 = hojeIso()) {
+    const f = buscar(d2, "fichas", fichaId);
+    if (!f) throw new ErroUsuario("Ficha não encontrada.");
+    if (!(f.reserva_valor > 0)) throw new ErroUsuario("A ficha não tem reserva depositada.");
+    if (fichaSemContrato(f)) throw new ErroUsuario("Esta ficha já está encerrada (reprovada ou com desistência).");
+    if (Object.keys(contratosDaFicha(d2, f)).length) throw new ErroUsuario("Esta ficha já virou contrato: a desistência da empresa não é por aqui.");
+    const fora = String(externa || motivo || "").trim();
+    const dentro = String(interna || "").trim();
+    if (justificada && !fora) throw new ErroUsuario("Escreva a justificativa para o cliente (ela vai no termo de devolução e no e-mail).");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(data2 || "")) || data2 > hoje3) throw new ErroUsuario("Informe a data da desistência (hoje ou antes).");
+    const qual = justificada ? "com_justificativa" : "sem_justificativa";
+    const devolver = justificada ? f.reserva_valor : f.reserva_valor * 2;
+    const cabeca = justificada ? `A empresa desistiu da reserva: ${fora}` : `A empresa desistiu da reserva sem justificativa (a lei manda devolver o dobro, Código Civil, art. 418).${fora ? ` Para o cliente: ${fora}` : ""}`;
+    atualizar(
+      d2,
+      "fichas",
+      f.id,
+      {
+        situacao: "Desistiu",
+        desistencia_empresa: qual,
+        desistencia_motivo_externo: fora || null,
+        decisao_data: data2,
+        decisao_por: usuario,
+        decisao_motivo: `${cabeca}${dentro ? ` Interna: ${dentro}` : ""}`,
+        reprovada_conferencia: null
+      },
+      usuario,
+      `Ficha de ${f.inquilino_nome}: a empresa desistiu da reserva ${justificada ? "com justificativa" : "sem justificativa"}; devolver ${reais(devolver)}`
+    );
+    return buscar(d2, "fichas", f.id);
+  }
+  function reabrirFichaReprovada(d2, fichaId, { combinado = "", data: data2 = hojeIso() } = {}, usuario) {
+    const f = buscar(d2, "fichas", fichaId);
+    if (!f || f.situacao !== "Reprovada") throw new ErroUsuario("Esta ficha não está reprovada (talvez outra pessoa já mudou). Atualize a página.");
+    if (f.devolucao_data || f.devolucao_valor > 0) throw new ErroUsuario('A reserva desta ficha já foi devolvida: para reabrir, use "Editar" (é preciso apagar o valor da reserva já devolvida).');
+    const outra = (f.imoveis_ids || []).map((iid) => fichaAbertaDoImovel(d2, iid, f.id)).find(Boolean);
+    if (outra) throw new ErroUsuario(`O imóvel já tem a ficha de ${outra.inquilino_nome} em aberto: decida aquela antes.`);
+    const ate = somarDias(data2, regra("reserva_dias_reapresentacao"));
+    const texto3 = String(combinado || "").trim();
+    atualizar(
+      d2,
+      "fichas",
+      f.id,
+      {
+        situacao: "Em análise",
+        decisao_data: null,
+        decisao_por: null,
+        decisao_motivo: null,
+        reprovada_conferencia: null,
+        reaberta_em: data2,
+        reabertura_ate: ate,
+        reabertura_combinado: texto3 || null
+      },
+      usuario,
+      `Ficha de ${f.inquilino_nome} reaberta para análise com documentos novos até ${dataBr(ate)} (estava reprovada em ${dataBr(f.decisao_data)}${f.decisao_motivo ? `: ${f.decisao_motivo}` : ""})${texto3 ? `. Combinado: ${texto3}` : ""}`
+    );
+    return buscar(d2, "fichas", f.id);
   }
   function guardarAceiteReserva(d2, fichaId, resposta, usuario) {
     const f = buscar(d2, "fichas", fichaId);
@@ -9216,9 +9337,13 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       if (devolucaoPendente(f)) {
         const dv = devolucaoDaReserva(f);
         const ate = devolverReservaAte(f);
-        out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome} ${f.situacao === "Desistiu" ? "com desistência" : "reprovada"}: registrar a devolução ${dv.integral ? `da reserva de ${reais(f.reserva_valor)}` : `de ${reais(dv.devolver)} da reserva de ${reais(f.reserva_valor)} (fica ${reais(dv.reter)}, como no termo)`}${ate ? ate < hoje3 ? ` (o prazo era ${dataBr(ate)})` : ` até ${dataBr(ate)}` : ""}` });
+        out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome} ${f.desistencia_empresa ? "(a empresa desistiu)" : f.situacao === "Desistiu" ? "com desistência" : "reprovada"}: registrar a devolução ${dv.dobro ? `de ${reais(dv.devolver)} (o dobro da reserva de ${reais(f.reserva_valor)})` : dv.integral ? `da reserva de ${reais(f.reserva_valor)}` : `de ${reais(dv.devolver)} da reserva de ${reais(f.reserva_valor)} (fica ${reais(dv.reter)}, como no termo)`}${ate ? ate < hoje3 ? ` (o prazo era ${dataBr(ate)})` : ` até ${dataBr(ate)}` : ""}` });
       }
-      const pz = f.situacao === "Em análise" && f.aceite_reserva ? prazosDaReserva(f) : null;
+      const pz = f.situacao === "Em análise" && f.aceite_reserva && !f.reaberta_em ? prazosDaReserva(f) : null;
+      const reab = f.situacao === "Em análise" ? reaberturaDaFicha(f) : null;
+      if (reab) out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome} reaberta em ${dataBr(reab.em)}: documentos novos até ${dataBr(reab.ate)}${reab.ate < hoje3 ? " (passou; é só guia, nada se cancela sozinho)" : " (guia)"}${reab.combinado ? `; combinado: ${reab.combinado}` : ""}` });
+      const avisoDoc = avisoDosDocumentos(f, hoje3);
+      if (avisoDoc) out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome}: ${avisoDoc.qual === "ultimo" ? "hoje é o último dia para mandar os documentos" : `faltam documentos e o prazo vai até ${dataBr(avisoDoc.ate)}`}: fale com a pessoa (e-mail "Lembrete dos documentos da ficha" na página da ficha): continuamos aguardando e à disposição para ajudar` });
       if (pz && pz.documentos_ate < hoje3 && fichaSemDocumentos(f)) out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome}: o prazo dos documentos acabou em ${dataBr(pz.documentos_ate)} e eles não estão marcados como recebidos: pelo termo, conta como desistência (${devolucaoDaReserva(f, { data: hoje3 }).devolver ? `devolve ${reais(devolucaoDaReserva(f, { data: hoje3 }).devolver)}` : "a reserva fica com a empresa"}); registre em "Desistiu antes de assinar"` });
       else if (pz && pz.vale_ate < hoje3) out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome}: a reserva segurava o imóvel até ${dataBr(pz.vale_ate)} (decida a ficha)` });
     }
@@ -14202,7 +14327,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (!(r.arquivos || []).includes(nome)) throw new ErroUsuario("Este arquivo já foi tirado do registro.");
     atualizar(d2, "cobranca_registros", r.id, { arquivos: r.arquivos.filter((x) => x !== nome) }, usuario, `Cobrança (${r.tipo} de ${dataBr(r.data)}): arquivo tirado: ${nome}`);
   }
-  var TABELAS, SITUACOES, CONCESSIONARIAS_POR_UF, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, IMAGEM_FORA_DO_HISTORICO, semPeso, RESPOSTA_PESADA, FORMULARIOS_DA_TABELA, camposDinheiro, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, camposDaGravacao, CODIGO_DE, nomeCurto, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, aplicacaoBaixada, aplicacoesEmVigor, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehSaldoSaida, ehBoletoAvulso, semMultaJuros, emAcordo, MOTIVO_EM_ACORDO, quitadoNaSaida, aCobrar, boletosCaucaoDa, parcelasIrmasDoComplemento, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, IPTU_DIVISAO_NOVA_DESDE, dividirIptu, vencimentoParcela, mesBoletoDaParcela, usaTarifaPadrao, CAMPOS_RECALCULO, CAMPOS_MANUAIS, JUNTOS_DO_MANUAL, totais, previstoNoPagamento, pagoAMaisDo, MOTIVO_PAGO_A_MENOS, textoDiferenca, diferencaPendente, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, fixosDoBoleto, somaValores, cobrancasEmAberto, DIAS_AVISO_SAIDA, nomeDebitoSaida, proximoBoletoAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, MODOS_FICHA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, DOCUMENTOS_RENDA, DICA_DOCUMENTOS, PJ2, casadoOuUniao, fichaComConjuge, PARTES_DOCUMENTOS_PF, separacaoTotal, documentosDoFiador, VAGAS_FIADOR_FICHA, fiadoresDaFicha, fichaAberta, fichaAbertaDoImovel, fichaSemContrato, devolucaoPendente, condicoesDaReservaAgora, condicoesDaReserva, valorDaReserva, retencaoDaReserva, devolverReservaAte, fichaSemDocumentos, inicioPrazoApagarFicha, apagarFichaEsperaDevolucao, dataApagarDocumentosFicha, FICHA_FICA, fichaFica, fichasComDadosVencidos, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraObrigatoria, relogiosObrigatorios, leituraDo, encerramentoDo, boletoDoSaldo, garantiaADevolverNaSaida, COMPROVANTE_SAIDA_DESDE, pastaDoBoletoPdf, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, titularidadeDevolvida, boletosParaReemitir, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, devolucoesDaTrocaDeTitular, devolucaoDaTrocaDeGarantia, garantiaDevolvidaNaTroca, devolucoesDeTrocaPendentes, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, companhiaCurtaDaConta, tamanhosVistos, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contasSoArquivo, contaSoArquivo, contasDoExtrato, contaBanco, limparId, contaPreMarcada, EMISSAO_EM_ANDAMENTO_MS, corta, encargosParaComparar, descontoLiberado, diasBaixaDaConta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, vencidosSemEmissao, boletosDoMesSemEmissao, solicitacoesDo, SITUACOES_NOTIFICACAO, MEIOS_NOTIFICACAO, NOTIFICACAO_ABERTA, notificacaoEmAberto, limiteNotificacao, notificacoesDo, numeroDaNotificacao, textoMultaNotificacao, multaSugerida, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, competenciaDoMesVencimento, mesVencimentoDaCompetencia, ressarcimentoConfirmado, ressarcimentosSemComprovante, textoCreditoRessarcimento, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DESTINOS_MOVIMENTACAO, contratoEncerrado, FAIXAS_ATRASO, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, mesDoPeriodoGuia, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, pagosAquiAbertosNoBanco, textoDeBusca, assinaturaLembrete, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, alvoDoAlerta, mesmoAlvo, desligamentosOrfaos, TIPOS_ALERTA_DO_IMOVEL, PRAZO_CONTESTAR_SAIDA, prazoContestarSaida, mudarRegraSistema, voltarRegrasAoPadrao, contratosDoPerfil, TIPOS_REGISTRO_COBRANCA, registrosCobrancaDo, acordoDoBoleto, gastoDaCobranca;
+  var TABELAS, SITUACOES, CONCESSIONARIAS_POR_UF, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, IMAGEM_FORA_DO_HISTORICO, semPeso, RESPOSTA_PESADA, FORMULARIOS_DA_TABELA, camposDinheiro, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, camposDaGravacao, CODIGO_DE, nomeCurto, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, aplicacaoBaixada, aplicacoesEmVigor, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehSaldoSaida, ehBoletoAvulso, semMultaJuros, emAcordo, MOTIVO_EM_ACORDO, quitadoNaSaida, aCobrar, boletosCaucaoDa, parcelasIrmasDoComplemento, recebedoresUsados, ignorados, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, IPTU_DIVISAO_NOVA_DESDE, dividirIptu, vencimentoParcela, mesBoletoDaParcela, usaTarifaPadrao, CAMPOS_RECALCULO, CAMPOS_MANUAIS, JUNTOS_DO_MANUAL, totais, previstoNoPagamento, pagoAMaisDo, MOTIVO_PAGO_A_MENOS, textoDiferenca, diferencaPendente, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, fixosDoBoleto, somaValores, cobrancasEmAberto, DIAS_AVISO_SAIDA, nomeDebitoSaida, proximoBoletoAberto, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, MODOS_FICHA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, DOCUMENTOS_RENDA, DICA_DOCUMENTOS, PJ2, casadoOuUniao, fichaComConjuge, PARTES_DOCUMENTOS_PF, separacaoTotal, documentosDoFiador, VAGAS_FIADOR_FICHA, fiadoresDaFicha, fichaAberta, fichaAbertaDoImovel, fichaSemContrato, devolucaoPendente, condicoesDaReservaAgora, condicoesDaReserva, prazoDosDocumentosTexto, valorDaReserva, retencaoDaReserva, reaberturaDaFicha, devolverReservaAte, fichaSemDocumentos, inicioPrazoApagarFicha, apagarFichaEsperaDevolucao, dataApagarDocumentosFicha, FICHA_FICA, fichaFica, fichasComDadosVencidos, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraObrigatoria, relogiosObrigatorios, leituraDo, encerramentoDo, boletoDoSaldo, garantiaADevolverNaSaida, COMPROVANTE_SAIDA_DESDE, pastaDoBoletoPdf, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, titularidadeDevolvida, boletosParaReemitir, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, devolucoesDaTrocaDeTitular, devolucaoDaTrocaDeGarantia, garantiaDevolvidaNaTroca, devolucoesDeTrocaPendentes, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, companhiaCurtaDaConta, tamanhosVistos, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contasSoArquivo, contaSoArquivo, contasDoExtrato, contaBanco, limparId, contaPreMarcada, EMISSAO_EM_ANDAMENTO_MS, corta, encargosParaComparar, descontoLiberado, diasBaixaDaConta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, vencidosSemEmissao, boletosDoMesSemEmissao, solicitacoesDo, SITUACOES_NOTIFICACAO, MEIOS_NOTIFICACAO, NOTIFICACAO_ABERTA, notificacaoEmAberto, limiteNotificacao, notificacoesDo, numeroDaNotificacao, textoMultaNotificacao, multaSugerida, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, competenciaDoMesVencimento, mesVencimentoDaCompetencia, ressarcimentoConfirmado, ressarcimentosSemComprovante, textoCreditoRessarcimento, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DESTINOS_MOVIMENTACAO, contratoEncerrado, FAIXAS_ATRASO, REGUA_COBRANCA, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, mesDoPeriodoGuia, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, DIAS_ALERTA_BANCO, DIAS_EXTRATO_RECENTE, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, pagosAquiAbertosNoBanco, textoDeBusca, assinaturaLembrete, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, alvoDoAlerta, mesmoAlvo, desligamentosOrfaos, TIPOS_ALERTA_DO_IMOVEL, PRAZO_CONTESTAR_SAIDA, prazoContestarSaida, mudarRegraSistema, voltarRegrasAoPadrao, contratosDoPerfil, TIPOS_REGISTRO_COBRANCA, registrosCobrancaDo, acordoDoBoleto, gastoDaCobranca;
   var init_regras = __esm({
     "docs/js/regras.js"() {
       init_alertas();
@@ -14544,14 +14669,15 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       casadoOuUniao = (estado2) => ["Casado(a)", "União estável"].includes(estado2);
       fichaComConjuge = (f) => f.inquilino_tipo !== PJ2 && casadoOuUniao(f.inquilino_estado_civil);
       PARTES_DOCUMENTOS_PF = {
-        inicio: ["Documento com foto e CPF (RG ou CNH)"],
+        // lista do termo da reserva conferida pelo advogado (24/11/2026, item 1.0): frente e verso; a renda com os exemplos dele
+        inicio: ["Documento com foto e CPF (RG ou CNH), frente e verso"],
         conjuge: ["Certidão de casamento ou declaração de união estável", "Documento com foto e CPF do cônjuge ou companheiro(a)"],
-        renda_padrao: ["Comprovante de renda dos 3 últimos meses"],
+        renda_padrao: ["Comprovante de renda dos 3 últimos meses (extratos bancários, holerite, folha de pagamento ou comprovante de vínculo empregatício)"],
         fim: ["Comprovante de residência atual (conta de água, energia ou telefone)"]
       };
       separacaoTotal = (x = {}) => /^Separação total/.test(x.regime_bens || "");
       documentosDoFiador = (x = {}) => [
-        "Documento com foto e CPF",
+        "Documento com foto e CPF (RG ou CNH), frente e verso",
         "Comprovante de renda dos 3 últimos meses",
         "Comprovante de residência atual",
         "Matrícula atualizada (de até 30 dias) de um imóvel em nome dele",
@@ -14567,12 +14693,18 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         retencao_pct: regra("reserva_retencao_pct"),
         dias_arrependimento: regra("reserva_dias_arrependimento"),
         dias_uteis_documentos: regra("reserva_dias_uteis_documentos"),
+        documentos_corridos: !!regra("reserva_documentos_dias_corridos"),
         dias_validade: regra("reserva_dias_validade"),
         dias_uteis_devolucao: regra("reserva_dias_uteis_devolucao")
       });
-      condicoesDaReserva = (f) => ({ ...condicoesDaReservaAgora(), ...(f && f.aceite_reserva || {}).condicoes || {} });
+      condicoesDaReserva = (f) => {
+        const aceitas = (f && f.aceite_reserva || {}).condicoes;
+        return { ...condicoesDaReservaAgora(), ...aceitas ? { documentos_corridos: false, ...aceitas } : {} };
+      };
+      prazoDosDocumentosTexto = (c) => c.documentos_corridos ? plural(c.dias_uteis_documentos, "dia corrido", "dias corridos") : plural(c.dias_uteis_documentos, "dia útil", "dias úteis");
       valorDaReserva = (f) => f.reserva_valor > 0 ? f.reserva_valor : f.reserva_combinada > 0 ? f.reserva_combinada : 0;
       retencaoDaReserva = (valor, pct2) => Math.round((valor || 0) * (Number(pct2) || 0) / 100);
+      reaberturaDaFicha = (f) => f && f.reaberta_em ? { em: f.reaberta_em, ate: f.reabertura_ate || somarDias(f.reaberta_em, regra("reserva_dias_reapresentacao")), combinado: f.reabertura_combinado || "" } : null;
       devolverReservaAte = (f) => fichaSemContrato(f) && f.decisao_data ? somarDiasUteis(f.decisao_data, condicoesDaReserva(f).dias_uteis_devolucao) : null;
       fichaSemDocumentos = (f) => !(f.doc_pessoais && f.doc_renda && f.doc_residencia);
       inicioPrazoApagarFicha = (f) => {
@@ -14595,6 +14727,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
         "pasta",
         "documentos_apagados_em",
         "reprovada_conferencia",
+        "desistencia_empresa",
+        "desistencia_motivo_externo",
         "link_aceite",
         "dados_apagados_em",
         "historico_limpo_em",
@@ -19690,14 +19824,15 @@ Não mova nem renomeie os arquivos desta pasta. chave-do-backup.json é a chave:
       "Consulta do nome e do CPF (ou do CNPJ) em cadastros de crédito, como Serasa e SPC.",
       ...String(f.requisitos || "").split(/\n+/).map((x) => x.trim()).filter(Boolean)
     ];
-    const documentos = [...documentosDaFicha(f), ...temFiador(f) ? ["Do fiador: documento com foto e CPF, comprovante de renda e de residência e a matrícula de um imóvel em nome dele (a lista completa vai no link dele)"] : []];
+    const documentos = [...documentosDaFicha(f), ...temFiador(f) ? ["Do fiador: documento com foto e CPF (RG ou CNH), frente e verso, comprovante de renda e de residência e a matrícula ATUALIZADA (de até 30 dias) de um imóvel em nome dele (a lista completa vai no link dele)"] : []];
     const valorTexto3 = valor ? valorComExtenso(valor) : "o valor combinado";
     const clausulas = [
       `1. Para reservar o imóvel, você deposita ${valorTexto3} na conta da empresa${deposito2 ? " informada no fim deste termo" : ""}. O imóvel fica reservado para você por ${c.dias_validade} dias, contados do depósito, enquanto analisamos a ficha.`,
       "2. A reserva não é aluguel e não forma o contrato: a locação só existe depois do contrato assinado por todos.",
       "3. Aprovada a ficha e assinado o contrato, a reserva é abatida do primeiro aluguel: o primeiro boleto já vem com o desconto. É para isso que ela serve.",
-      `4. Depois do depósito, você tem ${plural(c.dias_uteis_documentos, "dia útil", "dias úteis")} para preencher a ficha e mandar todos os documentos pelo link que vamos enviar. Sem os documentos nesse prazo, a reserva é cancelada, conta como desistência (item 6) e o imóvel volta a ser oferecido.`,
-      "5. Se a ficha não for aprovada, devolvemos a reserva inteira, sem nenhum desconto.",
+      `4. Depois do depósito, você tem ${prazoDosDocumentosTexto(c)} para preencher a ficha e mandar todos os documentos pelo link que vamos enviar. Se ainda faltar algum documento, entramos em contato antes do fim do prazo: continuamos aguardando e à disposição para tirar dúvidas e ajudar no que for preciso. Sem os documentos nesse prazo, a reserva é cancelada, conta como desistência (item 6) e o imóvel volta a ser oferecido.`,
+      // reprovação só por escrito, com a reapresentação de documentos (pedido do advogado, 24/11/2026, item 1.4)
+      "5. Se a ficha não for aprovada, informamos o motivo por escrito e devolvemos a reserva inteira, sem nenhum desconto. Você pode reapresentar documentos que fortaleçam a análise (por exemplo, outro comprovante de renda), e a ficha é analisada de novo.",
       `6. ${regraDaDesistencia(c, valor)}`,
       `7. ${TEXTO_CONFERENCIA}`,
       Math.min(retencaoDaReserva(valor, c.retencao_pct), valor) >= valor && !(c.dias_arrependimento > 0) ? `8. Quando houver devolução (ficha não aprovada), ela é feita em até ${plural(c.dias_uteis_devolucao, "dia útil", "dias úteis")} da reprovação, na conta de onde veio o depósito.` : `8. Quando houver devolução, ela é feita em até ${plural(c.dias_uteis_devolucao, "dia útil", "dias úteis")} da reprovação ou da desistência, na conta de onde veio o depósito.`,
@@ -19864,14 +19999,18 @@ ${t.deposito}`] : []
     }
     if (tipo === "devolucao_reserva") {
       const devolvido = f.devolucao_valor || f.reserva_valor;
-      const integral = devolvido >= f.reserva_valor;
+      const empresaDesistiu = !!f.desistencia_empresa;
+      const dobro = devolvido === f.reserva_valor * 2;
+      const integral = devolvido >= f.reserva_valor || empresaDesistiu;
+      const qual = dobro ? "correspondente ao dobro da" : devolvido === f.reserva_valor ? "correspondente à integralidade da" : devolvido > f.reserva_valor || empresaDesistiu ? "referente à" : "parte da";
+      const motivoCliente = String(f.desistencia_motivo_externo || "").trim();
       const meses = regra("meses_documentos_ficha");
       return {
         ...base,
         titulo: "TERMO DE DEVOLUÇÃO DA RESERVA E QUITAÇÃO",
         paragrafos: [
-          `${empresa}${e.cnpj ? `, CNPJ ${e.cnpj}` : ""}, devolveu em ${dataBr(f.devolucao_data)} a ${quem}, a importância de ${valorComExtenso(devolvido)}, ${integral ? "correspondente à integralidade" : `parte`} da reserva de ${reais(f.reserva_valor)} recebida em ${dataBr(f.reserva_data)} para o imóvel situado na ${endereco2}, por transferência para a conta de onde veio o depósito, conforme o comprovante bancário anexo.`,
-          `Com a devolução, a ficha cadastral fica encerrada${fichaSemContrato(f) ? ", sem a formação de contrato de locação" : ""}.`,
+          `${empresa}${e.cnpj ? `, CNPJ ${e.cnpj}` : ""}, devolveu em ${dataBr(f.devolucao_data)} a ${quem}, a importância de ${valorComExtenso(devolvido)}, ${qual} reserva de ${reais(f.reserva_valor)} recebida em ${dataBr(f.reserva_data)} para o imóvel situado na ${endereco2}, por transferência para a conta de onde veio o depósito, conforme o comprovante bancário anexo.`,
+          `Com a devolução, a ficha cadastral fica encerrada${fichaSemContrato(f) ? ", sem a formação de contrato de locação" : ""}${empresaDesistiu ? `, por desistência da empresa${dobro ? ", que devolve a reserva em dobro (Código Civil, artigo 418)" : ""}${motivoCliente ? `. Motivo: ${motivoCliente.replace(/[.\s]+$/, "")}` : ""}` : ""}.`,
           integral ? "As partes declaram que nada mais devem uma à outra em razão da reserva e da ficha cadastral, e dão-se mútua quitação desse valor (Código Civil, artigos 319 e 320)." : f.aceite_reserva && devolucaoDaReserva(f).devolver === devolvido ? `A diferença de ${reais(f.reserva_valor - devolvido)} fica com a empresa, como no termo de aceite da reserva aceito em ${dataBr(String(f.aceite_reserva.em).slice(0, 10))} (${devolucaoDaReserva(f).motivo}). As partes dão-se quitação do valor devolvido e do retido (Código Civil, artigos 319, 320 e 418).` : `A diferença de ${reais(f.reserva_valor - devolvido)} fica explicada nas observações da ficha. As partes dão-se quitação do valor devolvido (Código Civil, artigos 319 e 320).`,
           `Os documentos pessoais enviados para a análise serão apagados em até ${meses} meses. Ficam guardados só os comprovantes da reserva e da devolução, por obrigação legal (Lei 13.709/2018, artigo 16, I).`
         ],
@@ -20265,7 +20404,7 @@ ${t.deposito}`] : []
       documentoDe = (p2, campo2 = "inquilino_cpf", tipo = p2.inquilino_tipo) => p2[campo2] ? `${tipo === PJ3 ? "CNPJ" : "CPF"} ${p2[campo2]}` : "";
       pessoa = (nome, doc2) => [nome, doc2].filter(Boolean).join(", ");
       pctTexto2 = (n) => `${String(Math.round((Number(n) || 0) * 100) / 100).replace(".", ",")}%`;
-      TEXTO_CONFERENCIA = "Se, na conferência, alguma informação ou documento que você enviou não corresponder à realidade (por exemplo: renda diferente da declarada, emprego que a empresa não confirma, documento com dados alterados ou de outra pessoa), a proposta é encerrada e conta como desistência: vale a mesma regra da desistência acima.";
+      TEXTO_CONFERENCIA = "Se, na conferência, alguma informação ou documento que você enviou não corresponder à realidade (por exemplo: renda diferente da declarada, emprego que a empresa não confirma, documento com dados alterados ou de outra pessoa), a proposta é encerrada e conta como desistência: vale a mesma regra da desistência acima. Pequenas divergências (por exemplo, um erro de digitação ou um endereço antigo) são verificadas caso a caso, com você: não há motivo para se preocupar.";
       devolucaoDe = (d2, c, alvo) => {
         const dev = alvo.id ? buscar(d2, "devolucoes_garantia", Number(alvo.id)) : devolucoesGarantiaDo(d2, c.id).filter((x) => x.saldo > 0).at(-1);
         return dev && dev.contrato_id === c.id ? dev : null;
@@ -20398,7 +20537,7 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
     }
     if (l.pessoa === "interessado") {
       const docs = (l.arquivos || []).filter((a) => !a.apagado_em).map((a) => a.documento);
-      const renda = /* @__PURE__ */ new Set([...Object.values(DOCUMENTOS_RENDA).flat(), ...PARTES_DOCUMENTOS_PF.renda_padrao, "Faturamento dos 3 últimos meses (extratos bancários da empresa em PDF ou declaração do contador)"]);
+      const renda = /* @__PURE__ */ new Set([...Object.values(DOCUMENTOS_RENDA).flat(), ...PARTES_DOCUMENTOS_PF.renda_padrao, "Comprovante de renda dos 3 últimos meses", "Faturamento dos 3 últimos meses (extratos bancários da empresa em PDF ou declaração do contador)"]);
       if (docs.some((x) => /^Documento com foto/.test(x) || /^Contrato social|^Cartão do CNPJ/.test(x))) out.doc_pessoais = true;
       if (docs.some((x) => renda.has(x))) out.doc_renda = true;
       if (docs.some((x) => /residência|endereço da empresa/i.test(x))) out.doc_residencia = true;
@@ -21519,8 +21658,8 @@ DOCUMENTOS PARA A ANÁLISE
 RESERVA
 - Valor: {reserva_combinada}, abatido do 1º aluguel se a ficha for aprovada
 - O imóvel fica reservado para você por {dias_validade} dias depois do depósito
-- Depois do depósito, você tem {dias_documentos} dias úteis para mandar a ficha e os documentos; sem eles, a reserva é cancelada
-- Ficha não aprovada: devolvemos tudo
+- Depois do depósito, você tem {prazo_documentos_dias} para mandar a ficha e os documentos; se faltar algum, entramos em contato antes do fim do prazo; sem eles, a reserva é cancelada
+- Ficha não aprovada: informamos o motivo por escrito e devolvemos tudo; você pode reapresentar documentos que fortaleçam a análise
 - {regra_desistencia}
 - {texto_conferencia}
 - Quando houver devolução, ela sai em até {dias_devolucao} dias úteis, na conta de onde veio o depósito
@@ -21566,6 +21705,21 @@ A seguradora analisa junto e pode pedir algum documento a mais.[fim]
 Seus dados são tratados conforme a LGPD (Lei 13.709/2018).`
         },
         {
+          chave: "ficha_lembrete_documentos",
+          nome: "Lembrete dos documentos da ficha",
+          etapa: "Ficha",
+          // aviso no 4º dia e no último dia do prazo dos documentos (pedido do advogado, 24/11/2026, item 1.2; dias corridos, dono)
+          assunto: "{imovel}: documentos da ficha (prazo até {prazo_documentos})",
+          texto: `Olá, {nome}, tudo bem?
+
+Ainda não recebemos todos os documentos da ficha para o imóvel da {endereco}. [se ultimo_dia_documentos]Hoje, {prazo_documentos}, é o último dia do prazo.[senão]O prazo vai até {prazo_documentos}.[fim]
+
+Continuamos aguardando e estamos à disposição para tirar dúvidas e ajudar no que for preciso: se tiver alguma dificuldade com algum documento, responda este e-mail ou nos ligue[se link], e mande o que tiver pelo link da ficha:
+{link}[senão].[fim]
+
+Pelo termo da reserva, sem os documentos no prazo a reserva é cancelada e conta como desistência.`
+        },
+        {
           chave: "ficha_aprovada",
           nome: "Ficha aprovada",
           etapa: "Ficha",
@@ -21592,7 +21746,11 @@ Próximos passos: contrato para assinar em até 2 dias úteis[se fiador] (o fiad
           texto: `Olá, {nome},
 
 Agradecemos o interesse no imóvel da {imovel}. Depois da análise, não foi possível aprovar a ficha neste momento.
-
+[se motivo_reprovacao]
+Motivo: {motivo_reprovacao}
+[fim][se pode_reapresentar]
+Se tiver documentos que fortaleçam a análise (por exemplo, outro comprovante de renda), responda este e-mail com eles: a ficha é analisada de novo.
+[fim]
 [se reserva][se devolucao]A reserva de {reserva} já foi devolvida em {devolucao_data}, na conta de onde veio o depósito.[senão][se retencao_aplicada]Na conferência, informações ou documentos enviados não corresponderam à realidade, o que conta como desistência no termo da reserva aceito em {aceite_data}: [se devolve_algo]devolvemos {devolver_reserva} e ficamos com {reter_reserva}, em até {dias_devolucao} dias úteis, na conta de onde veio o depósito.[senão]a reserva de {reserva} fica com a empresa, como no termo.[fim][senão]A reserva de {reserva} será devolvida em até {dias_devolucao} dias úteis, na conta de onde veio o depósito.[fim][fim]
 
 [fim]Os documentos enviados serão apagados, conforme a LGPD (Lei 13.709/2018).`
@@ -21607,7 +21765,9 @@ Agradecemos o interesse no imóvel da {imovel}. Depois da análise, não foi pos
           texto: `Olá, {nome},
 
 Devolvemos {devolucao} em {devolucao_data}, na conta de onde veio a reserva do imóvel da {imovel}. Anexos: o comprovante e o termo de devolução e quitação.
-
+[se motivo_desistencia]
+Não seguimos com a reserva: {motivo_desistencia}
+[fim]
 A ficha está encerrada[se devolucao_parcial]. Da reserva, {devolucao_parcial} não foi devolvido[se termo_aceito], como no termo da reserva aceito em {aceite_data}[fim]: qualquer dúvida, responda este e-mail[senão], sem valores pendentes[fim]. Se puder, responda com o termo assinado (pode ser pelo gov.br); o comprovante do banco já prova a devolução.
 
 Os documentos da análise serão apagados, conforme a LGPD (Lei 13.709/2018).`
@@ -21954,6 +22114,14 @@ Já resolveu? Responda com uma foto ou um documento, para darmos a baixa. Sem is
         }
       ];
       ATUALIZACOES_EMAIL = [
+        // ajustes do advogado no termo da reserva (24/11/2026, itens 1.2 e 1.4): contato antes do fim do prazo; reprovação por escrito
+        // a empresa desistiu da reserva (dono, 25/11/2026): a justificativa externa vai para o cliente
+        ["ficha_devolucao", "Anexos: o comprovante e o termo de devolução e quitação.\n\nA ficha está encerrada", "Anexos: o comprovante e o termo de devolução e quitação.\n[se motivo_desistencia]\nNão seguimos com a reserva: {motivo_desistencia}\n[fim]\nA ficha está encerrada"],
+        // prazo dos documentos em dias corridos (correção do dono, 24/11/2026): "7 dias corridos" (ou "dias úteis", pela regra)
+        ["ficha_termo_reserva", "você tem {dias_documentos} dias úteis para mandar", "você tem {prazo_documentos_dias} para mandar"],
+        ["ficha_termo_reserva", "para mandar a ficha e os documentos; sem eles, a reserva é cancelada", "para mandar a ficha e os documentos; se faltar algum, entramos em contato antes do fim do prazo; sem eles, a reserva é cancelada"],
+        ["ficha_termo_reserva", "- Ficha não aprovada: devolvemos tudo\n", "- Ficha não aprovada: informamos o motivo por escrito e devolvemos tudo; você pode reapresentar documentos que fortaleçam a análise\n"],
+        ["ficha_reprovada", "não foi possível aprovar a ficha neste momento.\n\n[se reserva]", "não foi possível aprovar a ficha neste momento.\n[se motivo_reprovacao]\nMotivo: {motivo_reprovacao}\n[fim][se pode_reapresentar]\nSe tiver documentos que fortaleçam a análise (por exemplo, outro comprovante de renda), responda este e-mail com eles: a ficha é analisada de novo.\n[fim]\n[se reserva]"],
         // termo de aceite da reserva (decisões do dono de 2026-11-24): desistência, prazo dos documentos e devolução em dias úteis
         ["ficha_envio", "Aprovada a ficha, ela é descontada do primeiro aluguel; não aprovada, ou se você desistir antes de assinar, devolvemos tudo.[senão]", "Aprovada a ficha, ela é descontada do primeiro aluguel[se termo_aceito], como no termo da reserva que você aceitou em {aceite_data}: não aprovada, devolvemos tudo. {desistencia}[senão]; não aprovada, ou se você desistir antes de assinar, devolvemos tudo.[fim][senão]"],
         ["ficha_envio", "Depois: análise em até 2 dias úteis,", "[se prazo_documentos]Prazo para mandar a ficha e os documentos: {prazo_documentos} (sem eles, a reserva é cancelada).\n\n[fim]Depois: análise em até 2 dias úteis,"],
@@ -22210,6 +22378,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
       reserva_combinada: valor ? reais(valor) : "",
       dias_validade: String(c.dias_validade),
       dias_documentos: String(c.dias_uteis_documentos),
+      prazo_documentos_dias: prazoDosDocumentosTexto(c),
       dias_arrependimento: String(c.dias_arrependimento),
       dias_devolucao: String(c.dias_uteis_devolucao),
       retencao: pct(c.retencao_pct),
@@ -22224,6 +22393,8 @@ ${DICA_DOCUMENTOS}`].join("\n");
       aceite_data: f.aceite_reserva ? dataBr(String(f.aceite_reserva.em).slice(0, 10)) : "",
       desistencia: f.aceite_reserva ? textoDesistencia(f) : "",
       prazo_documentos: f.aceite_reserva && pz ? dataBr(pz.documentos_ate) : "",
+      // reprovação só com justificativa por escrito (pedido do advogado, 24/11/2026): o motivo da decisão vai no e-mail
+      motivo_reprovacao: f.situacao === "Reprovada" ? String(f.decisao_motivo || "").trim() : "",
       devolver_reserva: dv ? reais(dv.devolver) : "",
       reter_reserva: dv ? reais(dv.reter) : ""
     };
@@ -22351,7 +22522,9 @@ ${DICA_DOCUMENTOS}`].join("\n");
       devolucao: f && f.devolucao_data ? reais(f.devolucao_valor || f.reserva_valor) : "",
       devolucao_data: f && f.devolucao_data ? dataBr(f.devolucao_data) : "",
       // devolução de só uma parte da reserva: a diferença (o e-mail não diz "sem valores pendentes")
-      devolucao_parcial: f && f.devolucao_data && f.devolucao_valor > 0 && f.devolucao_valor < f.reserva_valor ? reais(f.reserva_valor - f.devolucao_valor) : "",
+      // a empresa desistiu: quitação total com o valor devolvido (dono, 25/11/2026), sem "não foi devolvido"
+      devolucao_parcial: f && !f.desistencia_empresa && f.devolucao_data && f.devolucao_valor > 0 && f.devolucao_valor < f.reserva_valor ? reais(f.reserva_valor - f.devolucao_valor) : "",
+      motivo_desistencia: f && f.desistencia_empresa ? String(f.desistencia_motivo_externo || "").trim() : "",
       documentos_ficha: f ? documentosDoEmail(f) : "",
       link: linkDaFicha(f, "interessado", hoje3).url,
       link_validade: linkDaFicha(f, "interessado", hoje3).validade,
@@ -22561,6 +22734,11 @@ ${DICA_DOCUMENTOS}`].join("\n");
           link_termo: !!urlDoAceite(f.id),
           termo_aceito: !!f.aceite_reserva,
           prazo_documentos: !!(f.aceite_reserva && prazosDaReserva(f)),
+          motivo_reprovacao: f.situacao === "Reprovada" && !!String(f.decisao_motivo || "").trim(),
+          motivo_desistencia: !!(f.desistencia_empresa && String(f.desistencia_motivo_externo || "").trim()),
+          // reprovada por informação que não se confirmou conta como desistência: aí não se convida a reapresentar
+          pode_reapresentar: f.situacao === "Reprovada" && !f.reprovada_conferencia,
+          ultimo_dia_documentos: (avisoDosDocumentos(f) || {}).qual === "ultimo",
           retencao_aplicada: !!(dv && !dv.integral),
           devolve_algo: !!(dv && dv.devolver > 0),
           aviso_desistencia: !!avisoDaDesistencia(c, valorDaReserva(f))
@@ -28314,12 +28492,13 @@ ${m.texto}`);
     const pz = prazosDaReserva(f);
     if (!pz) return `<div class="alerta info"><b>Falta o depósito da reserva de ${reais(valorDaReserva(f))}.</b> Quando chegar, registre o valor, a data e o comprovante em "Editar". Os prazos do termo contam do depósito.</div>`;
     if (fichaSemContrato(f) || f.situacao === "Aprovada") return "";
+    if (f.reaberta_em) return '<p class="suave">Ficha reaberta para nova análise: os prazos contados do depósito não valem mais (vale o guia da reabertura, em "Situação").</p>';
     const hoje3 = hojeIso();
     const dv = devolucaoDaReserva(f, { data: hoje3 });
     const c = condicoesDaReserva(f);
     const passou = (x) => x < hoje3 ? ` ${etiqueta("passou", "aviso")}` : "";
     return `<ul>
-    <li>Documentos até <b>${dataBr(pz.documentos_ate)}</b> (${plural(c.dias_uteis_documentos, "dia útil", "dias úteis")} do depósito)${passou(pz.documentos_ate)}${pz.documentos_ate < hoje3 && fichaSemDocumentos(f) ? ' · os documentos não estão marcados como recebidos: pelo termo, conta como desistência (use "Desistiu antes de assinar")' : ""}</li>
+    <li>Documentos até <b>${dataBr(pz.documentos_ate)}</b> (${prazoDosDocumentosTexto(c)} do depósito)${passou(pz.documentos_ate)}${pz.documentos_ate < hoje3 && fichaSemDocumentos(f) ? ' · os documentos não estão marcados como recebidos: pelo termo, conta como desistência (use "Desistiu antes de assinar")' : ""}${pz.documentos_ate >= hoje3 ? ` · se faltar documento, a equipe fala com a pessoa ${pz.aviso_documentos_em ? `em <b>${dataBr(pz.aviso_documentos_em)}</b> e ` : ""}no último dia` : ""}</li>
     <li>O imóvel fica reservado até <b>${dataBr(pz.vale_ate)}</b>${passou(pz.vale_ate)}</li>
     <li>${pz.arrependimento_ate ? `Desistência com tudo de volta até <b>${dataBr(pz.arrependimento_ate)}</b>; hoje, se` : "Sem prazo de devolução total; se"} desistir: ${dv.integral ? `devolve ${reais(dv.devolver)} (tudo)` : dv.devolver === 0 ? `a reserva de ${reais(dv.reter)} fica com a empresa` : `devolve <b>${reais(dv.devolver)}</b> e a empresa fica com ${reais(dv.reter)}`}</li></ul>`;
   }
@@ -28345,7 +28524,7 @@ ${m.texto}`);
       ${vale && naAba ? botao("compartilharLinkTermo", "Copiar / WhatsApp", { id: f.id }, "secundario pequeno") : ""}`;
     return `<div class="cartao" data-termo-reserva="${f.id}">${titulo2}
     <p><b>1º passo, antes do depósito:</b> a pessoa recebe as condições do imóvel e o termo da reserva${E.nuvem ? ", confirma o e-mail com um código e dá o aceite pelo link" : ", assina o termo (gov.br ou à mão) e devolve"}. Depois ela deposita a reserva.</p>
-    <p class="suave">Reserva de <b>${reais(valor)}</b>, abatida do 1º aluguel · documentos em ${plural(c.dias_uteis_documentos, "dia útil", "dias úteis")} do depósito · reservado por ${c.dias_validade} dias · ficha não aprovada: devolve tudo · ${esc(desistenciaResumo(c, valor))} (o termo avisa em destaque antes do aceite e do pagamento) · devolução (quando houver) em ${plural(c.dias_uteis_devolucao, "dia útil", "dias úteis")}. <a href="#/regras">Regras do sistema</a></p>
+    <p class="suave">Reserva de <b>${reais(valor)}</b>, abatida do 1º aluguel · documentos em ${prazoDosDocumentosTexto(c)} do depósito · reservado por ${c.dias_validade} dias · ficha não aprovada: devolve tudo · ${esc(desistenciaResumo(c, valor))} (o termo avisa em destaque antes do aceite e do pagamento) · devolução (quando houver) em ${plural(c.dias_uteis_devolucao, "dia útil", "dias úteis")}. <a href="#/regras">Regras do sistema</a></p>
     <details><summary class="suave">Ver o termo como a pessoa vai ler</summary><pre class="texto-modelo">${esc(textoDoTermo(termoDaReserva(d(), f)))}</pre></details>
     <p class="acoes">${botoes} ${botaoEmail("ficha_termo_reserva", { ficha: f.id }, "✉ E-mail: condições e termo da reserva")} ${pdf}</p>
     <p class="suave" data-situacao-aceite>${vale ? `Link até ${dataBr(String(vale.vence_em).slice(0, 10))}.${naAba ? "" : " Para mandar de novo, gere outro (o endereço só aparece na hora em que é gerado)."}` : ""}</p></div>`;
@@ -28465,6 +28644,7 @@ ${m.texto}`);
     const partes = [etiqueta(f.situacao || "Em análise", COR_SITUACAO[f.situacao] || "aviso")];
     if (imoveisParaContrato(d(), f).length) partes.push(etiqueta("falta o contrato", "aviso"));
     else if (f.situacao === "Aprovada" && Object.keys(contratosDaFicha(d(), f)).length) partes.push(etiqueta("virou contrato", "ok"));
+    if (f.desistencia_empresa) partes.push(etiqueta(f.desistencia_empresa === "sem_justificativa" ? "a empresa desistiu (sem justificativa)" : "a empresa desistiu", "neutra"));
     if (devolucaoPendente(f)) partes.push(etiqueta("devolver a reserva", "perigo"));
     if (f.situacao === "Em análise" && !f.aceite_reserva && !(f.reserva_valor > 0)) partes.push(etiqueta(f.link_aceite ? "esperando o aceite do termo" : "falta o termo da reserva", "aviso"));
     else if (f.situacao === "Em análise" && f.aceite_reserva && !(f.reserva_valor > 0)) partes.push(etiqueta("termo aceito · falta o depósito", "info"));
@@ -28541,6 +28721,10 @@ ${m.texto}`);
       if (f.situacao === "Em análise") return `<li>${esc(i.nome)}</li>`;
       return `<li class="suave">${esc(i.nome)}: sem contrato${f.modo_imoveis !== "Todos juntos" && Object.keys(feitos).length ? " (a ficha era para apenas um dos imóveis)" : ""}</li>`;
     }).join("");
+    const semDocs = f.situacao === "Em análise" && f.aceite_reserva && !f.reaberta_em && fichaSemDocumentos(f) && prazosDaReserva(f);
+    const lembreteDocumentos = semDocs && prazosDaReserva(f).documentos_ate >= hojeIso() ? ` ${botaoEmail("ficha_lembrete_documentos", { ficha: f.id }, "✉ E-mail: lembrete dos documentos")}` : "";
+    const avisoDoc = avisoDosDocumentos(f);
+    const avisoDocumentos = avisoDoc ? `<div class="alerta aviso"><b>${avisoDoc.qual === "ultimo" ? "Hoje é o último dia para os documentos." : `Faltam documentos: o prazo vai até ${dataBr(avisoDoc.ate)}.`}</b> Fale com a pessoa: a empresa continua aguardando e à disposição para tirar dúvidas e ajudar (botão "E-mail: lembrete dos documentos").</div>` : "";
     const decisao = f.situacao === "Em análise" ? "" : `<p>${esc(f.situacao)} em <b>${dataBr(f.decisao_data)}</b>${f.decisao_por ? ` por ${esc(f.decisao_por)}` : ""}${f.decisao_motivo ? `: ${esc(f.decisao_motivo)}` : ""}</p>`;
     const devolucao = !fichaSemContrato(f) || !(f.reserva_valor > 0) ? "" : f.devolucao_data ? `<p>Reserva devolvida em <b>${dataBr(f.devolucao_data)}</b>: ${reais(f.devolucao_valor || f.reserva_valor)} ${f.comprovante_devolucao ? abrir2(f.comprovante_devolucao, "comprovante da devolução") : etiqueta("sem comprovante da devolução", "aviso")}
         · ${link(`#/imprimir/recibo?tipo=devolucao_reserva&ficha=${f.id}`, "🧾 Termo de devolução e quitação", "")}</p>
@@ -28548,7 +28732,7 @@ ${m.texto}`);
       const dv = devolucaoDaReserva(f);
       const ate = devolverReservaAte(f);
       if (dv.devolver === 0) return `<p>A reserva de <b>${reais(f.reserva_valor)}</b> fica com a empresa: ${esc(dv.motivo)}. Nada a devolver.</p>`;
-      return `<div class="alerta aviso"><b>${dv.integral ? `Devolver a reserva de ${reais(f.reserva_valor)}` : `Devolver ${reais(dv.devolver)} da reserva de ${reais(f.reserva_valor)}`}${ate ? ` até ${dataBr(ate)}` : ""}.</b> ${dv.integral ? "" : `A empresa fica com ${reais(dv.reter)}: ${esc(dv.motivo)}. `}Depois de devolver, registre a data e o comprovante em "Editar".</div>`;
+      return `<div class="alerta aviso"><b>${dv.dobro ? `Devolver ${reais(dv.devolver)}, o dobro da reserva de ${reais(f.reserva_valor)}` : dv.integral ? `Devolver a reserva de ${reais(f.reserva_valor)}` : `Devolver ${reais(dv.devolver)} da reserva de ${reais(f.reserva_valor)}`}${ate ? ` até ${dataBr(ate)}` : ""}.</b> ${dv.dobro ? "A empresa desistiu sem justificativa: a lei das arras manda devolver em dobro (Código Civil, art. 418). " : dv.integral ? "" : `A empresa fica com ${reais(dv.reter)}: ${esc(dv.motivo)}. `}Depois de devolver, registre a data e o comprovante. ${opera() ? link(`#/editar/fichas/${f.id}`, "Devolvi", "botao pequeno") : ""}</div>`;
     })();
     const documentos = primeiro ? `<p>Os documentos da ficha foram para a pasta do inquilino: ${link(`#/contrato/${primeiro.id}?ir=arquivos`, esc(primeiro.inquilino_nome), "")}.</p>` : f.documentos_apagados_em ? `<p class="suave">Os documentos pessoais foram apagados em ${dataBr(f.documentos_apagados_em)} (${regra("meses_documentos_ficha")} meses depois da decisão ou da devolução da reserva). Ficaram só os comprovantes da reserva e da devolução.</p>` : "";
     return `<p class="suave"><a href="#/inquilinos?ir=fichas">← Inquilinos</a></p>
@@ -28557,7 +28741,13 @@ ${m.texto}`);
       ${podeUsuario("admin") ? botao("excluir", "Excluir", { tabela: "fichas", id: f.id }, "perigo pequeno") : ""}</div></div>
     <div class="cartao"><h2>Situação</h2><p>${situacaoDaFicha(f)} <span class="suave">· recebida em ${dataBr(f.data_recebida)}</span></p>
       ${decisao}
-      ${opera() ? `<p class="acoes">${f.situacao !== "Em análise" ? "" : f.reserva_valor > 0 ? botaoEmail("ficha_envio", { ficha: f.id }, "✉ E-mail: envio da ficha cadastral") : '<span class="suave">O e-mail com a ficha cadastral sai depois do depósito da reserva.</span>'} ${f.situacao === "Aprovada" ? botaoEmail("ficha_aprovada", { ficha: f.id }, "✉ E-mail: ficha aprovada") : ""} ${f.situacao === "Reprovada" ? botaoEmail("ficha_reprovada", { ficha: f.id }, "✉ E-mail: ficha reprovada") : ""}</p>` : ""}
+      ${opera() ? `<p class="acoes">${f.situacao !== "Em análise" ? "" : f.reserva_valor > 0 ? botaoEmail("ficha_envio", { ficha: f.id }, "✉ E-mail: envio da ficha cadastral") : '<span class="suave">O e-mail com a ficha cadastral sai depois do depósito da reserva.</span>'} ${f.situacao === "Aprovada" ? botaoEmail("ficha_aprovada", { ficha: f.id }, "✉ E-mail: ficha aprovada") : ""} ${f.situacao === "Reprovada" ? botaoEmail("ficha_reprovada", { ficha: f.id }, "✉ E-mail: ficha reprovada (com o motivo)") : ""}${lembreteDocumentos}</p>` : ""}
+      ${avisoDocumentos}
+      ${f.situacao === "Em análise" && reaberturaDaFicha(f) ? (() => {
+      const x = reaberturaDaFicha(f);
+      return `<div class="alerta info"><b>Reaberta em ${dataBr(x.em)} para nova análise: documentos novos até ${dataBr(x.ate)}.</b> Prazo só de guia: nada se cancela sozinho.${x.combinado ? ` Combinado com a pessoa: ${esc(x.combinado)}` : ""}</div>`;
+    })() : ""}
+      ${f.situacao === "Reprovada" && opera() && !f.devolucao_data && !(f.devolucao_valor > 0) ? `<p class="acoes">${botao("reabrirFichaReprovada", "Reabrir a análise (documentos novos)", { id: f.id }, "pequeno")}</p>` : ""}
       ${f.situacao === "Em análise" && opera() ? `<div class="acoes">${botao("decidirFicha", "Aprovar", { id: f.id, situacao: "Aprovada" }, "pequeno", `Aprovar a ficha de ${f.inquilino_nome}? Depois aparece o botão para fazer o contrato.`)}
         ${link(`#/editar/fichas/${f.id}?situacao=Reprovada`, "Reprovar (com o motivo)", "botao perigo pequeno")}</div>
         <p class="suave">Para reprovar, escolha "Reprovada" na situação e escreva o motivo. Com reserva paga, registre a devolução (data e comprovante) quando devolver.</p>` : ""}
@@ -28591,7 +28781,8 @@ ${m.texto}`);
     const bloqueio = contratos.map((c) => motivoSemDesistencia(d(), c)).find(Boolean);
     if (bloqueio) return `<p class="suave">Desistência: ${esc(bloqueio)}</p>`;
     if (contratos.length && !podeUsuario("admin")) return '<p class="suave">Desistência com contrato já gerado: só o administrador cancela o contrato.</p>';
-    return `<p class="acoes">${botao("desistirAntesDeAssinar", "Desistiu antes de assinar", { ficha: f.id }, "secundario pequeno")}</p>`;
+    const empresa = f.reserva_valor > 0 && !contratos.length ? ` ${botao("empresaDesisteReserva", "A empresa desiste desta reserva", { id: f.id }, "secundario pequeno")}` : "";
+    return `<p class="acoes">${botao("desistirAntesDeAssinar", "Desistiu antes de assinar", { ficha: f.id }, "secundario pequeno")}${empresa}</p>`;
   }
   function botaoDesistenciaContrato(c) {
     if (!podeUsuario("admin") || motivoSemDesistencia(d(), c)) return "";
@@ -29253,6 +29444,59 @@ ${m.texto}`);
           if (!f || f.situacao !== "Em análise") throw new ErroUsuario("Esta ficha já foi decidida (talvez por outra pessoa). Atualize a página.");
           await alterar((db) => atualizar(db, "fichas", f.id, { situacao: "Aprovada", decisao_data: hojeIso(), decisao_por: login() }, login(), `Ficha de ${f.inquilino_nome} aprovada`));
           aviso("Ficha aprovada. Agora faça o contrato.");
+          await mostrar();
+        },
+        /**
+         * A empresa desiste da reserva (pedido do dono, 24/11/2026): com justificativa por escrito, devolve a reserva (como na ficha
+         * reprovada); sem justificativa, a lei das arras manda devolver em dobro (CC art. 418). O termo da reserva não fala nisso.
+         */
+        async empresaDesisteReserva({ id }) {
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode registrar a desistência.");
+          const f = buscar2("fichas", id);
+          if (!f || !(f.reserva_valor > 0) || fichaSemContrato(f)) throw new ErroUsuario("Esta ficha não tem reserva em aberto (talvez outra pessoa já mudou). Atualize a página.");
+          const prazo = condicoesDaReserva(f).dias_uteis_devolucao;
+          const hoje3 = hojeIso();
+          const resp = await janela({
+            titulo: `A empresa desiste da reserva de ${f.inquilino_nome}`,
+            sim: "Registrar a desistência",
+            forte: true,
+            html: `<p>Reserva de <b>${reais(f.reserva_valor)}</b> depositada em ${dataBr(f.reserva_data)}. A ficha fica encerrada e o Painel avisa a devolução, em até ${plural(prazo, "dia útil", "dias úteis")}.</p>
+        <p><label class="check"><input type="radio" name="tipo" value="com" checked> <b>Com justificativa</b>: devolve a reserva, <b>${reais(f.reserva_valor)}</b> (como na ficha reprovada).</label></p>
+        <p><label class="check"><input type="radio" name="tipo" value="sem"> <b>Sem justificativa</b>: pela lei das arras (Código Civil, art. 418), quem recebeu a reserva e desiste devolve <b>o dobro: ${reais(f.reserva_valor * 2)}</b>.</label></p>
+        <p><label>Justificativa para o cliente (obrigatória com justificativa; vai no termo de devolução e no e-mail)</label><textarea name="externa" rows="2" placeholder="Ex.: o proprietário pediu o imóvel de volta para uso próprio."></textarea></p>
+        <p><label>Justificativa interna (só no sistema; o cliente não vê)</label><textarea name="interna" rows="2" placeholder="Ex.: proprietário ligou em 07/12 pedindo o imóvel para o filho."></textarea></p>
+        <p><label>Data da desistência</label><input type="date" name="data" value="${hoje3}" max="${hoje3}"></p>`
+          });
+          if (!resp) return;
+          const justificada = (resp.tipo || [])[0] !== "sem";
+          const externa = String((resp.externa || [])[0] || "").trim();
+          const interna = String((resp.interna || [])[0] || "").trim();
+          if (justificada && !externa) throw new ErroUsuario('Escreva a justificativa para o cliente, ou escolha "Sem justificativa" (a lei manda devolver o dobro).');
+          await alterar((db) => empresaDesisteDaReserva(db, f.id, { justificada, externa, interna, data: (resp.data || [])[0] || hoje3 }, login()));
+          const dv = devolucaoDaReserva(buscar2("fichas", id));
+          aviso(`Desistência registrada. Devolver ${reais(dv.devolver)} até ${dataBr(devolverReservaAte(buscar2("fichas", id)))}; depois, clique em "Devolvi" e anexe o comprovante.`);
+          await mostrar();
+        },
+        /**
+         * Ficha reprovada volta para análise com documentos novos que fortalecem a análise (pedido do advogado, 24/11/2026, item 1.4).
+         * O motivo da reprovação fica no Histórico. Reserva já devolvida: vai pelo "Editar", que explica o que fazer com ela.
+         */
+        async reabrirFichaReprovada({ id }) {
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode reabrir fichas.");
+          const f = buscar2("fichas", id);
+          if (!f || f.situacao !== "Reprovada") throw new ErroUsuario("Esta ficha não está reprovada (talvez outra pessoa já mudou). Atualize a página.");
+          const hoje3 = hojeIso();
+          const dias = regra("reserva_dias_reapresentacao");
+          const resp = await janela({
+            titulo: `Reabrir a análise da ficha de ${f.inquilino_nome}`,
+            sim: "Reabrir a análise",
+            html: `<p>A ficha volta para "Em análise". A pessoa tem até <b>${dataBr(somarDias(hoje3, dias))}</b> (${plural(dias, "dia corrido", "dias corridos")}) para reapresentar os documentos. O prazo é só guia: nada se cancela sozinho. O motivo da reprovação fica no Histórico.</p>
+        <p><label>O que foi combinado com a pessoa (aparece na ficha como guia)</label><textarea name="combinado" rows="3" placeholder="Ex.: vai mandar o extrato do novo emprego e o holerite de dezembro."></textarea></p>`
+          });
+          if (!resp) return;
+          const combinado = String((resp.combinado || [])[0] || "").trim();
+          await alterar((db) => reabrirFichaReprovada(db, f.id, { combinado, data: hoje3 }, login()));
+          aviso(`Ficha de volta para análise: documentos novos até ${dataBr(somarDias(hoje3, dias))}. Peça pelo link da ficha.`);
           await mostrar();
         }
       };
@@ -30841,9 +31085,13 @@ ${texto3}` : texto3;
           descricao: (dados) => `Ficha de ${dados.inquilino_nome}`,
           // devolver menos do que diz o termo de aceite (sem termo: a reserva inteira) pede confirmação
           conferir: (dados, r) => {
-            if (!(fichaSemContrato(dados) && dados.devolucao_valor > 0 && dados.devolucao_valor < dados.reserva_valor)) return [];
             if (r && r.devolucao_valor === dados.devolucao_valor && r.reserva_valor === dados.reserva_valor) return [];
-            const certo = devolucaoDaReserva({ ...r, ...dados });
+            const devido = devolucaoDaReserva({ ...r, ...dados });
+            if (devido.dobro && fichaSemContrato(dados) && dados.devolucao_valor > 0 && dados.devolucao_valor !== devido.devolver) {
+              return [`A lei manda devolver o dobro (${reais(devido.devolver)}, Código Civil, art. 418). Você registrou ${reais(dados.devolucao_valor)}: o alerta "devolver a reserva" some e o termo de devolução sai com ${reais(dados.devolucao_valor)}, com quitação total.`];
+            }
+            if (!(fichaSemContrato(dados) && dados.devolucao_valor > 0 && dados.devolucao_valor < dados.reserva_valor)) return [];
+            const certo = devido;
             if (dados.devolucao_valor === certo.devolver) return [];
             return [`Devolução de ${reais(dados.devolucao_valor)} de uma reserva de ${reais(dados.reserva_valor)}: ficam ${reais(dados.reserva_valor - dados.devolucao_valor)} sem devolver. ${certo.integral ? "Pelo termo (ou sem termo aceito), a reserva volta por inteiro" : `Pelo termo aceito, o certo é devolver ${reais(certo.devolver)}`}; o alerta "devolver a reserva" some e o termo de devolução sai como devolução de parte.`];
           },
@@ -30873,6 +31121,7 @@ ${texto3}` : texto3;
             }
             if (comContrato.length && dados.situacao !== "Aprovada") erros.situacao = dados.situacao === "Desistiu" ? 'Esta ficha já virou contrato: use o botão "Desistiu antes de assinar" na página da ficha (ele cancela o contrato não assinado)' : 'Esta ficha já virou contrato: a situação fica "Aprovada"';
             if (dados.situacao !== "Reprovada") dados.reprovada_conferencia = null;
+            if (dados.situacao !== "Desistiu") dados.desistencia_empresa = null;
             if (dados.situacao === "Em análise") {
               dados.decisao_data = null;
               dados.decisao_por = null;
@@ -30900,8 +31149,9 @@ ${texto3}` : texto3;
               if (dados.devolucao_valor > 0 && !dados.devolucao_data) erros.devolucao_data = "Informe a data da devolução";
               else if (dados.devolucao_data && dados.devolucao_data > hoje3) erros.devolucao_data = "A devolução não pode ser numa data futura (registre depois de devolver)";
               else if (dados.devolucao_data && dados.reserva_data && dados.devolucao_data < dados.reserva_data) erros.devolucao_data = `A devolução não pode ser antes da reserva (${dataBr(dados.reserva_data)})`;
-              if (dados.devolucao_valor > (dados.reserva_valor || 0)) erros.devolucao_valor = `A devolução não pode passar da reserva (${reais(dados.reserva_valor || 0)})`;
-              else if (dados.devolucao_valor > 0 && dados.devolucao_valor < dados.reserva_valor && dados.devolucao_valor !== devolucaoDaReserva({ ...r, ...dados }).devolver && !String(dados.observacoes || "").trim()) {
+              const teto = devolucaoDaReserva({ ...r, ...dados }).dobro ? (dados.reserva_valor || 0) * 2 : dados.reserva_valor || 0;
+              if (dados.devolucao_valor > teto) erros.devolucao_valor = teto > (dados.reserva_valor || 0) ? `A devolução não pode passar do dobro da reserva (${reais(teto)})` : `A devolução não pode passar da reserva (${reais(dados.reserva_valor || 0)})`;
+              else if (!(r && r.desistencia_empresa) && dados.devolucao_valor > 0 && dados.devolucao_valor < dados.reserva_valor && dados.devolucao_valor !== devolucaoDaReserva({ ...r, ...dados }).devolver && !String(dados.observacoes || "").trim()) {
                 erros.observacoes = `Devolução de ${reais(dados.devolucao_valor)} de uma reserva de ${reais(dados.reserva_valor)}: explique a diferença nas observações (ela sai no termo de devolução)`;
               }
             }
