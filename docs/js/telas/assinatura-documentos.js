@@ -7,6 +7,7 @@ import { aviso, baixar, E, mostrar } from '../app.js';
 import * as S from '../armazenamento.js';
 import * as AS from '../assinatura.js';
 import * as C from '../calculos.js';
+import * as K from '../contratos.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { botao, buscar, d, opera, pastaDoEscopo } from './comum.js';
@@ -142,6 +143,27 @@ export async function assinadoDoDocumento(tipo, q) {
   return { blob: await AS.baixarAssinado(r.pedido.id), nome: `${String(r.pedido.nome || doc.nome).replace(/\.pdf$/i, '')} - assinado.pdf` };
 }
 
+/** Onde fica lembrado, neste navegador, com que modelo, data e testemunhas o contrato foi mandado para assinar. */
+const LEMBRADO = (id) => `assinatura-contrato-${id}`;
+const lerJson = (chave) => { try { return JSON.parse(localStorage.getItem(chave)) || null; } catch { return null; } };
+
+/**
+ * Chaves do contrato como ele sai agora (para o e-mail "Contrato para assinar", que não sabe o que foi escolhido na página):
+ * com o modelo, a data e as testemunhas do último "Enviar para assinar" feito neste navegador e com cada modelo de contrato
+ * (com e sem as testemunhas lembradas). O assinado cuja chave não está aqui é de um texto que mudou.
+ */
+export async function chavesAtuaisDoContrato(c) {
+  const t = lerJson('testemunhas_contrato') || {};
+  const testemunhas = { t1: t.t1 || '', c1: t.c1 || '', t2: t.t2 || '', c2: t.c2 || '' };
+  const candidatos = [lerJson(LEMBRADO(c.id)), ...K.modelosDe(d()).flatMap((m) => [{ modelo: String(m.id), ...testemunhas }, { modelo: String(m.id) }])].filter(Boolean);
+  const chaves = new Set();
+  for (const q of candidatos) {
+    const doc = await documentoParaAssinar('contrato', { ...C.sanearParametros(q), contrato: String(c.id) });
+    if (doc) chaves.add(doc.chave);
+  }
+  return chaves;
+}
+
 /** Manda o documento da página para a fila; as outras versões dele saem da fila (a de antes da mudança do texto). */
 export async function pedirAssinaturaDoc() {
   const [tipo, q] = documentoDaPagina();
@@ -151,6 +173,7 @@ export async function pedirAssinaturaDoc() {
   const fila = await AS.fila({ fresca: true });
   const blob = await pdfParaAssinar(doc, fila.pc?.certificado);
   const novo = await AS.pedirAssinatura(blob, { titulo: doc.titulo, chave: doc.chave, nome: doc.nome, contrato: doc.c.id });
+  if (tipo === 'contrato') { try { localStorage.setItem(LEMBRADO(doc.c.id), JSON.stringify(q)); } catch { /* sem lembrar: o e-mail tenta os modelos */ } }
   for (const x of AS.pedidosDoDocumento(fila, doc.prefixo).filter((y) => !novo || y.id !== novo.id)) {
     try { await AS.cancelarAssinatura(x.id); } catch { /* fica na fila; o e-mail usa o desta versão */ }
   }
