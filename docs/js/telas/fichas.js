@@ -23,6 +23,7 @@ function situacaoDaFicha(f) {
   const partes = [etiqueta(f.situacao || 'Em análise', COR_SITUACAO[f.situacao] || 'aviso')];
   if (R.imoveisParaContrato(d(), f).length) partes.push(etiqueta('falta o contrato', 'aviso'));
   else if (f.situacao === 'Aprovada' && Object.keys(R.contratosDaFicha(d(), f)).length) partes.push(etiqueta('virou contrato', 'ok'));
+  if (f.desistencia_empresa) partes.push(etiqueta(f.desistencia_empresa === 'sem_justificativa' ? 'a empresa desistiu (sem justificativa)' : 'a empresa desistiu', 'neutra'));
   if (R.devolucaoPendente(f)) partes.push(etiqueta('devolver a reserva', 'perigo'));
   // termo de aceite da reserva (2026-11-24): o 1º passo, antes do depósito
   if (f.situacao === 'Em análise' && !f.aceite_reserva && !(f.reserva_valor > 0)) partes.push(etiqueta(f.link_aceite ? 'esperando o aceite do termo' : 'falta o termo da reserva', 'aviso'));
@@ -117,7 +118,7 @@ export function telaFicha(id) {
         const ate = R.devolverReservaAte(f);
         // termo aceito com retenção de tudo (padrão de 24/11/2026): nada a devolver
         if (dv.devolver === 0) return `<p>A reserva de <b>${reais(f.reserva_valor)}</b> fica com a empresa: ${esc(dv.motivo)}. Nada a devolver.</p>`;
-        return `<div class="alerta aviso"><b>${dv.integral ? `Devolver a reserva de ${reais(f.reserva_valor)}` : `Devolver ${reais(dv.devolver)} da reserva de ${reais(f.reserva_valor)}`}${ate ? ` até ${dataBr(ate)}` : ''}.</b> ${dv.integral ? '' : `A empresa fica com ${reais(dv.reter)}: ${esc(dv.motivo)}. `}Depois de devolver, registre a data e o comprovante em "Editar".</div>`;
+        return `<div class="alerta aviso"><b>${dv.dobro ? `Devolver ${reais(dv.devolver)}, o dobro da reserva de ${reais(f.reserva_valor)}` : dv.integral ? `Devolver a reserva de ${reais(f.reserva_valor)}` : `Devolver ${reais(dv.devolver)} da reserva de ${reais(f.reserva_valor)}`}${ate ? ` até ${dataBr(ate)}` : ''}.</b> ${dv.dobro ? 'A empresa desistiu sem justificativa: a lei das arras manda devolver em dobro (Código Civil, art. 418). ' : dv.integral ? '' : `A empresa fica com ${reais(dv.reter)}: ${esc(dv.motivo)}. `}Depois de devolver, registre a data e o comprovante. ${opera() ? link(`#/editar/fichas/${f.id}`, 'Devolvi', 'botao pequeno') : ''}</div>`;
       })();
   const documentos = primeiro ? `<p>Os documentos da ficha foram para a pasta do inquilino: ${link(`#/contrato/${primeiro.id}?ir=arquivos`, esc(primeiro.inquilino_nome), '')}.</p>`
     : f.documentos_apagados_em ? `<p class="suave">Os documentos pessoais foram apagados em ${dataBr(f.documentos_apagados_em)} (${R.regra('meses_documentos_ficha')} meses depois da decisão ou da devolução da reserva). Ficaram só os comprovantes da reserva e da devolução.</p>` : '';
@@ -169,7 +170,9 @@ function botaoDesistencia(f) {
   const bloqueio = contratos.map((c) => R.motivoSemDesistencia(d(), c)).find(Boolean);
   if (bloqueio) return `<p class="suave">Desistência: ${esc(bloqueio)}</p>`;
   if (contratos.length && !podeUsuario('admin')) return '<p class="suave">Desistência com contrato já gerado: só o administrador cancela o contrato.</p>';
-  return `<p class="acoes">${botao('desistirAntesDeAssinar', 'Desistiu antes de assinar', { ficha: f.id }, 'secundario pequeno')}</p>`;
+  // a empresa desiste (pedido do dono, 24/11/2026): só com a reserva depositada e antes do contrato
+  const empresa = f.reserva_valor > 0 && !contratos.length ? ` ${botao('empresaDesisteReserva', 'A empresa desiste desta reserva', { id: f.id }, 'secundario pequeno')}` : '';
+  return `<p class="acoes">${botao('desistirAntesDeAssinar', 'Desistiu antes de assinar', { ficha: f.id }, 'secundario pequeno')}${empresa}</p>`;
 }
 
 /** Botão "Desistiu antes de assinar" da página do inquilino (contrato ainda não assinado; só o administrador). */
@@ -837,6 +840,33 @@ export const ACOES_FICHAS = {
     if (!f || f.situacao !== 'Em análise') throw new C.ErroUsuario('Esta ficha já foi decidida (talvez por outra pessoa). Atualize a página.');
     await alterar((db) => R.atualizar(db, 'fichas', f.id, { situacao: 'Aprovada', decisao_data: C.hojeIso(), decisao_por: login() }, login(), `Ficha de ${f.inquilino_nome} aprovada`));
     aviso('Ficha aprovada. Agora faça o contrato.');
+    await mostrar();
+  },
+  /**
+   * A empresa desiste da reserva (pedido do dono, 24/11/2026): com justificativa por escrito, devolve a reserva (como na ficha
+   * reprovada); sem justificativa, a lei das arras manda devolver em dobro (CC art. 418). O termo da reserva não fala nisso.
+   */
+  async empresaDesisteReserva({ id }) {
+    if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode registrar a desistência.');
+    const f = buscar('fichas', id);
+    if (!f || !(f.reserva_valor > 0) || R.fichaSemContrato(f)) throw new C.ErroUsuario('Esta ficha não tem reserva em aberto (talvez outra pessoa já mudou). Atualize a página.');
+    const prazo = R.condicoesDaReserva(f).dias_uteis_devolucao;
+    const hoje = C.hojeIso();
+    const resp = await janela({
+      titulo: `A empresa desiste da reserva de ${f.inquilino_nome}`, sim: 'Registrar a desistência', forte: true,
+      html: `<p>Reserva de <b>${reais(f.reserva_valor)}</b> depositada em ${dataBr(f.reserva_data)}. A ficha fica encerrada e o Painel avisa a devolução, em até ${C.plural(prazo, 'dia útil', 'dias úteis')}.</p>
+        <p><label class="check"><input type="radio" name="tipo" value="com" checked> <b>Com justificativa</b>: devolve a reserva, <b>${reais(f.reserva_valor)}</b> (como na ficha reprovada).</label></p>
+        <p><label class="check"><input type="radio" name="tipo" value="sem"> <b>Sem justificativa</b>: pela lei das arras (Código Civil, art. 418), quem recebeu a reserva e desiste devolve <b>o dobro: ${reais(f.reserva_valor * 2)}</b>.</label></p>
+        <p><label>Justificativa (obrigatória com justificativa; vai no histórico da ficha)</label><textarea name="motivo" rows="3" placeholder="Ex.: o proprietário pediu o imóvel de volta para uso próprio."></textarea></p>
+        <p><label>Data da desistência</label><input type="date" name="data" value="${hoje}" max="${hoje}"></p>`,
+    });
+    if (!resp) return;
+    const justificada = (resp.tipo || [])[0] !== 'sem';
+    const motivo = String((resp.motivo || [])[0] || '').trim();
+    if (justificada && !motivo) throw new C.ErroUsuario('Escreva a justificativa, ou escolha "Sem justificativa" (devolve o dobro).');
+    await alterar((db) => R.empresaDesisteDaReserva(db, f.id, { justificada, motivo, data: (resp.data || [])[0] || hoje }, login()));
+    const dv = R.devolucaoDaReserva(buscar('fichas', id));
+    aviso(`Desistência registrada. Devolver ${reais(dv.devolver)} até ${dataBr(R.devolverReservaAte(buscar('fichas', id)))}; depois, clique em "Devolvi" e anexe o comprovante.`);
     await mostrar();
   },
   /**

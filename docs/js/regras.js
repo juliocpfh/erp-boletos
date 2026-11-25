@@ -3135,6 +3135,9 @@ export function devolucaoDaReserva(f, { data = null, hoje = C.hojeIso() } = {}) 
   const reserva = f && f.reserva_valor > 0 ? f.reserva_valor : 0;
   const tudo = (motivo) => ({ reserva, devolver: reserva, reter: 0, integral: true, motivo });
   if (!reserva) return { reserva: 0, devolver: 0, reter: 0, integral: true, motivo: 'sem reserva' };
+  // a empresa desistiu (pedido do dono, 24/11/2026): com justificativa, devolve tudo; sem, o dobro (arras, CC art. 418)
+  if (f.desistencia_empresa === 'sem_justificativa') return { reserva, devolver: reserva * 2, reter: 0, integral: true, dobro: true, motivo: 'a empresa desistiu sem justificativa: devolve o dobro da reserva (Código Civil, art. 418, arras)' };
+  if (f.desistencia_empresa === 'com_justificativa') return tudo('a empresa desistiu com justificativa: devolve tudo');
   if (!f.aceite_reserva) return tudo('sem o termo de aceite da reserva: devolve tudo');
   if (f.situacao === 'Reprovada' && !f.reprovada_conferencia) return tudo('ficha não aprovada: devolve tudo');
   const c = condicoesDaReserva(f);
@@ -3146,6 +3149,30 @@ export function devolucaoDaReserva(f, { data = null, hoje = C.hojeIso() } = {}) 
   const prazo = c.dias_arrependimento > 0 ? ` depois de ${c.dias_arrependimento} dias do depósito` : '';
   return { reserva, devolver: reserva - reter, reter, integral: reter === 0,
     motivo: `${porque}${prazo}: a empresa fica com ${reter >= reserva ? 'a reserva inteira' : C.pct(c.retencao_pct)} (${C.reais(reter)}), como no termo aceito em ${C.dataBr(String(f.aceite_reserva.em).slice(0, 10))}` };
+}
+
+/**
+ * A empresa desiste da reserva (pedido do dono, 24/11/2026; o termo não fala nisso). ``justificada``: com o motivo por escrito, a
+ * devolução é simples, como na ficha reprovada; sem justificativa, a lei das arras manda devolver em dobro (CC art. 418). Prazo: o
+ * da devolução (regra `reserva_dias_uteis_devolucao`). Ex.: reserva de R$ 500,00, desistência sem justificativa na terça, 08/12/2026
+ * → devolver R$ 1.000,00 até quinta, 10/12/2026; com justificativa → R$ 500,00 no mesmo prazo. Devolve a ficha.
+ */
+export function empresaDesisteDaReserva(d, fichaId, { justificada, motivo = '', data = C.hojeIso() }, usuario, hoje = C.hojeIso()) {
+  const f = buscar(d, 'fichas', fichaId);
+  if (!f) throw new C.ErroUsuario('Ficha não encontrada.');
+  if (!(f.reserva_valor > 0)) throw new C.ErroUsuario('A ficha não tem reserva depositada.');
+  if (fichaSemContrato(f)) throw new C.ErroUsuario('Esta ficha já está encerrada (reprovada ou com desistência).');
+  if (Object.keys(contratosDaFicha(d, f)).length) throw new C.ErroUsuario('Esta ficha já virou contrato: a desistência da empresa não é por aqui.');
+  const texto = String(motivo || '').trim();
+  if (justificada && !texto) throw new C.ErroUsuario('Escreva a justificativa da desistência.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(data || '')) || data > hoje) throw new C.ErroUsuario('Informe a data da desistência (hoje ou antes).');
+  const qual = justificada ? 'com_justificativa' : 'sem_justificativa';
+  const dobro = justificada ? f.reserva_valor : f.reserva_valor * 2;
+  atualizar(d, 'fichas', f.id, { situacao: 'Desistiu', desistencia_empresa: qual, decisao_data: data, decisao_por: usuario,
+    decisao_motivo: justificada ? `A empresa desistiu da reserva: ${texto}` : `A empresa desistiu da reserva sem justificativa (devolve o dobro, Código Civil, art. 418).${texto ? ` ${texto}` : ''}`,
+    reprovada_conferencia: null }, usuario,
+    `Ficha de ${f.inquilino_nome}: a empresa desistiu da reserva ${justificada ? 'com justificativa' : 'sem justificativa'}; devolver ${C.reais(dobro)}`);
+  return buscar(d, 'fichas', f.id);
 }
 
 /** Último dia para devolver a reserva (reprovada ou desistência): a decisão mais os dias úteis do termo. */
@@ -3190,7 +3217,7 @@ export const dataApagarDocumentosFicha = (f) => (inicioPrazoApagarFicha(f) && !f
  * situação e o motivo, a proposta (valores do imóvel, não da pessoa), as ligações (ids) e o dinheiro da reserva com os comprovantes.
  */
 const FICHA_FICA = new Set(['id', 'inquilino_nome', 'inquilino_tipo', 'situacao', 'decisao_data', 'decisao_por', 'decisao_motivo', 'data_recebida',
-  'imoveis_ids', 'modo_imoveis', 'pasta', 'documentos_apagados_em', 'reprovada_conferencia', 'link_aceite', 'dados_apagados_em', 'historico_limpo_em', 'documentos_no_contrato', 'criado_em', 'criado_por', 'alterado_em', 'alterado_por',
+  'imoveis_ids', 'modo_imoveis', 'pasta', 'documentos_apagados_em', 'reprovada_conferencia', 'desistencia_empresa','link_aceite', 'dados_apagados_em', 'historico_limpo_em', 'documentos_no_contrato', 'criado_em', 'criado_por', 'alterado_em', 'alterado_por',
   ...COMPROVANTES_DINHEIRO_FICHA, ...CAMPOS_PROPOSTA_FICHA]);
 const fichaFica = (k) => FICHA_FICA.has(k) || /^(reserva|devolucao)_/.test(k) || /_ids?$/.test(k);
 
@@ -3246,7 +3273,7 @@ export function pendenciasDasFichas(d, hoje = C.hojeIso()) {
     if (devolucaoPendente(f)) {
       const dv = devolucaoDaReserva(f);
       const ate = devolverReservaAte(f);
-      out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome} ${f.situacao === 'Desistiu' ? 'com desistência' : 'reprovada'}: registrar a devolução ${dv.integral ? `da reserva de ${C.reais(f.reserva_valor)}` : `de ${C.reais(dv.devolver)} da reserva de ${C.reais(f.reserva_valor)} (fica ${C.reais(dv.reter)}, como no termo)`}${ate ? (ate < hoje ? ` (o prazo era ${C.dataBr(ate)})` : ` até ${C.dataBr(ate)}`) : ''}` });
+      out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome} ${f.desistencia_empresa ? '(a empresa desistiu)' : f.situacao === 'Desistiu' ? 'com desistência' : 'reprovada'}: registrar a devolução ${dv.dobro ? `de ${C.reais(dv.devolver)} (o dobro da reserva de ${C.reais(f.reserva_valor)})` : dv.integral ? `da reserva de ${C.reais(f.reserva_valor)}` : `de ${C.reais(dv.devolver)} da reserva de ${C.reais(f.reserva_valor)} (fica ${C.reais(dv.reter)}, como no termo)`}${ate ? (ate < hoje ? ` (o prazo era ${C.dataBr(ate)})` : ` até ${C.dataBr(ate)}`) : ''}` });
     }
     // termo aceito (2026-11-24): prazo dos documentos e validade da reserva, contados do depósito
     const pz = f.situacao === 'Em análise' && f.aceite_reserva ? prazosDaReserva(f) : null;

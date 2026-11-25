@@ -378,3 +378,36 @@ test('advogado 24/11: e-mail da reprovação com o motivo e a reapresentação; 
   const t2 = atualizarTextoEmail('ficha_reprovada', 'Olá. Depois da análise, não foi possível aprovar a ficha neste momento.\n\n[se reserva]Reserva.[fim]');
   assert.match(t2, /neste momento\.\n\[se motivo_reprovacao\]\nMotivo: \{motivo_reprovacao\}\n\[fim\]\[se pode_reapresentar\]/);
 });
+
+// a empresa desiste da reserva (pedido do dono, 24/11/2026; o termo não fala nisso): com justificativa devolve a reserva; sem,
+// o dobro (CC art. 418). Ex.: R$ 500,00 desistida na terça, 08/12/2026 → devolver R$ 500,00 ou R$ 1.000,00 até quinta, 10/12/2026
+test('a empresa desiste: com justificativa devolve R$ 500,00; sem justificativa, o dobro (R$ 1.000,00); prazo de 2 dias úteis', () => {
+  const { d, f } = base({ reserva_valor: 50000, reserva_data: '2026-12-02' });
+  R.guardarAceiteReserva(d, f.id, aceite(), 'j');
+  assert.throws(() => R.empresaDesisteDaReserva(d, f.id, { justificada: true, motivo: ' ', data: '2026-12-08' }, 'j', '2026-12-08'), /justificativa/);
+  const g = R.empresaDesisteDaReserva(d, f.id, { justificada: true, motivo: 'O proprietário pediu o imóvel de volta.', data: '2026-12-08' }, 'j', '2026-12-08');
+  assert.equal(g.situacao, 'Desistiu');
+  assert.equal(g.desistencia_empresa, 'com_justificativa');
+  assert.match(g.decisao_motivo, /A empresa desistiu da reserva: O proprietário pediu o imóvel de volta\./);
+  let dv = R.devolucaoDaReserva(g);
+  assert.deepEqual([dv.devolver, dv.reter, dv.integral], [50000, 0, true], 'com justificativa: a reserva inteira, mesmo com o termo de 100%');
+  assert.equal(R.devolverReservaAte(g), '2026-12-10');
+  assert.ok(R.devolucaoPendente(g));
+  assert.throws(() => R.empresaDesisteDaReserva(d, f.id, { justificada: false, data: '2026-12-08' }, 'j', '2026-12-08'), /já está encerrada/);
+  // sem justificativa (outra ficha): o dobro
+  const { d: d2, f: f2 } = base({ reserva_valor: 50000, reserva_data: '2026-12-02' });
+  const h = R.empresaDesisteDaReserva(d2, f2.id, { justificada: false, data: '2026-12-08' }, 'j', '2026-12-08');
+  dv = R.devolucaoDaReserva(h);
+  assert.deepEqual([dv.devolver, dv.dobro], [100000, true]);
+  const p = R.pendenciasDasFichas(d2, '2026-12-09').find((x) => /devolução/.test(x.texto));
+  assert.match(p.texto, /\(a empresa desistiu\): registrar a devolução de R\$ 1\.000,00 \(o dobro da reserva de R\$ 500,00\) até 10\/12\/2026/);
+  // devolvido: o termo de devolução diz o dobro e o art. 418
+  R.atualizar(d2, 'fichas', f2.id, { devolucao_data: '2026-12-09', devolucao_valor: 100000 }, 'j');
+  const t = REC.montarRecibo(d2, 'devolucao_reserva', { ficha: R.buscar(d2, 'fichas', f2.id) }, '2026-12-09');
+  assert.match(t.paragrafos[0], /R\$ 1\.000,00 .*correspondente ao dobro da reserva de R\$ 500,00/);
+  assert.match(t.paragrafos[1], /por desistência da empresa, que devolve a reserva em dobro \(Código Civil, artigo 418\)/);
+  assert.match(t.paragrafos[2], /nada mais devem/);
+  assert.equal(R.devolucaoPendente(R.buscar(d2, 'fichas', f2.id)), false);
+  // o termo da reserva não fala de devolução em dobro (pedido do dono)
+  assert.doesNotMatch(REC.textoDoTermo(REC.termoDaReserva(d2, R.buscar(d2, 'fichas', f2.id))), /dobro/);
+});

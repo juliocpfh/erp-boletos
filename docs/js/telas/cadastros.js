@@ -665,6 +665,8 @@ export const CADASTROS = {
       if (comContrato.length && dados.situacao !== 'Aprovada') erros.situacao = dados.situacao === 'Desistiu' ? 'Esta ficha já virou contrato: use o botão "Desistiu antes de assinar" na página da ficha (ele cancela o contrato não assinado)' : 'Esta ficha já virou contrato: a situação fica "Aprovada"';
       // decisão: data (em branco: hoje) e quem decidiu; voltou para "Em análise": sem decisão
       if (dados.situacao !== 'Reprovada') dados.reprovada_conferencia = null;
+      // desistência da empresa (botão na página da ficha): some se a situação deixar de ser "Desistiu"
+      if (dados.situacao !== 'Desistiu') dados.desistencia_empresa = null;
       if (dados.situacao === 'Em análise') { dados.decisao_data = null; dados.decisao_por = null; } else {
         dados.decisao_data = dados.decisao_data || hoje;
         // mudou a decisão (ex.: aprovada em 10/10, reprovada hoje) e a data ficou a da decisão anterior, que veio no formulário:
@@ -694,7 +696,9 @@ export const CADASTROS = {
         if (dados.devolucao_valor > 0 && !dados.devolucao_data) erros.devolucao_data = 'Informe a data da devolução';
         else if (dados.devolucao_data && dados.devolucao_data > hoje) erros.devolucao_data = 'A devolução não pode ser numa data futura (registre depois de devolver)';
         else if (dados.devolucao_data && dados.reserva_data && dados.devolucao_data < dados.reserva_data) erros.devolucao_data = `A devolução não pode ser antes da reserva (${dataBr(dados.reserva_data)})`;
-        if (dados.devolucao_valor > (dados.reserva_valor || 0)) erros.devolucao_valor = `A devolução não pode passar da reserva (${reais(dados.reserva_valor || 0)})`;
+        // a empresa desistiu sem justificativa: devolve o dobro (CC art. 418)
+        const teto = R.devolucaoDaReserva({ ...r, ...dados }).dobro ? (dados.reserva_valor || 0) * 2 : (dados.reserva_valor || 0);
+        if (dados.devolucao_valor > teto) erros.devolucao_valor = teto > (dados.reserva_valor || 0) ? `A devolução não pode passar do dobro da reserva (${reais(teto)})` : `A devolução não pode passar da reserva (${reais(dados.reserva_valor || 0)})`;
         // devolução de só uma parte: o termo diz que a diferença "fica explicada nas observações da ficha" (a parte retida
         // pelo termo de aceite já sai explicada no termo de devolução)
         else if (dados.devolucao_valor > 0 && dados.devolucao_valor < dados.reserva_valor && dados.devolucao_valor !== R.devolucaoDaReserva({ ...r, ...dados }).devolver && !String(dados.observacoes || '').trim()) {

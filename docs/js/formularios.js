@@ -465,7 +465,7 @@ export const FICHA_FIM = [
   comprovante('comprovante_reserva', 'Comprovante da reserva', { ajuda: 'PDF ou foto do comprovante da reserva. Ao fazer o contrato, ele vai junto para a pasta do inquilino' }),
   { secao: 'Devolução da reserva (ficha reprovada ou desistência)', ...quando('situacao', 'Reprovada', 'Desistiu') },
   campo('devolucao_data', 'Reserva devolvida em', 'data', quando('situacao', 'Reprovada', 'Desistiu')),
-  campo('devolucao_valor', 'Valor devolvido', 'dinheiro', { ...quando('situacao', 'Reprovada', 'Desistiu'), ajuda: 'Em branco: o valor do termo de aceite (a reserva inteira, ou menos a parte que fica com a empresa na desistência); sem termo, a reserva inteira' }),
+  campo('devolucao_valor', 'Valor devolvido', 'dinheiro', { ...quando('situacao', 'Reprovada', 'Desistiu'), ajuda: 'Em branco: o valor do termo de aceite (a reserva inteira, ou menos a parte que fica com a empresa na desistência); sem termo, a reserva inteira; se a empresa desistiu sem justificativa, o dobro da reserva' }),
   comprovante('comprovante_devolucao', 'Comprovante da devolução', { ...quando('situacao', 'Reprovada', 'Desistiu'), ajuda: 'PDF ou foto do comprovante da devolução' }),
   secao('Observações'),
   campo('observacoes', 'Observações da análise', 'area'),
