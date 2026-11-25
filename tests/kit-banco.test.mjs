@@ -20,6 +20,12 @@ test('banco do kit: monta pelas regras, só com os documentos de teste, e com os
   assert.equal(R.buscar(d, 'encerramentos', ids.encerramento).saldo, 340000);
   assert.equal(R.buscar(d, 'notificacoes', ids.notificacao).situacao, 'Aguardando resposta');
   assert.ok(R.buscar(d, 'fichas', ids.ficha).aceite_reserva);
+  assert.equal(d.usuarios.filter((u) => u.papel === 'admin' && u.ativo).length, 1);
+});
+
+test('banco do kit: casos de 25/11 (reserva que quita o boleto e acordo refeito)', async () => {
+  const { banco: d, ids } = await montarBanco();
+  const cb = (id) => R.buscar(d, 'cobrancas', id);
   // reserva de R$ 2.000,00 que quita o boleto de R$ 1.800,00 (25/11/2026)
   assert.equal(cb(ids.juliaBoleto).situacao, 'Quitado pela reserva');
   assert.equal(cb(ids.juliaBoleto).reserva_utilizada, 180000);
@@ -29,5 +35,4 @@ test('banco do kit: monta pelas regras, só com os documentos de teste, e com os
   assert.ok(a1.honorarios > 0 && a1.despesas_cobranca[0].valor === 7350);
   const enc = R.parcelasDoAcordo(d, R.buscar(d, 'acordos', ids.acordoRefeito)).flatMap((x) => x.encargos_cobranca || []).reduce((s, e) => s + e.valor, 0);
   assert.equal(enc, a1.honorarios + 7350);
-  assert.equal(d.usuarios.filter((u) => u.papel === 'admin' && u.ativo).length, 1);
 });
