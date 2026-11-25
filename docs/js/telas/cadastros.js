@@ -239,6 +239,59 @@ function avisoCreditos(c, r) {
     : ` Crédito do inquilino: ${lista}. É taxa do proprietário paga pelo inquilino no condomínio, sem boleto onde abater: já vem em "Créditos" e soma ao valor devolvido (mantenha a linha na descrição).`;
 }
 
+/**
+ * Caixa do cálculo final com as multas sugeridas da saída (`R.multasDaSaida`): a da saída antes do fim do contrato e a da falta do
+ * aviso de 30 dias. Nenhuma entra sozinha: "Usar" soma o valor em "Débitos" e põe a linha na descrição (como a pintura, #395).
+ * Se couberem as duas, só a maior tem o botão. Ex.: aluguel R$ 1.800,00, aviso em 10/11 e saída em 25/11 → "Usar R$ 900,00".
+ */
+function sugestoesMultaSaida(c) {
+  if (!c || !c.data_saida) return '';
+  const { antecipada: m, aviso: a, vale } = R.multasDaSaida(d(), c);
+  const linhas = [];
+  const usar = (valor, texto) => ` <button type="button" class="secundario pequeno" data-usar-multa data-valor="${valor}" data-texto="${esc(texto)}">Usar ${esc(reais(valor))}</button>`;
+  const deixar = ' <span class="suave">(não some as duas: vale só a maior)</span>';
+  if (m) {
+    const texto = `Multa pela saída antecipada: ${reais(m.valor)} (3 aluguéis de ${reais(m.aluguel)}, proporcional aos ${m.restam} de ${m.total} dias que faltavam para ${dataBr(m.fim)})`;
+    linhas.push(`<li><b>Saída antes do fim do contrato (${esc(dataBr(m.fim))})</b>: ${esc(reais(m.valor))} (3 aluguéis de ${esc(reais(m.aluguel))}, proporcional aos ${m.restam} de ${m.total} dias que faltavam${m.herdado ? `, contados desde o início do contrato original, em ${esc(dataBr(m.inicio))}: na troca de titular o prazo não recomeça` : ''}; confira a cláusula no contrato assinado). A lei dispensa esta multa se o inquilino foi transferido pelo empregador e avisou com 30 dias (Lei 8.245/91, art. 4º): nesse caso, deixe de fora e anote o motivo na descrição.${vale === 'antecipada' ? usar(m.valor, texto) : deixar}</li>`);
+  }
+  if (a) {
+    const conta = a.modo === 'mes_inteiro' ? `1 mês de ${reais(a.mes)}` : `${reais(a.mes)} × ${a.faltaram}/${R.DIAS_AVISO_SAIDA} dias que faltaram`;
+    const quando = a.sem_aviso ? 'saiu sem avisar por escrito' : `avisou em ${dataBr(c.aviso_saida_data)}, ${a.antecedencia} dia(s) antes da saída`;
+    const mes = `aluguel de ${reais(a.aluguel)}${a.encargos ? ` + encargos de ${reais(a.encargos)} (IPTU e seguro do boleto)` : ''}`;
+    const texto = `Multa pela falta do aviso de ${R.DIAS_AVISO_SAIDA} dias: ${reais(a.valor)} (${quando}; ${conta})`;
+    linhas.push(`<li><b>Falta do aviso de ${R.DIAS_AVISO_SAIDA} dias</b>: ${esc(reais(a.valor))} (${esc(quando)}; ${esc(mes)}; ${esc(conta)}). O contrato e a lei (Lei 8.245/91, art. 6º) cobram 1 mês de aluguel e encargos de quem não avisa.${vale === 'aviso' ? usar(a.valor, texto) : deixar}</li>`);
+  }
+  const semData = !c.aviso_saida_data && !c.aviso_saida_sem && R.regra('falta_aviso_saida', c) !== 'nao_sugerir';
+  if (!linhas.length && !semData) return '';
+  const duas = m && a ? `<p>O contrato prevê as duas, mas cobrar as duas pela mesma saída pode ser visto como multa em dobro e o juiz pode reduzir (Código Civil, art. 413): o sistema sugere só a maior. Para cobrar as duas, some a outra à mão.</p>` : '';
+  return `<div class="alerta aviso" data-sugestoes-multa><p><b>Multa sugerida pela saída</b> (não entra sozinha: "Usar" soma aos débitos e escreve a linha na descrição).</p>
+    ${linhas.length ? `<ul>${linhas.join('')}</ul>` : ''}${duas}
+    ${semData ? `<p class="suave">A data em que o inquilino avisou da saída não foi registrada: informe em "Adiar ou mudar a data" (página do inquilino, caixa da saída) para o sistema conferir os ${R.DIAS_AVISO_SAIDA} dias de aviso.</p>` : ''}</div>`;
+}
+
+// "Usar" da multa sugerida: soma em "Débitos" e acrescenta a linha na descrição (uma vez só)
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener('click', (ev) => {
+    const b = ev.target.closest?.('[data-usar-multa]');
+    if (!b) return;
+    ev.preventDefault();
+    const form = document.querySelector('main form[data-form="cadastro"]');
+    const campo = form && form.querySelector('input[name="debitos"]');
+    const desc = form && form.querySelector('[name="debitos_descricao"]');
+    if (!campo || !desc) return;
+    const texto = b.dataset.texto || '';
+    if (desc.value.includes(texto)) { aviso('Esta multa já está nos débitos.', 'info'); return; }
+    let atual = 0;
+    try { atual = campo.value.trim() ? C.centavos(campo.value) : 0; } catch { atual = 0; }
+    campo.value = F.dinheiroTexto(atual + Number(b.dataset.valor || 0));
+    desc.value = desc.value.trim() ? `${desc.value.replace(/\s+$/, '')}\n${texto}` : texto;
+    for (const el of [campo, desc]) el.dispatchEvent(new Event('input', { bubbles: true }));
+    form.dataset.alterado = '1';
+    b.disabled = true;
+    b.textContent = 'Incluída nos débitos';
+  });
+}
+
 export const CADASTROS = {
   imoveis: {
     titulo: (r) => (r ? 'Editar imóvel' : 'Novo imóvel'),
@@ -1119,13 +1172,12 @@ export const CADASTROS = {
       const vistoria = v.vistoria ? `Vistoria de saída de ${dataBr(v.vistoria.data)}: ${v.texto.toLocaleLowerCase('pt-BR')}${v.pendencias.length ? ` (${v.pendencias.slice(0, 5).join('; ')}${v.pendencias.length > 5 ? '…' : ''}): ${v.semValor ? `falta o valor de ${v.semValor} reparo(s) (roteiro da saída, "Valores dos reparos")` : `os reparos (${reais(v.totalReparos)}) já entram nos débitos`}` : ''}.` : 'Vistoria de saída ainda não registrada: o cálculo fica como "não feita" (registre a vistoria antes, se houver).';
       const semDeposito = (R.temCaucao(c) || R.temDeposito(c)) && R.valorGarantia(d(), c) > 0 && !R.garantiaRecebida(d(), c)
         ? ` Atenção: a ${R.temCaucao(c) ? 'caução' : 'garantia'} de ${reais(R.valorGarantia(d(), c))} foi combinada, mas nada foi depositado: não há garantia a devolver (se foi depositada, registre o depósito antes).` : '';
-      // saída antes do fim do prazo: a multa do contrato não entra sozinha; o valor sugerido aparece para incluir ou dispensar
-      const m = R.multaSaidaAntecipada(d(), c);
-      const multa = m ? ` Saída antes do fim do contrato (${dataBr(m.fim)}): multa sugerida de ${reais(m.valor)} (3 aluguéis de ${reais(m.aluguel)}, proporcional aos ${m.restam} de ${m.total} dias que faltavam${m.herdado ? `, contados desde o início do contrato original, em ${dataBr(m.inicio)}: na troca de titular o prazo não recomeça` : ''}; confira a cláusula no contrato assinado). Ela não entra sozinha: para cobrar, some aos débitos e escreva "Multa pela saída antecipada" na descrição; para dispensar (ex.: transferência pelo empregador, Lei 8.245/91, art. 4º), deixe de fora e anote o motivo na descrição.` : '';
       const compSaida = c.data_saida ? C.competenciaDe(c.data_saida) : null;
       const semBoleto = compSaida && !R.boletoDoMes(d(), c.id, compSaida) ? ` Atenção: o boleto de ${compBr(compSaida)} (último mês, proporcional) ainda não foi gerado: gere antes, senão o aluguel desse mês fica fora dos débitos.` : '';
-      return `Saída em ${dataBr(c.data_saida)} (mude em "Saída do inquilino").${multa}${semBoleto}${semDeposito}${avisoCreditos(c, r)} ${vistoria} A leitura dos relógios é a da vistoria de saída: vem preenchida e, se mudar aqui, muda lá também. Confira o boleto do último mês (proporcional aos dias). A garantia é corrigida pela poupança: o índice vem do Banco Central, pelo aniversário de cada depósito (confira e corrija se precisar).`;
+      return `Saída em ${dataBr(c.data_saida)} (mude em "Saída do inquilino").${semBoleto}${semDeposito}${avisoCreditos(c, r)} ${vistoria} A leitura dos relógios é a da vistoria de saída: vem preenchida e, se mudar aqui, muda lá também. Confira o boleto do último mês (proporcional aos dias). A garantia é corrigida pela poupança: o índice vem do Banco Central, pelo aniversário de cada depósito (confira e corrija se precisar).`;
     },
+    // multas sugeridas (saída antecipada e falta do aviso de 30 dias): nunca entram sozinhas; "Usar" soma aos débitos
+    topo: (r, q) => sugestoesMultaSaida(buscar('contratos', q.contrato)),
     // os débitos vêm dos boletos que já existem: sem o boleto do mês da saída, o último aluguel ficava fora do cálculo
     // (ex.: saída em 20/10/2026 e o boleto de 10/2026 ainda não gerado → débitos R$ 0,00 e a caução devolvida inteira)
     conferir: (dados, r, q) => {
