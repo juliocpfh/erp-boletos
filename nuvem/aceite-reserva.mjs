@@ -14,6 +14,7 @@
 import { contaGuardada, emailValido, enviarEmail, estadoEmail } from './gmail.mjs';
 import { avisarAparelhos } from './push.mjs';
 import { HSTS, SO_SE_NOVO, hashDaChave } from './ficha-publica.mjs';
+import { validadeDoLink } from '../docs/js/brasilia.js';
 
 /** O link vale DIAS_LINK_ACEITE dias; o registro (com a prova) fica DIAS_GUARDA_ACEITE dias depois disso. */
 export const DIAS_LINK_ACEITE = 7;
@@ -118,7 +119,7 @@ export async function criarLinkAceite(request, env, email) {
   const chave = novaChave();
   const hash = await hashDaChave(chave);
   const agora = new Date().toISOString();
-  const vence = new Date(Date.now() + DIAS_LINK_ACEITE * 86400000).toISOString();
+  const vence = validadeDoLink(DIAS_LINK_ACEITE, new Date(), p.fim_expediente); // fim do 7º dia em Brasília; criado depois do expediente, conta de amanhã
   let hashAntigo = null; let gravado = false;
   for (let i = 0; i < 4 && !gravado; i += 1) {
     const anterior = await lerRegistro(env, ficha);
@@ -399,7 +400,7 @@ button.sec{background:transparent;color:var(--cor);border:1px solid var(--cor)}b
   const chave = location.hash.slice(1);
   const canal = { e: 'email', w: 'whatsapp' }[new URLSearchParams(location.search).get('c')] || 'direto';
   const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const dataBr = (iso) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '');
+  const dataBr = (iso) => (iso ? new Date(iso).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '');
   const horaBr = (iso) => (iso ? new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '');
   const so = (t) => String(t || '').split('').filter((x) => x >= '0' && x <= '9').join('');
   const api = async (caminho, op = {}) => {

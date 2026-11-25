@@ -85,7 +85,7 @@ function documentosDoEmail(f) {
 function linkDaFicha(f, pessoa, hoje) {
   const l = f && f.links_ficha && f.links_ficha[pessoa];
   const naAba = f && FO.urlDoLink(f.id, pessoa);
-  return l && !l.encerrado && naAba && String(l.vence_em).slice(0, 10) >= hoje ? { url: naAba.url, validade: C.dataBr(String(l.vence_em).slice(0, 10)) } : { url: '', validade: '' };
+  return l && !l.encerrado && naAba && C.dataDeBrasilia(l.vence_em) >= hoje ? { url: naAba.url, validade: C.dataBrDe(l.vence_em) } : { url: '', validade: '' };
 }
 
 /**
@@ -107,8 +107,8 @@ function camposDoTermo(f, hoje) {
     retencao_valor: C.reais(reter), devolve_depois: C.reais(valor - reter),
     regra_desistencia: REC.regraDaDesistencia(c, valor), texto_conferencia: REC.TEXTO_CONFERENCIA, aviso_desistencia: REC.avisoDaDesistencia(c, valor),
     requisitos: String(f.requisitos || '').split(/\n+/).map((x) => x.trim()).filter(Boolean).map((x) => `- ${x}`).join('\n'),
-    link_termo: link && String(link.vence_em).slice(0, 10) >= hoje ? link.url : '', link_termo_validade: link ? C.dataBr(String(link.vence_em).slice(0, 10)) : '',
-    aceite_data: f.aceite_reserva ? C.dataBr(String(f.aceite_reserva.em).slice(0, 10)) : '',
+    link_termo: link && C.dataDeBrasilia(link.vence_em) >= hoje ? link.url : '', link_termo_validade: link ? C.dataBrDe(link.vence_em) : '',
+    aceite_data: f.aceite_reserva ? C.dataBrDe(f.aceite_reserva.em) : '',
     desistencia: f.aceite_reserva ? REC.textoDesistencia(f) : '',
     prazo_documentos: f.aceite_reserva && pz ? C.dataBr(pz.documentos_ate) : '',
     devolver_reserva: dv ? C.reais(dv.devolver) : '', reter_reserva: dv ? C.reais(dv.reter) : '',

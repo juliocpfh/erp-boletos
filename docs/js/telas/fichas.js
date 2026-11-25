@@ -195,7 +195,7 @@ async function linkParaMandar(f, pessoa) {
   const naAba = FO.urlDoLink(f.id, pessoa);
   if (naAba) return naAba;
   const vale = linkValido(f, pessoa);
-  const ate = vale ? dataBr(String(vale.vence_em).slice(0, 10)) : '';
+  const ate = vale ? C.dataBrDe(vale.vence_em) : '';
   const ok = await janela({ titulo: 'Mandar o link de novo', sim: 'Gerar e mostrar', nao: 'Voltar',
     html: `<p>Por segurança, o link da ficha só aparece na hora em que é gerado (ele não fica guardado no sistema).</p>
       <p>Para mandar de novo a <b>${esc(FO.nomeDaPessoa(f, pessoa))}</b>, o sistema gera outro endereço${ate ? `, que vale até a mesma data (<b>${ate}</b>). O link que a pessoa já tem continua funcionando` : ''}. O que ela já mandou continua guardado.</p>` });
@@ -233,7 +233,7 @@ async function novoLinkDaFicha(f, pessoa, { pdf = true, manter = false } = {}) {
     const links = { ...(R.buscar(db, 'fichas', f.id).links_ficha || {}) };
     const { url, encerrado, ...anterior } = links[pessoa] || {}; // eslint-disable-line no-unused-vars
     links[pessoa] = { ...anterior, vence_em: link.vence_em, criado_em: new Date().toISOString(), por: login(), ...(pdfSha ? { pdf_sha256: pdfSha } : {}) };
-    R.atualizar(db, 'fichas', f.id, { links_ficha: links }, login(), `Link da ficha de ${FO.nomeDaPessoa(f, pessoa)} ${manter ? 'mandado de novo (o anterior continua valendo)' : 'gerado'} (vale até ${dataBr(link.vence_em.slice(0, 10))})`);
+    R.atualizar(db, 'fichas', f.id, { links_ficha: links }, login(), `Link da ficha de ${FO.nomeDaPessoa(f, pessoa)} ${manter ? 'mandado de novo (o anterior continua valendo)' : 'gerado'} (vale até ${C.dataBrDe(link.vence_em)})`);
   });
   return { url: link.url, vence_em: link.vence_em };
 }
@@ -261,7 +261,7 @@ function caixaFichaOnline(f) {
     const l = (f.links_ficha || {})[p];
     const valido = linkValido(f, p);
     return `<li style="margin:6px 0"><b>${esc(FO.nomeDaPessoa(f, p))}</b>${p === 'interessado' ? '' : ' <span class="suave">(fiador)</span>'}
-      <span data-situacao-link="${p}">${valido ? `<span class="suave">link até ${dataBr(String(l.vence_em).slice(0, 10))}</span>` : l ? etiqueta('link vencido', 'aviso') : '<span class="suave">sem link</span>'}</span><br>
+      <span data-situacao-link="${p}">${valido ? `<span class="suave">link até ${C.dataBrDe(l.vence_em)}</span>` : l ? etiqueta('link vencido', 'aviso') : '<span class="suave">sem link</span>'}</span><br>
       ${encerrada ? '' : botao('gerarLinkFicha', valido ? 'Gerar novo link' : 'Gerar link', { id: f.id, pessoa: p }, valido ? 'secundario pequeno' : 'pequeno', valido ? 'Gerar um link novo? O link atual deixa de valer (o que a pessoa já mandou continua guardado).' : '')}
       ${valido && !encerrada ? botao('compartilharLinkFicha', FO.urlDoLink(f.id, p) ? 'Copiar / WhatsApp' : 'Mandar de novo', { id: f.id, pessoa: p }, 'secundario pequeno') : ''}</li>`;
   }).join('');
@@ -310,7 +310,7 @@ function desenharLinksDaFicha(caixa, links, marcar) {
     if (!el) continue;
     const ultimo = (l.respostas || []).at(-1);
     el.innerHTML = `${etiqueta(TEXTO_SITUACAO_LINK[l.situacao] || l.situacao, COR_LINK[l.situacao] || 'neutra')}
-      <span class="suave">${ultimo ? ` · dados enviados em ${C.dataHoraBr(ultimo.em)}` : ''}${(l.arquivos || []).filter((a) => !a.apagado_em).length ? ` · ${l.arquivos.filter((a) => !a.apagado_em).length} arquivo(s)` : ''}${l.situacao === 'Encerrado' ? '' : Date.parse(l.vence_em) < Date.now() ? ` · link venceu em ${new Date(l.vence_em).toLocaleDateString('pt-BR')}` : ` · link até ${new Date(l.vence_em).toLocaleDateString('pt-BR')}`}</span>`;
+      <span class="suave">${ultimo ? ` · dados enviados em ${C.dataHoraBr(ultimo.em)}` : ''}${(l.arquivos || []).filter((a) => !a.apagado_em).length ? ` · ${l.arquivos.filter((a) => !a.apagado_em).length} arquivo(s)` : ''}${l.situacao === 'Encerrado' ? '' : Date.parse(l.vence_em) < Date.now() ? ` · link venceu em ${C.dataBrDe(l.vence_em)}` : ` · link até ${C.dataBrDe(l.vence_em)}`}</span>`;
   }
   caixa._links = links;
   const fichaAqui = buscar('fichas', Number(caixa.dataset.fichaOnline));
@@ -362,7 +362,7 @@ function blocoDoLink(f, l) {
   const trazido = ultimo && guardado.trazido_em === ultimo.em;
   const partes = [];
   if (l.situacao === 'Desistiu' && p === 'interessado' && !R.fichaSemContrato(f)) {
-    partes.push(`<div class="alerta perigo"><b>${esc(nome)} avisou pelo link, em ${C.dataHoraBr(l.desistiu_em)}, que não vai seguir com a análise.</b> Registre com "Desistiu antes de assinar"${f.reserva_valor > 0 ? (() => { const dv = R.devolucaoDaReserva(f, { data: String(l.desistiu_em || '').slice(0, 10) || null }); return dv.integral ? ` e devolva a reserva de ${reais(f.reserva_valor)} por inteiro` : dv.devolver === 0 ? ` (a reserva de ${reais(f.reserva_valor)} fica com a empresa: ${esc(dv.motivo)})` : ` e devolva ${reais(dv.devolver)} da reserva de ${reais(f.reserva_valor)} (${esc(dv.motivo)})`; })() : ''}.</div><p>${botaoDesistencia(f)}</p>`);
+    partes.push(`<div class="alerta perigo"><b>${esc(nome)} avisou pelo link, em ${C.dataHoraBr(l.desistiu_em)}, que não vai seguir com a análise.</b> Registre com "Desistiu antes de assinar"${f.reserva_valor > 0 ? (() => { const dv = R.devolucaoDaReserva(f, { data: C.dataDeBrasilia(l.desistiu_em) || null }); return dv.integral ? ` e devolva a reserva de ${reais(f.reserva_valor)} por inteiro` : dv.devolver === 0 ? ` (a reserva de ${reais(f.reserva_valor)} fica com a empresa: ${esc(dv.motivo)})` : ` e devolva ${reais(dv.devolver)} da reserva de ${reais(f.reserva_valor)} (${esc(dv.motivo)})`; })() : ''}.</div><p>${botaoDesistencia(f)}</p>`);
   }
   if (ultimo && !trazido) {
     const dif = diferencasDoEnvio(f, l);
@@ -604,7 +604,7 @@ async function janelaDoLink(f, pessoa, link, { lembrete = false, faltando = [] }
   const texto = FO.textoWhatsapp(f, pessoa, link, { lembrete, faltando });
   await janela({
     titulo: `Link da ficha: ${FO.nomeDaPessoa(f, pessoa)}`, sim: 'Fechar', nao: 'Voltar',
-    html: `<p>Vale até <b>${dataBr(String(link.vence_em).slice(0, 10))}</b>. É só desta pessoa: não publique.</p>
+    html: `<p>Vale até <b>${C.dataBrDe(link.vence_em)}</b>. É só desta pessoa: não publique.</p>
       <p class="texto-aviso"><b>Copie agora:</b> por segurança, este link não fica guardado no sistema. Para mandar de novo depois, o sistema gera outro endereço com a mesma validade (e este continua valendo).</p>
       <p><textarea rows="5" readonly data-texto-link style="width:100%">${esc(texto)}</textarea></p>
       <p class="acoes"><button type="button" class="secundario pequeno" data-copiar-link>Copiar a mensagem</button>

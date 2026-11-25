@@ -3176,7 +3176,7 @@ export function devolucaoDaReserva(f, { data = null, hoje = C.hojeIso() } = {}) 
   const porque = f.situacao === 'Reprovada' ? 'informação ou documento que não correspondeu à realidade na conferência (conta como desistência)' : 'desistência';
   const prazo = c.dias_arrependimento > 0 ? ` depois de ${c.dias_arrependimento} dias do depósito` : '';
   return { reserva, devolver: reserva - reter, reter, integral: reter === 0,
-    motivo: `${porque}${prazo}: a empresa fica com ${reter >= reserva ? 'a reserva inteira' : C.pct(c.retencao_pct)} (${C.reais(reter)}), como no termo aceito em ${C.dataBr(String(f.aceite_reserva.em).slice(0, 10))}` };
+    motivo: `${porque}${prazo}: a empresa fica com ${reter >= reserva ? 'a reserva inteira' : C.pct(c.retencao_pct)} (${C.reais(reter)}), como no termo aceito em ${C.dataBrDe(f.aceite_reserva.em)}` };
 }
 
 /** Último dia para devolver a reserva (reprovada ou desistência): a decisão mais os dias úteis do termo. */

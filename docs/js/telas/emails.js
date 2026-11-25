@@ -314,7 +314,7 @@ export async function caixaGmailHtml(volta = '') {
   if (!s) return `${topo}${avisoVolta}<p class="suave">Não deu para ver a situação agora (sem internet?). Recarregue a página para tentar de novo.</p></div>`;
   let situacao;
   if (s.origem === 'conta' && s.ligado) {
-    situacao = `<p>${etiqueta('Ligado', 'ok')} Os e-mails saem pela conta <b>${esc(s.conta || '')}</b>${s.remetente && s.remetente !== s.conta ? `, com o remetente <b>${esc(s.remetente)}</b>` : ''}${s.ligado_em ? ` <span class="suave">(conectado em ${dataBr(String(s.ligado_em).slice(0, 10))})</span>` : ''}.</p>`;
+    situacao = `<p>${etiqueta('Ligado', 'ok')} Os e-mails saem pela conta <b>${esc(s.conta || '')}</b>${s.remetente && s.remetente !== s.conta ? `, com o remetente <b>${esc(s.remetente)}</b>` : ''}${s.ligado_em ? ` <span class="suave">(conectado em ${C.dataBrDe(s.ligado_em)})</span>` : ''}.</p>`;
   } else if (s.origem === 'segredo' && s.ligado) {
     situacao = `<p>${etiqueta('Ligado', 'ok')} Pelo jeito antigo (código colado no Cloudflare), com o remetente <b>${esc(s.remetente || '')}</b>.</p>
       <p class="suave">Para passar ao botão: clique em <b>Conectar o Gmail</b>. Depois disso o jeito antigo deixa de ser usado e o técnico pode apagá-lo da nuvem (para ele: segredo GMAIL_REFRESH_TOKEN no Cloudflare).</p>`;

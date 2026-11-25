@@ -32,7 +32,7 @@ export function situacaoDoCertificado(pc, agora = Date.now()) {
   if (!c) return { anexado: false, texto: `Nenhum certificado anexado${pc.computador ? ` (último computador: ${pc.computador})` : ''}.`, cor: 'neutra', aviso: '' };
   const dias = diasAte(c.validade, agora);
   const quem = `${c.nome}${c.cnpj ? `, CNPJ ${c.cnpj}` : ''}`;
-  const onde = `${pc.computador ? `no computador ${pc.computador}` : 'no programa do PC'}${c.instalado_em ? `, desde ${C.dataBr(c.instalado_em.slice(0, 10))}` : ''}`;
+  const onde = `${pc.computador ? `no computador ${pc.computador}` : 'no programa do PC'}${c.instalado_em ? `, desde ${C.dataBrDe(c.instalado_em)}` : ''}`;
   const validade = dias < 0 ? `venceu em ${C.dataBr(c.validade)}` : `válido até ${C.dataBr(c.validade)} (${dias === 0 ? 'vence hoje' : `faltam ${dias} ${dias === 1 ? 'dia' : 'dias'}`})`;
   const aviso = dias < 0 ? `O certificado digital da empresa venceu em ${C.dataBr(c.validade)}: os documentos não são mais assinados. Renove com a certificadora e anexe o novo em Sistema → Empresas.`
     : dias <= AVISO_CERTIFICADO_DIAS ? `O certificado digital da empresa vence em ${C.dataBr(c.validade)} (${dias === 0 ? 'hoje' : `faltam ${dias} ${dias === 1 ? 'dia' : 'dias'}`}): renove com a certificadora e anexe o novo em Sistema → Empresas.` : '';

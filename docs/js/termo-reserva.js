@@ -25,7 +25,7 @@ export function pedidoDoAceite(d, f, logo = '') {
 export function textoWhatsappAceite(f, link) {
   const nome = String(f.inquilino_nome || '').trim().split(/\s+/)[0];
   const valor = R.valorDaReserva(f);
-  return `Olá${nome ? `, ${nome}` : ''}! Seguem as condições do imóvel e o termo da reserva${valor ? ` (${C.reais(valor)}, abatida do 1º aluguel)` : ''}. Leia e, se estiver de acordo, dê o aceite por este link, só seu, que vale até ${C.dataBr(String(link.vence_em).slice(0, 10))}: ${link.url}
+  return `Olá${nome ? `, ${nome}` : ''}! Seguem as condições do imóvel e o termo da reserva${valor ? ` (${C.reais(valor)}, abatida do 1º aluguel)` : ''}. Leia e, se estiver de acordo, dê o aceite por este link, só seu, que vale até ${C.dataBrDe(link.vence_em)}: ${link.url}
 Depois do aceite, mandamos a conta para o depósito.${REC.avisoDaDesistencia(R.condicoesDaReservaAgora(), valor) ? ' Atenção: leia a regra da desistência antes de depositar.' : ''} Qualquer dúvida, é só responder.`;
 }
 
@@ -53,6 +53,7 @@ async function pedir(caminho, op = {}) {
   return dados;
 }
 
-export const criarLinkDoAceite = (corpo) => pedir('link', { method: 'POST', body: JSON.stringify(corpo) });
+// fim_expediente: a nuvem conta a validade de amanhã quando o link é criado depois do horário comercial (regra fim_expediente_hora)
+export const criarLinkDoAceite = (corpo) => pedir('link', { method: 'POST', body: JSON.stringify({ ...corpo, fim_expediente: C.fimDoExpediente() }) });
 export const lerAceiteNaNuvem = (fichaId) => pedir(`ler?ficha=${Number(fichaId)}`).then((r) => r.link || null);
 export const encerrarAceiteNaNuvem = (fichaId) => pedir('encerrar', { method: 'POST', body: JSON.stringify({ ficha_id: Number(fichaId) }) });

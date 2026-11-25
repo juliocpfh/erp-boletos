@@ -423,7 +423,7 @@ button.sec{background:transparent;color:var(--cor);border:1px solid var(--cor)}b
   const chave = location.hash.slice(1);
   const canal = { e: 'email', w: 'whatsapp' }[new URLSearchParams(location.search).get('c')] || 'direto';
   const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const dataBr = (iso) => (iso ? new Date(iso.length === 10 ? iso + 'T12:00:00' : iso).toLocaleDateString('pt-BR') : '');
+  const dataBr = (iso) => (iso ? new Date(iso.length === 10 ? iso + 'T12:00:00' : iso).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '');
   const horaBr = (iso) => (iso ? new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '');
   const so = (t) => String(t || '').split('').filter((x) => x >= '0' && x <= '9').join('');
   const fone = (t) => { const n = so(t).replace(/^55(?=[0-9]{10,11}$)/, ''); return n.length === 11 ? '(' + n.slice(0, 2) + ') ' + n.slice(2, 7) + '-' + n.slice(7) : n.length === 10 ? '(' + n.slice(0, 2) + ') ' + n.slice(2, 6) + '-' + n.slice(6) : t || ''; };

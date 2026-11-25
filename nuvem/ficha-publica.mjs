@@ -20,6 +20,7 @@
 // - Avisos a cada etapa (e-mail para a pessoa e para a equipe, celular da equipe): avisos-ficha.mjs e push.mjs.
 import { desinscrever, inscrever, publica, pushLigado, testarAparelho } from './push.mjs';
 import { paraLixeira } from './lixeira.mjs';
+import { validadeDoLink } from '../docs/js/brasilia.js';
 // import circular de propósito (contatos-publico usa HSTS e hashDaChave daqui só dentro de funções)
 import { atenderContatosPublico, paginaDosContatos } from './contatos-publico.mjs';
 import { atenderAceitePublico, paginaDoAceite } from './aceite-reserva.mjs';
@@ -294,7 +295,7 @@ export async function criarLink(request, env, email) {
   const chave = novaChave();
   const hash = await hashDaChave(chave);
   const agora = new Date();
-  const vence = new Date(agora.getTime() + DIAS_LINK * 86400000).toISOString();
+  const vence = validadeDoLink(DIAS_LINK, agora, p.fim_expediente); // fim do 7º dia em Brasília; criado depois do expediente, conta de amanhã
   // O registro só entra se ninguém mexeu nele desde a leitura (a pessoa pode estar enviando pelo link antigo agora mesmo):
   // senão lê de novo e repete, para não perder a resposta ou o arquivo que acabou de chegar.
   let antigos = []; let gravado = false; let vale = vence;
@@ -529,7 +530,7 @@ export async function receberArquivoPublico(request, env, url, avisar) {
   const corpo = await lerBytes(request, MAX_DOCUMENTO);
   const ext = tipoDoArquivo(corpo);
   if (!ext) throw new ErroFicha(415, 'Mande o documento em PDF ou foto (JPG ou PNG).');
-  const dia = new Date().toISOString().slice(0, 10);
+  const dia = hojeBrasil();
   const quem = pessoa === 'interessado' ? '' : `${pessoa.replace('fiador', 'fiador-')}-`;
   const sufixo = [...crypto.getRandomValues(new Uint8Array(3))].map((b) => b.toString(16).padStart(2, '0')).join('');
   const base = `${registro.pasta}/link-${quem}${nomeSimples(documento)}-${dia}-${sufixo}`;
@@ -762,7 +763,7 @@ button.mini{padding:5px 10px;font-size:.85rem;margin:2px 4px 2px 6px}.enviado{ma
   const app = document.getElementById('app');
   const chave = location.hash.slice(1);
   const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const dataBr = (iso) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '');
+  const dataBr = (iso) => (iso ? new Date(iso).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '');
   const horaBr = (iso) => (iso ? new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '');
   const reais = (c) => (c === null || c === undefined || c === '' ? '' : (c / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
   // valor em reais: "2.500,50" ou, no teclado do celular que só tem ponto, "2500.50" (sem vírgula e com 1 ou 2 algarismos depois

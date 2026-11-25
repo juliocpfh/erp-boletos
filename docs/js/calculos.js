@@ -2,6 +2,9 @@
 // Valores em dinheiro são sempre CENTAVOS inteiros (R$ 1.350,00 = 135000).
 // Percentuais são números comuns (10 = 10%). Datas são textos "AAAA-MM-DD".
 import { feriadosLocais, regra } from './config-regras.js';
+import { dataDeBrasilia, inicioDoPrazo, ultimoDiaDoPrazo, validadeDoLink } from './brasilia.js';
+
+export { dataDeBrasilia, horaDeBrasilia, inicioDoPrazo, ultimoDiaDoPrazo, validadeDoLink } from './brasilia.js';
 
 /**
  * Erro "do usuário": o que ele digitou ou pediu não serve (senha errada, valor acima do limite, código de barras curto).
@@ -95,6 +98,17 @@ export function hojeIso() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+
+/** Hora do fim do expediente (regra `fim_expediente_hora`, padrão 18): prazo dado a partir dela começa a contar amanhã. */
+export const fimDoExpediente = () => regra('fim_expediente_hora');
+/** Dia em que começa um prazo dado agora, pela regra do expediente. Ex.: 24/11 às 21h45 → '2026-11-25'; às 10h → '2026-11-24'. */
+export const inicioDoPrazoAgora = (agora = new Date()) => inicioDoPrazo(agora, fimDoExpediente());
+/** Último dia de um prazo de `dias` corridos dado agora (regra do expediente). Ex.: 7 dias às 21h45 de 24/11 → '2026-12-02'. */
+export const prazoDadoAgora = (dias, agora = new Date()) => ultimoDiaDoPrazo(dias, agora, fimDoExpediente());
+/** Validade (ISO, fim do último dia em Brasília) de um link de `dias` criado agora. */
+export const validadeDoLinkAgora = (dias, agora = new Date()) => validadeDoLink(dias, agora, fimDoExpediente());
+/** Data de Brasília de um instante, em dd/mm/aaaa. Ex.: '2026-11-25T00:47:00Z' → '24/11/2026'. */
+export const dataBrDe = (instante) => dataBr(dataDeBrasilia(instante));
 
 /** Data e hora locais para nomes de arquivo: 'AAAA-MM-DD-HH-MM' (às 20:57 de 16/11/2026 → '2026-11-16-20-57'; não a hora UTC). */
 export function carimboLocal(agora = new Date()) {

@@ -311,7 +311,7 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
         '1. A reserva não forma a locação: o contrato só existe depois de assinado por todas as partes.',
         '2. Aprovada a ficha e assinado o contrato, o valor é abatido do primeiro aluguel.',
         f && f.aceite_reserva && R.retencaoDaReserva(p.reserva_valor, R.condicoesDaReserva(f).retencao_pct) > 0
-          ? `3. Não aprovada a ficha, o valor é devolvido por inteiro, sem desconto, na conta de onde veio o depósito. Na desistência, vale o termo de aceite da reserva de ${C.dataBr(String(f.aceite_reserva.em).slice(0, 10))}: ${textoDesistencia(f)}`
+          ? `3. Não aprovada a ficha, o valor é devolvido por inteiro, sem desconto, na conta de onde veio o depósito. Na desistência, vale o termo de aceite da reserva de ${C.dataBrDe(f.aceite_reserva.em)}: ${textoDesistencia(f)}`
           : '3. Não aprovada a ficha, ou se o interessado desistir antes de assinar o contrato, o valor é devolvido por inteiro, sem desconto, na conta de onde veio o depósito.',
       ],
       tabela: proposta.length ? [['CONDIÇÕES PROPOSTAS (dependem da aprovação da ficha)', null], ...proposta] : [],
@@ -333,7 +333,7 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
         integral
           ? 'As partes declaram que nada mais devem uma à outra em razão da reserva e da ficha cadastral, e dão-se mútua quitação desse valor (Código Civil, artigos 319 e 320).'
           : f.aceite_reserva && R.devolucaoDaReserva(f).devolver === devolvido
-            ? `A diferença de ${C.reais(f.reserva_valor - devolvido)} fica com a empresa, como no termo de aceite da reserva aceito em ${C.dataBr(String(f.aceite_reserva.em).slice(0, 10))} (${R.devolucaoDaReserva(f).motivo}). As partes dão-se quitação do valor devolvido e do retido (Código Civil, artigos 319, 320 e 418).`
+            ? `A diferença de ${C.reais(f.reserva_valor - devolvido)} fica com a empresa, como no termo de aceite da reserva aceito em ${C.dataBrDe(f.aceite_reserva.em)} (${R.devolucaoDaReserva(f).motivo}). As partes dão-se quitação do valor devolvido e do retido (Código Civil, artigos 319, 320 e 418).`
             : `A diferença de ${C.reais(f.reserva_valor - devolvido)} fica explicada nas observações da ficha. As partes dão-se quitação do valor devolvido (Código Civil, artigos 319 e 320).`,
         `Os documentos pessoais enviados para a análise serão apagados em até ${meses} meses. Ficam guardados só os comprovantes da reserva e da devolução, por obrigação legal (Lei 13.709/2018, artigo 16, I).`,
       ],
@@ -707,7 +707,7 @@ function termoReservaPdf(d, f, base, nomeArq) {
     const partes = String(a.texto_aceito).split(/\n{2,}/);
     const quando = new Date(a.em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' });
     return {
-      ...base, titulo: partes[0] || 'TERMO DE ACEITE DA RESERVA DE IMÓVEL', data: String(a.em).slice(0, 10),
+      ...base, titulo: partes[0] || 'TERMO DE ACEITE DA RESERVA DE IMÓVEL', data: C.dataDeBrasilia(a.em),
       paragrafos: partes.slice(1).flatMap((x) => x.split('\n')).filter((x) => !/^Declaração: /.test(x)),
       depois: [
         `ACEITE ELETRÔNICO. ${f.inquilino_nome} leu este termo e marcou "Li e concordo" no link enviado só a essa pessoa, em ${quando} (horário de Brasília).`,
@@ -718,7 +718,7 @@ function termoReservaPdf(d, f, base, nomeArq) {
       ],
       imagem: a.assinatura ? { rotulo: 'Assinatura desenhada na tela:', src: a.assinatura } : null,
       assinaturas: [],
-      arquivo: nomeArq('Termo aceite reserva', String(a.em).slice(0, 10)),
+      arquivo: nomeArq('Termo aceite reserva', C.dataDeBrasilia(a.em)),
     };
   }
   const t = termoDaReserva(d, f);
