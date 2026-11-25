@@ -53,7 +53,7 @@ test('regras novas: padrões (100%, 0 dias, 7 dias corridos, aviso no 4º, 7 dia
 test('devolução pelo padrão (100%, 0 dias): desistência depois do depósito não devolve nada; reprovada devolve tudo', () => {
   const { d, f } = base({ reserva_valor: 50000, reserva_data: '2026-12-02' });
   assert.deepEqual(R.prazosDaReserva(f), { documentos_ate: '2026-12-09', vale_ate: '2026-12-09', aviso_documentos_em: '2026-12-06', arrependimento_ate: null },
-    'quarta 02/12 + 4 dias corridos = sábado 06/12 (aviso); + 7 dias corridos = quarta 09/12; reservado 7 dias; sem prazo de devolução total');
+    'quarta 02/12 + 4 dias corridos = domingo 06/12 (aviso); + 7 dias corridos = quarta 09/12; reservado 7 dias; sem prazo de devolução total');
   assert.equal(R.devolucaoDaReserva(f, { data: '2026-12-02' }).devolver, 50000, 'sem o termo aceito: devolve tudo');
   R.guardarAceiteReserva(d, f.id, aceite(), 'j');
   const dv = R.devolucaoDaReserva(R.buscar(d, 'fichas', f.id), { data: '2026-12-02' });
