@@ -142,6 +142,16 @@ export const DEFINICOES_REGRAS = [
     explica: 'Sim: o aluguel de julho vence em agosto (paga-se depois de usar).',
     consequencia: 'Não: o aluguel de julho vence em julho. Cobrar antes de usar é proibido quando há garantia (art. 20; só é permitido sem garantia, art. 42, ou na temporada) e é contravenção (art. 43, III).',
     lei: LI + ', arts. 20, 42 e 43, III.' },
+  // honorários da cobrança fora da Justiça (aprovados pelo advogado e pelo dono em 24/11/2026): só sugestão no acordo e no
+  // cálculo final da saída, nunca no boleto do mês nem na NF
+  { chave: 'honorarios_percentual', grupo: 'contrato', rotulo: 'Honorários do advogado na cobrança fora da Justiça (%)', tipo: 'pct', padrao: 10, min: 0, max: 20,
+    explica: 'Sugeridos no acordo e no cálculo final da saída, para "Usar" ou "Não cobrar" (nunca entram sozinhos, nem no boleto do mês, nem na NF). Só aparecem com débito em atraso há mais dias que a regra abaixo, aviso por escrito antes e o advogado que atuou registrado em "Cobrança: registros e provas" (pode ser o sócio da ANK ou da JCK com OAB ativa). Ex.: débito atualizado de R$ 2.000,00 com 45 dias de atraso, cobrado pelo advogado → R$ 200,00. 0 = não sugerir.',
+    consequencia: 'Só muda a sugestão. Sem advogado de fato atuando, os honorários viram "taxa de cobrança" (contravenção, art. 43, I, com multa a favor do inquilino). A mesma regra vale a favor do inquilino se ele precisar cobrar da empresa (cláusula do contrato). No despejo, o que vale é o fixado pelo juiz (20% quando o inquilino paga para ficar): lançado à mão, sem somar com estes.',
+    lei: 'Código Civil, arts. 389, 395 e 404 (com a Lei 14.905/2024); STJ, REsp 1.274.629/AP (precisa de advogado de fato trabalhando, valor razoável); ' + LI + ', arts. 43, I, e 62, II, "d".' },
+  { chave: 'honorarios_dias_atraso', grupo: 'contrato', rotulo: 'Honorários do advogado: só com atraso de mais de (dias)', tipo: 'inteiro', padrao: 30, min: 1, max: 365,
+    explica: 'Os honorários só são sugeridos sobre os boletos atrasados há mais destes dias (contados do vencimento). Ex.: 30 → boleto que venceu em 10/10/2026 entra a partir de 10/11/2026.',
+    consequencia: 'Só muda a sugestão. Menos de 30 dias não está na lei, mas aumenta o risco de o juiz ver os honorários como uma segunda multa (Código Civil, art. 413).',
+    lei: 'Código Civil, arts. 395 e 413; STJ, REsp 1.274.629/AP (antes, tentar a solução amigável).' },
   // decisão do dono de 24/11/2026: a tarifa é sempre cobrada; o contrato sem valor próprio cobra esta (antes ela só vinha preenchida)
   { chave: 'tarifa_padrao', grupo: 'aluguel', rotulo: 'Tarifa do boleto cobrada do inquilino (R$)', tipo: 'dinheiro', padrao: null, min: 0,
     explica: 'Vale para todo contrato sem valor próprio da tarifa. No contrato dá para pôr outro valor ou marcar "Não cobrar tarifa do boleto". Em branco: sem tarifa. Ex.: R$ 8,50 por boleto.',
