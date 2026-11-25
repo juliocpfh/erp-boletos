@@ -22,7 +22,7 @@ import { CADASTROS, nomeComprovante } from './cadastros.js';
 import { apagarRascunhoVistoria } from './campos.js';
 import { acertarNomesDosComprovantes, adiados, alterarApagandoAnexos, buscar, cienciaDaTroca, d, memoria, pastaDoEscopo, registrarCiencia, salvarAssinado, SO_ADMIN_NUMERACAO, trazerHerancaAssinada } from './comum.js';
 import { fimParaDocumento, guardarCamposDoDocumento, modeloDocumento, modelosNoBanco, reduzirFoto } from './documentos.js';
-import { TIPOS_DOCUMENTO } from '../modelos-documentos.js';
+import { documentoAtivo, TIPOS_DOCUMENTO } from '../modelos-documentos.js';
 
 const REGISTRO_EXCLUIDO = 'Este registro foi excluído por outra pessoa; nada foi salvo.';
 
@@ -414,10 +414,19 @@ export const FORMULARIOS = {
     const c = buscar('contratos', contrato);
     if (!m || !c) throw new C.ErroUsuario('Modelo ou inquilino não encontrado.');
     const tipo = K.tipoDoModelo(m);
+    // advogado, 24/11/2026: a prorrogação do prazo não se gera mais (os termos já gerados continuam valendo)
+    if (!documentoAtivo(tipo)) throw new C.ErroUsuario(TIPOS_DOCUMENTO[tipo].retirado);
+    // residencial de menos de 30 meses: a notificação só sai com o motivo do art. 47 (item 6.5 do advogado)
+    const condicoes = K.dadosDoContrato(d(), c).condicoes;
+    if (tipo === 'notificacao_desocupacao' && !condicoes.retomada_livre && String(valores.motivo_retomada || '').length < DL.MOTIVO_MINIMO) {
+      throw new C.ErroUsuario(`Contrato residencial de menos de 30 meses: a empresa só pode pedir o imóvel de volta nos casos do art. 47 da Lei 8.245/91. Escreva no "Motivo da retomada" qual é o caso e a prova (pelo menos ${DL.MOTIVO_MINIMO} letras).`);
+    }
     let reg = null;
     await alterar((db) => { reg = DL.registrarDocumento(db, c.id, { tipo, modelo: m, valores, data: String(f.get('data') || ''), fim: fimParaDocumento(c) }, login()); });
+    const prazos = DL.ehNotificacaoComAr(reg.registro) ? DL.prazosDaNotificacao(reg.registro) : null;
     aviso(DL.ehTermoAditivo(tipo) ? 'Termo aditivo registrado em "Termos aditivos", aguardando assinatura: imprima ou baixe o PDF, colha as assinaturas e anexe o assinado.'
-      : 'Documento registrado na página do inquilino ("Outros documentos da locação"): depois de assinado, anexe a via assinada lá.');
+      : prazos ? `Notificação registrada na página do inquilino ("Outros documentos da locação"). Mande por carta com AR e, quando o AR voltar, anexe-o lá com a data do recebimento.${prazos.acaoAte ? ` Se o inquilino não sair até ${C.dataBr(prazos.desocupar)}, a ação de despejo com pedido de liminar deve ser proposta até ${C.dataBr(prazos.acaoAte)}.` : ''}`
+        : 'Documento registrado na página do inquilino ("Outros documentos da locação"): depois de assinado, anexe a via assinada lá.');
     ir(reg.tabela === 'aditivos' ? `#/imprimir/aditivo?id=${reg.registro.id}` : `#/imprimir/documento?id=${reg.registro.id}`);
   },
 
@@ -427,11 +436,13 @@ export const FORMULARIOS = {
     const arquivo = form.querySelector('[name=arquivo]').files[0];
     const x = buscar('documentos_locacao', f.id);
     if (!x) throw new C.ErroUsuario('Documento não encontrado.');
-    if (!C.dataValida(f.data)) throw new C.ErroUsuario('Informe a data da assinatura.');
-    if (!arquivo) throw new C.ErroUsuario('Anexe o arquivo assinado.');
-    const nome = await salvarAssinado('aditivos', x.contrato_id, arquivo, `${x.nome.replace(/\s*\(.*\)$/, '')} ${f.data}`.slice(0, 80));
+    const ar = DL.ehNotificacaoComAr(x);
+    if (!C.dataValida(f.data)) throw new C.ErroUsuario(ar ? 'Informe a data do recebimento (a do AR).' : 'Informe a data da assinatura.');
+    if (!arquivo) throw new C.ErroUsuario(ar ? 'Anexe o AR devolvido pelos Correios.' : 'Anexe o arquivo assinado.');
+    const nome = await salvarAssinado('aditivos', x.contrato_id, arquivo, `${x.nome.replace(/\s*\(.*\)$/, '')}${ar ? ' AR' : ''} ${f.data}`.slice(0, 80));
     await alterar((db) => DL.anexarDocumento(db, x.id, { data: f.data, arquivo: nome }, login()));
-    aviso('Via assinada anexada.');
+    const prazos = ar ? DL.prazosDaNotificacao(buscar('documentos_locacao', x.id)) : null;
+    aviso(prazos && prazos.desocupar ? `AR anexado. Prazo para desocupar: até ${C.dataBr(prazos.desocupar)}; sem a saída, ação de despejo com pedido de liminar até ${C.dataBr(prazos.acaoAte)}.` : ar ? 'AR anexado.' : 'Via assinada anexada.');
     await mostrar();
   },
 

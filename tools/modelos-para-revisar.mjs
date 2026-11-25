@@ -23,10 +23,10 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 const { d: dx, c: cx } = K.exemploDeDocumento();
 const secoes = [];
 const novo = (m) => m.tipo in TIPOS_DOCUMENTO;
-function porModelo(m) {
+function porModelo(m, valores = {}, contrato = cx) {
   const tipo = K.tipoDoModelo(m);
   let dados;
-  if (tipo === 'contrato' || novo(m)) dados = K.dadosDoDocumento(dx, cx, tipo, K.valoresDeExemplo(tipo), { data: HOJE });
+  if (tipo === 'contrato' || novo(m)) dados = K.dadosDoDocumento({ ...dx, contratos: [contrato] }, contrato, tipo, { ...K.valoresDeExemplo(tipo), ...valores }, { data: HOJE });
   else if (tipo === 'aditivo') dados = K.dadosDoAditivo(dx, cx, { numero: 2, data: HOJE, dia_anterior: 10, dia_novo: 5, primeiro_vencimento: '2027-01-05', testemunhas: [] });
   else if (tipo === 'aditivo_valor') dados = K.dadosDoAditivo(dx, cx, { tipo: K.TIPO_ADITIVO_VALOR, numero: 2, data: HOJE, data_vigencia: '2026-12-01', valor_anterior: 190000, valor_novo: 205000, percentual: 10 });
   else {
@@ -38,9 +38,19 @@ function porModelo(m) {
   }
   return K.contratoHtml(K.montarContrato(m.texto, dados), { logo: '', rodape: dados.rodape });
 }
+// variações pedidas na revisão do advogado de 24/11/2026: a dispensa da multa (aviso) e o motivo do art. 47 (notificação)
+const VARIACOES = {
+  aviso_desocupacao: [['com a caixa "transferido pelo empregador" marcada', { transferencia_empregador: 'sim', data_saida_prevista: '2026-12-31' }, { ...cx, vigencia_fim: '2027-05-14' }]],
+  notificacao_desocupacao: [['residencial de 12 meses: só com o motivo do art. 47', { motivo_retomada: 'uso próprio: o imóvel será a moradia do filho do sócio, que não tem imóvel residencial próprio, conforme declaração anexa' }, { ...cx, prazo_meses: 12 }]],
+};
 for (const m of MODELOS_PADRAO) {
+  // a prorrogação do prazo saiu em 24/11/2026 (advogado, item 6.1): não se gera mais
+  if (novo(m) && TIPOS_DOCUMENTO[m.tipo].retirado) continue;
   let html;
-  try { html = porModelo(m); } catch (e) { html = `<p class="erro">Não montado com o exemplo (${esc(e.message)}). Veja em Sistema → Teste dos PDFs.</p><pre>${esc(m.texto)}</pre>`; }
+  try {
+    html = porModelo(m);
+    for (const [titulo, valores, contrato] of VARIACOES[m.tipo] || []) html += `<h3 class="variacao">Variação: ${esc(titulo)}</h3>${porModelo(m, valores, contrato)}`;
+  } catch (e) { html = `<p class="erro">Não montado com o exemplo (${esc(e.message)}). Veja em Sistema → Teste dos PDFs.</p><pre>${esc(m.texto)}</pre>`; }
   secoes.push({ titulo: m.nome, grupo: novo(m) ? 'Outros documentos da locação' : (m.tipo ? 'Termos aditivos' : 'Contratos'), novo: novo(m), onde: 'Editável: Sistema → Modelos de documentos', html });
 }
 
@@ -125,7 +135,7 @@ secoes.push({ titulo: 'Notificações ao inquilino: os modelos', grupo: 'Notific
 const INVENTARIO = [
   ['Contrato de locação residencial e não residencial', 'Sim, em Modelos de documentos', ''],
   ['Termos aditivos: vencimento, troca de inquilino, novo valor', 'Sim, em Modelos de documentos', ''],
-  ...Object.values(TIPOS_DOCUMENTO).map((t) => [t.nome, 'Sim, em Modelos de documentos', 'NOVO']),
+  ...Object.values(TIPOS_DOCUMENTO).filter((t) => !t.retirado).map((t) => [t.nome, 'Sim, em Modelos de documentos', 'NOVO']),
   ...Object.values(REC.TIPOS_RECIBO).map((n) => [n, 'Não: texto fixo (recibos.js)', '']),
   ['Recibo de entrega das chaves (entrada)', 'Não: texto fixo (contratos.js)', ''],
   ['Vistoria de entrada e de saída', 'Em parte: itens em "Modelo de vistoria"; textos fixos', ''],

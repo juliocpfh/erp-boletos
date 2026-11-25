@@ -7,13 +7,19 @@
 
 /**
  * Tipos novos: nome, explicação, quem assina (papéis do quadro de assinaturas; vazio = todos os do contrato) e os campos
- * digitados ao gerar: [chave, rótulo, formato ('data' | 'dinheiro' | 'numero' | 'texto'), exemplo]. Campo em branco sai
- * como uma linha para preencher à mão (dinheiro em branco = sem valor, para as condições [se campo]).
+ * digitados ao gerar: [chave, rótulo, formato ('data' | 'dinheiro' | 'numero' | 'texto' | 'marcar'), exemplo, quando]. Campo
+ * em branco sai como uma linha para preencher à mão (dinheiro em branco = sem valor, para as condições [se campo]); 'marcar'
+ * é uma caixa (marcada = a condição [se campo] vale). ``quando``: (condições do contrato, as de dadosDoContrato) → o campo
+ * aparece na tela (fora dela fica vazio). ``retirado``: tipo que não se gera mais (os já gerados continuam valendo e
+ * aparecendo); fica na lista porque o id negativo dos modelos padrão é a posição (não tire nem mude a ordem).
  */
 export const TIPOS_DOCUMENTO = {
   aditivo_prazo: {
     nome: 'Termo aditivo de prorrogação do prazo',
     explica: 'Prorroga o contrato por um novo prazo, com o mesmo aluguel e as mesmas condições (o fiador assina concordando).',
+    // advogado, 24/11/2026 (item 6.1): não aprovado. O contrato vencido continua por prazo indeterminado, com o reajuste anual
+    // ou uma renegociação (termo de novo valor). Os termos já gerados continuam valendo: assinados, mudam o término (#401).
+    retirado: 'Não é mais gerado (advogado, 24/11/2026): depois do fim do prazo, o contrato continua por prazo indeterminado, com o reajuste anual ou uma renegociação do valor. Os termos já gerados continuam valendo.',
     campos: [['numero_aditivo', 'Número do termo aditivo', 'numero', '2'], ['novo_prazo_meses', 'Novo prazo (meses)', 'numero', '30'],
       ['nova_data_inicio', 'Início do novo prazo', 'data', '2026-12-01'], ['nova_data_fim', 'Fim do novo prazo', 'data', '2029-05-31']],
   },
@@ -33,13 +39,19 @@ export const TIPOS_DOCUMENTO = {
     nome: 'Aviso de desocupação (o inquilino avisa que vai sair)',
     explica: 'Para o inquilino assinar quando avisa a saída: 30 dias de antecedência (Lei 8.245/91, art. 6º). A empresa assina o recebimento.',
     assinam: ['LOCATÁRIO', 'LOCATÁRIO SOLIDÁRIO', 'LOCADORA'],
-    campos: [['data_saida_prevista', 'Data prevista da entrega das chaves', 'data', '2026-12-31']],
+    campos: [['data_saida_prevista', 'Data prevista da entrega das chaves', 'data', '2026-12-31'],
+      // advogado, 24/11/2026 (item 6.4): a dispensa da multa por transferência do empregador (art. 4º, parágrafo único), marcada
+      // antes de gerar; só pessoa física, como no resumo do contrato (item 5.2)
+      ['transferencia_empregador', 'O inquilino foi transferido pelo empregador para outra cidade: dispensa da multa da saída antes do fim do prazo (peça o comprovante da transferência)', 'marcar', '', (k) => !k.pj]],
   },
   notificacao_desocupacao: {
     nome: 'Notificação para desocupação (contrato por prazo indeterminado)',
-    explica: 'A empresa pede o imóvel de volta com 30 dias de prazo, depois do fim do prazo do contrato. Residencial com contrato de menos de 30 meses: só nos casos do art. 47 da Lei 8.245/91 (confirme com o advogado antes de mandar).',
+    explica: 'A empresa pede o imóvel de volta com 30 dias de prazo, contados do recebimento, depois do fim do prazo do contrato. Vai por carta com aviso de recebimento (AR). Residencial com contrato de menos de 30 meses: só nos casos do art. 47 da Lei 8.245/91, com o motivo escrito.',
     assinam: ['LOCADORA'],
-    campos: [['data_limite', 'Data limite para desocupar', 'data', '2026-12-31']],
+    // advogado, 24/11/2026 (item 6.5): carta com AR e prazo contado do recebimento; residencial de menos de 30 meses só com o
+    // motivo do art. 47 (sem ele, o documento não é gerado); o fiador é notificado para conhecimento
+    campos: [['data_limite', 'Data limite para desocupar (30 dias depois da entrega da carta)', 'data', '2026-12-31'],
+      ['motivo_retomada', 'Motivo da retomada (art. 47 da Lei 8.245/91) e a prova', 'texto', '', (k) => !k.retomada_livre]],
   },
   autorizacao_obra: {
     nome: 'Autorização para obra ou benfeitoria',
@@ -62,6 +74,46 @@ export const TIPOS_DOCUMENTO = {
       ['valor_debito', 'Valor total em atraso', 'dinheiro', '1.963,50'], ['prazo_pagamento', 'Pagar até', 'data', '2026-12-05']],
   },
 };
+
+// Revisão do advogado de 24/11/2026: os trechos de antes (saem dos modelos já gravados por atualizarTextoDocumento) e os de hoje.
+const AVISO_MULTA_ANTIGO = '3. [se data_fim]saindo antes do fim do prazo do contrato ({data_fim}), incide a multa prevista no contrato, proporcional ao tempo que falta (Lei nº 8.245/91, art. 4º); depois do fim do prazo, basta o aviso de 30 (trinta) dias, sem multa;[senão]a locação é por prazo indeterminado: basta o aviso de 30 (trinta) dias, sem multa (Lei nº 8.245/91, art. 6º);[fim]';
+/** Item 3 do aviso de desocupação: a multa da saída antes do fim do prazo ou, com a caixa marcada, a dispensa por transferência do empregador (item 6.4). */
+const AVISO_MULTA = '3. [se data_fim][se transferencia_empregador]saindo antes do fim do prazo do contrato ({data_fim}), o LOCATÁRIO fica dispensado da multa prevista no contrato, por ter sido transferido pelo seu empregador para prestar serviços em outra localidade, conforme o comprovante entregue com este aviso (Lei nº 8.245/91, art. 4º, parágrafo único);[senão]saindo antes do fim do prazo do contrato ({data_fim}), incide a multa prevista no contrato, proporcional ao tempo que falta (Lei nº 8.245/91, art. 4º); depois do fim do prazo, basta o aviso de 30 (trinta) dias, sem multa;[fim][senão]a locação é por prazo indeterminado: basta o aviso de 30 (trinta) dias, sem multa (Lei nº 8.245/91, art. 6º);[fim]';
+const NOTIFICACAO_PEDIDO_ANTIGO = '{l:vem|vêm} comunicar que não {l:tem|têm} interesse em continuar a locação e, nos termos do [se nao_residencial]art. 57[senão]art. 46, § 2º[fim], da Lei nº 8.245/91, {l:concede|concedem} o prazo de 30 (trinta) dias para a desocupação do imóvel, até **{data_limite}**.';
+/**
+ * Pedido da notificação (item 6.5): o prazo conta do recebimento da carta com AR (a data limite vale para o recebimento até
+ * 30 dias antes dela, {recebimento_ate}) e, no residencial de menos de 30 meses, só pelo motivo do art. 47, escrito ao gerar.
+ */
+const NOTIFICACAO_PEDIDO = '{l:vem|vêm} comunicar que não {l:tem|têm} interesse em continuar a locação e, [se retomada_livre]nos termos do [se nao_residencial]art. 57[senão]art. 46, § 2º[fim], da Lei nº 8.245/91[senão]com fundamento no art. 47 da Lei nº 8.245/91, pelo seguinte motivo: {motivo_retomada}[fim], {l:concede|concedem} o prazo de 30 (trinta) dias, contados do recebimento desta notificação, para a desocupação do imóvel, até **{data_limite}**. Se esta notificação for recebida depois de {recebimento_ate}, o prazo termina 30 (trinta) dias depois do recebimento.\n\nEsta notificação é enviada por carta com aviso de recebimento (AR)[se fiador], com cópia {f:ao FIADOR|aos FIADORES}[fim].';
+const NOTIFICACAO_CONTATO_ANTIGO = 'Para combinar a data da vistoria e a entrega das chaves, basta responder a este e-mail.';
+const NOTIFICACAO_CONTATO = 'Para combinar a data da vistoria e a entrega das chaves, basta entrar em contato com {l:a LOCADORA|as LOCADORAS}.';
+const GARANTIA_CHAVES_ANTIGO = 'renunciando ao benefício de ordem (Código Civil, arts. 827 e 828), até a entrega real e definitiva das chaves.';
+/** Troca de garantia (item 6.2): "devolução" no lugar de "entrega" das chaves. */
+const GARANTIA_CHAVES = 'renunciando ao benefício de ordem (Código Civil, arts. 827 e 828), até a devolução real e definitiva das chaves.';
+
+/**
+ * Modelos já gravados (editados ou copiados em Sistema → Modelos de documentos): [texto antigo exato, texto novo] por tipo.
+ * Só troca o que ainda está igual ao antigo (o editado à mão fica como está). Chamada por textoAtualizadoDoModelo
+ * (modelos-contrato.js), a mesma função que a nuvem usa para não abrir conflito entre aparelhos de versões diferentes.
+ */
+export const ATUALIZACOES_DOCUMENTOS = {
+  aditivo_garantia: [[GARANTIA_CHAVES_ANTIGO, GARANTIA_CHAVES]],
+  aviso_desocupacao: [[AVISO_MULTA_ANTIGO, AVISO_MULTA]],
+  notificacao_desocupacao: [[NOTIFICACAO_PEDIDO_ANTIGO, NOTIFICACAO_PEDIDO], [NOTIFICACAO_CONTATO_ANTIGO, NOTIFICACAO_CONTATO]],
+};
+
+/** Texto gravado de um outro documento com as trocas de ATUALIZACOES_DOCUMENTOS (sem troca, o mesmo texto). */
+export function atualizarTextoDocumento(tipo, texto) {
+  const trocas = Object.prototype.hasOwnProperty.call(ATUALIZACOES_DOCUMENTOS, tipo) ? ATUALIZACOES_DOCUMENTOS[tipo] : null;
+  if (!trocas || typeof texto !== 'string') return texto;
+  const antes = texto.replace(/\r\n/g, '\n');
+  let t = antes;
+  for (const [antigo, novo] of trocas) if (t.includes(antigo)) t = t.split(antigo).join(novo);
+  return t === antes ? texto : t;
+}
+
+/** Tipo de documento que ainda se gera (o retirado só aparece nos documentos já registrados). */
+export const documentoAtivo = (tipo) => Object.prototype.hasOwnProperty.call(TIPOS_DOCUMENTO, tipo) && !TIPOS_DOCUMENTO[tipo].retirado;
 
 const FECHO = `E por estarem de acordo, as partes assinam este documento por assinatura eletrônica, que reconhecem como válida (Lei nº 14.063/2020), ou, no papel, em duas vias de igual teor e forma[se testemunhas], na presença das testemunhas abaixo[fim].
 
@@ -112,7 +164,7 @@ As partes acima, já qualificadas no Contrato de Locação {finalidade} que tem 
 
 [se caucao]**CLÁUSULA #** – A caução nova será depositada pelo LOCATÁRIO em caderneta de poupança, nos termos do art. 38, § 2º, da Lei nº 8.245/91, e o comprovante faz parte deste termo.[fim]
 
-[se fiador]**CLÁUSULA #** – {f:O FIADOR qualificado acima declara|Os FIADORES qualificados acima declaram} conhecer o contrato de locação e {f:garante|garantem} as obrigações do LOCATÁRIO, solidariamente, como {f:fiador e principal pagador|fiadores e principais pagadores}, renunciando ao benefício de ordem (Código Civil, arts. 827 e 828), até a entrega real e definitiva das chaves.[fim]
+[se fiador]**CLÁUSULA #** – {f:O FIADOR qualificado acima declara|Os FIADORES qualificados acima declaram} conhecer o contrato de locação e {f:garante|garantem} as obrigações do LOCATÁRIO, solidariamente, como {f:fiador e principal pagador|fiadores e principais pagadores}, ${GARANTIA_CHAVES}[fim]
 
 [se seguro_fianca]**CLÁUSULA #** – O LOCATÁRIO apresentará a apólice do seguro fiança locatícia em até 30 (trinta) dias, sob pena de infração contratual.[fim]
 
@@ -158,7 +210,7 @@ O LOCATÁRIO declara estar ciente de que:
 
 2. a vistoria de saída será feita na entrega das chaves, com convite por escrito, por e-mail, para acompanhá-la, e os reparos necessários para o imóvel voltar ao estado da vistoria de entrada, ressalvado o desgaste natural do uso, serão descontados da garantia ou cobrados com base em orçamento ou nota do serviço;
 
-3. [se data_fim]saindo antes do fim do prazo do contrato ({data_fim}), incide a multa prevista no contrato, proporcional ao tempo que falta (Lei nº 8.245/91, art. 4º); depois do fim do prazo, basta o aviso de 30 (trinta) dias, sem multa;[senão]a locação é por prazo indeterminado: basta o aviso de 30 (trinta) dias, sem multa (Lei nº 8.245/91, art. 6º);[fim]
+${AVISO_MULTA}
 
 4. deve encerrar as contas de consumo que estejam em seu nome e entregar os comprovantes das últimas contas pagas.
 
@@ -172,13 +224,13 @@ O LOCATÁRIO declara estar ciente de que:
 
 Ao LOCATÁRIO: {locatarios}.[se solidario] Ao LOCATÁRIO SOLIDÁRIO: {solidario}.[fim][se fiador] {f:Ao FIADOR|Aos FIADORES}, para conhecimento: {fiadores}.[fim]
 
-{l:A LOCADORA|As LOCADORAS}, {locadoras}, no Contrato de Locação {finalidade} que tem por objeto {objeto}, firmado em {data_contrato}, [se data_fim]cujo prazo terminou em {data_fim} e que continua[senão]que vigora[fim] por prazo indeterminado, {l:vem|vêm} comunicar que não {l:tem|têm} interesse em continuar a locação e, nos termos do [se nao_residencial]art. 57[senão]art. 46, § 2º[fim], da Lei nº 8.245/91, {l:concede|concedem} o prazo de 30 (trinta) dias para a desocupação do imóvel, até **{data_limite}**.
+{l:A LOCADORA|As LOCADORAS}, {locadoras}, no Contrato de Locação {finalidade} que tem por objeto {objeto}, firmado em {data_contrato}, [se data_fim]cujo prazo terminou em {data_fim} e que continua[senão]que vigora[fim] por prazo indeterminado, ${NOTIFICACAO_PEDIDO}
 
 Até a entrega das chaves continuam devidos o aluguel e os encargos. A vistoria de saída será feita na entrega das chaves, com convite por escrito, por e-mail, para acompanhá-la.
 
 Não havendo a desocupação no prazo, {l:a LOCADORA poderá|as LOCADORAS poderão} propor a ação de despejo prevista em lei, sem prejuízo da cobrança dos valores devidos.
 
-Para combinar a data da vistoria e a entrega das chaves, basta responder a este e-mail.
+${NOTIFICACAO_CONTATO}
 
 > {cidade}, {data_assinatura}.
 
