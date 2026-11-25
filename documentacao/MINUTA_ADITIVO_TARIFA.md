@@ -1,5 +1,10 @@
 # Minuta: termo aditivo da tarifa do boleto (para o advogado conferir)
 
+> **NÃO SERÁ USADO: decisão do advogado e do dono, 24/11/2026 (item 2.2 da resposta do advogado).** Não haverá termo
+> aditivo: a tarifa é cobrada também nos contratos já assinados, mesmo que o contrato não a preveja; se o inquilino for
+> à Justiça, a empresa reembolsa (risco mínimo). A minuta fica só como histórico. Multa e juros nunca incidem sobre a
+> tarifa (item 2.1): aluguel R$ 1.900,00 + tarifa R$ 8,50 = boleto de R$ 1.908,50; multa de 2% = R$ 38,00.
+
 Pedido do dono em 24/11/2026: o contrato passa a dizer sempre que o inquilino reembolsa a tarifa bancária do boleto
 (desfaz a retirada de 20/10/2026). Os contratos **novos** já saem com a cláusula. Esta minuta é para os contratos **já
 assinados sem ela**. **Ainda não está no sistema e não foi conferida por advogado.**

@@ -239,6 +239,59 @@ function avisoCreditos(c, r) {
     : ` Crédito do inquilino: ${lista}. É taxa do proprietário paga pelo inquilino no condomínio, sem boleto onde abater: já vem em "Créditos" e soma ao valor devolvido (mantenha a linha na descrição).`;
 }
 
+/**
+ * Caixa do cálculo final com as multas sugeridas da saída (`R.multasDaSaida`): a da saída antes do fim do contrato e a da falta do
+ * aviso de 30 dias. Nenhuma entra sozinha: "Usar" soma o valor em "Débitos" e põe a linha na descrição (como a pintura, #395).
+ * Se couberem as duas, só a maior tem o botão. Ex.: aluguel R$ 1.800,00, aviso em 10/11 e saída em 25/11 → "Usar R$ 900,00".
+ */
+function sugestoesMultaSaida(c) {
+  if (!c || !c.data_saida) return '';
+  const { antecipada: m, aviso: a, vale } = R.multasDaSaida(d(), c);
+  const linhas = [];
+  const usar = (valor, texto) => ` <button type="button" class="secundario pequeno" data-usar-multa data-valor="${valor}" data-texto="${esc(texto)}">Usar ${esc(reais(valor))}</button>`;
+  const deixar = ' <span class="suave">(não some as duas: vale só a maior)</span>';
+  if (m) {
+    const texto = `Multa pela saída antecipada: ${reais(m.valor)} (3 aluguéis de ${reais(m.aluguel)}, proporcional aos ${m.restam} de ${m.total} dias que faltavam para ${dataBr(m.fim)})`;
+    linhas.push(`<li><b>Saída antes do fim do contrato (${esc(dataBr(m.fim))})</b>: ${esc(reais(m.valor))} (3 aluguéis de ${esc(reais(m.aluguel))}, proporcional aos ${m.restam} de ${m.total} dias que faltavam${m.herdado ? `, contados desde o início do contrato original, em ${esc(dataBr(m.inicio))}: na troca de titular o prazo não recomeça` : ''}; confira a cláusula no contrato assinado). A lei dispensa esta multa se o inquilino foi transferido pelo empregador e avisou com 30 dias (Lei 8.245/91, art. 4º): nesse caso, deixe de fora e anote o motivo na descrição.${vale === 'antecipada' ? usar(m.valor, texto) : deixar}</li>`);
+  }
+  if (a) {
+    const conta = a.modo === 'mes_inteiro' ? `1 mês de ${reais(a.mes)}` : `${reais(a.mes)} × ${a.faltaram}/${R.DIAS_AVISO_SAIDA} dias que faltaram`;
+    const quando = a.sem_aviso ? 'saiu sem avisar por escrito' : `avisou em ${dataBr(c.aviso_saida_data)}, ${a.antecedencia} dia(s) antes da saída`;
+    const mes = `aluguel de ${reais(a.aluguel)}${a.encargos ? ` + encargos de ${reais(a.encargos)} (IPTU e seguro do boleto)` : ''}`;
+    const texto = `Multa pela falta do aviso de ${R.DIAS_AVISO_SAIDA} dias: ${reais(a.valor)} (${quando}; ${conta})`;
+    linhas.push(`<li><b>Falta do aviso de ${R.DIAS_AVISO_SAIDA} dias</b>: ${esc(reais(a.valor))} (${esc(quando)}; ${esc(mes)}; ${esc(conta)}). O contrato e a lei (Lei 8.245/91, art. 6º) cobram 1 mês de aluguel e encargos de quem não avisa.${vale === 'aviso' ? usar(a.valor, texto) : deixar}</li>`);
+  }
+  const semData = !c.aviso_saida_data && !c.aviso_saida_sem && R.regra('falta_aviso_saida', c) !== 'nao_sugerir';
+  if (!linhas.length && !semData) return '';
+  const duas = m && a ? `<p>O contrato prevê as duas, mas cobrar as duas pela mesma saída pode ser visto como multa em dobro e o juiz pode reduzir (Código Civil, art. 413): o sistema sugere só a maior. Para cobrar as duas, some a outra à mão.</p>` : '';
+  return `<div class="alerta aviso" data-sugestoes-multa><p><b>Multa sugerida pela saída</b> (não entra sozinha: "Usar" soma aos débitos e escreve a linha na descrição).</p>
+    ${linhas.length ? `<ul>${linhas.join('')}</ul>` : ''}${duas}
+    ${semData ? `<p class="suave">A data em que o inquilino avisou da saída não foi registrada: informe em "Adiar ou mudar a data" (página do inquilino, caixa da saída) para o sistema conferir os ${R.DIAS_AVISO_SAIDA} dias de aviso.</p>` : ''}</div>`;
+}
+
+// "Usar" da multa sugerida: soma em "Débitos" e acrescenta a linha na descrição (uma vez só)
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener('click', (ev) => {
+    const b = ev.target.closest?.('[data-usar-multa]');
+    if (!b) return;
+    ev.preventDefault();
+    const form = document.querySelector('main form[data-form="cadastro"]');
+    const campo = form && form.querySelector('input[name="debitos"]');
+    const desc = form && form.querySelector('[name="debitos_descricao"]');
+    if (!campo || !desc) return;
+    const texto = b.dataset.texto || '';
+    if (desc.value.includes(texto)) { aviso('Esta multa já está nos débitos.', 'info'); return; }
+    let atual = 0;
+    try { atual = campo.value.trim() ? C.centavos(campo.value) : 0; } catch { atual = 0; }
+    campo.value = F.dinheiroTexto(atual + Number(b.dataset.valor || 0));
+    desc.value = desc.value.trim() ? `${desc.value.replace(/\s+$/, '')}\n${texto}` : texto;
+    for (const el of [campo, desc]) el.dispatchEvent(new Event('input', { bubbles: true }));
+    form.dataset.alterado = '1';
+    b.disabled = true;
+    b.textContent = 'Incluída nos débitos';
+  });
+}
+
 export const CADASTROS = {
   imoveis: {
     titulo: (r) => (r ? 'Editar imóvel' : 'Novo imóvel'),
@@ -395,7 +448,8 @@ export const CADASTROS = {
       const ficha = r ? null : fichaDoNovoContrato(q);
       const guardado = ficha && { acao: 'apagarArquivoDaFicha', dados: { ficha: ficha.id }, abrir: { escopo: 'ficha', id: ficha.id } };
       const perfis = ordenar(d().perfis_regras || [], 'nome');
-      return comListas(F.CONTRATO.flatMap((c) => (c.fiador ? (c.fiador === 1 && c.secao ? F.fiadoresNoCadastro(fiadores) : []) : [c]))
+      // reserva e carência perguntadas pelo mês do vencimento do boleto (24/11/2026); gravada continua a referência
+      return comListas(F.comPerguntaPeloVencimento(F.CONTRATO).flatMap((c) => (c.fiador ? (c.fiador === 1 && c.secao ? F.fiadoresNoCadastro(fiadores) : []) : [c]))
         .filter((c) => (r ? !c.soNovo : !c.soEditar))
         .filter((c) => c.nome !== 'perfil_regras_id' || perfis.length || (r && r.perfil_regras_id))
         .map((c) => (c.nome === 'perfil_regras_id' ? { ...c, opcoes: perfis.map((p) => [String(p.id), p.nome]) } : c.nome === 'contrato_anterior_id' ? { ...c, opcoes: ops } : c.nome === 'imovel_id' ? { ...c, opcoes: imoveis }
@@ -421,6 +475,7 @@ export const CADASTROS = {
       conta_iptu: r.conta_iptu || (r.cobrar_iptu ? R.SITUACOES[0] : R.SITUACOES[1]), conta_seguro: r.conta_seguro || (r.cobrar_seguro === false ? R.SITUACOES[1] : R.SITUACOES[0]),
       inquilino_tipo: r.inquilino_tipo || 'Pessoa física', prazo_meses: R.prazoDoContrato(d(), r),
       aluguel_bonificado: r.bonificacao === false ? null : inicialBonificado(r),
+      vencimento_reserva: R.mesVencimentoDaCompetencia(r, r.reserva_competencia), vencimento_carencia: R.mesVencimentoDaCompetencia(r, r.carencia_inicio),
       ...Object.fromEntries(R.fiadoresDoContrato(d(), r.id).flatMap((f, k) => F.CAMPOS_FIADOR.map((x) => [`fiador${k + 1}_${x.nome}`, f[x.nome] ?? null]))) }),
     conferir: conferirContrato,
     aviso: (r, q) => (!r && q && fichaDoNovoContrato(q) ? avisoDaFicha(fichaDoNovoContrato(q))
@@ -429,6 +484,14 @@ export const CADASTROS = {
     voltar: (r, q) => (r ? `#/contrato/${r.id}` : q.imovel ? `#/imovel/${q.imovel}` : '#/inquilinos'),
     descricao: (dados, r) => dados.inquilino_nome || (r && r.inquilino_nome),
     ajustar(dados, erros, r, form, q = {}) {
+      // a tela pergunta o mês do vencimento; gravada é a referência, pelo "vence no mês seguinte" que está no formulário.
+      // Ex.: vence no mês seguinte, reserva no boleto que vence em 01/2027 = referência 12/2026 (no próprio mês: 01/2027)
+      const vencimento = { cobranca_mes_seguinte: 'cobranca_mes_seguinte' in dados ? dados.cobranca_mes_seguinte : !r || r.cobranca_mes_seguinte !== false };
+      for (const [gravado, tela] of [['reserva_competencia', 'vencimento_reserva'], ['carencia_inicio', 'vencimento_carencia']]) {
+        if (!(tela in dados)) continue;
+        dados[gravado] = erros[tela] ? null : R.competenciaDoMesVencimento(vencimento, dados[tela]);
+        delete dados[tela];
+      }
       // troca de titular: garantia, aluguel, bonificação, boleto e reserva são os do contrato (travados no formulário)
       const anteriorHerdado = r ? R.contratoHerdado(d(), r) : dados.contrato_anterior_id && buscar('contratos', dados.contrato_anterior_id);
       const herdado = !!anteriorHerdado;
@@ -1062,7 +1125,9 @@ export const CADASTROS = {
   },
   renovacoes: {
     titulo: (r, q) => `Renovação / novo valor - ${buscar('contratos', q.contrato).inquilino_nome}`,
-    campos: () => F.RENOVACAO,
+    // o novo valor é perguntado pelo mês do vencimento do boleto (24/11/2026); gravada continua a referência (vale_desde)
+    campos: () => F.comPerguntaPeloVencimento(F.RENOVACAO),
+    valores: (r) => ({ ...r, vencimento_vale_desde: R.mesVencimentoDaCompetencia(buscar('contratos', r.contrato_id), r.vale_desde) }),
     padrao: (q) => { const c = buscar('contratos', q.contrato); return { data: c.vigencia_fim || C.hojeIso(), tipo: 'Renovado com nova data de término', novo_percentual: R.percentualBonificacao(c) || null }; },
     aviso: (r, q) => { const c = buscar('contratos', q.contrato); return `Aluguel atual ${reais(R.aluguelAtual(d(), c))}. Contrato ${c.prazo_tipo === 'Indeterminado' ? 'por prazo indeterminado' : `até ${dataBr(c.vigencia_fim)}`}.`; },
     voltar: (r, q) => `#/contrato/${q.contrato}`,
@@ -1087,9 +1152,14 @@ export const CADASTROS = {
         if (!Number.isFinite(v) || v < 0 || v > dados.novo_valor) erros.novo_bonificado = `Informe um valor entre R$ 0,00 e ${reais(dados.novo_valor)} (aluguel cheio)`;
         else dados.novo_percentual = C.percentualPorBonificado(dados.novo_valor, v);
       }
+      // a tela pergunta o mês do vencimento; gravada é a referência. Ex.: vence no mês seguinte, 01/2027 = referência 12/2026
+      if ('vencimento_vale_desde' in dados) {
+        dados.vale_desde = erros.vencimento_vale_desde ? null : R.competenciaDoMesVencimento(c, dados.vencimento_vale_desde);
+        delete dados.vencimento_vale_desde;
+      }
       if (!(dados.novo_valor > 0)) { dados.novo_percentual = null; dados.vale_desde = null; }
-      else if (dados.vale_desde && !C.competenciaValida(dados.vale_desde, '')) erros.vale_desde = 'Informe o mês (ex.: 12/2026)';
-      else if (dados.vale_desde && dados.vale_desde < String(buscar('contratos', q.contrato).data_entrada || '').slice(0, 7)) erros.vale_desde = 'O mês é anterior à entrada do inquilino';
+      else if (dados.vale_desde && !C.competenciaValida(dados.vale_desde, '')) erros.vencimento_vale_desde = 'Informe o mês (ex.: 12/2026)';
+      else if (dados.vale_desde && dados.vale_desde < String(c.data_entrada || '').slice(0, 7)) erros.vencimento_vale_desde = `O boleto de referência ${compBr(dados.vale_desde)} é anterior à entrada do inquilino`;
       else dados.vale_desde = R.valeDesdeDaRenovacao(dados);
       if (dados.novo_percentual !== null && dados.novo_percentual !== undefined && (dados.novo_percentual < 0 || dados.novo_percentual > 100)) erros.novo_percentual = 'Informe um percentual entre 0 e 100';
     },
@@ -1129,13 +1199,12 @@ export const CADASTROS = {
       const vistoria = v.vistoria ? `Vistoria de saída de ${dataBr(v.vistoria.data)}: ${v.texto.toLocaleLowerCase('pt-BR')}${v.pendencias.length ? ` (${v.pendencias.slice(0, 5).join('; ')}${v.pendencias.length > 5 ? '…' : ''}): ${v.semValor ? `falta o valor de ${v.semValor} reparo(s) (roteiro da saída, "Valores dos reparos")` : `os reparos (${reais(v.totalReparos)}) já entram nos débitos`}` : ''}.` : 'Vistoria de saída ainda não registrada: o cálculo fica como "não feita" (registre a vistoria antes, se houver).';
       const semDeposito = (R.temCaucao(c) || R.temDeposito(c)) && R.valorGarantia(d(), c) > 0 && !R.garantiaRecebida(d(), c)
         ? ` Atenção: a ${R.temCaucao(c) ? 'caução' : 'garantia'} de ${reais(R.valorGarantia(d(), c))} foi combinada, mas nada foi depositado: não há garantia a devolver (se foi depositada, registre o depósito antes).` : '';
-      // saída antes do fim do prazo: a multa do contrato não entra sozinha; o valor sugerido aparece para incluir ou dispensar
-      const m = R.multaSaidaAntecipada(d(), c);
-      const multa = m ? ` Saída antes do fim do contrato (${dataBr(m.fim)}): multa sugerida de ${reais(m.valor)} (3 aluguéis de ${reais(m.aluguel)}, proporcional aos ${m.restam} de ${m.total} dias que faltavam${m.herdado ? `, contados desde o início do contrato original, em ${dataBr(m.inicio)}: na troca de titular o prazo não recomeça` : ''}; confira a cláusula no contrato assinado). Ela não entra sozinha: para cobrar, some aos débitos e escreva "Multa pela saída antecipada" na descrição; para dispensar (ex.: transferência pelo empregador, Lei 8.245/91, art. 4º), deixe de fora e anote o motivo na descrição.` : '';
       const compSaida = c.data_saida ? C.competenciaDe(c.data_saida) : null;
       const semBoleto = compSaida && !R.boletoDoMes(d(), c.id, compSaida) ? ` Atenção: o boleto de ${compBr(compSaida)} (último mês, proporcional) ainda não foi gerado: gere antes, senão o aluguel desse mês fica fora dos débitos.` : '';
-      return `Saída em ${dataBr(c.data_saida)} (mude em "Saída do inquilino").${multa}${semBoleto}${semDeposito}${avisoCreditos(c, r)} ${vistoria} A leitura dos relógios é a da vistoria de saída: vem preenchida e, se mudar aqui, muda lá também. Confira o boleto do último mês (proporcional aos dias). A garantia é corrigida pela poupança: o índice vem do Banco Central, pelo aniversário de cada depósito (confira e corrija se precisar).`;
+      return `Saída em ${dataBr(c.data_saida)} (mude em "Saída do inquilino").${semBoleto}${semDeposito}${avisoCreditos(c, r)} ${vistoria} A leitura dos relógios é a da vistoria de saída: vem preenchida e, se mudar aqui, muda lá também. Confira o boleto do último mês (proporcional aos dias). A garantia é corrigida pela poupança: o índice vem do Banco Central, pelo aniversário de cada depósito (confira e corrija se precisar).`;
     },
+    // multas sugeridas (saída antecipada e falta do aviso de 30 dias): nunca entram sozinhas; "Usar" soma aos débitos
+    topo: (r, q) => sugestoesMultaSaida(buscar('contratos', q.contrato)),
     // os débitos vêm dos boletos que já existem: sem o boleto do mês da saída, o último aluguel ficava fora do cálculo
     // (ex.: saída em 20/10/2026 e o boleto de 10/2026 ainda não gerado → débitos R$ 0,00 e a caução devolvida inteira)
     conferir: (dados, r, q) => {

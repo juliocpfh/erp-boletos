@@ -340,7 +340,7 @@ test('revisão de 2026-11-12: procuração com os números do imóvel, aviso pr�
   assert.match(t, /recebe o imóvel na data da entrega das chaves/);
   assert.match(t, /5 \(cinco\) dias úteis, contados da entrega das chaves/);
   assert.match(t, /feito pela LOCADORA com o imóvel desocupado, antes da entrega/);
-  assert.match(t, /honorários advocatícios de 20% \(vinte por cento\)/);
+  assert.match(t, /evitar a rescisão na ação de despejo .*de 20% \(vinte por cento\) sobre o valor devido/); // honorários de 24/11 (advogado)
   assert.doesNotMatch(t, /25%/);
   // sem água nem energia por conta do inquilino e sem as outras contas: a cláusula sai
   const { d: d2, c: c2 } = base({ conta_agua: 'Incluso no aluguel', conta_energia: 'Não tem' });
@@ -411,4 +411,41 @@ test('fiador casado: o cônjuge assina em anuência; sem ele, pendência (salvo 
   assert.deepEqual(dados.assinaturas.map((a) => a.papel), ['LOCADORA', 'LOCATÁRIO', 'FIADOR', 'CÔNJUGE DO FIADOR (ANUÊNCIA)']);
   const { d: d2, c: c2 } = base({ garantia_tipo: 'Fiador + depósito' });
   assert.ok(K.pendenciasDoContrato(d2, c2).some((x) => /garantia dupla/.test(x)));
+});
+
+test('cláusulas aprovadas pelo advogado (24/11/2026): honorários, IPCA, visita perdida, serviços extras, estorno, pintura e art. 4º só para PF', async () => {
+  const M = await import('../docs/js/modelos-contrato.js');
+  const { usarRegras } = await import('../docs/js/config-regras.js');
+  const gera = (extra, nome = 'Residencial') => {
+    const { d, c } = base(extra);
+    d.config_regras.push({ id: 1, chave: 'pintura_vida_meses', valor: 48 });
+    usarRegras(d);
+    return texto(K.montarContrato(K.modelosDe(d).find((m) => m.nome === nome).texto, K.dadosDoContrato(d, c, { data: '2026-09-01' })));
+  };
+  for (const nome of ['Residencial', 'Não residencial (comercial)']) {
+    const t = gera({}, nome);
+    assert.match(t, /multa de 2% \(dois por cento\) e juros de 1% \(um por cento\) ao mês, contados por dia de atraso/);
+    assert.match(t, /atualizados monetariamente pela variação do IPCA \(IBGE\)/);
+    assert.match(t, /Passados 30 \(trinta\) dias de atraso .* advogado com inscrição ativa na OAB, que pode ser sócio (da própria LOCADORA|de uma das LOCADORAS);.*somente se houver efetiva atuação do advogado.*honorários de 10% \(dez por cento\).*A mesma regra vale em favor do LOCATÁRIO/);
+    assert.match(t, /ação de despejo \(Lei nº 8\.245\/91, art\. 62, II\).*20% \(vinte por cento\).*fixados pelo juiz/);
+    assert.match(t, /pelo valor exato do comprovante/);
+    assert.match(t, /Pagamento devolvido ou estornado não quita o aluguel/);
+    assert.match(t, /48 \(quarenta e oito\) horas de aviso por escrito, pagará o custo comprovado da nova visita ou vistoria, cobrado no boleto seguinte/);
+    assert.match(t, /Serviços pedidos pelo LOCATÁRIO .* custo comprovado, no boleto seguinte/);
+    assert.match(t, /vida útil da pintura, de 48 \(quarenta e oito\) meses contados da entrada.*depois de 48 \(quarenta e oito\) meses de ocupação.*salvo contravistoria.*outro, de profissional da sua escolha, até a devolução das chaves/);
+    assert.doesNotMatch(t, /departamento jurídico|empresa de cobrança|em qualquer caso, os honorários|\[pintura_vida\?\]/);
+    assert.match(t, /transferido pelo empregador/, 'pessoa física: a dispensa do art. 4º continua no resumo');
+    assert.match(t, /com as mesmas regras\./, 'pergunta 4 como estava (item 5.1)');
+    const pj = gera({ inquilino_tipo: 'Pessoa jurídica (empresa)' }, nome);
+    assert.doesNotMatch(pj, /transferido pelo empregador/, 'empresa locatária: sem a frase do art. 4º');
+    assert.match(pj, /proporcional ao tempo que falta para terminar o contrato\./);
+  }
+  // modelos já gravados com o texto de antes recebem as cláusulas, uma vez só; texto editado à mão fica como está
+  const velho = ['**Parágrafo segundo** – O aluguel não pago no seu vencimento, além de não fazer jus à bonificação de pagamento com pontualidade, estará sujeito a cobrança pelo departamento jurídico, judicial ou extrajudicial, arcando o LOCATÁRIO com as despesas dela decorrentes, multa de {multa}, juros de {juros} ao mês e honorários de advogado.',
+    '**CLÁUSULA #** – Tudo quanto for devido em razão deste contrato e que não comporte o processo executivo será cobrado em ação competente, ficando a cargo do devedor, em qualquer caso, os honorários do advogado que o credor constituir para o ressarcimento de seus débitos.',
+    '**CLÁUSULA #** – Fim.'].join('\n\n');
+  const novo = M.textoAtualizadoDoModelo({ texto: velho });
+  assert.equal(novo, `${M.ATRASO_E_COBRANCA}\n\n**CLÁUSULA #** – Fim.`);
+  assert.equal(M.textoAtualizadoDoModelo({ texto: novo }), novo);
+  assert.equal(M.textoAtualizadoDoModelo({ texto: 'honorários de 30%' }), 'honorários de 30%');
 });

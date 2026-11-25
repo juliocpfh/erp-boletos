@@ -94,9 +94,9 @@ test('dados antigos — mensal-025: o ajuste do mês não apaga a diferença pre
   assert.equal(jul.outros, falta + 5000);
   assert.match(jul.outros_descricao, /reforma do banheiro/);
   assert.ok(jul.outros_descricao.includes(R.textoDiferenca(jun)));
-  // base de multa e juros: sem a diferença (que já tem multa e juros dentro)
+  // base de multa e juros: sem a diferença (que já tem multa e juros dentro) e sem a tarifa do boleto (24/11/2026)
   const t = R.totais(jul);
-  assert.equal(t.base_multa, t.total_sem_desconto - falta);
+  assert.equal(t.base_multa, t.total_sem_desconto - falta - (jul.taxa_boleto || 0));
 });
 
 test('dados antigos — mensal-026 e saida-002: excluir o boleto que recebeu a diferença a solta; ela vai ao próximo boleto gerado', () => {
