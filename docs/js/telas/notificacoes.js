@@ -79,8 +79,8 @@ function feriadosNoPrazo(inicio, limite) {
   return out;
 }
 
-/** Nome do boleto nos avisos: "10/2026, vencido em 14/11/2026" ou "acordo 1/2, vencido em …". */
-const nomeBoletoAviso = (cb) => `${R.ehParcelaAcordo(cb) ? `acordo ${cb.acordo_parcela || ''}`.trim() : compBr(cb.competencia)}, vencido em ${dataBr(cb.vencimento)}`;
+/** Nome do boleto nos avisos: "10/2026 (vencido em 14/11/2026)" ou "acordo 1/2 (vencido em …)". */
+const nomeBoletoAviso = (cb) => `${R.ehParcelaAcordo(cb) ? `acordo ${cb.acordo_parcela || ''}`.trim() : compBr(cb.competencia)} (vencido em ${dataBr(cb.vencimento)})`;
 
 /**
  * Avisos dos boletos do aluguel em atraso (teste da PR #420): na 2ª notificação, os vencidos que a 1ª não listou (a regra não
@@ -89,10 +89,10 @@ const nomeBoletoAviso = (cb) => `${R.ehParcelaAcordo(cb) ? `acordo ${cb.acordo_p
 function avisosDosBoletos(c, data, { anterior = null, propria = null } = {}) {
   const vencidos = R.boletosEmAtraso(d(), c.id, data);
   if (anterior) {
-    return vencidos.filter((cb) => !(anterior.boletos || []).includes(cb.id)).map((cb) => `O boleto <b>${nomeBoletoAviso(cb)}</b>, não está nesta notificação: faça uma notificação nova de "Aluguel em atraso" para ele.`);
+    return vencidos.filter((cb) => !(anterior.boletos || []).includes(cb.id)).map((cb) => `O boleto <b>${nomeBoletoAviso(cb)}</b> não está nesta notificação: faça uma notificação nova de "Aluguel em atraso" para ele.`);
   }
   const exceto = propria ? R.cadeiaDaNotificacao(d(), propria).map((x) => x.id) : [];
-  return R.boletosEmOutraNotificacao(d(), c.id, vencidos.map((cb) => cb.id), exceto).map((o) => `O boleto <b>${nomeBoletoAviso(o.cobranca)}</b>, já está na notificação de <a href="#/notificacao/${o.notificacao.id}">${dataBr(o.notificacao.data)}</a> (${esc(o.notificacao.situacao || 'Rascunho')}), ainda aberta.`);
+  return R.boletosEmOutraNotificacao(d(), c.id, vencidos.map((cb) => cb.id), exceto).map((o) => `O boleto <b>${nomeBoletoAviso(o.cobranca)}</b> já está na notificação de <a href="#/notificacao/${o.notificacao.id}">${dataBr(o.notificacao.data)}</a> (${esc(o.notificacao.situacao || 'Rascunho')}), ainda aberta.`);
 }
 
 /**
