@@ -86,6 +86,8 @@ export function contextoValido(ctx = {}) {
   const condicoes = {
     retencao_pct: Number.isFinite(Number(c.retencao_pct)) && Number(c.retencao_pct) >= 0 && Number(c.retencao_pct) <= 100 ? Number(c.retencao_pct) : null,
     dias_arrependimento: inteiro(c.dias_arrependimento, 0, 60), dias_uteis_documentos: inteiro(c.dias_uteis_documentos, 1, 15),
+    // dias corridos (correção do dono, 24/11/2026); o site antigo não manda: dias úteis, como o texto dele
+    documentos_corridos: c.documentos_corridos === true,
     dias_validade: inteiro(c.dias_validade, 1, 60), dias_uteis_devolucao: inteiro(c.dias_uteis_devolucao, 1, 30),
   };
   if (Object.values(condicoes).some((v) => v === null)) throw new ErroAceite(400, 'Condições da reserva inválidas.');
@@ -282,7 +284,7 @@ export function textoDoComprovante(c, resposta) {
   const quando = new Date(resposta.em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' });
   return `Olá${primeiro(c.nome) ? `, ${primeiro(c.nome)}` : ''}.\n\nRecebemos o seu aceite do termo da reserva em ${quando} (horário de Brasília).\n\n`
     + `PRÓXIMO PASSO: faça o depósito da reserva de ${c.reserva}${c.deposito ? ` na conta abaixo e responda este e-mail com o comprovante:\n${c.deposito}` : ' e mande o comprovante para a administração'}.\n`
-    + `Depois do depósito, você tem ${c.condicoes.dias_uteis_documentos} dias úteis para mandar a ficha e os documentos pelo link que vamos enviar.\n\n`
+    + `Depois do depósito, você tem ${c.condicoes.dias_uteis_documentos} ${c.condicoes.documentos_corridos ? 'dias corridos' : 'dias úteis'} para mandar a ficha e os documentos pelo link que vamos enviar.\n\n`
     + `O texto que você leu e aceitou:\n\n${textoDoAceite(c)}\n\nCódigo de conferência do texto: ${resposta.texto_sha256.slice(0, 16)}\n\n`
     + `Guarde este e-mail. Qualquer dúvida, fale com a administração${c.telefone_empresa ? ` pelo ${c.telefone_empresa}` : ''}.\n\n${c.empresa || 'Administração'}`;
 }
@@ -420,7 +422,7 @@ button.sec{background:transparent;color:var(--cor);border:1px solid var(--cor)}b
   function feito(c, resp, novo) {
     app.innerHTML = topo(c) + '<div class="cartao"><div class="ok"><b>' + (novo ? 'Pronto! Termo aceito.' : 'Você já aceitou este termo.') + '</b><br>Em ' + esc(horaBr(resp.em)) + ', com o e-mail <b>' + esc(resp.email) + '</b>.</div>'
       + '<h2>Próximo passo: o depósito da reserva</h2><p>Deposite <b>' + esc(c.reserva) + '</b>' + (c.deposito ? ' na conta abaixo e mande o comprovante respondendo o e-mail do comprovante:</p><div class="texto">' + esc(c.deposito) + '</div>' : ' e mande o comprovante para a administração.</p>')
-      + '<p>Depois do depósito, você tem <b>' + esc(c.condicoes.dias_uteis_documentos) + ' dias úteis</b> para mandar a ficha e os documentos pelo link que vamos enviar.</p>'
+      + '<p>Depois do depósito, você tem <b>' + esc(c.condicoes.dias_uteis_documentos) + (c.condicoes.documentos_corridos ? ' dias corridos' : ' dias úteis') + '</b> para mandar a ficha e os documentos pelo link que vamos enviar.</p>'
       + '<p class="suave">' + (resp.comprovante ? 'Mandamos o comprovante do aceite, com o texto inteiro, para o seu e-mail.' : 'Não conseguimos mandar o comprovante para o seu e-mail agora: guarde esta tela (tire uma foto ou um print).') + ' Confira também a caixa de spam.</p></div>'
       + '<div class="cartao"><h2>O termo que você aceitou</h2><div class="texto">' + esc(c.termo) + '</div></div>' + rodape(c);
   }

@@ -102,7 +102,7 @@ function camposDoTermo(f, hoje) {
   const pz = R.prazosDaReserva(f);
   const dv = R.fichaSemContrato(f) ? R.devolucaoDaReserva(f) : null;
   return {
-    reserva_combinada: valor ? C.reais(valor) : '', dias_validade: String(c.dias_validade), dias_documentos: String(c.dias_uteis_documentos),
+    reserva_combinada: valor ? C.reais(valor) : '', dias_validade: String(c.dias_validade), dias_documentos: String(c.dias_uteis_documentos), prazo_documentos_dias: R.prazoDosDocumentosTexto(c),
     dias_arrependimento: String(c.dias_arrependimento), dias_devolucao: String(c.dias_uteis_devolucao), retencao: C.pct(c.retencao_pct),
     retencao_valor: C.reais(reter), devolve_depois: C.reais(valor - reter),
     regra_desistencia: REC.regraDaDesistencia(c, valor), texto_conferencia: REC.TEXTO_CONFERENCIA, aviso_desistencia: REC.avisoDaDesistencia(c, valor),

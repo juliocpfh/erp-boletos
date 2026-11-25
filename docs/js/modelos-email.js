@@ -53,7 +53,7 @@ DOCUMENTOS PARA A ANÁLISE
 RESERVA
 - Valor: {reserva_combinada}, abatido do 1º aluguel se a ficha for aprovada
 - O imóvel fica reservado para você por {dias_validade} dias depois do depósito
-- Depois do depósito, você tem {dias_documentos} dias úteis para mandar a ficha e os documentos; se faltar algum, entramos em contato antes do fim do prazo; sem eles, a reserva é cancelada
+- Depois do depósito, você tem {prazo_documentos_dias} para mandar a ficha e os documentos; se faltar algum, entramos em contato antes do fim do prazo; sem eles, a reserva é cancelada
 - Ficha não aprovada: informamos o motivo por escrito e devolvemos tudo; você pode reapresentar documentos que fortaleçam a análise
 - {regra_desistencia}
 - {texto_conferencia}
@@ -98,7 +98,7 @@ Seus dados são tratados conforme a LGPD (Lei 13.709/2018).`,
   },
   {
     chave: 'ficha_lembrete_documentos', nome: 'Lembrete dos documentos da ficha', etapa: 'Ficha',
-    // aviso no 4º dia útil e no último dia do prazo dos documentos (pedido do advogado, 24/11/2026, item 1.2)
+    // aviso no 4º dia e no último dia do prazo dos documentos (pedido do advogado, 24/11/2026, item 1.2; dias corridos, dono)
     assunto: '{imovel}: documentos da ficha (prazo até {prazo_documentos})',
     texto: `Olá, {nome}, tudo bem?
 
@@ -433,6 +433,8 @@ Já resolveu? Responda com uma foto ou um documento, para darmos a baixa. Sem is
  */
 export const ATUALIZACOES_EMAIL = [
   // ajustes do advogado no termo da reserva (24/11/2026, itens 1.2 e 1.4): contato antes do fim do prazo; reprovação por escrito
+  // prazo dos documentos em dias corridos (correção do dono, 24/11/2026): "7 dias corridos" (ou "dias úteis", pela regra)
+  ['ficha_termo_reserva', 'você tem {dias_documentos} dias úteis para mandar', 'você tem {prazo_documentos_dias} para mandar'],
   ['ficha_termo_reserva', 'para mandar a ficha e os documentos; sem eles, a reserva é cancelada', 'para mandar a ficha e os documentos; se faltar algum, entramos em contato antes do fim do prazo; sem eles, a reserva é cancelada'],
   ['ficha_termo_reserva', '- Ficha não aprovada: devolvemos tudo\n', '- Ficha não aprovada: informamos o motivo por escrito e devolvemos tudo; você pode reapresentar documentos que fortaleçam a análise\n'],
   ['ficha_reprovada', 'não foi possível aprovar a ficha neste momento.\n\n[se reserva]', 'não foi possível aprovar a ficha neste momento.\n[se motivo_reprovacao]\nMotivo: {motivo_reprovacao}\n[fim][se pode_reapresentar]\nSe tiver documentos que fortaleçam a análise (por exemplo, outro comprovante de renda), responda este e-mail com eles: a ficha é analisada de novo.\n[fim]\n[se reserva]'],

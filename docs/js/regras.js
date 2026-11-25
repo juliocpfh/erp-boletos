@@ -3088,11 +3088,19 @@ export const devolucaoPendente = (f) => fichaSemContrato(f) && f.reserva_valor >
 /** Condições da reserva pelas regras de agora (Sistema → Regras do sistema, grupo "Reserva e termo de aceite"). */
 export const condicoesDaReservaAgora = () => ({
   retencao_pct: CR.regra('reserva_retencao_pct'), dias_arrependimento: CR.regra('reserva_dias_arrependimento'),
-  dias_uteis_documentos: CR.regra('reserva_dias_uteis_documentos'), dias_validade: CR.regra('reserva_dias_validade'),
-  dias_uteis_devolucao: CR.regra('reserva_dias_uteis_devolucao'),
+  dias_uteis_documentos: CR.regra('reserva_dias_uteis_documentos'), documentos_corridos: !!CR.regra('reserva_documentos_dias_corridos'),
+  dias_validade: CR.regra('reserva_dias_validade'), dias_uteis_devolucao: CR.regra('reserva_dias_uteis_devolucao'),
 });
-/** Condições da ficha: as do termo aceito ou, sem aceite, as de agora. */
-export const condicoesDaReserva = (f) => ({ ...condicoesDaReservaAgora(), ...(((f && f.aceite_reserva) || {}).condicoes || {}) });
+/**
+ * Condições da ficha: as do termo aceito ou, sem aceite, as de agora. Termo aceito antes de 24/11/2026 (sem `documentos_corridos`):
+ * o prazo dos documentos era em dias úteis, como foi aceito.
+ */
+export const condicoesDaReserva = (f) => {
+  const aceitas = ((f && f.aceite_reserva) || {}).condicoes;
+  return { ...condicoesDaReservaAgora(), ...(aceitas ? { documentos_corridos: false, ...aceitas } : {}) };
+};
+/** O prazo dos documentos em palavras. Ex.: "7 dias corridos"; termo antigo: "3 dias úteis". */
+export const prazoDosDocumentosTexto = (c) => (c.documentos_corridos ? C.plural(c.dias_uteis_documentos, 'dia corrido', 'dias corridos') : C.plural(c.dias_uteis_documentos, 'dia útil', 'dias úteis'));
 /** Valor da reserva da ficha: o depositado ou, antes do depósito, o combinado no termo. */
 export const valorDaReserva = (f) => (f.reserva_valor > 0 ? f.reserva_valor : f.reserva_combinada > 0 ? f.reserva_combinada : 0);
 /** Quanto a empresa fica numa desistência depois do prazo. Ex.: R$ 500,00 com 40% → R$ 200,00. */
@@ -3100,23 +3108,25 @@ export const retencaoDaReserva = (valor, pct) => Math.round((valor || 0) * (Numb
 
 /**
  * Prazos contados do depósito da reserva (null sem a data do depósito). Ex.: depósito na quarta, 02/12/2026 → 1º aviso dos
- * documentos na terça, 08/12/2026 (4º dia útil, `aviso_documentos_em`), documentos até sexta, 11/12/2026 (7 dias úteis, pedido do
- * advogado de 24/11/2026) e reservado até 17/12/2026 (15 dias); desistência com tudo de volta até 09/12/2026 com 7 dias na regra,
- * ou nenhuma (arrependimento_ate null) com 0 dias, o padrão. Aviso no último dia ou depois: `aviso_documentos_em` null (só o do fim).
+ * documentos no sábado, 06/12/2026 (4º dia, `aviso_documentos_em`), documentos até quarta, 09/12/2026 (7 dias corridos: pedido do
+ * advogado e correção do dono, 24/11/2026; termo aceito antes, em dias úteis) e reservado até 09/12/2026 (7 dias); desistência com
+ * tudo de volta até 09/12/2026 com 7 dias na regra, ou nenhuma (arrependimento_ate null) com 0 dias, o padrão. Aviso no último dia
+ * ou depois: `aviso_documentos_em` null (só o do fim).
  */
 export function prazosDaReserva(f) {
   if (!f || !/^\d{4}-\d{2}-\d{2}$/.test(String(f.reserva_data || ''))) return null;
   const c = condicoesDaReserva(f);
   const aviso = CR.regra('reserva_dia_aviso_documentos');
-  return { documentos_ate: C.somarDiasUteis(f.reserva_data, c.dias_uteis_documentos), vale_ate: C.somarDias(f.reserva_data, c.dias_validade),
-    aviso_documentos_em: aviso > 0 && aviso < c.dias_uteis_documentos ? C.somarDiasUteis(f.reserva_data, aviso) : null,
+  const somar = c.documentos_corridos ? C.somarDias : C.somarDiasUteis;
+  return { documentos_ate: somar(f.reserva_data, c.dias_uteis_documentos), vale_ate: C.somarDias(f.reserva_data, c.dias_validade),
+    aviso_documentos_em: aviso > 0 && aviso < c.dias_uteis_documentos ? somar(f.reserva_data, aviso) : null,
     arrependimento_ate: c.dias_arrependimento > 0 ? C.somarDias(f.reserva_data, c.dias_arrependimento) : null };
 }
 
 /**
  * Aviso de hoje para a equipe falar com quem ainda não mandou os documentos (pedido do advogado, 24/11/2026, item 1.2): no dia
  * do 1º aviso e no último dia do prazo, com o termo aceito, a ficha em análise e os documentos não marcados. { qual: 'primeiro' |
- * 'ultimo', ate } ou null. Ex.: depósito em 02/12/2026 → 'primeiro' de 08/12 a 10/12/2026 e 'ultimo' em 11/12/2026.
+ * 'ultimo', ate } ou null. Ex.: depósito em 02/12/2026 → 'primeiro' de 06/12 a 08/12/2026 e 'ultimo' em 09/12/2026.
  */
 export function avisoDosDocumentos(f, hoje = C.hojeIso()) {
   const pz = f && f.situacao === 'Em análise' && f.aceite_reserva && fichaSemDocumentos(f) ? prazosDaReserva(f) : null;
