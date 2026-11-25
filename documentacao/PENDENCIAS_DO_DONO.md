@@ -19,7 +19,7 @@
 - Caixa do fiador na troca de titular: a frase "o que devia já foi abatido" aparece também quando ele não devia nada.
 - O termo do 2º acordo (acordo refeito) não cita os honorários do 1º.
 - A 2ª via mostra "setting 'hidden'" no console do navegador.
-- Também anotadas nos testes: a pergunta 2 do resumo do contrato fala em honorários sem as condições (vale a cláusula); no cálculo final, mudar à mão o valor da multa do aviso não muda o texto da descrição; o CPF da testemunha fica no navegador depois de "Sair" (`assinatura-contrato-<id>`); a ponte do C6 (`emission_date`), `conciliacao.js` e `envios.js` ainda usam a data de antes (das 21h em diante sairia o dia seguinte); a 2ª notificação de atraso não pega o boleto que venceu depois da 1ª (só avisa); dois CPFs além do de teste em `SIMULACAO_ETAPAS_24_11.md`.
+- Também anotadas nos testes: a pergunta 2 do resumo do contrato fala em honorários sem as condições (vale a cláusula); no cálculo final, mudar à mão o valor da multa do aviso não muda o texto da descrição; o CPF da testemunha fica no navegador depois de "Sair" (`assinatura-contrato-<id>`); a ponte do C6 (`emission_date`), `conciliacao.js` e `envios.js` ainda usam a data de antes (das 21h em diante sairia o dia seguinte); a 2ª notificação de atraso não pega o boleto que venceu depois da 1ª (só avisa).
 
 **Próximo trabalho do Claude:** o **kit de teste automático** (agendado pelo dono): banco com os casos montados e um roteiro que sobe o site e a nuvem local e roda os 4 lugares.
 
