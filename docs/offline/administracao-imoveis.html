@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-Pp9gnPOJPXWEIEaTowTT80XKRaFz+gSTj3CngQu5ylA='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-/svYK4wWkxIiW/D4etIGO9xvQqYzVGjO/9WB+1Sc3K0='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="4f714cfb4eb5e919">
+<meta name="fontes" content="a0dd16281bd535ad">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -58,6 +58,7 @@ tr.total td { font-weight: 700; border-top: 2px solid var(--texto); }
 .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px 18px; }
 .grade .rotulo { font-size: 12px; color: var(--suave); }
 .grade .valor { font-weight: 600; }
+.grade > .largo { grid-column: 1 / -1; }
 .etiqueta { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
 .etiqueta.ok { background: #dcfce7; color: var(--ok); }
 .etiqueta.aviso { background: #fef3c7; color: var(--aviso); }
@@ -3263,6 +3264,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   });
 
   // docs/js/modelos-documentos.js
+  function atualizarTextoDocumento(tipo, texto3) {
+    const trocas = Object.prototype.hasOwnProperty.call(ATUALIZACOES_DOCUMENTOS, tipo) ? ATUALIZACOES_DOCUMENTOS[tipo] : null;
+    if (!trocas || typeof texto3 !== "string") return texto3;
+    const antes = texto3.replace(/\r\n/g, "\n");
+    let t = antes;
+    for (const [antigo, novo] of trocas) if (t.includes(antigo)) t = t.split(antigo).join(novo);
+    return t === antes ? texto3 : t;
+  }
   function modelosDocumentos(PARTES2) {
     const textos = {
       aditivo_prazo: `# {numero_aditivo} TERMO ADITIVO AO CONTRATO DE LOCAÇÃO
@@ -3302,7 +3311,7 @@ As partes acima, já qualificadas no Contrato de Locação {finalidade} que tem 
 
 [se caucao]**CLÁUSULA #** – A caução nova será depositada pelo LOCATÁRIO em caderneta de poupança, nos termos do art. 38, § 2º, da Lei nº 8.245/91, e o comprovante faz parte deste termo.[fim]
 
-[se fiador]**CLÁUSULA #** – {f:O FIADOR qualificado acima declara|Os FIADORES qualificados acima declaram} conhecer o contrato de locação e {f:garante|garantem} as obrigações do LOCATÁRIO, solidariamente, como {f:fiador e principal pagador|fiadores e principais pagadores}, renunciando ao benefício de ordem (Código Civil, arts. 827 e 828), até a entrega real e definitiva das chaves.[fim]
+[se fiador]**CLÁUSULA #** – {f:O FIADOR qualificado acima declara|Os FIADORES qualificados acima declaram} conhecer o contrato de locação e {f:garante|garantem} as obrigações do LOCATÁRIO, solidariamente, como {f:fiador e principal pagador|fiadores e principais pagadores}, ${GARANTIA_CHAVES}[fim]
 
 [se seguro_fianca]**CLÁUSULA #** – O LOCATÁRIO apresentará a apólice do seguro fiança locatícia em até 30 (trinta) dias, sob pena de infração contratual.[fim]
 
@@ -3346,7 +3355,7 @@ O LOCATÁRIO declara estar ciente de que:
 
 2. a vistoria de saída será feita na entrega das chaves, com convite por escrito, por e-mail, para acompanhá-la, e os reparos necessários para o imóvel voltar ao estado da vistoria de entrada, ressalvado o desgaste natural do uso, serão descontados da garantia ou cobrados com base em orçamento ou nota do serviço;
 
-3. [se data_fim]saindo antes do fim do prazo do contrato ({data_fim}), incide a multa prevista no contrato, proporcional ao tempo que falta (Lei nº 8.245/91, art. 4º); depois do fim do prazo, basta o aviso de 30 (trinta) dias, sem multa;[senão]a locação é por prazo indeterminado: basta o aviso de 30 (trinta) dias, sem multa (Lei nº 8.245/91, art. 6º);[fim]
+${AVISO_MULTA}
 
 4. deve encerrar as contas de consumo que estejam em seu nome e entregar os comprovantes das últimas contas pagas.
 
@@ -3359,13 +3368,13 @@ O LOCATÁRIO declara estar ciente de que:
 
 Ao LOCATÁRIO: {locatarios}.[se solidario] Ao LOCATÁRIO SOLIDÁRIO: {solidario}.[fim][se fiador] {f:Ao FIADOR|Aos FIADORES}, para conhecimento: {fiadores}.[fim]
 
-{l:A LOCADORA|As LOCADORAS}, {locadoras}, no Contrato de Locação {finalidade} que tem por objeto {objeto}, firmado em {data_contrato}, [se data_fim]cujo prazo terminou em {data_fim} e que continua[senão]que vigora[fim] por prazo indeterminado, {l:vem|vêm} comunicar que não {l:tem|têm} interesse em continuar a locação e, nos termos do [se nao_residencial]art. 57[senão]art. 46, § 2º[fim], da Lei nº 8.245/91, {l:concede|concedem} o prazo de 30 (trinta) dias para a desocupação do imóvel, até **{data_limite}**.
+{l:A LOCADORA|As LOCADORAS}, {locadoras}, no Contrato de Locação {finalidade} que tem por objeto {objeto}, firmado em {data_contrato}, [se data_fim]cujo prazo terminou em {data_fim} e que continua[senão]que vigora[fim] por prazo indeterminado, ${NOTIFICACAO_PEDIDO}
 
 Até a entrega das chaves continuam devidos o aluguel e os encargos. A vistoria de saída será feita na entrega das chaves, com convite por escrito, por e-mail, para acompanhá-la.
 
 Não havendo a desocupação no prazo, {l:a LOCADORA poderá|as LOCADORAS poderão} propor a ação de despejo prevista em lei, sem prejuízo da cobrança dos valores devidos.
 
-Para combinar a data da vistoria e a entrega das chaves, basta responder a este e-mail.
+${NOTIFICACAO_CONTATO}
 
 > {cidade}, {data_assinatura}.
 
@@ -3414,13 +3423,16 @@ Sem o pagamento, o débito poderá ser cobrado do LOCATÁRIO e {f:do FIADOR|dos 
     };
     return Object.entries(textos).map(([tipo, texto3]) => ({ nome: TIPOS_DOCUMENTO[tipo].nome, tipo, texto: texto3 }));
   }
-  var TIPOS_DOCUMENTO, FECHO, DEMAIS;
+  var TIPOS_DOCUMENTO, AVISO_MULTA_ANTIGO, AVISO_MULTA, NOTIFICACAO_PEDIDO_ANTIGO, NOTIFICACAO_PEDIDO, NOTIFICACAO_CONTATO_ANTIGO, NOTIFICACAO_CONTATO, GARANTIA_CHAVES_ANTIGO, GARANTIA_CHAVES, ATUALIZACOES_DOCUMENTOS, documentoAtivo, FECHO, DEMAIS;
   var init_modelos_documentos = __esm({
     "docs/js/modelos-documentos.js"() {
       TIPOS_DOCUMENTO = {
         aditivo_prazo: {
           nome: "Termo aditivo de prorrogação do prazo",
           explica: "Prorroga o contrato por um novo prazo, com o mesmo aluguel e as mesmas condições (o fiador assina concordando).",
+          // advogado, 24/11/2026 (item 6.1): não aprovado. O contrato vencido continua por prazo indeterminado, com o reajuste anual
+          // ou uma renegociação (termo de novo valor). Os termos já gerados continuam valendo: assinados, mudam o término (#401).
+          retirado: "Não é mais gerado (advogado, 24/11/2026): depois do fim do prazo, o contrato continua por prazo indeterminado, com o reajuste anual ou uma renegociação do valor. Os termos já gerados continuam valendo.",
           campos: [
             ["numero_aditivo", "Número do termo aditivo", "numero", "2"],
             ["novo_prazo_meses", "Novo prazo (meses)", "numero", "30"],
@@ -3447,13 +3459,23 @@ Sem o pagamento, o débito poderá ser cobrado do LOCATÁRIO e {f:do FIADOR|dos 
           nome: "Aviso de desocupação (o inquilino avisa que vai sair)",
           explica: "Para o inquilino assinar quando avisa a saída: 30 dias de antecedência (Lei 8.245/91, art. 6º). A empresa assina o recebimento.",
           assinam: ["LOCATÁRIO", "LOCATÁRIO SOLIDÁRIO", "LOCADORA"],
-          campos: [["data_saida_prevista", "Data prevista da entrega das chaves", "data", "2026-12-31"]]
+          campos: [
+            ["data_saida_prevista", "Data prevista da entrega das chaves", "data", "2026-12-31"],
+            // advogado, 24/11/2026 (item 6.4): a dispensa da multa por transferência do empregador (art. 4º, parágrafo único), marcada
+            // antes de gerar; só pessoa física, como no resumo do contrato (item 5.2)
+            ["transferencia_empregador", "O inquilino foi transferido pelo empregador para outra cidade: dispensa da multa da saída antes do fim do prazo (peça o comprovante da transferência)", "marcar", "", (k) => !k.pj]
+          ]
         },
         notificacao_desocupacao: {
           nome: "Notificação para desocupação (contrato por prazo indeterminado)",
-          explica: "A empresa pede o imóvel de volta com 30 dias de prazo, depois do fim do prazo do contrato. Residencial com contrato de menos de 30 meses: só nos casos do art. 47 da Lei 8.245/91 (confirme com o advogado antes de mandar).",
+          explica: "A empresa pede o imóvel de volta com 30 dias de prazo, contados do recebimento, depois do fim do prazo do contrato. Vai por carta com aviso de recebimento (AR). Residencial com contrato de menos de 30 meses: só nos casos do art. 47 da Lei 8.245/91, com o motivo escrito.",
           assinam: ["LOCADORA"],
-          campos: [["data_limite", "Data limite para desocupar", "data", "2026-12-31"]]
+          // advogado, 24/11/2026 (item 6.5): carta com AR e prazo contado do recebimento; residencial de menos de 30 meses só com o
+          // motivo do art. 47 (sem ele, o documento não é gerado); o fiador é notificado para conhecimento
+          campos: [
+            ["data_limite", "Data limite para desocupar (30 dias depois da entrega da carta)", "data", "2026-12-31"],
+            ["motivo_retomada", "Motivo da retomada (art. 47 da Lei 8.245/91) e a prova", "texto", "", (k) => !k.retomada_livre]
+          ]
         },
         autorizacao_obra: {
           nome: "Autorização para obra ou benfeitoria",
@@ -3481,6 +3503,20 @@ Sem o pagamento, o débito poderá ser cobrado do LOCATÁRIO e {f:do FIADOR|dos 
           ]
         }
       };
+      AVISO_MULTA_ANTIGO = "3. [se data_fim]saindo antes do fim do prazo do contrato ({data_fim}), incide a multa prevista no contrato, proporcional ao tempo que falta (Lei nº 8.245/91, art. 4º); depois do fim do prazo, basta o aviso de 30 (trinta) dias, sem multa;[senão]a locação é por prazo indeterminado: basta o aviso de 30 (trinta) dias, sem multa (Lei nº 8.245/91, art. 6º);[fim]";
+      AVISO_MULTA = "3. [se data_fim][se transferencia_empregador]saindo antes do fim do prazo do contrato ({data_fim}), o LOCATÁRIO fica dispensado da multa prevista no contrato, por ter sido transferido pelo seu empregador para prestar serviços em outra localidade, conforme o comprovante entregue com este aviso (Lei nº 8.245/91, art. 4º, parágrafo único);[senão]saindo antes do fim do prazo do contrato ({data_fim}), incide a multa prevista no contrato, proporcional ao tempo que falta (Lei nº 8.245/91, art. 4º); depois do fim do prazo, basta o aviso de 30 (trinta) dias, sem multa;[fim][senão]a locação é por prazo indeterminado: basta o aviso de 30 (trinta) dias, sem multa (Lei nº 8.245/91, art. 6º);[fim]";
+      NOTIFICACAO_PEDIDO_ANTIGO = "{l:vem|vêm} comunicar que não {l:tem|têm} interesse em continuar a locação e, nos termos do [se nao_residencial]art. 57[senão]art. 46, § 2º[fim], da Lei nº 8.245/91, {l:concede|concedem} o prazo de 30 (trinta) dias para a desocupação do imóvel, até **{data_limite}**.";
+      NOTIFICACAO_PEDIDO = "{l:vem|vêm} comunicar que não {l:tem|têm} interesse em continuar a locação e, [se retomada_livre]nos termos do [se nao_residencial]art. 57[senão]art. 46, § 2º[fim], da Lei nº 8.245/91[senão]com fundamento no art. 47 da Lei nº 8.245/91, pelo seguinte motivo: {motivo_retomada}[fim], {l:concede|concedem} o prazo de 30 (trinta) dias, contados do recebimento desta notificação, para a desocupação do imóvel, até **{data_limite}**. Se esta notificação for recebida depois de {recebimento_ate}, o prazo termina 30 (trinta) dias depois do recebimento.\n\nEsta notificação é enviada por carta com aviso de recebimento (AR)[se fiador], com cópia {f:ao FIADOR|aos FIADORES}[fim].";
+      NOTIFICACAO_CONTATO_ANTIGO = "Para combinar a data da vistoria e a entrega das chaves, basta responder a este e-mail.";
+      NOTIFICACAO_CONTATO = "Para combinar a data da vistoria e a entrega das chaves, basta entrar em contato com {l:a LOCADORA|as LOCADORAS}.";
+      GARANTIA_CHAVES_ANTIGO = "renunciando ao benefício de ordem (Código Civil, arts. 827 e 828), até a entrega real e definitiva das chaves.";
+      GARANTIA_CHAVES = "renunciando ao benefício de ordem (Código Civil, arts. 827 e 828), até a devolução real e definitiva das chaves.";
+      ATUALIZACOES_DOCUMENTOS = {
+        aditivo_garantia: [[GARANTIA_CHAVES_ANTIGO, GARANTIA_CHAVES]],
+        aviso_desocupacao: [[AVISO_MULTA_ANTIGO, AVISO_MULTA]],
+        notificacao_desocupacao: [[NOTIFICACAO_PEDIDO_ANTIGO, NOTIFICACAO_PEDIDO], [NOTIFICACAO_CONTATO_ANTIGO, NOTIFICACAO_CONTATO]]
+      };
+      documentoAtivo = (tipo) => Object.prototype.hasOwnProperty.call(TIPOS_DOCUMENTO, tipo) && !TIPOS_DOCUMENTO[tipo].retirado;
       FECHO = `E por estarem de acordo, as partes assinam este documento por assinatura eletrônica, que reconhecem como válida (Lei nº 14.063/2020), ou, no papel, em duas vias de igual teor e forma[se testemunhas], na presença das testemunhas abaixo[fim].
 
 > {cidade}, {data_assinatura}.
@@ -3521,6 +3557,7 @@ Sem o pagamento, o débito poderá ser cobrado do LOCATÁRIO e {f:do FIADOR|dos 
       }
     }
     if (tipo === "aditivo_troca") texto3 = trocar(texto3);
+    texto3 = atualizarTextoDocumento(tipo, texto3);
     return texto3;
   }
   var VISTORIA_ENTRADA, VISTORIA_ENTRADA_1211, SEM_AVISO, REPRESENTACAO, LGPD, PARTES, ITENS, PRAZO_ANTIGO, PRAZO_PARAGRAFO, TARIFA_BOLETO, DESPESAS_A_QUALQUER_TEMPO, EXTRAORDINARIAS, ALUGUEL, CONSERVACAO, CLAUSULAS_FCI, SEGURO_ANTIGO, SEGURO_INCENDIO, RESTITUICAO, MULTA, RESCISAO, GARANTIA, CONVITE_SAIDA, NEGATIVACAO, FECHO_CONTRATO, TARIFA_RESUMO, TARIFA_RESUMO_ANTIGA, RESUMO_CONTRATO, DIA_NAO_UTIL_ANTIGO, DIA_NAO_UTIL, RESUMO_FIM, RESUMO_FIM_COM_ANIMAIS, FINAIS, CONDOMINIO, ADITIVO_VENCIMENTO, ADITIVO_VALOR, ACERTO_POUPANCA, DEVOLUCAO_POUPANCA, ACERTO_CAUCAO_ANTIGO, ACERTO_DEPOSITO_ANTIGO, DEVOLUCAO_ANTIGA, GARANTIA_NOVA_TROCA, CONTAS_TROCA_ANTIGA, CONTAS_TROCA, ADITIVO_TROCA, MODELOS_PADRAO, ENDERECO_PARAGRAFO, ATUALIZACOES_MODELO;
@@ -4611,15 +4648,21 @@ ${RESUMO_CONTRATO}`, "RESUMO DO CONTRATO EM PERGUNTAS E RESPOSTAS"],
       data_fim: termino ? dataPorExtenso(termino) : "",
       fiadores_nomes: fiadores.map((f) => String(f.nome || "").toLocaleUpperCase("pt-BR")).join(", ")
     });
-    for (const [chave, , formato] of def ? def.campos : []) {
-      const v = String(valores[chave] ?? "").trim();
-      if (formato === "dinheiro") {
+    for (const [chave, , formato, , quando4] of def ? def.campos : []) {
+      const v = quando4 && !quando4(dados.condicoes) ? "" : String(valores[chave] ?? "").trim();
+      if (formato === "marcar") dados.campos[chave] = v && v !== "nao" ? "sim" : "";
+      else if (quando4 && !quando4(dados.condicoes)) dados.campos[chave] = "";
+      else if (formato === "dinheiro") {
         const centavos2 = typeof valores[chave] === "number" ? valores[chave] : centavos(v) || 0;
         dados.campos[chave] = centavos2 > 0 ? valorComExtenso(centavos2) : "";
       } else if (!v) dados.campos[chave] = LINHA_EM_BRANCO;
       else if (formato === "data") dados.campos[chave] = dataValida(v) ? dataPorExtenso(v) : LINHA_EM_BRANCO;
       else if (formato === "numero") dados.campos[chave] = chave === "numero_aditivo" ? `${Number(v) || 1}º` : Number(v) > 0 ? numeroComExtenso(Number(v)) : LINHA_EM_BRANCO;
       else dados.campos[chave] = v;
+    }
+    if (tipo === "notificacao_desocupacao") {
+      const limite = dataValida(String(valores.data_limite ?? "").trim());
+      dados.campos.recebimento_ate = limite ? dataPorExtenso(somarDias(limite, -30)) : LINHA_EM_BRANCO;
     }
     if (def && def.assinam) {
       const ordem = (a) => def.assinam.indexOf(a.papel);
@@ -25765,7 +25808,7 @@ ${m.texto}
       case "distrato":
         return `Distrato: entrega das chaves em ${data2("data_saida")}${String(v.multa_combinada || "").trim() ? `, multa de R$ ${String(v.multa_combinada).trim()}` : ", multa dispensada"}`;
       case "aviso_desocupacao":
-        return `Aviso de desocupação: entrega prevista em ${data2("data_saida_prevista")}`;
+        return `Aviso de desocupação: entrega prevista em ${data2("data_saida_prevista")}${v.transferencia_empregador ? ", sem multa (transferência pelo empregador)" : ""}`;
       case "notificacao_desocupacao":
         return `Notificação para desocupar até ${data2("data_limite")}`;
       case "autorizacao_obra":
@@ -25817,13 +25860,20 @@ ${m.texto}
     );
     return { tabela: "documentos_locacao", registro: r };
   }
+  function prazosDaNotificacao(x) {
+    const limite = dataValida(x && x.campos && x.campos.data_limite || "");
+    const recebida = x && x.arquivo ? dataValida(x.assinado_em || "") || null : null;
+    const pelaCarta = recebida ? somarDias(recebida, 30) : "";
+    const desocupar = [limite, pelaCarta].filter(Boolean).sort().pop() || "";
+    return { recebida, desocupar: desocupar || null, acaoAte: desocupar ? somarDias(desocupar, 30) : null };
+  }
   function anexarDocumento(d2, id, { data: data2, arquivo }, usuario) {
     const x = buscar(d2, "documentos_locacao", id);
     if (!x) throw new ErroUsuario("Documento não encontrado.");
     if (!dataValida(data2)) throw new ErroUsuario("Informe a data da assinatura.");
     if (!arquivo) throw new ErroUsuario("Anexe o arquivo assinado.");
     const c = buscar(d2, "contratos", x.contrato_id);
-    atualizar(d2, "documentos_locacao", x.id, { arquivo, assinado_em: data2 }, usuario, `${c ? c.inquilino_nome : "Contrato"}: ${x.nome} de ${dataBr(x.data)} assinado em ${dataBr(data2)}`);
+    atualizar(d2, "documentos_locacao", x.id, { arquivo, assinado_em: data2 }, usuario, `${c ? c.inquilino_nome : "Contrato"}: ${x.nome} de ${dataBr(x.data)} ${ehNotificacaoComAr(x) ? "recebida (AR)" : "assinado"} em ${dataBr(data2)}`);
     return x;
   }
   function tirarArquivoDocumento(d2, id, usuario) {
@@ -25867,7 +25917,7 @@ ${m.texto}
     const fim = fimDoContrato(d2, c) || mud.vigencia_fim;
     return mud.prazo_tipo === "Indeterminado" ? "O contrato volta a prazo indeterminado." : `A data de término do contrato volta a ${dataBr(fim)}.`;
   }
-  var TIPOS_ADITIVO_DOCUMENTO, ehTermoAditivo, ehProrrogacao, porData2, curto2, termoAguardando, documentosDo, termoDaRenovacao;
+  var TIPOS_ADITIVO_DOCUMENTO, ehTermoAditivo, ehProrrogacao, porData2, curto2, termoAguardando, documentosDo, MOTIVO_MINIMO, ehNotificacaoComAr, termoDaRenovacao;
   var init_documentos_locacao = __esm({
     "docs/js/documentos-locacao.js"() {
       init_calculos();
@@ -25883,6 +25933,8 @@ ${m.texto}
       };
       termoAguardando = (d2, contratoId, tipo) => (d2.aditivos || []).filter((a) => a.contrato_id === contratoId && a.documento === tipo && !a.arquivo && !a.perdido_em).sort(porData2)[0] || null;
       documentosDo = (d2, contratoId) => (d2.documentos_locacao || []).filter((x) => x.contrato_id === contratoId).sort(porData2);
+      MOTIVO_MINIMO = 30;
+      ehNotificacaoComAr = (x) => !!(x && x.documento === "notificacao_desocupacao");
       termoDaRenovacao = (d2, ren) => ren && ren.aditivo_id ? (d2.aditivos || []).find((a) => a.id === ren.aditivo_id && a.renovacao_id === ren.id) || null : null;
     }
   });
@@ -31983,10 +32035,18 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
   function caixaOutrosDocumentos(c) {
     const lista3 = documentosDo(d(), c.id);
     const abrir2 = (x) => `<a href="#" data-acao="abrirArquivo" data-escopo="aditivos" data-id="${x.contrato_id}" data-nome="${esc(x.arquivo)}">📎 ${esc(x.arquivo)}</a>`;
-    const assinatura = (x) => x.arquivo ? `${etiqueta(`assinado em ${dataBr(x.assinado_em)}`, "ok")}<br>${abrir2(x)}${xAnexo("tirarArquivoDocumento", { id: x.id })}` : `${etiqueta("aguardando a via assinada", "aviso")}${opera() ? `<form data-form="anexarDocumentoLocacao" class="acoes" style="margin-top:4px"><input type="hidden" name="id" value="${x.id}">
-      <input type="date" name="data" value="${hojeIso()}" style="width:auto" title="Data da assinatura">${atalhosData()}
-      <label class="botao secundario pequeno enviar" title="Via assinada (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}" data-arquivo-doc></label>
-      <button class="pequeno">Anexar assinado</button></form>` : ""}`;
+    const prazos = (x) => {
+      if (!ehNotificacaoComAr(x)) return "";
+      const p2 = prazosDaNotificacao(x);
+      return p2.desocupar ? `<div class="suave">Desocupar até ${dataBr(p2.desocupar)}${p2.recebida ? "" : " (pela data limite; confira quando o AR voltar)"}; sem a saída, ação de despejo com pedido de liminar até <b>${dataBr(p2.acaoAte)}</b>.</div>` : "";
+    };
+    const assinatura = (x) => {
+      const ar = ehNotificacaoComAr(x);
+      return x.arquivo ? `${etiqueta(`${ar ? "recebida (AR) em" : "assinado em"} ${dataBr(x.assinado_em)}`, "ok")}<br>${abrir2(x)}${xAnexo("tirarArquivoDocumento", { id: x.id })}${prazos(x)}` : `${etiqueta(ar ? "aguardando o AR (carta com aviso de recebimento)" : "aguardando a via assinada", "aviso")}${opera() ? `<form data-form="anexarDocumentoLocacao" class="acoes" style="margin-top:4px"><input type="hidden" name="id" value="${x.id}">
+      <input type="date" name="data" value="${hojeIso()}" style="width:auto" title="${ar ? "Data do recebimento (a do AR)" : "Data da assinatura"}">${atalhosData()}
+      <label class="botao secundario pequeno enviar" title="${ar ? "AR devolvido pelos Correios (PDF ou foto)" : "Via assinada (PDF ou foto)"}"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}" data-arquivo-doc></label>
+      <button class="pequeno">${ar ? "Anexar o AR" : "Anexar assinado"}</button></form>` : ""}${prazos(x)}`;
+    };
     return `<div class="cabecalho"><h3 id="outros-documentos">Outros documentos da locação</h3>${opera() ? link(`#/documento-gerar?contrato=${c.id}`, "Gerar documento", "botao secundario") : ""}</div>
     ${lista3.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Documento</th><th>Via assinada</th><th></th></tr>${lista3.map((x) => `<tr><td class="nw">${dataBr(x.data)}</td>
       <td><b>${esc(x.nome)}</b><br><span class="suave">${esc(x.assunto || "")}</span></td><td>${assinatura(x)}</td>
@@ -33091,7 +33151,12 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     const db = d();
     const v = {};
     if (tipo.startsWith("aditivo_")) v.numero_aditivo = String(proximoNumeroAditivo(db, c));
-    if (["aviso_desocupacao", "notificacao_desocupacao"].includes(tipo)) v[tipo === "aviso_desocupacao" ? "data_saida_prevista" : "data_limite"] = somarDias(hoje3, 30);
+    if (tipo === "aviso_desocupacao") v.data_saida_prevista = somarDias(hoje3, 30);
+    if (tipo === "notificacao_desocupacao") {
+      v.data_limite = somarDias(hoje3, 40);
+      const entrada = c.data_entrada || c.vigencia_inicio;
+      if (entrada && fimDoPrazo(entrada, 60) <= hoje3) v.motivo_retomada = `a locação está em vigor, sem interrupção, há mais de 5 (cinco) anos, desde ${dataBr(entrada)} (art. 47, V)`;
+    }
     if (tipo === "aditivo_prazo") {
       const ini = c.vigencia_fim && c.vigencia_fim >= hoje3 ? somarDias(c.vigencia_fim, 1) : hoje3;
       Object.assign(v, { novo_prazo_meses: String(c.prazo_meses || 30), nova_data_inicio: ini });
@@ -33115,21 +33180,27 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     const out = [];
     const fiadores = d().fiadores.filter((f) => f.contrato_id === c.id && !f.substituido_por_id && (!f.data_saida || f.data_saida >= hoje3));
     if (tipo === "aviso_fiador" && !fiadores.length) out.push("Este contrato não tem fiador: o aviso sai sem o nome do fiador.");
-    if (tipo === "notificacao_desocupacao") {
-      if (c.vigencia_fim && c.vigencia_fim >= hoje3) out.push(`O prazo do contrato vai até ${dataBr(c.vigencia_fim)}: antes disso, a empresa não pode pedir o imóvel de volta sem motivo (Lei 8.245/91, art. 4º).`);
-      if (c.finalidade !== "Não residencial" && Number(c.prazo_meses) > 0 && Number(c.prazo_meses) < 30) out.push("Residencial com contrato de menos de 30 meses: depois do prazo, a retomada só cabe nos casos do art. 47 da Lei 8.245/91 (ex.: 5 anos de locação, uso próprio). Confirme com o advogado antes de mandar.");
-    }
+    if (tipo === "notificacao_desocupacao" && c.vigencia_fim && c.vigencia_fim >= hoje3) out.push(`O prazo do contrato vai até ${dataBr(c.vigencia_fim)}: antes disso, a empresa não pode pedir o imóvel de volta sem motivo (Lei 8.245/91, art. 4º).`);
     if (tipo === "declaracao_pagamentos" && d().cobrancas.some((cb) => cb.contrato_id === c.id && aCobrar(cb) && vencido(cb.vencimento, hoje3))) out.push("Há boleto vencido em aberto deste inquilino: a declaração diz que não há débito vencido.");
     return out;
   }
+  function orientacaoNotificacao(condicoes) {
+    return `<div class="alerta info"><b>Como mandar:</b> imprima e mande <b>por carta com aviso de recebimento (AR)</b>, pelos Correios${condicoes.fiador ? ", ao inquilino e, com cópia, ao fiador" : ""}.
+    O prazo de 30 dias conta do <b>recebimento</b>: a data limite sugerida dá 10 dias para a carta chegar. Quando o AR voltar, anexe-o em "Outros documentos da locação"
+    com a data do recebimento: o sistema mostra o último dia para desocupar e até quando propor a ação de despejo.<br>
+    <b>Se o inquilino não sair:</b> para pedir a liminar de desocupação, a ação de despejo deve ser proposta <b>em até 30 dias</b> depois do fim do prazo (Lei 8.245/91, art. 59, § 1º, VIII${condicoes.residencial ? "; no residencial, confirme com o advogado" : ""}). Ex.: prazo até 31/12/2026 → ação até 30/01/2027.</div>
+    ${condicoes.retomada_livre ? "" : `<div class="alerta aviso"><b>Contrato residencial de menos de 30 meses:</b> depois do prazo, a empresa só pode pedir o imóvel de volta nos casos do art. 47 da Lei 8.245/91:
+      <ul>${CASOS_ART_47.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>Escreva no campo <b>Motivo da retomada</b> qual é o caso e a prova (ex.: "uso próprio: o imóvel será a moradia do filho do sócio, que não tem imóvel próprio, conforme declaração anexa"). Sem um motivo de pelo menos ${MOTIVO_MINIMO} letras, o documento não é gerado.</div>`}`;
+  }
   function telaGerarDocumento(rota) {
     const q = rota.q;
-    const outros = todosOsModelos().filter((m) => tipoDoModelo(m) in TIPOS_DOCUMENTO);
+    const outros = todosOsModelos().filter((m) => documentoAtivo(tipoDoModelo(m)));
+    const retirado = todosOsModelos().find((m) => String(m.id) === String(q.modelo) && tipoDoModelo(m) in TIPOS_DOCUMENTO && !documentoAtivo(tipoDoModelo(m)));
     const modelo = outros.find((m) => String(m.id) === String(q.modelo));
     const c = q.contrato ? buscar2("contratos", q.contrato) : null;
     const topo3 = `<p class="suave"><a href="${c ? `#/contrato/${c.id}?ir=aditivos` : "#/modelos-contrato?ir=modelos-outros"}">← Voltar</a></p><h1>Gerar documento${c ? `: ${esc(c.inquilino_nome)}` : ""}</h1>`;
     if (!modelo) {
-      return `${topo3}<div class="cartao"><h2>Qual documento?</h2><table><tr><th>Documento</th><th></th></tr>
+      return `${topo3}${retirado ? `<div class="alerta aviso"><b>${esc(retirado.nome)}:</b> ${esc(TIPOS_DOCUMENTO[tipoDoModelo(retirado)].retirado)}</div>` : ""}<div class="cartao"><h2>Qual documento?</h2><table><tr><th>Documento</th><th></th></tr>
       ${outros.map((m) => `<tr><td><b>${esc(m.nome)}</b><div class="suave">${esc(TIPOS_DOCUMENTO[tipoDoModelo(m)].explica)}</div></td>
         <td class="n nw">${link(`#/documento-gerar?modelo=${m.id}${c ? `&contrato=${c.id}` : ""}`, "Escolher", "botao pequeno")} ${link(`#/imprimir/documento?modelo=${m.id}&exemplo=1`, "Ver exemplo", "botao secundario pequeno")}</td></tr>`).join("")}</table></div>`;
     }
@@ -33145,14 +33216,17 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     const pendente = ehTermoAditivo(tipo) ? termoAguardando(d(), c.id, tipo) : null;
     const guardado = preenchidos.get(`${modelo.id}:${c.id}`) || (pendente ? { valores: pendente.campos || {}, data: pendente.data } : null);
     const v = guardado && guardado.valores || valoresSugeridos(tipo, c);
-    const campo2 = ([k, rotulo3, formato]) => `<div><label>${esc(rotulo3)}</label>${formato === "texto" ? `<textarea name="${k}" rows="2">${esc(v[k] || "")}</textarea>` : `<input name="${k}" ${formato === "data" ? 'type="date"' : formato === "dinheiro" ? 'inputmode="decimal" data-dinheiro' : 'inputmode="numeric"'} value="${esc(v[k] || "")}">`}</div>`;
+    const condicoes = dadosDoContrato(d(), c).condicoes;
+    const campo2 = ([k, rotulo3, formato]) => formato === "marcar" ? `<div class="largo"><label><input type="checkbox" name="${k}" value="sim"${v[k] ? " checked" : ""}> ${esc(rotulo3)}</label></div>` : `<div${k === "motivo_retomada" ? ' class="largo"' : ""}><label>${esc(rotulo3)}</label>${formato === "texto" ? `<textarea name="${k}" rows="2">${esc(v[k] || "")}</textarea>` : `<input name="${k}" ${formato === "data" ? 'type="date"' : formato === "dinheiro" ? 'inputmode="decimal" data-dinheiro' : 'inputmode="numeric"'} value="${esc(v[k] || "")}">`}</div>`;
+    const camposDaTela = def.campos.filter(([, , , , quando4]) => !quando4 || quando4(condicoes));
     const avisos = avisosDoDocumento(tipo, c);
     return `${topo3}
     ${avisos.map((a) => `<div class="alerta aviso">${esc(a)}</div>`).join("")}
+    ${tipo === "notificacao_desocupacao" ? orientacaoNotificacao(condicoes) : ""}
     <form class="cartao" data-form="gerarDocumento"><h2>${esc(modelo.nome)}</h2><p class="suave">${esc(def.explica)} Campo em branco sai como uma linha para preencher à mão.</p>
       <p class="suave">${ehTermoAditivo(tipo) ? `O termo fica registrado em "Termos aditivos" da página do inquilino, aguardando a assinatura${pendente ? ` (o ${pendente.numero || ""}º termo, gerado em ${dataBr(pendente.data)}, ainda sem assinatura, é atualizado)` : ""}${tipo === "aditivo_prazo" ? '. Quando a via assinada for anexada, a data de término do contrato passa a ser a do "Fim do novo prazo"' : ""}.` : 'O documento fica registrado na página do inquilino ("Outros documentos da locação"), onde se anexa a via assinada.'}</p>
       <input type="hidden" name="modelo" value="${esc(modelo.id)}"><input type="hidden" name="contrato" value="${c.id}">
-      <div class="grade">${def.campos.map(campo2).join("")}<div><label>Data do documento</label><input type="date" name="data" value="${esc(guardado && guardado.data || hojeIso())}"></div></div>
+      <div class="grade">${camposDaTela.map(campo2).join("")}<div><label>Data do documento</label><input type="date" name="data" value="${esc(guardado && guardado.data || hojeIso())}"></div></div>
       <div class="acoes"><button>Gerar o documento</button>${link(`#/modelo-contrato/${modelo.id}`, "Editar o texto do modelo", "botao secundario")}</div></form>`;
   }
   function guardarCamposDoDocumento(modeloId, contratoId, valores, data2) {
@@ -33433,15 +33507,15 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       ${opera() ? `${link(`#/modelo-contrato/${m.id}`, "Editar")} ${botao("copiarModelo", "Copiar", { id: m.id })}` : ""}
       ${opera() && m.padrao && MODELOS_PADRAO.some((x) => x.nome === m.padrao) ? botao("restaurarModelo", "Voltar ao texto padrão", { id: m.id }, "secundario pequeno", `Trocar o texto de "${m.nome}" pelo texto padrão? As alterações feitas nele se perdem.`) : ""}
       ${temExemplo(m) ? link(`#/imprimir/documento?modelo=${m.id}&exemplo=1`, "Exemplo em PDF", "botao secundario pequeno") : ""}
-      ${opera() && tipo in TIPOS_DOCUMENTO ? link(`#/documento-gerar?modelo=${m.id}`, "Gerar para um inquilino", "botao secundario pequeno") : ""}
+      ${opera() && documentoAtivo(tipo) ? link(`#/documento-gerar?modelo=${m.id}`, "Gerar para um inquilino", "botao secundario pequeno") : ""}
       ${podeUsuario("admin") && m.id > 0 && modelosDe(d(), tipo).length > 1 ? botao("excluirModelo", "×", { id: m.id }, "x-excluir", `Excluir o modelo "${m.nome}"?`) : ""}</td></tr>`;
-    const outros = Object.keys(TIPOS_DOCUMENTO).flatMap((tipo) => modelosDe(d(), tipo).map((m) => [m, tipo]));
+    const outros = Object.keys(TIPOS_DOCUMENTO).filter(documentoAtivo).flatMap((tipo) => modelosDe(d(), tipo).map((m) => [m, tipo]));
     return `<p class="suave"><a href="#/sistema-modelos">← Modelos de documentos</a></p>
     <h1>Modelos de contrato, termos aditivos e outros documentos</h1>
     ${TIPOS_COM_CARTAO.map((tipo) => [tipo, TIPOS_MODELO[tipo]]).map(([tipo, titulo2]) => `<div class="cartao" id="modelos-${tipo}"><div class="cabecalho"><h2>${titulo2}</h2>${opera() ? link(`#/modelo-contrato/novo${tipo === "contrato" ? "" : `?tipo=${tipo}`}`, NOVO_MODELO[tipo], "botao secundario pequeno") : ""}</div>
       <table><tr><th>Modelo</th><th></th></tr>${modelosDe(d(), tipo).map((m) => linha(m, tipo)).join("")}</table></div>`).join("")}
     <div class="cartao" id="modelos-outros"><h2>Outros documentos da locação</h2>
-      <p class="suave">Prorrogação do prazo, troca de garantia, distrato, avisos e declarações. Para gerar, use <b>Gerar para um inquilino</b> aqui ou <b>Outros documentos</b> na página do inquilino (em "Termos aditivos"). <b>Exemplo em PDF</b> mostra o texto com uma pessoa fictícia, para ler e ajustar. Para ter outra versão de um deles, use <b>Copiar</b>.</p>
+      <p class="suave">Troca de garantia, distrato, avisos e declarações (a prorrogação do prazo saiu em 24/11/2026, a pedido do advogado: o contrato vencido continua por prazo indeterminado). Para gerar, use <b>Gerar para um inquilino</b> aqui ou <b>Outros documentos</b> na página do inquilino (em "Termos aditivos"). <b>Exemplo em PDF</b> mostra o texto com uma pessoa fictícia, para ler e ajustar. Para ter outra versão de um deles, use <b>Copiar</b>.</p>
       <table><tr><th>Modelo</th><th></th></tr>${outros.map(([m, tipo]) => linha(m, tipo).replace("</b>", `</b><div class="suave">${esc(TIPOS_DOCUMENTO[tipo].explica)}</div>`)).join("")}</table></div>
     <p class="suave">Para gerar um contrato, abra o inquilino e clique em <b>Gerar contrato</b>; o termo aditivo, em <b>Gerar termo aditivo</b> (em "Termos aditivos"), escolhendo vencimento ou troca de inquilino.
       Edite à vontade: os modelos ficam guardados no banco de dados.</p>
@@ -33456,7 +33530,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     const doc2 = TIPOS_DOCUMENTO[tipo];
     return `<p class="suave"><a href="#/modelos-contrato">← Modelos de contrato</a></p>
     <h1>${m.id === "" ? `Novo modelo de ${doc2 ? esc(doc2.nome.toLocaleLowerCase("pt-BR")) : aditivo ? "termo aditivo" : "contrato"}` : `Modelo: ${esc(m.nome)}`}</h1>
-    ${doc2 ? `<p class="suave">${esc(doc2.explica)} Campos deste documento (digitados ao gerar): ${doc2.campos.map(([k, r]) => `<code>{${k}}</code> (${esc(r.toLocaleLowerCase("pt-BR"))})`).join(", ")}; e também <code>{data_contrato}</code> e <code>{fiadores_nomes}</code>.</p>` : ""}
+    ${doc2 ? `<p class="suave">${esc(doc2.explica)} Campos deste documento (digitados ao gerar): ${doc2.campos.map(([k, r, formato]) => `<code>${formato === "marcar" ? `[se ${k}]` : `{${k}}`}</code> (${esc(r.toLocaleLowerCase("pt-BR"))})`).join(", ")}; e também <code>{data_contrato}</code> e <code>{fiadores_nomes}</code>.</p>` : ""}
     ${m.id !== "" && temExemplo(m) ? `<p>${link(`#/imprimir/documento?modelo=${m.id}&exemplo=1`, "Ver o exemplo em PDF (texto salvo)", "botao secundario pequeno")}</p>` : ""}
     <form class="cartao" data-form="modeloContrato">
       <input type="hidden" name="id" value="${esc(m.id)}"><input type="hidden" name="tipo" value="${esc(tipo)}">
@@ -33496,7 +33570,7 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
     g.drawImage(img, 0, 0);
     return { bytes: bytes2, marca: await png(), largura: canvas.width, altura: canvas.height };
   }
-  var ESCALA_PDF, cartasGuardadas, EMAIL_DO_RECIBO, todosOsModelos, temExemplo, preenchidos, modeloDocumento, fimParaDocumento, ROTEIRO_BASE, ROTEIROS, roteiroTexto, ESTADOS_COMODO, GERAIS, MODELO_COMODOS, AJUDA_MODELO, TIPOS_MODELO, TIPOS_COM_CARTAO, NOVO_MODELO;
+  var ESCALA_PDF, cartasGuardadas, EMAIL_DO_RECIBO, todosOsModelos, temExemplo, preenchidos, modeloDocumento, fimParaDocumento, CASOS_ART_47, ROTEIRO_BASE, ROTEIROS, roteiroTexto, ESTADOS_COMODO, GERAIS, MODELO_COMODOS, AJUDA_MODELO, TIPOS_MODELO, TIPOS_COM_CARTAO, NOVO_MODELO;
   var init_documentos = __esm({
     "docs/js/telas/documentos.js"() {
       init_emails();
@@ -33523,11 +33597,18 @@ Salvar assim mesmo?`, { titulo: "Confira antes de salvar", sim: "Salvar assim me
       todosOsModelos = () => Object.keys(TIPOS_MODELO).flatMap((t) => modelosDe(d(), t));
       temExemplo = (m) => {
         const t = tipoDoModelo(m);
-        return t === "contrato" || t in TIPOS_DOCUMENTO;
+        return t === "contrato" || documentoAtivo(t);
       };
       preenchidos = /* @__PURE__ */ new Map();
       modeloDocumento = (id) => todosOsModelos().find((m) => String(m.id) === String(id) && tipoDoModelo(m) in TIPOS_DOCUMENTO) || null;
       fimParaDocumento = (c) => c.prazo_tipo === "Indeterminado" ? c.vigencia_fim || null : fimDoContrato(d(), c) || c.vigencia_fim || null;
+      CASOS_ART_47 = [
+        "I – acordo, falta de pagamento, infração do contrato ou reparos urgentes (art. 9º);",
+        "II – fim do contrato de trabalho, quando a moradia está ligada ao emprego;",
+        "III – uso próprio, do cônjuge ou companheiro, ou moradia de pai, mãe, filho ou neto que não tenha imóvel residencial próprio;",
+        "IV – demolição ou obra aprovada pela prefeitura que aumente a área construída em 20% ou mais (50% em hotel ou pensão);",
+        "V – locação em vigor, sem interrupção, há mais de 5 anos."
+      ];
       ROTEIRO_BASE = [
         "Piso e rodapé",
         "Paredes e teto (pintura, manchas, fissuras, furos)",
@@ -37100,7 +37181,7 @@ ${xref}
     return `${topo2("Modelos de documentos")}
     <div class="cartao" id="modelos-de-contrato"><h2>Modelos de contrato</h2><p>Textos usados no botão <b>Gerar contrato</b> do inquilino (residencial, não residencial e os que você criar).</p>${link("#/modelos-contrato", "Ver e editar os modelos de contrato")}</div>
     <div class="cartao" id="modelos-de-aditivo"><h2>Termos aditivos</h2><p>Textos usados no botão <b>Gerar termo aditivo</b> do inquilino: troca do vencimento, troca de inquilino e novo valor do aluguel.</p>${link("#/modelos-contrato?ir=modelos-aditivo", "Ver e editar os termos aditivos")}</div>
-    <div class="cartao" id="outros-documentos"><h2>Outros documentos da locação</h2><p>Prorrogação do prazo, troca de garantia, distrato (rescisão amigável), aviso de desocupação do inquilino, notificação para desocupação, autorização de obra, declaração de pagamentos em dia e aviso ao fiador. Cada um tem o <b>Exemplo em PDF</b> para ler e ajustar o texto; para gerar, botão <b>Outros documentos</b> na página do inquilino.</p>${link("#/modelos-contrato?ir=modelos-outros", "Ver e editar os outros documentos")}</div>
+    <div class="cartao" id="outros-documentos"><h2>Outros documentos da locação</h2><p>Troca de garantia, distrato (rescisão amigável), aviso de desocupação do inquilino, notificação para desocupação, autorização de obra, declaração de pagamentos em dia e aviso ao fiador. Cada um tem o <b>Exemplo em PDF</b> para ler e ajustar o texto; para gerar, botão <b>Outros documentos</b> na página do inquilino.</p>${link("#/modelos-contrato?ir=modelos-outros", "Ver e editar os outros documentos")}</div>
     <div class="cartao" id="modelo-excel"><h2>Modelo Excel da NF</h2>
       <p>${modeloProprio ? `${etiqueta("Modelo próprio", "ok")} usando o arquivo enviado (${PASTA_MODELOS}/${MODELO_FATURA}).` : "Usando o modelo padrão do sistema (uma NF por empresa, com os dados do cadastro de Empresas)."}</p>
       <p class="suave">Para trocar, envie um .xlsx com uma aba por empresa no mesmo desenho. Os dados são preenchidos nas mesmas células da planilha original (peça ao técnico se precisar do detalhe).</p>
@@ -42390,11 +42471,17 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           const c = buscar2("contratos", contrato);
           if (!m || !c) throw new ErroUsuario("Modelo ou inquilino não encontrado.");
           const tipo = tipoDoModelo(m);
+          if (!documentoAtivo(tipo)) throw new ErroUsuario(TIPOS_DOCUMENTO[tipo].retirado);
+          const condicoes = dadosDoContrato(d(), c).condicoes;
+          if (tipo === "notificacao_desocupacao" && !condicoes.retomada_livre && String(valores.motivo_retomada || "").length < MOTIVO_MINIMO) {
+            throw new ErroUsuario(`Contrato residencial de menos de 30 meses: a empresa só pode pedir o imóvel de volta nos casos do art. 47 da Lei 8.245/91. Escreva no "Motivo da retomada" qual é o caso e a prova (pelo menos ${MOTIVO_MINIMO} letras).`);
+          }
           let reg = null;
           await alterar((db) => {
             reg = registrarDocumento(db, c.id, { tipo, modelo: m, valores, data: String(f.get("data") || ""), fim: fimParaDocumento(c) }, login());
           });
-          aviso(ehTermoAditivo(tipo) ? 'Termo aditivo registrado em "Termos aditivos", aguardando assinatura: imprima ou baixe o PDF, colha as assinaturas e anexe o assinado.' : 'Documento registrado na página do inquilino ("Outros documentos da locação"): depois de assinado, anexe a via assinada lá.');
+          const prazos = ehNotificacaoComAr(reg.registro) ? prazosDaNotificacao(reg.registro) : null;
+          aviso(ehTermoAditivo(tipo) ? 'Termo aditivo registrado em "Termos aditivos", aguardando assinatura: imprima ou baixe o PDF, colha as assinaturas e anexe o assinado.' : prazos ? `Notificação registrada na página do inquilino ("Outros documentos da locação"). Mande por carta com AR e, quando o AR voltar, anexe-o lá com a data do recebimento.${prazos.acaoAte ? ` Se o inquilino não sair até ${dataBr(prazos.desocupar)}, a ação de despejo com pedido de liminar deve ser proposta até ${dataBr(prazos.acaoAte)}.` : ""}` : 'Documento registrado na página do inquilino ("Outros documentos da locação"): depois de assinado, anexe a via assinada lá.');
           ir(reg.tabela === "aditivos" ? `#/imprimir/aditivo?id=${reg.registro.id}` : `#/imprimir/documento?id=${reg.registro.id}`);
         },
         /** Via assinada de um outro documento da locação (2026-11-24, DOC-07): na pasta "Aditivos, correções e comunicação" do contrato. */
@@ -42403,11 +42490,13 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           const arquivo = form.querySelector("[name=arquivo]").files[0];
           const x = buscar2("documentos_locacao", f.id);
           if (!x) throw new ErroUsuario("Documento não encontrado.");
-          if (!dataValida(f.data)) throw new ErroUsuario("Informe a data da assinatura.");
-          if (!arquivo) throw new ErroUsuario("Anexe o arquivo assinado.");
-          const nome = await salvarAssinado("aditivos", x.contrato_id, arquivo, `${x.nome.replace(/\s*\(.*\)$/, "")} ${f.data}`.slice(0, 80));
+          const ar = ehNotificacaoComAr(x);
+          if (!dataValida(f.data)) throw new ErroUsuario(ar ? "Informe a data do recebimento (a do AR)." : "Informe a data da assinatura.");
+          if (!arquivo) throw new ErroUsuario(ar ? "Anexe o AR devolvido pelos Correios." : "Anexe o arquivo assinado.");
+          const nome = await salvarAssinado("aditivos", x.contrato_id, arquivo, `${x.nome.replace(/\s*\(.*\)$/, "")}${ar ? " AR" : ""} ${f.data}`.slice(0, 80));
           await alterar((db) => anexarDocumento(db, x.id, { data: f.data, arquivo: nome }, login()));
-          aviso("Via assinada anexada.");
+          const prazos = ar ? prazosDaNotificacao(buscar2("documentos_locacao", x.id)) : null;
+          aviso(prazos && prazos.desocupar ? `AR anexado. Prazo para desocupar: até ${dataBr(prazos.desocupar)}; sem a saída, ação de despejo com pedido de liminar até ${dataBr(prazos.acaoAte)}.` : ar ? "AR anexado." : "Via assinada anexada.");
           await mostrar();
         },
         async escolherInquilinoDocumento(form) {
