@@ -15,6 +15,7 @@ const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PASTA_ROTEIROS = path.join(RAIZ, 'tests', 'kit', 'roteiros');
 const LUGARES = { computador: 'Computador', celular: 'Celular', nuvem: 'Nuvem', pc: 'Versão PC' };
 const PASSO_MS = 30000;
+const ESPERA_TEXTO_MS = 8000; // tempo máximo para a tela nova mostrar os textos esperados
 
 // ------------------------------------------------------------------ opções
 const args = process.argv.slice(2);
@@ -288,9 +289,17 @@ async function rodarLugar(lugar, { navegador, kit, roteiros, site, nuvem, pc }) 
         const problema = await problemaDaTela(pagina);
         if (problema) throw Object.assign(new Error(problema), { esperado: 'a tela abrir sem erro' });
         if (r.acoes) await r.acoes(ferramentas);
-        const texto = await textoDaTela(pagina);
+        // A nuvem pode redesenhar a tela anterior (sincronia) antes de trocar de rota: espera até ESPERA_TEXTO_MS
+        // pelos textos esperados antes de dar falha, para não acusar falha falsa quando a tela nova demora.
+        const esperados = [].concat(r.espera || []);
+        const temTudo = (t) => esperados.every((e) => (e instanceof RegExp ? e.test(t) : t.includes(limpo(e))));
+        let texto = await textoDaTela(pagina);
+        for (const fimTexto = Date.now() + ESPERA_TEXTO_MS; !temTudo(texto) && Date.now() < fimTexto;) {
+          await new Promise((ok) => setTimeout(ok, 250));
+          texto = await textoDaTela(pagina);
+        }
         if (guardarTextos) fs.writeFileSync(path.join(TEMP, `texto-${lugar}-${nomeArquivo(r.nome)}.txt`), texto);
-        for (const e of [].concat(r.espera || [])) {
+        for (const e of esperados) {
           const ok = e instanceof RegExp ? e.test(texto) : texto.includes(limpo(e));
           if (!ok) throw Object.assign(new Error(`não está na tela; ${await trechoParecido(pagina, texto, e)}`), { esperado: `"${e}"` });
         }
