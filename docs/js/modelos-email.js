@@ -397,7 +397,7 @@ DESCRITIVO
 
 Segue a [se reiteracao]{notificacao_numero} [fim]notificação de {notificacao_data} sobre {notificacao_assunto_minusculo} (imóvel da {imovel}).
 
-Prazo para resolver: {prazo_notificacao}, até {data_limite}. Ao terminar, responda com uma foto ou um documento que mostre, para darmos a baixa. Dúvidas, é só responder.`,
+[se atraso]Prazo para pagar: {prazo_notificacao}, até {data_limite}. A notificação lista os boletos em aberto, com a multa e os juros do atraso. Se precisar, responda para combinarmos um acordo. Depois do pagamento, a baixa é automática.[senão]Prazo para resolver: {prazo_notificacao}, até {data_limite}. Ao terminar, responda com uma foto ou um documento que mostre, para darmos a baixa.[fim] Dúvidas, é só responder.`,
   },
   {
     chave: 'notificacao_lembrete', nome: 'Lembrete do prazo da notificação', etapa: 'Notificação ao inquilino', notificacao: true,
@@ -407,7 +407,7 @@ Prazo para resolver: {prazo_notificacao}, até {data_limite}. Ao terminar, respo
 
 O prazo da notificação de {notificacao_data}, sobre {notificacao_assunto_minusculo}, termina [se vence_hoje]hoje, {data_limite}[senão]em {data_limite}[fim] (anexa de novo).
 
-Já resolveu? Responda com uma foto ou um documento, para darmos a baixa. Sem isso no prazo, vale o que está na notificação, inclusive a multa do contrato.`,
+[se atraso]Se já pagou, desconsidere este lembrete. Se precisar, responda para combinarmos um acordo de pagamento.[senão]Já resolveu? Responda com uma foto ou um documento, para darmos a baixa. Sem isso no prazo, vale o que está na notificação, inclusive a multa do contrato.[fim]`,
   },
 ];
 

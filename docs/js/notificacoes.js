@@ -24,7 +24,14 @@ const CLAUSULAS = {
   finalidade: { busca: /DO OBJETO E SUA FINALIDADE/i, sem: 'o item do contrato sobre o objeto e a finalidade da locação', item: true },
   sublocacao: { busca: /Não é permitida a transferência deste contrato/i, sem: 'a cláusula do contrato sobre cessão e sublocação' },
   multa: { busca: /Fica estipulada a multa no valor/i, sem: 'a cláusula de multa do contrato' },
+  aluguel: { busca: /O aluguel mensal é de/i, sem: 'a cláusula do contrato sobre o aluguel e os encargos' },
 };
+
+// Aluguel em atraso (24/11/2026, decisão do dono: "sim, sem multa contratual"): só a multa do atraso e os juros do contrato, que
+// já estão em cada boleto. A multa contratual (cláusula penal) não entra: seria uma segunda multa pelo mesmo atraso.
+const ATRASO_FIM = `Fica o LOCATÁRIO notificado a, no prazo de {prazo} contados desta notificação, ou seja, até {data_limite}, pagar os valores acima, com a multa e os juros contados até o dia do pagamento, ou procurar a LOCADORA para combinar um acordo de pagamento.
+
+Esta notificação não acrescenta multa: a multa e os juros acima são os do atraso, previstos no contrato ({clausula}). Não pago no prazo, a LOCADORA poderá adotar as medidas previstas no contrato e na lei para receber, inclusive a cobrança judicial e a ação de despejo por falta de pagamento (Lei 8.245/91, artigo 9º, inciso III, e artigo 62).`;
 
 const PRAZO_E_MULTA = `Fica o LOCATÁRIO notificado a, no prazo de {prazo} contados desta notificação, ou seja, até {data_limite}, {providencia}, e a avisar a LOCADORA quando terminar, para a conferência.
 
@@ -77,6 +84,16 @@ O imóvel foi alugado só para a finalidade escrita no contrato ({clausula}), e 
 ${PRAZO_E_MULTA.replace('{providencia}', 'voltar a usar o imóvel somente como combinado no contrato')}`,
   },
   {
+    chave: 'atraso', nome: 'Aluguel em atraso', clausula: 'aluguel', atraso: true,
+    texto: `Pela presente, a LOCADORA NOTIFICA o LOCATÁRIO de que constam em aberto, na data desta notificação ({data}), os seguintes valores da locação do imóvel acima, já vencidos e não pagos:
+
+{lista_atraso}
+
+Total devido em {data}: {total_atraso}. O aluguel não pago no vencimento perde a bonificação de pontualidade, quando houver, e fica sujeito à multa de {multa_atraso} e aos juros de {juros_atraso} ao mês, contados por dia de atraso (Lei 8.245/91, artigo 23, inciso I).
+
+${ATRASO_FIM}`,
+  },
+  {
     chave: 'generica', nome: 'Outro assunto (texto livre)', clausula: 'multa',
     texto: `Pela presente, a LOCADORA NOTIFICA o LOCATÁRIO de que [preencher: descreva o que aconteceu].
 
@@ -96,7 +113,40 @@ Fica o LOCATÁRIO novamente notificado a, no prazo de {prazo} contados desta not
 O descumprimento do prazo anterior já sujeita o LOCATÁRIO à multa prevista no contrato ({clausula_multa}). Não cumprida a providência também neste novo prazo, a multa será cobrada no boleto do aluguel, sem prejuízo da reparação dos danos e das demais medidas previstas no contrato e na lei, inclusive a rescisão da locação por infração contratual (Lei 8.245/91, artigo 9º, inciso II).`,
 };
 
-export const modeloNotificacao = (chave) => (chave === MODELO_REITERACAO.chave ? MODELO_REITERACAO : MODELOS_NOTIFICACAO.find((m) => m.chave === chave) || null);
+/** Reiteração do aluguel em atraso: os boletos da 1ª ainda em aberto, com a multa e os juros de hoje, sem a multa contratual. */
+export const MODELO_REITERACAO_ATRASO = {
+  chave: 'reiteracao_atraso', nome: 'Nova notificação sobre o aluguel em atraso', clausula: 'aluguel', atraso: true,
+  texto: `Pela presente, a LOCADORA REITERA a notificação de {anterior_data}[se anterior_envio] (recebida pelo LOCATÁRIO em {anterior_envio})[fim], sobre {anterior_assunto}, cujo prazo terminou em {anterior_limite} sem o pagamento. Continuam em aberto, na data desta notificação ({data}):
+
+{lista_atraso}
+
+Total devido em {data}: {total_atraso}, com a multa de {multa_atraso} e os juros de {juros_atraso} ao mês, contados por dia de atraso.
+
+${ATRASO_FIM}`,
+};
+
+export const modeloNotificacao = (chave) => (chave === MODELO_REITERACAO.chave ? MODELO_REITERACAO : chave === MODELO_REITERACAO_ATRASO.chave ? MODELO_REITERACAO_ATRASO
+  : MODELOS_NOTIFICACAO.find((m) => m.chave === chave) || null);
+
+/** "2%"; "0,5%". */
+const pct = (x) => `${String(Number(x) || 0).replace('.', ',')}%`;
+
+/**
+ * Boletos do aluguel em atraso para o texto, com a multa e os juros na data da notificação: a 1ª pega os vencidos em aberto do
+ * contrato; a reiteração, os da notificação anterior ainda não pagos. { boletos, lista, total }. Ex.: boleto de R$ 1.800,00
+ * vencido em 14/11/2026, em 24/11/2026: "Aluguel de 10/2026, vencido em 14/11/2026 (10 dias de atraso): R$ 1.800,00 + multa
+ * de R$ 36,00 + juros de R$ 6,00 = R$ 1.842,00".
+ */
+export function atrasoDaNotificacao(d, c, n) {
+  const ant = n.anterior_id ? R.buscar(d, 'notificacoes', n.anterior_id) : null;
+  const boletos = ant ? R.boletosDaNotificacao(d, ant).filter((x) => !x.quitado).map((x) => x.cobranca) : R.boletosEmAtraso(d, c.id, n.data);
+  const linhas = boletos.map((cb) => {
+    const v = R.devidoNoAtraso(cb, n.data);
+    const nome = R.ehParcelaAcordo(cb) ? `Parcela ${cb.acordo_parcela || 'única'} do acordo${cb.acordo_referente ? ` (${cb.acordo_referente})` : ''}` : `Aluguel de ${C.compBr(cb.competencia)}`;
+    return `- ${nome}, vencido em ${C.dataBr(cb.vencimento)} (${C.plural(v.dias, 'dia', 'dias')} de atraso): ${C.reais(v.valor)} + multa de ${C.reais(v.multa)} + juros de ${C.reais(v.juros)} = ${C.reais(v.total)}`;
+  });
+  return { boletos, lista: linhas.join('\n\n') ||'[preencher: não há boleto vencido em aberto nesta data]', total: boletos.reduce((s2, cb) => s2 + R.devidoNoAtraso(cb, n.data).total, 0) };
+}
 
 /** "10 (dez) dias úteis"; "1 (um) dia útil". */
 export const prazoPorExtenso = (dias) => `${dias} (${K.numeroPorExtenso(dias)}) ${dias === 1 ? 'dia útil' : 'dias úteis'}`;
@@ -142,6 +192,10 @@ export function camposDaNotificacao(d, c, n, modelo) {
     anterior_data: ant ? C.dataBr(ant.data) : '', anterior_envio: ant && ant.enviada_em ? C.dataBr(ant.enviada_em) : '',
     anterior_limite: ant ? C.dataBr(ant.data_limite) : '', anterior_assunto: ant ? String(ant.assunto || '').toLocaleLowerCase('pt-BR') : '',
   };
+  if (modelo && modelo.atraso) {
+    const a = atrasoDaNotificacao(d, c, n);
+    Object.assign(campos, { lista_atraso: a.lista, total_atraso: C.reais(a.total), multa_atraso: pct(c.multa_percentual), juros_atraso: pct(c.juros_mensal_percentual) });
+  }
   return { campos, condicoes: { anterior_envio: !!campos.anterior_envio } };
 }
 
@@ -150,13 +204,14 @@ export function camposDaNotificacao(d, c, n, modelo) {
  * ``clausula``: o que fica anotado na notificação (a do assunto e a da multa).
  */
 export function textoDoModelo(d, c, n, chave) {
-  const modelo = n.anterior_id ? MODELO_REITERACAO : modeloNotificacao(chave) || MODELOS_NOTIFICACAO.at(-1);
-  const dados = camposDaNotificacao(d, c, n, modelo);
   const ant = n.anterior_id ? R.buscar(d, 'notificacoes', n.anterior_id) : null;
+  const modelo = ant ? (R.ehNotificacaoAtraso(ant) ? MODELO_REITERACAO_ATRASO : MODELO_REITERACAO) : modeloNotificacao(chave) || MODELOS_NOTIFICACAO.at(-1);
+  const dados = camposDaNotificacao(d, c, n, modelo);
   const texto = preencherEmail(modelo.texto, dados).replace(/\[preencher: (anterior_[a-z]+)\]/g, '');
   return {
     assunto: ant ? ant.assunto : modelo.nome.replace(/ \(ex\.: [^)]*\)$/, '').replace(/ \(texto livre\)$/, ''),
-    texto, clausula: [dados.campos.clausula, dados.campos.clausula_multa].filter(Boolean).filter((x, i, l) => l.indexOf(x) === i).join('; '),
+    // (aluguel em atraso: só a cláusula do aluguel; a da multa contratual não se aplica)
+    texto, clausula: [dados.campos.clausula, modelo.atraso ? '' : dados.campos.clausula_multa].filter(Boolean).filter((x, i, l) => l.indexOf(x) === i).join('; '),
     data_limite: R.limiteNotificacao(n.data, n.prazo_dias),
   };
 }
