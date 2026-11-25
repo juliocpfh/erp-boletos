@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-vh85I/st62OqXODwPjhxEULPLXXqMoqDHRYvrhRRAxI='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-6N2rFK/dKnstFS+PsRFjLmWF8UaFkQ8VFCKFc53egjA=' 'sha256-M6S/uaDGz29zQEiWnDIbcaf1zHfMKftZhHg+VmRRAYQ='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="78f8b57f0abb32c2">
+<meta name="fontes" content="7b6aa32e958fba69">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -19123,6 +19123,23 @@ Não mova nem renomeie os arquivos desta pasta. chave-do-backup.json é a chave:
     const extra = alvo.id || alvo.acordo || alvo.notificacao && alvo.notificacao.id || (alvo.fiador ? `fiador${alvo.fiador}` : "");
     return `recibo:${tipo}:${quem}${extra ? `:${extra}` : ""}`;
   }
+  function prefixoDoDocumento(tipo, { contrato, id, comp } = {}) {
+    return `doc:${tipo}:c${contrato.id}${id ? `:a${id}` : ""}${comp ? `:${comp}` : ""}:`;
+  }
+  function resumoDoTexto(s) {
+    let h = 2166136261;
+    for (const ch of String(s)) {
+      h ^= ch.codePointAt(0);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    return h.toString(16).padStart(8, "0");
+  }
+  function assinadoParaEmail(dados, prefixo, chave = null) {
+    const p2 = chave ? pedidoDe(dados, chave) : pedidosDoDocumento(dados, prefixo)[0] || null;
+    if (!p2) return { pedido: null, ok: false, motivo: "" };
+    if (p2.situacao === "assinado") return { pedido: p2, ok: true, motivo: "" };
+    return { pedido: p2, ok: false, motivo: p2.situacao === "erro" ? `o PC não conseguiu assinar (${p2.erro})` : "ainda na fila do PC para assinar" };
+  }
   async function pedir(caminho, opcoes2 = {}, tempo = 2e4) {
     if (local2() || globalThis.navigator?.onLine === false) throw new ErroUsuario("A assinatura digital só funciona pela internet.");
     let r;
@@ -19179,7 +19196,7 @@ Não mova nem renomeie os arquivos desta pasta. chave-do-backup.json é a chave:
     if (erros.length) out.push(`${erros.length} ${erros.length === 1 ? "documento não foi assinado" : "documentos não foram assinados"} pelo PC (${erros[0].erro}).`);
     return out;
   }
-  var cfg, SEM_ASSINATURA_DA_EMPRESA, AVISO_CERTIFICADO_DIAS, diaDaqui, diasAte, PC_PARADO_MS, ehJson, local2, filaGuardada, pedidoDe;
+  var cfg, SEM_ASSINATURA_DA_EMPRESA, AVISO_CERTIFICADO_DIAS, diaDaqui, diasAte, PC_PARADO_MS, chaveDoDocumento, pedidosDoDocumento, ehJson, local2, filaGuardada, pedidoDe;
   var init_assinatura = __esm({
     "docs/js/assinatura.js"() {
       init_calculos();
@@ -19193,6 +19210,8 @@ Não mova nem renomeie os arquivos desta pasta. chave-do-backup.json é a chave:
       };
       diasAte = (iso2, agora) => Math.round((Date.parse(`${iso2}T12:00:00Z`) - Date.parse(`${diaDaqui(agora)}T12:00:00Z`)) / 864e5);
       PC_PARADO_MS = 10 * 60 * 1e3;
+      chaveDoDocumento = (tipo, alvo, conteudo) => `${prefixoDoDocumento(tipo, alvo)}v${resumoDoTexto(conteudo)}`;
+      pedidosDoDocumento = (dados, prefixo) => (dados?.pedidos || []).filter((p2) => String(p2.chave || "").startsWith(prefixo)).sort((a, b) => String(b.pedido_em).localeCompare(String(a.pedido_em)));
       ehJson = (r) => (r.headers.get("content-type") || "").includes("json");
       local2 = () => globalThis.location && !/^https?:$/.test(globalThis.location.protocol);
       filaGuardada = null;
@@ -21581,6 +21600,8 @@ Os documentos da análise serão apagados, conforme a LGPD (Lei 13.709/2018).`
           etapa: "Gerar o contrato",
           assunto: "Contrato de locação para assinatura – {imovel}",
           anexos: "Contrato (PDF)",
+          prontos: ["digital:contrato"],
+          // assinado digitalmente pela empresa, quando houver (2026-11-24)
           perguntas: [["prazo_assinatura", "Devolver assinado até", "data"]],
           texto: `Olá, {nome},
 
@@ -21646,6 +21667,7 @@ LEMBRETES
           etapa: "Novo valor negociado",
           assunto: "Novo valor do aluguel: termo para assinatura – {imovel}",
           anexos: "Termo aditivo do novo valor (PDF)",
+          prontos: ["digital:aditivo"],
           perguntas: [["prazo_assinatura", "Devolver assinado até", "data"]],
           texto: `Olá, {nome},
 
@@ -22378,6 +22400,20 @@ ${DICA_DOCUMENTOS}`].join("\n");
           const nome = (DOCUMENTOS_ENTRADA.find(([k]) => k === campo2) || [])[1] || "documento";
           if (doc2 && doc2.arquivo) arquivo("assinados", doc2.contrato.id, doc2.arquivo, `${nome.toLowerCase()} assinado por todos`);
         }
+        continue;
+      }
+      if (tipo === "digital") {
+        const a = qual === "aditivo" ? alvo.aditivo || null : null;
+        if (!regra("assinatura_digital") || !c || qual === "aditivo" && !a) continue;
+        out.push({
+          tipo: "digital",
+          doc: qual,
+          contrato: c.id,
+          ...a ? { id: a.id } : {},
+          ok: true,
+          motivo: "",
+          rotulo: a ? `termo aditivo de ${dataBr(a.data)} assinado digitalmente pela empresa` : "contrato assinado digitalmente pela empresa"
+        });
         continue;
       }
       if (tipo === "notificacao") {
@@ -25471,588 +25507,6 @@ Confirma o envio?`, { titulo: "Enviar os e-mails da régua", sim: `Enviar ${iten
     }
   });
 
-  // docs/js/telas/emails.js
-  function ultimoEnvio(chave, alvo) {
-    return (d().envios_email || []).filter((x) => x.chave === chave && (alvo.contrato && x.contrato_id === Number(alvo.contrato) || alvo.ficha && x.ficha_id === Number(alvo.ficha)) && (!alvo.aditivo || x.aditivo_id === Number(alvo.aditivo)) && (!alvo.notificacao || x.notificacao_id === Number(alvo.notificacao)) && (!alvo.cobranca || x.cobranca_id === Number(alvo.cobranca))).sort((a, b) => String(b.data).localeCompare(String(a.data)))[0] || null;
-  }
-  function botaoEmail(chave, alvo, texto3 = "✉ E-mail") {
-    if (!opera() || !MODELOS_EMAIL.some((m) => m.chave === chave)) return "";
-    const u = ultimoEnvio(chave, alvo);
-    return `${botao("abrirEmail", texto3, { chave, ...alvo }, "secundario mini")}${u ? ` <span class="suave" title="${esc(u.como)}">${u.como === "enviado" ? "enviado" : "aberto"} em ${dataBr(u.data)}</span>` : ""}`;
-  }
-  async function copiar3(texto3) {
-    try {
-      await navigator.clipboard.writeText(texto3);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-  function listaProntos(prontos, ligado2) {
-    if (!prontos.length) return "";
-    const linha = (a, k) => a.tipo === "recibo" && !a.ok ? `<p class="suave">🧾 ${esc(a.rotulo)}: ${esc(a.motivo)}</p>` : `<p><label class="check"><input type="checkbox" name="pronto" value="${k}" checked> ${a.tipo === "recibo" ? `🧾 ${esc(a.rotulo)} (PDF)` : `📎 ${esc(a.rotulo)}`}</label></p>`;
-    const algum = prontos.some((a) => a.tipo !== "recibo" || a.ok);
-    return `<div class="cartao" style="margin:0 0 8px"><p><b>Anexos do sistema</b></p>${prontos.map(linha).join("")}
-    ${algum ? `<p><button type="button" class="secundario mini" data-baixar-prontos>Baixar os marcados</button> <span class="suave">${ligado2 ? 'Vão juntos no "Enviar agora".' : "Para o Gmail: baixe e anexe por lá."}</span></p>` : ""}</div>`;
-  }
-  async function reciboParaEnviar(a, alvo) {
-    if (!regra("assinatura_digital") || SEM_ASSINATURA_DA_EMPRESA.includes(a.recibo)) {
-      const r = await pdfDoRecibo(a.recibo, alvo);
-      return { nome: r.nome, blob: r.blob };
-    }
-    const p2 = pedidoDe(await fila({ fresca: true }), chaveDoRecibo(a.recibo, alvo));
-    if (!p2 || p2.situacao !== "assinado") throw new ErroUsuario(`O ${a.rotulo} ainda não foi assinado digitalmente${p2 && p2.situacao === "erro" ? ` (${p2.erro})` : p2 ? " (está na fila do PC)" : ""}: abra o recibo e use "Enviar para assinar", ou desmarque esse anexo. Nada foi enviado.`);
-    return { nome: `${String(p2.nome || "documento.pdf").replace(/\.pdf$/i, "")} - assinado.pdf`, blob: await baixarAssinado(p2.id) };
-  }
-  async function arquivosProntos(dlg, prontos, objeto) {
-    const out = [];
-    for (const el of dlg.querySelectorAll("[name=pronto]:checked")) {
-      const a = prontos[Number(el.value)];
-      if (a.tipo === "recibo") out.push(await reciboParaEnviar(a, a.alvo || objeto));
-      else if (a.tipo === "boleto") {
-        const cb = buscar2("cobrancas", a.id);
-        const blob = cb && cb.banco ? a.qual === "pdf" ? await pdfDoBoleto(cb) : qrDoPix(cb.banco) : null;
-        if (!blob) throw new ErroUsuario(`Não consegui pegar o ${a.rotulo}: confira se a ponte do C6 está ligada neste computador, ou desmarque esse anexo.`);
-        out.push({ nome: a.nome, blob });
-      } else out.push({ nome: a.nome, blob: await abrirArquivo(await pastaDoEscopo(a.escopo, Number(a.id)), a.nome) });
-    }
-    return out;
-  }
-  async function pdfDoBoleto(cb) {
-    let blob = null;
-    try {
-      await chamarPonteCrua("GET", `/contas/${encodeURIComponent(cb.banco.conta_id)}/boletos/${encodeURIComponent(cb.banco.id_externo)}/pdf`, null, { fetch: async (url, o) => {
-        const r = await fetch(url, o);
-        if (!r.ok) return r;
-        blob = await r.blob();
-        return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
-      } });
-    } catch {
-      blob = null;
-    }
-    return blob;
-  }
-  function qrDoPix(b) {
-    if (!b.pix_qr_base64) return null;
-    const bin = atob(b.pix_qr_base64);
-    const bytes2 = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i += 1) bytes2[i] = bin.charCodeAt(i);
-    return new Blob([bytes2], { type: b.pix_qr_mime || "image/png" });
-  }
-  async function janelaEmail(chave, alvo) {
-    const modelo = modeloEmail(d(), chave);
-    const reg = alvo.contrato ? buscar2("contratos", alvo.contrato) : buscar2("fichas", alvo.ficha);
-    if (!modelo || !reg) throw new ErroUsuario("Este inquilino ou ficha não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.");
-    const objeto = alvo.contrato ? { contrato: reg } : { ficha: reg };
-    if (alvo.aditivo) {
-      objeto.aditivo = buscar2("aditivos", alvo.aditivo);
-      if (!objeto.aditivo) throw new ErroUsuario("Este termo aditivo não existe mais (pode ter sido excluído). Atualize a página.");
-    }
-    if (alvo.notificacao) {
-      objeto.notificacao = buscar2("notificacoes", alvo.notificacao);
-      if (!objeto.notificacao) throw new ErroUsuario("Esta notificação não existe mais (pode ter sido excluída). Atualize a página.");
-    }
-    if (alvo.cobranca) {
-      objeto.cobranca = buscar2("cobrancas", alvo.cobranca);
-      if (!objeto.cobranca) throw new ErroUsuario("Este boleto não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.");
-    }
-    const inicio = dadosDoEmail(d(), objeto);
-    const ligado2 = await emailLigado();
-    const perguntas = (modelo.perguntas || []).map((p2) => campoPergunta(p2, inicio.perguntas[p2[0]] ?? "")).join("");
-    const prontos = anexosProntos(d(), modelo, objeto);
-    const dlg = document.createElement("dialog");
-    dlg.className = "janela-erro janela-pergunta janela-email";
-    dlg.innerHTML = `<form method="dialog"><h3><span>${esc(modelo.nome)} · ${esc(reg.inquilino_nome || "")}</span><button type="button" class="fechar-janela" data-fechar title="Fechar" aria-label="Fechar">✕</button></h3><div class="corpo">
-    ${perguntas ? `<div class="cartao" style="margin:0 0 8px">${perguntas}</div>` : ""}
-    <p class="suave">De: ${esc(inicio.remetente.assinatura || "Administradora")}${inicio.remetente.email ? ` &lt;${esc(inicio.remetente.email)}&gt;` : ""}${modelo.anexos ? ` · Anexar: <b>${esc(modelo.anexos)}</b>` : ""}</p>
-    ${listaProntos(prontos, ligado2)}
-    <p><label>Para</label><input type="email" name="para" value="${esc(inicio.para)}" multiple></p>
-    ${inicio.para ? "" : '<p class="alerta aviso">Sem e-mail no cadastro: digite o destinatário.</p>'}
-    <p><label>Assunto</label><input name="assunto"></p>
-    <p><label>Texto <span class="suave">(pode alterar antes de enviar)</span></label><textarea name="texto" rows="16" spellcheck="true"></textarea></p>
-    <p class="suave" data-editado hidden>Texto alterado à mão: as respostas acima não mudam mais o texto.</p>
-    ${ligado2 ? `<p><label>${prontos.length ? "Outros anexos" : "Anexos"} para o "Enviar agora" <span class="suave">(PDF ou foto)</span></label><input type="file" name="anexos" multiple accept="${ACEITA_DOCUMENTOS}"></p>` : ""}
-    <p class="suave">${alvo.contrato && /saida_aviso/.test(chave) ? "Confira no contrato do inquilino a multa da saída antecipada antes de enviar. " : ""}${ligado2 ? "" : 'Envio direto ainda não ligado: use "Copiar texto" ou "Abrir no Gmail".'}</p>
-  </div><div class="acoes" style="justify-content:flex-end;flex-wrap:wrap">
-    <p class="alerta aviso-janela" data-aviso-janela role="status" aria-live="polite" hidden style="flex-basis:100%"></p>
-    <button type="button" class="secundario" data-fechar>Fechar</button>
-    <button type="button" class="secundario" data-copiar>Copiar texto</button>
-    <button type="button" class="secundario" data-gmail>Abrir no Gmail</button>
-    ${ligado2 ? '<button type="button" data-enviar>Enviar agora</button>' : ""}</div></form>`;
-    document.body.appendChild(dlg);
-    const q = (s) => dlg.querySelector(s);
-    let editado = false;
-    let assuntoEditado = false;
-    let registrou = false;
-    const avisar = (texto3, tipo = "ok") => {
-      const el = q("[data-aviso-janela]");
-      el.className = `alerta aviso-janela ${tipo}`;
-      el.textContent = texto3;
-      el.hidden = false;
-      el.scrollIntoView({ block: "nearest" });
-    };
-    const respostas = () => Object.fromEntries((modelo.perguntas || []).map(([n]) => [n, q(`[name=p_${n}]`).value]));
-    const desenhar = () => {
-      const e = montarEmail(modelo, dadosDoEmail(d(), objeto, respostas()));
-      if (!assuntoEditado) q("[name=assunto]").value = e.assunto;
-      if (!editado) q("[name=texto]").value = e.texto;
-    };
-    desenhar();
-    q("[name=texto]").addEventListener("input", () => {
-      editado = true;
-      q("[data-editado]").hidden = false;
-    });
-    q("[name=assunto]").addEventListener("input", () => {
-      assuntoEditado = true;
-    });
-    dlg.querySelectorAll("[name^=p_]").forEach((el) => el.addEventListener("input", desenhar));
-    const atual = () => ({ para: q("[name=para]").value.trim(), assunto: q("[name=assunto]").value.trim(), texto: q("[name=texto]").value });
-    const pendente = () => /\[preencher: /.test(atual().texto + atual().assunto) ? 'Ainda há "[preencher: ...]" no texto: complete antes de mandar.' : "";
-    dlg.querySelectorAll("[data-fechar]").forEach((b) => b.addEventListener("click", () => dlg.close()));
-    const baixarProntos = q("[data-baixar-prontos]");
-    if (baixarProntos) baixarProntos.addEventListener("click", async () => {
-      baixarProntos.disabled = true;
-      try {
-        const lista3 = await arquivosProntos(dlg, prontos, objeto);
-        if (!lista3.length) {
-          avisar("Marque pelo menos um anexo.", "aviso");
-          return;
-        }
-        for (const a of lista3) baixar(a.blob, a.nome);
-      } catch (erro) {
-        aviso(erro.message || "Não consegui preparar os anexos.", "erro");
-      } finally {
-        baixarProntos.disabled = false;
-      }
-    });
-    q("[data-copiar]").addEventListener("click", async () => {
-      const e = atual();
-      const ok = await copiar3(`${e.assunto}
-
-${e.texto}`);
-      avisar(ok ? `Assunto e texto copiados: cole no e-mail.${pendente() ? ` ${pendente()}` : ""}` : "O navegador não deixou copiar: selecione o texto e copie.", !ok || pendente() ? "aviso" : "ok");
-    });
-    q("[data-gmail]").addEventListener("click", async () => {
-      const e = atual();
-      if (pendente() && !await confirmar(`${pendente()}
-
-Abrir o Gmail mesmo assim? O texto vai com o buraco, e você completa por lá.`, { titulo: "Texto incompleto", sim: "Abrir mesmo assim" })) return;
-      const comCorpo = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(e.para)}&su=${encodeURIComponent(e.assunto)}&body=${encodeURIComponent(e.texto)}`;
-      const cabe = comCorpo.length <= LIMITE_ENDERECO2;
-      const copiado = await copiar3(e.texto);
-      const aba = window.open(cabe ? comCorpo : `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(e.para)}&su=${encodeURIComponent(e.assunto)}`, "_blank");
-      if (!aba) {
-        avisar(`O navegador bloqueou a aba do Gmail (bloqueador de janelas): permita janelas deste site e clique de novo, ou use "Copiar texto".${copiado ? " O texto já foi copiado." : ""}`, "aviso");
-        return;
-      }
-      try {
-        aba.opener = null;
-      } catch {
-      }
-      await registrar2(chave, alvo, e.para, e.assunto, "aberto no Gmail");
-      registrou = true;
-      avisar(cabe ? "Gmail aberto com o texto. Anexe os arquivos e envie por lá." : copiado ? "Gmail aberto. O texto é comprido para ir pelo endereço: ele foi copiado, cole no corpo do e-mail." : "Gmail aberto. Copie o texto da janela e cole no corpo do e-mail.", cabe ? "ok" : "aviso");
-    });
-    const enviar = q("[data-enviar]");
-    if (enviar) enviar.addEventListener("click", async () => {
-      const e = atual();
-      if (!e.para) {
-        avisar("Digite o e-mail do destinatário.", "aviso");
-        return;
-      }
-      if (pendente()) {
-        avisar(pendente(), "aviso");
-        return;
-      }
-      const n = chave === "notificacao_envio" && alvo.notificacao ? buscar2("notificacoes", alvo.notificacao) : null;
-      if (n && n.situacao === "Rascunho" && n.data > hojeIso()) {
-        avisar(`A notificação está datada de ${dataBr(n.data)}, no futuro: o envio não poderia ser marcado. Corrija a data no rascunho (hoje ou antes) e mande depois.`, "aviso");
-        return;
-      }
-      let arquivos;
-      try {
-        arquivos = [...await arquivosProntos(dlg, prontos, objeto), ...[...q("[name=anexos]").files || []].map((f) => ({ nome: f.name, blob: f }))];
-      } catch (erro) {
-        aviso(`Não consegui preparar os anexos: ${erro.message}`, "erro");
-        return;
-      }
-      const alertas = [];
-      if (!arquivos.length && modelo.anexos) alertas.push(`ATENÇÃO: o texto fala em anexo (${modelo.anexos}), mas nenhum arquivo vai junto. Anexe em "${prontos.length ? "Outros anexos" : "Anexos"}" antes de enviar.`);
-      const marcados = [...dlg.querySelectorAll("[name=pronto]:checked")].map((el) => prontos[Number(el.value)]);
-      if (n && !n.arquivo_assinado && !regra("assinatura_digital") && marcados.some((a) => a.tipo === "recibo" && a.recibo === "notificacao")) alertas.push("ATENÇÃO: vai o PDF da notificação SEM a assinatura (a assinada não foi anexada na notificação). Ao enviar, a notificação fica marcada como enviada hoje e o prazo começa a correr.");
-      if (!await confirmar(`${alertas.length ? `${alertas.join("\n\n")}
-
-` : ""}O e-mail vai agora para ${e.para}${arquivos.length ? `, com ${arquivos.length} anexo(s)` : ", sem anexo"}.`, { titulo: alertas.length ? "Enviar mesmo assim?" : "Enviar o e-mail?", sim: "Enviar agora", forte: alertas.length > 0 })) return;
-      enviar.disabled = true;
-      try {
-        const r = await enviarEmail({ para: e.para, assunto: e.assunto, texto: e.texto, anexos: arquivos });
-        await registrar2(chave, alvo, e.para, e.assunto, "enviado", r.id);
-        dlg.close();
-        aviso(`E-mail enviado para ${e.para}. Fica em "Enviados" no Gmail.`);
-        await mostrar();
-      } catch (erro) {
-        aviso(erro.message || "O e-mail não foi enviado.", "erro");
-      } finally {
-        enviar.disabled = false;
-      }
-    });
-    dlg.addEventListener("close", () => {
-      dlg.remove();
-      if (registrou) mostrar();
-    });
-    voltarFecha(dlg);
-    dlg.showModal();
-  }
-  async function caixaGmailHtml(volta = "") {
-    if (!podeUsuario("admin")) return "";
-    const topo3 = '<div class="cartao"><h2>E-mail pelo Gmail</h2>';
-    if (!E.nuvem) {
-      return `${topo3}<p class="suave">O envio direto (botão <b>Enviar agora</b>) só existe no sistema na nuvem (erp.ankjck.com.br), onde o administrador liga o Gmail da empresa com o botão <b>Conectar o Gmail</b>. Aqui, os e-mails saem por <b>Copiar texto</b> ou <b>Abrir no Gmail</b>.</p></div>`;
-    }
-    const s = await situacaoGmail();
-    const [tipo, texto3] = VOLTA_GMAIL[volta] || [];
-    const avisoVolta = texto3 ? `<div class="alerta ${tipo}">${texto3}</div>` : "";
-    if (!s) return `${topo3}${avisoVolta}<p class="suave">Não deu para ver a situação agora (sem internet?). Recarregue a página para tentar de novo.</p></div>`;
-    let situacao2;
-    if (s.origem === "conta" && s.ligado) {
-      situacao2 = `<p>${etiqueta("Ligado", "ok")} Os e-mails saem pela conta <b>${esc(s.conta || "")}</b>${s.remetente && s.remetente !== s.conta ? `, com o remetente <b>${esc(s.remetente)}</b>` : ""}${s.ligado_em ? ` <span class="suave">(conectado em ${dataBr(String(s.ligado_em).slice(0, 10))})</span>` : ""}.</p>`;
-    } else if (s.origem === "segredo" && s.ligado) {
-      situacao2 = `<p>${etiqueta("Ligado", "ok")} Pelo jeito antigo (código colado no Cloudflare), com o remetente <b>${esc(s.remetente || "")}</b>.</p>
-      <p class="suave">Para passar ao botão: clique em <b>Conectar o Gmail</b>. Depois disso o jeito antigo deixa de ser usado e o técnico pode apagá-lo da nuvem (para ele: segredo GMAIL_REFRESH_TOKEN no Cloudflare).</p>`;
-    } else if (s.origem === "simulado") {
-      situacao2 = `<p>${etiqueta("Simulado", "info")} Teste no computador: os e-mails só aparecem na janela do programa, nada vai ao Google.</p>`;
-    } else {
-      situacao2 = `<p>${etiqueta("Desligado", "neutra")} Os e-mails saem por <b>Copiar texto</b> ou <b>Abrir no Gmail</b>.</p>`;
-    }
-    const ilegivel = s.ilegivel ? '<div class="alerta aviso">A autorização guardada não abre mais (a configuração do Google pode ter sido trocada). Clique em <b>Conectar o Gmail</b> de novo.</div>' : "";
-    const falta = s.cliente ? "" : '<div class="alerta info">Falta terminar a configuração do Gmail na nuvem antes de conectar: peça ao técnico <span class="suave">(para ele: segredos GMAIL_CLIENT_ID e GMAIL_CLIENT_SECRET no Cloudflare)</span>.</div>';
-    const botoes = s.origem === "simulado" ? "" : `<p>${s.cliente ? botao("conectarGmail", s.origem === "conta" && s.ligado ? "Trocar a conta do Gmail" : "Conectar o Gmail", {}, "pequeno") : ""}
-    ${s.origem === "conta" ? botao("desconectarGmail", "Desconectar", {}, "perigo pequeno", 'Desconectar o Gmail? O botão "Enviar agora" some até alguém conectar de novo; a permissão também é retirada na conta do Google.') : ""}</p>`;
-    const retorno = s.retorno ? `<p><label>Endereço de retorno <span class="suave">(para o técnico: Google Cloud, credencial, "URIs de redirecionamento autorizados")</span></label>
-    <span class="nw"><input readonly value="${esc(s.retorno)}" data-retorno-gmail style="max-width:480px"> ${botao("copiarRetornoGmail", "Copiar", {}, "secundario pequeno")}</span></p>` : "";
-    return `${topo3}${avisoVolta}${ilegivel}
-    <p class="suave">Com o Gmail conectado, os e-mails das etapas (boleto, NF, recibos, avisos) saem pelo botão <b>Enviar agora</b>, pela conta da empresa. Conectar é como entrar com o Google em qualquer site: <b>Conectar o Gmail → escolher a conta → Permitir</b>. O sistema só <b>envia</b>: não lê a caixa de entrada.</p>
-    ${situacao2}${falta}${botoes}${retorno}</div>`;
-  }
-  function telaModelosEmail() {
-    const etapas = [...new Set(MODELOS_EMAIL.map((m) => m.etapa))];
-    const linha = (p2) => {
-      const m = modeloEmail(d(), p2.chave);
-      return `<tr><td><b>${esc(m.nome)}</b>${m.editado ? ' <span class="suave">(editado)</span>' : ""}<br><span class="suave">${esc(m.assunto)}</span></td><td class="nw">${esc(m.etapa)}</td>
-    <td class="n nw">${opera() ? link(`#/modelo-email/${m.chave}`, "Editar") : ""} ${opera() && m.editado ? botao("restaurarModeloEmail", "Voltar ao texto padrão", { chave: m.chave }, "secundario pequeno", `Trocar o texto de "${m.nome}" pelo padrão? As alterações se perdem.`) : ""}</td></tr>`;
-    };
-    return `<p class="suave"><a href="#/sistema-email">← Comunicação E-mail</a></p>
-    <div class="cabecalho"><h1>Modelos de e-mail</h1>${botao("baixarModelosEmail", "Baixar todos (TXT)", {}, "secundario pequeno")}</div>
-    <p class="suave">Um e-mail para cada etapa da ficha, da entrada e da saída do inquilino, a régua de cobrança (lembretes antes e no dia do vencimento, boleto em atraso), as notificações ao inquilino, o novo valor do aluguel, os termos aditivos e o informe anual do Imposto de Renda. O botão <b>✉ E-mail</b> de cada etapa abre o texto já preenchido para copiar, abrir no Gmail ou enviar.</p>
-    <div class="cartao"><table><tr><th>E-mail</th><th>Etapa</th><th></th></tr>${etapas.map((e) => MODELOS_EMAIL.filter((m) => m.etapa === e).map(linha).join("")).join("")}</table></div>${AJUDA}`;
-  }
-  function telaModeloEmail(chave) {
-    const m = modeloEmail(d(), chave);
-    if (!m) return naoEncontrado("Modelo não encontrado", "#/modelos-email", "Ver os modelos de e-mail");
-    return `<p class="suave"><a href="#/modelos-email">← Modelos de e-mail</a></p><h1>Modelo de e-mail: ${esc(m.nome)}</h1>
-    <form class="cartao" data-form="modeloEmail"><input type="hidden" name="chave" value="${esc(m.chave)}">
-      <p class="suave">Botão na etapa: <b>${esc(m.etapa)}</b>${m.anexos ? ` · lembrete de anexo: ${esc(m.anexos)}` : ""}</p>
-      <p><label>Assunto</label><input name="assunto" value="${esc(m.assunto)}" required></p>
-      <p><label>Texto (o fecho e a assinatura entram sozinhos no fim)</label><textarea name="texto" class="texto-modelo" spellcheck="true">${esc(m.texto)}</textarea></p>
-      <div class="acoes"><button>Salvar</button><a class="botao secundario" href="#/modelos-email">Cancelar</a></div></form>${AJUDA}`;
-  }
-  function alertaInformeIr() {
-    const { ano, contratos } = informesPendentes(d());
-    if (!contratos.length) return "";
-    return `<div class="alerta info"><b>Informe do Imposto de Renda de ${ano}:</b> enviar a ${contratos.length} inquilino(s) (de preferência até o fim de fevereiro):
-    ${contratos.map((c) => `<a href="#/imprimir/declaracao?contrato=${c.id}&ano=${ano}">${esc(c.inquilino_nome)}</a>`).join(", ")}. Na declaração, use o botão ✉ E-mail.</div>`;
-  }
-  var LIMITE_ENDERECO2, registrar2, campoPergunta, VOLTA_GMAIL, ACOES_EMAILS, FORMULARIOS_EMAILS, AJUDA;
-  var init_emails = __esm({
-    "docs/js/telas/emails.js"() {
-      init_app();
-      init_armazenamento();
-      init_banco();
-      init_calculos();
-      init_calculos();
-      init_email_dados();
-      init_formularios();
-      init_gmail();
-      init_modelos_email();
-      init_regras();
-      init_comum();
-      init_documentos();
-      init_assinatura();
-      LIMITE_ENDERECO2 = 7e3;
-      registrar2 = (chave, alvo, para, assunto, como, id = "") => alterar((db) => {
-        const dados = {
-          data: hojeIso(),
-          chave,
-          contrato_id: alvo.contrato ? Number(alvo.contrato) : null,
-          ficha_id: alvo.ficha ? Number(alvo.ficha) : null,
-          aditivo_id: alvo.aditivo ? Number(alvo.aditivo) : null,
-          ...alvo.notificacao ? { notificacao_id: Number(alvo.notificacao) } : {},
-          ...alvo.cobranca ? { cobranca_id: Number(alvo.cobranca) } : {},
-          para,
-          assunto,
-          como,
-          gmail_id: id || null
-        };
-        const n = como === "enviado" && chave === "notificacao_envio" && alvo.notificacao ? buscar(db, "notificacoes", alvo.notificacao) : null;
-        if (n && n.situacao === "Rascunho") marcarNotificacaoEnviada(db, n.id, { data: dados.data, meio: "E-mail" }, login());
-        if (como !== "enviado") {
-          const ja = (db.envios_email || []).find((x) => x.como === como && x.data === dados.data && x.chave === chave && x.contrato_id === dados.contrato_id && x.ficha_id === dados.ficha_id && x.aditivo_id === dados.aditivo_id && (x.notificacao_id || null) === (dados.notificacao_id || null) && (x.cobranca_id || null) === (dados.cobranca_id || null));
-          if (ja) return ja;
-          return inserir(db, "envios_email", dados, login(), null, { historico: false });
-        }
-        return inserir(db, "envios_email", dados, login(), `E-mail "${assunto}" enviado para ${para || "(sem destinatário)"}`);
-      });
-      campoPergunta = ([nome, rotulo3, tipo], valor) => {
-        if (tipo === "area") return `<p><label>${esc(rotulo3)}</label><textarea name="p_${nome}" rows="3">${esc(valor)}</textarea></p>`;
-        const t = tipo === "data" ? "date" : tipo === "ano" ? "number" : "text";
-        return `<p><label>${esc(rotulo3)}</label><input type="${t}" name="p_${nome}" value="${esc(valor)}"${tipo === "ano" ? ' min="2020" max="2100" style="width:120px"' : ""}></p>`;
-      };
-      VOLTA_GMAIL = {
-        ligado: ["ok", 'Gmail conectado. Faça um teste: abra o e-mail de uma etapa, ponha o seu próprio e-mail e clique em <b>Enviar agora</b>; ele aparece em "Enviados" no Gmail.'],
-        cancelado: ["aviso", "Você cancelou na tela do Google: nada foi ligado."],
-        recusado: ["erro", "O pedido venceu ou foi aberto em outro navegador. Clique em <b>Conectar o Gmail</b> de novo e termine em até 10 minutos, no mesmo navegador."],
-        "sem-permissao": ["erro", "Faltou marcar, na tela do Google, a caixa de <b>enviar e-mail em seu nome</b>. Clique em <b>Conectar o Gmail</b> de novo e marque essa caixa."],
-        credencial: ["erro", "O Google não reconheceu o aplicativo: falta terminar a configuração do Gmail na nuvem. Peça ao técnico para conferir (para ele: segredos GMAIL_CLIENT_ID e GMAIL_CLIENT_SECRET no Cloudflare)."],
-        retorno: ["erro", "O endereço de retorno cadastrado no Google está diferente. Copie o endereço abaixo e mande ao técnico, para ele cadastrar no Google Cloud."],
-        "sem-rede": ["erro", "Não deu para falar com o Google agora. Tente de novo daqui a pouco."],
-        erro: ["erro", "Não deu para ligar o Gmail. Tente de novo; se repetir, peça ajuda ao técnico."]
-      };
-      ACOES_EMAILS = {
-        async conectarGmail() {
-          const url = await enderecoParaConectar();
-          aviso("Abrindo a tela do Google…", "info");
-          window.location.assign(url);
-        },
-        async desconectarGmail() {
-          const r = await desconectarGmail();
-          aviso(r.segredo_antigo ? "Gmail desconectado. Atenção: o jeito antigo ainda está guardado na nuvem e continua enviando até o técnico apagá-lo (para ele: segredo GMAIL_REFRESH_TOKEN no Cloudflare)." : r.havia && !r.revogado ? "Gmail desconectado aqui. O Google não confirmou a retirada da permissão: confira em Conta do Google → Segurança → Apps com acesso." : "Gmail desconectado.", r.segredo_antigo || r.havia && !r.revogado ? "aviso" : "ok");
-          if (/[?&]gmail=/.test(window.location.hash)) ir("#/sistema-email");
-          else await mostrar();
-        },
-        async copiarRetornoGmail() {
-          const campo2 = document.querySelector("[data-retorno-gmail]");
-          if (!campo2) return;
-          if (await copiar3(campo2.value)) aviso("Endereço copiado. Mande ao técnico, para ele colar no Google Cloud.");
-          else {
-            campo2.select();
-            aviso("O navegador não deixou copiar: o endereço ficou selecionado, é só copiar.", "info");
-          }
-        },
-        async abrirEmail({ chave, contrato, ficha, aditivo, notificacao, cobranca }) {
-          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode enviar e-mails. Peça ao administrador, se precisar.");
-          await janelaEmail(chave, contrato ? { contrato: Number(contrato), ...aditivo ? { aditivo: Number(aditivo) } : {}, ...notificacao ? { notificacao: Number(notificacao) } : {}, ...cobranca ? { cobranca: Number(cobranca) } : {} } : { ficha: Number(ficha) });
-        },
-        /**
-         * "Enviar boleto por e-mail" (página do boleto, 2026-11-24): abre a janela do e-mail com o PDF do banco anexado. Sem o PDF
-         * (ou com o arquivo sumido da pasta) só avisa; boleto que mudou depois de anexado o PDF pergunta antes.
-         */
-        async enviarBoletoEmail({ id }) {
-          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode enviar e-mails. Peça ao administrador, se precisar.");
-          const cb = buscar2("cobrancas", id);
-          if (!cb) throw new ErroUsuario("Este boleto não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.");
-          if (!cb.boleto_pdf) throw new ErroUsuario('Anexe antes o PDF do boleto emitido no banco (botão "Anexar o PDF do boleto", nesta página). O e-mail vai com ele.');
-          if (arquivoSumiu("contrato", pastaDoBoletoPdf(cb), cb.boleto_pdf)) throw new ErroUsuario(`O PDF do boleto (${cb.boleto_pdf}) sumiu da pasta: anexe de novo antes de enviar.`);
-          const mudou = avisoBoletoPdfDesatualizado(cb);
-          if (mudou && !await confirmar(`${mudou}
-
-Emita de novo no banco e troque o PDF, ou abra o e-mail mesmo assim.`, { titulo: "PDF do boleto desatualizado", sim: "Abrir o e-mail mesmo assim", forte: true })) return;
-          await janelaEmail("boleto_envio", { contrato: cb.contrato_id, cobranca: cb.id });
-        },
-        async restaurarModeloEmail({ chave }) {
-          const m = (d().modelos_email || []).find((x) => x.chave === chave);
-          if (m) await alterar((db) => excluir(db, "modelos_email", m.id, login(), `Modelo de e-mail "${modeloEmail(db, chave).nome}" voltou ao texto padrão`));
-          aviso("Texto padrão restaurado.");
-          await mostrar();
-        },
-        /** Baixa os modelos em uso (para conferir ou guardar) num arquivo de texto. */
-        baixarModelosEmail() {
-          const t = MODELOS_EMAIL.map((p2) => {
-            const m = modeloEmail(d(), p2.chave);
-            return `=== ${m.nome} (${m.etapa}) ===
-Assunto: ${m.assunto}
-
-${m.texto}
-`;
-          }).join("\n");
-          baixar(new Blob([t], { type: "text/plain;charset=utf-8" }), "Modelos de e-mail.txt");
-        }
-      };
-      FORMULARIOS_EMAILS = {
-        async modeloEmail(form) {
-          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode alterar os modelos de e-mail.");
-          const f = new FormData(form);
-          const chave = String(f.get("chave") || "");
-          const padrao = MODELOS_EMAIL.find((m) => m.chave === chave);
-          if (!padrao) throw new Error("Modelo não encontrado.");
-          const assunto = String(f.get("assunto") || "").trim();
-          const texto3 = String(f.get("texto") || "").trim();
-          if (!assunto || !texto3) throw new ErroUsuario("Preencha o assunto e o texto do e-mail antes de salvar.");
-          await alterar((db) => {
-            const m = (db.modelos_email || []).find((x) => x.chave === chave);
-            if (m) atualizar(db, "modelos_email", m.id, { assunto, texto: texto3 }, login(), `Modelo de e-mail "${padrao.nome}"`);
-            else inserir(db, "modelos_email", { chave, assunto, texto: texto3 }, login(), `Modelo de e-mail "${padrao.nome}"`);
-          });
-          aviso("Modelo de e-mail salvo.");
-          ir("#/modelos-email");
-        }
-      };
-      AJUDA = `<div class="cartao"><h2>Como escrever</h2>
-  <p><b>{campo}</b> entra com o dado do inquilino ou da ficha: {nome} (primeiro nome), {locatario}, {documento}, {imovel}, {endereco}, {aluguel}, {aluguel_bonificado}, {bonificacao},
-  {vencimento}, {garantia}, {tipo_deposito}, {valor_deposito}, {prazo}, {inicio}, {fim}, {indice}, {reserva}, {reserva_data}, {contas_texto}, {contas_concessionarias}, {primeiro_boleto},
-  {data_chaves}, {data_limite_vistoria}, {data_saida}, {ano_saida}, {acerto}, {saldo}, {data_devolucao}, {informe}, {ano}, {conta_deposito} (conta para depósito da caução, do cadastro da empresa) e as respostas da janela ({prazo_assinatura}, {opcoes_entrega}, {data_aviso}, {data_vistoria}, {pendencias}).
-  Na ficha: {inclusos}, {iptu_valor}, {seguro_valor}, {devolucao}, {devolucao_data}, {documentos_ficha}, {link}, {link_validade}, {link_fiador} (o do 1º fiador) e {links_fiadores} (uma linha para cada fiador com link).
-  No termo aditivo: {aditivo_data}, {aditivo_assunto}, {valor_anterior}, {valor_novo}, {novo_inicio}, {novo_bonificado}. Na notificação: {notificacao_data}, {notificacao_numero}, {notificacao_assunto}, {notificacao_assunto_minusculo}, {prazo_notificacao}, {data_limite}.
-  Nos e-mails da régua de cobrança, também os do boleto: {boleto_referente}, {vencimento_boleto}, {limite_pagamento}, {valor_em_dia}, {valor_cheio}, {multa_pct}, {juros_pct}, {valor_hoje}, {multa_hoje}, {juros_hoje}, {dias_atraso}, {data_hoje}, {pix}, {linha_digitavel}, {competencia_boleto} (mês de competência) e {descricao_boleto} (o descritivo do boleto) (condições nao_util, bonificacao_boleto, pix, linha_digitavel, multa_juros).
-  Com a 1ª letra maiúscula ({Nome}) sai com maiúscula; todo em maiúsculas ({NOME}), em maiúsculas.</p>
-  <p><b>[se condição]</b> texto <b>[senão]</b> outro <b>[fim]</b>: pj, caucao, deposito, dinheiro (caução ou depósito), fiador, seguro_fianca, sem_garantia, tem_garantia, contas, iptu, seguro_incendio,
-  bonificacao, reserva, saida_antecipada, devolver, cobrar, garantia_depositada (caução ou depósito já registrado), inclusos, iptu_valor, seguro_valor, link, link_fiador, varios_fiadores,
-  novo_bonificacao (termo do novo valor), reiteracao e vence_hoje (notificação). Também "[se não pj]". Qualquer campo serve de condição: "[se valor_deposito]" sai só quando o campo tem valor.</p>
-  <p class="suave">O fecho ("Agradecemos e ficamos à disposição em caso de dúvidas." e a assinatura) entra sozinho no fim de todo e-mail.</p></div>`;
-    }
-  });
-
-  // docs/js/documentos-locacao.js
-  function assuntoDoDocumento(tipo, v = {}) {
-    const data2 = (k) => dataValida(v[k]) ? dataBr(v[k]) : "___";
-    switch (tipo) {
-      case "aditivo_prazo":
-        return `Prorrogação do prazo${Number(v.novo_prazo_meses) > 0 ? `: ${Number(v.novo_prazo_meses)} meses,` : ":"} de ${data2("nova_data_inicio")} a ${data2("nova_data_fim")}`;
-      case "aditivo_garantia":
-        return `Troca de garantia a partir de ${data2("data_troca")}${v.garantia_nova ? `: ${curto2(v.garantia_nova, 60)}` : ""}`;
-      case "distrato":
-        return `Distrato: entrega das chaves em ${data2("data_saida")}${String(v.multa_combinada || "").trim() ? `, multa de R$ ${String(v.multa_combinada).trim()}` : ", multa dispensada"}`;
-      case "aviso_desocupacao":
-        return `Aviso de desocupação: entrega prevista em ${data2("data_saida_prevista")}${v.transferencia_empregador ? ", sem multa (transferência pelo empregador)" : ""}`;
-      case "notificacao_desocupacao":
-        return `Notificação para desocupar até ${data2("data_limite")}`;
-      case "autorizacao_obra":
-        return `Autorização de obra${v.descricao_obra ? `: ${curto2(v.descricao_obra, 60)}` : ""}${dataValida(v.prazo_obra) ? ` (até ${data2("prazo_obra")})` : ""}`;
-      case "declaracao_pagamentos":
-        return `Declaração de pagamentos em dia de ${data2("periodo_inicio")} a ${data2("periodo_fim")}`;
-      case "aviso_fiador":
-        return `Aviso ao fiador${String(v.valor_debito || "").trim() ? `: R$ ${String(v.valor_debito).trim()} em atraso` : ""}${dataValida(v.prazo_pagamento) ? `, pagar até ${data2("prazo_pagamento")}` : ""}`;
-      default:
-        return (TIPOS_DOCUMENTO[tipo] || {}).nome || "Documento";
-    }
-  }
-  function registrarDocumento(d2, contratoId, { tipo, modelo, valores = {}, data: data2, fim = null }, usuario) {
-    const c = buscar(d2, "contratos", contratoId);
-    if (!c) throw new ErroUsuario("Inquilino não encontrado.");
-    const def = TIPOS_DOCUMENTO[tipo];
-    if (!def || !modelo) throw new ErroUsuario("Modelo de documento não encontrado.");
-    const campos = Object.fromEntries(def.campos.map(([k]) => [k, String(valores[k] ?? "").trim()]));
-    const dataDoc = dataValida(data2, hojeIso());
-    const base = { contrato_id: c.id, imovel_id: c.imovel_id || null, documento: tipo, data: dataDoc, campos, modelo_doc: modelo.id, texto: String(modelo.texto || ""), fim: fim || null };
-    if (ehTermoAditivo(tipo)) {
-      const pendente = termoAguardando(d2, c.id, tipo);
-      const numero2 = Number(campos.numero_aditivo) > 0 ? Math.trunc(Number(campos.numero_aditivo)) : pendente && pendente.numero || proximoNumeroAditivo(d2, c);
-      campos.numero_aditivo = String(numero2);
-      const dados = {
-        ...base,
-        campos,
-        tipo: TIPOS_ADITIVO_DOCUMENTO[tipo],
-        numero: numero2,
-        assunto: assuntoDoDocumento(tipo, campos),
-        testemunhas: [],
-        arquivo: null,
-        ...tipo === "aditivo_prazo" ? { nova_vigencia_fim: dataValida(campos.nova_data_fim) || null } : {}
-      };
-      if (pendente) {
-        atualizar(d2, "aditivos", pendente.id, dados, usuario, `${c.inquilino_nome}: ${numero2}º termo aditivo (${dados.tipo.toLocaleLowerCase("pt-BR")}) gerado de novo, aguardando assinatura`);
-        return { tabela: "aditivos", registro: pendente };
-      }
-      return { tabela: "aditivos", registro: inserir(d2, "aditivos", dados, usuario, `${c.inquilino_nome}: ${numero2}º termo aditivo (${dados.tipo.toLocaleLowerCase("pt-BR")}) gerado, aguardando assinatura`) };
-    }
-    const igual2 = documentosDo(d2, c.id).find((x) => x.documento === tipo && !x.arquivo && x.data === dataDoc && x.texto === base.texto && JSON.stringify(x.campos || {}) === JSON.stringify(campos));
-    if (igual2) return { tabela: "documentos_locacao", registro: igual2 };
-    const r = inserir(
-      d2,
-      "documentos_locacao",
-      { ...base, nome: def.nome, assunto: assuntoDoDocumento(tipo, campos), arquivo: null, assinado_em: null },
-      usuario,
-      `${c.inquilino_nome}: ${def.nome} gerado (${dataBr(dataDoc)})`
-    );
-    return { tabela: "documentos_locacao", registro: r };
-  }
-  function prazosDaNotificacao(x) {
-    const limite = dataValida(x && x.campos && x.campos.data_limite || "");
-    const recebida = x && x.arquivo ? dataValida(x.assinado_em || "") || null : null;
-    const pelaCarta = recebida ? somarDias(recebida, 30) : "";
-    const desocupar = [limite, pelaCarta].filter(Boolean).sort().pop() || "";
-    return { recebida, desocupar: desocupar || null, acaoAte: desocupar ? somarDias(desocupar, 30) : null };
-  }
-  function anexarDocumento(d2, id, { data: data2, arquivo }, usuario) {
-    const x = buscar(d2, "documentos_locacao", id);
-    if (!x) throw new ErroUsuario("Documento não encontrado.");
-    if (!dataValida(data2)) throw new ErroUsuario("Informe a data da assinatura.");
-    if (!arquivo) throw new ErroUsuario("Anexe o arquivo assinado.");
-    const c = buscar(d2, "contratos", x.contrato_id);
-    atualizar(d2, "documentos_locacao", x.id, { arquivo, assinado_em: data2 }, usuario, `${c ? c.inquilino_nome : "Contrato"}: ${x.nome} de ${dataBr(x.data)} ${ehNotificacaoComAr(x) ? "recebida (AR)" : "assinado"} em ${dataBr(data2)}`);
-    return x;
-  }
-  function tirarArquivoDocumento(d2, id, usuario) {
-    const x = buscar(d2, "documentos_locacao", id);
-    if (!x || !x.arquivo) throw new ErroUsuario("Arquivo não encontrado.");
-    const c = buscar(d2, "contratos", x.contrato_id);
-    atualizar(d2, "documentos_locacao", x.id, { arquivo: null, assinado_em: null }, usuario, `${c ? c.inquilino_nome : "Contrato"}: arquivo assinado do ${x.nome} de ${dataBr(x.data)} apagado (volta a aguardar assinatura)`);
-  }
-  function aplicarProrrogacao(d2, aditivoId, usuario) {
-    const a = buscar(d2, "aditivos", aditivoId);
-    if (!ehProrrogacao(a) || !a.arquivo) return "";
-    if (a.renovacao_id && buscar(d2, "renovacoes", a.renovacao_id)) return "";
-    const c = buscar(d2, "contratos", a.contrato_id);
-    const nova = dataValida(a.nova_vigencia_fim);
-    if (!nova) return "O termo foi gerado sem a nova data de término: a data de término do contrato não mudou (gere o termo de novo com a data, ou registre a renovação).";
-    const inicio = c.data_entrada || c.vigencia_inicio;
-    if (inicio && nova <= inicio) return `A nova data de término (${dataBr(nova)}) é antes da entrada: a data de término do contrato não mudou.`;
-    const antes = { vigencia_fim: c.vigencia_fim ?? null, prazo_meses: c.prazo_meses ?? null, prazo_tipo: c.prazo_tipo ?? null };
-    const r = registrarRenovacao(d2, c.id, {
-      tipo: "Renovado com nova data de término",
-      data: a.assinado_em || hojeIso(),
-      nova_vigencia_fim: nova,
-      aditivo_id: a.id,
-      observacoes: `${a.numero || ""}º termo aditivo de prorrogação do prazo, assinado`
-    }, usuario);
-    atualizar(d2, "aditivos", a.id, { renovacao_id: r.id, prazo_antes: antes }, usuario, `${c.inquilino_nome}: prorrogação assinada, término do contrato passa a ${dataBr(nova)}`);
-    return `A data de término do contrato passou a ${dataBr(nova)}.`;
-  }
-  function desfazerProrrogacao(d2, aditivoId, usuario) {
-    const a = buscar(d2, "aditivos", aditivoId);
-    if (!ehProrrogacao(a) || !a.renovacao_id) return "";
-    const c = buscar(d2, "contratos", a.contrato_id);
-    const ren = buscar(d2, "renovacoes", a.renovacao_id);
-    const antes = { ...a.prazo_antes || {} };
-    if (ren) excluirRenovacao(d2, ren.id, usuario);
-    atualizar(d2, "aditivos", a.id, { renovacao_id: null, prazo_antes: null }, usuario, `${c.inquilino_nome}: prorrogação do termo aditivo de ${dataBr(a.data)} desfeita`);
-    if (!ren || c.vigencia_fim !== ren.nova_vigencia_fim) return "";
-    const outra = fimRenovado(d2, c);
-    const mud = outra ? { vigencia_fim: outra, prazo_tipo: "Determinado", prazo_meses: prazoDoContrato(d2, c) } : { vigencia_fim: antes.vigencia_fim ?? null, prazo_meses: antes.prazo_meses ?? null, prazo_tipo: antes.prazo_tipo ?? "Determinado" };
-    atualizar(d2, "contratos", c.id, mud, usuario, `${c.inquilino_nome}: término do contrato volta a ${mud.vigencia_fim ? dataBr(mud.vigencia_fim) : "prazo indeterminado"} (prorrogação não valeu)`);
-    const fim = fimDoContrato(d2, c) || mud.vigencia_fim;
-    return mud.prazo_tipo === "Indeterminado" ? "O contrato volta a prazo indeterminado." : `A data de término do contrato volta a ${dataBr(fim)}.`;
-  }
-  var TIPOS_ADITIVO_DOCUMENTO, ehTermoAditivo, ehProrrogacao, porData2, curto2, termoAguardando, documentosDo, MOTIVO_MINIMO, ehNotificacaoComAr, termoDaRenovacao;
-  var init_documentos_locacao = __esm({
-    "docs/js/documentos-locacao.js"() {
-      init_calculos();
-      init_modelos_documentos();
-      init_regras();
-      TIPOS_ADITIVO_DOCUMENTO = { aditivo_prazo: "Prorrogação do prazo", aditivo_garantia: "Troca de garantia" };
-      ehTermoAditivo = (tipo) => Object.prototype.hasOwnProperty.call(TIPOS_ADITIVO_DOCUMENTO, tipo);
-      ehProrrogacao = (a) => !!(a && a.documento === "aditivo_prazo");
-      porData2 = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
-      curto2 = (t, n = 90) => {
-        const s = String(t || "").replace(/\s+/g, " ").trim();
-        return s.length > n ? `${s.slice(0, n - 1)}…` : s;
-      };
-      termoAguardando = (d2, contratoId, tipo) => (d2.aditivos || []).filter((a) => a.contrato_id === contratoId && a.documento === tipo && !a.arquivo && !a.perdido_em).sort(porData2)[0] || null;
-      documentosDo = (d2, contratoId) => (d2.documentos_locacao || []).filter((x) => x.contrato_id === contratoId).sort(porData2);
-      MOTIVO_MINIMO = 30;
-      ehNotificacaoComAr = (x) => !!(x && x.documento === "notificacao_desocupacao");
-      termoDaRenovacao = (d2, ren) => ren && ren.aditivo_id ? (d2.aditivos || []).find((a) => a.id === ren.aditivo_id && a.renovacao_id === ren.id) || null : null;
-    }
-  });
-
   // docs/js/ajuda.js
   function chaveDaAjuda(hash) {
     const nome = String(hash || "").replace(/^#\/?/, "").split(/[/?]/)[0] || "painel";
@@ -26649,6 +26103,788 @@ ${m.texto}
       init_regras();
       init_comum();
       MOSTRAR_REAJUSTES = 10;
+    }
+  });
+
+  // docs/js/telas/assinatura-documentos.js
+  function documentoDaPagina() {
+    const [caminho, consulta2] = location.hash.replace(/^#\/?/, "").split("?");
+    return [TIPO_DA_PAGINA[caminho.split("/")[1]] || "", sanearParametros(Object.fromEntries(new URLSearchParams(consulta2 || "")))];
+  }
+  function locadoraQueAssina(blocos, cert) {
+    const locadoras = blocos.filter((b) => b.tipo === "assinaturas").flatMap((b) => b.pessoas).filter((p2) => /^LOCADORA/.test(p2.papel || ""));
+    const cnpj = String(cert?.cnpj || "").replace(/\D/g, "");
+    if (!cnpj) return { pessoa: locadoras.length === 1 ? locadoras[0] : null, outra: false };
+    const pessoa2 = locadoras.find((p2) => String(p2.doc || "").replace(/\D/g, "") === cnpj) || null;
+    return { pessoa: pessoa2, outra: !pessoa2 && locadoras.length > 0 };
+  }
+  async function documentoParaAssinar(tipo, q) {
+    if (tipo === "carta_reajuste") {
+      const c = buscar2("contratos", q.contrato);
+      if (!c || !competenciaValida(q.comp)) return null;
+      const html = textoDaCarta(c, q.comp);
+      if (!html.includes('class="carta"')) return null;
+      const alvo2 = { contrato: c, comp: q.comp };
+      return {
+        tipo,
+        c,
+        alvo: alvo2,
+        prefixo: prefixoDoDocumento(tipo, alvo2),
+        chave: chaveDoDocumento(tipo, alvo2, html),
+        titulo: `Carta de reajuste ${compBr(q.comp)} · ${c.inquilino_nome}`,
+        nome: `${nomeArquivoDoc("Carta reajuste", c, q.comp)}.pdf`,
+        assinadoPorTodos: false
+      };
+    }
+    if (tipo !== "contrato" && tipo !== "aditivo") return null;
+    const m = await documentoMontado(tipo, q);
+    if (!m || m.exemplo || tipo === "aditivo" && !m.a) return null;
+    const alvo = { contrato: m.c, ...tipo === "aditivo" ? { id: m.a.id } : {} };
+    const doc2 = documentoEntrada(d(), m.c, "doc_contrato_em");
+    return {
+      tipo,
+      c: m.c,
+      alvo,
+      blocos: m.blocos,
+      rodape: m.rodape,
+      prefixo: prefixoDoDocumento(tipo, alvo),
+      chave: chaveDoDocumento(tipo, alvo, JSON.stringify([m.blocos, m.rodape])),
+      titulo: `${tipo === "aditivo" ? `Termo aditivo${m.a.numero ? ` ${m.a.numero}` : ""} de ${dataBr(m.a.data)}` : "Contrato de locação"} · ${m.c.inquilino_nome}`,
+      nome: `${m.arquivo || `${m.nome} - ${m.c.inquilino_nome}`}.pdf`.replace(/[\\/:*?"<>|]/g, "-"),
+      // já assinado por todos (o arquivo anexado): não há mais o que mandar para assinar
+      assinadoPorTodos: tipo === "aditivo" ? !!m.a.arquivo : !!(doc2 && doc2.arquivo && doc2.contrato.id === m.c.id)
+    };
+  }
+  async function pdfParaAssinar(doc2, cert) {
+    if (doc2.tipo === "carta_reajuste") return (await pdfDaCarta(doc2.c, doc2.alvo.comp, { paraAssinar: true })).blob;
+    const tela = document.querySelector(".impressao .contrato");
+    if (!tela) throw new Error("Documento não encontrado.");
+    const caixa = document.createElement("div");
+    caixa.className = "impressao";
+    caixa.style.cssText = "position:absolute;left:-10000px;top:0;width:860px";
+    const copia2 = tela.cloneNode(true);
+    copia2.style.maxWidth = "none";
+    if (tela.offsetWidth >= 700) copia2.style.width = `${tela.offsetWidth}px`;
+    const { pessoa: pessoa2 } = locadoraQueAssina(doc2.blocos, cert);
+    if (pessoa2) {
+      const linha = [...copia2.querySelectorAll(".ct-assina")].find((x) => (x.querySelector("b")?.textContent || "").trim() === String(pessoa2.nome || "").trim());
+      if (linha) linha.setAttribute("data-assina-empresa", "");
+    }
+    caixa.append(copia2);
+    document.body.append(caixa);
+    try {
+      return await pdfDoDocumento(copia2, doc2.rodape, { assinatura: { logo: d().logo } });
+    } finally {
+      caixa.remove();
+    }
+  }
+  async function caixaAssinaturaDoc(tipo, q) {
+    if (!regra("assinatura_digital") || !opera()) return "";
+    const doc2 = await documentoParaAssinar(tipo, q);
+    if (!doc2 || doc2.assinadoPorTodos) return "";
+    if (!E.nuvem) return '<div class="alerta info nao-imprimir">Assinatura digital: só pelo sistema na internet (a fila fica na nuvem e o PC com o certificado assina).</div>';
+    let fila2 = null;
+    try {
+      fila2 = await fila();
+    } catch (e) {
+      return `<div class="alerta aviso nao-imprimir">Assinatura digital: ${esc(e.message)}</div>`;
+    }
+    const p2 = pedidoDe(fila2, doc2.chave);
+    const antiga = p2 ? null : pedidosDoDocumento(fila2, doc2.prefixo).find((x) => x.situacao === "assinado");
+    const s = situacaoDoPedido(p2, fila2.pc);
+    const cert = fila2.pc?.certificado;
+    const outra = doc2.blocos && locadoraQueAssina(doc2.blocos, cert).outra;
+    const assinado = p2 && p2.situacao === "assinado";
+    return `<div class="cartao nao-imprimir" style="margin:0 0 12px"><p><b>Assinatura digital da empresa</b> · <span class="etiqueta ${s.cor}">${esc(s.texto)}</span></p>
+    ${antiga ? `<p class="alerta aviso">O documento mudou depois da assinatura de ${esc(dataHoraBr(antiga.assinado_em))}: a versão assinada é a de antes. Envie de novo para assinar este texto.</p>` : ""}
+    ${outra ? `<p class="alerta aviso">O certificado anexado é de ${esc(cert.nome)}${cert.cnpj ? ` (CNPJ ${esc(cert.cnpj)})` : ""}, que não é LOCADORA neste documento: o selo vai só na página "Assinatura digital" do fim.</p>` : ""}
+    <p class="acoes">${assinado ? `${botao("assinaturaDocBaixar", "Baixar PDF assinado", { pedido: p2.id }, "")} ` : ""}
+      ${botao("assinaturaDocPedir", p2 ? "Enviar de novo para assinar" : "Enviar para assinar", {}, assinado ? "secundario pequeno" : "")}
+      ${p2 && !assinado ? botao("assinaturaCancelar", "Tirar da fila", { id: p2.id }, "secundario pequeno") : ""}
+      ${botao("assinaturaAtualizar", "Atualizar", {}, "secundario pequeno")}</p>
+    <p class="suave">Confira o documento abaixo (ou pelo "Baixar PDF", que sai sem a assinatura) antes de enviar para assinar. ${esc(COMO_ASSINAM[tipo])} Enviar de novo troca a versão que está na fila (e a assinada antes).</p></div>`;
+  }
+  async function assinadoDoDocumento(tipo, q) {
+    if (!regra("assinatura_digital") || !E.nuvem) return null;
+    const doc2 = await documentoParaAssinar(tipo, q);
+    if (!doc2) return null;
+    let fila2 = null;
+    try {
+      fila2 = await fila({ fresca: true });
+    } catch (e) {
+      return { motivo: e.message };
+    }
+    const r = assinadoParaEmail(fila2, doc2.prefixo, doc2.chave);
+    if (!r.ok) return { motivo: r.motivo || "não foi enviado para assinar" };
+    return { blob: await baixarAssinado(r.pedido.id), nome: `${String(r.pedido.nome || doc2.nome).replace(/\.pdf$/i, "")} - assinado.pdf` };
+  }
+  async function pedirAssinaturaDoc() {
+    const [tipo, q] = documentoDaPagina();
+    const doc2 = await documentoParaAssinar(tipo, q);
+    if (!doc2) throw new ErroUsuario("Este documento não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.");
+    aviso("Montando o PDF para assinar…", "info");
+    const fila2 = await fila({ fresca: true });
+    const blob = await pdfParaAssinar(doc2, fila2.pc?.certificado);
+    const novo = await pedirAssinatura(blob, { titulo: doc2.titulo, chave: doc2.chave, nome: doc2.nome, contrato: doc2.c.id });
+    for (const x of pedidosDoDocumento(fila2, doc2.prefixo).filter((y) => !novo || y.id !== novo.id)) {
+      try {
+        await cancelarAssinatura(x.id);
+      } catch {
+      }
+    }
+    aviso("Enviado para assinar: o programa do PC com o certificado assina em cerca de 1 minuto (se estiver ligado).", "ok");
+    await mostrar();
+  }
+  async function baixarAssinaturaDoc(pedido) {
+    const blob = await baixarAssinado(pedido);
+    const [tipo, q] = documentoDaPagina();
+    const doc2 = await documentoParaAssinar(tipo, q);
+    const p2 = ((await fila()).pedidos || []).find((x) => x.id === pedido) || {};
+    const nome = `${limparNome(String(p2.nome || doc2 && doc2.nome || "documento-assinado.pdf").replace(/\.pdf$/i, ""))} - assinado.pdf`;
+    if (doc2) {
+      try {
+        await escreverTexto(await pastaDoEscopo("contrato", doc2.c.id), nome, blob);
+      } catch (e) {
+        aviso(`O PDF foi baixado, mas não consegui guardar a cópia na pasta: ${e.message}`, "aviso");
+      }
+    }
+    baixar(blob, nome);
+  }
+  var TIPO_DA_PAGINA, textoDaCarta, COMO_ASSINAM;
+  var init_assinatura_documentos = __esm({
+    "docs/js/telas/assinatura-documentos.js"() {
+      init_app();
+      init_armazenamento();
+      init_assinatura();
+      init_calculos();
+      init_formularios();
+      init_regras();
+      init_comum();
+      init_documentos();
+      init_reajustes();
+      TIPO_DA_PAGINA = { carta: "carta_reajuste", contrato: "contrato", aditivo: "aditivo" };
+      textoDaCarta = (c, comp) => cartaReajuste(c, comp).replace(/<p class="carta-data">[\s\S]*?<\/p>/, "");
+      COMO_ASSINAM = {
+        contrato: 'A empresa assina digitalmente só a parte dela: o selo fica na linha da LOCADORA e a página "Assinatura digital" vai no fim. O inquilino, os fiadores e as testemunhas assinam como hoje (à mão ou pelo gov.br, no próprio PDF assinado pela empresa) e o contrato assinado por todos continua sendo anexado na página do inquilino. O e-mail "Contrato para assinar" leva o PDF assinado pela empresa.',
+        aditivo: 'A empresa assina digitalmente só a parte dela: o selo fica na linha da LOCADORA e a página "Assinatura digital" vai no fim. As outras partes assinam como hoje (à mão ou pelo gov.br, no próprio PDF assinado pela empresa) e o termo assinado por todos continua sendo anexado em "Termos aditivos". O e-mail do termo para assinar leva o PDF assinado pela empresa.',
+        carta_reajuste: 'A carta é só para ciência do inquilino: só a empresa assina, e o selo vai na página "Assinatura digital" no fim. O "✉ Enviar por e-mail" passa a levar a carta assinada.'
+      };
+    }
+  });
+
+  // docs/js/telas/emails.js
+  function ultimoEnvio(chave, alvo) {
+    return (d().envios_email || []).filter((x) => x.chave === chave && (alvo.contrato && x.contrato_id === Number(alvo.contrato) || alvo.ficha && x.ficha_id === Number(alvo.ficha)) && (!alvo.aditivo || x.aditivo_id === Number(alvo.aditivo)) && (!alvo.notificacao || x.notificacao_id === Number(alvo.notificacao)) && (!alvo.cobranca || x.cobranca_id === Number(alvo.cobranca))).sort((a, b) => String(b.data).localeCompare(String(a.data)))[0] || null;
+  }
+  function botaoEmail(chave, alvo, texto3 = "✉ E-mail") {
+    if (!opera() || !MODELOS_EMAIL.some((m) => m.chave === chave)) return "";
+    const u = ultimoEnvio(chave, alvo);
+    return `${botao("abrirEmail", texto3, { chave, ...alvo }, "secundario mini")}${u ? ` <span class="suave" title="${esc(u.como)}">${u.como === "enviado" ? "enviado" : "aberto"} em ${dataBr(u.data)}</span>` : ""}`;
+  }
+  async function copiar3(texto3) {
+    try {
+      await navigator.clipboard.writeText(texto3);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  function listaProntos(prontos, ligado2) {
+    if (!prontos.length) return "";
+    const linha = (a, k) => (a.tipo === "recibo" || a.tipo === "digital") && !a.ok ? `<p class="suave">🧾 ${esc(a.rotulo)}: ${esc(a.motivo)}</p>` : `<p><label class="check"><input type="checkbox" name="pronto" value="${k}" checked> ${a.tipo === "recibo" || a.tipo === "digital" ? `🧾 ${esc(a.rotulo)} (PDF)` : `📎 ${esc(a.rotulo)}`}</label></p>`;
+    const algum = prontos.some((a) => a.tipo !== "recibo" && a.tipo !== "digital" || a.ok);
+    return `<div class="cartao" style="margin:0 0 8px"><p><b>Anexos do sistema</b></p>${prontos.map(linha).join("")}
+    ${algum ? `<p><button type="button" class="secundario mini" data-baixar-prontos>Baixar os marcados</button> <span class="suave">${ligado2 ? 'Vão juntos no "Enviar agora".' : "Para o Gmail: baixe e anexe por lá."}</span></p>` : ""}</div>`;
+  }
+  async function reciboParaEnviar(a, alvo) {
+    if (!regra("assinatura_digital") || SEM_ASSINATURA_DA_EMPRESA.includes(a.recibo)) {
+      const r = await pdfDoRecibo(a.recibo, alvo);
+      return { nome: r.nome, blob: r.blob };
+    }
+    const p2 = pedidoDe(await fila({ fresca: true }), chaveDoRecibo(a.recibo, alvo));
+    if (!p2 || p2.situacao !== "assinado") throw new ErroUsuario(`O ${a.rotulo} ainda não foi assinado digitalmente${p2 && p2.situacao === "erro" ? ` (${p2.erro})` : p2 ? " (está na fila do PC)" : ""}: abra o recibo e use "Enviar para assinar", ou desmarque esse anexo. Nada foi enviado.`);
+    return { nome: `${String(p2.nome || "documento.pdf").replace(/\.pdf$/i, "")} - assinado.pdf`, blob: await baixarAssinado(p2.id) };
+  }
+  async function assinadosDaFila(prontos) {
+    if (!prontos.some((a) => a.tipo === "digital")) return prontos;
+    let fila2 = null;
+    try {
+      if (E.nuvem) fila2 = await fila({ fresca: true });
+    } catch {
+      fila2 = null;
+    }
+    const out = [];
+    for (const a of prontos) {
+      if (a.tipo !== "digital") {
+        out.push(a);
+        continue;
+      }
+      const c = fila2 && buscar2("contratos", a.contrato);
+      if (!c) continue;
+      const doc2 = a.doc === "aditivo" ? await documentoParaAssinar("aditivo", { id: a.id }) : null;
+      if (a.doc === "aditivo" && !doc2) continue;
+      const r = assinadoParaEmail(fila2, prefixoDoDocumento(a.doc, { contrato: c, id: a.id }), doc2 ? doc2.chave : null);
+      if (!r.pedido) continue;
+      out.push({
+        ...a,
+        pedido: r.pedido.id,
+        ok: r.ok,
+        motivo: r.motivo,
+        nome: `${String(r.pedido.nome || "documento.pdf").replace(/\.pdf$/i, "")} - assinado.pdf`,
+        // a data no horário daqui (assinado às 22h de 24/11 é 01h de 25/11 no horário universal)
+        rotulo: r.ok && r.pedido.assinado_em ? `${a.rotulo} em ${dataHoraBr(r.pedido.assinado_em).split(",")[0]}` : a.rotulo
+      });
+    }
+    return out;
+  }
+  async function arquivosProntos(dlg, prontos, objeto) {
+    const out = [];
+    for (const el of dlg.querySelectorAll("[name=pronto]:checked")) {
+      const a = prontos[Number(el.value)];
+      if (a.tipo === "recibo") out.push(await reciboParaEnviar(a, a.alvo || objeto));
+      else if (a.tipo === "digital") out.push({ nome: a.nome, blob: await baixarAssinado(a.pedido) });
+      else if (a.tipo === "boleto") {
+        const cb = buscar2("cobrancas", a.id);
+        const blob = cb && cb.banco ? a.qual === "pdf" ? await pdfDoBoleto(cb) : qrDoPix(cb.banco) : null;
+        if (!blob) throw new ErroUsuario(`Não consegui pegar o ${a.rotulo}: confira se a ponte do C6 está ligada neste computador, ou desmarque esse anexo.`);
+        out.push({ nome: a.nome, blob });
+      } else out.push({ nome: a.nome, blob: await abrirArquivo(await pastaDoEscopo(a.escopo, Number(a.id)), a.nome) });
+    }
+    return out;
+  }
+  async function pdfDoBoleto(cb) {
+    let blob = null;
+    try {
+      await chamarPonteCrua("GET", `/contas/${encodeURIComponent(cb.banco.conta_id)}/boletos/${encodeURIComponent(cb.banco.id_externo)}/pdf`, null, { fetch: async (url, o) => {
+        const r = await fetch(url, o);
+        if (!r.ok) return r;
+        blob = await r.blob();
+        return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
+      } });
+    } catch {
+      blob = null;
+    }
+    return blob;
+  }
+  function qrDoPix(b) {
+    if (!b.pix_qr_base64) return null;
+    const bin = atob(b.pix_qr_base64);
+    const bytes2 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i += 1) bytes2[i] = bin.charCodeAt(i);
+    return new Blob([bytes2], { type: b.pix_qr_mime || "image/png" });
+  }
+  async function janelaEmail(chave, alvo) {
+    const modelo = modeloEmail(d(), chave);
+    const reg = alvo.contrato ? buscar2("contratos", alvo.contrato) : buscar2("fichas", alvo.ficha);
+    if (!modelo || !reg) throw new ErroUsuario("Este inquilino ou ficha não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.");
+    const objeto = alvo.contrato ? { contrato: reg } : { ficha: reg };
+    if (alvo.aditivo) {
+      objeto.aditivo = buscar2("aditivos", alvo.aditivo);
+      if (!objeto.aditivo) throw new ErroUsuario("Este termo aditivo não existe mais (pode ter sido excluído). Atualize a página.");
+    }
+    if (alvo.notificacao) {
+      objeto.notificacao = buscar2("notificacoes", alvo.notificacao);
+      if (!objeto.notificacao) throw new ErroUsuario("Esta notificação não existe mais (pode ter sido excluída). Atualize a página.");
+    }
+    if (alvo.cobranca) {
+      objeto.cobranca = buscar2("cobrancas", alvo.cobranca);
+      if (!objeto.cobranca) throw new ErroUsuario("Este boleto não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.");
+    }
+    const inicio = dadosDoEmail(d(), objeto);
+    const ligado2 = await emailLigado();
+    const perguntas = (modelo.perguntas || []).map((p2) => campoPergunta(p2, inicio.perguntas[p2[0]] ?? "")).join("");
+    const prontos = await assinadosDaFila(anexosProntos(d(), modelo, objeto));
+    const dlg = document.createElement("dialog");
+    dlg.className = "janela-erro janela-pergunta janela-email";
+    dlg.innerHTML = `<form method="dialog"><h3><span>${esc(modelo.nome)} · ${esc(reg.inquilino_nome || "")}</span><button type="button" class="fechar-janela" data-fechar title="Fechar" aria-label="Fechar">✕</button></h3><div class="corpo">
+    ${perguntas ? `<div class="cartao" style="margin:0 0 8px">${perguntas}</div>` : ""}
+    <p class="suave">De: ${esc(inicio.remetente.assinatura || "Administradora")}${inicio.remetente.email ? ` &lt;${esc(inicio.remetente.email)}&gt;` : ""}${modelo.anexos ? ` · Anexar: <b>${esc(modelo.anexos)}</b>` : ""}</p>
+    ${listaProntos(prontos, ligado2)}
+    <p><label>Para</label><input type="email" name="para" value="${esc(inicio.para)}" multiple></p>
+    ${inicio.para ? "" : '<p class="alerta aviso">Sem e-mail no cadastro: digite o destinatário.</p>'}
+    <p><label>Assunto</label><input name="assunto"></p>
+    <p><label>Texto <span class="suave">(pode alterar antes de enviar)</span></label><textarea name="texto" rows="16" spellcheck="true"></textarea></p>
+    <p class="suave" data-editado hidden>Texto alterado à mão: as respostas acima não mudam mais o texto.</p>
+    ${ligado2 ? `<p><label>${prontos.length ? "Outros anexos" : "Anexos"} para o "Enviar agora" <span class="suave">(PDF ou foto)</span></label><input type="file" name="anexos" multiple accept="${ACEITA_DOCUMENTOS}"></p>` : ""}
+    <p class="suave">${alvo.contrato && /saida_aviso/.test(chave) ? "Confira no contrato do inquilino a multa da saída antecipada antes de enviar. " : ""}${ligado2 ? "" : 'Envio direto ainda não ligado: use "Copiar texto" ou "Abrir no Gmail".'}</p>
+  </div><div class="acoes" style="justify-content:flex-end;flex-wrap:wrap">
+    <p class="alerta aviso-janela" data-aviso-janela role="status" aria-live="polite" hidden style="flex-basis:100%"></p>
+    <button type="button" class="secundario" data-fechar>Fechar</button>
+    <button type="button" class="secundario" data-copiar>Copiar texto</button>
+    <button type="button" class="secundario" data-gmail>Abrir no Gmail</button>
+    ${ligado2 ? '<button type="button" data-enviar>Enviar agora</button>' : ""}</div></form>`;
+    document.body.appendChild(dlg);
+    const q = (s) => dlg.querySelector(s);
+    let editado = false;
+    let assuntoEditado = false;
+    let registrou = false;
+    const avisar = (texto3, tipo = "ok") => {
+      const el = q("[data-aviso-janela]");
+      el.className = `alerta aviso-janela ${tipo}`;
+      el.textContent = texto3;
+      el.hidden = false;
+      el.scrollIntoView({ block: "nearest" });
+    };
+    const respostas = () => Object.fromEntries((modelo.perguntas || []).map(([n]) => [n, q(`[name=p_${n}]`).value]));
+    const desenhar = () => {
+      const e = montarEmail(modelo, dadosDoEmail(d(), objeto, respostas()));
+      if (!assuntoEditado) q("[name=assunto]").value = e.assunto;
+      if (!editado) q("[name=texto]").value = e.texto;
+    };
+    desenhar();
+    q("[name=texto]").addEventListener("input", () => {
+      editado = true;
+      q("[data-editado]").hidden = false;
+    });
+    q("[name=assunto]").addEventListener("input", () => {
+      assuntoEditado = true;
+    });
+    dlg.querySelectorAll("[name^=p_]").forEach((el) => el.addEventListener("input", desenhar));
+    const atual = () => ({ para: q("[name=para]").value.trim(), assunto: q("[name=assunto]").value.trim(), texto: q("[name=texto]").value });
+    const pendente = () => /\[preencher: /.test(atual().texto + atual().assunto) ? 'Ainda há "[preencher: ...]" no texto: complete antes de mandar.' : "";
+    dlg.querySelectorAll("[data-fechar]").forEach((b) => b.addEventListener("click", () => dlg.close()));
+    const baixarProntos = q("[data-baixar-prontos]");
+    if (baixarProntos) baixarProntos.addEventListener("click", async () => {
+      baixarProntos.disabled = true;
+      try {
+        const lista3 = await arquivosProntos(dlg, prontos, objeto);
+        if (!lista3.length) {
+          avisar("Marque pelo menos um anexo.", "aviso");
+          return;
+        }
+        for (const a of lista3) baixar(a.blob, a.nome);
+      } catch (erro) {
+        aviso(erro.message || "Não consegui preparar os anexos.", "erro");
+      } finally {
+        baixarProntos.disabled = false;
+      }
+    });
+    q("[data-copiar]").addEventListener("click", async () => {
+      const e = atual();
+      const ok = await copiar3(`${e.assunto}
+
+${e.texto}`);
+      avisar(ok ? `Assunto e texto copiados: cole no e-mail.${pendente() ? ` ${pendente()}` : ""}` : "O navegador não deixou copiar: selecione o texto e copie.", !ok || pendente() ? "aviso" : "ok");
+    });
+    q("[data-gmail]").addEventListener("click", async () => {
+      const e = atual();
+      if (pendente() && !await confirmar(`${pendente()}
+
+Abrir o Gmail mesmo assim? O texto vai com o buraco, e você completa por lá.`, { titulo: "Texto incompleto", sim: "Abrir mesmo assim" })) return;
+      const comCorpo = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(e.para)}&su=${encodeURIComponent(e.assunto)}&body=${encodeURIComponent(e.texto)}`;
+      const cabe = comCorpo.length <= LIMITE_ENDERECO2;
+      const copiado = await copiar3(e.texto);
+      const aba = window.open(cabe ? comCorpo : `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(e.para)}&su=${encodeURIComponent(e.assunto)}`, "_blank");
+      if (!aba) {
+        avisar(`O navegador bloqueou a aba do Gmail (bloqueador de janelas): permita janelas deste site e clique de novo, ou use "Copiar texto".${copiado ? " O texto já foi copiado." : ""}`, "aviso");
+        return;
+      }
+      try {
+        aba.opener = null;
+      } catch {
+      }
+      await registrar2(chave, alvo, e.para, e.assunto, "aberto no Gmail");
+      registrou = true;
+      avisar(cabe ? "Gmail aberto com o texto. Anexe os arquivos e envie por lá." : copiado ? "Gmail aberto. O texto é comprido para ir pelo endereço: ele foi copiado, cole no corpo do e-mail." : "Gmail aberto. Copie o texto da janela e cole no corpo do e-mail.", cabe ? "ok" : "aviso");
+    });
+    const enviar = q("[data-enviar]");
+    if (enviar) enviar.addEventListener("click", async () => {
+      const e = atual();
+      if (!e.para) {
+        avisar("Digite o e-mail do destinatário.", "aviso");
+        return;
+      }
+      if (pendente()) {
+        avisar(pendente(), "aviso");
+        return;
+      }
+      const n = chave === "notificacao_envio" && alvo.notificacao ? buscar2("notificacoes", alvo.notificacao) : null;
+      if (n && n.situacao === "Rascunho" && n.data > hojeIso()) {
+        avisar(`A notificação está datada de ${dataBr(n.data)}, no futuro: o envio não poderia ser marcado. Corrija a data no rascunho (hoje ou antes) e mande depois.`, "aviso");
+        return;
+      }
+      let arquivos;
+      try {
+        arquivos = [...await arquivosProntos(dlg, prontos, objeto), ...[...q("[name=anexos]").files || []].map((f) => ({ nome: f.name, blob: f }))];
+      } catch (erro) {
+        aviso(`Não consegui preparar os anexos: ${erro.message}`, "erro");
+        return;
+      }
+      const alertas = [];
+      if (!arquivos.length && modelo.anexos) alertas.push(`ATENÇÃO: o texto fala em anexo (${modelo.anexos}), mas nenhum arquivo vai junto. Anexe em "${prontos.length ? "Outros anexos" : "Anexos"}" antes de enviar.`);
+      const marcados = [...dlg.querySelectorAll("[name=pronto]:checked")].map((el) => prontos[Number(el.value)]);
+      if (n && !n.arquivo_assinado && !regra("assinatura_digital") && marcados.some((a) => a.tipo === "recibo" && a.recibo === "notificacao")) alertas.push("ATENÇÃO: vai o PDF da notificação SEM a assinatura (a assinada não foi anexada na notificação). Ao enviar, a notificação fica marcada como enviada hoje e o prazo começa a correr.");
+      if (!await confirmar(`${alertas.length ? `${alertas.join("\n\n")}
+
+` : ""}O e-mail vai agora para ${e.para}${arquivos.length ? `, com ${arquivos.length} anexo(s)` : ", sem anexo"}.`, { titulo: alertas.length ? "Enviar mesmo assim?" : "Enviar o e-mail?", sim: "Enviar agora", forte: alertas.length > 0 })) return;
+      enviar.disabled = true;
+      try {
+        const r = await enviarEmail({ para: e.para, assunto: e.assunto, texto: e.texto, anexos: arquivos });
+        await registrar2(chave, alvo, e.para, e.assunto, "enviado", r.id);
+        dlg.close();
+        aviso(`E-mail enviado para ${e.para}. Fica em "Enviados" no Gmail.`);
+        await mostrar();
+      } catch (erro) {
+        aviso(erro.message || "O e-mail não foi enviado.", "erro");
+      } finally {
+        enviar.disabled = false;
+      }
+    });
+    dlg.addEventListener("close", () => {
+      dlg.remove();
+      if (registrou) mostrar();
+    });
+    voltarFecha(dlg);
+    dlg.showModal();
+  }
+  async function caixaGmailHtml(volta = "") {
+    if (!podeUsuario("admin")) return "";
+    const topo3 = '<div class="cartao"><h2>E-mail pelo Gmail</h2>';
+    if (!E.nuvem) {
+      return `${topo3}<p class="suave">O envio direto (botão <b>Enviar agora</b>) só existe no sistema na nuvem (erp.ankjck.com.br), onde o administrador liga o Gmail da empresa com o botão <b>Conectar o Gmail</b>. Aqui, os e-mails saem por <b>Copiar texto</b> ou <b>Abrir no Gmail</b>.</p></div>`;
+    }
+    const s = await situacaoGmail();
+    const [tipo, texto3] = VOLTA_GMAIL[volta] || [];
+    const avisoVolta = texto3 ? `<div class="alerta ${tipo}">${texto3}</div>` : "";
+    if (!s) return `${topo3}${avisoVolta}<p class="suave">Não deu para ver a situação agora (sem internet?). Recarregue a página para tentar de novo.</p></div>`;
+    let situacao2;
+    if (s.origem === "conta" && s.ligado) {
+      situacao2 = `<p>${etiqueta("Ligado", "ok")} Os e-mails saem pela conta <b>${esc(s.conta || "")}</b>${s.remetente && s.remetente !== s.conta ? `, com o remetente <b>${esc(s.remetente)}</b>` : ""}${s.ligado_em ? ` <span class="suave">(conectado em ${dataBr(String(s.ligado_em).slice(0, 10))})</span>` : ""}.</p>`;
+    } else if (s.origem === "segredo" && s.ligado) {
+      situacao2 = `<p>${etiqueta("Ligado", "ok")} Pelo jeito antigo (código colado no Cloudflare), com o remetente <b>${esc(s.remetente || "")}</b>.</p>
+      <p class="suave">Para passar ao botão: clique em <b>Conectar o Gmail</b>. Depois disso o jeito antigo deixa de ser usado e o técnico pode apagá-lo da nuvem (para ele: segredo GMAIL_REFRESH_TOKEN no Cloudflare).</p>`;
+    } else if (s.origem === "simulado") {
+      situacao2 = `<p>${etiqueta("Simulado", "info")} Teste no computador: os e-mails só aparecem na janela do programa, nada vai ao Google.</p>`;
+    } else {
+      situacao2 = `<p>${etiqueta("Desligado", "neutra")} Os e-mails saem por <b>Copiar texto</b> ou <b>Abrir no Gmail</b>.</p>`;
+    }
+    const ilegivel = s.ilegivel ? '<div class="alerta aviso">A autorização guardada não abre mais (a configuração do Google pode ter sido trocada). Clique em <b>Conectar o Gmail</b> de novo.</div>' : "";
+    const falta = s.cliente ? "" : '<div class="alerta info">Falta terminar a configuração do Gmail na nuvem antes de conectar: peça ao técnico <span class="suave">(para ele: segredos GMAIL_CLIENT_ID e GMAIL_CLIENT_SECRET no Cloudflare)</span>.</div>';
+    const botoes = s.origem === "simulado" ? "" : `<p>${s.cliente ? botao("conectarGmail", s.origem === "conta" && s.ligado ? "Trocar a conta do Gmail" : "Conectar o Gmail", {}, "pequeno") : ""}
+    ${s.origem === "conta" ? botao("desconectarGmail", "Desconectar", {}, "perigo pequeno", 'Desconectar o Gmail? O botão "Enviar agora" some até alguém conectar de novo; a permissão também é retirada na conta do Google.') : ""}</p>`;
+    const retorno = s.retorno ? `<p><label>Endereço de retorno <span class="suave">(para o técnico: Google Cloud, credencial, "URIs de redirecionamento autorizados")</span></label>
+    <span class="nw"><input readonly value="${esc(s.retorno)}" data-retorno-gmail style="max-width:480px"> ${botao("copiarRetornoGmail", "Copiar", {}, "secundario pequeno")}</span></p>` : "";
+    return `${topo3}${avisoVolta}${ilegivel}
+    <p class="suave">Com o Gmail conectado, os e-mails das etapas (boleto, NF, recibos, avisos) saem pelo botão <b>Enviar agora</b>, pela conta da empresa. Conectar é como entrar com o Google em qualquer site: <b>Conectar o Gmail → escolher a conta → Permitir</b>. O sistema só <b>envia</b>: não lê a caixa de entrada.</p>
+    ${situacao2}${falta}${botoes}${retorno}</div>`;
+  }
+  function telaModelosEmail() {
+    const etapas = [...new Set(MODELOS_EMAIL.map((m) => m.etapa))];
+    const linha = (p2) => {
+      const m = modeloEmail(d(), p2.chave);
+      return `<tr><td><b>${esc(m.nome)}</b>${m.editado ? ' <span class="suave">(editado)</span>' : ""}<br><span class="suave">${esc(m.assunto)}</span></td><td class="nw">${esc(m.etapa)}</td>
+    <td class="n nw">${opera() ? link(`#/modelo-email/${m.chave}`, "Editar") : ""} ${opera() && m.editado ? botao("restaurarModeloEmail", "Voltar ao texto padrão", { chave: m.chave }, "secundario pequeno", `Trocar o texto de "${m.nome}" pelo padrão? As alterações se perdem.`) : ""}</td></tr>`;
+    };
+    return `<p class="suave"><a href="#/sistema-email">← Comunicação E-mail</a></p>
+    <div class="cabecalho"><h1>Modelos de e-mail</h1>${botao("baixarModelosEmail", "Baixar todos (TXT)", {}, "secundario pequeno")}</div>
+    <p class="suave">Um e-mail para cada etapa da ficha, da entrada e da saída do inquilino, a régua de cobrança (lembretes antes e no dia do vencimento, boleto em atraso), as notificações ao inquilino, o novo valor do aluguel, os termos aditivos e o informe anual do Imposto de Renda. O botão <b>✉ E-mail</b> de cada etapa abre o texto já preenchido para copiar, abrir no Gmail ou enviar.</p>
+    <div class="cartao"><table><tr><th>E-mail</th><th>Etapa</th><th></th></tr>${etapas.map((e) => MODELOS_EMAIL.filter((m) => m.etapa === e).map(linha).join("")).join("")}</table></div>${AJUDA}`;
+  }
+  function telaModeloEmail(chave) {
+    const m = modeloEmail(d(), chave);
+    if (!m) return naoEncontrado("Modelo não encontrado", "#/modelos-email", "Ver os modelos de e-mail");
+    return `<p class="suave"><a href="#/modelos-email">← Modelos de e-mail</a></p><h1>Modelo de e-mail: ${esc(m.nome)}</h1>
+    <form class="cartao" data-form="modeloEmail"><input type="hidden" name="chave" value="${esc(m.chave)}">
+      <p class="suave">Botão na etapa: <b>${esc(m.etapa)}</b>${m.anexos ? ` · lembrete de anexo: ${esc(m.anexos)}` : ""}</p>
+      <p><label>Assunto</label><input name="assunto" value="${esc(m.assunto)}" required></p>
+      <p><label>Texto (o fecho e a assinatura entram sozinhos no fim)</label><textarea name="texto" class="texto-modelo" spellcheck="true">${esc(m.texto)}</textarea></p>
+      <div class="acoes"><button>Salvar</button><a class="botao secundario" href="#/modelos-email">Cancelar</a></div></form>${AJUDA}`;
+  }
+  function alertaInformeIr() {
+    const { ano, contratos } = informesPendentes(d());
+    if (!contratos.length) return "";
+    return `<div class="alerta info"><b>Informe do Imposto de Renda de ${ano}:</b> enviar a ${contratos.length} inquilino(s) (de preferência até o fim de fevereiro):
+    ${contratos.map((c) => `<a href="#/imprimir/declaracao?contrato=${c.id}&ano=${ano}">${esc(c.inquilino_nome)}</a>`).join(", ")}. Na declaração, use o botão ✉ E-mail.</div>`;
+  }
+  var LIMITE_ENDERECO2, registrar2, campoPergunta, VOLTA_GMAIL, ACOES_EMAILS, FORMULARIOS_EMAILS, AJUDA;
+  var init_emails = __esm({
+    "docs/js/telas/emails.js"() {
+      init_app();
+      init_armazenamento();
+      init_banco();
+      init_calculos();
+      init_calculos();
+      init_email_dados();
+      init_formularios();
+      init_gmail();
+      init_modelos_email();
+      init_regras();
+      init_comum();
+      init_documentos();
+      init_assinatura_documentos();
+      init_assinatura();
+      LIMITE_ENDERECO2 = 7e3;
+      registrar2 = (chave, alvo, para, assunto, como, id = "") => alterar((db) => {
+        const dados = {
+          data: hojeIso(),
+          chave,
+          contrato_id: alvo.contrato ? Number(alvo.contrato) : null,
+          ficha_id: alvo.ficha ? Number(alvo.ficha) : null,
+          aditivo_id: alvo.aditivo ? Number(alvo.aditivo) : null,
+          ...alvo.notificacao ? { notificacao_id: Number(alvo.notificacao) } : {},
+          ...alvo.cobranca ? { cobranca_id: Number(alvo.cobranca) } : {},
+          para,
+          assunto,
+          como,
+          gmail_id: id || null
+        };
+        const n = como === "enviado" && chave === "notificacao_envio" && alvo.notificacao ? buscar(db, "notificacoes", alvo.notificacao) : null;
+        if (n && n.situacao === "Rascunho") marcarNotificacaoEnviada(db, n.id, { data: dados.data, meio: "E-mail" }, login());
+        if (como !== "enviado") {
+          const ja = (db.envios_email || []).find((x) => x.como === como && x.data === dados.data && x.chave === chave && x.contrato_id === dados.contrato_id && x.ficha_id === dados.ficha_id && x.aditivo_id === dados.aditivo_id && (x.notificacao_id || null) === (dados.notificacao_id || null) && (x.cobranca_id || null) === (dados.cobranca_id || null));
+          if (ja) return ja;
+          return inserir(db, "envios_email", dados, login(), null, { historico: false });
+        }
+        return inserir(db, "envios_email", dados, login(), `E-mail "${assunto}" enviado para ${para || "(sem destinatário)"}`);
+      });
+      campoPergunta = ([nome, rotulo3, tipo], valor) => {
+        if (tipo === "area") return `<p><label>${esc(rotulo3)}</label><textarea name="p_${nome}" rows="3">${esc(valor)}</textarea></p>`;
+        const t = tipo === "data" ? "date" : tipo === "ano" ? "number" : "text";
+        return `<p><label>${esc(rotulo3)}</label><input type="${t}" name="p_${nome}" value="${esc(valor)}"${tipo === "ano" ? ' min="2020" max="2100" style="width:120px"' : ""}></p>`;
+      };
+      VOLTA_GMAIL = {
+        ligado: ["ok", 'Gmail conectado. Faça um teste: abra o e-mail de uma etapa, ponha o seu próprio e-mail e clique em <b>Enviar agora</b>; ele aparece em "Enviados" no Gmail.'],
+        cancelado: ["aviso", "Você cancelou na tela do Google: nada foi ligado."],
+        recusado: ["erro", "O pedido venceu ou foi aberto em outro navegador. Clique em <b>Conectar o Gmail</b> de novo e termine em até 10 minutos, no mesmo navegador."],
+        "sem-permissao": ["erro", "Faltou marcar, na tela do Google, a caixa de <b>enviar e-mail em seu nome</b>. Clique em <b>Conectar o Gmail</b> de novo e marque essa caixa."],
+        credencial: ["erro", "O Google não reconheceu o aplicativo: falta terminar a configuração do Gmail na nuvem. Peça ao técnico para conferir (para ele: segredos GMAIL_CLIENT_ID e GMAIL_CLIENT_SECRET no Cloudflare)."],
+        retorno: ["erro", "O endereço de retorno cadastrado no Google está diferente. Copie o endereço abaixo e mande ao técnico, para ele cadastrar no Google Cloud."],
+        "sem-rede": ["erro", "Não deu para falar com o Google agora. Tente de novo daqui a pouco."],
+        erro: ["erro", "Não deu para ligar o Gmail. Tente de novo; se repetir, peça ajuda ao técnico."]
+      };
+      ACOES_EMAILS = {
+        async conectarGmail() {
+          const url = await enderecoParaConectar();
+          aviso("Abrindo a tela do Google…", "info");
+          window.location.assign(url);
+        },
+        async desconectarGmail() {
+          const r = await desconectarGmail();
+          aviso(r.segredo_antigo ? "Gmail desconectado. Atenção: o jeito antigo ainda está guardado na nuvem e continua enviando até o técnico apagá-lo (para ele: segredo GMAIL_REFRESH_TOKEN no Cloudflare)." : r.havia && !r.revogado ? "Gmail desconectado aqui. O Google não confirmou a retirada da permissão: confira em Conta do Google → Segurança → Apps com acesso." : "Gmail desconectado.", r.segredo_antigo || r.havia && !r.revogado ? "aviso" : "ok");
+          if (/[?&]gmail=/.test(window.location.hash)) ir("#/sistema-email");
+          else await mostrar();
+        },
+        async copiarRetornoGmail() {
+          const campo2 = document.querySelector("[data-retorno-gmail]");
+          if (!campo2) return;
+          if (await copiar3(campo2.value)) aviso("Endereço copiado. Mande ao técnico, para ele colar no Google Cloud.");
+          else {
+            campo2.select();
+            aviso("O navegador não deixou copiar: o endereço ficou selecionado, é só copiar.", "info");
+          }
+        },
+        async abrirEmail({ chave, contrato, ficha, aditivo, notificacao, cobranca }) {
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode enviar e-mails. Peça ao administrador, se precisar.");
+          await janelaEmail(chave, contrato ? { contrato: Number(contrato), ...aditivo ? { aditivo: Number(aditivo) } : {}, ...notificacao ? { notificacao: Number(notificacao) } : {}, ...cobranca ? { cobranca: Number(cobranca) } : {} } : { ficha: Number(ficha) });
+        },
+        /**
+         * "Enviar boleto por e-mail" (página do boleto, 2026-11-24): abre a janela do e-mail com o PDF do banco anexado. Sem o PDF
+         * (ou com o arquivo sumido da pasta) só avisa; boleto que mudou depois de anexado o PDF pergunta antes.
+         */
+        async enviarBoletoEmail({ id }) {
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode enviar e-mails. Peça ao administrador, se precisar.");
+          const cb = buscar2("cobrancas", id);
+          if (!cb) throw new ErroUsuario("Este boleto não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.");
+          if (!cb.boleto_pdf) throw new ErroUsuario('Anexe antes o PDF do boleto emitido no banco (botão "Anexar o PDF do boleto", nesta página). O e-mail vai com ele.');
+          if (arquivoSumiu("contrato", pastaDoBoletoPdf(cb), cb.boleto_pdf)) throw new ErroUsuario(`O PDF do boleto (${cb.boleto_pdf}) sumiu da pasta: anexe de novo antes de enviar.`);
+          const mudou = avisoBoletoPdfDesatualizado(cb);
+          if (mudou && !await confirmar(`${mudou}
+
+Emita de novo no banco e troque o PDF, ou abra o e-mail mesmo assim.`, { titulo: "PDF do boleto desatualizado", sim: "Abrir o e-mail mesmo assim", forte: true })) return;
+          await janelaEmail("boleto_envio", { contrato: cb.contrato_id, cobranca: cb.id });
+        },
+        async restaurarModeloEmail({ chave }) {
+          const m = (d().modelos_email || []).find((x) => x.chave === chave);
+          if (m) await alterar((db) => excluir(db, "modelos_email", m.id, login(), `Modelo de e-mail "${modeloEmail(db, chave).nome}" voltou ao texto padrão`));
+          aviso("Texto padrão restaurado.");
+          await mostrar();
+        },
+        /** Baixa os modelos em uso (para conferir ou guardar) num arquivo de texto. */
+        baixarModelosEmail() {
+          const t = MODELOS_EMAIL.map((p2) => {
+            const m = modeloEmail(d(), p2.chave);
+            return `=== ${m.nome} (${m.etapa}) ===
+Assunto: ${m.assunto}
+
+${m.texto}
+`;
+          }).join("\n");
+          baixar(new Blob([t], { type: "text/plain;charset=utf-8" }), "Modelos de e-mail.txt");
+        }
+      };
+      FORMULARIOS_EMAILS = {
+        async modeloEmail(form) {
+          if (!opera()) throw new ErroUsuario("Seu usuário só consulta: não pode alterar os modelos de e-mail.");
+          const f = new FormData(form);
+          const chave = String(f.get("chave") || "");
+          const padrao = MODELOS_EMAIL.find((m) => m.chave === chave);
+          if (!padrao) throw new Error("Modelo não encontrado.");
+          const assunto = String(f.get("assunto") || "").trim();
+          const texto3 = String(f.get("texto") || "").trim();
+          if (!assunto || !texto3) throw new ErroUsuario("Preencha o assunto e o texto do e-mail antes de salvar.");
+          await alterar((db) => {
+            const m = (db.modelos_email || []).find((x) => x.chave === chave);
+            if (m) atualizar(db, "modelos_email", m.id, { assunto, texto: texto3 }, login(), `Modelo de e-mail "${padrao.nome}"`);
+            else inserir(db, "modelos_email", { chave, assunto, texto: texto3 }, login(), `Modelo de e-mail "${padrao.nome}"`);
+          });
+          aviso("Modelo de e-mail salvo.");
+          ir("#/modelos-email");
+        }
+      };
+      AJUDA = `<div class="cartao"><h2>Como escrever</h2>
+  <p><b>{campo}</b> entra com o dado do inquilino ou da ficha: {nome} (primeiro nome), {locatario}, {documento}, {imovel}, {endereco}, {aluguel}, {aluguel_bonificado}, {bonificacao},
+  {vencimento}, {garantia}, {tipo_deposito}, {valor_deposito}, {prazo}, {inicio}, {fim}, {indice}, {reserva}, {reserva_data}, {contas_texto}, {contas_concessionarias}, {primeiro_boleto},
+  {data_chaves}, {data_limite_vistoria}, {data_saida}, {ano_saida}, {acerto}, {saldo}, {data_devolucao}, {informe}, {ano}, {conta_deposito} (conta para depósito da caução, do cadastro da empresa) e as respostas da janela ({prazo_assinatura}, {opcoes_entrega}, {data_aviso}, {data_vistoria}, {pendencias}).
+  Na ficha: {inclusos}, {iptu_valor}, {seguro_valor}, {devolucao}, {devolucao_data}, {documentos_ficha}, {link}, {link_validade}, {link_fiador} (o do 1º fiador) e {links_fiadores} (uma linha para cada fiador com link).
+  No termo aditivo: {aditivo_data}, {aditivo_assunto}, {valor_anterior}, {valor_novo}, {novo_inicio}, {novo_bonificado}. Na notificação: {notificacao_data}, {notificacao_numero}, {notificacao_assunto}, {notificacao_assunto_minusculo}, {prazo_notificacao}, {data_limite}.
+  Nos e-mails da régua de cobrança, também os do boleto: {boleto_referente}, {vencimento_boleto}, {limite_pagamento}, {valor_em_dia}, {valor_cheio}, {multa_pct}, {juros_pct}, {valor_hoje}, {multa_hoje}, {juros_hoje}, {dias_atraso}, {data_hoje}, {pix}, {linha_digitavel}, {competencia_boleto} (mês de competência) e {descricao_boleto} (o descritivo do boleto) (condições nao_util, bonificacao_boleto, pix, linha_digitavel, multa_juros).
+  Com a 1ª letra maiúscula ({Nome}) sai com maiúscula; todo em maiúsculas ({NOME}), em maiúsculas.</p>
+  <p><b>[se condição]</b> texto <b>[senão]</b> outro <b>[fim]</b>: pj, caucao, deposito, dinheiro (caução ou depósito), fiador, seguro_fianca, sem_garantia, tem_garantia, contas, iptu, seguro_incendio,
+  bonificacao, reserva, saida_antecipada, devolver, cobrar, garantia_depositada (caução ou depósito já registrado), inclusos, iptu_valor, seguro_valor, link, link_fiador, varios_fiadores,
+  novo_bonificacao (termo do novo valor), reiteracao e vence_hoje (notificação). Também "[se não pj]". Qualquer campo serve de condição: "[se valor_deposito]" sai só quando o campo tem valor.</p>
+  <p class="suave">O fecho ("Agradecemos e ficamos à disposição em caso de dúvidas." e a assinatura) entra sozinho no fim de todo e-mail.</p></div>`;
+    }
+  });
+
+  // docs/js/documentos-locacao.js
+  function assuntoDoDocumento(tipo, v = {}) {
+    const data2 = (k) => dataValida(v[k]) ? dataBr(v[k]) : "___";
+    switch (tipo) {
+      case "aditivo_prazo":
+        return `Prorrogação do prazo${Number(v.novo_prazo_meses) > 0 ? `: ${Number(v.novo_prazo_meses)} meses,` : ":"} de ${data2("nova_data_inicio")} a ${data2("nova_data_fim")}`;
+      case "aditivo_garantia":
+        return `Troca de garantia a partir de ${data2("data_troca")}${v.garantia_nova ? `: ${curto2(v.garantia_nova, 60)}` : ""}`;
+      case "distrato":
+        return `Distrato: entrega das chaves em ${data2("data_saida")}${String(v.multa_combinada || "").trim() ? `, multa de R$ ${String(v.multa_combinada).trim()}` : ", multa dispensada"}`;
+      case "aviso_desocupacao":
+        return `Aviso de desocupação: entrega prevista em ${data2("data_saida_prevista")}${v.transferencia_empregador ? ", sem multa (transferência pelo empregador)" : ""}`;
+      case "notificacao_desocupacao":
+        return `Notificação para desocupar até ${data2("data_limite")}`;
+      case "autorizacao_obra":
+        return `Autorização de obra${v.descricao_obra ? `: ${curto2(v.descricao_obra, 60)}` : ""}${dataValida(v.prazo_obra) ? ` (até ${data2("prazo_obra")})` : ""}`;
+      case "declaracao_pagamentos":
+        return `Declaração de pagamentos em dia de ${data2("periodo_inicio")} a ${data2("periodo_fim")}`;
+      case "aviso_fiador":
+        return `Aviso ao fiador${String(v.valor_debito || "").trim() ? `: R$ ${String(v.valor_debito).trim()} em atraso` : ""}${dataValida(v.prazo_pagamento) ? `, pagar até ${data2("prazo_pagamento")}` : ""}`;
+      default:
+        return (TIPOS_DOCUMENTO[tipo] || {}).nome || "Documento";
+    }
+  }
+  function registrarDocumento(d2, contratoId, { tipo, modelo, valores = {}, data: data2, fim = null }, usuario) {
+    const c = buscar(d2, "contratos", contratoId);
+    if (!c) throw new ErroUsuario("Inquilino não encontrado.");
+    const def = TIPOS_DOCUMENTO[tipo];
+    if (!def || !modelo) throw new ErroUsuario("Modelo de documento não encontrado.");
+    const campos = Object.fromEntries(def.campos.map(([k]) => [k, String(valores[k] ?? "").trim()]));
+    const dataDoc = dataValida(data2, hojeIso());
+    const base = { contrato_id: c.id, imovel_id: c.imovel_id || null, documento: tipo, data: dataDoc, campos, modelo_doc: modelo.id, texto: String(modelo.texto || ""), fim: fim || null };
+    if (ehTermoAditivo(tipo)) {
+      const pendente = termoAguardando(d2, c.id, tipo);
+      const numero2 = Number(campos.numero_aditivo) > 0 ? Math.trunc(Number(campos.numero_aditivo)) : pendente && pendente.numero || proximoNumeroAditivo(d2, c);
+      campos.numero_aditivo = String(numero2);
+      const dados = {
+        ...base,
+        campos,
+        tipo: TIPOS_ADITIVO_DOCUMENTO[tipo],
+        numero: numero2,
+        assunto: assuntoDoDocumento(tipo, campos),
+        testemunhas: [],
+        arquivo: null,
+        ...tipo === "aditivo_prazo" ? { nova_vigencia_fim: dataValida(campos.nova_data_fim) || null } : {}
+      };
+      if (pendente) {
+        atualizar(d2, "aditivos", pendente.id, dados, usuario, `${c.inquilino_nome}: ${numero2}º termo aditivo (${dados.tipo.toLocaleLowerCase("pt-BR")}) gerado de novo, aguardando assinatura`);
+        return { tabela: "aditivos", registro: pendente };
+      }
+      return { tabela: "aditivos", registro: inserir(d2, "aditivos", dados, usuario, `${c.inquilino_nome}: ${numero2}º termo aditivo (${dados.tipo.toLocaleLowerCase("pt-BR")}) gerado, aguardando assinatura`) };
+    }
+    const igual2 = documentosDo(d2, c.id).find((x) => x.documento === tipo && !x.arquivo && x.data === dataDoc && x.texto === base.texto && JSON.stringify(x.campos || {}) === JSON.stringify(campos));
+    if (igual2) return { tabela: "documentos_locacao", registro: igual2 };
+    const r = inserir(
+      d2,
+      "documentos_locacao",
+      { ...base, nome: def.nome, assunto: assuntoDoDocumento(tipo, campos), arquivo: null, assinado_em: null },
+      usuario,
+      `${c.inquilino_nome}: ${def.nome} gerado (${dataBr(dataDoc)})`
+    );
+    return { tabela: "documentos_locacao", registro: r };
+  }
+  function prazosDaNotificacao(x) {
+    const limite = dataValida(x && x.campos && x.campos.data_limite || "");
+    const recebida = x && x.arquivo ? dataValida(x.assinado_em || "") || null : null;
+    const pelaCarta = recebida ? somarDias(recebida, 30) : "";
+    const desocupar = [limite, pelaCarta].filter(Boolean).sort().pop() || "";
+    return { recebida, desocupar: desocupar || null, acaoAte: desocupar ? somarDias(desocupar, 30) : null };
+  }
+  function anexarDocumento(d2, id, { data: data2, arquivo }, usuario) {
+    const x = buscar(d2, "documentos_locacao", id);
+    if (!x) throw new ErroUsuario("Documento não encontrado.");
+    if (!dataValida(data2)) throw new ErroUsuario("Informe a data da assinatura.");
+    if (!arquivo) throw new ErroUsuario("Anexe o arquivo assinado.");
+    const c = buscar(d2, "contratos", x.contrato_id);
+    atualizar(d2, "documentos_locacao", x.id, { arquivo, assinado_em: data2 }, usuario, `${c ? c.inquilino_nome : "Contrato"}: ${x.nome} de ${dataBr(x.data)} ${ehNotificacaoComAr(x) ? "recebida (AR)" : "assinado"} em ${dataBr(data2)}`);
+    return x;
+  }
+  function tirarArquivoDocumento(d2, id, usuario) {
+    const x = buscar(d2, "documentos_locacao", id);
+    if (!x || !x.arquivo) throw new ErroUsuario("Arquivo não encontrado.");
+    const c = buscar(d2, "contratos", x.contrato_id);
+    atualizar(d2, "documentos_locacao", x.id, { arquivo: null, assinado_em: null }, usuario, `${c ? c.inquilino_nome : "Contrato"}: arquivo assinado do ${x.nome} de ${dataBr(x.data)} apagado (volta a aguardar assinatura)`);
+  }
+  function aplicarProrrogacao(d2, aditivoId, usuario) {
+    const a = buscar(d2, "aditivos", aditivoId);
+    if (!ehProrrogacao(a) || !a.arquivo) return "";
+    if (a.renovacao_id && buscar(d2, "renovacoes", a.renovacao_id)) return "";
+    const c = buscar(d2, "contratos", a.contrato_id);
+    const nova = dataValida(a.nova_vigencia_fim);
+    if (!nova) return "O termo foi gerado sem a nova data de término: a data de término do contrato não mudou (gere o termo de novo com a data, ou registre a renovação).";
+    const inicio = c.data_entrada || c.vigencia_inicio;
+    if (inicio && nova <= inicio) return `A nova data de término (${dataBr(nova)}) é antes da entrada: a data de término do contrato não mudou.`;
+    const antes = { vigencia_fim: c.vigencia_fim ?? null, prazo_meses: c.prazo_meses ?? null, prazo_tipo: c.prazo_tipo ?? null };
+    const r = registrarRenovacao(d2, c.id, {
+      tipo: "Renovado com nova data de término",
+      data: a.assinado_em || hojeIso(),
+      nova_vigencia_fim: nova,
+      aditivo_id: a.id,
+      observacoes: `${a.numero || ""}º termo aditivo de prorrogação do prazo, assinado`
+    }, usuario);
+    atualizar(d2, "aditivos", a.id, { renovacao_id: r.id, prazo_antes: antes }, usuario, `${c.inquilino_nome}: prorrogação assinada, término do contrato passa a ${dataBr(nova)}`);
+    return `A data de término do contrato passou a ${dataBr(nova)}.`;
+  }
+  function desfazerProrrogacao(d2, aditivoId, usuario) {
+    const a = buscar(d2, "aditivos", aditivoId);
+    if (!ehProrrogacao(a) || !a.renovacao_id) return "";
+    const c = buscar(d2, "contratos", a.contrato_id);
+    const ren = buscar(d2, "renovacoes", a.renovacao_id);
+    const antes = { ...a.prazo_antes || {} };
+    if (ren) excluirRenovacao(d2, ren.id, usuario);
+    atualizar(d2, "aditivos", a.id, { renovacao_id: null, prazo_antes: null }, usuario, `${c.inquilino_nome}: prorrogação do termo aditivo de ${dataBr(a.data)} desfeita`);
+    if (!ren || c.vigencia_fim !== ren.nova_vigencia_fim) return "";
+    const outra = fimRenovado(d2, c);
+    const mud = outra ? { vigencia_fim: outra, prazo_tipo: "Determinado", prazo_meses: prazoDoContrato(d2, c) } : { vigencia_fim: antes.vigencia_fim ?? null, prazo_meses: antes.prazo_meses ?? null, prazo_tipo: antes.prazo_tipo ?? "Determinado" };
+    atualizar(d2, "contratos", c.id, mud, usuario, `${c.inquilino_nome}: término do contrato volta a ${mud.vigencia_fim ? dataBr(mud.vigencia_fim) : "prazo indeterminado"} (prorrogação não valeu)`);
+    const fim = fimDoContrato(d2, c) || mud.vigencia_fim;
+    return mud.prazo_tipo === "Indeterminado" ? "O contrato volta a prazo indeterminado." : `A data de término do contrato volta a ${dataBr(fim)}.`;
+  }
+  var TIPOS_ADITIVO_DOCUMENTO, ehTermoAditivo, ehProrrogacao, porData2, curto2, termoAguardando, documentosDo, MOTIVO_MINIMO, ehNotificacaoComAr, termoDaRenovacao;
+  var init_documentos_locacao = __esm({
+    "docs/js/documentos-locacao.js"() {
+      init_calculos();
+      init_modelos_documentos();
+      init_regras();
+      TIPOS_ADITIVO_DOCUMENTO = { aditivo_prazo: "Prorrogação do prazo", aditivo_garantia: "Troca de garantia" };
+      ehTermoAditivo = (tipo) => Object.prototype.hasOwnProperty.call(TIPOS_ADITIVO_DOCUMENTO, tipo);
+      ehProrrogacao = (a) => !!(a && a.documento === "aditivo_prazo");
+      porData2 = (a, b) => String(b.data).localeCompare(String(a.data)) || b.id - a.id;
+      curto2 = (t, n = 90) => {
+        const s = String(t || "").replace(/\s+/g, " ").trim();
+        return s.length > n ? `${s.slice(0, n - 1)}…` : s;
+      };
+      termoAguardando = (d2, contratoId, tipo) => (d2.aditivos || []).filter((a) => a.contrato_id === contratoId && a.documento === tipo && !a.arquivo && !a.perdido_em).sort(porData2)[0] || null;
+      documentosDo = (d2, contratoId) => (d2.documentos_locacao || []).filter((x) => x.contrato_id === contratoId).sort(porData2);
+      MOTIVO_MINIMO = 30;
+      ehNotificacaoComAr = (x) => !!(x && x.documento === "notificacao_desocupacao");
+      termoDaRenovacao = (d2, ren) => ren && ren.aditivo_id ? (d2.aditivos || []).find((a) => a.id === ren.aditivo_id && a.renovacao_id === ren.id) || null : null;
     }
   });
 
@@ -32863,7 +33099,7 @@ ${texto3}` : texto3;
       const carta = cartaReajuste(c, rota.q.comp);
       return `<div class="impressao">${voltar(carta.includes('class="carta"') ? { seletor: ".impressao .carta", nome: nomeArquivoDoc("Carta reajuste", c, rota.q.comp) } : null)}
       ${r && opera() ? `<div class="acoes nao-imprimir" style="margin-bottom:12px">${botoesReajuste(c, r, true)}</div>` : ""}
-      ${carta}</div>`;
+      ${await caixaAssinaturaDoc("carta_reajuste", rota.q)}${carta}</div>`;
     }
     if (["contrato", "vistoria", "chaves", "aditivo", "documento"].includes(tipo)) {
       const m = await documentoMontado(tipo, rota.q);
@@ -32880,6 +33116,7 @@ ${texto3}` : texto3;
       ${m.semCampos ? `<div class="alerta aviso nao-imprimir">Os campos deste documento saíram em branco (linha para preencher à mão). ${link(volta, "Preencher os campos", "")}</div>` : ""}
       ${falta.length ? `<div class="alerta aviso nao-imprimir"><b>Faltam dados no cadastro:</b> ${falta.map(esc).join("; ")}.</div>` : ""}
       ${tipo === "vistoria" && m.semSituacao ? `<div class="alerta aviso nao-imprimir">${m.semSituacao} item(ns) do modelo ficaram sem situação e não saem no documento.</div>` : ""}
+      ${tipo === "contrato" || tipo === "aditivo" ? await caixaAssinaturaDoc(tipo, rota.q) : ""}
       ${tipo === "chaves" && !m.temChaves ? `<div class="alerta aviso nao-imprimir">Sem a relação de chaves: o recibo sai com linhas em branco. Informe as chaves no imóvel (Editar) ou na vistoria de entrada.</div>` : ""}
       ${contratoHtml(m.blocos, { logo: d().logo, rodape: m.rodape })}</div>`;
     }
@@ -33061,7 +33298,7 @@ ${texto3}` : texto3;
     }
     const pdf = new jsPDF({ unit: "mm", format: "a4" });
     if (assinatura) {
-      const linha = el.querySelector("[data-assina-empresa] .assina-linha");
+      const linha = el.querySelector("[data-assina-empresa] .assina-linha, [data-assina-empresa] .ct-linha");
       let local4 = null;
       if (linha) {
         const x = linha.getBoundingClientRect();
@@ -33107,13 +33344,13 @@ ${texto3}` : texto3;
     }
     return pdf.output("blob");
   }
-  async function guardarCartaNaPasta(c, comp) {
-    const carta = await pdfDaCarta(c, comp);
+  async function guardarCartaNaPasta(c, comp, pronta = null) {
+    const carta = pronta || await pdfDaCarta(c, comp);
     if (!carta) return null;
     await escreverTexto(await pastaDoEscopo("aditivos", c.id), carta.nome, carta.blob);
     return carta.nome;
   }
-  async function pdfDaCarta(c, comp) {
+  async function pdfDaCarta(c, comp, { paraAssinar = false } = {}) {
     const html = cartaReajuste(c, comp);
     if (!html.includes('class="carta"')) return null;
     const caixa = document.createElement("div");
@@ -33123,7 +33360,7 @@ ${texto3}` : texto3;
     document.body.append(caixa);
     try {
       const el = caixa.querySelector(".carta");
-      const blob = await pdfDoDocumento(el, [], { margemLado: 15 });
+      const blob = await pdfDoDocumento(el, [], { margemLado: 15, ...paraAssinar ? { assinatura: { logo: d().logo } } : {} });
       el.querySelectorAll(".ct-capa, .ct-marca, .ct-marcas").forEach((x) => x.remove());
       const texto3 = [...el.querySelectorAll("p, tr")].map((x) => x.tagName === "TR" ? [...x.children].map((td) => td.textContent.trim()).filter(Boolean).join(" · ") : x.innerText.replace(/\s*\n\s*/g, "\n").trim()).filter(Boolean).join("\n\n");
       return { blob, nome: `${nomeArquivoDoc("Carta reajuste", c, comp)}.pdf`, texto: texto3 };
@@ -33758,6 +33995,7 @@ ${texto3}` : texto3;
       init_cobrancas();
       init_comum();
       init_reajustes();
+      init_assinatura_documentos();
       ESCALA_PDF = 2;
       cartasGuardadas = false;
       EMAIL_DO_RECIBO = { termo_reserva: "ficha_termo_reserva", reserva: "ficha_envio", devolucao_reserva: "ficha_devolucao", garantia: "contrato_assinado", quitacao: "saida_encerramento", notificacao: "notificacao_envio" };
@@ -39981,6 +40219,7 @@ ${xref}
       init_comunicacoes();
       init_documentos();
       init_assinatura();
+      init_assinatura_documentos();
       init_recibos();
       init_envios();
       init_faturas();
@@ -40560,6 +40799,9 @@ ${MODELO_COMODOS[comodo].join("\n")}
           await fila({ fresca: true });
           await mostrar();
         },
+        /** Assinatura digital do contrato, do termo aditivo e da carta de reajuste da página aberta (telas/assinatura-documentos.js). */
+        assinaturaDocPedir: () => pedirAssinaturaDoc(),
+        assinaturaDocBaixar: ({ pedido }) => baixarAssinaturaDoc(pedido),
         /** Rotina de entrada: etapa que não se aplica a este inquilino (ex.: sem reserva) ou volta a pendente. */
         async pularEtapaEntrada({ contrato, chave }) {
           await alterar((db) => marcarEtapaEntrada(db, Number(contrato), chave, { pular: true }, login()));
@@ -41404,8 +41646,10 @@ ${MODELO_COMODOS[comodo].join("\n")}
         async enviarCartaEmail({ contrato, comp }) {
           const c = buscar2("contratos", contrato);
           if (!c) throw new ErroUsuario("Este inquilino não existe mais (pode ter sido excluído por outra pessoa). Atualize a página.");
-          const carta = await pdfDaCarta(c, comp);
+          let carta = await pdfDaCarta(c, comp);
           if (!carta) throw new ErroUsuario("A carta ainda não sai: falta o índice ou a correção aplicada (tela Reajustes).");
+          const assinada = await assinadoDoDocumento("carta_reajuste", { contrato: c.id, comp });
+          if (assinada && assinada.blob) carta = { ...carta, blob: assinada.blob, nome: assinada.nome };
           const assunto = `Reajuste do aluguel a partir de ${compBr(comp)} · ${(buscar2("imoveis", c.imovel_id) || {}).nome || ""}`.trim();
           const para = c.inquilino_email || "";
           const gmail = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(para)}&su=${encodeURIComponent(assunto)}&body=${encodeURIComponent(carta.texto)}`;
@@ -41414,6 +41658,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
             titulo: `Enviar carta de reajuste · ${c.inquilino_nome}`,
             sim: "Abrir o e-mail e marcar como enviada",
             html: `<p>${para ? `Para: <b>${esc(para)}</b>.` : "<b>Este inquilino não tem e-mail no cadastro:</b> o e-mail abre sem destinatário."} O PDF <b>${esc(carta.nome)}</b> é baixado agora: <b>anexe-o no e-mail</b> (arraste da pasta Downloads). O texto da carta já vai no corpo.</p>
+        ${assinada && assinada.motivo ? `<p class="alerta aviso">Carta sem a assinatura digital da empresa (${esc(assinada.motivo)}): para mandar a assinada, abra a carta e use "Enviar para assinar".</p>` : ""}
         <p><label><input type="radio" name="por" value="gmail" checked> Abrir no Gmail (conta do Google da empresa)</label><br><label><input type="radio" name="por" value="mailto"> Abrir no programa de e-mail do computador</label></p>
         <p><label><input type="checkbox" name="marcar" value="1" checked> Marcar a carta como enviada hoje (guarda o PDF na pasta do inquilino)</label></p>`
           });
@@ -41421,13 +41666,13 @@ ${MODELO_COMODOS[comodo].join("\n")}
           baixar(carta.blob, carta.nome);
           window.open((r.por || [])[0] === "mailto" ? mailto : gmail, "_blank", "noopener");
           if ((r.marcar || [])[0] === "1") {
-            await ACOES.cartaEnviada({ contrato: c.id, comp, enviada: "1" });
+            await ACOES.cartaEnviada({ contrato: c.id, comp, enviada: "1", pronta: carta });
             return;
           }
           aviso("PDF baixado e e-mail aberto. A carta não foi marcada como enviada.");
         },
         /** Marca a carta como enviada e guarda o PDF dela na pasta do inquilino; desfazer apaga o PDF. */
-        async cartaEnviada({ contrato, comp, enviada }) {
+        async cartaEnviada({ contrato, comp, enviada, pronta = null }) {
           if (enviada !== "1") {
             await alterarApagandoAnexos((db) => marcarCartaEnviada(db, Number(contrato), comp, false, login()));
             await mostrar();
@@ -41436,7 +41681,7 @@ ${MODELO_COMODOS[comodo].join("\n")}
           await alterar((db) => marcarCartaEnviada(db, Number(contrato), comp, true, login()));
           try {
             const c = buscar2("contratos", contrato);
-            const nome = await guardarCartaNaPasta(c, comp);
+            const nome = await guardarCartaNaPasta(c, comp, pronta);
             const carta = d().cartas_reajuste.find((x) => x.contrato_id === c.id && x.competencia === comp);
             if (nome && carta) await alterar((db) => atualizar(db, "cartas_reajuste", carta.id, { arquivo: nome }, login(), "Carta de reajuste guardada na pasta do inquilino"));
             if (nome) aviso(`Carta guardada na pasta do inquilino: ${nome}.`);
