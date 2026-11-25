@@ -164,7 +164,7 @@ function ligarContinuacaoDeContrato(raiz) {
         <p class="suave">Sem o termo agora: o contrato é registrado e fica o alerta "Aditivo da troca de titular" até anexar (em "Termos aditivos" na página do inquilino).</p>
         <p class="suave">Ao salvar, ${esc(anterior.inquilino_nome)} fica com <b>fim do vínculo</b> na véspera dessa data (não é saída: o contrato continua, com as mesmas regras e documentos).
         Os boletos continuam no nome de ${esc(anterior.inquilino_nome)} até a véspera (o último sai proporcional aos dias); a partir da data, saem no nome do novo inquilino.
-        Data futura: garantia e seguro passam no dia. A reserva de ${esc(anterior.inquilino_nome)} não passa: é dele e já foi usada nos boletos dele.</p>` });
+        Data futura: garantia e seguro passam no dia. A reserva não passa ao novo inquilino: é de quem sai e já foi usada nos boletos de ${esc(anterior.inquilino_nome)}.</p>` });
     if (!r) { sel.value = ''; return mensagemAuto(sel, ''); }
     const data = (r.data || [])[0] || C.hojeIso();
     const arq = (r.arquivo || [])[0];
