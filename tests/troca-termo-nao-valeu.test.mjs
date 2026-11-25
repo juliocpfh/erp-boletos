@@ -30,7 +30,7 @@ test('troca em 01/12, boletos de dezembro gerados e termo "não valeu": só Joã
   assert.deepEqual(doMes(d, '2026-12'), [['Maria Lima', 180000]], 'antes: dezembro é de Maria');
   const msg = R.desfazerAditivo(d, ad.id, 'j', { excluirTermo: false });
   assert.match(msg, /João Souza continua no contrato/);
-  assert.match(msg, /O boleto de Maria Lima \(12\/2026\) saiu e João Souza volta a ser cobrado pelo mês cheio/);
+  assert.match(msg, /O boleto de Maria Lima \(12\/2026\) saiu. João Souza volta a ser cobrado pelo mês cheio \(12\/2026\)/);
   assert.deepEqual(doMes(d, '2026-12'), [['João Souza', 180000]], 'antes da correção: Maria R$ 1.800,00 e João R$ 1.800,00');
   // gerar de novo não volta o boleto de Maria (sem o termo, a troca espera)
   R.gerarCobrancas(d, '2026-12', 'j');
@@ -47,20 +47,139 @@ test('troca em 15/12: o boleto de Maria (16/30) sai e o de João volta de 14/30 
   assert.deepEqual(doMes(d, '2026-12'), [['João Souza', 180000]], 'antes da correção: Maria R$ 960,00 e João R$ 1.800,00');
 });
 
-test('boleto do novo titular pago ou emitido no banco fica, com aviso; o em aberto sai', () => {
+test('boleto do novo titular já pago: João paga o mês cheio e o que Maria pagou fica "a devolver" (opção (a) do dono, 24/11)', () => {
   const { d, c } = base();
   const { ad } = troca(d, c, '2026-12-01');
   R.gerarCobrancas(d, '2026-12', 'j');
-  R.gerarCobrancas(d, '2027-01', 'j');
   const dez = d.cobrancas.find((x) => x.competencia === '2026-12');
-  const jan = d.cobrancas.find((x) => x.competencia === '2027-01');
   R.registrarPagamento(d, dez.id, '2027-01-08', null, 'j');
-  R.atualizar(d, 'cobrancas', jan.id, { banco: { situacao: 'emitido' } }, 'j');
+  const msg = R.desfazerAditivo(d, ad.id, 'j', { excluirTermo: false });
+  assert.match(msg, /João Souza volta a ser cobrado pelo mês cheio \(12\/2026\)/);
+  assert.match(msg, /Maria Lima já tinha pago 12\/2026 \(R\$\s?1\.800,00\): o valor fica "a devolver"/);
+  assert.deepEqual(doMes(d, '2026-12'), [['Maria Lima', 180000], ['João Souza', 180000]]);
+  const joao = R.boletoDoMes(d, c.id, '2026-12');
+  assert.equal(joao.data_pagamento, null, 'o boleto de João, cheio, em aberto');
+  // o pago de Maria fica inteiro a devolver; "Devolvi" zera
+  const pago = R.buscar(d, 'cobrancas', dez.id);
+  assert.equal(R.devidoDoPago(pago), 0);
+  assert.equal(R.pagoAMaisDo(pago), 180000);
+  R.marcarDevolvidoAMao(d, dez.id, '2027-01-10', 'j');
+  assert.equal(R.pagoAMaisDo(R.buscar(d, 'cobrancas', dez.id)), 0);
+  // gerar de novo não dobra o mês (João já tem o dele; Maria espera o termo)
+  R.gerarCobrancas(d, '2026-12', 'j');
+  assert.equal(d.cobrancas.filter((x) => x.competencia === '2026-12').length, 2);
+});
+
+test('boleto do novo emitido no banco e não pago: fica com aviso para cancelar no banco; o em aberto sai; João é cobrado', () => {
+  const { d, c } = base();
+  const { ad } = troca(d, c, '2026-12-15');
+  R.gerarCobrancas(d, '2027-01', 'j');
   R.gerarCobrancas(d, '2027-02', 'j');
+  const jan = d.cobrancas.find((x) => x.competencia === '2027-01' && x.contrato_id !== c.id);
+  R.atualizar(d, 'cobrancas', jan.id, { banco: { situacao: 'emitido' } }, 'j');
   const msg = R.desfazerAditivo(d, ad.id, 'j', { excluirTermo: false });
   assert.match(msg, /O boleto de Maria Lima \(02\/2027\) saiu/);
-  assert.match(msg, /Atenção: os boletos de Maria Lima 12\/2026 \(pago em 08\/01\/2027\), 01\/2027 \(emitido no banco\) ficaram: confira/);
-  assert.ok(R.buscar(d, 'cobrancas', dez.id) && R.buscar(d, 'cobrancas', jan.id), 'pago e emitido no banco não são apagados');
+  assert.match(msg, /o boleto de Maria Lima 01\/2027 está emitido no banco: cancele no banco e depois exclua aqui/);
+  assert.ok(R.buscar(d, 'cobrancas', jan.id), 'emitido no banco não é apagado');
+  assert.deepEqual(doMes(d, '2027-01').sort(), [['João Souza', 180000], ['Maria Lima', 180000]]);
   assert.deepEqual(doMes(d, '2027-02'), [['João Souza', 180000]]);
-  assert.ok(d.historico.some((h) => /Boleto 12\/2026 de Maria Lima pago em 08\/01\/2027: fica/.test(h.descricao || '')), 'anotado no Histórico');
+  assert.ok(d.historico.some((h) => /Boleto 01\/2027 de Maria Lima emitido no banco: .*Cancele este boleto no banco/.test(h.descricao || '')), 'anotado no Histórico');
+});
+
+// 2º teste de tela da PR #393: termo "não valeu" e depois o termo certo anexado. O pagamento de Maria continuava "a devolver"
+// e a empresa perdia o mês (R$ 960,00 na troca em 15/12; R$ 1.800,00 na troca em 01/12).
+for (const [entrada, maria, joao] of [['2026-12-15', 96000, [['João Souza', 84000]]], ['2026-12-01', 180000, []]]) {
+  test(`troca em ${entrada.slice(8)}/12: termo certo anexado depois do "não valeu" → o pagamento de Maria volta a ser dela`, () => {
+    const { d, c } = base();
+    const { n, ad } = troca(d, c, entrada);
+    R.gerarCobrancas(d, '2026-12', 'j');
+    const dela = d.cobrancas.find((x) => x.contrato_id === n.id && x.competencia === '2026-12');
+    assert.equal(dela.aluguel, maria);
+    R.registrarPagamento(d, dela.id, '2026-11-22', null, 'j');
+    R.desfazerAditivo(d, ad.id, 'j', { excluirTermo: false });
+    assert.equal(R.pagoAMaisDo(R.buscar(d, 'cobrancas', dela.id)), maria, 'depois do "não valeu": a devolver');
+    // o termo certo é anexado (o mesmo termo volta a ter o arquivo)
+    R.atualizar(d, 'aditivos', ad.id, { arquivo: 'termo-certo.pdf' }, 'j');
+    const r = R.transferirHeranca(d, n.id, 'j', '2026-11-24');
+    assert.deepEqual(r.pagamentosDevolvidos, []);
+    const pago = R.buscar(d, 'cobrancas', dela.id);
+    assert.equal(pago.troca_nao_valeu, null);
+    assert.equal(R.devidoDoPago(pago), maria);
+    assert.equal(R.pagoAMaisDo(pago), 0, 'nada a devolver');
+    const deJoao = doMes(d, '2026-12').filter(([nome]) => nome === 'João Souza');
+    assert.deepEqual(deJoao, joao, entrada.endsWith('15') ? 'João volta ao proporcional' : 'o boleto de João sai');
+  });
+}
+
+test('termo certo anexado depois de o pagamento de Maria já ter sido devolvido: fica devolvido e avisa para cobrar de novo', () => {
+  const { d, c } = base();
+  const { n, ad } = troca(d, c, '2026-12-15');
+  R.gerarCobrancas(d, '2026-12', 'j');
+  const dela = d.cobrancas.find((x) => x.contrato_id === n.id && x.competencia === '2026-12');
+  R.registrarPagamento(d, dela.id, '2026-11-22', null, 'j');
+  R.desfazerAditivo(d, ad.id, 'j', { excluirTermo: false });
+  R.marcarDevolvidoAMao(d, dela.id, '2026-11-23', 'j');
+  R.atualizar(d, 'aditivos', ad.id, { arquivo: 'termo-certo.pdf' }, 'j');
+  const r = R.transferirHeranca(d, n.id, 'j', '2026-11-24');
+  assert.deepEqual(r.pagamentosDevolvidos.map((x) => [x.cobranca.id, x.valor]), [[dela.id, 96000]]);
+  assert.ok(d.historico.some((h) => /já tinha sido devolvido. Cobre o mês de novo de Maria Lima/.test(h.descricao || '')));
+});
+
+test('"Desfazer pagamento" do boleto de Maria depois do "não valeu": o boleto dela sai e fica só o de João (antes R$ 3.600,00)', () => {
+  for (const [entrada, joao] of [['2026-12-01', 180000], ['2026-12-15', 180000]]) {
+    const { d, c } = base();
+    const { n, ad } = troca(d, c, entrada);
+    R.gerarCobrancas(d, '2026-12', 'j');
+    const dela = d.cobrancas.find((x) => x.contrato_id === n.id && x.competencia === '2026-12');
+    R.registrarPagamento(d, dela.id, '2026-11-22', null, 'j');
+    R.desfazerAditivo(d, ad.id, 'j', { excluirTermo: false });
+    R.marcarDevolvidoAMao(d, dela.id, '2026-11-23', 'j');
+    R.estornarPagamento(d, dela.id, 'j');
+    assert.ok(!R.buscar(d, 'cobrancas', dela.id), 'o boleto de Maria saiu');
+    assert.deepEqual(doMes(d, '2026-12'), [['João Souza', joao]]);
+  }
+});
+
+// Defeito 2 da PR #393, decisão do dono de 24/11/2026 (opção b, "cancelar acordo com Maria e devolver o valor pago e cobrar João"):
+// mês do novo titular em acordo e termo "não valeu" → o acordo é cancelado, o que ela pagou fica "a devolver", a parcela em aberto
+// sai e João paga o mês cheio.
+for (const [entrada, total] of [['2026-12-01', 180000], ['2026-12-15', 96000]]) {
+  test(`troca em ${entrada.slice(8)}/12 com o mês de Maria em acordo e a 1ª parcela paga, termo "não valeu": acordo cancelado, pago a devolver, João R$ 1.800,00`, () => {
+    const { d, c } = base();
+    const { n, ad } = troca(d, c, entrada);
+    R.gerarCobrancas(d, '2026-12', 'j');
+    const dela = d.cobrancas.find((x) => x.contrato_id === n.id && x.competencia === '2026-12');
+    const { acordo, parcelas } = R.fazerAcordo(d, { contrato_id: n.id, ids: [dela.id], total, parcelas: 2, primeiro_vencimento: '2027-02-10' }, 'j', '2027-01-20');
+    R.registrarPagamento(d, parcelas[0].id, '2027-02-10', null, 'j');
+    const msg = R.desfazerAditivo(d, ad.id, 'j', { excluirTermo: false });
+    assert.match(msg, /O acordo de Maria Lima de 20\/01\/2027 .* foi cancelado: R\$\s?[\d.]+,00 já pagos ficam "a devolver" a Maria Lima/);
+    assert.ok(R.buscar(d, 'acordos', acordo.id).desfeito_em, 'acordo cancelado');
+    const paga = R.buscar(d, 'cobrancas', parcelas[0].id);
+    assert.equal(R.pagoAMaisDo(paga), total / 2, 'a parcela paga fica toda a devolver');
+    assert.ok(!R.buscar(d, 'cobrancas', parcelas[1].id), 'a parcela em aberto saiu');
+    assert.ok(!R.buscar(d, 'cobrancas', dela.id), 'o boleto de origem de Maria saiu');
+    assert.deepEqual(doMes(d, '2026-12'), [['João Souza', 180000]], 'João paga o mês cheio');
+    R.gerarCobrancas(d, '2026-12', 'j');
+    R.recalcularCobrancas(d, () => true, 'j');
+    assert.deepEqual(doMes(d, '2026-12'), [['João Souza', 180000]], '"Gerar boletos" e o recálculo não dobram o mês');
+    R.marcarDevolvidoAMao(d, paga.id, '2027-02-12', 'j');
+    assert.equal(R.pagoAMaisDo(R.buscar(d, 'cobrancas', paga.id)), 0);
+    assert.ok(d.historico.some((h) => /Acordo de 20\/01\/2027 com Maria Lima cancelado: o termo da troca de titular não valeu/.test(h.descricao || '')));
+  });
+}
+
+test('acordo de Maria com boleto de fora da troca: não é cancelado sozinho; avisa, e João não é cobrado pelo mês enquanto o acordo existir', () => {
+  const { d, c } = base();
+  const { n, ad } = troca(d, c, '2026-12-01');
+  R.gerarCobrancas(d, '2026-12', 'j');
+  const dela = d.cobrancas.find((x) => x.contrato_id === n.id && x.competencia === '2026-12');
+  const { acordo } = R.fazerAcordo(d, { contrato_id: n.id, ids: [dela.id], total: 180000, parcelas: 2, primeiro_vencimento: '2027-02-10' }, 'j', '2027-01-20');
+  // caso raro simulado: um boleto avulso de Maria (saldo de outra cobrança) ligado ao mesmo acordo
+  const { id: _, ...copia } = dela; // eslint-disable-line no-unused-vars
+  R.inserir(d, 'cobrancas', { ...copia, saldo_saida_de: 999, aluguel: 0, desconto: 0, outros: 30000, outros_descricao: 'Saldo', situacao: 'Em acordo', acordo_id: acordo.id }, 'j');
+  const msg = R.desfazerAditivo(d, ad.id, 'j', { excluirTermo: false });
+  assert.match(msg, /também tem boletos de fora da troca e não foi cancelado sozinho. Decida/);
+  assert.equal(R.buscar(d, 'acordos', acordo.id).desfeito_em, null);
+  R.gerarCobrancas(d, '2026-12', 'j');
+  assert.deepEqual(doMes(d, '2026-12').filter(([nome]) => nome === 'João Souza'), [], 'o mês não fica cobrado dos dois');
 });
