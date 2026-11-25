@@ -130,7 +130,8 @@ export function telaFicha(id) {
       ${decisao}
       ${opera() ? `<p class="acoes">${f.situacao !== 'Em análise' ? '' : f.reserva_valor > 0 ? botaoEmail('ficha_envio', { ficha: f.id }, '✉ E-mail: envio da ficha cadastral') : '<span class="suave">O e-mail com a ficha cadastral sai depois do depósito da reserva.</span>'} ${f.situacao === 'Aprovada' ? botaoEmail('ficha_aprovada', { ficha: f.id }, '✉ E-mail: ficha aprovada') : ''} ${f.situacao === 'Reprovada' ? botaoEmail('ficha_reprovada', { ficha: f.id }, '✉ E-mail: ficha reprovada (com o motivo)') : ''}${lembreteDocumentos}</p>` : ''}
       ${avisoDocumentos}
-      ${f.situacao === 'Reprovada' && opera() && !f.devolucao_data && !(f.devolucao_valor > 0) ? `<p class="acoes">${botao('reabrirFichaReprovada', 'Reabrir a análise (documentos novos)', { id: f.id }, 'pequeno', `Voltar a ficha de ${f.inquilino_nome} para análise? Use quando a pessoa reapresentar documentos que fortaleçam a análise. O motivo da reprovação fica no Histórico.`)}</p>` : ''}
+      ${f.situacao === 'Em análise' && R.reaberturaDaFicha(f) ? (() => { const x = R.reaberturaDaFicha(f); return `<div class="alerta info"><b>Reaberta em ${dataBr(x.em)} para nova análise: documentos novos até ${dataBr(x.ate)}.</b> Prazo só de guia: nada se cancela sozinho.${x.combinado ? ` Combinado com a pessoa: ${esc(x.combinado)}` : ''}</div>`; })() : ''}
+      ${f.situacao === 'Reprovada' && opera() && !f.devolucao_data && !(f.devolucao_valor > 0) ? `<p class="acoes">${botao('reabrirFichaReprovada', 'Reabrir a análise (documentos novos)', { id: f.id }, 'pequeno')}</p>` : ''}
       ${f.situacao === 'Em análise' && opera() ? `<div class="acoes">${botao('decidirFicha', 'Aprovar', { id: f.id, situacao: 'Aprovada' }, 'pequeno', `Aprovar a ficha de ${f.inquilino_nome}? Depois aparece o botão para fazer o contrato.`)}
         ${link(`#/editar/fichas/${f.id}?situacao=Reprovada`, 'Reprovar (com o motivo)', 'botao perigo pequeno')}</div>
         <p class="suave">Para reprovar, escolha "Reprovada" na situação e escreva o motivo. Com reserva paga, registre a devolução (data e comprovante) quando devolver.</p>` : ''}
@@ -857,14 +858,16 @@ export const ACOES_FICHAS = {
       html: `<p>Reserva de <b>${reais(f.reserva_valor)}</b> depositada em ${dataBr(f.reserva_data)}. A ficha fica encerrada e o Painel avisa a devolução, em até ${C.plural(prazo, 'dia útil', 'dias úteis')}.</p>
         <p><label class="check"><input type="radio" name="tipo" value="com" checked> <b>Com justificativa</b>: devolve a reserva, <b>${reais(f.reserva_valor)}</b> (como na ficha reprovada).</label></p>
         <p><label class="check"><input type="radio" name="tipo" value="sem"> <b>Sem justificativa</b>: pela lei das arras (Código Civil, art. 418), quem recebeu a reserva e desiste devolve <b>o dobro: ${reais(f.reserva_valor * 2)}</b>.</label></p>
-        <p><label>Justificativa (obrigatória com justificativa; vai no histórico da ficha)</label><textarea name="motivo" rows="3" placeholder="Ex.: o proprietário pediu o imóvel de volta para uso próprio."></textarea></p>
+        <p><label>Justificativa para o cliente (obrigatória com justificativa; vai no termo de devolução e no e-mail)</label><textarea name="externa" rows="2" placeholder="Ex.: o proprietário pediu o imóvel de volta para uso próprio."></textarea></p>
+        <p><label>Justificativa interna (só no sistema; o cliente não vê)</label><textarea name="interna" rows="2" placeholder="Ex.: proprietário ligou em 07/12 pedindo o imóvel para o filho."></textarea></p>
         <p><label>Data da desistência</label><input type="date" name="data" value="${hoje}" max="${hoje}"></p>`,
     });
     if (!resp) return;
     const justificada = (resp.tipo || [])[0] !== 'sem';
-    const motivo = String((resp.motivo || [])[0] || '').trim();
-    if (justificada && !motivo) throw new C.ErroUsuario('Escreva a justificativa, ou escolha "Sem justificativa" (devolve o dobro).');
-    await alterar((db) => R.empresaDesisteDaReserva(db, f.id, { justificada, motivo, data: (resp.data || [])[0] || hoje }, login()));
+    const externa = String((resp.externa || [])[0] || '').trim();
+    const interna = String((resp.interna || [])[0] || '').trim();
+    if (justificada && !externa) throw new C.ErroUsuario('Escreva a justificativa para o cliente, ou escolha "Sem justificativa" (a lei manda devolver o dobro).');
+    await alterar((db) => R.empresaDesisteDaReserva(db, f.id, { justificada, externa, interna, data: (resp.data || [])[0] || hoje }, login()));
     const dv = R.devolucaoDaReserva(buscar('fichas', id));
     aviso(`Desistência registrada. Devolver ${reais(dv.devolver)} até ${dataBr(R.devolverReservaAte(buscar('fichas', id)))}; depois, clique em "Devolvi" e anexe o comprovante.`);
     await mostrar();
@@ -877,12 +880,18 @@ export const ACOES_FICHAS = {
     if (!opera()) throw new C.ErroUsuario('Seu usuário só consulta: não pode reabrir fichas.');
     const f = buscar('fichas', id);
     if (!f || f.situacao !== 'Reprovada') throw new C.ErroUsuario('Esta ficha não está reprovada (talvez outra pessoa já mudou). Atualize a página.');
-    if (f.devolucao_data || f.devolucao_valor > 0) throw new C.ErroUsuario('A reserva desta ficha já foi devolvida: para reabrir, use "Editar" (é preciso apagar o valor da reserva já devolvida).');
-    const outra = (f.imoveis_ids || []).map((iid) => R.fichaAbertaDoImovel(d(), iid, f.id)).find(Boolean);
-    if (outra) throw new C.ErroUsuario(`O imóvel já tem a ficha de ${outra.inquilino_nome} em aberto: decida aquela antes.`);
-    await alterar((db) => R.atualizar(db, 'fichas', f.id, { situacao: 'Em análise', decisao_data: null, decisao_por: null, decisao_motivo: null, reprovada_conferencia: null }, login(),
-      `Ficha de ${f.inquilino_nome} reaberta para análise com documentos novos (estava reprovada em ${C.dataBr(f.decisao_data)}${f.decisao_motivo ? `: ${f.decisao_motivo}` : ''})`));
-    aviso('Ficha de volta para análise. Peça os documentos novos pelo link da ficha.');
+    const hoje = C.hojeIso();
+    const dias = R.regra('reserva_dias_reapresentacao');
+    // decisão do dono de 25/11/2026: fica em aberto, com o combinado como guia, e mais 3 dias corridos (só guia)
+    const resp = await janela({
+      titulo: `Reabrir a análise da ficha de ${f.inquilino_nome}`, sim: 'Reabrir a análise',
+      html: `<p>A ficha volta para "Em análise". A pessoa tem até <b>${dataBr(C.somarDias(hoje, dias))}</b> (${C.plural(dias, 'dia corrido', 'dias corridos')}) para reapresentar os documentos. O prazo é só guia: nada se cancela sozinho. O motivo da reprovação fica no Histórico.</p>
+        <p><label>O que foi combinado com a pessoa (aparece na ficha como guia)</label><textarea name="combinado" rows="3" placeholder="Ex.: vai mandar o extrato do novo emprego e o holerite de dezembro."></textarea></p>`,
+    });
+    if (!resp) return;
+    const combinado = String((resp.combinado || [])[0] || '').trim();
+    await alterar((db) => R.reabrirFichaReprovada(db, f.id, { combinado, data: hoje }, login()));
+    aviso(`Ficha de volta para análise: documentos novos até ${dataBr(C.somarDias(hoje, dias))}. Peça pelo link da ficha.`);
     await mostrar();
   },
 };

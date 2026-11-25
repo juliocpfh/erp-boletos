@@ -632,9 +632,14 @@ export const CADASTROS = {
     descricao: (dados) => `Ficha de ${dados.inquilino_nome}`,
     // devolver menos do que diz o termo de aceite (sem termo: a reserva inteira) pede confirmação
     conferir: (dados, r) => {
-      if (!(R.fichaSemContrato(dados) && dados.devolucao_valor > 0 && dados.devolucao_valor < dados.reserva_valor)) return [];
       if (r && r.devolucao_valor === dados.devolucao_valor && r.reserva_valor === dados.reserva_valor) return [];
-      const certo = R.devolucaoDaReserva({ ...r, ...dados });
+      // a empresa desistiu sem justificativa e devolve outro valor que não o dobro: avisa a lei e aceita (dono, 25/11/2026)
+      const devido = R.devolucaoDaReserva({ ...r, ...dados });
+      if (devido.dobro && R.fichaSemContrato(dados) && dados.devolucao_valor > 0 && dados.devolucao_valor !== devido.devolver) {
+        return [`A lei manda devolver o dobro (${reais(devido.devolver)}, Código Civil, art. 418). Você registrou ${reais(dados.devolucao_valor)}: o alerta "devolver a reserva" some e o termo de devolução sai com ${reais(dados.devolucao_valor)}, com quitação total.`];
+      }
+      if (!(R.fichaSemContrato(dados) && dados.devolucao_valor > 0 && dados.devolucao_valor < dados.reserva_valor)) return [];
+      const certo = devido;
       if (dados.devolucao_valor === certo.devolver) return [];
       return [`Devolução de ${reais(dados.devolucao_valor)} de uma reserva de ${reais(dados.reserva_valor)}: ficam ${reais(dados.reserva_valor - dados.devolucao_valor)} sem devolver. ${certo.integral ? 'Pelo termo (ou sem termo aceito), a reserva volta por inteiro' : `Pelo termo aceito, o certo é devolver ${reais(certo.devolver)}`}; o alerta "devolver a reserva" some e o termo de devolução sai como devolução de parte.`];
     },
@@ -701,7 +706,8 @@ export const CADASTROS = {
         if (dados.devolucao_valor > teto) erros.devolucao_valor = teto > (dados.reserva_valor || 0) ? `A devolução não pode passar do dobro da reserva (${reais(teto)})` : `A devolução não pode passar da reserva (${reais(dados.reserva_valor || 0)})`;
         // devolução de só uma parte: o termo diz que a diferença "fica explicada nas observações da ficha" (a parte retida
         // pelo termo de aceite já sai explicada no termo de devolução)
-        else if (dados.devolucao_valor > 0 && dados.devolucao_valor < dados.reserva_valor && dados.devolucao_valor !== R.devolucaoDaReserva({ ...r, ...dados }).devolver && !String(dados.observacoes || '').trim()) {
+        // a empresa desistiu: qualquer valor é aceito depois do aviso (conferir, abaixo) e o termo dá quitação total (dono, 25/11/2026)
+        else if (!(r && r.desistencia_empresa) && dados.devolucao_valor > 0 && dados.devolucao_valor < dados.reserva_valor && dados.devolucao_valor !== R.devolucaoDaReserva({ ...r, ...dados }).devolver && !String(dados.observacoes || '').trim()) {
           erros.observacoes = `Devolução de ${reais(dados.devolucao_valor)} de uma reserva de ${reais(dados.reserva_valor)}: explique a diferença nas observações (ela sai no termo de devolução)`;
         }
       }

@@ -3118,8 +3118,11 @@ export function prazosDaReserva(f) {
   const c = condicoesDaReserva(f);
   const aviso = CR.regra('reserva_dia_aviso_documentos');
   const somar = c.documentos_corridos ? C.somarDias : C.somarDiasUteis;
-  return { documentos_ate: somar(f.reserva_data, c.dias_uteis_documentos), vale_ate: C.somarDias(f.reserva_data, c.dias_validade),
-    aviso_documentos_em: aviso > 0 && aviso < c.dias_uteis_documentos ? somar(f.reserva_data, aviso) : null,
+  const documentosAte = somar(f.reserva_data, c.dias_uteis_documentos);
+  // 1º aviso em sábado, domingo ou feriado passa para o dia útil seguinte (dono, 25/11/2026); se chegar ao último dia, fica só o do fim
+  const avisoEm = aviso > 0 && aviso < c.dias_uteis_documentos ? C.proximoDiaUtil(somar(f.reserva_data, aviso)) : null;
+  return { documentos_ate: documentosAte, vale_ate: C.somarDias(f.reserva_data, c.dias_validade),
+    aviso_documentos_em: avisoEm && avisoEm < documentosAte ? avisoEm : null,
     arrependimento_ate: c.dias_arrependimento > 0 ? C.somarDias(f.reserva_data, c.dias_arrependimento) : null };
 }
 
@@ -3129,7 +3132,8 @@ export function prazosDaReserva(f) {
  * 'ultimo', ate } ou null. Ex.: depósito em 02/12/2026 → 'primeiro' de 06/12 a 08/12/2026 e 'ultimo' em 09/12/2026.
  */
 export function avisoDosDocumentos(f, hoje = C.hojeIso()) {
-  const pz = f && f.situacao === 'Em análise' && f.aceite_reserva && fichaSemDocumentos(f) ? prazosDaReserva(f) : null;
+  // ficha reaberta: vale o prazo da reapresentação, só de guia (reaberturaDaFicha)
+  const pz = f && f.situacao === 'Em análise' && f.aceite_reserva && !f.reaberta_em && fichaSemDocumentos(f) ? prazosDaReserva(f) : null;
   if (!pz || hoje > pz.documentos_ate) return null;
   if (hoje === pz.documentos_ate) return { qual: 'ultimo', ate: pz.documentos_ate };
   return pz.aviso_documentos_em && hoje >= pz.aviso_documentos_em ? { qual: 'primeiro', ate: pz.documentos_ate } : null;
@@ -3167,23 +3171,46 @@ export function devolucaoDaReserva(f, { data = null, hoje = C.hojeIso() } = {}) 
  * da devolução (regra `reserva_dias_uteis_devolucao`). Ex.: reserva de R$ 500,00, desistência sem justificativa na terça, 08/12/2026
  * → devolver R$ 1.000,00 até quinta, 10/12/2026; com justificativa → R$ 500,00 no mesmo prazo. Devolve a ficha.
  */
-export function empresaDesisteDaReserva(d, fichaId, { justificada, motivo = '', data = C.hojeIso() }, usuario, hoje = C.hojeIso()) {
+export function empresaDesisteDaReserva(d, fichaId, { justificada, externa = '', interna = '', motivo = '', data = C.hojeIso() }, usuario, hoje = C.hojeIso()) {
   const f = buscar(d, 'fichas', fichaId);
   if (!f) throw new C.ErroUsuario('Ficha não encontrada.');
   if (!(f.reserva_valor > 0)) throw new C.ErroUsuario('A ficha não tem reserva depositada.');
   if (fichaSemContrato(f)) throw new C.ErroUsuario('Esta ficha já está encerrada (reprovada ou com desistência).');
   if (Object.keys(contratosDaFicha(d, f)).length) throw new C.ErroUsuario('Esta ficha já virou contrato: a desistência da empresa não é por aqui.');
-  const texto = String(motivo || '').trim();
-  if (justificada && !texto) throw new C.ErroUsuario('Escreva a justificativa da desistência.');
+  // justificativa externa: vai para o cliente (termo de devolução e e-mail); interna: só no sistema (dono, 25/11/2026)
+  const fora = String(externa || motivo || '').trim();
+  const dentro = String(interna || '').trim();
+  if (justificada && !fora) throw new C.ErroUsuario('Escreva a justificativa para o cliente (ela vai no termo de devolução e no e-mail).');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(data || '')) || data > hoje) throw new C.ErroUsuario('Informe a data da desistência (hoje ou antes).');
   const qual = justificada ? 'com_justificativa' : 'sem_justificativa';
-  const dobro = justificada ? f.reserva_valor : f.reserva_valor * 2;
-  atualizar(d, 'fichas', f.id, { situacao: 'Desistiu', desistencia_empresa: qual, decisao_data: data, decisao_por: usuario,
-    decisao_motivo: justificada ? `A empresa desistiu da reserva: ${texto}` : `A empresa desistiu da reserva sem justificativa (devolve o dobro, Código Civil, art. 418).${texto ? ` ${texto}` : ''}`,
-    reprovada_conferencia: null }, usuario,
-    `Ficha de ${f.inquilino_nome}: a empresa desistiu da reserva ${justificada ? 'com justificativa' : 'sem justificativa'}; devolver ${C.reais(dobro)}`);
+  const devolver = justificada ? f.reserva_valor : f.reserva_valor * 2;
+  const cabeca = justificada ? `A empresa desistiu da reserva: ${fora}` : `A empresa desistiu da reserva sem justificativa (a lei manda devolver o dobro, Código Civil, art. 418).${fora ? ` Para o cliente: ${fora}` : ''}`;
+  atualizar(d, 'fichas', f.id, { situacao: 'Desistiu', desistencia_empresa: qual, desistencia_motivo_externo: fora || null, decisao_data: data, decisao_por: usuario,
+    decisao_motivo: `${cabeca}${dentro ? ` Interna: ${dentro}` : ''}`, reprovada_conferencia: null }, usuario,
+    `Ficha de ${f.inquilino_nome}: a empresa desistiu da reserva ${justificada ? 'com justificativa' : 'sem justificativa'}; devolver ${C.reais(devolver)}`);
   return buscar(d, 'fichas', f.id);
 }
+
+/**
+ * Ficha reprovada reaberta para nova análise (dono, 25/11/2026): fica em aberto, com o que foi combinado com a pessoa como guia, e
+ * mais `reserva_dias_reapresentacao` dias corridos (padrão 3) para reapresentar os documentos. Os prazos são só guia: nada se cancela
+ * sozinho. Ex.: reaberta em 07/12/2026 → documentos novos até 10/12/2026. Devolve a ficha.
+ */
+export function reabrirFichaReprovada(d, fichaId, { combinado = '', data = C.hojeIso() } = {}, usuario) {
+  const f = buscar(d, 'fichas', fichaId);
+  if (!f || f.situacao !== 'Reprovada') throw new C.ErroUsuario('Esta ficha não está reprovada (talvez outra pessoa já mudou). Atualize a página.');
+  if (f.devolucao_data || f.devolucao_valor > 0) throw new C.ErroUsuario('A reserva desta ficha já foi devolvida: para reabrir, use "Editar" (é preciso apagar o valor da reserva já devolvida).');
+  const outra = (f.imoveis_ids || []).map((iid) => fichaAbertaDoImovel(d, iid, f.id)).find(Boolean);
+  if (outra) throw new C.ErroUsuario(`O imóvel já tem a ficha de ${outra.inquilino_nome} em aberto: decida aquela antes.`);
+  const ate = C.somarDias(data, CR.regra('reserva_dias_reapresentacao'));
+  const texto = String(combinado || '').trim();
+  atualizar(d, 'fichas', f.id, { situacao: 'Em análise', decisao_data: null, decisao_por: null, decisao_motivo: null, reprovada_conferencia: null,
+    reaberta_em: data, reabertura_ate: ate, reabertura_combinado: texto || null }, usuario,
+    `Ficha de ${f.inquilino_nome} reaberta para análise com documentos novos até ${C.dataBr(ate)} (estava reprovada em ${C.dataBr(f.decisao_data)}${f.decisao_motivo ? `: ${f.decisao_motivo}` : ''})${texto ? `. Combinado: ${texto}` : ''}`);
+  return buscar(d, 'fichas', f.id);
+}
+/** Guia da ficha reaberta: { em, ate, combinado } ou null. */
+export const reaberturaDaFicha = (f) => (f && f.reaberta_em ? { em: f.reaberta_em, ate: f.reabertura_ate || C.somarDias(f.reaberta_em, CR.regra('reserva_dias_reapresentacao')), combinado: f.reabertura_combinado || '' } : null);
 
 /** Último dia para devolver a reserva (reprovada ou desistência): a decisão mais os dias úteis do termo. */
 export const devolverReservaAte = (f) => (fichaSemContrato(f) && f.decisao_data ? C.somarDiasUteis(f.decisao_data, condicoesDaReserva(f).dias_uteis_devolucao) : null);
@@ -3227,7 +3254,7 @@ export const dataApagarDocumentosFicha = (f) => (inicioPrazoApagarFicha(f) && !f
  * situação e o motivo, a proposta (valores do imóvel, não da pessoa), as ligações (ids) e o dinheiro da reserva com os comprovantes.
  */
 const FICHA_FICA = new Set(['id', 'inquilino_nome', 'inquilino_tipo', 'situacao', 'decisao_data', 'decisao_por', 'decisao_motivo', 'data_recebida',
-  'imoveis_ids', 'modo_imoveis', 'pasta', 'documentos_apagados_em', 'reprovada_conferencia', 'desistencia_empresa','link_aceite', 'dados_apagados_em', 'historico_limpo_em', 'documentos_no_contrato', 'criado_em', 'criado_por', 'alterado_em', 'alterado_por',
+  'imoveis_ids', 'modo_imoveis', 'pasta', 'documentos_apagados_em', 'reprovada_conferencia', 'desistencia_empresa', 'desistencia_motivo_externo', 'link_aceite', 'dados_apagados_em', 'historico_limpo_em', 'documentos_no_contrato', 'criado_em', 'criado_por', 'alterado_em', 'alterado_por',
   ...COMPROVANTES_DINHEIRO_FICHA, ...CAMPOS_PROPOSTA_FICHA]);
 const fichaFica = (k) => FICHA_FICA.has(k) || /^(reserva|devolucao)_/.test(k) || /_ids?$/.test(k);
 
@@ -3286,7 +3313,10 @@ export function pendenciasDasFichas(d, hoje = C.hojeIso()) {
       out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome} ${f.desistencia_empresa ? '(a empresa desistiu)' : f.situacao === 'Desistiu' ? 'com desistência' : 'reprovada'}: registrar a devolução ${dv.dobro ? `de ${C.reais(dv.devolver)} (o dobro da reserva de ${C.reais(f.reserva_valor)})` : dv.integral ? `da reserva de ${C.reais(f.reserva_valor)}` : `de ${C.reais(dv.devolver)} da reserva de ${C.reais(f.reserva_valor)} (fica ${C.reais(dv.reter)}, como no termo)`}${ate ? (ate < hoje ? ` (o prazo era ${C.dataBr(ate)})` : ` até ${C.dataBr(ate)}`) : ''}` });
     }
     // termo aceito (2026-11-24): prazo dos documentos e validade da reserva, contados do depósito
-    const pz = f.situacao === 'Em análise' && f.aceite_reserva ? prazosDaReserva(f) : null;
+    // ficha reaberta (dono, 25/11/2026): os prazos do depósito deixam de valer; fica o guia da reapresentação
+    const pz = f.situacao === 'Em análise' && f.aceite_reserva && !f.reaberta_em ? prazosDaReserva(f) : null;
+    const reab = f.situacao === 'Em análise' ? reaberturaDaFicha(f) : null;
+    if (reab) out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome} reaberta em ${C.dataBr(reab.em)}: documentos novos até ${C.dataBr(reab.ate)}${reab.ate < hoje ? ' (passou; é só guia, nada se cancela sozinho)' : ' (guia)'}${reab.combinado ? `; combinado: ${reab.combinado}` : ''}` });
     const avisoDoc = avisoDosDocumentos(f, hoje);
     if (avisoDoc) out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome}: ${avisoDoc.qual === 'ultimo' ? 'hoje é o último dia para mandar os documentos' : `faltam documentos e o prazo vai até ${C.dataBr(avisoDoc.ate)}`}: fale com a pessoa (e-mail "Lembrete dos documentos da ficha" na página da ficha): continuamos aguardando e à disposição para ajudar` });
     if (pz && pz.documentos_ate < hoje && fichaSemDocumentos(f)) out.push({ ficha: f, texto: `ficha de ${f.inquilino_nome}: o prazo dos documentos acabou em ${C.dataBr(pz.documentos_ate)} e eles não estão marcados como recebidos: pelo termo, conta como desistência (${devolucaoDaReserva(f, { data: hoje }).devolver ? `devolve ${C.reais(devolucaoDaReserva(f, { data: hoje }).devolver)}` : 'a reserva fica com a empresa'}); registre em "Desistiu antes de assinar"` });

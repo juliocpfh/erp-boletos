@@ -324,13 +324,18 @@ export function montarRecibo(d, tipo, alvo, hoje = C.hojeIso()) {
 
   if (tipo === 'devolucao_reserva') {
     const devolvido = f.devolucao_valor || f.reserva_valor;
-    const integral = devolvido >= f.reserva_valor;
+    // a empresa desistiu (dono, 25/11/2026): quitação total com qualquer valor; "dobro" só com o dobro exato
+    const empresaDesistiu = !!f.desistencia_empresa;
+    const dobro = devolvido === f.reserva_valor * 2;
+    const integral = devolvido >= f.reserva_valor || empresaDesistiu;
+    const qual = dobro ? 'correspondente ao dobro da' : devolvido === f.reserva_valor ? 'correspondente à integralidade da' : devolvido > f.reserva_valor || empresaDesistiu ? 'referente à' : 'parte da';
+    const motivoCliente = String(f.desistencia_motivo_externo || '').trim();
     const meses = CR.regra('meses_documentos_ficha');
     return {
       ...base, titulo: 'TERMO DE DEVOLUÇÃO DA RESERVA E QUITAÇÃO',
       paragrafos: [
-        `${empresa}${e.cnpj ? `, CNPJ ${e.cnpj}` : ''}, devolveu em ${C.dataBr(f.devolucao_data)} a ${quem}, a importância de ${K.valorComExtenso(devolvido)}, ${devolvido > f.reserva_valor ? 'correspondente ao dobro' : integral ? 'correspondente à integralidade' : `parte`} da reserva de ${C.reais(f.reserva_valor)} recebida em ${C.dataBr(f.reserva_data)} para o imóvel situado na ${endereco}, por transferência para a conta de onde veio o depósito, conforme o comprovante bancário anexo.`,
-        `Com a devolução, a ficha cadastral fica encerrada${R.fichaSemContrato(f) ? ', sem a formação de contrato de locação' : ''}${f.desistencia_empresa ? `, por desistência da empresa${devolvido > f.reserva_valor ? ', que devolve a reserva em dobro (Código Civil, artigo 418)' : ''}` : ''}.`,
+        `${empresa}${e.cnpj ? `, CNPJ ${e.cnpj}` : ''}, devolveu em ${C.dataBr(f.devolucao_data)} a ${quem}, a importância de ${K.valorComExtenso(devolvido)}, ${qual} reserva de ${C.reais(f.reserva_valor)} recebida em ${C.dataBr(f.reserva_data)} para o imóvel situado na ${endereco}, por transferência para a conta de onde veio o depósito, conforme o comprovante bancário anexo.`,
+        `Com a devolução, a ficha cadastral fica encerrada${R.fichaSemContrato(f) ? ', sem a formação de contrato de locação' : ''}${empresaDesistiu ? `, por desistência da empresa${dobro ? ', que devolve a reserva em dobro (Código Civil, artigo 418)' : ''}${motivoCliente ? `. Motivo: ${motivoCliente.replace(/[.\s]+$/, '')}` : ''}` : ''}.`,
         integral
           ? 'As partes declaram que nada mais devem uma à outra em razão da reserva e da ficha cadastral, e dão-se mútua quitação desse valor (Código Civil, artigos 319 e 320).'
           : f.aceite_reserva && R.devolucaoDaReserva(f).devolver === devolvido

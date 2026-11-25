@@ -148,7 +148,9 @@ Se tiver documentos que fortaleçam a análise (por exemplo, outro comprovante d
     texto: `Olá, {nome},
 
 Devolvemos {devolucao} em {devolucao_data}, na conta de onde veio a reserva do imóvel da {imovel}. Anexos: o comprovante e o termo de devolução e quitação.
-
+[se motivo_desistencia]
+Não seguimos com a reserva: {motivo_desistencia}
+[fim]
 A ficha está encerrada[se devolucao_parcial]. Da reserva, {devolucao_parcial} não foi devolvido[se termo_aceito], como no termo da reserva aceito em {aceite_data}[fim]: qualquer dúvida, responda este e-mail[senão], sem valores pendentes[fim]. Se puder, responda com o termo assinado (pode ser pelo gov.br); o comprovante do banco já prova a devolução.
 
 Os documentos da análise serão apagados, conforme a LGPD (Lei 13.709/2018).`,
@@ -434,6 +436,8 @@ Já resolveu? Responda com uma foto ou um documento, para darmos a baixa. Sem is
  */
 export const ATUALIZACOES_EMAIL = [
   // ajustes do advogado no termo da reserva (24/11/2026, itens 1.2 e 1.4): contato antes do fim do prazo; reprovação por escrito
+  // a empresa desistiu da reserva (dono, 25/11/2026): a justificativa externa vai para o cliente
+  ['ficha_devolucao', 'Anexos: o comprovante e o termo de devolução e quitação.\n\nA ficha está encerrada', 'Anexos: o comprovante e o termo de devolução e quitação.\n[se motivo_desistencia]\nNão seguimos com a reserva: {motivo_desistencia}\n[fim]\nA ficha está encerrada'],
   // prazo dos documentos em dias corridos (correção do dono, 24/11/2026): "7 dias corridos" (ou "dias úteis", pela regra)
   ['ficha_termo_reserva', 'você tem {dias_documentos} dias úteis para mandar', 'você tem {prazo_documentos_dias} para mandar'],
   ['ficha_termo_reserva', 'para mandar a ficha e os documentos; sem eles, a reserva é cancelada', 'para mandar a ficha e os documentos; se faltar algum, entramos em contato antes do fim do prazo; sem eles, a reserva é cancelada'],

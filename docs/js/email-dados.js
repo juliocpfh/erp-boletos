@@ -123,6 +123,7 @@ const condicoesDoTermo = (f) => {
   return { retencao: R.retencaoDaReserva(R.valorDaReserva(f), c.retencao_pct) > 0, requisitos: !!String(f.requisitos || '').trim(), link_termo: !!TR.urlDoAceite(f.id),
     termo_aceito: !!f.aceite_reserva, prazo_documentos: !!(f.aceite_reserva && R.prazosDaReserva(f)),
     motivo_reprovacao: f.situacao === 'Reprovada' && !!String(f.decisao_motivo || '').trim(),
+    motivo_desistencia: !!(f.desistencia_empresa && String(f.desistencia_motivo_externo || '').trim()),
     // reprovada por informação que não se confirmou conta como desistência: aí não se convida a reapresentar
     pode_reapresentar: f.situacao === 'Reprovada' && !f.reprovada_conferencia,
     ultimo_dia_documentos: (R.avisoDosDocumentos(f) || {}).qual === 'ultimo', retencao_aplicada: !!(dv && !dv.integral), devolve_algo: !!(dv && dv.devolver > 0),
@@ -237,7 +238,9 @@ export function dadosDoEmail(d, alvo, respostas = {}, hoje = C.hojeIso()) {
     inclusos: juntar(inclusos), iptu_valor: f && f.iptu_estimado > 0 ? C.reais(f.iptu_estimado) : '', seguro_valor: f && f.seguro_estimado > 0 ? C.reais(f.seguro_estimado) : '',
     devolucao: f && f.devolucao_data ? C.reais(f.devolucao_valor || f.reserva_valor) : '', devolucao_data: f && f.devolucao_data ? C.dataBr(f.devolucao_data) : '',
     // devolução de só uma parte da reserva: a diferença (o e-mail não diz "sem valores pendentes")
-    devolucao_parcial: f && f.devolucao_data && f.devolucao_valor > 0 && f.devolucao_valor < f.reserva_valor ? C.reais(f.reserva_valor - f.devolucao_valor) : '',
+    // a empresa desistiu: quitação total com o valor devolvido (dono, 25/11/2026), sem "não foi devolvido"
+    devolucao_parcial: f && !f.desistencia_empresa && f.devolucao_data && f.devolucao_valor > 0 && f.devolucao_valor < f.reserva_valor ? C.reais(f.reserva_valor - f.devolucao_valor) : '',
+    motivo_desistencia: f && f.desistencia_empresa ? String(f.desistencia_motivo_externo || '').trim() : '',
     documentos_ficha: f ? documentosDoEmail(f) : '',
     link: linkDaFicha(f, 'interessado', hoje).url, link_validade: linkDaFicha(f, 'interessado', hoje).validade,
     link_fiador: fiadoresLink.length ? fiadoresLink[0].url : '', links_fiadores: linksFiadores,

@@ -175,6 +175,11 @@ export const DEFINICOES_REGRAS = [
     explica: 'Enquanto a ficha é analisada, o imóvel fica reservado para a pessoa. Passado o prazo sem decisão, o Painel avisa. Ex.: depósito em 02/12/2026 e 7 dias → reservado até 09/12/2026, o mesmo dia do fim do prazo dos documentos.',
     consequencia: 'Muda o prazo dos termos aceitos daqui em diante e o aviso do Painel.',
     lei: 'Sem lei específica: é o combinado no termo (Código Civil, art. 421).' },
+  { chave: 'reserva_dias_reapresentacao', grupo: 'reserva', rotulo: 'Ficha reaberta: prazo para reapresentar os documentos (dias corridos)', tipo: 'inteiro', padrao: 3, min: 1, max: 30,
+    // decisão do dono de 25/11/2026: os prazos de documentos e análise são flexíveis; reabrir dá mais 3 dias corridos
+    explica: 'Quando a ficha reprovada é reaberta para nova análise ("Reabrir a análise"), a pessoa tem estes dias corridos para reapresentar os documentos. É só guia: aparece na ficha e no Painel, junto com o que foi combinado com a pessoa, e nada se cancela sozinho. Ex.: reaberta em 07/12/2026 com 3 → documentos novos até 10/12/2026.',
+    consequencia: 'Só muda o prazo de guia das fichas reabertas daqui em diante.',
+    lei: 'Sem lei específica: combinado com a pessoa (Código Civil, art. 421).' },
   { chave: 'reserva_dias_uteis_devolucao', grupo: 'reserva', rotulo: 'Prazo para devolver a reserva (dias úteis)', tipo: 'inteiro', padrao: 2, min: 1, max: 30,
     // 2 (pedido do advogado, 24/11/2026, itens 1.0 e 1.4; antes 5)
     explica: 'Contado da reprovação ou da desistência. Ex.: ficha reprovada na segunda, 14/12/2026, e 2 dias úteis → devolver até quarta, 16/12/2026. O Painel avisa quando o prazo passa. Era 5 dias até 24/11/2026; o advogado pediu 2.',

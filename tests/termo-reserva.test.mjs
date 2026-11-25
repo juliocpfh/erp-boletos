@@ -52,24 +52,27 @@ test('regras novas: padrões (100%, 0 dias, 7 dias corridos, aviso no 4º, 7 dia
 
 test('devolução pelo padrão (100%, 0 dias): desistência depois do depósito não devolve nada; reprovada devolve tudo', () => {
   const { d, f } = base({ reserva_valor: 50000, reserva_data: '2026-12-02' });
-  assert.deepEqual(R.prazosDaReserva(f), { documentos_ate: '2026-12-09', vale_ate: '2026-12-09', aviso_documentos_em: '2026-12-06', arrependimento_ate: null },
-    'quarta 02/12 + 4 dias corridos = sábado 06/12 (aviso); + 7 dias corridos = quarta 09/12; reservado 7 dias; sem prazo de devolução total');
+  assert.deepEqual(R.prazosDaReserva(f), { documentos_ate: '2026-12-09', vale_ate: '2026-12-09', aviso_documentos_em: '2026-12-07', arrependimento_ate: null },
+    'quarta 02/12 + 4 dias corridos = sábado 06/12, aviso no dia útil seguinte, segunda 07/12 (dono, 25/11); + 7 dias corridos = quarta 09/12; reservado 7 dias');
   assert.equal(R.devolucaoDaReserva(f, { data: '2026-12-02' }).devolver, 50000, 'sem o termo aceito: devolve tudo');
   R.guardarAceiteReserva(d, f.id, aceite(), 'j');
   const dv = R.devolucaoDaReserva(R.buscar(d, 'fichas', f.id), { data: '2026-12-02' });
   assert.deepEqual([dv.devolver, dv.reter], [0, 50000], 'no próprio dia do depósito já não devolve');
   assert.match(dv.motivo, /a empresa fica com a reserva inteira \(R\$ 500,00\)/);
-  // avisos para falar com a pessoa (advogado e dono, 24/11): nada até o 3º dia; do 4º (06/12) ao 6º, o 1º aviso; no 7º (09/12), o último dia
+  // avisos para falar com a pessoa (advogado e dono, 24 e 25/11): nada até domingo 06/12; da segunda 07/12 ao dia 08, o 1º aviso;
+  // no 7º dia (09/12), o último dia
   const g = R.buscar(d, 'fichas', f.id);
   const falar = (hoje) => R.pendenciasDasFichas(d, hoje).find((x) => /fale com a pessoa/.test(x.texto));
-  assert.equal(R.avisoDosDocumentos(g, '2026-12-05'), null);
-  assert.equal(falar('2026-12-05'), undefined);
-  assert.deepEqual(R.avisoDosDocumentos(g, '2026-12-06'), { qual: 'primeiro', ate: '2026-12-09' });
-  assert.match(falar('2026-12-06').texto, /faltam documentos e o prazo vai até 09\/12\/2026: fale com a pessoa .*continuamos aguardando e à disposição para ajudar/);
+  assert.equal(R.avisoDosDocumentos(g, '2026-12-06'), null, 'sábado 06/12: o aviso passou para segunda');
+  assert.equal(falar('2026-12-06'), undefined);
+  assert.deepEqual(R.avisoDosDocumentos(g, '2026-12-07'), { qual: 'primeiro', ate: '2026-12-09' });
+  assert.match(falar('2026-12-07').texto, /faltam documentos e o prazo vai até 09\/12\/2026: fale com a pessoa .*continuamos aguardando e à disposição para ajudar/);
   assert.equal(R.avisoDosDocumentos(g, '2026-12-08').qual, 'primeiro');
   assert.match(falar('2026-12-09').texto, /hoje é o último dia para mandar os documentos/);
   assert.equal(falar('2026-12-10'), undefined, 'depois do prazo, só o aviso da desistência');
-  assert.equal(R.avisoDosDocumentos({ ...g, doc_pessoais: true, doc_renda: true, doc_residencia: true }, '2026-12-06'), null, 'com os documentos marcados, sem aviso');
+  assert.equal(R.avisoDosDocumentos({ ...g, doc_pessoais: true, doc_renda: true, doc_residencia: true }, '2026-12-07'), null, 'com os documentos marcados, sem aviso');
+  // aviso que cai em dia útil fica no dia: depósito na segunda 30/11 → 4º dia, sexta 04/12
+  assert.equal(R.prazosDaReserva({ ...g, reserva_data: '2026-11-30' }).aviso_documentos_em, '2026-12-04');
   // termo aceito antes da correção (sem documentos_corridos): continua em dias úteis, como foi aceito
   const velha = { ...g, aceite_reserva: { ...g.aceite_reserva, condicoes: { ...g.aceite_reserva.condicoes, documentos_corridos: undefined } } };
   delete velha.aceite_reserva.condicoes.documentos_corridos;
@@ -416,4 +419,53 @@ test('a empresa desiste: com justificativa devolve R$ 500,00; sem justificativa,
   assert.equal(R.devolucaoPendente(R.buscar(d2, 'fichas', f2.id)), false);
   // o termo da reserva não fala de devolução em dobro (pedido do dono)
   assert.doesNotMatch(REC.textoDoTermo(REC.termoDaReserva(d2, R.buscar(d2, 'fichas', f2.id))), /dobro/);
+});
+
+// decisões do dono de 25/11/2026: a empresa desiste sem justificativa e devolve outro valor (aviso da lei, aceito, quitação total;
+// "dobro" só com o dobro exato); justificativa externa (cliente) e interna (sistema); ficha reaberta com 3 dias corridos de guia
+test('dono 25/11: devolução diferente do dobro com quitação total; justificativa externa e interna; reabrir com 3 dias corridos', () => {
+  const { d, f } = base({ reserva_valor: 50000, reserva_data: '2026-12-02' });
+  R.guardarAceiteReserva(d, f.id, aceite(), 'j');
+  assert.throws(() => R.empresaDesisteDaReserva(d, f.id, { justificada: true, interna: 'só interna', data: '2026-12-08' }, 'j', '2026-12-08'), /justificativa para o cliente/);
+  const g = R.empresaDesisteDaReserva(d, f.id, { justificada: false, externa: 'O proprietário vai usar o imóvel.', interna: 'Ligou em 07/12.', data: '2026-12-08' }, 'j', '2026-12-08');
+  assert.equal(g.desistencia_motivo_externo, 'O proprietário vai usar o imóvel.');
+  assert.match(g.decisao_motivo, /Para o cliente: O proprietário vai usar o imóvel. Interna: Ligou em 07\/12\./);
+  assert.equal(R.devolucaoDaReserva(g).devolver, 100000, 'o devido continua o dobro');
+  // registrou R$ 500,00 (não o dobro): aceito, o alerta some, o termo dá quitação total e não fala em dobro
+  R.atualizar(d, 'fichas', f.id, { devolucao_data: '2026-12-09', devolucao_valor: 50000 }, 'j');
+  const h = R.buscar(d, 'fichas', f.id);
+  assert.equal(R.devolucaoPendente(h), false);
+  assert.ok(!R.pendenciasDasFichas(d, '2026-12-10').some((x) => /devolução/.test(x.texto)));
+  const t = REC.montarRecibo(d, 'devolucao_reserva', { ficha: h }, '2026-12-09');
+  const texto = t.paragrafos.join(' ');
+  assert.doesNotMatch(texto, /dobro/);
+  assert.match(t.paragrafos[0], /R\$ 500,00 .*correspondente à integralidade da reserva de R\$ 500,00/);
+  assert.match(t.paragrafos[1], /por desistência da empresa\. Motivo: O proprietário vai usar o imóvel\./);
+  assert.match(t.paragrafos[2], /nada mais devem uma à outra/);
+  assert.doesNotMatch(texto, /Ligou em 07/, 'a justificativa interna não vai para o cliente');
+  // R$ 700,00: nem o dobro nem a reserva → "referente à", quitação total
+  R.atualizar(d, 'fichas', f.id, { devolucao_valor: 70000 }, 'j');
+  const t7 = REC.montarRecibo(d, 'devolucao_reserva', { ficha: R.buscar(d, 'fichas', f.id) }, '2026-12-09');
+  assert.match(t7.paragrafos[0], /R\$ 700,00 .*referente à reserva de R\$ 500,00/);
+  assert.match(t7.paragrafos[2], /nada mais devem/);
+  // e-mail da devolução: a justificativa externa vai; sem "não foi devolvido"
+  const e = montarEmail(modeloEmail(d, 'ficha_devolucao'), dadosDoEmail(d, { ficha: R.buscar(d, 'fichas', f.id) }, {}, '2026-12-09')).texto;
+  assert.match(e, /Não seguimos com a reserva: O proprietário vai usar o imóvel\./);
+  assert.doesNotMatch(e, /Ligou em 07|não foi devolvido/);
+  assert.match(e, /sem valores pendentes/);
+  // modelo da devolução já gravado (texto de antes) recebe a linha da justificativa
+  const antigo = 'Anexos: o comprovante e o termo de devolução e quitação.\n\nA ficha está encerrada';
+  assert.match(atualizarTextoEmail('ficha_devolucao', antigo), /\[se motivo_desistencia\]\nNão seguimos com a reserva: \{motivo_desistencia\}\n\[fim\]\nA ficha está encerrada/);
+
+  // reabrir: fica em aberto, com o combinado e mais 3 dias corridos (só guia)
+  const { d: d2, f: f2 } = base({ reserva_valor: 50000, reserva_data: '2026-12-02' });
+  R.guardarAceiteReserva(d2, f2.id, aceite(), 'j');
+  R.atualizar(d2, 'fichas', f2.id, { situacao: 'Reprovada', decisao_data: '2026-12-05', decisao_motivo: 'Renda baixa.' }, 'j');
+  const r = R.reabrirFichaReprovada(d2, f2.id, { combinado: 'Vai mandar o holerite de dezembro.', data: '2026-12-07' }, 'j');
+  assert.deepEqual([r.situacao, r.reaberta_em, r.reabertura_ate, r.reabertura_combinado], ['Em análise', '2026-12-07', '2026-12-10', 'Vai mandar o holerite de dezembro.']);
+  assert.equal(r.decisao_motivo, null);
+  const p = R.pendenciasDasFichas(d2, '2026-12-11');
+  assert.ok(p.some((x) => /reaberta em 07\/12\/2026: documentos novos até 10\/12\/2026 \(passou; é só guia, nada se cancela sozinho\); combinado: Vai mandar o holerite de dezembro\./.test(x.texto)));
+  assert.ok(!p.some((x) => /conta como desistência|fale com a pessoa|segurava o imóvel/.test(x.texto)), 'os prazos do depósito não valem mais na reaberta');
+  assert.throws(() => R.reabrirFichaReprovada(d2, f2.id, {}, 'j'), /não está reprovada/);
 });
