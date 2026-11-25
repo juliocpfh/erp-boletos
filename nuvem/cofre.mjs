@@ -4,8 +4,10 @@
 // Também: faixas de códigos por aparelho (sem internet não repete), contador da NF (só com internet), backup diário no R2.
 // A lógica fica em `Cofre` (recebe `sql` e `transacao`) para os testes rodarem no Node com node:sqlite.
 // Crachás do programa do PC (aparelhos ligados): aparelhos.mjs, numa tabela própria. Gmail ligado pelo botão: gmail-conta.mjs.
+// E-mails agendados (fora do horário comercial, saem pelo cron do Worker): agendados.mjs, numa tabela própria.
 import { Aparelhos, ErroAparelho } from './aparelhos.mjs';
 import { ContaGmail } from './gmail-conta.mjs';
+import { EnviosAgendados } from './agendados.mjs';
 import { faxinaDosLinks } from './ficha-publica.mjs';
 import { faxinaDosContatos } from './contatos-publico.mjs';
 import { faxinaDosAceites } from './aceite-reserva.mjs';
@@ -1266,6 +1268,7 @@ export class CofreDO {
     this.cofre.dono = String(env?.DONO_EMAIL || '').trim().toLowerCase();
     this.aparelhos = new Aparelhos(this.cofre);
     this.gmail = new ContaGmail(this.cofre, ErroCofre);
+    this.agendados = new EnviosAgendados(this.cofre, ErroCofre);
     this.alarmeMarcado = false;
   }
 
@@ -1285,7 +1288,7 @@ export class CofreDO {
     const c = this.cofre;
     if (so !== 'faxina' && this.env.DADOS) await backupDoDia(c, this.env.DADOS, agora);
     if (so !== 'backup') {
-      c.limpar(); c.controle('ultima_faxina', agora.toISOString());
+      c.limpar(); this.agendados.faxina(agora); c.controle('ultima_faxina', agora.toISOString());
       // R2: lixeira dos anexos apagados (regra dias_lixeira_anexos, padrão 30 dias) e links da ficha passados da guarda (LGPD)
       if (this.env.DADOS) {
         await faxinaDaLixeira(this.env.DADOS, agora, c.regraNumero('dias_lixeira_anexos')).catch((e) => console.error('lixeira', e));
@@ -1332,6 +1335,10 @@ export class CofreDO {
       if (rota === '/aparelho/conferir' && request.method === 'POST') { const c = await corpo(); return resposta(200, await this.aparelhos.conferir(c?.cracha, c?.versao)); }
       // a conta do Gmail (refresh token cifrado): só o Worker chega aqui (gmail.mjs, contaGuardada), também nos avisos da ficha
       if (rota === '/gmail/conta' && request.method === 'GET') return resposta(200, { conta: this.gmail.conta() });
+      // e-mails agendados: a rodada do cron (só o Worker chega aqui, como a conta do Gmail); `agora` vem do Worker
+      const agoraDo = (b) => (b && typeof b.agora === 'string' && Number.isFinite(Date.parse(b.agora)) ? new Date(b.agora) : new Date());
+      if (rota === '/agendados/vencidos' && request.method === 'POST') return resposta(200, this.agendados.vencidos(agoraDo(await corpo())));
+      if (rota === '/agendados/resultado' && request.method === 'POST') { const b = await corpo(); const feito = this.agendados.resultado(b, agoraDo(b)); await this.depoisDeGravar(); return resposta(200, feito); }
       if (!email) throw new ErroCofre(401, 'Sem login.');
       if (rota === '/aparelhos' && request.method === 'GET') r = this.aparelhos.lista(c.exigir(email, 'consulta'));
       else if (rota === '/desligar-aparelho' && request.method === 'POST') r = this.aparelhos.desligar(await corpo(), c.exigir(email, 'consulta'), email);
@@ -1352,6 +1359,10 @@ export class CofreDO {
       else if (rota === '/mudancas' && request.method === 'GET') r = c.mudancas(url.searchParams.get('desde'), c.exigir(email, 'consulta'), undefined, Number(url.searchParams.get('formato')) || 1);
       else if (rota === '/conflitos' && request.method === 'GET') r = { conflitos: c.conflitosAbertos(c.exigir(email, 'consulta')) };
       else if (rota === '/registrar-email' && request.method === 'POST') r = c.registrarEmail(await corpo(), email);
+      else if (rota === '/agendados/novo' && request.method === 'POST') r = this.agendados.novo(await corpo(), email);
+      else if (rota === '/agendados/lista' && request.method === 'GET') r = this.agendados.lista(email);
+      else if (rota === '/agendados/mudar' && request.method === 'POST') r = this.agendados.mudar(await corpo(), email);
+      else if (rota === '/agendados/cancelar' && request.method === 'POST') r = this.agendados.cancelar(await corpo(), email);
       else if (rota === '/gmail/estado-novo' && request.method === 'POST') r = this.gmail.novoEstado(await corpo(), email);
       else if (rota === '/gmail/estado-usar' && request.method === 'POST') r = this.gmail.usarEstado(await corpo(), email);
       else if (rota === '/gmail/guardar' && request.method === 'POST') r = this.gmail.guardar(await corpo(), email);
