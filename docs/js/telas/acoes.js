@@ -932,6 +932,12 @@ export const ACOES = {
     await mostrar();
   },
 
+  async desfazerReservaDevolvida({ id }) {
+    await alterar((db) => R.desfazerReservaDevolvida(db, Number(id), login()));
+    aviso('Registro da devolução da reserva excluído: ela volta a ficar a devolver.');
+    await mostrar();
+  },
+
   async condominioConferido({ id, mes }) {
     await alterar((db) => R.marcarCondominioConferido(db, Number(id), mes, login()));
     await mostrar();

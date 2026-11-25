@@ -164,7 +164,7 @@ function ligarContinuacaoDeContrato(raiz) {
         <p class="suave">Sem o termo agora: o contrato é registrado e fica o alerta "Aditivo da troca de titular" até anexar (em "Termos aditivos" na página do inquilino).</p>
         <p class="suave">Ao salvar, ${esc(anterior.inquilino_nome)} fica com <b>fim do vínculo</b> na véspera dessa data (não é saída: o contrato continua, com as mesmas regras e documentos).
         Os boletos continuam no nome de ${esc(anterior.inquilino_nome)} até a véspera (o último sai proporcional aos dias); a partir da data, saem no nome do novo inquilino.
-        Data futura: garantia, seguro e reserva passam no dia.</p>` });
+        Data futura: garantia e seguro passam no dia. A reserva não passa ao novo inquilino: é de quem sai e já foi usada nos boletos de ${esc(anterior.inquilino_nome)}.</p>` });
     if (!r) { sel.value = ''; return mensagemAuto(sel, ''); }
     const data = (r.data || [])[0] || C.hojeIso();
     const arq = (r.arquivo || [])[0];
@@ -173,9 +173,14 @@ function ligarContinuacaoDeContrato(raiz) {
     const campos = F.CONTRATO.filter((c) => c.nome && c.tipo !== 'simnao');
     const cond = R.condicoesDoContrato(d(), anterior, data);
     const feitos = preencherVazios(sel.form, F.paraFormulario(campos, cond), F.paraFormulario(campos, null));
-    // aluguel, bonificado, boleto e reserva: iguais aos do anterior (sobrescreve o que estiver digitado) e travados
-    travarValoresHerdados(sel.form, { ...F.paraFormulario(F.CONTRATO.filter((c) => c.nome), { bonificacao: anterior.bonificacao !== false,
-      cobranca_mes_seguinte: anterior.cobranca_mes_seguinte !== false, ...cond }), vencimento_reserva: R.mesVencimentoDaCompetencia(anterior, cond.reserva_competencia) || '' });
+    // o imóvel e a locação são os mesmos: gás, condomínio, o que está incluso e a descrição vêm do anterior mesmo que o
+    // formulário já mostre outra coisa (aberto pelo imóvel sem relógio de gás, o gás vinha "Não tem", `contasDoImovel`)
+    const daLocacao = { ...cond, gerar_nf: anterior.gerar_nf !== false };
+    for (const k of copiarDaLocacao(sel.form, F.paraFormulario(F.CONTRATO.filter((c) => CAMPOS_DA_LOCACAO.includes(c.nome) && c.nome in daLocacao), daLocacao))) if (!feitos.includes(k)) feitos.push(k);
+    // aluguel, bonificado e boleto: iguais aos do anterior (sobrescreve o que estiver digitado) e travados. A reserva não vem:
+    // é do inquilino que saiu (já abatida nos boletos dele)
+    travarValoresHerdados(sel.form, F.paraFormulario(F.CONTRATO.filter((c) => c.nome), { bonificacao: anterior.bonificacao !== false,
+      cobranca_mes_seguinte: anterior.cobranca_mes_seguinte !== false, ...cond }));
     if (temGarantia && garantia === 'continua') travarGarantiaHerdada(sel.form, anterior, anterior.inquilino_nome);
     if (garantia === 'nova') liberarGarantiaNova(sel.form, anterior.inquilino_nome, dinheiro);
     // a data da alteração é o novo início do contrato e da vigência (mesmo se já havia outra data no formulário)
@@ -184,7 +189,7 @@ function ligarContinuacaoDeContrato(raiz) {
       if (el) { el.value = data; el.dispatchEvent(new Event('change', { bubbles: true })); }
     }
     mensagemAuto(sel, `Continuação do contrato de ${esc(anterior.inquilino_nome)} a partir de ${dataBr(data)}${feitos.length ? `: ${esc(feitos.join(', '))} vieram do contrato anterior` : ''}.
-      <b>Aluguel (${reais(cond.aluguel_inicial)}), bonificação, boleto, reserva${garantia === 'nova' ? '' : ' e garantia'} são os do contrato e ficam travados</b>: mudanças depois, pelos botões da página do inquilino (correção, renovação${garantia === 'nova' ? '' : ', corrigir caução'}).
+      <b>Aluguel (${reais(cond.aluguel_inicial)}), bonificação, boleto${garantia === 'nova' ? '' : ' e garantia'} são os do contrato e ficam travados</b>: mudanças depois, pelos botões da página do inquilino (correção, renovação${garantia === 'nova' ? '' : ', corrigir caução'}).
       ${garantia === 'nova' ? `<br><b>Garantia nova:</b> escolha abaixo a garantia do novo inquilino; ${dinheiro ? `a de ${nomeAnt} fica no contrato dele para registrar a devolução` : `a de ${nomeAnt} vale só até a véspera`}.` : ''}
       ${memoria.continuacao.arquivo ? `Termo aditivo: ${esc(memoria.continuacao.arquivo.name)} (anexado ao salvar).` : 'Sem termo aditivo: fica o alerta para anexar.'}`);
   });
@@ -193,9 +198,36 @@ function ligarContinuacaoDeContrato(raiz) {
 /** Campos da garantia que vêm do contrato anterior na troca de titular (não se digita uma garantia nova). */
 export const CAMPOS_GARANTIA_HERDADA = ['garantia_tipo', 'caucao_meses', 'caucao_valor', 'caucao_data', 'deposito_valor', 'deposito_data'];
 
-/** Valores e boleto e reserva que vêm iguais do contrato anterior na troca de titular (travados no formulário). */
+/**
+ * Valores e boleto que vêm iguais do contrato anterior na troca de titular (travados no formulário). A reserva não está aqui:
+ * é de quem sai (pedido de 24/11/2026; antes vinha copiada e a do anterior aparecia no cadastro do novo).
+ */
 export const CAMPOS_VALORES_HERDADOS = ['aluguel_inicial', 'aluguel_bonificado', 'desconto_pontualidade_percentual', 'bonificacao', 'dia_vencimento', 'cobranca_mes_seguinte',
-  'taxa_boleto', 'nao_cobrar_tarifa', 'fci_percentual', 'fci_indice', 'multa_percentual', 'juros_mensal_percentual', 'reserva_valor', 'reserva_data', 'reserva_competencia', 'comprovante_reserva'];
+  'taxa_boleto', 'nao_cobrar_tarifa', 'fci_percentual', 'fci_indice', 'multa_percentual', 'juros_mensal_percentual'];
+
+/** O imóvel e a locação na troca de titular: vêm do contrato anterior trocando o que o formulário mostrar (podem ser mudados). */
+export const CAMPOS_DA_LOCACAO = ['gerar_nf', 'finalidade', 'atividade', 'descricao_objeto', 'conta_iptu', 'conta_seguro', 'conta_agua', 'conta_energia', 'conta_gas',
+  'conta_internet', 'conta_condominio', 'contas_adicionais'];
+
+/** Põe no formulário os valores (já no formato da tela) que forem diferentes; devolve os rótulos dos que mudaram. */
+function copiarDaLocacao(form, valores) {
+  const feitos = [];
+  for (const [nome, valor] of Object.entries(valores)) {
+    const el = form.querySelector(`[name="${nome}"]`);
+    if (!el || el.type === 'file') continue;
+    if (el.type === 'checkbox') {
+      const marcar = valor === true || valor === '1' || valor === 1;
+      if (el.checked === marcar) continue;
+      el.checked = marcar;
+    } else {
+      if (String(el.value) === String(valor ?? '')) continue;
+      el.value = valor ?? '';
+    }
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    feitos.push(((form.querySelector(`label[for="${el.id}"]`) || {}).textContent || nome).replace(/\s*\*$/, ''));
+  }
+  return feitos;
+}
 
 /** Trava campos do formulário (só leitura, em cinza); ``valores`` (já no formato da tela) troca o que estiver escrito. */
 function travarCampos(form, nomes, valores = {}) {
@@ -214,13 +246,9 @@ function travarCampos(form, nomes, valores = {}) {
   }
 }
 
-/** Troca de titular: aluguel, bonificado, vencimento, tarifa, multa, juros e reserva iguais aos do contrato anterior. */
+/** Troca de titular: aluguel, bonificado, vencimento, tarifa, multa e juros iguais aos do contrato anterior. */
 function travarValoresHerdados(form, valores = {}) {
-  // a reserva aparece na tela pelo mês do vencimento (``vencimento_reserva``); gravada é a referência (``reserva_competencia``)
-  travarCampos(form, [...CAMPOS_VALORES_HERDADOS, 'vencimento_reserva'], valores);
-  const ajuda = (form.querySelector('[name=reserva_valor]') || { closest: () => null }).closest('div');
-  const texto = ajuda && (ajuda.querySelector('.ajuda') || ajuda.appendChild(Object.assign(document.createElement('div'), { className: 'ajuda' })));
-  if (texto) texto.textContent = 'Reserva do contrato (herdada do titular anterior); o que ele já usou não abate de novo.';
+  travarCampos(form, CAMPOS_VALORES_HERDADOS, valores);
 }
 
 /**

@@ -1000,13 +1000,17 @@ function telaAditivoTroca(c, a) {
   const modelos = K.modelosDe(d(), 'aditivo_troca');
   const t = a ? { t1: (a.testemunhas[0] || {}).nome, c1: (a.testemunhas[0] || {}).cpf, t2: (a.testemunhas[1] || {}).nome, c2: (a.testemunhas[1] || {}).cpf } : testemunhasLembradas();
   // de quem sai, só a qualificação das pessoas importa
+  // garantia nova sem valor: aviso próprio (abaixo) em vez do "caução: valor ou quantos aluguéis" da lista
+  const semValor = K.garantiaNovaSemValor(c);
   const falta = [...K.pendenciasDoContrato(d(), ant).filter((x) => /^(inquilino|solidário|empresa|representante)/.test(x)).map((x) => `quem sai (${ant.inquilino_nome}), ${x}`),
-    ...K.pendenciasDoContrato(d(), c)];
+    ...K.pendenciasDoContrato(d(), c).filter((x) => !(semValor && x.startsWith('caução: valor')))];
   const troca = c.data_entrada || c.vigencia_inicio;
   // garantia em dinheiro de quem sai: o valor com os rendimentos da poupança até a troca entra no termo (campos.js busca no Banco Central)
   const emDinheiro = !!R.contratoDaGarantiaNaTroca(d(), c);
   return `<p class="suave"><a href="#/contrato/${c.id}?ir=aditivos">← ${esc(c.inquilino_nome)}</a></p>
     <h1>${a ? `Termo aditivo nº ${a.numero || 1}: troca de inquilino` : 'Gerar termo aditivo: troca de inquilino'}</h1>
+    ${semValor ? `<div class="alerta aviso"><b>A garantia nova de ${esc(c.inquilino_nome)} ainda não foi lançada</b>: ${semValor === 'caucao' ? 'caução' : 'depósito de garantia'} sem valor no cadastro.
+      O termo sai com o valor em branco, para preencher à mão. Para sair com o valor, lance a garantia em ${link(`#/editar/contratos/${c.id}`, 'Editar contrato', '')} (ex.: caução de 3 aluguéis) e gere de novo.</div>` : ''}
     ${falta.length ? `<div class="alerta aviso"><b>Faltam dados no cadastro</b> (o termo sai com o espaço em branco): ${falta.map(esc).join('; ')}.</div>` : ''}
     <div class="alerta info">Sai <b>${esc(ant.inquilino_nome)}</b>${ant.solidario_nome ? ` (e o solidário ${esc(ant.solidario_nome)})` : ''}; entra <b>${esc(c.inquilino_nome)}</b>${c.solidario_nome ? ` com ${esc(c.solidario_nome)}` : ''}, a partir de <b>${dataBr(troca)}</b>.
       O que for do período até ${dataBr(C.somarDias(troca, -1))} fica com quem sai.

@@ -912,6 +912,18 @@ export function fiadoresDaTroca(d, c, data) {
 }
 
 /**
+ * Troca de titular com garantia nova em dinheiro que ainda não tem valor no cadastro de quem entra: 'caucao' (sem valor e sem
+ * quantos aluguéis), 'deposito' (sem valor) ou null. Ex.: Pedro entra com "Caução" e o valor em branco → 'caucao': o termo sai
+ * com o valor em branco e a tela avisa (antes saía "caução de R$ 0,00, correspondente a 0 aluguéis").
+ */
+export function garantiaNovaSemValor(c) {
+  if (!c || c.garantia_na_troca !== 'nova') return null;
+  if (c.garantia_tipo === 'Caução' && !(c.caucao_valor > 0) && !(c.caucao_meses > 0)) return 'caucao';
+  if (['Depósito garantia', 'Fiador + depósito'].includes(c.garantia_tipo) && !(c.deposito_valor > 0)) return 'deposito';
+  return null;
+}
+
+/**
  * Termo aditivo de troca de inquilino (herança do contrato). ``c``: o contrato do novo titular (continua o anterior);
  * ``a``: registro da tabela aditivos (data, aluguel na data da troca, testemunhas). Saem o titular anterior e o solidário dele;
  * entram o novo titular e o solidário dele (no texto, todos como locatários: {a:...|...} e {s:...|...}).
@@ -946,6 +958,9 @@ function dadosDoAditivoTroca(d, c, a) {
   const dinheiroAnt = ['Caução', 'Depósito garantia', 'Fiador + depósito'].includes(tipoAnt);
   const valorAnt = a.garantia_anterior || (tipoAnt === 'Caução' ? ant.caucao_valor : ant.deposito_valor) || 0;
   dados.condicoes.garantia_nova = nova;
+  // garantia em dinheiro de quem entra ainda sem valor: o termo sai com o valor em branco (antes, "R$ 0,00, correspondente a 0 aluguéis")
+  if (nova && garantiaNovaSemValor(c) === 'caucao') Object.assign(dados.campos, { caucao_valor: `R$ ${LINHA_EM_BRANCO}`, caucao_meses: '______', caucao_meses_aluguel: '______ aluguéis' });
+  if (nova && garantiaNovaSemValor(c) === 'deposito') dados.campos.deposito_valor = `R$ ${LINHA_EM_BRANCO}`;
   dados.condicoes.garantia_anterior_dinheiro = nova && dinheiroAnt;
   dados.condicoes.garantia_anterior_fianca = nova && !dinheiroAnt && ['Fiador', 'Seguro fiança'].includes(tipoAnt);
   dados.campos.garantia_anterior = !nova ? '' : dinheiroAnt ? `${tipoAnt === 'Caução' ? 'caução' : 'depósito de garantia'} de ${valorComExtenso(valorAnt)}`

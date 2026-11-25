@@ -23,6 +23,31 @@ const comListas = (campos) => campos.map((c) => (c.lista ? { ...c, opcoes: R.lis
 
 // --------------------------------------------------------------------------
 /**
+ * Reserva de quem saiu na troca de titular (decisão do dono de 25/11/2026): não passa ao novo; a parte não usada abate os
+ * boletos em aberto dele e o resto entra nos créditos da devolução da garantia ou fica "a devolver", com o botão "Devolvi".
+ * Ex.: R$ 500,00, R$ 300,00 abatidos no último aluguel → "R$ 200,00 a devolver a Maria".
+ */
+function caixaReservaDaTroca(c) {
+  if (!R.reservaFicaNaTroca(d(), c)) return '';
+  const n = R.continuadoPor(d(), c);
+  const ac = R.acertoDaReservaNaTroca(d(), c);
+  const creditada = R.reservaAcertadaNaTroca(d(), c) - (c.reserva_devolvida_valor || 0);
+  const feito = [creditada > 0 ? `${reais(creditada)} entraram como crédito na devolução da garantia` : '',
+    c.reserva_devolvida_valor > 0 ? `${reais(c.reserva_devolvida_valor)} devolvidos em ${dataBr(c.reserva_devolvida_data)}` : ''].filter(Boolean).join('; ');
+  const desfazer = c.reserva_devolvida_valor > 0 && opera() ? ` ${botao('desfazerReservaDevolvida', 'Desfazer "Devolvi"', { id: c.id }, 'secundario mini')}` : '';
+  if (!ac) return feito ? `<div class="alerta ok"><b>Reserva acertada na troca de titular</b>: ${feito}.${desfazer}</div>` : '';
+  if (ac.onde === 'devolucao') {
+    return `<div class="alerta aviso"><b>Reserva não usada: ${reais(ac.valor)}</b>. ${esc(n.inquilino_nome)} assumiu o contrato e a reserva não passa a ele.
+      Ela é crédito de ${esc(c.inquilino_nome)}: já vem em "Créditos" na devolução da garantia, abate os débitos e o resto volta junto com a garantia.</div>`;
+  }
+  return `<div class="alerta aviso"><b>Reserva a devolver a ${esc(c.inquilino_nome)}: ${reais(ac.valor)}</b>. ${esc(n.inquilino_nome)} assumiu o contrato e a reserva não passa a ele;
+    o que ${esc(c.inquilino_nome)} devia em boletos já foi abatido${feito ? ` (${feito})` : ''}.${desfazer}
+    ${opera() ? `<form data-form="reservaDevolvida" class="acoes" style="margin-top:6px"><input type="hidden" name="contrato" value="${c.id}">
+      <label class="suave" style="margin:0">Devolvida em</label><input type="date" name="data" value="${C.hojeIso()}" style="width:auto" required>
+      <button class="secundario pequeno">Devolvi</button></form>` : ''}</div>`;
+}
+
+/**
  * Uso da reserva: nos boletos do sistema e/ou marcada como já abatida em aluguéis antigos (fora do sistema).
  * Marcada: mostra o mês e o valor, com "Excluir registro". A reserva vai para o mês certo sozinha ao salvar o contrato.
  */
@@ -37,6 +62,8 @@ export function caixaReservaAbatida(c) {
       ${opera() ? `<div class="acoes" style="margin-top:6px">${botao('desmarcarReservaAbatida', 'Excluir registro', { id: c.id }, 'perigo pequeno', 'Excluir o registro de reserva já abatida? A reserva volta a abater os boletos em aberto.')}</div>` : ''}</div>`;
   }
   const max = R.reservaParaMarcarAbatida(d(), c);
+  const troca = caixaReservaDaTroca(c);
+  if (troca) return `${usos.length ? `<p class="suave">${nosBoletos}</p>` : ''}${troca}`;
   return `${usos.length || ant ? `<p class="suave">${nosBoletos}</p>` : `<div class="alerta aviso"><b>Reserva ainda não abatida em nenhum boleto do sistema.</b> Se ela já foi abatida num aluguel antigo, marque abaixo o mês e o valor.</div>`}
     ${opera() ? `${max > 0 ? `<form data-form="reservaAbatida" class="acoes" style="margin-top:6px"><input type="hidden" name="contrato" value="${c.id}">
         <label class="suave" style="margin:0" title="Mês de referência do aluguel antigo (não o do vencimento)">Abatida no aluguel de (referência)</label><input type="month" name="competencia" value="${esc(R.competenciaReserva(c) || '')}" style="width:auto" required>
@@ -233,11 +260,14 @@ export function contasDoImovel(i) {
  */
 function avisoCreditos(c, r) {
   const cred = R.creditosDaSaida(d(), c);
-  const fora = r ? cred.itens.filter((x) => !(r.ressarcimentos_creditados || []).includes(x.ressarcimento.id)) : cred.itens;
+  // a reserva parada de quem saiu na troca (25/11/2026) só aparece enquanto não foi acertada: na edição, está fora desta conta
+  const fora = r ? cred.itens.filter((x) => x.reserva || !(r.ressarcimentos_creditados || []).includes(x.ressarcimento.id)) : cred.itens;
   if (!fora.length) return '';
-  const lista = fora.map((x) => `${reais(x.valor)} (${x.ressarcimento.descricao}, condomínio ${compBr(x.ressarcimento.competencia_condominio)})`).join('; ');
+  const lista = fora.map((x) => (x.reserva ? `${reais(x.valor)} (reserva não usada)` : `${reais(x.valor)} (${x.ressarcimento.descricao}, condomínio ${compBr(x.ressarcimento.competencia_condominio)})`)).join('; ');
+  const porque = [fora.some((x) => !x.reserva) ? 'taxa do proprietário paga pelo inquilino no condomínio, sem boleto onde abater' : '',
+    fora.some((x) => x.reserva) ? 'reserva dada na visita que não chegou a ser usada num aluguel: abate os débitos e o resto volta a quem saiu' : ''].filter(Boolean).join('; ');
   return r ? ` Crédito do inquilino ainda fora desta conta: ${lista}. Para somar, ponha o valor em "Créditos" e copie na descrição a linha: ${fora.map((x) => `"${x.texto}"`).join('; ')}.`
-    : ` Crédito do inquilino: ${lista}. É taxa do proprietário paga pelo inquilino no condomínio, sem boleto onde abater: já vem em "Créditos" e soma ao valor devolvido (mantenha a linha na descrição).`;
+    : ` Crédito do inquilino: ${lista}. É ${porque}: já vem em "Créditos" e soma ao valor devolvido (mantenha a linha na descrição).`;
 }
 
 /**
