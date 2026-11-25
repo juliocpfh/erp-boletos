@@ -13,7 +13,7 @@ import { MODELOS_EMAIL, modeloEmail, montarEmail } from '../modelos-email.js';
 import * as R from '../regras.js';
 import { ACEITA_DOCUMENTOS, arquivoSumiu, botao, buscar, d, etiqueta, link, naoEncontrado, opera, pastaDoEscopo } from './comum.js';
 import { pdfDoRecibo } from './documentos.js';
-import { documentoParaAssinar } from './assinatura-documentos.js';
+import { chavesAtuaisDoContrato, documentoParaAssinar } from './assinatura-documentos.js';
 import * as AS from '../assinatura.js';
 
 /** Endereço do Gmail para escrever: com o texto, enquanto couber no endereço (o navegador corta endereços muito longos). */
@@ -96,6 +96,11 @@ async function assinadosDaFila(prontos) {
     if (a.doc === 'aditivo' && !doc) continue;
     const r = AS.assinadoParaEmail(fila, AS.prefixoDoDocumento(a.doc, { contrato: c, id: a.id }), doc ? doc.chave : null);
     if (!r.pedido) continue;
+    // contrato: o mais novo da fila só vai se for o texto de agora (mudou o cadastro depois da assinatura: não anexa e avisa)
+    if (a.doc === 'contrato' && !(await chavesAtuaisDoContrato(c)).has(r.pedido.chave)) {
+      out.push({ ...a, ok: false, motivo: `o contrato mudou depois que foi mandado para assinar (${C.dataHoraBr(r.pedido.pedido_em).split(',')[0]}): abra o contrato e use "Enviar de novo para assinar"; o assinado antigo não vai` });
+      continue;
+    }
     out.push({ ...a, pedido: r.pedido.id, ok: r.ok, motivo: r.motivo, nome: `${String(r.pedido.nome || 'documento.pdf').replace(/\.pdf$/i, '')} - assinado.pdf`,
       // a data no horário daqui (assinado às 22h de 24/11 é 01h de 25/11 no horário universal)
       rotulo: r.ok && r.pedido.assinado_em ? `${a.rotulo} em ${C.dataHoraBr(r.pedido.assinado_em).split(',')[0]}` : a.rotulo });
