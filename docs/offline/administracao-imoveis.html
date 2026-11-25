@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-rpv1dpC0uPUFP/icbzwSH3SVZkFsYyFzjH1UC2mDVDY=' 'sha256-wp2QsHfw7qNrroiXNZj8oolvC8FuwaJuYeJgWTB19o4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-rpv1dpC0uPUFP/icbzwSH3SVZkFsYyFzjH1UC2mDVDY=' 'sha256-3HAPT6VsT4ed201amUOYUNen2JfgenMM3GccHU1ngL4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="bfa9619a580364ba">
+<meta name="fontes" content="bf82f40144eb631d">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -2020,6 +2020,18 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           lei: "Sem lei: rotina."
         },
         {
+          chave: "fim_expediente_hora",
+          grupo: "rotina",
+          rotulo: "Fim do horário comercial (hora): prazo dado depois dele começa a contar no dia seguinte",
+          tipo: "inteiro",
+          padrao: 18,
+          min: 12,
+          max: 24,
+          explica: "Vale para o prazo que o sistema dá a alguém: a validade do link da ficha e do link do termo da reserva e o prazo que já vem no comunicado a todos. Dado a partir desta hora (de Brasília), o prazo começa a contar no dia seguinte (decisão do dono de 24/11/2026). Ex.: link de 7 dias criado às 10h de 24/11/2026 → vale até 01/12/2026; criado às 21h45 → até 02/12/2026. A data de um fato (aceite, assinatura, envio, recibo) é sempre a data real de Brasília: termo aceito às 21h47 de 24/11 sai datado de 24/11. Com 24, o dia inteiro conta como expediente.",
+          consequencia: "Muda só os links e prazos dados daqui em diante; os já criados continuam com a data que têm. O link, o e-mail, o WhatsApp e a página da pessoa mostram a mesma data final. Sábado, domingo e feriado não mudam a conta (o prazo é de dias corridos).",
+          lei: "Sem lei específica: é o combinado com a pessoa (Código Civil, art. 132: na contagem do prazo, exclui-se o dia do começo e inclui-se o do vencimento)."
+        },
+        {
           chave: "dias_antecipacao_banco",
           grupo: "rotina",
           rotulo: 'Extrato: no aviso "Pix sem identificação", contar boletos que vencem até quantos dias depois',
@@ -2354,6 +2366,36 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     }
   });
 
+  // docs/js/brasilia.js
+  function dataDeBrasilia(instante) {
+    if (instante === null || instante === void 0 || instante === "") return "";
+    if (typeof instante === "string" && /^\d{4}-\d{2}-\d{2}$/.test(instante)) return instante;
+    const d2 = instante instanceof Date ? instante : new Date(instante);
+    return Number.isNaN(d2.getTime()) ? "" : formatoData.format(d2);
+  }
+  function inicioDoPrazo(agora = /* @__PURE__ */ new Date(), fimExpediente = 18) {
+    const hoje3 = dataDeBrasilia(agora);
+    return horaDeBrasilia(agora) >= horaDoExpediente(fimExpediente) ? somar(hoje3, 1) : hoje3;
+  }
+  var FUSO, MS_DIA, formatoData, formatoHora, horaDeBrasilia, somar, horaDoExpediente, ultimoDiaDoPrazo, fimDoDiaEmBrasilia, validadeDoLink;
+  var init_brasilia = __esm({
+    "docs/js/brasilia.js"() {
+      FUSO = "America/Sao_Paulo";
+      MS_DIA = 864e5;
+      formatoData = new Intl.DateTimeFormat("en-CA", { timeZone: FUSO, year: "numeric", month: "2-digit", day: "2-digit" });
+      formatoHora = new Intl.DateTimeFormat("en-GB", { timeZone: FUSO, hour: "2-digit", hourCycle: "h23" });
+      horaDeBrasilia = (agora = /* @__PURE__ */ new Date()) => Number(formatoHora.format(agora)) % 24;
+      somar = (data2, dias) => {
+        const [a, m, d2] = data2.split("-").map(Number);
+        return new Date(Date.UTC(a, m - 1, d2) + dias * MS_DIA).toISOString().slice(0, 10);
+      };
+      horaDoExpediente = (h) => Number.isInteger(Number(h)) && Number(h) >= 1 && Number(h) <= 24 ? Number(h) : 18;
+      ultimoDiaDoPrazo = (dias, agora = /* @__PURE__ */ new Date(), fimExpediente = 18) => somar(inicioDoPrazo(agora, fimExpediente), dias);
+      fimDoDiaEmBrasilia = (data2) => new Date(Date.parse(`${data2}T23:59:59.999-03:00`)).toISOString();
+      validadeDoLink = (dias, agora = /* @__PURE__ */ new Date(), fimExpediente = 18) => fimDoDiaEmBrasilia(ultimoDiaDoPrazo(dias, agora, fimExpediente));
+    }
+  });
+
   // docs/js/calculos.js
   var calculos_exports = {};
   __export(calculos_exports, {
@@ -2375,6 +2417,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     competenciaDe: () => competenciaDe,
     competenciaValida: () => competenciaValida,
     dataBr: () => dataBr,
+    dataBrDe: () => dataBrDe,
+    dataDeBrasilia: () => dataDeBrasilia,
     dataHoraBr: () => dataHoraBr,
     dataValida: () => dataValida,
     descontoPorPercentual: () => descontoPorPercentual,
@@ -2387,8 +2431,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     dividir: () => dividir,
     faltamDias: () => faltamDias,
     feriados: () => feriados,
+    fimDoExpediente: () => fimDoExpediente,
     fimDoPrazo: () => fimDoPrazo,
     hojeIso: () => hojeIso,
+    horaDeBrasilia: () => horaDeBrasilia,
+    inicioDoPrazo: () => inicioDoPrazo,
+    inicioDoPrazoAgora: () => inicioDoPrazoAgora,
     iso: () => iso,
     jurosAoDia: () => jurosAoDia,
     limitePagamento: () => limitePagamento,
@@ -2414,6 +2462,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     percentualPorDesconto: () => percentualPorDesconto,
     periodoServico: () => periodoServico,
     plural: () => plural,
+    prazoDadoAgora: () => prazoDadoAgora,
     proximoDiaUtil: () => proximoDiaUtil,
     reais: () => reais,
     sanearParametros: () => sanearParametros,
@@ -2426,6 +2475,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     tamanhoTexto: () => tamanhoTexto,
     totaisCobranca: () => totaisCobranca,
     ufDoCep: () => ufDoCep,
+    ultimoDiaDoPrazo: () => ultimoDiaDoPrazo,
+    validadeDoLink: () => validadeDoLink,
+    validadeDoLinkAgora: () => validadeDoLinkAgora,
     valorNotaFiscal: () => valorNotaFiscal,
     vencido: () => vencido,
     vencimentoDaCompetencia: () => vencimentoDaCompetencia
@@ -2485,10 +2537,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     return `${agora.getFullYear()}-${p2(agora.getMonth() + 1)}-${p2(agora.getDate())}-${p2(agora.getHours())}-${p2(agora.getMinutes())}`;
   }
   function diasEntre(a, b) {
-    return Math.round((paraData(b) - paraData(a)) / MS_DIA);
+    return Math.round((paraData(b) - paraData(a)) / MS_DIA2);
   }
   function somarDias(isoData, dias) {
-    return iso(new Date(paraData(isoData).getTime() + dias * MS_DIA));
+    return iso(new Date(paraData(isoData).getTime() + dias * MS_DIA2));
   }
   function dataBr(isoData) {
     if (!isoData) return "-";
@@ -2812,10 +2864,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     }
     return limpo;
   }
-  var ErroUsuario, faltamDias, FMT_REAIS, FMT_PCT, MS_DIA, FMT_DATA_HORA, agoraBr, FERIADOS, PRAZO_VISTORIA_ENTRADA, limiteVistoriaEntrada, PARCELAS_NOVAS_DESDE, parcelasDesde, FAIXAS_CEP, maisRecentePrimeiro, maisAntigoPrimeiro, semAcento, paraNomeDeArquivo, COMPETENCIA_RE, DATA_RE, FORMATOS_PARAMETRO;
+  var ErroUsuario, faltamDias, FMT_REAIS, FMT_PCT, MS_DIA2, fimDoExpediente, inicioDoPrazoAgora, prazoDadoAgora, validadeDoLinkAgora, dataBrDe, FMT_DATA_HORA, agoraBr, FERIADOS, PRAZO_VISTORIA_ENTRADA, limiteVistoriaEntrada, PARCELAS_NOVAS_DESDE, parcelasDesde, FAIXAS_CEP, maisRecentePrimeiro, maisAntigoPrimeiro, semAcento, paraNomeDeArquivo, COMPETENCIA_RE, DATA_RE, FORMATOS_PARAMETRO;
   var init_calculos = __esm({
     "docs/js/calculos.js"() {
       init_config_regras();
+      init_brasilia();
+      init_brasilia();
       ErroUsuario = class extends Error {
         constructor(mensagem) {
           super(mensagem);
@@ -2826,7 +2880,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       faltamDias = (n) => Number(n) === 0 ? "é hoje" : `${Number(n) === 1 ? "falta" : "faltam"} ${plural(n, "dia")}`;
       FMT_REAIS = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       FMT_PCT = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 4 });
-      MS_DIA = 864e5;
+      MS_DIA2 = 864e5;
+      fimDoExpediente = () => regra("fim_expediente_hora");
+      inicioDoPrazoAgora = (agora = /* @__PURE__ */ new Date()) => inicioDoPrazo(agora, fimDoExpediente());
+      prazoDadoAgora = (dias, agora = /* @__PURE__ */ new Date()) => ultimoDiaDoPrazo(dias, agora, fimDoExpediente());
+      validadeDoLinkAgora = (dias, agora = /* @__PURE__ */ new Date()) => validadeDoLink(dias, agora, fimDoExpediente());
+      dataBrDe = (instante) => dataBr(dataDeBrasilia(instante));
       FMT_DATA_HORA = new Intl.DateTimeFormat("pt-BR", { year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric" });
       agoraBr = () => dataHoraBr(Date.now());
       FERIADOS = /* @__PURE__ */ new Map();
@@ -9226,9 +9285,9 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     if (!f || !/^\d{4}-\d{2}-\d{2}$/.test(String(f.reserva_data || ""))) return null;
     const c = condicoesDaReserva(f);
     const aviso2 = regra("reserva_dia_aviso_documentos");
-    const somar = c.documentos_corridos ? somarDias : somarDiasUteis;
-    const documentosAte = somar(f.reserva_data, c.dias_uteis_documentos);
-    const avisoEm = aviso2 > 0 && aviso2 < c.dias_uteis_documentos ? proximoDiaUtil(somar(f.reserva_data, aviso2)) : null;
+    const somar2 = c.documentos_corridos ? somarDias : somarDiasUteis;
+    const documentosAte = somar2(f.reserva_data, c.dias_uteis_documentos);
+    const avisoEm = aviso2 > 0 && aviso2 < c.dias_uteis_documentos ? proximoDiaUtil(somar2(f.reserva_data, aviso2)) : null;
     return {
       documentos_ate: documentosAte,
       vale_ate: somarDias(f.reserva_data, c.dias_validade),
@@ -9262,7 +9321,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       devolver: reserva - reter,
       reter,
       integral: reter === 0,
-      motivo: `${porque}${prazo}: a empresa fica com ${reter >= reserva ? "a reserva inteira" : pct(c.retencao_pct)} (${reais(reter)}), como no termo aceito em ${dataBr(String(f.aceite_reserva.em).slice(0, 10))}`
+      motivo: `${porque}${prazo}: a empresa fica com ${reter >= reserva ? "a reserva inteira" : pct(c.retencao_pct)} (${reais(reter)}), como no termo aceito em ${dataBrDe(f.aceite_reserva.em)}`
     };
   }
   function empresaDesisteDaReserva(d2, fichaId, { justificada, externa = "", interna = "", motivo = "", data: data2 = hojeIso() }, usuario, hoje3 = hojeIso()) {
@@ -12603,18 +12662,18 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       const airbnb = ganhos.reduce((s, g) => s + g.valor, 0);
       let impostos = 0;
       let impostosEstimados = 0;
-      const somar = (r) => {
+      const somar2 = (r) => {
         impostos += r.valor;
         if (!r.confirmado) impostosEstimados += r.valor;
       };
-      for (const cb of pagas) if (cb.valor_nf > 0) somar(impostoDaOrigem(d2, "cobranca", cb.id, cb.valor_nf, cache));
-      for (const a of listaAvulsas) somar(impostoDaOrigem(d2, "avulsa", a.id, a.valor, cache));
+      for (const cb of pagas) if (cb.valor_nf > 0) somar2(impostoDaOrigem(d2, "cobranca", cb.id, cb.valor_nf, cache));
+      for (const a of listaAvulsas) somar2(impostoDaOrigem(d2, "avulsa", a.id, a.valor, cache));
       for (const g of ganhos) {
         const nf = nfAirbnbDe(d2, g.competencia);
         if (nf && nf.valor > 0) {
           const r = impostoDaOrigem(d2, "avulsa", nf.id, nf.valor, cache);
-          somar({ valor: Math.round(r.valor * g.valor / nf.valor), confirmado: r.confirmado });
-        } else somar({ valor: Math.round(g.valor * aliquotaImpostos() / 100), confirmado: false });
+          somar2({ valor: Math.round(r.valor * g.valor / nf.valor), confirmado: r.confirmado });
+        } else somar2({ valor: Math.round(g.valor * aliquotaImpostos() / 100), confirmado: false });
       }
       let iptu = 0;
       for (const p2 of iptusDe(i.id)) {
@@ -19451,7 +19510,7 @@ Não mova nem renomeie os arquivos desta pasta. chave-do-backup.json é a chave:
     if (!c) return { anexado: false, texto: `Nenhum certificado anexado${pc.computador ? ` (último computador: ${pc.computador})` : ""}.`, cor: "neutra", aviso: "" };
     const dias = diasAte(c.validade, agora);
     const quem = `${c.nome}${c.cnpj ? `, CNPJ ${c.cnpj}` : ""}`;
-    const onde = `${pc.computador ? `no computador ${pc.computador}` : "no programa do PC"}${c.instalado_em ? `, desde ${dataBr(c.instalado_em.slice(0, 10))}` : ""}`;
+    const onde = `${pc.computador ? `no computador ${pc.computador}` : "no programa do PC"}${c.instalado_em ? `, desde ${dataBrDe(c.instalado_em)}` : ""}`;
     const validade = dias < 0 ? `venceu em ${dataBr(c.validade)}` : `válido até ${dataBr(c.validade)} (${dias === 0 ? "vence hoje" : `faltam ${dias} ${dias === 1 ? "dia" : "dias"}`})`;
     const aviso2 = dias < 0 ? `O certificado digital da empresa venceu em ${dataBr(c.validade)}: os documentos não são mais assinados. Renove com a certificadora e anexe o novo em Sistema → Empresas.` : dias <= AVISO_CERTIFICADO_DIAS ? `O certificado digital da empresa vence em ${dataBr(c.validade)} (${dias === 0 ? "hoje" : `faltam ${dias} ${dias === 1 ? "dia" : "dias"}`}): renove com a certificadora e anexe o novo em Sistema → Empresas.` : "";
     return { anexado: true, texto: `Anexado: ${quem}, ${validade}, ${onde}.`, cor: dias < 0 ? "perigo" : aviso2 ? "aviso" : "ok", aviso: aviso2, nome: c.nome, validade: c.validade, dias };
@@ -20175,7 +20234,7 @@ ${t.deposito}`] : []
           "Condições da reserva:",
           "1. A reserva não forma a locação: o contrato só existe depois de assinado por todas as partes.",
           "2. Aprovada a ficha e assinado o contrato, o valor é abatido do primeiro aluguel.",
-          f && f.aceite_reserva && retencaoDaReserva(p2.reserva_valor, condicoesDaReserva(f).retencao_pct) > 0 ? `3. Não aprovada a ficha, o valor é devolvido por inteiro, sem desconto, na conta de onde veio o depósito. Na desistência, vale o termo de aceite da reserva de ${dataBr(String(f.aceite_reserva.em).slice(0, 10))}: ${textoDesistencia(f)}` : "3. Não aprovada a ficha, ou se o interessado desistir antes de assinar o contrato, o valor é devolvido por inteiro, sem desconto, na conta de onde veio o depósito."
+          f && f.aceite_reserva && retencaoDaReserva(p2.reserva_valor, condicoesDaReserva(f).retencao_pct) > 0 ? `3. Não aprovada a ficha, o valor é devolvido por inteiro, sem desconto, na conta de onde veio o depósito. Na desistência, vale o termo de aceite da reserva de ${dataBrDe(f.aceite_reserva.em)}: ${textoDesistencia(f)}` : "3. Não aprovada a ficha, ou se o interessado desistir antes de assinar o contrato, o valor é devolvido por inteiro, sem desconto, na conta de onde veio o depósito."
         ],
         tabela: proposta.length ? [["CONDIÇÕES PROPOSTAS (dependem da aprovação da ficha)", null], ...proposta] : [],
         depois: ["Damos quitação do valor acima, nos termos dos artigos 319 e 320 do Código Civil."],
@@ -20197,7 +20256,7 @@ ${t.deposito}`] : []
         paragrafos: [
           `${empresa}${e.cnpj ? `, CNPJ ${e.cnpj}` : ""}, devolveu em ${dataBr(f.devolucao_data)} a ${quem}, a importância de ${valorComExtenso(devolvido)}, ${qual} reserva de ${reais(f.reserva_valor)} recebida em ${dataBr(f.reserva_data)} para o imóvel situado na ${endereco2}, por transferência para a conta de onde veio o depósito, conforme o comprovante bancário anexo.`,
           `Com a devolução, a ficha cadastral fica encerrada${fichaSemContrato(f) ? ", sem a formação de contrato de locação" : ""}${empresaDesistiu ? `, por desistência da empresa${dobro ? ", que devolve a reserva em dobro (Código Civil, artigo 418)" : ""}${motivoCliente ? `. Motivo: ${motivoCliente.replace(/[.\s]+$/, "")}` : ""}` : ""}.`,
-          integral ? "As partes declaram que nada mais devem uma à outra em razão da reserva e da ficha cadastral, e dão-se mútua quitação desse valor (Código Civil, artigos 319 e 320)." : f.aceite_reserva && devolucaoDaReserva(f).devolver === devolvido ? `A diferença de ${reais(f.reserva_valor - devolvido)} fica com a empresa, como no termo de aceite da reserva aceito em ${dataBr(String(f.aceite_reserva.em).slice(0, 10))} (${devolucaoDaReserva(f).motivo}). As partes dão-se quitação do valor devolvido e do retido (Código Civil, artigos 319, 320 e 418).` : `A diferença de ${reais(f.reserva_valor - devolvido)} fica explicada nas observações da ficha. As partes dão-se quitação do valor devolvido (Código Civil, artigos 319 e 320).`,
+          integral ? "As partes declaram que nada mais devem uma à outra em razão da reserva e da ficha cadastral, e dão-se mútua quitação desse valor (Código Civil, artigos 319 e 320)." : f.aceite_reserva && devolucaoDaReserva(f).devolver === devolvido ? `A diferença de ${reais(f.reserva_valor - devolvido)} fica com a empresa, como no termo de aceite da reserva aceito em ${dataBrDe(f.aceite_reserva.em)} (${devolucaoDaReserva(f).motivo}). As partes dão-se quitação do valor devolvido e do retido (Código Civil, artigos 319, 320 e 418).` : `A diferença de ${reais(f.reserva_valor - devolvido)} fica explicada nas observações da ficha. As partes dão-se quitação do valor devolvido (Código Civil, artigos 319 e 320).`,
           `Os documentos pessoais enviados para a análise serão apagados em até ${meses} meses. Ficam guardados só os comprovantes da reserva e da devolução, por obrigação legal (Lei 13.709/2018, artigo 16, I).`
         ],
         assinaturas: [assinaEmpresa, assinaPessoa("recebi o valor e dou quitação")],
@@ -20540,7 +20599,7 @@ ${t.deposito}`] : []
       return {
         ...base,
         titulo: partes[0] || "TERMO DE ACEITE DA RESERVA DE IMÓVEL",
-        data: String(a.em).slice(0, 10),
+        data: dataDeBrasilia(a.em),
         paragrafos: partes.slice(1).flatMap((x) => x.split("\n")).filter((x) => !/^Declaração: /.test(x)),
         depois: [
           `ACEITE ELETRÔNICO. ${f.inquilino_nome} leu este termo e marcou "Li e concordo" no link enviado só a essa pessoa, em ${quando4} (horário de Brasília).`,
@@ -20551,7 +20610,7 @@ ${t.deposito}`] : []
         ],
         imagem: a.assinatura ? { rotulo: "Assinatura desenhada na tela:", src: a.assinatura } : null,
         assinaturas: [],
-        arquivo: nomeArq("Termo aceite reserva", String(a.em).slice(0, 10))
+        arquivo: nomeArq("Termo aceite reserva", dataDeBrasilia(a.em))
       };
     }
     const t = termoDaReserva(d2, f);
@@ -20702,7 +20761,7 @@ ${t.deposito}`] : []
     const nome = String(nomeDaPessoa(f, pessoa2) || "").trim().split(/\s+/)[0];
     const fiador = pessoa2 !== "interessado";
     const qual = fiador ? `da ficha do fiador${f.inquilino_nome ? ` (locação de ${f.inquilino_nome})` : ""}` : "da sua ficha cadastral";
-    const validade = dataBr(String(link2.vence_em).slice(0, 10));
+    const validade = dataBrDe(link2.vence_em);
     if (lembrete) {
       return `Olá${nome ? `, ${nome}` : ""}! Passando para lembrar ${qual}${faltando.length ? `. Falta: ${faltando.join("; ")}` : ""}. O link vale até ${validade}: ${link2.url}
 Se preferir não seguir, é só avisar por lá${!fiador && f.reserva_valor > 0 ? `. ${textoDesistencia(f)}` : ""}.`.replace(/\.\.$/, ".");
@@ -20868,7 +20927,7 @@ Pelo link você preenche os dados, manda os documentos e, depois, a ficha assina
       geracaoDosLinks = 0;
       chaveDosLinks = (fichaId) => fichaId ? String(Number(fichaId)) : "";
       esquecendo = (promessa) => promessa.finally(esquecerLinks);
-      criarLinkNaNuvem = (corpo) => esquecendo(pedir2("link", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) }));
+      criarLinkNaNuvem = (corpo) => esquecendo(pedir2("link", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...corpo, fim_expediente: fimDoExpediente() }) }));
       guardarPdfNaNuvem = (fichaId, pessoa2, blob) => esquecendo(pedir2(`pdf?ficha=${Number(fichaId)}&pessoa=${encodeURIComponent(pessoa2)}`, { method: "PUT", headers: { "Content-Type": "application/pdf" }, body: blob }));
       linksNaNuvem = (fichaId = null) => {
         const geracao = geracaoDosLinks;
@@ -21731,7 +21790,7 @@ Lei Geral de Proteção de Dados (Lei 13.709/2018), art. 18: direito de acesso a
   function textoWhatsappAceite(f, link2) {
     const nome = String(f.inquilino_nome || "").trim().split(/\s+/)[0];
     const valor = valorDaReserva(f);
-    return `Olá${nome ? `, ${nome}` : ""}! Seguem as condições do imóvel e o termo da reserva${valor ? ` (${reais(valor)}, abatida do 1º aluguel)` : ""}. Leia e, se estiver de acordo, dê o aceite por este link, só seu, que vale até ${dataBr(String(link2.vence_em).slice(0, 10))}: ${link2.url}
+    return `Olá${nome ? `, ${nome}` : ""}! Seguem as condições do imóvel e o termo da reserva${valor ? ` (${reais(valor)}, abatida do 1º aluguel)` : ""}. Leia e, se estiver de acordo, dê o aceite por este link, só seu, que vale até ${dataBrDe(link2.vence_em)}: ${link2.url}
 Depois do aceite, mandamos a conta para o depósito.${avisoDaDesistencia(condicoesDaReservaAgora(), valor) ? " Atenção: leia a regra da desistência antes de depositar." : ""} Qualquer dúvida, é só responder.`;
   }
   function urlDoAceite(fichaId) {
@@ -21761,7 +21820,7 @@ Depois do aceite, mandamos a conta para o depósito.${avisoDaDesistencia(condico
       urls = /* @__PURE__ */ new Map();
       lembrarUrlDoAceite = (fichaId, link2) => urls.set(Number(fichaId), link2);
       cfg3 = { base: "api/aceite-reserva/", buscar: (...a) => fetch(...a) };
-      criarLinkDoAceite = (corpo) => pedir3("link", { method: "POST", body: JSON.stringify(corpo) });
+      criarLinkDoAceite = (corpo) => pedir3("link", { method: "POST", body: JSON.stringify({ ...corpo, fim_expediente: fimDoExpediente() }) });
       lerAceiteNaNuvem = (fichaId) => pedir3(`ler?ficha=${Number(fichaId)}`).then((r) => r.link || null);
     }
   });
@@ -22557,7 +22616,7 @@ ${DICA_DOCUMENTOS}`].join("\n");
   function linkDaFicha(f, pessoa2, hoje3) {
     const l = f && f.links_ficha && f.links_ficha[pessoa2];
     const naAba = f && urlDoLink(f.id, pessoa2);
-    return l && !l.encerrado && naAba && String(l.vence_em).slice(0, 10) >= hoje3 ? { url: naAba.url, validade: dataBr(String(l.vence_em).slice(0, 10)) } : { url: "", validade: "" };
+    return l && !l.encerrado && naAba && dataDeBrasilia(l.vence_em) >= hoje3 ? { url: naAba.url, validade: dataBrDe(l.vence_em) } : { url: "", validade: "" };
   }
   function camposDoTermo(f, hoje3) {
     if (!f) return {};
@@ -22581,9 +22640,9 @@ ${DICA_DOCUMENTOS}`].join("\n");
       texto_conferencia: TEXTO_CONFERENCIA,
       aviso_desistencia: avisoDaDesistencia(c, valor),
       requisitos: String(f.requisitos || "").split(/\n+/).map((x) => x.trim()).filter(Boolean).map((x) => `- ${x}`).join("\n"),
-      link_termo: link2 && String(link2.vence_em).slice(0, 10) >= hoje3 ? link2.url : "",
-      link_termo_validade: link2 ? dataBr(String(link2.vence_em).slice(0, 10)) : "",
-      aceite_data: f.aceite_reserva ? dataBr(String(f.aceite_reserva.em).slice(0, 10)) : "",
+      link_termo: link2 && dataDeBrasilia(link2.vence_em) >= hoje3 ? link2.url : "",
+      link_termo_validade: link2 ? dataBrDe(link2.vence_em) : "",
+      aceite_data: f.aceite_reserva ? dataBrDe(f.aceite_reserva.em) : "",
       desistencia: f.aceite_reserva ? textoDesistencia(f) : "",
       prazo_documentos: f.aceite_reserva && pz ? dataBr(pz.documentos_ate) : "",
       // reprovação só com justificativa por escrito (pedido do advogado, 24/11/2026): o motivo da decisão vai no e-mail
@@ -26998,7 +27057,7 @@ Abrir o Gmail mesmo assim? O texto vai com o buraco, e você completa por lá.`,
     if (!s) return `${topo3}${avisoVolta}<p class="suave">Não deu para ver a situação agora (sem internet?). Recarregue a página para tentar de novo.</p></div>`;
     let situacao2;
     if (s.origem === "conta" && s.ligado) {
-      situacao2 = `<p>${etiqueta("Ligado", "ok")} Os e-mails saem pela conta <b>${esc(s.conta || "")}</b>${s.remetente && s.remetente !== s.conta ? `, com o remetente <b>${esc(s.remetente)}</b>` : ""}${s.ligado_em ? ` <span class="suave">(conectado em ${dataBr(String(s.ligado_em).slice(0, 10))})</span>` : ""}.</p>`;
+      situacao2 = `<p>${etiqueta("Ligado", "ok")} Os e-mails saem pela conta <b>${esc(s.conta || "")}</b>${s.remetente && s.remetente !== s.conta ? `, com o remetente <b>${esc(s.remetente)}</b>` : ""}${s.ligado_em ? ` <span class="suave">(conectado em ${dataBrDe(s.ligado_em)})</span>` : ""}.</p>`;
     } else if (s.origem === "segredo" && s.ligado) {
       situacao2 = `<p>${etiqueta("Ligado", "ok")} Pelo jeito antigo (código colado no Cloudflare), com o remetente <b>${esc(s.remetente || "")}</b>.</p>
       <p class="suave">Para passar ao botão: clique em <b>Conectar o Gmail</b>. Depois disso o jeito antigo deixa de ser usado e o técnico pode apagá-lo da nuvem (para ele: segredo GMAIL_REFRESH_TOKEN no Cloudflare).</p>`;
@@ -28230,7 +28289,7 @@ A conta e a chave Pix para pagamento não mudam. Nunca pedimos pagamento em outr
     const m = { ...MODELOS[chave] || MODELOS.contatos, ...editado ? Object.fromEntries(["titulo", "assunto", "texto", "whatsapp", "lembrete", "aviso", "ciencia"].map((k) => [k, editado[k] || ""])) : {} };
     const pessoas = editado ? editado.destinos : destinatarios(d());
     if (!pessoas.length) return `${voltar}<h1>Novo comunicado a todos</h1><div class="alerta aviso">Não há inquilino com contrato ativo hoje: o comunicado não teria para quem ir.</div>`;
-    const prazo = editado ? editado.prazo : somarDias(hojeIso(), DIAS_PRAZO);
+    const prazo = editado ? editado.prazo : somarDias(inicioDoPrazoAgora(), DIAS_PRAZO);
     const email = editado ? editado.email_empresa : dadoDaEmpresa(d(), {}, "email_contato") || "administracao@ankjck.com.br";
     const ultimo = [...d().comunicados || []].sort((a, b) => b.id - a.id).find((x) => x.telefone_empresa);
     const telefone = editado ? editado.telefone_empresa : ultimo ? ultimo.telefone_empresa : "";
@@ -28720,7 +28779,7 @@ ${m.texto}`);
     <p class="suave">Reserva de <b>${reais(valor)}</b>, abatida do 1º aluguel · documentos em ${prazoDosDocumentosTexto(c)} do depósito · reservado por ${c.dias_validade} dias · ficha não aprovada: devolve tudo · ${esc(desistenciaResumo(c, valor))} (o termo avisa em destaque antes do aceite e do pagamento) · devolução (quando houver) em ${plural(c.dias_uteis_devolucao, "dia útil", "dias úteis")}. <a href="#/regras">Regras do sistema</a></p>
     <details><summary class="suave">Ver o termo como a pessoa vai ler</summary><pre class="texto-modelo">${esc(textoDoTermo(termoDaReserva(d(), f)))}</pre></details>
     <p class="acoes">${botoes} ${botaoEmail("ficha_termo_reserva", { ficha: f.id }, "✉ E-mail: condições e termo da reserva")} ${pdf}</p>
-    <p class="suave" data-situacao-aceite>${vale ? `Link até ${dataBr(String(vale.vence_em).slice(0, 10))}.${naAba ? "" : " Para mandar de novo, gere outro (o endereço só aparece na hora em que é gerado)."}` : ""}</p></div>`;
+    <p class="suave" data-situacao-aceite>${vale ? `Link até ${dataBrDe(vale.vence_em)}.${naAba ? "" : " Para mandar de novo, gere outro (o endereço só aparece na hora em que é gerado)."}` : ""}</p></div>`;
   }
   async function ligarTermoReserva(raiz) {
     const caixa = raiz.querySelector("[data-termo-reserva]");
@@ -28751,7 +28810,7 @@ ${m.texto}`);
     const s = caixa.querySelector("[data-situacao-aceite]");
     if (s && !l.resposta && caixa.isConnected) {
       s.innerHTML = `${l.encerrado_em ? etiqueta("link encerrado", "neutra") : Date.parse(l.vence_em) < Date.now() ? etiqueta("link vencido", "aviso") : etiqueta(l.aberto_em ? "aberto, sem aceite ainda" : "ainda não aberto", "info")}
-      <span class="suave">${l.aberto_em ? ` · aberto em ${esc(quando3(l.aberto_em))}` : ""}${l.codigo_enviado_para ? ` · código pedido para ${esc(l.codigo_enviado_para)}` : ""} · link até ${dataBr(String(l.vence_em).slice(0, 10))}</span>`;
+      <span class="suave">${l.aberto_em ? ` · aberto em ${esc(quando3(l.aberto_em))}` : ""}${l.codigo_enviado_para ? ` · código pedido para ${esc(l.codigo_enviado_para)}` : ""} · link até ${dataBrDe(l.vence_em)}</span>`;
     }
   }
   async function janelaDoAceite(f, l) {
@@ -28760,7 +28819,7 @@ ${m.texto}`);
       titulo: `Termo da reserva: ${f.inquilino_nome}`,
       sim: "Fechar",
       nao: "Voltar",
-      html: `<p>Vale até <b>${dataBr(String(l.vence_em).slice(0, 10))}</b>. É só desta pessoa: não publique.</p>
+      html: `<p>Vale até <b>${dataBrDe(l.vence_em)}</b>. É só desta pessoa: não publique.</p>
       <p class="texto-aviso"><b>Copie agora:</b> por segurança, este link não fica guardado no sistema. Se você mandar agora o e-mail "Condições e termo da reserva" (botão na ficha), ele já leva o link.</p>
       <p><textarea rows="5" readonly data-texto-link style="width:100%">${esc(textoWhatsappAceite(f, l))}</textarea></p>
       <p class="acoes"><button type="button" class="secundario pequeno" data-copiar-link>Copiar a mensagem</button>
@@ -28817,7 +28876,7 @@ ${m.texto}`);
             f.id,
             { link_aceite: { vence_em: l.vence_em, criado_em: (/* @__PURE__ */ new Date()).toISOString(), por: login() } },
             login(),
-            `Link do termo da reserva de ${f.inquilino_nome} gerado (vale até ${dataBr(String(l.vence_em).slice(0, 10))})`
+            `Link do termo da reserva de ${f.inquilino_nome} gerado (vale até ${dataBrDe(l.vence_em)})`
           ));
           await mostrar();
           await janelaDoAceite(buscar2("fichas", id), l);
@@ -28987,7 +29046,7 @@ ${m.texto}`);
     const naAba = urlDoLink(f.id, pessoa2);
     if (naAba) return naAba;
     const vale = linkValido(f, pessoa2);
-    const ate = vale ? dataBr(String(vale.vence_em).slice(0, 10)) : "";
+    const ate = vale ? dataBrDe(vale.vence_em) : "";
     const ok = await janela({
       titulo: "Mandar o link de novo",
       sim: "Gerar e mostrar",
@@ -29026,7 +29085,7 @@ ${m.texto}`);
       const links = { ...buscar(db, "fichas", f.id).links_ficha || {} };
       const { url, encerrado, ...anterior } = links[pessoa2] || {};
       links[pessoa2] = { ...anterior, vence_em: link2.vence_em, criado_em: (/* @__PURE__ */ new Date()).toISOString(), por: login(), ...pdfSha ? { pdf_sha256: pdfSha } : {} };
-      atualizar(db, "fichas", f.id, { links_ficha: links }, login(), `Link da ficha de ${nomeDaPessoa(f, pessoa2)} ${manter ? "mandado de novo (o anterior continua valendo)" : "gerado"} (vale até ${dataBr(link2.vence_em.slice(0, 10))})`);
+      atualizar(db, "fichas", f.id, { links_ficha: links }, login(), `Link da ficha de ${nomeDaPessoa(f, pessoa2)} ${manter ? "mandado de novo (o anterior continua valendo)" : "gerado"} (vale até ${dataBrDe(link2.vence_em)})`);
     });
     return { url: link2.url, vence_em: link2.vence_em };
   }
@@ -29045,7 +29104,7 @@ ${m.texto}`);
       const l = (f.links_ficha || {})[p2];
       const valido = linkValido(f, p2);
       return `<li style="margin:6px 0"><b>${esc(nomeDaPessoa(f, p2))}</b>${p2 === "interessado" ? "" : ' <span class="suave">(fiador)</span>'}
-      <span data-situacao-link="${p2}">${valido ? `<span class="suave">link até ${dataBr(String(l.vence_em).slice(0, 10))}</span>` : l ? etiqueta("link vencido", "aviso") : '<span class="suave">sem link</span>'}</span><br>
+      <span data-situacao-link="${p2}">${valido ? `<span class="suave">link até ${dataBrDe(l.vence_em)}</span>` : l ? etiqueta("link vencido", "aviso") : '<span class="suave">sem link</span>'}</span><br>
       ${encerrada ? "" : botao("gerarLinkFicha", valido ? "Gerar novo link" : "Gerar link", { id: f.id, pessoa: p2 }, valido ? "secundario pequeno" : "pequeno", valido ? "Gerar um link novo? O link atual deixa de valer (o que a pessoa já mandou continua guardado)." : "")}
       ${valido && !encerrada ? botao("compartilharLinkFicha", urlDoLink(f.id, p2) ? "Copiar / WhatsApp" : "Mandar de novo", { id: f.id, pessoa: p2 }, "secundario pequeno") : ""}</li>`;
     }).join("");
@@ -29097,7 +29156,7 @@ ${m.texto}`);
       if (!el) continue;
       const ultimo = (l.respostas || []).at(-1);
       el.innerHTML = `${etiqueta(TEXTO_SITUACAO_LINK[l.situacao] || l.situacao, COR_LINK[l.situacao] || "neutra")}
-      <span class="suave">${ultimo ? ` · dados enviados em ${dataHoraBr(ultimo.em)}` : ""}${(l.arquivos || []).filter((a) => !a.apagado_em).length ? ` · ${l.arquivos.filter((a) => !a.apagado_em).length} arquivo(s)` : ""}${l.situacao === "Encerrado" ? "" : Date.parse(l.vence_em) < Date.now() ? ` · link venceu em ${new Date(l.vence_em).toLocaleDateString("pt-BR")}` : ` · link até ${new Date(l.vence_em).toLocaleDateString("pt-BR")}`}</span>`;
+      <span class="suave">${ultimo ? ` · dados enviados em ${dataHoraBr(ultimo.em)}` : ""}${(l.arquivos || []).filter((a) => !a.apagado_em).length ? ` · ${l.arquivos.filter((a) => !a.apagado_em).length} arquivo(s)` : ""}${l.situacao === "Encerrado" ? "" : Date.parse(l.vence_em) < Date.now() ? ` · link venceu em ${dataBrDe(l.vence_em)}` : ` · link até ${dataBrDe(l.vence_em)}`}</span>`;
     }
     caixa._links = links;
     const fichaAqui = buscar2("fichas", Number(caixa.dataset.fichaOnline));
@@ -29143,7 +29202,7 @@ ${m.texto}`);
     const partes = [];
     if (l.situacao === "Desistiu" && p2 === "interessado" && !fichaSemContrato(f)) {
       partes.push(`<div class="alerta perigo"><b>${esc(nome)} avisou pelo link, em ${dataHoraBr(l.desistiu_em)}, que não vai seguir com a análise.</b> Registre com "Desistiu antes de assinar"${f.reserva_valor > 0 ? (() => {
-        const dv = devolucaoDaReserva(f, { data: String(l.desistiu_em || "").slice(0, 10) || null });
+        const dv = devolucaoDaReserva(f, { data: dataDeBrasilia(l.desistiu_em) || null });
         return dv.integral ? ` e devolva a reserva de ${reais(f.reserva_valor)} por inteiro` : dv.devolver === 0 ? ` (a reserva de ${reais(f.reserva_valor)} fica com a empresa: ${esc(dv.motivo)})` : ` e devolva ${reais(dv.devolver)} da reserva de ${reais(f.reserva_valor)} (${esc(dv.motivo)})`;
       })() : ""}.</div><p>${botaoDesistencia(f)}</p>`);
     }
@@ -29349,7 +29408,7 @@ ${m.texto}`);
       titulo: `Link da ficha: ${nomeDaPessoa(f, pessoa2)}`,
       sim: "Fechar",
       nao: "Voltar",
-      html: `<p>Vale até <b>${dataBr(String(link2.vence_em).slice(0, 10))}</b>. É só desta pessoa: não publique.</p>
+      html: `<p>Vale até <b>${dataBrDe(link2.vence_em)}</b>. É só desta pessoa: não publique.</p>
       <p class="texto-aviso"><b>Copie agora:</b> por segurança, este link não fica guardado no sistema. Para mandar de novo depois, o sistema gera outro endereço com a mesma validade (e este continua valendo).</p>
       <p><textarea rows="5" readonly data-texto-link style="width:100%">${esc(texto3)}</textarea></p>
       <p class="acoes"><button type="button" class="secundario pequeno" data-copiar-link>Copiar a mensagem</button>
@@ -33077,7 +33136,7 @@ ${texto3}` : texto3;
         <input type="date" name="data" value="${hojeIso()}" style="width:auto" title="Data da assinatura">${atalhosData()}
         <label class="botao secundario pequeno enviar" title="Termo aditivo assinado (PDF ou foto)"><span data-nome-escolhido>Anexar</span><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}" data-arquivo-doc></label>
         <button class="pequeno">Marcar assinado</button></form>` : ""}</td></tr>`).join("")}</table></div></div>` : ""}
-    ${lista3.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Assunto</th><th>Arquivo</th><th></th></tr>${lista3.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}${a.ciencia_por ? `<br><span class="suave mini">ciência da herança: ${esc(a.ciencia_por)} em ${dataBr(String(a.ciencia_em).slice(0, 10))}</span>` : ""}</td><td class="nw">${aditivoPerdido(a) ? `${abrir2(a)} ${acoesPerdido(a)}` : `${abrir2(a)}${xAnexo("excluirAditivoAssinado", { id: a.id, so: "arquivo" })}`}</td>
+    ${lista3.length ? `<div class="rolagem"><table><tr><th>Data</th><th>Assunto</th><th>Arquivo</th><th></th></tr>${lista3.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}${a.ciencia_por ? `<br><span class="suave mini">ciência da herança: ${esc(a.ciencia_por)} em ${dataBrDe(a.ciencia_em)}</span>` : ""}</td><td class="nw">${aditivoPerdido(a) ? `${abrir2(a)} ${acoesPerdido(a)}` : `${abrir2(a)}${xAnexo("excluirAditivoAssinado", { id: a.id, so: "arquivo" })}`}</td>
       <td class="n nw">${a.arquivo ? `${botaoEmail("aditivo_assinado", { contrato: c.id, aditivo: a.id })} ` : ""}${ver(a)} ${opera() ? a.arquivo ? botao("excluirAditivoAssinado", "×", { id: a.id, so: "termo" }, "x-excluir") : botao("excluir", "×", { tabela: "aditivos", id: a.id }, "x-excluir", `Excluir o termo aditivo de ${dataBr(a.data)}?${oQueContinuaDoAditivo(a, c)}`) : ""}</td></tr>`).join("")}</table></div>` : '<p class="suave">Nenhum termo aditivo registrado.</p>'}
     ${anteriores.map(([x, l]) => `<details open><summary>Histórico: aditivos do contrato anterior de <a href="#/contrato/${x.id}?ir=aditivos">${esc(x.inquilino_nome)}</a> (${l.length})</summary>
       <div class="rolagem"><table>${l.map((a) => `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(a.assunto)}</td><td>${abrir2(a)}</td></tr>`).join("")}</table></div></details>`).join("")}
@@ -36695,14 +36754,14 @@ ${xref}
     const m = String(metodo).toUpperCase();
     if (!SIM.EXTRATO[contaId]) erroTeste(`A conta "${contaId}" não está configurada na ponte (no modo de teste só existem ank e jck).`);
     if (m === "GET" && partes[0] === "extrato") return { conta_id: contaId, de: q.de, ate: q.ate, lancamentos: extratoTeste(contaId, q.de, q.ate) };
-    if (m === "GET" && partes[0] === "saldo") return { ...SIM.SALDO[contaId] || SIM.SALDO.ank, conta_id: contaId, date: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) };
+    if (m === "GET" && partes[0] === "saldo") return { ...SIM.SALDO[contaId] || SIM.SALDO.ank, conta_id: contaId, date: hojeIso() };
     if (m === "GET" && partes[0] === "boletos" && partes[1] === "pagos") return { conta_id: contaId, de: q.de, ate: q.ate, por: q.por || "payment_date", boletos: boletosPagosTeste(contaId, q.de, q.ate, q.por || "payment_date") };
     if (m === "GET" && partes[0] === "dda") return { conta_id: contaId, ...SIM.DDA[contaId] || { items: [] } };
     if (partes[0] === "pagamentos") {
       if (m === "POST" && partes[1] === "decodificar") {
         const group_id = idTeste();
         const items = Array.isArray(corpo && corpo.items) && corpo.items.length ? corpo.items.map((it2, i) => validarItem(it2, i + 1)) : erroTeste("Informe pelo menos um pagamento.");
-        gruposTeste.set(group_id, items.map((it2) => itemLidoSimulado(contaId, it2, { id: idTeste(), group_id, hoje: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) })));
+        gruposTeste.set(group_id, items.map((it2) => itemLidoSimulado(contaId, it2, { id: idTeste(), group_id, hoje: hojeIso() })));
         return { conta_id: contaId, group_id };
       }
       const grupoId = decodeURIComponent(partes[1] || "");
@@ -36721,7 +36780,7 @@ ${xref}
     }
     if (m === "GET" && partes[0] === "comprovante") {
       const ref = decodeURIComponent(partes[1] || "");
-      const dia = q.data || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+      const dia = q.data || hojeIso();
       const l = extratoTeste(contaId, `${dia.slice(0, 7)}-01`, `${dia.slice(0, 7)}-31`).find((x) => x.reference === ref || x.local_reference && x.local_reference === ref);
       if (!l) erroTeste(`Não achei o lançamento ${ref} no extrato (modo de teste).`);
       const pdf = pdfDeTexto([
@@ -36743,6 +36802,7 @@ ${xref}
     "docs/js/banco-fase2.js"() {
       init_banco();
       init_c6_comum();
+      init_calculos();
       SIM = null;
       ponte = async (contaId, metodo, caminho, corpo) => {
         if (!emTeste()) return chamarPonte(contaId, metodo, caminho, corpo);
