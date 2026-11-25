@@ -274,3 +274,41 @@ test('regras dos honorários: 10% e 30 dias, por contrato, com explicação, con
   assert.match(p.lei, /arts\. 389, 395 e 404/);
   assert.match(p.lei, /REsp 1\.274\.629/);
 });
+
+test('acordo quebrado: honorários nunca de novo sobre a mesma dívida (decisão de 25/11); os do 1º acordo continuam na parcela', () => {
+  const { d, c, cb, ago, out } = comProvas();
+  // 1º acordo (24/11) com honorários, parcela única que vence 10/12/2026 e não é paga
+  const { acordo, parcelas } = R.fazerAcordo(d, { contrato_id: c.id, ids: [ago.id, cb.id], total: 400000, parcelas: 1, primeiro_vencimento: '2026-12-10', cobranca: { honorarios: true } }, 'julio', HOJE);
+  const p = parcelas[0];
+  assert.ok(acordo.honorarios > 0);
+  assert.equal(R.totais(p).a_pagar_sem_desconto, 400000 + acordo.honorarios, 'os honorários do 1º acordo continuam devidos na parcela');
+  assert.equal(R.parcelaJaComHonorarios(d, p), true);
+  // em 20/01/2027 (41 dias de atraso da parcela): só a parcela → não sugere
+  const s = R.sugestaoHonorarios(d, c, [p], '2027-01-20');
+  assert.equal(s.cabe, false);
+  assert.deepEqual(s.faltam, ['as parcelas de acordo atrasadas já tiveram honorários no acordo: não se cobram de novo sobre a mesma dívida']);
+  // com o boleto de 10/2026 (fora do acordo, 71 dias): a base é só ele
+  const s2 = R.sugestaoHonorarios(d, c, [p, out], '2027-01-20');
+  assert.equal(s2.cabe, true);
+  assert.equal(s2.base, C.liquidar(out, '2027-01-20').valor_devido);
+  assert.deepEqual(s2.boletos.map((x) => x.id), [out.id]);
+  // novo acordo refazendo a parcela, sem honorários: a parcela dele também não volta a ter honorários depois
+  assert.throws(() => R.previaAcordo(d, { contrato_id: c.id, ids: [p.id], total: 450000, parcelas: 1, primeiro_vencimento: '2027-02-10', cobranca: { honorarios: true } }, '2027-01-20'), /não cabem/);
+  const b = R.fazerAcordo(d, { contrato_id: c.id, ids: [p.id], total: 450000, parcelas: 1, primeiro_vencimento: '2027-02-10' }, 'julio', '2027-01-20');
+  assert.equal(R.parcelaJaComHonorarios(d, b.parcelas[0]), true, 'a dívida do 2º acordo já teve honorários no 1º');
+  assert.equal(R.sugestaoHonorarios(d, c, [b.parcelas[0]], '2027-04-20').cabe, false);
+  // acordo sem honorários: a parcela atrasada pode ter (é a 1ª vez)
+  const x = comProvas();
+  const semHon = R.fazerAcordo(x.d, { contrato_id: x.c.id, ids: [x.ago.id, x.cb.id], total: 400000, parcelas: 1, primeiro_vencimento: '2026-12-10' }, 'julio', HOJE);
+  assert.equal(R.sugestaoHonorarios(x.d, x.c, [semHon.parcelas[0]], '2027-01-20').cabe, true);
+});
+
+test('cálculo final depois do acordo quebrado: a parcela com honorários fica fora da base', () => {
+  const { d, c, cb, ago } = comProvas();
+  R.fazerAcordo(d, { contrato_id: c.id, ids: [ago.id, cb.id], total: 400000, parcelas: 1, primeiro_vencimento: '2026-12-10', cobranca: { honorarios: true } }, 'julio', HOJE);
+  R.atualizar(d, 'contratos', c.id, { data_saida: '2026-11-30' }, 'julio');
+  const s = R.sugestoesCobrancaDaSaida(d, c, '2027-01-20').honorarios;
+  // a base é só o boleto de 10/2026 (fora do acordo), não a parcela
+  const out = R.boletoDoMes(d, c.id, '2026-10');
+  assert.deepEqual(s.boletos.map((x) => x.id), [out.id]);
+});

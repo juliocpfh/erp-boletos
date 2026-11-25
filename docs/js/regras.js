@@ -9659,7 +9659,18 @@ export function despesasCobraveis(d, c) {
 
 /** Registros da cobrança ligados aos boletos (os do boleto e do acordo de que ele faz parte) mais os "em geral" do contrato. */
 function registrosDosBoletos(d, c, boletos) {
-  const ids = new Set(boletos.flatMap((cb) => registrosDoBoleto(d, cb).map((x) => x.id)));
+  // parcela de acordo: valem também os registros dos boletos que o acordo substituiu (o aviso foi dado na dívida original)
+  const todos = [];
+  const juntar = (cb, vistos) => {
+    if (!cb || vistos.has(cb.id)) return;
+    vistos.add(cb.id);
+    todos.push(cb);
+    const a = ehParcelaAcordo(cb) && buscar(d, 'acordos', cb.acordo_parcela_de);
+    if (a) for (const o of origensDoAcordo(d, a)) juntar(o, vistos);
+  };
+  const vistos = new Set();
+  for (const cb of boletos) juntar(cb, vistos);
+  const ids = new Set(todos.flatMap((cb) => registrosDoBoleto(d, cb).map((x) => x.id)));
   return registrosCobrancaDo(d, c.id).filter((x) => ids.has(x.id) || (!x.cobranca_id && !x.acordo_id));
 }
 
@@ -9669,17 +9680,34 @@ function registrosDosBoletos(d, c, boletos) {
  * { cabe, valor, base, percentual, dias, advogado, boletos, faltam: [motivos], texto }.
  * Ex.: boleto vencido há 45 dias que hoje vale R$ 2.000,00 com multa e juros, aviso por carta e advogado registrado → R$ 200,00.
  */
+/**
+ * Parcela de um acordo cuja dívida já teve honorários (do próprio acordo, ou de um acordo anterior que ele refez): no acordo
+ * quebrado nunca se cobram honorários de novo sobre a mesma dívida (decisão do dono, 25/11/2026). Os do 1º acordo continuam
+ * devidos dentro da parcela. Ex.: parcela de R$ 2.200,00 (R$ 2.000,00 + R$ 200,00 de honorários) não paga → em 20/01 o novo
+ * acordo ou o cálculo final não sugere honorários sobre ela.
+ */
+export function parcelaJaComHonorarios(d, cb, vistos = new Set()) {
+  if (!cb || !ehParcelaAcordo(cb) || vistos.has(cb.acordo_parcela_de)) return false;
+  vistos.add(cb.acordo_parcela_de);
+  const a = buscar(d, 'acordos', cb.acordo_parcela_de);
+  if (!a) return false;
+  if ((a.honorarios || 0) > 0 || (a.honorarios_judiciais || 0) > 0) return true;
+  return origensDoAcordo(d, a).some((x) => parcelaJaComHonorarios(d, x, vistos));
+}
+
 export function sugestaoHonorarios(d, c, boletos, data = C.hojeIso()) {
   const percentual = Number(CR.regra('honorarios_percentual', c)) || 0;
   const dias = Number(CR.regra('honorarios_dias_atraso', c)) || 30;
-  const atrasados = boletos.filter((cb) => cb && !cb.data_pagamento && C.vencido(cb.vencimento, data) && C.diasEntre(cb.vencimento, data) > dias);
+  const vencidos = boletos.filter((cb) => cb && !cb.data_pagamento && C.vencido(cb.vencimento, data) && C.diasEntre(cb.vencimento, data) > dias);
+  const jaCom = vencidos.filter((cb) => parcelaJaComHonorarios(d, cb));
+  const atrasados = vencidos.filter((cb) => !jaCom.includes(cb));
   const base = atrasados.reduce((s, cb) => s + Math.max(0, C.liquidar(cb, data).valor_devido - somaValores(cb.encargos_cobranca || [])), 0);
   const ligados = registrosDosBoletos(d, c, boletos).filter((x) => !x.data || x.data <= data);
   const adv = ligados.filter((x) => x.tipo === 'Advogado' && String(x.advogado || '').trim()).pop() || null;
   const aviso = ligados.some((x) => AVISOS_COBRANCA.includes(x.tipo) && (!adv || String(x.data || '') <= String(adv.data || '')));
   const faltam = [];
   if (!percentual) faltam.push('a regra "Honorários do advogado na cobrança fora da Justiça" está em 0%');
-  if (!atrasados.length) faltam.push(`nenhum boleto com mais de ${dias} dias de atraso`);
+  if (!atrasados.length) faltam.push(jaCom.length ? `as parcelas de acordo atrasadas já tiveram honorários no acordo: não se cobram de novo sobre a mesma dívida` : `nenhum boleto com mais de ${dias} dias de atraso`);
   if (!aviso) faltam.push('falta o aviso por escrito antes do advogado (registro de carta, e-mail, WhatsApp ou notificação)');
   if (!adv) faltam.push(ligados.some((x) => x.tipo === 'Advogado') ? 'falta o nome do advogado no registro "Advogado"' : 'falta o registro do advogado que atuou (tipo "Advogado", com o nome)');
   const valor = Math.round((base * percentual) / 100);
