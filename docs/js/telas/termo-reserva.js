@@ -28,12 +28,14 @@ function prazosHtml(f) {
   const pz = R.prazosDaReserva(f);
   if (!pz) return `<div class="alerta info"><b>Falta o depósito da reserva de ${reais(R.valorDaReserva(f))}.</b> Quando chegar, registre o valor, a data e o comprovante em "Editar". Os prazos do termo contam do depósito.</div>`;
   if (R.fichaSemContrato(f) || f.situacao === 'Aprovada') return '';
+  // ficha reaberta (dono, 25/11/2026): os prazos do depósito deixam de valer; vale o guia da reabertura (alerta em "Situação")
+  if (f.reaberta_em) return '<p class="suave">Ficha reaberta para nova análise: os prazos contados do depósito não valem mais (vale o guia da reabertura, em "Situação").</p>';
   const hoje = C.hojeIso();
   const dv = R.devolucaoDaReserva(f, { data: hoje });
   const c = R.condicoesDaReserva(f);
   const passou = (x) => (x < hoje ? ` ${etiqueta('passou', 'aviso')}` : '');
   return `<ul>
-    <li>Documentos até <b>${dataBr(pz.documentos_ate)}</b> (${C.plural(c.dias_uteis_documentos, 'dia útil', 'dias úteis')} do depósito)${passou(pz.documentos_ate)}${pz.documentos_ate < hoje && R.fichaSemDocumentos(f) ? ' · os documentos não estão marcados como recebidos: pelo termo, conta como desistência (use "Desistiu antes de assinar")' : ''}</li>
+    <li>Documentos até <b>${dataBr(pz.documentos_ate)}</b> (${R.prazoDosDocumentosTexto(c)} do depósito)${passou(pz.documentos_ate)}${pz.documentos_ate < hoje && R.fichaSemDocumentos(f) ? ' · os documentos não estão marcados como recebidos: pelo termo, conta como desistência (use "Desistiu antes de assinar")' : ''}${pz.documentos_ate >= hoje ? ` · se faltar documento, a equipe fala com a pessoa ${pz.aviso_documentos_em ? `em <b>${dataBr(pz.aviso_documentos_em)}</b> e ` : ''}no último dia` : ''}</li>
     <li>O imóvel fica reservado até <b>${dataBr(pz.vale_ate)}</b>${passou(pz.vale_ate)}</li>
     <li>${pz.arrependimento_ate ? `Desistência com tudo de volta até <b>${dataBr(pz.arrependimento_ate)}</b>; hoje, se` : 'Sem prazo de devolução total; se'} desistir: ${dv.integral ? `devolve ${reais(dv.devolver)} (tudo)` : dv.devolver === 0 ? `a reserva de ${reais(dv.reter)} fica com a empresa` : `devolve <b>${reais(dv.devolver)}</b> e a empresa fica com ${reais(dv.reter)}`}</li></ul>`;
 }
@@ -62,7 +64,7 @@ export function caixaTermoReserva(f) {
       ${vale && naAba ? botao('compartilharLinkTermo', 'Copiar / WhatsApp', { id: f.id }, 'secundario pequeno') : ''}`;
   return `<div class="cartao" data-termo-reserva="${f.id}">${titulo}
     <p><b>1º passo, antes do depósito:</b> a pessoa recebe as condições do imóvel e o termo da reserva${E.nuvem ? ', confirma o e-mail com um código e dá o aceite pelo link' : ', assina o termo (gov.br ou à mão) e devolve'}. Depois ela deposita a reserva.</p>
-    <p class="suave">Reserva de <b>${reais(valor)}</b>, abatida do 1º aluguel · documentos em ${C.plural(c.dias_uteis_documentos, 'dia útil', 'dias úteis')} do depósito · reservado por ${c.dias_validade} dias · ficha não aprovada: devolve tudo · ${esc(desistenciaResumo(c, valor))} (o termo avisa em destaque antes do aceite e do pagamento) · devolução (quando houver) em ${C.plural(c.dias_uteis_devolucao, 'dia útil', 'dias úteis')}. <a href="#/regras">Regras do sistema</a></p>
+    <p class="suave">Reserva de <b>${reais(valor)}</b>, abatida do 1º aluguel · documentos em ${R.prazoDosDocumentosTexto(c)} do depósito · reservado por ${c.dias_validade} dias · ficha não aprovada: devolve tudo · ${esc(desistenciaResumo(c, valor))} (o termo avisa em destaque antes do aceite e do pagamento) · devolução (quando houver) em ${C.plural(c.dias_uteis_devolucao, 'dia útil', 'dias úteis')}. <a href="#/regras">Regras do sistema</a></p>
     <details><summary class="suave">Ver o termo como a pessoa vai ler</summary><pre class="texto-modelo">${esc(REC.textoDoTermo(REC.termoDaReserva(d(), f)))}</pre></details>
     <p class="acoes">${botoes} ${botaoEmail('ficha_termo_reserva', { ficha: f.id }, '✉ E-mail: condições e termo da reserva')} ${pdf}</p>
     <p class="suave" data-situacao-aceite>${vale ? `Link até ${dataBr(String(vale.vence_em).slice(0, 10))}.${naAba ? '' : ' Para mandar de novo, gere outro (o endereço só aparece na hora em que é gerado).'}` : ''}</p></div>`;

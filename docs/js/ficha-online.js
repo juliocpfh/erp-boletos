@@ -156,7 +156,8 @@ export function dadosParaFicha(f, l) {
   if (ultimo) for (const [k, v] of Object.entries(ultimo.valores || {})) if (campos.has(k) && v !== null && v !== undefined && v !== '') out[k] = v;
   if (l.pessoa === 'interessado') {
     const docs = (l.arquivos || []).filter((a) => !a.apagado_em).map((a) => a.documento);
-    const renda = new Set([...Object.values(R.DOCUMENTOS_RENDA).flat(), ...R.PARTES_DOCUMENTOS_PF.renda_padrao, 'Faturamento dos 3 últimos meses (extratos bancários da empresa em PDF ou declaração do contador)']);
+    // 'Comprovante de renda dos 3 últimos meses': o nome de antes de 24/11/2026, de documentos já mandados pelo link
+    const renda = new Set([...Object.values(R.DOCUMENTOS_RENDA).flat(), ...R.PARTES_DOCUMENTOS_PF.renda_padrao, 'Comprovante de renda dos 3 últimos meses', 'Faturamento dos 3 últimos meses (extratos bancários da empresa em PDF ou declaração do contador)']);
     if (docs.some((x) => /^Documento com foto/.test(x) || /^Contrato social|^Cartão do CNPJ/.test(x))) out.doc_pessoais = true;
     if (docs.some((x) => renda.has(x))) out.doc_renda = true;
     if (docs.some((x) => /residência|endereço da empresa/i.test(x))) out.doc_residencia = true;

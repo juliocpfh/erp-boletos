@@ -53,8 +53,8 @@ DOCUMENTOS PARA A ANÁLISE
 RESERVA
 - Valor: {reserva_combinada}, abatido do 1º aluguel se a ficha for aprovada
 - O imóvel fica reservado para você por {dias_validade} dias depois do depósito
-- Depois do depósito, você tem {dias_documentos} dias úteis para mandar a ficha e os documentos; sem eles, a reserva é cancelada
-- Ficha não aprovada: devolvemos tudo
+- Depois do depósito, você tem {prazo_documentos_dias} para mandar a ficha e os documentos; se faltar algum, entramos em contato antes do fim do prazo; sem eles, a reserva é cancelada
+- Ficha não aprovada: informamos o motivo por escrito e devolvemos tudo; você pode reapresentar documentos que fortaleçam a análise
 - {regra_desistencia}
 - {texto_conferencia}
 - Quando houver devolução, ela sai em até {dias_devolucao} dias úteis, na conta de onde veio o depósito
@@ -97,6 +97,19 @@ A seguradora analisa junto e pode pedir algum documento a mais.[fim]
 Seus dados são tratados conforme a LGPD (Lei 13.709/2018).`,
   },
   {
+    chave: 'ficha_lembrete_documentos', nome: 'Lembrete dos documentos da ficha', etapa: 'Ficha',
+    // aviso no 4º dia e no último dia do prazo dos documentos (pedido do advogado, 24/11/2026, item 1.2; dias corridos, dono)
+    assunto: '{imovel}: documentos da ficha (prazo até {prazo_documentos})',
+    texto: `Olá, {nome}, tudo bem?
+
+Ainda não recebemos todos os documentos da ficha para o imóvel da {endereco}. [se ultimo_dia_documentos]Hoje, {prazo_documentos}, é o último dia do prazo.[senão]O prazo vai até {prazo_documentos}.[fim]
+
+Continuamos aguardando e estamos à disposição para tirar dúvidas e ajudar no que for preciso: se tiver alguma dificuldade com algum documento, responda este e-mail ou nos ligue[se link], e mande o que tiver pelo link da ficha:
+{link}[senão].[fim]
+
+Pelo termo da reserva, sem os documentos no prazo a reserva é cancelada e conta como desistência.`,
+  },
+  {
     chave: 'ficha_aprovada', nome: 'Ficha aprovada', etapa: 'Ficha',
     assunto: 'Ficha aprovada – {imovel}: próximos passos',
     perguntas: [['prazo', 'Prazo do contrato', 'texto']],
@@ -119,7 +132,11 @@ Próximos passos: contrato para assinar em até 2 dias úteis[se fiador] (o fiad
     texto: `Olá, {nome},
 
 Agradecemos o interesse no imóvel da {imovel}. Depois da análise, não foi possível aprovar a ficha neste momento.
-
+[se motivo_reprovacao]
+Motivo: {motivo_reprovacao}
+[fim][se pode_reapresentar]
+Se tiver documentos que fortaleçam a análise (por exemplo, outro comprovante de renda), responda este e-mail com eles: a ficha é analisada de novo.
+[fim]
 [se reserva][se devolucao]A reserva de {reserva} já foi devolvida em {devolucao_data}, na conta de onde veio o depósito.[senão][se retencao_aplicada]Na conferência, informações ou documentos enviados não corresponderam à realidade, o que conta como desistência no termo da reserva aceito em {aceite_data}: [se devolve_algo]devolvemos {devolver_reserva} e ficamos com {reter_reserva}, em até {dias_devolucao} dias úteis, na conta de onde veio o depósito.[senão]a reserva de {reserva} fica com a empresa, como no termo.[fim][senão]A reserva de {reserva} será devolvida em até {dias_devolucao} dias úteis, na conta de onde veio o depósito.[fim][fim]
 
 [fim]Os documentos enviados serão apagados, conforme a LGPD (Lei 13.709/2018).`,
@@ -131,7 +148,9 @@ Agradecemos o interesse no imóvel da {imovel}. Depois da análise, não foi pos
     texto: `Olá, {nome},
 
 Devolvemos {devolucao} em {devolucao_data}, na conta de onde veio a reserva do imóvel da {imovel}. Anexos: o comprovante e o termo de devolução e quitação.
-
+[se motivo_desistencia]
+Não seguimos com a reserva: {motivo_desistencia}
+[fim]
 A ficha está encerrada[se devolucao_parcial]. Da reserva, {devolucao_parcial} não foi devolvido[se termo_aceito], como no termo da reserva aceito em {aceite_data}[fim]: qualquer dúvida, responda este e-mail[senão], sem valores pendentes[fim]. Se puder, responda com o termo assinado (pode ser pelo gov.br); o comprovante do banco já prova a devolução.
 
 Os documentos da análise serão apagados, conforme a LGPD (Lei 13.709/2018).`,
@@ -426,6 +445,14 @@ Já resolveu? Responda com uma foto ou um documento, para darmos a baixa. Sem is
  * [chave, texto antigo exato, texto novo]. O trecho só é trocado se ainda estiver igual ao antigo (o resto do texto editado fica).
  */
 export const ATUALIZACOES_EMAIL = [
+  // ajustes do advogado no termo da reserva (24/11/2026, itens 1.2 e 1.4): contato antes do fim do prazo; reprovação por escrito
+  // a empresa desistiu da reserva (dono, 25/11/2026): a justificativa externa vai para o cliente
+  ['ficha_devolucao', 'Anexos: o comprovante e o termo de devolução e quitação.\n\nA ficha está encerrada', 'Anexos: o comprovante e o termo de devolução e quitação.\n[se motivo_desistencia]\nNão seguimos com a reserva: {motivo_desistencia}\n[fim]\nA ficha está encerrada'],
+  // prazo dos documentos em dias corridos (correção do dono, 24/11/2026): "7 dias corridos" (ou "dias úteis", pela regra)
+  ['ficha_termo_reserva', 'você tem {dias_documentos} dias úteis para mandar', 'você tem {prazo_documentos_dias} para mandar'],
+  ['ficha_termo_reserva', 'para mandar a ficha e os documentos; sem eles, a reserva é cancelada', 'para mandar a ficha e os documentos; se faltar algum, entramos em contato antes do fim do prazo; sem eles, a reserva é cancelada'],
+  ['ficha_termo_reserva', '- Ficha não aprovada: devolvemos tudo\n', '- Ficha não aprovada: informamos o motivo por escrito e devolvemos tudo; você pode reapresentar documentos que fortaleçam a análise\n'],
+  ['ficha_reprovada', 'não foi possível aprovar a ficha neste momento.\n\n[se reserva]', 'não foi possível aprovar a ficha neste momento.\n[se motivo_reprovacao]\nMotivo: {motivo_reprovacao}\n[fim][se pode_reapresentar]\nSe tiver documentos que fortaleçam a análise (por exemplo, outro comprovante de renda), responda este e-mail com eles: a ficha é analisada de novo.\n[fim]\n[se reserva]'],
   // termo de aceite da reserva (decisões do dono de 2026-11-24): desistência, prazo dos documentos e devolução em dias úteis
   ['ficha_envio', 'Aprovada a ficha, ela é descontada do primeiro aluguel; não aprovada, ou se você desistir antes de assinar, devolvemos tudo.[senão]', 'Aprovada a ficha, ela é descontada do primeiro aluguel[se termo_aceito], como no termo da reserva que você aceitou em {aceite_data}: não aprovada, devolvemos tudo. {desistencia}[senão]; não aprovada, ou se você desistir antes de assinar, devolvemos tudo.[fim][senão]'],
   ['ficha_envio', 'Depois: análise em até 2 dias úteis,', '[se prazo_documentos]Prazo para mandar a ficha e os documentos: {prazo_documentos} (sem eles, a reserva é cancelada).\n\n[fim]Depois: análise em até 2 dias úteis,'],
