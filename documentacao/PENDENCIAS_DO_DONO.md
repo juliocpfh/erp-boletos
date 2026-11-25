@@ -15,11 +15,12 @@
 - [ ] Também das PRs: ler o termo da reserva com os ajustes do advogado (7 dias corridos, reserva de 7 dias, empresa pode desistir); ler o PDF do contrato com as cláusulas novas (#406) e os documentos da locação (#407: aviso de desocupação com a caixa, notificação com AR e art. 47); perguntar ao advogado sobre a liminar do art. 59, § 1º, VIII no residencial.
 
 **Pequenas observações para depois (não impedem nada):**
-- Boleto coberto inteiro pela reserva aparece "em aberto" com R$ 0,00.
-- Caixa do fiador na troca de titular: a frase "o que devia já foi abatido" aparece também quando ele não devia nada.
-- O termo do 2º acordo (acordo refeito) não cita os honorários do 1º.
-- A 2ª via mostra "setting 'hidden'" no console do navegador.
-- Também anotadas nos testes: a pergunta 2 do resumo do contrato fala em honorários sem as condições (vale a cláusula); no cálculo final, mudar à mão o valor da multa do aviso não muda o texto da descrição; o CPF da testemunha fica no navegador depois de "Sair" (`assinatura-contrato-<id>`); a ponte do C6 (`emission_date`), `conciliacao.js` e `envios.js` ainda usam a data de antes (das 21h em diante sairia o dia seguinte); a 2ª notificação de atraso não pega o boleto que venceu depois da 1ª (só avisa).
+- A pergunta 2 do resumo do contrato fala em honorários sem as condições (vale a cláusula).
+- No cálculo final, mudar à mão o valor da multa do aviso não muda o texto da descrição.
+- `envios.js` ainda usa a data de antes (das 21h em diante sairia o dia seguinte): fica com a PR do agendador de envios.
+- A 2ª notificação de atraso não pega o boleto que venceu depois da 1ª (só avisa).
+
+**Resolvido na PR dos acertos de 25/11 (`claude/acertos-25-11`, #428):** [x] boleto quitado inteiro pela reserva ("Quitado pela reserva", quitação e NF sozinhas no vencimento); [x] o termo do acordo refeito cita os honorários e despesas do 1º; [x] a 2ª via sem o erro "setting 'hidden'" (e com os botões de e-mail, WhatsApp e copiar funcionando); [x] "Sair" apaga do navegador o que ficou da assinatura do contrato (`assinatura-contrato-<id>`, com o CPF da testemunha) e pergunta antes de apagar uma vistoria pela metade; [x] conciliação do banco e ponte do C6 (`emission_date`) pela data de Brasília. A frase da caixa do fiador na troca de titular fica como está (modelo geral, decisão de 25/11).
 
 **Feito na PR #424 (25/11):** [x] boleto descontado da garantia no cálculo final (ou na devolução da troca de titular): antes de gravar, a janela "Confira o que vai acontecer" mostra o boleto, a notificação de atraso que fecha e o que acontece com a caução, e pede "Já cancelei no banco" quando o boleto foi emitido no banco (PDF ou C6). Desfeito o cálculo final, o boleto volta a "Em aberto" e a notificação reabre. Ex.: caução de R$ 5.400,00 − boleto de 10/2026 de R$ 1.800,00 = R$ 3.600,00 a devolver. Falta conferir (testador): celular de verdade, nuvem com 2 abas, versão PC e a troca de titular com garantia nova.
 
@@ -27,7 +28,7 @@
 
 **Decidido em 25/11:** [x] o botão "Corrigir caução" fica com esse nome (confirma 14/11; não há mais pendência).
 
-**Próximo trabalho do Claude:** o **kit de teste automático** (agendado pelo dono): banco com os casos montados e um roteiro que sobe o site e a nuvem local e roda os 4 lugares.
+**Kit de teste automático:** [x] feito (PRs #425 e #426): `node tools/kit-teste.mjs` monta o banco com os casos, sobe o site, a nuvem local e a versão PC e roda os 4 lugares e os links (`tools/kit-teste/README.md`).
 
 ## ONDE PARAMOS em 24/11/2026, noite (histórico; atualizado em 25/11)
 
@@ -57,7 +58,7 @@
 
 **Fora do sistema:** rever boletos em aberto alterados à mão antes de 24/11; alertas "A verificar" da importação de 2026 (5 contratos); chaves do C6; verificação em duas etapas no GitHub; cópia do OneDrive no HD externo; certificado da ANK vence 02/01/2027 (aviso a partir de 03/12); 16/12/2026: CBS 2027 com o contador.
 
-**Ideia para testes mais rápidos (pergunta do dono, 24/11):** kit de teste pronto (banco com os casos montados e um roteiro que sobe servidor + nuvem local e roda os 4 lugares); fazer quando o dono pedir. **25/11: agendado pelo dono, é o próximo trabalho do Claude.**
+**Ideia para testes mais rápidos (pergunta do dono, 24/11):** kit de teste pronto (banco com os casos montados e um roteiro que sobe servidor + nuvem local e roda os 4 lugares); fazer quando o dono pedir. **25/11: [x] feito (PRs #425 e #426).**
 
 ## PEDIDOS DE 24/11/2026 (fazer em seguida, na ordem; marque `[x]` ao concluir)
 

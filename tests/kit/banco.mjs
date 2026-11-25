@@ -138,6 +138,37 @@ export function montarBanco() {
       texto_aceito: 'TERMO DE ACEITE DA RESERVA DE IMÓVEL (kit de teste)', texto_sha256: 'a'.repeat(64), condicoes: R.condicoesDaReservaAgora(), reserva_valor: 50000 }, u);
     Object.assign(ids, { ficha: ficha.id, imovelVago: vago.id, fichaAntiga: antiga.id });
 
+    // 9. Reserva que quita o boleto inteiro (25/11/2026): reserva de R$ 2.000,00 e boleto 11/2026 de R$ 1.800,00 → "Quitado
+    // pela reserva" (sobram R$ 200,00 para o mês seguinte)
+    const julia = contrato(imovel('Kit Reserva'), { inquilino_nome: 'Júlia Reserva Teste', data_entrada: '2026-11-01', vigencia_inicio: '2026-11-01', vigencia_fim: '2029-04-30',
+      reserva_valor: 200000, reserva_data: '2026-10-25' });
+    const juliaNov = boleto(julia, '2026-11');
+    R.realocarReserva(d, R.buscar(d, 'contratos', julia.id), u);
+    Object.assign(ids, { julia: julia.id, juliaBoleto: juliaNov.id });
+
+    // 9b. Reserva que quita o boleto 10/2026 (venceu em 10/11): ao abrir o Painel, a quitação é registrada sozinha com a data
+    // do vencimento e a NF entra na fila (decisão do dono de 25/11/2026, "sozinha, no vencimento")
+    const kaua = contrato(imovel('Kit Quitação'), { inquilino_nome: 'Kauã Quitação Teste', data_entrada: '2026-10-01', vigencia_inicio: '2026-10-01', vigencia_fim: '2029-03-31',
+      reserva_valor: 200000, reserva_data: '2026-09-25' });
+    const kauaOut = boleto(kaua, '2026-10');
+    R.realocarReserva(d, R.buscar(d, 'contratos', kaua.id), u);
+    Object.assign(ids, { kaua: kaua.id, kauaBoleto: kauaOut.id });
+
+    // 10. Acordo refeito (25/11/2026): 1º acordo em 24/08/2026 com honorários e a carta de R$ 73,50, parcela vencida em 10/09;
+    // o 2º acordo, hoje, refaz a parcela e o termo dele cita os honorários e a despesa do 1º
+    const lia = contrato(imovel('Kit Acordo Refeito'), { inquilino_nome: 'Lia Acordo Refeito Teste', data_entrada: '2026-05-01', vigencia_inicio: '2026-05-01', vigencia_fim: '2028-10-31' });
+    const mai = boleto(lia, '2026-05');
+    const jun = boleto(lia, '2026-06');
+    for (const m of ['2026-07', '2026-08', '2026-09', '2026-10']) pagar(boleto(lia, m));
+    const carta = R.inserir(d, 'cobranca_registros', { contrato_id: lia.id, cobranca_id: mai.id, data: '2026-07-20', tipo: 'Carta', valor: 7350, descricao: 'Carta com AR', arquivos: ['cobranca-carta-2026-07-20-ar.pdf'] }, u);
+    R.inserir(d, 'cobranca_registros', { contrato_id: lia.id, data: '2026-08-01', tipo: 'Advogado', advogado: 'Dr. Exemplo Teste, OAB/PR 12.345', descricao: 'Advogado atuando', arquivos: [] }, u);
+    const dia1 = '2026-08-24';
+    const a1 = R.fazerAcordo(d, { contrato_id: lia.id, ids: [mai.id, jun.id], total: C.liquidar(mai, dia1).valor_devido + C.liquidar(jun, dia1).valor_devido, parcelas: 1,
+      primeiro_vencimento: '2026-09-10', cobranca: { honorarios: true, despesas: [carta.id] } }, u, dia1);
+    const velha = a1.parcelas[0];
+    const a2 = R.fazerAcordo(d, { contrato_id: lia.id, ids: [velha.id], total: C.liquidar(velha, HOJE).valor_devido, parcelas: 2, primeiro_vencimento: '2026-12-15' }, u, HOJE);
+    Object.assign(ids, { lia: lia.id, acordoAntigo: a1.acordo.id, acordoRefeito: a2.acordo.id });
+
     R.normalizar(d);
     d.revisao = (d.revisao || 0) + 1;
     return { banco: d, ids };

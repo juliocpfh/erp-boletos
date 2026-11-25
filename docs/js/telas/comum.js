@@ -31,7 +31,7 @@ export const link = (hash, texto, cls = 'botao secundario pequeno') => `<a class
 
 export const etiqueta = (texto, tipo) => `<span class="etiqueta ${tipo}">${esc(texto)}</span>`;
 
-export const situacao = (s) => etiqueta(s, { 'Paga em dia': 'ok', 'Paga com atraso': 'aviso', 'Em aberto': 'neutra', Carência: 'info', 'Em acordo': 'info', 'Descontado da garantia': 'info', 'Paga em parte': 'aviso' }[s] || 'neutra');
+export const situacao = (s) => etiqueta(s, { 'Paga em dia': 'ok', 'Paga com atraso': 'aviso', 'Em aberto': 'neutra', Carência: 'info', 'Em acordo': 'info', 'Descontado da garantia': 'info', 'Quitado pela reserva': 'ok', 'Paga em parte': 'aviso' }[s] || 'neutra');
 
 export const item = (rotulo, valor) => `<div><div class="rotulo">${esc(rotulo)}</div><div class="valor">${valor}</div></div>`;
 
@@ -401,6 +401,34 @@ export async function buscarComLimite(url, opcoes = {}, ms = TEMPO_DE_RESPOSTA) 
 export function redesenharSeLivre(endereco) {
   if (location.hash !== endereco || formularioAberto()) return null;
   return mostrar();
+}
+
+/**
+ * Quitação pela reserva no vencimento (decisão do dono de 25/11/2026, "sozinha, no vencimento"): ao abrir ou atualizar o Painel,
+ * os boletos cobertos inteiros pela reserva que já venceram são registrados sozinhos, com a data do vencimento, e a NF entra
+ * na fila da tela NF. Na nuvem, só com internet (o número da NF só anda com internet): sem ela, um aviso e fica para a próxima
+ * abertura. A regra roda dentro de ``alterar`` (relê o banco): duas abas ou dois aparelhos não registram duas vezes.
+ */
+let avisoQuitacaoSemInternet = '';
+export async function quitarPelaReservaNoVencimento() {
+  if (!opera() || !E.d) return 0;
+  const hoje = C.hojeIso();
+  const devidos = R.quitacoesPelaReservaAte(d(), hoje);
+  if (!devidos.length) return 0;
+  if (E.nuvem && !E.nuvem.online) {
+    if (avisoQuitacaoSemInternet !== hoje) {
+      avisoQuitacaoSemInternet = hoje;
+      aviso(`Sem internet: ${devidos.length === 1 ? 'o boleto quitado pela reserva que venceu fica' : `os ${devidos.length} boletos quitados pela reserva que venceram ficam`} para registrar (e ir para a NF) na próxima abertura com internet.`, 'aviso');
+    }
+    return 0;
+  }
+  const endereco = location.hash;
+  const feitos = await alterar((db) => R.registrarQuitacoesPelaReserva(db, hoje, login()).map((cb) => cb.id));
+  if (feitos && feitos.length) {
+    aviso(`${feitos.length === 1 ? 'Quitação pela reserva registrada' : `${feitos.length} quitações pela reserva registradas`} no vencimento: a NF está na fila da tela NF.`, 'ok');
+    await redesenharSeLivre(endereco);
+  }
+  return feitos ? feitos.length : 0;
 }
 
 /** Contratos herdados antes desta regra: trazem os dados do anterior uma vez (ao abrir o Painel). */

@@ -41,6 +41,7 @@ import { listarPaginas } from './c6-boletos-listar.mjs';
 import { rotasFase2 } from './rotas-fase2.mjs';
 import { comNovasTentativas } from './c6-tentativas.mjs';
 import { explicarRecusa } from './c6-extrato.mjs';
+import { hojeEmBrasilia } from './c6-datas.mjs';
 
 export const VERSAO = '0.1.0';
 const PASTA = path.dirname(fileURLToPath(import.meta.url));
@@ -433,7 +434,7 @@ export function respostaSimulada(contaId, pedido, ambiente = 'sandbox') {
   const pix = (pedido[M.CAMPOS.forma] || {})[M.CAMPOS.pix] || null;
   return {
     id: crypto.randomUUID(), external_reference_id: pedido[M.CAMPOS.referencia] || `S${digitos(25)}`, status: M.STATUS.criado,
-    amount: Number(valor), due_date: pedido[M.CAMPOS.vencimento], emission_date: new Date().toISOString().slice(0, 10), description: pedido[M.CAMPOS.descricao] || '',
+    amount: Number(valor), due_date: pedido[M.CAMPOS.vencimento], emission_date: hojeEmBrasilia(), description: pedido[M.CAMPOS.descricao] || '',
     days_after_due_date: pedido[M.CAMPOS.dias_baixa] ?? null, payer: pedido[M.CAMPOS.pagador], fees: pedido[M.CAMPOS.encargos] || {}, origin: pedido[M.CAMPOS.origem] || null,
     payment_method: {
       bank_slip: { originator_id: 'SIMULADO', billing_scheme: bs[M.CAMPOS.carteira] || M.CARTEIRAS[ambiente], billing_type: pix ? 'HYBRID' : 'BANK_SLIP', digitable_line: linhaDigitavel, bar_code: codigoBarras,
@@ -498,7 +499,7 @@ const inteiro = (v) => { const n = Number(v); return Number.isInteger(n) && n >=
 const RE_EMAIL = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
 /** Dia de hoje em Brasília ('AAAA-MM-DD'). */
-const hojeBrasilia = () => new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+const hojeBrasilia = () => hojeEmBrasilia();
 
 /**
  * Multa, juros e desconto (``fees``) nos limites: só os campos conhecidos, tipos permitidos, valores ≥ 0; o desconto menor que o
@@ -622,7 +623,7 @@ const simuladoOuErro = (conta, id) => {
 
 // Boletos novos por conta e por dia (BOLETOS_POR_DIA no .env): se a senha da ponte vazar, ninguém emite milhares de boletos
 const emitidosNoDia = new Map(); // "conta|AAAA-MM-DD" → quantidade
-const diaDeHoje = () => new Date().toISOString().slice(0, 10);
+const diaDeHoje = () => hojeEmBrasilia();
 function conferirLimiteDiario(cfg, conta) {
   const chave = `${conta.id}|${diaDeHoje()}`;
   for (const k of emitidosNoDia.keys()) if (!k.endsWith(diaDeHoje())) emitidosNoDia.delete(k);
@@ -794,7 +795,7 @@ export const SERVICOS = {
       { metodo: 'POST', padrao: /^\/simulado\/pagar\/([A-Za-z0-9_-]+)\/?$/, async executar({ cfg, conta, params, corpo }) {
         if (!cfg.simulado) throw new ErroHttp(404, 'Rota só do modo simulado.');
         const r = simuladoOuErro(conta, params[0]);
-        const hoje = new Date().toISOString().slice(0, 10);
+        const hoje = hojeEmBrasilia();
         r.status = corpo && corpo.aguardando ? M.STATUS.aguardando_credito : M.STATUS.pago;
         // como na listagem do C6: payments[] { amount (texto), external_payment_id, payment_date, credit_date, payment_type }
         r.payments = [{ amount: Number(corpo && corpo.amount !== undefined ? corpo.amount : r.amount).toFixed(2), external_payment_id: crypto.randomUUID(),

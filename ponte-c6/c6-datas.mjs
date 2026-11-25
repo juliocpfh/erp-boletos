@@ -10,6 +10,13 @@ const RE_DATA = /^\d{4}-\d{2}-\d{2}$/;
 /** Dias corridos entre duas datas (ate - de); 0 quando iguais. */
 export const diasEntre = (de, ate) => Math.round((Date.parse(`${ate}T00:00:00Z`) - Date.parse(`${de}T00:00:00Z`)) / 86400000);
 
+const FORMATO_BRASILIA = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' });
+/**
+ * Data de Brasília ('AAAA-MM-DD') de um instante (padrão: agora), em qualquer fuso do computador. Nunca `toISOString()`, que é a
+ * data de Londres: 24/11/2026 às 21h47 em Brasília → '2026-11-24' (o toISOString dava '2026-11-25'). Decisão do dono, 25/11/2026.
+ */
+export const hojeEmBrasilia = (agora = new Date()) => FORMATO_BRASILIA.format(agora instanceof Date ? agora : new Date(agora));
+
 /** Hoje no fuso do computador, 'AAAA-MM-DD'. */
 export function hoje() {
   const d = new Date();

@@ -516,6 +516,51 @@ function cartaDaNotificacao(d, c, n, base, x) {
 const acordoDe = (d, c, alvo) => { const a = R.buscar(d, 'acordos', Number(alvo.acordo)); return a && a.contrato_id === c.id ? a : null; };
 
 /**
+ * Acordo refeito (decisão do dono, 25/11/2026): honorários e despesas de cobrança de acordo anterior que vieram nas parcelas
+ * deste (`encargos_cobranca`, já dentro da dívida), por acordo de origem; só os de fora da Justiça (os da ação judicial ficam
+ * de fora). Ex.: [{ acordo, honorarios: 20000, despesas: 7350 }] → "R$ 200,00 de honorários e R$ 73,50 de despesas de
+ * cobrança do acordo de 24/11/2026". Os deste acordo (escolhidos nele) não contam.
+ */
+export function cobrancaDeAcordoAnterior(d, a) {
+  const somar = (m, t, v) => m.set(t, (m.get(t) || 0) + v);
+  const proprios = new Map();
+  if (a.honorarios) somar(proprios, a.honorarios_texto, a.honorarios);
+  if (a.honorarios_judiciais) somar(proprios, a.honorarios_judiciais_texto, a.honorarios_judiciais);
+  for (const x of a.despesas_cobranca || []) somar(proprios, x.texto, x.valor);
+  const nasParcelas = new Map();
+  for (const cb of R.parcelasDoAcordo(d, a)) for (const e of cb.encargos_cobranca || []) if (e.valor > 0) somar(nasParcelas, e.texto, e.valor);
+  // de que acordo veio cada texto (sobe a cadeia: o 3º acordo pode trazer os honorários do 1º pelo 2º)
+  const deOnde = (ant, texto, vistos = new Set()) => {
+    if (!ant || vistos.has(ant.id)) return null;
+    vistos.add(ant.id);
+    if (ant.honorarios && ant.honorarios_texto === texto) return { acordo: ant, tipo: 'honorarios' };
+    if (ant.honorarios_judiciais && ant.honorarios_judiciais_texto === texto) return { acordo: ant, tipo: 'judicial' };
+    if ((ant.despesas_cobranca || []).some((x) => x.texto === texto)) return { acordo: ant, tipo: 'despesas' };
+    for (const cb of R.origensDoAcordo(d, ant)) {
+      const achou = cb.acordo_parcela_de && deOnde(R.buscar(d, 'acordos', cb.acordo_parcela_de), texto, vistos);
+      if (achou) return achou;
+    }
+    return null;
+  };
+  const anteriores = R.origensDoAcordo(d, a).map((cb) => cb.acordo_parcela_de && R.buscar(d, 'acordos', cb.acordo_parcela_de)).filter(Boolean);
+  const porAcordo = new Map();
+  for (const [texto, valor] of nasParcelas) {
+    const herdado = valor - (proprios.get(texto) || 0);
+    if (!(herdado > 0)) continue;
+    const o = anteriores.reduce((x, ant) => x || deOnde(ant, texto), null);
+    if (!o || o.tipo === 'judicial') continue;
+    const item = porAcordo.get(o.acordo.id) || { acordo: o.acordo, honorarios: 0, despesas: 0 };
+    item[o.tipo] += herdado;
+    porAcordo.set(o.acordo.id, item);
+  }
+  return [...porAcordo.values()].sort((x, y) => String(x.acordo.data).localeCompare(String(y.acordo.data)));
+}
+
+/** Frase do termo do acordo refeito: "R$ 200,00 de honorários e R$ 73,50 de despesas de cobrança do acordo de 24/11/2026". */
+export const fraseDeAcordoAnterior = (lista) => lista.map((x) => [x.honorarios ? `${C.reais(x.honorarios)} de honorários` : '', x.despesas ? `${C.reais(x.despesas)} de despesas de cobrança` : '']
+  .filter(Boolean).join(' e ') + ` do acordo de ${C.dataBr(x.acordo.data)}`).join('; ');
+
+/**
  * Termo de confissão de dívida e acordo de pagamento (pedido do dono em 2026-11-15): a dívida confessada, os boletos que o
  * acordo substituiu, as parcelas, o vencimento antecipado no atraso, sem novação, a concordância dos fiadores e duas testemunhas.
  * Ex.: boletos de ago/2026 e set/2026 (R$ 2.700,00, R$ 2.910,00 com multa e juros em 10/11/2026), acordo de R$ 2.910,00 em
@@ -541,11 +586,13 @@ function termoDoAcordo(d, c, a, base, x) {
     ['PARCELAS DO ACORDO', null], ...parcelas.map((cb, k) => [`${parcelas.length > 1 ? `${k + 1}ª parcela` : 'Parcela única'}, vencimento ${C.dataBr(cb.vencimento)}`, C.reais(R.totais(cb).a_pagar_sem_desconto)]),
     ['Total do acordo', C.reais(a.valor_total)]];
   const nomesFiadores = fiadores.map((f) => pessoa(f.nome, f.cpf ? `CPF ${f.cpf}` : '')).join('; ');
+  // acordo refeito: cita os honorários e despesas do acordo anterior que já estão nas parcelas (25/11/2026)
+  const anteriores = cobrancaDeAcordoAnterior(d, a);
   return {
     ...base, data: a.data, titulo: 'TERMO DE CONFISSÃO DE DÍVIDA E ACORDO DE PAGAMENTO',
     paragrafos: [
       `CREDORA (LOCADORA): ${x.empresa}${x.e.cnpj ? `, CNPJ ${x.e.cnpj}` : ''}. DEVEDOR (LOCATÁRIO): ${x.quem}${solidario ? `. LOCATÁRIO SOLIDÁRIO: ${solidario}` : ''}${nomesFiadores ? `. FIADOR(ES), como intervenientes anuentes: ${nomesFiadores}` : ''}. IMÓVEL: ${x.endereco}.`,
-      `1. DÍVIDA. O LOCATÁRIO reconhece e confessa dever à LOCADORA a importância de ${K.valorComExtenso(a.valor_total)}, referente aos aluguéis e encargos do contrato de locação do imóvel acima (${a.referente}), vencidos e não pagos${cobranca.length ? `, e ${cobranca.some((l) => l.texto.startsWith('Honorários')) ? `aos honorários de advogado${a.despesas_cobranca && a.despesas_cobranca.length ? ' e ' : ''}` : 'às '}${a.despesas_cobranca && a.despesas_cobranca.length ? 'despesas de cobrança pagas a terceiros, pelo valor exato dos comprovantes' : ''} (Código Civil, artigos 389, 395 e 404)` : ''}, discriminados abaixo. A dívida é líquida, certa e exigível.`,
+      `1. DÍVIDA. O LOCATÁRIO reconhece e confessa dever à LOCADORA a importância de ${K.valorComExtenso(a.valor_total)}, referente aos aluguéis e encargos do contrato de locação do imóvel acima (${a.referente}), vencidos e não pagos${anteriores.length ? ` (inclui ${fraseDeAcordoAnterior(anteriores)}, que já estavam nas parcelas refeitas por este termo e não são cobrados de novo)` : ''}${cobranca.length ? `, e ${cobranca.some((l) => l.texto.startsWith('Honorários')) ? `aos honorários de advogado${a.despesas_cobranca && a.despesas_cobranca.length ? ' e ' : ''}` : 'às '}${a.despesas_cobranca && a.despesas_cobranca.length ? 'despesas de cobrança pagas a terceiros, pelo valor exato dos comprovantes' : ''} (Código Civil, artigos 389, 395 e 404)` : ''}, discriminados abaixo. A dívida é líquida, certa e exigível.`,
     ],
     tabela,
     depois: [

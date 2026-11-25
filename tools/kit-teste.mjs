@@ -120,7 +120,7 @@ function bloqueios() {
 async function esperarDesenho(pagina, ms = 20000) {
   const fim = Date.now() + ms;
   for (;;) {
-    const ok = await pagina.evaluate(() => !document.getElementById('kit-sentinela') && !!document.querySelector('#app main, #app .login, #app h1')).catch(() => false);
+    const ok = await pagina.evaluate(() => !document.getElementById('kit-sentinela') && !!document.querySelector('#app main, #app .login, #app h1, #app > #mensagens')).catch(() => false);
     if (ok) break;
     if (Date.now() > fim) throw new Error(`a tela não terminou de abrir em ${ms / 1000} s`);
     await new Promise((r) => setTimeout(r, 100));
@@ -334,7 +334,8 @@ function criarFerramentas(pagina, lugar, kit) {
     /** Roda ``fn(A, arg)`` na página com A = docs/js/app.js (E, R, C, alterar…). Não existe na versão PC (programa num arquivo só). */
     app(fn, arg) {
       if (lugar === 'pc') throw new Error('t.app não existe na versão PC: ponha lugares sem "pc" no roteiro');
-      return pagina.evaluate(async ([codigo, a]) => { const A = await import('/js/app.js'); return (0, eval)(`(${codigo})`)(A, a); }, [fn.toString(), arg]);
+      // a função e o argumento vão como texto ao Playwright (roda pelo protocolo do navegador): eval dentro da página a CSP barra
+      return pagina.evaluate(`(async () => { const A = await import('/js/app.js'); return (${fn.toString()})(A, ${JSON.stringify(arg ?? null)}); })()`);
     },
   };
 }

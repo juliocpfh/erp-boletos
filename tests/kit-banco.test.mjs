@@ -28,3 +28,21 @@ test('banco do kit: monta pelas regras, só com os documentos de teste, e com os
   assert.equal(v.inquilino_telefone, undefined, 'o telefone é dos contratos de Ana, Bruno…: outra pessoa');
   assert.equal(d.usuarios.filter((u) => u.papel === 'admin' && u.ativo).length, 1);
 });
+
+test('banco do kit: casos de 25/11 (reserva que quita o boleto e acordo refeito)', async () => {
+  const { banco: d, ids } = await montarBanco();
+  const cb = (id) => R.buscar(d, 'cobrancas', id);
+  // reserva de R$ 2.000,00 que quita o boleto de R$ 1.800,00 (25/11/2026)
+  assert.equal(cb(ids.juliaBoleto).situacao, 'Quitado pela reserva');
+  assert.equal(cb(ids.juliaBoleto).reserva_utilizada, 180000);
+  assert.equal(R.aCobrar(cb(ids.juliaBoleto)), false);
+  // Kauã: venceu em 10/11 e a quitação fica para o Painel registrar sozinho
+  assert.equal(cb(ids.kauaBoleto).vencimento, '2026-11-10');
+  assert.equal(cb(ids.kauaBoleto).data_pagamento, null);
+  assert.deepEqual(R.quitacoesPelaReservaAte(d, HOJE).map((x) => x.id), [ids.kauaBoleto]);
+  // acordo refeito: as parcelas novas trazem os honorários e a carta de R$ 73,50 do 1º acordo
+  const a1 = R.buscar(d, 'acordos', ids.acordoAntigo);
+  assert.ok(a1.honorarios > 0 && a1.despesas_cobranca[0].valor === 7350);
+  const enc = R.parcelasDoAcordo(d, R.buscar(d, 'acordos', ids.acordoRefeito)).flatMap((x) => x.encargos_cobranca || []).reduce((s, e) => s + e.valor, 0);
+  assert.equal(enc, a1.honorarios + 7350);
+});

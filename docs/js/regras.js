@@ -105,6 +105,8 @@ export function normalizar(d) {
   d.config_banco.contas = (Array.isArray(d.config_banco.contas) ? d.config_banco.contas : []).map((x) => ({ ...CONTA_BANCO_PADRAO, ...x,
     notificar: { ...CONTA_BANCO_PADRAO.notificar, ...((x && x.notificar) || {}) }, negativacao: { ...CONTA_BANCO_PADRAO.negativacao, ...((x && x.negativacao) || {}) } }));
   for (const cb of d.cobrancas) if (cb.banco === undefined) cb.banco = null;
+  // boleto em aberto que a reserva cobre inteiro (antes de 25/11/2026 ficava "Em aberto" com R$ 0,00 a pagar): "Quitado pela reserva"
+  for (const cb of d.cobrancas) if (cb.situacao === 'Em aberto' && cb.reserva_utilizada > 0 && cobertoPelaReserva(cb)) cb.situacao = QUITADO_RESERVA;
   // registros da cobrança (2026-11-24): a lista de arquivos sempre existe
   for (const x of d.cobranca_registros) if (!Array.isArray(x.arquivos)) x.arquivos = x.arquivos ? [String(x.arquivos)] : [];
   // conta padrão dos boletos sem escolha: era a de identificador "ank" (2026-11-05); passou a ser só a escolhida em Sistema → Banco
@@ -949,7 +951,45 @@ const MOTIVO_EM_ACORDO = (cb, oQue) => `O boleto de ${C.compBr(cb.competencia)} 
 export const quitadoNaSaida = (cb) => !!(cb.quitado_saida || cb.quitado_devolucao) && !cb.data_pagamento;
 /** Boleto ainda a cobrar: não pago, sem carência, fora de acordo e não descontado no cálculo final da saída. */
 // (também o descontado da garantia devolvida na troca de titular, ``quitado_devolucao``)
-export const aCobrar = (cb) => !cb.data_pagamento && cb.situacao !== 'Carência' && !emAcordo(cb) && !cb.quitado_saida && !cb.quitado_devolucao;
+// (e não o quitado inteiro pela reserva, ``cobertoPelaReserva``, 25/11/2026)
+export const aCobrar = (cb) => !cb.data_pagamento && cb.situacao !== 'Carência' && !emAcordo(cb) && !cb.quitado_saida && !cb.quitado_devolucao && !cobertoPelaReserva(cb);
+/**
+ * Boleto do aluguel quitado inteiro pela reserva (decisão do dono, 25/11/2026): a reserva entra por Pix, transferência ou
+ * dinheiro, nunca por boleto; quando ela cobre o boleto do mês inteiro, não há nada a pagar no banco. Ex.: reserva de
+ * R$ 2.000,00 e boleto de R$ 1.800,00 → "Quitado pela reserva" (sobram R$ 200,00 para o mês seguinte). Fica fora de
+ * ``aCobrar`` (multa, notificação, régua, inadimplência, emissão no banco). Sem a quitação registrada, é calculado na hora
+ * (``realocarReserva`` mexe na reserva e a situação acompanha; desfeita a reserva, volta a "Em aberto"). A NF continua como
+ * antes: sai quando a quitação é registrada (a data dela é a da NF), pelo aluguel em dia (``registrarPagamento``).
+ */
+export const cobertoPelaReserva = (cb) => !cb.data_pagamento && cb.reserva_utilizada > 0 && !cb.carencia && cb.situacao !== 'Carência' && !emAcordo(cb)
+  && !cb.quitado_saida && !cb.quitado_devolucao && !ehBoletoAvulso(cb) && totais(cb).a_pagar_pontual <= 0;
+export const QUITADO_RESERVA = 'Quitado pela reserva';
+/** Quitado pela reserva: ainda sem a quitação registrada (``cobertoPelaReserva``) ou já registrada (situação gravada). */
+export const quitadoPelaReserva = (cb) => (cb.data_pagamento ? cb.situacao === QUITADO_RESERVA : cobertoPelaReserva(cb));
+/**
+ * Boletos quitados pela reserva com o vencimento já chegado (até ``hoje``) e ainda sem a quitação registrada. Decisão do dono
+ * de 25/11/2026 ("sozinha, no vencimento"): a quitação é registrada sozinha, com a data do vencimento, e a NF entra na fila.
+ */
+export const quitacoesPelaReservaAte = (d, hoje) => d.cobrancas.filter((cb) => cb.vencimento && cb.vencimento <= hoje && cobertoPelaReserva(cb))
+  .sort((a, b) => a.vencimento.localeCompare(b.vencimento) || a.id - b.id);
+
+/**
+ * Registra sozinha a quitação pela reserva dos boletos que já venceram (``quitacoesPelaReservaAte``), com a data do
+ * vencimento (a data da NF), pelo aluguel em dia. Ex.: boleto de 12/2026 (vence 05/12) coberto pela reserva → no 1º acesso
+ * de 05/12 em diante, "Quitado pela reserva" com pagamento em 05/12 e a NF na fila. Roda dentro de ``alterar`` (relê o banco):
+ * boleto já registrado (em outra aba ou aparelho) não volta, então nunca registra duas vezes. Devolve os boletos registrados.
+ */
+export function registrarQuitacoesPelaReserva(d, hoje, usuario) {
+  const feitos = [];
+  for (const cb of quitacoesPelaReservaAte(d, hoje)) {
+    registrarPagamento(d, cb.id, cb.vencimento, null, usuario);
+    feitos.push(cb);
+  }
+  return feitos;
+}
+
+/** Situação gravada do boleto não pago (fora de carência e de acordo): "Quitado pela reserva" ou "Em aberto". */
+export const situacaoSemPagamento = (cb) => (cobertoPelaReserva(cb) ? QUITADO_RESERVA : 'Em aberto');
 
 /**
  * Caução depois de um reajuste ou novo valor do aluguel (correção posterior à última caução registrada): a necessária
@@ -1335,8 +1375,11 @@ function realocar(d, contrato, usuario) {
     const disponivel = reservaParaCompetencia(d, contrato, cb.competencia, (x) => livres.has(x.id));
     const usar = cb.carencia ? 0 : C.totaisCobranca(cb, disponivel).reserva_utilizada;
     livres.delete(cb.id);
-    if ((cb.reserva_utilizada || 0) !== usar) {
-      atualizar(d, 'cobrancas', cb.id, { reserva_utilizada: usar }, usuario, `Boleto ${C.compBr(cb.competencia)}: reserva ${usar ? `de ${C.reais(usar)} aplicada` : 'retirada'}`);
+    // a situação acompanha a reserva: cobre o boleto inteiro → "Quitado pela reserva"; deixou de cobrir → "Em aberto" (25/11/2026)
+    const situacao = [QUITADO_RESERVA, 'Em aberto'].includes(cb.situacao) ? situacaoSemPagamento({ ...cb, reserva_utilizada: usar }) : cb.situacao;
+    if ((cb.reserva_utilizada || 0) !== usar || situacao !== cb.situacao) {
+      atualizar(d, 'cobrancas', cb.id, { reserva_utilizada: usar, ...(situacao !== cb.situacao ? { situacao } : {}) }, usuario,
+        `Boleto ${C.compBr(cb.competencia)}: reserva ${usar ? `de ${C.reais(usar)} aplicada` : 'retirada'}${situacao === QUITADO_RESERVA ? ' (quitado pela reserva)' : ''}`);
       mudaram.push(cb.id);
     }
   }
@@ -2123,9 +2166,13 @@ export function registrarPagamento(d, cobrancaId, dataContabil, valorPago, usuar
     throw new Error('Este boleto já tem NF emitida. Desfaça o pagamento antes de alterar.');
   }
   if (dataPagou && dataPagou > dataContabil) throw new Error('O dia em que pagou não pode ser depois da data contábil.');
+  // quitado pela reserva (25/11/2026): a reserva foi paga antes do boleto, então é sempre em dia (sem multa e juros, NF do
+  // aluguel em dia); registrar a quitação só dá a data da NF
+  const pelaReserva = cobertoPelaReserva(cb);
+  if (pelaReserva) { pagouEmDia = true; dataPagou = null; }
   const r = previstoNoPagamento(cb, dataContabil, { pagouEmDia, dataPagou });
   conferirValorRecebido(cb, valorPago, r.valor_devido);
-  const compensadoDepois = pagouEmDia && dataContabil > cb.vencimento;
+  const compensadoDepois = pagouEmDia && dataContabil > cb.vencimento && !pelaReserva;
   const caucao = ehComplementoCaucao(cb);
   const saldoSaida = ehSaldoSaida(cb); // boleto do saldo da saída: sem NF, como o complemento da caução
   // pago a mais com a NF no valor calculado (decisão do dono, 21/11/2026, mensal-009): a NF não muda e a diferença fica
@@ -2137,9 +2184,9 @@ export function registrarPagamento(d, cobrancaId, dataContabil, valorPago, usuar
   atualizar(d, 'cobrancas', cb.id, {
     data_pagamento: dataContabil, data_pagou: pagouEmDia ? null : (dataPagou || null), valor_pago: valorPago ?? r.valor_devido,
     dias_atraso: r.dias_atraso, multa: r.multa, juros: r.juros, valor_nf: caucao || saldoSaida ? 0 : manual ? valorNf : r.valor_nf, pagou_em_dia: compensadoDepois,
-    situacao: r.pontual ? 'Paga em dia' : 'Paga com atraso', nf_manual: manual, divergencia: manual ? String(justificativa).trim() : null,
+    situacao: pelaReserva ? QUITADO_RESERVA : r.pontual ? 'Paga em dia' : 'Paga com atraso', nf_manual: manual, divergencia: manual ? String(justificativa).trim() : null,
     ...(aMais ? { valor_a_mais: aMais } : {}),
-  }, usuario, `${compensadoDepois ? `Pagamento confirmado (pagou em dia, entrou em ${C.dataBr(dataContabil)})` : 'Pagamento confirmado'}: boleto ${ehParcelaAcordo(cb) ? `do acordo ${cb.acordo_parcela || ''}`.trim() : C.compBr(cb.competencia)} de ${buscar(d, 'contratos', cb.contrato_id)?.inquilino_nome || 'inquilino'}${manual
+  }, usuario, `${pelaReserva ? 'Quitação pela reserva registrada' : compensadoDepois ? `Pagamento confirmado (pagou em dia, entrou em ${C.dataBr(dataContabil)})` : 'Pagamento confirmado'}: boleto ${ehParcelaAcordo(cb) ? `do acordo ${cb.acordo_parcela || ''}`.trim() : C.compBr(cb.competencia)} de ${buscar(d, 'contratos', cb.contrato_id)?.inquilino_nome || 'inquilino'}${manual
     ? `. Recebido ${C.reais(valorPago)}, previsto ${C.reais(r.valor_devido)}; NF digitada ${C.reais(valorNf)} (calculada ${C.reais(r.valor_nf)}). Justificativa: ${String(justificativa).trim()}` : ''}${aMais
     ? `. Recebido ${C.reais(valorPago)}, previsto ${C.reais(r.valor_devido)}: ${C.reais(aMais)} a devolver ao inquilino (a NF não muda)${String(justificativa || '').trim() ? `. Motivo: ${String(justificativa).trim()}` : ''}` : ''}`);
   // complemento da caução pago: soma na caução atual (parcelas, em qualquer ordem); a data nunca fica antes da última correção
@@ -2266,7 +2313,9 @@ export function estornarPagamento(d, cobrancaId, usuario) {
   }
   cancelarFaturas(d, 'cobranca', cobrancaId, usuario);
   atualizar(d, 'cobrancas', cobrancaId, { data_pagamento: null, data_pagou: null, valor_pago: null, dias_atraso: null, multa: null,
-    juros: null, valor_nf: null, pagou_em_dia: false, situacao: 'Em aberto', nf_manual: false, divergencia: null, movimentacao_id: null, pagamento_c6: null,
+    // quitação pela reserva desfeita: a reserva continua cobrindo o boleto, que volta a "Quitado pela reserva" (sem a NF)
+    juros: null, valor_nf: null, pagou_em_dia: false, situacao: cb ? situacaoSemPagamento({ ...cb, data_pagamento: null, situacao: 'Em aberto' }) : 'Em aberto',
+    nf_manual: false, divergencia: null, movimentacao_id: null, pagamento_c6: null,
     ...(cb && (cb.valor_a_mais || cb.valor_devolvido) ? { valor_a_mais: null, valor_devolvido: null } : {}) }, usuario, 'Pagamento desfeito');
   if (cb) reabrirNotificacoesDeAtraso(d, cb.contrato_id, usuario);
   // confirmado pelo extrato: a movimentação volta a "sem destino" (também a entrada a mais e a devolução ao inquilino ligadas a ele).

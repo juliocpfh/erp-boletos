@@ -343,3 +343,24 @@ test('acordo quebrado refeito: honorários e despesas da parcela antiga passam �
   assert.equal(atraso.valor_nf, C.liquidar(semEnc, '2027-03-12').valor_nf);
   assert.ok(!/^Encargos do acordo/.test(nova.outros_descricao) || nova.outros > encVelha, 'sem "Encargos do acordo" vazio');
 });
+
+test('termo do acordo refeito cita os honorários e as despesas do 1º acordo que entraram nas parcelas novas (25/11/2026)', async () => {
+  const REC = await import('../docs/js/recibos.js');
+  const { d, c, cb, ago, carta } = comProvas();
+  const a1 = R.fazerAcordo(d, { contrato_id: c.id, ids: [ago.id, cb.id], total: 400000, parcelas: 1, primeiro_vencimento: '2026-12-10', cobranca: { honorarios: true, despesas: [carta.id] } }, 'julio', HOJE);
+  const velha = a1.parcelas[0];
+  const dia = '2027-01-20';
+  const a2 = R.fazerAcordo(d, { contrato_id: c.id, ids: [velha.id], total: C.liquidar(velha, dia).valor_devido, parcelas: 2, primeiro_vencimento: '2027-02-10' }, 'julio', dia);
+  const lista = REC.cobrancaDeAcordoAnterior(d, a2.acordo);
+  assert.equal(lista.length, 1);
+  assert.equal(lista[0].acordo.id, a1.acordo.id);
+  assert.equal(lista[0].honorarios, a1.acordo.honorarios);
+  assert.equal(lista[0].despesas, 2850);
+  const frase = REC.fraseDeAcordoAnterior(lista);
+  assert.equal(frase, `${C.reais(a1.acordo.honorarios)} de honorários e R$ 28,50 de despesas de cobrança do acordo de ${C.dataBr(a1.acordo.data)}`);
+  const termo = REC.montarRecibo(d, 'acordo', { contrato: c, acordo: a2.acordo.id }, dia);
+  assert.ok(termo.paragrafos.some((p) => p.includes(`inclui ${frase}`)), 'o termo do 2º acordo cita o 1º');
+  // o 1º acordo não cita acordo anterior
+  assert.equal(REC.cobrancaDeAcordoAnterior(d, a1.acordo).length, 0);
+  assert.ok(!REC.montarRecibo(d, 'acordo', { contrato: c, acordo: a1.acordo.id }, HOJE).paragrafos.some((p) => p.includes('do acordo de')));
+});
