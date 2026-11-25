@@ -53,15 +53,15 @@ não e o artigo da lei. O sistema avisa, mas não proíbe as escolhas do adminis
 
 ## C. Contrato e saída
 
-- **Pintura na saída: vida da pintura** (`pintura_vida_meses`, padrão 36 meses; 24/11/2026). Vistoria de entrada com "Pintura nova na entrada" = Sim → sugere o orçamento inteiro; Não → orçamento × (36 − meses de moradia) ÷ 36, mínimo zero (ex.: R$ 2.400,00, 12 meses → R$ 1.600,00); vistoria antiga sem a resposta → sem sugestão, com aviso. Só sugestão (janela dos reparos, `K.sugestaoPintura`); a equipe muda o valor. Lei 8.245/91, art. 23, III.
+- **Pintura na saída: vida da pintura** (`pintura_vida_meses`, padrão 48 meses desde 24/11/2026, advogado; era 36). Vistoria de entrada com "Pintura nova na entrada" = Sim → sugere o orçamento inteiro; Não → orçamento × (vida − meses de moradia) ÷ vida, mínimo zero (ex.: R$ 2.400,00, 24 meses → R$ 1.200,00; com 36, 12 meses → R$ 1.600,00); outro orçamento do inquilino só antes da devolução das chaves; vistoria antiga sem a resposta → sem sugestão, com aviso. Só sugestão (janela dos reparos, `K.sugestaoPintura`); a equipe muda o valor. Lei 8.245/91, art. 23, III.
 
 | # | Regra | Hoje (exemplo) | Opções | Padrão recomendado e por quê | Aprovado? |
 |---|---|---|---|---|---|
 | C1 | Prazo padrão do contrato residencial | Em branco (digitado) | [E] meses padrão | 30 meses. LI art. 46: com 30 meses ou mais, no fim o locador pode retomar sem motivo; com menos, o contrato prorroga e só se retoma em casos da lei ou depois de 5 anos (art. 47) | |
 | C2 | Prazo padrão do contrato comercial | Em branco | [E] meses padrão | Em branco. LI art. 51: com 5 anos ou mais (somando contratos), o inquilino ganha direito à renovação na Justiça; o locador decide | |
 | C3 | Multa por sair antes do fim | No texto do contrato: residencial 3 aluguéis proporcional ao tempo que falta; comercial 10% proporcional | [S] nº de aluguéis + sempre proporcional | 3 aluguéis, proporcional. LI art. 4º: tem que ser proporcional ao tempo que falta; sem multa se o inquilino for transferido pelo emprego (aviso de 30 dias). Ex.: contrato de 30 meses, sai no mês 20 → 3 × R$ 2.000,00 × 10/30 = R$ 2.000,00. **Texto do contrato é da outra sessão**: aqui só o valor | |
-| C4 | Aviso prévio de saída | 30 dias, no texto do contrato | [C] dias | 30 dias. LI art. 6º (prazo indeterminado: mínimo 30 dias) | |
-| C5 | Honorários de advogado na cobrança | 25% no texto do residencial | [C] % | **Até 20%**: na cobrança judicial o juiz fixa de 10% a 20% (CPC art. 85, §2º); 25% pode ser visto como abusivo. Texto da outra sessão | |
+| C4 | Aviso prévio de saída | 30 dias, no texto do contrato. Desde 24/11 a data do aviso é gravada (`contratos.aviso_saida_data`, `aviso_saida_sem`) e a multa pela falta do aviso é sugerida no cálculo final pela regra `falta_aviso_saida` (padrão proporcional aos dias que faltaram; com a multa da saída antecipada, vale a maior). Ex.: aluguel R$ 1.800,00, aviso 15 dias antes → R$ 900,00 | [C] dias; [S] proporcional / mês inteiro | 30 dias. LI art. 6º (prazo indeterminado: mínimo 30 dias) | Feito (multa, 24/11) |
+| C5 | Honorários de advogado na cobrança (24/11: `honorarios_percentual`, padrão 10%, e `honorarios_dias_atraso`, padrão 30: só no acordo e no cálculo final, sobre os boletos com mais de 30 dias, com aviso e advogado de fato) | 25% no texto do residencial (até 24/11) | [C] % | **Até 20%**: na cobrança judicial o juiz fixa de 10% a 20% (CPC art. 85, §2º); 25% pode ser visto como abusivo. Texto da outra sessão | |
 | C6 | Prazo da vistoria de saída | 72 h úteis (residencial), 48 h (comercial), no texto | [C] horas | Mantém. Sem lei | |
 | C7 | Seguro contra incêndio pelo inquilino | Sim (por conta do inquilino, padrão) | [E] padrão | Inquilino (hoje). LI art. 22, VIII: é do locador, salvo cláusula expressa passando ao inquilino, que o contrato tem | |
 | C8 | IPTU pelo inquilino | Sim (padrão), proporcional aos dias ocupados | [E] padrão | Inquilino (hoje). LI art. 22, VIII e art. 25: pode passar ao inquilino por contrato | |
@@ -92,6 +92,7 @@ não e o artigo da lei. O sistema avisa, mas não proíbe as escolhas do adminis
 | D9 | Avisos antes de salvar | Pagamento de mais de 90 dias atrás; data até 60 dias no futuro; IPTU/seguro 30% fora do anterior | [C] cada número | Hoje. Rotina | |
 | D10 | Registro de acessos da nuvem (17/11/2026, `dias_registro_acessos`) | Guardado 180 dias: quem baixou o banco, abriu/anexou/apagou arquivos, baixou backups, mandou e-mail, mexeu na ficha pela internet e ligou o programa do PC (tela Acessos, só administrador) | [C] dias (30 a 730) | 180. Marco Civil da Internet, art. 15 (6 meses); LGPD arts. 6º, 37 e 46: guardar o registro das operações, mas só pelo tempo necessário (tem e-mail e endereço de internet da equipe) | Feito (mutirão 3000) |
 | D11 | Notificação ao inquilino (17/11/2026, `notificacao_prazo_dias`, `notificacao_aviso_dias`, `notificacao_multa_alugueis`) | Prazo padrão de 10 dias úteis (17/11/2026 → 02/12/2026); lembrete 3 dias úteis antes e no dia; multa sugerida de 1 aluguel (o administrador digita o valor) | [C] dias (1 a 90), dias (0 a 15), aluguéis (0 a 3) | Código Civil, art. 397, parágrafo único (notificação constitui em mora) e arts. 408 a 413 (multa não passa da obrigação; a excessiva pode ser reduzida); Lei 8.245/91, arts. 9º, II, e 23 | Feito |
+| D12 | Fim do horário comercial (24/11/2026, `fim_expediente_hora`) | 18h: prazo dado a alguém depois desse horário conta do dia seguinte. Ex.: link de 7 dias criado às 21h45 de 24/11 → até 02/12 (às 10h → até 01/12) | [C] hora | 18 (decisão do dono). Rotina | Feito |
 
 ## Fora desta lista (de propósito)
 - Impostos (PIS/COFINS, IRPJ, CSLL, mínimo de R$ 10,00 da guia): dependem do regime da empresa; viram configuração quando o
@@ -113,9 +114,12 @@ para os termos aceitos depois.
 |---|---|---|---|---|
 | `reserva_retencao_pct` | Desistência depois do depósito: a empresa fica com (%) | 100 | Reserva de R$ 500,00 → fica tudo, nada é devolvido; com 40%, fica R$ 200,00 e devolve R$ 300,00. Risco: o juiz pode reduzir (CC art. 413; CDC art. 51, IV); decisões costumam aceitar 10% a 25%. O termo avisa em destaque antes do aceite e do pagamento | CC arts. 418, 420 e 413; CDC art. 51, IV |
 | `reserva_dias_arrependimento` | Dias para desistir com devolução total (do depósito) | 0 | 0: nenhum. Com 7: depósito em 10/12/2026 → até 17/12/2026. O dono entende que não é compra fora do estabelecimento (o interessado vê o imóvel); há decisões isoladas aplicando o art. 49 | CDC art. 49 |
-| `reserva_dias_uteis_documentos` | Prazo dos documentos (dias úteis do depósito) | 3 | Depósito na quinta, 10/12/2026 → até terça, 15/12/2026 | CC art. 421 (o combinado) |
+| `reserva_dias_uteis_documentos` | Prazo dos documentos (do depósito; o nome ficou o antigo) | 7 (antes 3 dias úteis; advogado e dono, 24/11) | Depósito em 02/12/2026 → até 09/12/2026 | CC art. 421 (o combinado) |
+| `reserva_documentos_dias_corridos` | O prazo dos documentos é em dias corridos? (24/11) | Sim (Não = dias úteis; guardado no aceite como `documentos_corridos`) | Termo aceito sem a marca conta em dias úteis | CC art. 421 |
+| `reserva_dia_aviso_documentos` | Dia do 1º aviso à equipe sobre os documentos (24/11) | 4 (corrido ou útil como o prazo; vale para todas as fichas, não é guardado no aceite; em fim de semana ou feriado passa ao dia útil seguinte, 25/11) | Depósito em 02/12/2026 → 4º dia, domingo 06/12 → aviso em 07/12 | Rotina |
 | `reserva_dias_validade` | A reserva segura o imóvel por (dias) | 7 | Até 17/12/2026 | CC art. 421 |
-| `reserva_dias_uteis_devolucao` | Prazo da devolução (dias úteis da decisão) | 5 | Reprovada em 14/12/2026 → até 21/12/2026 | CDC art. 49, parágrafo único; CC art. 418 |
+| `reserva_dias_uteis_devolucao` | Prazo da devolução (dias úteis da decisão) | 2 (antes 5; advogado, 24/11) | Reprovada em 08/12/2026 → até 10/12/2026 | CDC art. 49, parágrafo único; CC art. 418 |
+| `reserva_dias_reapresentacao` | Ficha reaberta: prazo para reapresentar os documentos (25/11) | 3 dias corridos | Reaberta em 07/12/2026 → até 10/12/2026 (só guia: nada se cancela sozinho) | Rotina |
 
 ## Regras especiais por contrato (18/11/2026)
 

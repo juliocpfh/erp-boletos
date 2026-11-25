@@ -265,7 +265,7 @@ Ficaram de fora as PRs só de documentação (#348, #350, #356, #362, #363) e a 
   - Onde clicar: Menu → Usuários → Aparelhos ligados, coluna "Programa".
   - O que fazer: compare a versão do computador com a data da última mudança (ex.: 24/11/2026). Se for antiga, espere 1 hora com o computador ligado.
   - O que deve aparecer: a versão mais nova em até 1 hora depois de cada mudança no sistema (antes só às 20h ou ao entrar no Windows).
-  - ⚠ Fontes discordam: em Sistema → "Programa deste computador" o texto ainda diz que ele se atualiza "todo dia às 20h e ao entrar no Windows", mas desde a PR #361 é também de hora em hora. Só o texto está velho.
+  - (Não vale mais em 25/11: o texto já foi acertado.) ~~⚠ Fontes discordam: em Sistema → "Programa deste computador" o texto ainda diz que ele se atualiza "todo dia às 20h e ao entrar no Windows", mas desde a PR #361 é também de hora em hora. Só o texto está velho.~~
 
 ### Boletos: página de um boleto (como chegar: Menu → Boletos → clicar no boleto)
 - [ ] **Vários ajustes no mesmo boleto** (PR #364, 24/11/2026)

@@ -4,7 +4,9 @@ Pesquisa de 24/11/2026, feita a pedido do dono antes de programar qualquer cobra
 
 **Isto não é parecer de advogado.** O advogado da empresa deve conferir antes de mudar o contrato ou o sistema. Os números de processo marcados com "(notícia)" foram lidos em notícias ou artigos que citam a decisão, não no texto completo: o site do STJ recusou a consulta automática.
 
-> **Situação no sistema:** nada é cobrado. Desde 24/11 o sistema só **guarda as provas** da cobrança (data, o que foi feito, valor gasto, descrição e os comprovantes). Ficam na página do boleto vencido e na página do inquilino, em "Cobrança: registros e provas", com um botão que baixa tudo num ZIP para o advogado. Os valores ficam só anotados: não entram no boleto, na NF, no acordo nem no cálculo final.
+> **Situação no sistema (atualizada em 25/11, PR #415):** o dono aprovou e as cláusulas foram aprovadas pelo advogado (PR #406). Os honorários (10%, só sobre os boletos com mais de 30 dias de atraso, com aviso antes e advogado que atuou registrado) e as despesas com comprovante entram **só no acordo e no cálculo final**, por escolha ("Usar"/"Não cobrar"), nunca no boleto do mês nem na NF; nunca de novo no acordo quebrado (os do acordo anterior passam às parcelas novas, fora da NF e sem multa nem juros). Regras `honorarios_percentual` e `honorarios_dias_atraso`. Ex.: R$ 2.000,00 com 45 dias de atraso → R$ 200,00; com despesas de R$ 73,50 → R$ 2.273,50. Falta o advogado ler o texto da confissão de dívida (termo do acordo) com os honorários.
+>
+> Situação até 24/11 (histórico): nada é cobrado. Desde 24/11 o sistema só **guarda as provas** da cobrança (data, o que foi feito, valor gasto, descrição e os comprovantes). Ficam na página do boleto vencido e na página do inquilino, em "Cobrança: registros e provas", com um botão que baixa tudo num ZIP para o advogado. Os valores ficam só anotados: não entram no boleto, na NF, no acordo nem no cálculo final.
 
 ---
 
@@ -128,15 +130,15 @@ O contrato residencial do sistema diz que o atraso fica sujeito a "cobrança pel
 
 O contrato comercial fala em "honorários de advogado" sem percentual: vale a mesma troca.
 
-## 6. Como o sistema ficaria, se o dono disser sim
+## 6. Como o sistema ficaria, se o dono disser sim (feito em 24–25/11, PR #415)
 
 1. **Já feito:** os registros e as provas (ver o quadro "Situação no sistema", no início). Eles servem de base para tudo o que vem depois.
-2. **A fazer, se aprovado:** um campo "cobrar do inquilino" em cada registro. Ele só valeria para:
+2. **Feito (PR #415):** um campo "cobrar do inquilino" em cada registro. Ele só valeria para:
    - despesa paga a terceiro, **com comprovante**;
    - advogado, depois de 30 dias de atraso e com o contrato ou o recibo do advogado anexado.
 
    O valor entraria **só no acordo e no cálculo final da saída**, em linha própria ("despesas de cobrança" e "honorários de advogado, 10%"). **Nunca no boleto do mês nem na NF.**
-3. **A fazer, se aprovado:** a regra (Sistema → Regras do sistema), com o padrão desligado e o artigo da lei explicado.
+3. **Feito (PR #415):** a regra (Sistema → Regras do sistema), com o padrão desligado e o artigo da lei explicado.
 
 ---
 
