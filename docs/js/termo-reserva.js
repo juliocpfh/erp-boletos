@@ -36,6 +36,7 @@ export function urlDoAceite(fichaId) {
   return l && String(l.vence_em) > new Date().toISOString() ? l : null;
 }
 export const esquecerUrlsDoAceite = () => urls.clear();
+export const esquecerUrlDoAceite = (fichaId) => urls.delete(Number(fichaId));
 
 const cfg = { base: 'api/aceite-reserva/', buscar: (...a) => fetch(...a) };
 
