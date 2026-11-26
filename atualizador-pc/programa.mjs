@@ -55,7 +55,7 @@ export const NOME_NO_WINDOWS = 'Administração de Imóveis';
 export const ARQUIVOS_DO_PROGRAMA = [NOME_EXE, NOME_VBS, NOME_VBS_PASTA, NOME_VBS_DESINSTALAR, NOME_VBS_CERTIFICADO, NOME_VBS_JANELA, NOME_ICONE, NOME_NOVO, NOME_VELHO, NOME_TRAVA];
 export const TEXTO_CONFIRMAR = `Desinstalar ${NOME_NO_WINDOWS}?|As cópias e a pasta de arquivos continuam no computador.|Para cortar o acesso deste computador ao sistema, use Usuários → Aparelhos ligados → Desligar.`;
 export const TEXTO_PRONTO = 'Pronto: programa desinstalado.|As cópias na pasta do backup seguro e a pasta Arquivos dos imoveis continuam no computador.|Para cortar o acesso deste computador ao sistema, use Usuários → Aparelhos ligados → Desligar.';
-/** As mesmas tarefas (e os mesmos nomes) de instalar-tarefa.cmd: criar de novo troca as antigas, que chamavam o Node. */
+/** As mesmas tarefas (e os mesmos nomes) do jeito antigo com o Node (instalar-tarefa.cmd, tirado em 25/11/2026): criar de novo troca as antigas. Não mude os nomes. */
 export const TAREFAS = [
   { nome: 'Imoveis - atualizador da versao PC', quando: ['/SC', 'DAILY', '/ST', '20:00'], args: '--atualizar', texto: 'todo dia às 20h: dados, versão PC, arquivos e o próprio programa' },
   { nome: 'Imoveis - atualizador da versao PC (ao entrar)', quando: ['/SC', 'ONLOGON', '/DELAY', '0002:00'], args: '--atualizar', texto: 'ao entrar no Windows: dados, versão PC, arquivos e o próprio programa' },
@@ -438,7 +438,7 @@ function instalar({ env, simular, elevado, dizer, rodarReg }) {
     for (const a of comandosDoRegistro(pasta, env, { versao: EXE?.versao || '' })) dizer(`  reg ${comoDigitado(a)}`);
     return true;
   }
-  if (!EXE) throw new Error(`Instalar só funciona no programa ${NOME_EXE} (gerado por tools/gerar-exe.mjs). Pelo Node, use instalar-tarefa.cmd.`);
+  if (!EXE) throw new Error(`Instalar só funciona no programa ${NOME_EXE} (gerado por tools/gerar-exe.mjs). Pelo Node não há instalação: rode node atualizador.mjs à mão.`);
   const pasta = copiarPrograma(env, dizer);
   dizer(registrarNoWindows(pasta, { rodar: rodarReg, env }) ? 'Programa registrado no Windows (Aplicativos instalados) e botões do sistema ligados neste computador.'
     : 'Aviso: não consegui registrar o programa no Windows (Aplicativos instalados e botões do sistema; o resto continua normal).');

@@ -21,12 +21,12 @@ function nuvemFalsa(arquivos) {
   n.ler = async (c) => { if (!n.arquivos[c]) throw new Error('não achei'); n.pedidos.push(c); return new Blob([n.arquivos[c].texto]); };
   n.buscar = async (url, op = {}) => {
     const u = new URL(url);
-    if (op.headers?.['CF-Access-Client-Id'] !== 'id-teste') return new Response('<html>login</html>', { status: 302, headers: { 'content-type': 'text/html' } });
-    if (u.pathname === '/api/lista-tudo/arquivos/') {
+    if (op.headers?.Authorization !== 'Bearer ap1_cracha-de-teste') return new Response('<html>login</html>', { status: 302, headers: { 'content-type': 'text/html' } });
+    if (u.pathname === '/api/aparelho/lista-tudo/arquivos/') {
       const tudo = lista(); const de = Number(u.searchParams.get('cursor') || 0);
       return new Response(JSON.stringify({ arquivos: tudo.slice(de, de + 2), mais: de + 2 < tudo.length, cursor: String(de + 2) }), { headers: { 'content-type': 'application/json' } });
     }
-    const c = u.pathname.replace('/api/arquivos/', '').split('/').map(decodeURIComponent).join('/');
+    const c = u.pathname.replace('/api/aparelho/arquivos/', '').split('/').map(decodeURIComponent).join('/');
     if (!n.arquivos[c]) return new Response('{}', { status: 404 });
     n.pedidos.push(c);
     return new Response(n.arquivos[c].texto);
@@ -84,9 +84,9 @@ test('site: arquivo que falhou fica para a próxima (não entra no registro)', a
   assert.deepEqual(r, { baixados: 1, apagados: 0, falhas: 0, total: 2 });
 });
 
-test('atualizador do PC: baixa com a chave de serviço, em partes, e o arquivo apagado à mão volta', async () => {
+test('atualizador do PC: baixa com o crachá, em partes, e o arquivo apagado à mão volta', async () => {
   const raiz = pasta();
-  const cfg = { site: 'https://erp.exemplo.com.br', clientId: 'id-teste', clientSecret: 'segredo-teste', pasta: raiz };
+  const cfg = { site: 'https://erp.exemplo.com.br', cracha: 'ap1_cracha-de-teste', pasta: raiz };
   const n = nuvemFalsa({
     'Casa 1/Inquilinos/Maria Exemplo/Contrato assinado.pdf': { texto: 'contrato', alterado: '1' },
     'Casa 1/Inquilinos/Maria Exemplo/RG.jpg': { texto: 'rg', alterado: '1' },
@@ -126,9 +126,12 @@ test('caminho da cópia no PC: o site mostra só caminho do Windows e mantém o 
   assert.equal(sit.caminho, caminho, 'a atualização feita pelo site não apaga o caminho');
 });
 
-test('atualizador do PC: chave de serviço recusada avisa', async () => {
+test('atualizador do PC: crachá recusado avisa; sem crachá nem tenta falar com a nuvem', async () => {
   const n = nuvemFalsa({});
-  await assert.rejects(A.atualizarCopia({ site: 'https://x', clientId: 'errado', clientSecret: 's', pasta: pasta() }, { buscar: n.buscar }), /não aceitou a chave/);
+  await assert.rejects(A.atualizarCopia({ site: 'https://x', cracha: 'ap1_errado', pasta: pasta() }, { buscar: n.buscar }), /não aceitou o crachá/);
+  let chamou = false;
+  await assert.rejects(A.atualizarCopia({ site: 'https://x', clientId: 'id-teste', clientSecret: 's', pasta: pasta() }, { buscar: async () => { chamou = true; return new Response('{}'); } }), /ainda não está ligado/);
+  assert.equal(chamou, false, 'a chave de serviço antiga nunca sai deste computador');
 });
 
 test('sem internet, o anexo abre da cópia aberta deste computador (lerDaCopia, mesmo nome que a cópia gravou)', async () => {

@@ -17,7 +17,7 @@ O computador entra **com o e-mail e a senha do sistema**, uma vez só (decisão 
 - A **senha não fica guardada**. O crachá fica cifrado pelo Windows (DPAPI, só esta conta deste computador abre) em `%LOCALAPPDATA%\Administracao de Imoveis\cracha.dat`, ao lado de `config.json` (site, pasta e nome do computador). Fora do OneDrive; copiar a pasta para outro computador não leva o crachá.
 - Errou a senha 5 vezes: espera 15 minutos. Programa antigo (de antes de 15/11/2026) não entra mais ("este programa do computador é antigo"): baixe o novo.
 
-Não precisa mais de chave de serviço do Cloudflare, de `.env` nem do segredo `SERVICOS`.
+Não existe mais chave de serviço do Cloudflare, `.env` nem segredo `SERVICOS`: saíram do programa e da nuvem em 25/11/2026.
 
 **Por que uma página no navegador?** É o jeito mais simples sem instalar nada além do Node: o programa abre no navegador uma página que só existe neste computador (`http://127.0.0.1:<porta>/<código sorteado>`; outro site ou outro computador não chega nela), com os campos e-mail, senha, nome do computador e a pasta (botão **Escolher…** abre a janela de pastas do Windows). Quando liga, a página diz "Pronto" e pode ser fechada.
 
@@ -49,32 +49,20 @@ Para trocar à mão (ou num computador com o programa de antes de 17/11): baixe 
 
 Para gerar o `.exe` na mão (Windows, com Node 24): `node tools/gerar-exe.mjs` → `atualizador-pc/dist/` (fora do repositório). É o próprio `node.exe` com `programa.mjs` dentro (Node "single executable application": esbuild + `--experimental-sea-config` + postject). No GitHub: `.github/workflows/programa-pc.yml`. Gera também `programa-pc.json` (o aviso de versão nova que os computadores conferem). Testes: `tests/programa-pc.test.mjs` e `tests/programa-pc-se-atualizar.test.mjs`.
 
-## O que precisa ter (jeito antigo, com o Node)
+## Rodar pelo Node (só para quem programa)
 
-- [Node.js](https://nodejs.org) (versão 20 ou mais nova). Nada mais.
-- O backup seguro já ligado neste computador (Sistema → Backup seguro): a pasta escolhida tem o arquivo `chave-do-backup.json`.
-- Na nuvem, a regra **Bypass** do caminho `/api/aparelho` no Cloudflare Access (uma vez só, feita pelo dono: passo a passo em `nuvem/README.md`, "Programa do PC"). Sem ela a página avisa: *"falta a regra Bypass"*.
+O jeito antigo (copiar esta pasta, `instalar-tarefa.cmd`, `ligar-computador.cmd`, o arquivo `.env` e a chave de serviço do Cloudflare) **saiu em 25/11/2026**: quem usa o sistema instala o `.exe` acima. O programa só entra na nuvem com o crachá do aparelho; sem crachá não há outro caminho.
 
-## Passo a passo com o Node (computador novo; com o `.exe`, veja acima)
+Para testar pelo Node (20 ou mais novo): `node atualizador.mjs --ligar` (abre a página de ligar), `node atualizador.mjs` (dados, versão PC e arquivos) e `node atualizador.mjs --arquivos` (só a cópia aberta). As tarefas do Windows são criadas só pelo `.exe`. As variáveis `SITE` e `PASTA_BACKUP` do ambiente mudam o endereço e a pasta sugerida na página de ligar (para testar com a nuvem local).
 
-1. Copie a pasta `atualizador-pc` para o computador (ex.: `C:\Imoveis\atualizador-pc`).
-2. Clique com o botão direito em `instalar-tarefa.cmd` → **Executar como administrador**: cria as tarefas no Windows e roda a primeira atualização. Como o computador ainda não está ligado, abre a página de ligar no navegador: e-mail e senha do sistema, a pasta do backup seguro → **Ligar**. Em seguida aparece `Atualizado: imoveis-dados-AAAA-MM-DD.bkp …`.
-3. Confira no sistema: **Usuários → Aparelhos ligados** mostra o computador.
-
-Para ligar de novo (depois de Desligar, de 90 dias parado, ou para trocar de usuário): dois cliques em `ligar-computador.cmd`. Para rodar na mão a qualquer hora: `node atualizador.mjs`. Para desfazer as tarefas: `desinstalar-tarefa.cmd`.
-
-## Para quem já usava o jeito antigo (chave de serviço + `.env`)
-
-1. Copie por cima os arquivos novos (`atualizador.mjs`, `ligar.mjs`, `ligar-computador.cmd`). Até ligar, ele continua funcionando com o `.env` de antes.
-2. Dois cliques em `ligar-computador.cmd` e entre com e-mail e senha (a pasta já vem preenchida com a do `.env`). Dali em diante o crachá passa na frente do `.env`.
-3. Confira `ultima-atualizacao.txt` no dia seguinte (`ok …`). Só então apague: o arquivo `.env` desta pasta; no Cloudflare, a chave de serviço `atualizador-pc` (Zero Trust → Access controls → Service credentials), a política "Atualizador" do aplicativo "Sistema de Imoveis" e o segredo `SERVICOS` do Worker (Workers & Pages → `erp-boletos` → Settings → Variables and secrets). A nuvem continua aceitando a chave de serviço até lá.
+Se ainda existir no Cloudflare a chave de serviço `atualizador-pc` (Zero Trust → Access controls → Service credentials), a política "Atualizador" do aplicativo "Sistema de Imoveis" ou o segredo `SERVICOS` do Worker, podem ser apagados: o sistema não os lê mais (um token de serviço é recusado com 403).
 
 ## Cópia aberta dos arquivos (desde 15/11/2026)
 
 Além dos dados cifrados, o atualizador mantém na pasta do backup seguro a subpasta **`Arquivos dos imoveis`**: os arquivos do sistema **sem cifrar**, como estão na nuvem (imóvel → Inquilinos → pessoa), para abrir, imprimir e copiar direto no Windows. Ela é só para consulta: o que for posto ou mudado lá não volta para o sistema. A cada vez ele baixa só o que é novo ou mudou e tira da cópia o que foi apagado no sistema (arquivo apagado à mão na cópia volta). O registro fica em `copia-aberta.json`.
 
 - Todo dia às 20h e ao entrar no Windows: dados, versão PC e arquivos.
-- **De hora em hora**: só os arquivos (`node atualizador.mjs --arquivos`, pela tarefa "Imoveis - copia dos arquivos (de hora em hora)", que roda escondida por `rodar-escondido.vbs`, sem janela preta; escondida, ela nunca abre a página de ligar: só registra o erro).
+- **De hora em hora**: só os arquivos (`node atualizador.mjs --arquivos`, pela tarefa "Imoveis - copia dos arquivos (de hora em hora)", que roda escondida por `rodar-escondido.vbs` (o `.exe` grava esse arquivo ao instalar), sem janela preta; escondida, ela nunca abre a página de ligar: só registra o erro).
 - O sistema aberto neste computador também atualiza a cópia logo depois de anexar, apagar ou mover arquivos, e no botão **Atualizar a pasta agora** (Sistema → Backup seguro).
 
 ### Botão "Abrir a pasta no Explorer" (desde 17/11/2026, só com o `.exe`)

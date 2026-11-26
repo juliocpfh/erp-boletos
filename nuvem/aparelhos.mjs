@@ -214,7 +214,7 @@ export class Aparelhos {
    * versão do programa (`versao`, já conferida pelo Worker; vazia = programa antigo, que não conta).
    */
   async conferir(cracha, versao = '') {
-    const naoVale = new ErroAparelho(401, 'Este computador não está mais ligado ao sistema. Ligue de novo com o e-mail e a senha (abra o programa do computador com --ligar, ou ligar-computador.cmd).');
+    const naoVale = new ErroAparelho(401, 'Este computador não está mais ligado ao sistema. Ligue de novo com o e-mail e a senha (abra o programa do computador com --ligar).');
     if (!crachaValido(cracha)) throw naoVale;
     const a = this.c.q('SELECT * FROM aparelhos WHERE hash = ? AND desligado_em IS NULL', await hashDoCracha(cracha))[0];
     if (!a) throw naoVale;

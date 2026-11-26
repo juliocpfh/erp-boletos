@@ -121,10 +121,10 @@ test('item 28: o que sai da nuvem vai para "Apagados na nuvem/<dia>" na cópia a
   fs.writeFileSync(path.join(raiz2, CA.PASTA_COPIA, 'Casa 2', 'guia.pdf'), 'guia');
   fs.writeFileSync(path.join(raiz2, CA.ARQUIVO_COPIA), JSON.stringify({ dias_apagados: 5, arquivos: { 'Casa 2/guia.pdf': { tamanho: 4, alterado: '1' } } }));
   const buscar = async (url) => {
-    if (new URL(url).pathname === '/api/lista-tudo/arquivos/') return new Response(JSON.stringify({ arquivos: [], mais: false }), { headers: { 'content-type': 'application/json' } });
+    if (new URL(url).pathname === '/api/aparelho/lista-tudo/arquivos/') return new Response(JSON.stringify({ arquivos: [], mais: false }), { headers: { 'content-type': 'application/json' } });
     return new Response('{}', { status: 404 });
   };
-  const cfg = { site: 'https://erp.exemplo.com.br', clientId: 'id-teste', clientSecret: 'segredo-teste', pasta: raiz2 };
+  const cfg = { site: 'https://erp.exemplo.com.br', cracha: 'ap1_cracha-de-teste', pasta: raiz2 };
   const r2 = await A.atualizarCopia(cfg, { buscar });
   assert.equal(r2.apagados, 1);
   assert.equal(fs.readFileSync(path.join(raiz2, A.PASTA_APAGADOS, A.diaDeHoje(), 'Casa 2', 'guia.pdf'), 'utf8'), 'guia');

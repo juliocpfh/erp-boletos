@@ -1,5 +1,5 @@
 // Programa do PC num arquivo só (atualizador-pc/programa.mjs, o que vai dentro do .exe gerado por tools/gerar-exe.mjs):
-// argumentos, ajuda, as tarefas do Windows (mesmos nomes de instalar-tarefa.cmd, para trocar as antigas) e o .vbs que roda
+// argumentos, ajuda, as tarefas do Windows (mesmos nomes do jeito antigo, para trocar as antigas) e o .vbs que roda
 // sem janela. Nada é criado de verdade: o schtasks é de mentira.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -33,13 +33,15 @@ test('atualizar, só arquivos e ligar chamam a rotina do atualizador; falha vira
   assert.equal((await rodarPrograma(['--arquivos'], { ok: false })).codigo, 1);
 });
 
-test('tarefas do Windows: mesmos nomes e horários de instalar-tarefa.cmd, apontando para o .exe instalado', () => {
-  const cmd = fs.readFileSync(path.join(import.meta.dirname, '..', 'atualizador-pc', 'instalar-tarefa.cmd'), 'utf8');
+test('tarefas do Windows: os mesmos nomes e horários de sempre (trocam as do jeito antigo com o Node), apontando para o .exe instalado', () => {
   const tarefas = P.comandosDeCriar('C:\\cfg\\programa');
-  assert.equal(tarefas.length, 3);
+  // nomes fixos: é por eles que criar de novo troca a tarefa que já existe no Windows (mudar o nome deixaria duas rodando)
+  assert.deepEqual(tarefas.map((t) => [t.nome, t.quando.join(' ')]), [
+    ['Imoveis - atualizador da versao PC', '/SC DAILY /ST 20:00'],
+    ['Imoveis - atualizador da versao PC (ao entrar)', '/SC ONLOGON /DELAY 0002:00'],
+    ['Imoveis - copia dos arquivos (de hora em hora)', '/SC HOURLY'],
+  ]);
   for (const t of tarefas) {
-    assert.ok(cmd.includes(`/TN "${t.nome}"`), `nome igual ao do .cmd: ${t.nome}`);
-    assert.ok(cmd.includes(t.quando.join(' ')), `quando igual ao do .cmd: ${t.quando.join(' ')}`);
     assert.equal(t.comando[t.comando.indexOf('/TN') + 1], t.nome);
   }
   const tr = (i) => tarefas[i].comando.at(-1);

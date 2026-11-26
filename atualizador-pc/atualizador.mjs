@@ -4,9 +4,9 @@
 // Também mantém a cópia ABERTA dos arquivos (pasta "Arquivos dos imoveis", sem cifrar, para abrir no Windows): mesma regra de
 // docs/js/copia-aberta.js (tests/copia-aberta.test.mjs confere as duas).
 // Uso: node atualizador.mjs (dados, versão PC e arquivos) ou node atualizador.mjs --arquivos (só a cópia aberta, de hora em hora);
-// node atualizador.mjs --ligar (ligar-computador.cmd) abre a página para entrar com e-mail e senha (ligar.mjs): o computador
-// recebe o crachá do aparelho, guardado cifrado pelo Windows. Sem crachá, ainda vale o .env antigo com a chave de serviço do Access
-// (transição; README.md). Não precisa de nada além do Node 20+. No programa .exe (programa.mjs, gerado por tools/gerar-exe.mjs,
+// node atualizador.mjs --ligar abre a página para entrar com e-mail e senha (ligar.mjs): o computador
+// recebe o crachá do aparelho, guardado cifrado pelo Windows. Sem crachá não entra (a chave de serviço e o .env da transição
+// saíram em 25/11/2026). Não precisa de nada além do Node 20+. No programa .exe (programa.mjs, gerado por tools/gerar-exe.mjs,
 // que traz o Node dentro) a mesma rotina é chamada por `principal`.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,13 +17,12 @@ import { ErroNaoLigado, SITE_PADRAO, janelaDeLigar, lerLigacao } from './ligar.m
 export const EXE = globalThis.PROGRAMA_EXE || null;
 const PASTA = EXE ? path.dirname(process.execPath) : path.dirname(fileURLToPath(import.meta.url));
 /** Como a pessoa liga o computador de novo (texto dos avisos). */
-export const COMO_LIGAR = EXE ? 'abra o programa Administracao-de-Imoveis.exe (dois cliques)' : 'dê dois cliques em ligar-computador.cmd';
+export const COMO_LIGAR = EXE ? 'abra o programa Administracao-de-Imoveis.exe (dois cliques)' : 'rode node atualizador.mjs --ligar';
 export const PASTA_DIARIO = 'copias-diarias';
 export const PASTA_PROGRAMA = 'programa';
 export const ARQUIVO_CHAVE = 'chave-do-backup.json';
 export const ARQUIVO_REGISTRO = 'ultima-atualizacao.txt';
 export const ARQUIVO_PROGRAMA = 'administracao-imoveis.html';
-export const CAMINHO_PROGRAMA = 'offline/administracao-imoveis.html';
 export const PASTA_COPIA = 'Arquivos dos imoveis'; // iguais a docs/js/copia-aberta.js
 export const ARQUIVO_COPIA = 'copia-aberta.json';
 export const PASTA_APAGADOS = 'Apagados na nuvem'; // iguais a docs/js/copia-aberta.js (item 28)
@@ -42,19 +41,6 @@ export const MAX_ERROS_REGISTRO = 5; // falhas da cópia aberta que vão para ul
 const prazo = (ms) => AbortSignal.timeout(ms);
 export const MANTER_DIARIOS = 60; // igual a MANTER_DIARIOS de docs/js/backup-seguro.js
 const MAGICO = 'IMOVEIS-BACKUP-SEGURO-1'; // igual ao de docs/js/backup-seguro.js (tests/atualizador-pc.test.mjs confere abrindo o arquivo)
-
-/** Lê um arquivo .env simples (CHAVE=valor, # comentários) sem sobrescrever o que já está no ambiente. */
-export function lerEnv(arquivo, env = process.env) {
-  if (!fs.existsSync(arquivo)) return env;
-  for (const linha of fs.readFileSync(arquivo, 'utf8').split(/\r?\n/)) {
-    const m = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/.exec(linha);
-    if (!m || linha.trim().startsWith('#')) continue;
-    let v = m[2];
-    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
-    if (env[m[1]] === undefined) env[m[1]] = v;
-  }
-  return env;
-}
 
 // ---------------------------------------------------------------------------
 // Cifra no mesmo formato do backup seguro (docs/js/backup-seguro.js → cifrar): chave AES nova por arquivo, embrulhada com a
@@ -90,35 +76,23 @@ export function diariosParaApagar(nomes) {
 // A atualização
 // ---------------------------------------------------------------------------
 /**
- * Como este computador entra: o crachá do aparelho (ligado com e-mail e senha, ligar.mjs) ou, na transição, a chave de serviço
- * do .env antigo. `ligacao` = lerLigacao() (trocada nos testes). Sem nenhum dos dois: ErroNaoLigado.
+ * Como este computador entra: só com o crachá do aparelho (ligado com e-mail e senha, ligar.mjs). `ligacao` = lerLigacao()
+ * (trocada nos testes). Sem crachá: ErroNaoLigado. (A chave de serviço do .env antigo saiu em 25/11/2026.)
  */
-export function carregarConfig(env = lerEnv(path.join(PASTA, '.env')), ligacao = lerLigacao(env)) {
+export function carregarConfig(env = process.env, ligacao = lerLigacao(env)) {
   if (ligacao?.cracha) return { site: String(ligacao.site || SITE_PADRAO).replace(/\/+$/, ''), pasta: ligacao.pasta, cracha: ligacao.cracha, computador: ligacao.computador };
-  if (!env.ACCESS_CLIENT_ID && !env.ACCESS_CLIENT_SECRET) throw new ErroNaoLigado(`Este computador ainda não está ligado ao sistema: ${COMO_LIGAR} e entre com o e-mail e a senha do sistema.`);
-  const cfg = {
-    site: String(env.SITE || SITE_PADRAO).replace(/\/+$/, ''),
-    clientId: String(env.ACCESS_CLIENT_ID || '').trim(),
-    clientSecret: String(env.ACCESS_CLIENT_SECRET || '').trim(),
-    pasta: String(env.PASTA_BACKUP || '').trim(),
-  };
-  const faltam = Object.entries({ ACCESS_CLIENT_ID: cfg.clientId, ACCESS_CLIENT_SECRET: cfg.clientSecret, PASTA_BACKUP: cfg.pasta }).filter(([, v]) => !v).map(([k]) => k);
-  if (faltam.length) throw new Error(`Falta no .env: ${faltam.join(', ')} (veja .env.exemplo).`);
-  return cfg;
+  throw new ErroNaoLigado(`Este computador ainda não está ligado ao sistema: ${COMO_LIGAR} e entre com o e-mail e a senha do sistema.`);
 }
 
 /**
- * Endereços e cabeçalhos para falar com a nuvem. Crachá: tudo por /api/aparelho/ (fora do login do Access, só leitura) e a
- * versão PC também por lá. Chave de serviço (antiga): /api/ e /offline/ pelo Access.
+ * Endereços e cabeçalhos para falar com a nuvem: tudo por /api/aparelho/ (fora do login do Access, só leitura), com o crachá;
+ * a versão PC também por lá. Sem crachá não há outro caminho: ErroNaoLigado.
  */
 export function acesso(cfg) {
-  if (cfg.cracha) {
+  if (!cfg?.cracha) throw new ErroNaoLigado(`Este computador ainda não está ligado ao sistema: ${COMO_LIGAR} e entre com o e-mail e a senha do sistema.`);
     // a versão do programa vai junto: o sistema mostra em Usuários → Aparelhos ligados (o programa se atualiza sozinho)
-    return { api: `${cfg.site}/api/aparelho/`, programa: `${cfg.site}/api/aparelho/programa`, cabecalhos: { Authorization: `Bearer ${cfg.cracha}`, ...(EXE?.versao ? { 'X-Programa-Versao': EXE.versao } : {}) },
-      recusou: (status) => `A nuvem não aceitou o crachá deste computador (resposta ${status}). Se ele foi desligado em Usuários, ligue de novo (${COMO_LIGAR}); se for logo depois de instalar, confira a regra "Bypass" do Access (README.md).` };
-  }
-  return { api: `${cfg.site}/api/`, programa: `${cfg.site}/${CAMINHO_PROGRAMA}`, cabecalhos: { 'CF-Access-Client-Id': cfg.clientId, 'CF-Access-Client-Secret': cfg.clientSecret },
-    recusou: (status) => `A nuvem não aceitou a chave de serviço (resposta ${status}). Confira ACCESS_CLIENT_ID/SECRET, a política "Service Auth" do Access e a variável SERVICOS do Worker.` };
+  return { api: `${cfg.site}/api/aparelho/`, programa: `${cfg.site}/api/aparelho/programa`, cabecalhos: { Authorization: `Bearer ${cfg.cracha}`, ...(EXE?.versao ? { 'X-Programa-Versao': EXE.versao } : {}) },
+    recusou: (status) => `A nuvem não aceitou o crachá deste computador (resposta ${status}). Se ele foi desligado em Usuários, ligue de novo (${COMO_LIGAR}); se for logo depois de instalar, confira a regra "Bypass" do Access (README.md).` };
 }
 
 /** Resposta da nuvem em JSON; erro com o motivo (o Access responde com a página de login, que não é JSON). */
@@ -162,7 +136,7 @@ export async function atualizar(cfg, { buscar = fetch, hoje = hojeIso() } = {}) 
     const versaoArq = path.join(pastaPrograma, 'versao.txt');
     const atual = fs.existsSync(versaoArq) ? fs.readFileSync(versaoArq, 'utf8').trim() : '';
     const cab = await buscar(a.programa, { method: 'HEAD', headers: cabecalhos, redirect: 'manual', signal: prazo(TEMPO_CONSULTA) });
-    // pelo crachá a versão PC vem do GitHub (ETag); pela chave de serviço, do site (Last-Modified)
+    // a versão PC vem do GitHub, pela nuvem (ETag; Last-Modified se o ETag faltar)
     const publicada = cab.ok ? (cab.headers.get('etag') || cab.headers.get('last-modified') || '') : '';
     if (!cab.ok && cab.status !== 304) throw new Error(`resposta ${cab.status}`);
     if (publicada && publicada !== atual) {
@@ -328,7 +302,7 @@ export async function principal(args = []) {
       if (!(e instanceof ErroNaoLigado) || soArquivos || !process.stdout.isTTY) throw e;
     }
     if (!cfg) {
-      const env = lerEnv(path.join(PASTA, '.env'));
+      const env = process.env; // SITE e PASTA_BACKUP só para quem testa com outro endereço
       console.log('Abrindo no navegador a página para ligar este computador (e-mail e senha do sistema)…');
       const lig = await janelaDeLigar({ site: String(env.SITE || SITE_PADRAO).replace(/\/+$/, ''), padrao: { pasta: env.PASTA_BACKUP || '' }, aoAbrir: (url) => console.log(`Se não abriu sozinha: ${url}`) });
       console.log(`Ligado: ${lig.computador} (${lig.login}). Fazendo a primeira atualização…`);
