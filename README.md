@@ -2,9 +2,9 @@
 
 Sistema web para administrar imóveis alugados: inquilinos, cobrança mensal, faturas de locação e documentos.
 
-**Endereço:** https://juliocpfh.github.io/erp-boletos/
+**Endereço:** https://erp.ankjck.com.br
 
-Não precisa instalar nada. O sistema abre no navegador, mas **os dados ficam numa pasta do seu computador**, que você escolhe. Pode ser uma pasta do OneDrive, para usar os mesmos dados em outro computador. Nada é guardado na internet: o endereço acima só entrega as telas.
+Desde 06/11/2026 os dados ficam **na nuvem** (Cloudflare, com login), e o sistema também abre no celular como aplicativo instalado; sem internet, o aplicativo instalado continua abrindo e as mudanças sobem sozinhas depois. O modo antigo, com **os dados numa pasta do computador**, continua existindo: as seções "Como usar", "O que fica na pasta" e "Mais de um computador ou usuário" abaixo descrevem esse modo. Detalhes atuais em `documentacao/RESUMO.md` e `nuvem/README.md`.
 
 ## Como usar
 
@@ -14,9 +14,9 @@ Não precisa instalar nada. O sistema abre no navegador, mas **os dados ficam nu
 4. Nos próximos acessos, o navegador lembra a pasta e só pede para confirmar a permissão.
 5. O login fica lembrado neste navegador, em todas as abas, por 12 horas sem uso, até clicar em **Sair**.
 
-## Sem internet (arquivo único)
+## Sem internet
 
-Em **Sistema → Baixar a versão sem internet** você baixa `Administração de Imóveis.html`: o programa inteiro num único arquivo (código, componentes de Excel/ZIP/PDF e modelo da NF). Guarde no computador e abra com dois cliques no Chrome ou no Edge. Funciona sem internet e mesmo se o site sair do ar; os dados são os mesmos (escolha a mesma pasta). Quando o programa receber melhorias, baixe o arquivo de novo.
+Sem internet (ou com o site fora do ar) abre-se o **aplicativo instalado**, que usa a cópia guardada no aparelho. O programa inteiro num único arquivo (`administracao-imoveis.html`, a "versão PC") ficou só como reserva para desastre: o GitHub o gera a cada mudança e ele fica na pasta do backup seguro, fora das telas.
 
 O site e o arquivo único não dependem de nenhum outro serviço: os componentes de terceiros ficam em `docs/vendor/`.
 
@@ -62,7 +62,7 @@ O sistema já está preparado para emitir os boletos (com QR Code Pix) direto na
 
 ## Publicar o endereço (uma vez)
 
-No GitHub: **Settings → Pages → Build and deployment → Deploy from a branch**, branch `main`, pasta `/docs`, e salvar. Em alguns minutos o endereço acima passa a funcionar. Cada alteração enviada para `main` atualiza o sistema.
+A publicação é feita pelo GitHub Actions (`.github/workflows/publicar-site.yml`) a cada alteração enviada para `main`; o passo a passo do domínio está em `documentacao/PUBLICAR_NO_DOMINIO.md`.
 
 ## Desenvolvimento
 
@@ -74,12 +74,8 @@ cd docs && python3 -m http.server 8000
 
 Abra `http://localhost:8000/?teste` para usar uma pasta interna do navegador, sem escolher pasta. Depois de mudar o código, gere de novo a versão sem internet (o teste avisa se ela ficar desatualizada):
 
-```
-node tools/gerar-offline.mjs
-```
-
-Testes das regras de cálculo e numeração:
+Conferir tudo (sintaxe e testes) antes de enviar:
 
 ```
-node --test tests/*.test.mjs
+node tools/checar.mjs
 ```

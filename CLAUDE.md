@@ -9,7 +9,7 @@ Código em `docs/` (é também a pasta publicada pelo GitHub Pages: não ponha d
 |---|---|
 | Achar onde mexer (função → linha) | `node tools/mapa.mjs <trecho>` (ex.: `reserva`, `CADASTROS.`, `FORMULARIOS.pag`; só `docs/js`) |
 | Conferir tudo antes do commit | `node tools/checar.mjs` (sintaxe via esbuild + testes de `tests/`; `node --check` NÃO detecta erros nestes módulos); com `--offline` gera também a versão PC (normalmente não precisa: o GitHub gera na `main`) |
-| Testar a ponte do C6 | `node --test tests/ponte-c6.test.mjs` (sobe a ponte em modo simulado) e `node --test "ponte-c6/testes/*.test.mjs"` (módulos da fase 2; `checar.mjs` não os roda) |
+| Testar a ponte do C6 | `node --test tests/ponte-c6.test.mjs` (sobe a ponte em modo simulado) e `node --test "ponte-c6/testes/*.test.mjs"` (módulos da fase 2; `checar.mjs` também os roda) |
 | Rodar a ponte em modo simulado | `cd ponte-c6 && SIMULADO=1 PONTE_SENHA=<frase com 20+ caracteres> CONTAS=ank,jck node servidor.mjs` → `http://127.0.0.1:8765` (ou copie `.env.exemplo` para `.env`); nada vai ao banco |
 | Testar os dados na nuvem (Cloudflare) | `node nuvem/local.mjs` → `http://localhost:8787` (site + `/api` com o cofre em SQLite; `/__internet?ligar=0` simula a queda); detalhes em `nuvem/README.md` e `documentacao/ESTUDO_DADOS_NUVEM.md` |
 | Rodar no navegador | `cd docs && python3 -m http.server 8000` → `http://localhost:8000/?teste` (pasta interna, sem escolher pasta; em `?teste` a ponte é simulada dentro do site, `banco-fase2.js` + `simulado-banco.js`) |
@@ -21,7 +21,7 @@ Código em `docs/` (é também a pasta publicada pelo GitHub Pages: não ponha d
 - Não leia `docs/offline/` (gerado, ~2 MB), `docs/vendor/` (bibliotecas minificadas), `docs/js/simulado-banco.js` (dados fictícios copiados de `ponte-c6/simulado/`) nem `documentacao/c6-openapi/*.yaml` inteiros (busque o campo com `Grep`).
 
 ## Regras que não podem quebrar
-1. Dinheiro em **centavos inteiros**; datas `'AAAA-MM-DD'`; competência (mês de uso) `'AAAA-MM'`. Data de um instante só por `C.dataDeBrasilia`/`C.dataBrDe` (`brasilia.js`), nunca `toISOString().slice(0, 10)` (`tests/datas-brasilia.test.mjs` barra); prazo dado a alguém por `C.prazoDadoAgora`/`validadeDoLink` (regra `fim_expediente_hora`: depois das 18h conta do dia seguinte).
+1. Dinheiro em **centavos inteiros**; datas `'AAAA-MM-DD'`; competência (mês de uso) `'AAAA-MM'`. Data de um instante só por `C.dataDeBrasilia`/`C.dataBrDe` (`brasilia.js`), nunca `toISOString().slice(0, 10)` (`tests/datas-brasilia.test.mjs` barra); prazo dado a alguém por `C.inicioDoPrazoAgora`/`ultimoDiaDoPrazo`/`validadeDoLink` (regra `fim_expediente_hora`: depois das 18h conta do dia seguinte).
 2. Toda gravação: na tela, `alterar((db) => …)` (`docs/js/app.js`; é uma fila, uma gravação por vez, `alterarAgora` grava de verdade); nas regras, só `inserir`/`atualizar`/`excluir` (`docs/js/regras.js`), que registram o histórico (`inserir(..., { historico: false })` só em carga em lote que grava uma linha própria, como a importação do extrato).
 3. Campo ou tabela nova no banco: `TABELAS` em `regras.js`; dados antigos se ajustam em `normalizar()` (nunca remova passos de migração).
 4. HTML com texto do usuário sempre passa por `esc()`. Parâmetros do endereço (`rota.q`) passam por `sanearParametros` (`calculos.js`): parâmetro novo = entrada em `FORMATOS_PARAMETRO` (valor fora do formato some em silêncio: sem acento nem espaço no valor; `tests/links-parametros.test.mjs` confere os links fixos); mês e data nas telas por `competenciaValida`/`dataValida`.
