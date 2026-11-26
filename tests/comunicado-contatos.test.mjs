@@ -145,9 +145,25 @@ test('quem recebe: inquilinos e fiadores dos contratos ativos; textos do fiador'
   const com = CM.novoComunicado(d, 'contatos', { prazo: '2026-11-28', email_empresa: 'administracao@exemplo.com.br', telefone_empresa: '(41) 3333-0000' }, '2026-11-18');
   const texto = CM.preencher(com.texto, CM.camposDe(d, com, lista[1], 'https://x/contatos#k'));
   assert.match(texto, /Olá, Diego\./);
-  assert.match(texto, /contrato de locação de Ana Teste, do qual você é fiador/);
+  assert.match(texto, /Olá, Diego\. Você é fiador\(a\) da locação de Ana Teste \(Apto 101\)\./);
   assert.match(texto, /até 28\/11\/2026/);
   assert.ok(!/\[preencher/.test(texto));
+  // textos curtos (25/11): o que não pode sumir de nenhum canal, para o inquilino e para o fiador, sem campo em branco
+  const m = CM.MODELOS.contatos;
+  for (const p of lista) {
+    const dados = CM.camposDe(d, com, p, 'https://x/contatos#k');
+    for (const k of ['texto', 'whatsapp', 'lembrete', 'aviso', 'ciencia']) {
+      const t = CM.preencher(com[k], dados);
+      assert.ok(!/\[preencher|\[se |\[fim\]|\{\w+\}/.test(t), `${k} de ${p.chave} sem campo em branco: ${t}`);
+      if (k !== 'aviso' && k !== 'ciencia') assert.ok(t.includes('https://x/contatos#k') && t.includes('28/11/2026'), `${k}: link e prazo`);
+      if (k !== 'ciencia') assert.match(t, /a conta e o Pix (de pagamento )?não mudam/i, `${k}: aviso contra golpe`);
+    }
+    assert.equal(/fiador|Ana Teste/.test(CM.preencher(com.texto, dados)), p.tipo === 'fiador', 'só o fiador lê a frase do fiador');
+  }
+  for (const k of ['texto', 'aviso']) assert.match(m[k], /Nunca pedimos pagamento em outra conta\./);
+  for (const k of ['texto', 'whatsapp', 'aviso']) assert.match(m[k], /\{email_empresa\}/);
+  assert.ok(m.whatsapp.length < 300 && m.lembrete.length < 300, 'WhatsApp e lembrete curtos');
+  assert.match(CP.textoDoAceite(CP.contextoValido(CM.contextoDoLink(d, com, lista[0]))), /saem de administracao@exemplo\.com\.br[\s\S]*Declaração: Li o aviso acima e concordo: /);
   const ctx = CM.contextoDoLink(d, com, lista[0]);
   assert.equal(ctx.desde, '03/2025');
   assert.deepEqual(ctx.cnpjs, ['11.222.333/0001-81']);

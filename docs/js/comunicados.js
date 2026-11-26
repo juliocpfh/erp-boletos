@@ -15,35 +15,31 @@ export const MODELOS = {
     nome: 'Atualização de contatos e novo e-mail da empresa',
     titulo: 'Novo e-mail da administração e confirmação dos seus contatos',
     assunto: 'Confirme seus contatos ({imovel_curto})',
-    texto: `Olá, {nome}.
+    // Textos curtos (pedido do dono, 18/11; aplicados em 25/11). Ficam sempre: o novo e-mail, o prazo, o link, o efeito pelo
+    // contrato e o aviso contra golpe ("a conta e o Pix não mudam", "nunca pedimos pagamento em outra conta", "ligue para").
+    texto: `Olá, {nome}.[se fiador] Você é fiador(a) da locação de {locatario} ({imovel_curto}).[fim]
 
-Aqui é a administração [se fiador]do contrato de locação de {locatario}, do qual você é fiador(a), no imóvel {imovel}[senão]do seu imóvel: {imovel}[fim].
+Nossos e-mails (boletos e avisos) agora saem de {email_empresa}: salve nos seus contatos e olhe também o spam.
 
-A partir de agora, nossos e-mails (boletos, avisos e documentos) saem do endereço {email_empresa}. Salve esse endereço nos seus contatos e confira também a caixa de spam.
-
-Precisamos que você confirme seus contatos até {prazo}. Leva 2 minutos:
+Confirme seus contatos até {prazo} (leva 2 minutos):
 
 {link}
 
-Pelo contrato, as mensagens enviadas para o e-mail e o telefone cadastrados valem como recebidas. Se você não atualizar, continuaremos usando os contatos que temos hoje.
+Se não atualizar, seguimos usando os contatos do cadastro, que valem como recebidos pelo contrato.
 
-Atenção: a conta e a chave Pix para pagamento não mudam. Nunca pedimos pagamento em outra conta. Na dúvida, ligue para {telefone_empresa}.
+Atenção: a conta e o Pix de pagamento não mudam. Nunca pedimos pagamento em outra conta. Na dúvida, ligue para {telefone_empresa}.
 
-Atenciosamente,
 {empresas}`,
-    whatsapp: `Olá, {nome}! Aqui é a {empresas}, administração [se fiador]da locação de {locatario} ({imovel_curto})[senão]do seu imóvel ({imovel_curto})[fim].
-Nosso novo e-mail é {email_empresa}. Confirme seus contatos até {prazo}: {link}
-A conta e o Pix de pagamento não mudam. Na dúvida, ligue para {telefone_empresa}.`,
-    lembrete: `Olá, {nome}! Ainda não recebemos a confirmação dos seus contatos ([se fiador]locação de {locatario}, [fim]{imovel_curto}). O prazo vai até {prazo}: {link}
-Nosso e-mail é {email_empresa}. A conta e o Pix de pagamento não mudam.`,
-    aviso: `A partir de agora, os e-mails da administração (boletos, avisos, notificações, recibos e documentos) saem do endereço {email_empresa}. Confira com a administração qualquer mensagem de outro endereço que diga falar em nosso nome.
+    whatsapp: `Olá, {nome}! Aqui é a {empresas}[se fiador] (locação de {locatario})[fim]. Novo e-mail: {email_empresa}. Confirme seus contatos até {prazo}: {link}
+A conta e o Pix não mudam. Na dúvida, ligue para {telefone_empresa}.`,
+    lembrete: `Olá, {nome}! Falta confirmar seus contatos ([se fiador]locação de {locatario}, [fim]{imovel_curto}), até {prazo}: {link}
+A conta e o Pix de pagamento não mudam.`,
+    aviso: `Nossos e-mails agora saem de {email_empresa}. Desconfie de mensagem de outro endereço em nosso nome.
 
-Pelo contrato de locação, as comunicações e notificações enviadas ao e-mail e ao endereço cadastrados são válidas, e você se comprometeu a avisar qualquer mudança de endereço, inclusive de e-mail. Por isso pedimos que confirme ou atualize abaixo o seu e-mail e o seu celular.
+Pelo contrato, as mensagens enviadas ao e-mail e ao telefone do cadastro valem como recebidas, e você deve nos avisar se eles mudarem. Confirme ou corrija abaixo.
 
-Até você nos informar outro contato, continuaremos usando os contatos do seu cadastro, e as mensagens enviadas a eles serão consideradas recebidas. Manter esses contatos atualizados e acompanhar as mensagens que chegam por eles, inclusive na caixa de spam, fica sob a sua responsabilidade.
-
-A conta e a chave Pix para pagamento não mudam. Nunca pedimos pagamento em outra conta. Em caso de dúvida, ligue para {telefone_empresa} antes de pagar.`,
-    ciencia: 'Li e concordo: os e-mails da administração saem de {email_empresa}; o e-mail e o celular acima são os meus contatos atuais; as mensagens enviadas a eles valem como recebidas; e vou avisar a administração se eles mudarem.',
+A conta e o Pix de pagamento não mudam. Nunca pedimos pagamento em outra conta. Na dúvida, ligue para {telefone_empresa} antes de pagar.`,
+    ciencia: 'Li o aviso acima e concordo: o e-mail e o celular acima são os meus contatos; as mensagens enviadas a eles valem como recebidas; aviso se mudarem.',
   },
 };
 
