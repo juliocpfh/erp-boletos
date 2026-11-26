@@ -175,17 +175,17 @@ test('voltar para um backup (ou substituir pelos dados de uma pasta) não reemit
   assert.equal(c.faixa({ tabela: 'contratos', quantidade: 1 }, DONO).inicio, 901);
 });
 
-test('número da NF: só pelo contador, um de cada vez, nunca repete', () => {
+test('número da NF: pelo lote, só com o número que o aparelho viu; nunca repete', () => {
   const c = carregado();
-  assert.deepEqual([c.contador({ nome: 'proxima_fatura' }, DONO).numero, c.contador({ nome: 'proxima_fatura' }, SOCIO).numero], [157, 158]);
+  c.aplicar(lote([{ op: 'raiz', campo: 'proxima_fatura', antes: 157, depois: 158 }]), DONO);
+  c.aplicar(lote([{ op: 'raiz', campo: 'proxima_fatura', antes: 158, depois: 159 }]), SOCIO);
   assert.equal(c.tudo().proxima_fatura, 159);
   // pelo lote: só se o número que o aparelho viu ainda for o atual; senão o lote inteiro volta
   c.aplicar(lote([{ op: 'raiz', campo: 'proxima_fatura', antes: 159, depois: 160 }]), DONO);
   assert.throws(() => c.aplicar(lote([{ op: 'historico', entrada: { nf: 159 } }, { op: 'raiz', campo: 'proxima_fatura', antes: 159, depois: 160 }]), SOCIO), (e) => e.status === 409 && e.extra.contador);
   assert.equal(c.tudo().proxima_fatura, 160);
   assert.equal(c.tudo().historico.filter((h) => h.nf).length, 0, 'nada do lote recusado ficou');
-  assert.throws(() => c.contador({ nome: 'outro' }, DONO), (e) => e.status === 400);
-  assert.throws(() => c.contador({ nome: 'proxima_fatura' }, CONSULTA), (e) => e.status === 403);
+  assert.throws(() => c.aplicar(lote([{ op: 'raiz', campo: 'proxima_fatura', antes: 160, depois: 161 }]), CONSULTA), (e) => e.status === 403);
 });
 
 test('papéis: consulta só lê; operador não mexe em usuários (só a própria senha) nem na ordem das caixas; e-mail sem usuário não entra', () => {

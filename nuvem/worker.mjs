@@ -1,6 +1,6 @@
 // Worker do Cloudflare: guarda o banco (imoveis-dados.json) e os anexos no R2, no lugar da pasta do OneDrive.
 // Só entra quem passou pelo Cloudflare Access (lista de e-mails no painel) e tem usuário ativo com esse e-mail no sistema (o cofre confere). Não fala com o C6 (a ponte continua no computador).
-// Rotas (todas em /api/): saude · dados/… (o cofre: tudo, mudancas, lote, resolver, faixa, contador, importar; cofre.mjs)
+// Rotas (todas em /api/): saude · dados/… (o cofre: tudo, mudancas, lote, resolver, faixa, importar; cofre.mjs)
 // · arquivos/<caminho> (GET/PUT/DELETE) · lista/<pasta>/ · lista-tudo/<pasta>/ (tudo de uma vez, em partes) · mover · apagar
 // · icone-192.png / icone-512.png (GET: ícone do aplicativo, o da logo ou o padrão) · icone/192 e icone/512 (PUT) · icone (DELETE)
 // · email/estado (GET) e email/enviar (POST): e-mail pela conta Gmail da empresa (gmail.mjs; documentacao/LIGAR_GMAIL.md).
@@ -169,7 +169,7 @@ async function lerCorpo(request, maximo) {
 // ---------------------------------------------------------------------------
 // Dados: repassa ao cofre (Durable Object), com o e-mail já conferido; o Worker não lê o conteúdo (limite de 10 ms)
 // ---------------------------------------------------------------------------
-const ROTAS_COFRE = { tudo: 'GET', mudancas: 'GET', conflitos: 'GET', lote: 'POST', resolver: 'POST', faixa: 'POST', contador: 'POST', importar: 'POST', aparelhos: 'GET', 'desligar-aparelho': 'POST', 'verificador-aparelho': 'POST', 'chave-backup': 'POST', 'backup-seguro': 'GET', 'backup-seguro-feito': 'POST', acessos: 'GET' };
+const ROTAS_COFRE = { tudo: 'GET', mudancas: 'GET', lote: 'POST', resolver: 'POST', faixa: 'POST', importar: 'POST', aparelhos: 'GET', 'desligar-aparelho': 'POST', 'verificador-aparelho': 'POST', 'chave-backup': 'POST', 'backup-seguro': 'GET', 'backup-seguro-feito': 'POST', acessos: 'GET' };
 const cofreDe = (env) => env.COFRE.get(env.COFRE.idFromName('principal')); // um cofre só: as filas entram uma por vez
 
 async function repassarAoCofre(request, env, rota, email, url, origem = 'site') {

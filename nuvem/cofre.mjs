@@ -30,7 +30,7 @@ const INTERVALO_FAXINA_MS = 3600000; // sem alarme (testes, nuvem local): a faxi
 export const RAIZ_DO_SERVIDOR = ['formato', 'revisao', 'atualizado_em', 'atualizado_por', 'seq', 'revisao_so_sessao', 'historico', '_nuvem'];
 /**
  * Contadores que só andam com internet (número da NF): o lote só muda se o valor que o aparelho viu ainda for o atual;
- * senão o lote inteiro volta (409, `contador: true`) e o aparelho refaz com o número novo. Ou pelo `contador()`.
+ * senão o lote inteiro volta (409, `contador: true`) e o aparelho refaz com o número novo.
  */
 export const CONTADORES = ['proxima_fatura'];
 /** Segredos que nunca ficam nos dados (regra 8 do CLAUDE.md; normalizar também apaga). */
@@ -923,18 +923,6 @@ export class Cofre {
     return { tabela: t, inicio: proximo, fim: proximo + qtd - 1 };
   }
 
-  /** Próximo número de um contador (NF): só com internet, um pedido de cada vez, nunca repete. */
-  contador({ nome } = {}, email) {
-    this.exigir(email, 'operador');
-    if (!CONTADORES.includes(nome)) throw new ErroCofre(400, 'Contador desconhecido.');
-    return this.transacao(() => {
-      const linha = this.q('SELECT valor FROM raiz WHERE campo = ?', nome)[0];
-      const numero = Number(linha ? JSON.parse(linha.valor) : 1) || 1;
-      this.gravarRaiz(nome, numero + 1, email);
-      return { numero, seq: this.ultimoSeq() };
-    });
-  }
-
   /**
    * E-mail pela conta da empresa: registra quem mandou, para quem, o assunto e os nomes dos anexos (não o texto), com limite
    * por usuário e por dia (MAX_EMAILS_DIA). Só operador ou administrador.
@@ -1357,7 +1345,6 @@ export class CofreDO {
       }
       else if (rota === '/acessos' && request.method === 'GET') r = c.listarAcessos(Object.fromEntries(url.searchParams), email);
       else if (rota === '/mudancas' && request.method === 'GET') r = c.mudancas(url.searchParams.get('desde'), c.exigir(email, 'consulta'), undefined, Number(url.searchParams.get('formato')) || 1);
-      else if (rota === '/conflitos' && request.method === 'GET') r = { conflitos: c.conflitosAbertos(c.exigir(email, 'consulta')) };
       else if (rota === '/registrar-email' && request.method === 'POST') r = c.registrarEmail(await corpo(), email);
       else if (rota === '/agendados/novo' && request.method === 'POST') r = this.agendados.novo(await corpo(), email);
       else if (rota === '/agendados/lista' && request.method === 'GET') r = this.agendados.lista(email);
@@ -1373,7 +1360,6 @@ export class CofreDO {
       else if (rota === '/lote' && request.method === 'POST') r = c.aplicar(await corpo(), email);
       else if (rota === '/resolver' && request.method === 'POST') r = c.resolver(await corpo(), email);
       else if (rota === '/faixa' && request.method === 'POST') r = c.faixa(await corpo(), email);
-      else if (rota === '/contador' && request.method === 'POST') r = c.contador(await corpo(), email);
       else if (rota === '/importar' && request.method === 'POST') {
         const pedido = await corpo();
         if (!c.vazio()) {
