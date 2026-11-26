@@ -964,8 +964,6 @@ export const aCobrar = (cb) => !cb.data_pagamento && cb.situacao !== 'Carência'
 export const cobertoPelaReserva = (cb) => !cb.data_pagamento && cb.reserva_utilizada > 0 && !cb.carencia && cb.situacao !== 'Carência' && !emAcordo(cb)
   && !cb.quitado_saida && !cb.quitado_devolucao && !ehBoletoAvulso(cb) && totais(cb).a_pagar_pontual <= 0;
 export const QUITADO_RESERVA = 'Quitado pela reserva';
-/** Quitado pela reserva: ainda sem a quitação registrada (``cobertoPelaReserva``) ou já registrada (situação gravada). */
-export const quitadoPelaReserva = (cb) => (cb.data_pagamento ? cb.situacao === QUITADO_RESERVA : cobertoPelaReserva(cb));
 /**
  * Boletos quitados pela reserva com o vencimento já chegado (até ``hoje``) e ainda sem a quitação registrada. Decisão do dono
  * de 25/11/2026 ("sozinha, no vencimento"): a quitação é registrada sozinha, com a data do vencimento, e a NF entra na fila.
@@ -8872,12 +8870,7 @@ export function faixasDeAtraso(devedores) {
  * Régua de cobrança (rotina D8, dono em 2026-11-07): só um aviso do que fazer, nada é enviado sozinho.
  * A partir do dia de atraso do boleto mais antigo: 1 → lembrete por e-mail; 10 → ligar; 30 → avaliar a negativação.
  */
-export const REGUA_COBRANCA = [
-  { dias: 30, passo: 'Avaliar a negativação' },
-  { dias: 10, passo: 'Ligar para o inquilino' },
-  { dias: 1, passo: 'Mandar o lembrete por e-mail' },
-];
-/** Régua em uso (regra `regua_cobranca`; padrão = REGUA_COBRANCA), do passo de mais dias para o de menos. */
+/** Régua em uso (regra `regua_cobranca`, padrão em `DEFINICOES_REGRAS`), do passo de mais dias para o de menos. */
 export const reguaCobranca = () => [...CR.regra('regua_cobranca')].sort((a, b) => b.dias - a.dias);
 export const passoDaRegua = (dias) => (reguaCobranca().find((x) => dias >= x.dias) || {}).passo || '';
 
@@ -9225,10 +9218,6 @@ export function extratoImportadoAte(d, contaId) {
   const antigo = (((d && d.config_banco) || {}).ultima_importacao || {})[contaId] || null;
   return novo && antigo ? (novo > antigo ? novo : antigo) : novo || antigo;
 }
-/** Movimentação sem destino há mais dias que isto vira alerta no Painel. */
-export const DIAS_ALERTA_BANCO = 7;
-/** No mês corrente, a etapa "Banco" do fechamento aceita o extrato buscado há até este número de dias (não precisa chegar até hoje). */
-export const DIAS_EXTRATO_RECENTE = 7;
 
 /** Id da pasta "<Imóvel>/Contas pagas/<ano>" (escopo contasano) e "<Imóvel>/IPTU (guias)/<ano>" (iptuano): igual a idGuiasDoAno. */
 export const idPastaAno = (imovelId, ano) => Number(imovelId) * 10000 + Number(ano);
@@ -9315,7 +9304,7 @@ export function rotuloDoComprovante(d, x) {
 
 /**
  * Pendências do banco no mês (para o fechamento e os alertas): movimentações sem destino, sem comprovante, contas cujo extrato
- * ainda não foi buscado até o fim do mês (mês já fechado) ou nos últimos DIAS_EXTRATO_RECENTE dias (mês corrente: ex.: em
+ * ainda não foi buscado até o fim do mês (mês já fechado) ou nos últimos dias da regra `dias_extrato_recente` (mês corrente: ex.: em
  * 07/11/2026, extrato buscado em 01/11 vale; em 30/10, não) e pagamentos enviados sem confirmação.
  */
 export function pendenciasBancoDoMes(d, mes, hoje = C.hojeIso()) {
@@ -9335,7 +9324,7 @@ export function pendenciasBancoDoMes(d, mes, hoje = C.hojeIso()) {
 }
 
 /**
- * Alerta "Banco" do Painel: movimentações sem destino há mais de DIAS_ALERTA_BANCO dias, pagamentos enviados sem confirmação e
+ * Alerta "Banco" do Painel: movimentações sem destino há mais dias que a regra `dias_alerta_banco`, pagamentos enviados sem confirmação e
  * pagamentos aprovados aqui cujo envio ao banco não se confirmou (a resposta se perdeu: "Atualizar situação"). Só com o banco ligado.
  */
 export function alertaBanco(d, hoje = C.hojeIso()) {
@@ -10233,7 +10222,3 @@ export function cobrancaEscolhida(d, c, boletos, escolha = {}, data = C.hojeIso(
   return out;
 }
 
-/** Sugestões do cálculo final da saída na ``data``: honorários sobre os boletos a cobrar e as despesas com comprovante. */
-export function sugestoesCobrancaDaSaida(d, c, data = C.hojeIso()) {
-  return { honorarios: sugestaoHonorarios(d, c, cobrancasEmAberto(d, c.id), data), ...despesasCobraveis(d, c) };
-}

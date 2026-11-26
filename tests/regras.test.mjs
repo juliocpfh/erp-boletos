@@ -755,7 +755,7 @@ test('fechamento: no mês corrente a etapa "Banco" aceita o extrato buscado nos 
   d.config_banco = { ...R.CONFIG_BANCO_PADRAO, ativo: true, provedor: 'c6', conta_padrao_id: 'ank', contas: [{ id: 'ank', apelido: 'ANK', emitente_id: ank.id, ambiente: 'sandbox' }] };
   R.normalizar(d);
   const banco = (hoje, mes = '2026-11') => R.etapasFechamento(d, mes, hoje).find((e) => e.chave === 'banco');
-  assert.equal(R.DIAS_EXTRATO_RECENTE, 7);
+  assert.equal(R.regra('dias_extrato_recente'), 7);
   assert.deepEqual([banco('2026-11-07').pendentes, banco('2026-11-07').feito], [1, false]);
   assert.match(banco('2026-11-07').detalhe, /^ANK: extrato ainda não buscado \(no mês corrente, a etapa fica feita com o extrato buscado nos últimos 7 dias/);
   d.config_banco.ultima_importacao.ank = '2026-10-30';

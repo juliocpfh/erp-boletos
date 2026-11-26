@@ -300,7 +300,7 @@ Documento de 24/11/2026 (pedido C5 de 24/11). Ele junta, por assunto, tudo o que
 - **17/11/2026** — antes: havia uma parte que trazia de volta a garantia herdada desfeita; agora: foi tirada na limpeza da PR #310. Por quê: não era mais usada (decidido em 17/11, PENDENCIAS_DO_DONO.md).
 - **20/11/2026** — antes: o saldo devedor da saída era pago só por Pix ou depósito; agora: é cobrado por boleto. Por quê: o boleto é título executivo, e "se não pago é protesto e execução" (dono em 20/11, DECISOES.md e memória decisoes-20-11).
 - **20/11/2026** — antes: o boleto podia ser "pago em parte", e a diferença ia para o boleto seguinte (decisão de 16 e 17/11); agora: valor menor que o devido é recusado, e o complemento da caução só é aceito pelo valor exato. Por quê: "Não existe boleto pago em parte!" (dono em 20/11, DECISOES.md).
-- **20/11/2026** — antes: quatro telas antigas sem botão (trocar fiador, fiador avulso, ligar contrato a imóvel, correção avulsa); agora: foram apagadas (conferido: não existem mais no código). Por quê: decisão do dono de 20/11 (fios-019, mutirao-19-11/lote-I.md).
+- **20/11/2026** — antes: quatro telas antigas sem botão (trocar fiador, fiador avulso, ligar contrato a imóvel, correção avulsa); agora: foram apagadas (conferido: não existem mais no código). Por quê: decisão do dono de 20/11 (fios-019, arquivo/mutirao-19-11/lote-I.md).
 - **21/11/2026** — antes: adiar ou desfazer a saída só mostrava a diferença (ex.: "faltam R$ 750,00") e não lançava nada; agora: o último boleto em aberto é refeito. Por quê: o inquilino nunca paga adiantado (decisão do dono, item 3 de PENDENCIAS_4000.md).
 
 ### Pela metade ou nunca feito
@@ -481,7 +481,7 @@ Junta as listas dos sete assuntos, sem repetir. **Quem faz:** "Claude" (programa
 23. [ ] **Você:** depois do C6 no ar, rever a sugestão do tipo de despesa pela descrição (ex.: SANEPAR → Água).
 
 ### 5. Baixa (quando der ou quando acontecer)
-24. [ ] **Você:** **simular todas as etapas** com pessoas de teste (ficha → saída), com e-mails de verdade (decidido em 24/11: depois dos itens acima). (O Claude simulou em 24/11 com pessoas de teste: `SIMULACAO_ETAPAS_24_11.md`, PR #416; os 3 erros da troca de titular corrigidos na PR #422.)
+24. [ ] **Você:** **simular todas as etapas** com pessoas de teste (ficha → saída), com e-mails de verdade (decidido em 24/11: depois dos itens acima). (O Claude simulou em 24/11 com pessoas de teste: `arquivo/SIMULACAO_ETAPAS_24_11.md`, PR #416; os 3 erros da troca de titular corrigidos na PR #422.)
 25. [x] **Claude:** sugerir no cálculo final a multa pela falta do aviso de 30 dias (hoje só está no contrato). (Feito em 24/11, PR #408: proporcional, e vale a maior com a multa da saída antecipada.)
 26. [ ] **Você:** primeira rodada do **Arquivo impresso** e o advogado rever o termo do acordo.
 27. [ ] **Você:** guardar a última cópia da pasta do OneDrive num HD externo e apagá-la (decidido em 14/11).

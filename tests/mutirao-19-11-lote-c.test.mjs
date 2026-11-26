@@ -1,4 +1,4 @@
-// Mutirão de 19–20/11 (documentacao/mutirao-19-11/lote-C.md): prazo do contrato não residencial, regra de número inteiro e
+// Mutirão de 19–20/11 (documentacao/arquivo/mutirao-19-11/lote-C.md): prazo do contrato não residencial, regra de número inteiro e
 // login da internet vencido na faixa do topo. Dados fictícios.
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';

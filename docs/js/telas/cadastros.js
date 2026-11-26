@@ -127,7 +127,6 @@ const COMPROVANTE_APLICACAO = [{ campo: 'comprovante', valor: 'valor', data: 'da
 
 const comprovanteDoDeposito = (r) => [{ campo: 'comprovante', valor: 'valor', data: 'data', nome: r.qual === 'caucao' ? 'caucao' : 'deposito-garantia', texto: 'do depósito', vale: () => true }];
 
-const COMPROVANTE_COMPLEMENTO = [{ campo: 'comprovante', valor: 'complemento', data: 'data', nome: 'complemento-caucao', texto: 'do complemento da caução', vale: () => true }];
 const COMPROVANTES_FICHA = [
   { campo: 'comprovante_reserva', valor: 'reserva_valor', data: 'reserva_data', nome: 'reserva', texto: 'da reserva', vale: () => true },
   { campo: 'comprovante_devolucao', valor: 'devolucao_valor', data: 'devolucao_data', nome: 'devolucao-reserva', texto: 'da devolução da reserva', vale: (x) => R.fichaSemContrato(x) },
@@ -1100,34 +1099,8 @@ export const CADASTROS = {
     ajustarAsync: (dados, erros, r, form) => guardarComprovantes(comprovanteDoDeposito(r), dados, form, () => pastaDoEscopo('contrato', r.contrato_id)),
   },
   correcoes_garantia: {
-    titulo: (r, q) => `Correção da caução - ${buscar('contratos', q.contrato).inquilino_nome}`,
-    campos: () => F.CORRECAO_GARANTIA,
-    fixos: (r, q) => ({ contrato_id: Number(q.contrato) }),
-    padrao: (q) => {
-      const c = buscar('contratos', q.contrato);
-      const ult = R.correcoesDo(d(), c.id).pop();
-      return { data: ult ? ult.data_vigencia : C.hojeIso(), valor_novo: R.caucaoSugerida(d(), c, ult ? ult.data_vigencia : C.hojeIso()) };
-    },
-    aviso: (r, q) => { const c = buscar('contratos', q.contrato); return R.garantiaDepositada(c) ? `Caução atual: ${reais(R.valorGarantia(d(), c))}${c.caucao_meses ? ` (${c.caucao_meses} aluguéis ${R.regra('caucao_base', c) === 'cheio' || !R.percentualBonificacao(c) ? 'cheios' : 'com bonificação'})` : ''}.`
-      : `Caução ainda não registrada (depositado ${reais(R.somaDepositos(d(), c, 'caucao'))} de ${reais(c.caucao_valor)}): a correção vale depois que o valor inicial for depositado; o complemento é o que passa do valor inicial.`; },
-    voltar: (r, q) => `#/contrato/${q.contrato}`,
+    semFormulario: ['A correção da caução é feita na tela Reajustes', '#/reajustes', 'Ir para Reajustes'],
     descricao: (dados) => `Caução corrigida para ${reais(dados.valor_novo)}`,
-    ajustar(dados, erros, r, form, q) {
-      const c = buscar('contratos', q.contrato);
-      if (r) {
-        // edição: o valor anterior é o da época da correção; complemento não mexido acompanha o novo valor
-        if (dados.complemento === null || (dados.complemento === r.complemento && dados.valor_novo !== r.valor_novo)) dados.complemento = dados.valor_novo - (r.valor_anterior ?? r.valor_novo - (r.complemento || 0));
-        return conferirComprovantes(COMPROVANTE_COMPLEMENTO, dados, r, form);
-      }
-      // caução ainda não depositada inteira: corrige o valor a depositar (o complemento entra nos depósitos, sem comprovante próprio)
-      const antes = !R.garantiaDepositada(c);
-      const anterior = antes ? R.garantiaADepositar(d(), c, 'caucao').combinado : R.valorGarantia(d(), c);
-      dados.valor_anterior = anterior;
-      dados.antes_do_deposito = antes;
-      if (dados.complemento === null) dados.complemento = dados.valor_novo - anterior;
-      conferirComprovantes(COMPROVANTE_COMPLEMENTO, dados, r, form);
-    },
-    ajustarAsync: (dados, erros, r, form, q) => guardarComprovantes(COMPROVANTE_COMPLEMENTO, dados, form, () => pastaDoEscopo('contrato', Number(q.contrato))),
   },
   devolucoes_garantia: {
     titulo: (r, q) => `Devolução da garantia (${(r ? r.troca_id : q.troca) ? 'troca de garantia' : 'troca de titular'}) - ${buscar('contratos', r ? r.contrato_id : q.contrato).inquilino_nome}`,

@@ -21,13 +21,13 @@ test('sem nada escolhido valem as regras do dono (padrão do sistema), iguais ao
   assert.deepEqual(R.regrasDe(d), { ...CR.PADRAO_SISTEMA });
   assert.equal(R.regra('dia_gerar_boletos'), 20);
   assert.equal(R.regra('meses_documentos_ficha'), 3);
-  assert.equal(R.regra('dias_alerta_banco'), R.DIAS_ALERTA_BANCO);
-  assert.equal(R.regra('dias_extrato_recente'), R.DIAS_EXTRATO_RECENTE);
+  assert.equal(R.regra('dias_alerta_banco'), 7);
+  assert.equal(R.regra('dias_extrato_recente'), 7);
   assert.equal(R.regra('dias_sem_imovel'), 7);
   assert.equal(R.regra('meses_depois_de_alugar'), 2);
   assert.equal(R.regra('dias_vermelho'), 5);
-  assert.equal(R.regra('dias_antecipacao_banco'), Z.DIAS_ANTECIPACAO);
-  assert.deepEqual(R.reguaCobranca(), R.REGUA_COBRANCA);
+  assert.equal(R.regra('dias_antecipacao_banco'), 45);
+  assert.deepEqual(R.reguaCobranca(), [{ dias: 30, passo: 'Avaliar a negativação' }, { dias: 10, passo: 'Ligar para o inquilino' }, { dias: 1, passo: 'Mandar o lembrete por e-mail' }]);
   assert.equal(R.regra('multa_padrao'), 2);
   assert.equal(R.regra('juros_padrao'), 1);
   // toda regra tem explicação, consequência e lei (pedido do dono, 2026-11-12)

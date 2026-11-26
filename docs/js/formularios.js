@@ -430,7 +430,6 @@ export const FICHA_RENDA = [
 ];
 /** Fiadores da ficha: os mesmos campos do Novo contrato (fiador1_nome…), sem as datas do vínculo; vão preenchidos para o contrato. */
 const SO_NO_CONTRATO = ['data_entrada', 'data_saida'];
-export const CAMPOS_FIADOR_FICHA = CAMPOS_FIADOR.filter((c) => !SO_NO_CONTRATO.includes(c.nome)).map((c) => c.nome);
 export const FICHA_FIADORES = [1, 2].flatMap((n) => [
   { secao: n === 1 ? 'Fiador' : 'Segundo fiador (se houver)', ...GARANTIA_FIADOR, ...(n === 1 ? {} : { recolher: EXPANDIR_PARTE }) },
   ...FORM_FIADOR.filter((c) => !SO_NO_CONTRATO.includes(c.nome)).map((c) => ({ ...c, nome: `fiador${n}_${c.nome}`, obrig: false, ...GARANTIA_FIADOR })),

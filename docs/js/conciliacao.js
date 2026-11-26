@@ -677,11 +677,6 @@ export const nomePadraoComprovante = (d, mov) => nomeComprovante(d, mov);
 const emAberto = (cb) => !cb.data_pagamento && cb.situacao !== 'Carência' && cb.situacao !== 'Em acordo' && !cobertoPelaReserva(cb);
 const semDigitos = (t) => maiusculaSemAcento(t).replace(/\d+/g, '').replace(/\s+/g, ' ').trim();
 
-/**
- * No aviso "Pix sem identificação", contam-se só os boletos que vencem até tantos dias depois da entrada (pagamento adiantado). Ex.:
- * entrada de 10/08 → vencimentos até 24/09. Nada é ligado por valor e data (decisão do dono, 17/11/2026): o prazo só limita a lista.
- */
-export const DIAS_ANTECIPACAO = 45;
 /** Boleto já pago à mão que ainda pode receber a linha do extrato (sem outra linha ligada a ele). */
 const ligavel = (cb, movId = null) => !!cb.data_pagamento && (!cb.movimentacao_id || cb.movimentacao_id === movId);
 /** Pago (data contábil ou dia em que pagou) entre ``de`` e ``ate``. */
@@ -695,7 +690,7 @@ const pagoEntre = (cb, de, ate) => [cb.data_pagamento, cb.data_pagou].some((x) =
  * 2) SEM identificador igual (decisão do dono, 17/11/2026: Pix feito à mão nunca liga sozinho), só candidatos para o aviso "Pix sem
  *    identificação: vincular manualmente", sempre 'provavel' e ``semId``: o boleto JÁ PAGO com o mesmo valor na mesma data
  *    (jaPago), os em aberto pelo valor e pela data (no prazo, até ``dias`` depois do vencimento, ou com multa e juros), vencendo até
- *    DIAS_ANTECIPACAO dias depois da entrada, e os já pagos com o mesmo valor nos 4 dias antes. Quem escolhe é o usuário.
+ *    dias da regra `dias_antecipacao_banco` (padrão 45) depois da entrada, e os já pagos com o mesmo valor nos 4 dias antes. Quem escolhe é o usuário.
  * ``movId``: na linha do extrato, o boleto já ligado a outra linha não conta. Ex.: boleto 07/2026 de R$ 1.318,50 pago à mão em 10/08 e
  * a entrada de 10/08 → só o 07/2026 (jaPago), e não o 08/2026 de mesmo valor, que vence em 10/09.
  */

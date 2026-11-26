@@ -26,7 +26,7 @@ test('reserva que cobre o boleto inteiro: "Quitado pela reserva", fora de a cobr
   assert.equal(jul.reserva_utilizada, 180000);
   assert.equal(R.totais(jul).a_pagar_pontual, 0);
   assert.equal(jul.situacao, 'Quitado pela reserva');
-  assert.ok(R.cobertoPelaReserva(jul) && R.quitadoPelaReserva(jul));
+  assert.ok(R.cobertoPelaReserva(jul));
   assert.equal(R.aCobrar(jul), false);
   // agosto: sobram R$ 200,00 da reserva, R$ 1.600,00 a pagar, em aberto
   assert.equal(ago.reserva_utilizada, 20000);
@@ -53,7 +53,7 @@ test('registrar a quitação dá a NF do aluguel em dia, sem multa, mesmo depois
   assert.equal(pago.juros, 0);
   assert.equal(pago.valor_nf, 180000);
   assert.equal(pago.pagou_em_dia, false);
-  assert.ok(R.quitadoPelaReserva(pago));
+  assert.equal(pago.situacao, R.QUITADO_RESERVA);
   assert.ok(R.pendentesDeFatura(d).some((p) => p.registro.id === jul.id));
   R.estornarPagamento(d, jul.id, 'j');
   const volta = R.buscar(d, 'cobrancas', jul.id);

@@ -29,7 +29,7 @@ Feito em 24/11/2026 (compactação geral pedida pelo dono). Cada documento, para
 | [MANUAL_BANCO.md](MANUAL_BANCO.md) | Como usar a parte do banco: boletos com Pix, extrato, comprovantes, pagamentos. | Quando o C6 estiver ligado. |
 | [TAXAS_COBRAVEIS.md](TAXAS_COBRAVEIS.md) | Taxas que podem ser cobradas do inquilino, cada uma com uma pergunta sim/não. O advogado deve conferir. | Ao decidir taxas do contrato. |
 | [HONORARIOS_E_DESPESAS_DE_COBRANCA.md](HONORARIOS_E_DESPESAS_DE_COBRANCA.md) | Pesquisa jurídica: honorários e despesas de cobrança de quem atrasa. Desde 24–25/11 (PR #415) entram só no acordo e no cálculo final, por escolha. | Ao mexer na cobrança do atraso. |
-| [MINUTA_ADITIVO_TARIFA.md](MINUTA_ADITIVO_TARIFA.md) | Minuta do termo aditivo da tarifa do boleto (histórico: o advogado dispensou o aditivo em 24/11, PR #411). | Só para saber de onde veio a decisão. |
+| [arquivo/MINUTA_ADITIVO_TARIFA.md](arquivo/MINUTA_ADITIVO_TARIFA.md) | Minuta do termo aditivo da tarifa do boleto (histórico: o advogado dispensou o aditivo em 24/11, PR #411). | Só para saber de onde veio a decisão. |
 | [REVISAO_JURIDICA_CONTRATO.md](REVISAO_JURIDICA_CONTRATO.md) | Revisão jurídica do contrato e dos e-mails (itens A1–A20, B1–B10): o que foi feito e o que espera o dono. | Antes de mudar texto do contrato. |
 | [ESTUDO_PRODUTO_COMERCIAL.md](ESTUDO_PRODUTO_COMERCIAL.md) | Mercado, bancos, concorrentes e o que falta para vender o sistema. | Ao pensar na venda. |
 | [PROPOSTA_LICENCA_E_PROGRAMA_PC.md](PROPOSTA_LICENCA_E_PROGRAMA_PC.md) | Plano aprovado (15/11) da licença por chave e do programa do PC sem `.env`; "Andamento" no fim. | Ao mexer na licença ou no programa do PC. |
@@ -63,14 +63,14 @@ Feito em 24/11/2026 (compactação geral pedida pelo dono). Cada documento, para
 
 | Documento | O que é | Quando ler |
 |---|---|---|
-| [BUSCA_24_11.md](BUSCA_24_11.md) (e o PDF) | Busca de 24/11: 52 erros, 4 lotes, as 10 perguntas ao dono com a resposta e a PR de cada uma. | Para conferir um erro de 24/11. |
-| [SIMULACAO_ETAPAS_24_11.md](SIMULACAO_ETAPAS_24_11.md) | Simulação de uma locação inteira com pessoas de teste (24/11, pedido 5b): o que foi aberto e clicado em cada etapa e os erros achados (os da troca de titular corrigidos na #422). | Ao rever textos dos e-mails e documentos ou repetir a simulação. |
+| [BUSCA_24_11.md](BUSCA_24_11.md) | Busca de 24/11: 52 erros, 4 lotes, as 10 perguntas ao dono com a resposta e a PR de cada uma. | Para conferir um erro de 24/11. |
+| [arquivo/SIMULACAO_ETAPAS_24_11.md](arquivo/SIMULACAO_ETAPAS_24_11.md) | Simulação de uma locação inteira com pessoas de teste (24/11, pedido 5b): o que foi aberto e clicado em cada etapa e os erros achados (os da troca de titular corrigidos na #422). | Ao rever textos dos e-mails e documentos ou repetir a simulação. |
 | [CONFERENCIA_BOLETOS_24_11.md](CONFERENCIA_BOLETOS_24_11.md) | Conferência de tudo o que entra e sai do boleto (24/11), citada pelos testes. | Ao mexer na montagem do boleto. |
-| [MUTIRAO_19_11.md](MUTIRAO_19_11.md) e [mutirao-19-11/](mutirao-19-11/) | Busca de 19–20/11: 345 erros, 17 lotes, todos corrigidos. | Só para a prova de um erro antigo. |
+| [MUTIRAO_19_11.md](MUTIRAO_19_11.md) e [arquivo/mutirao-19-11/](arquivo/mutirao-19-11/) | Busca de 19–20/11: 345 erros, 17 lotes, todos corrigidos. | Só para a prova de um erro antigo. |
 | [MUTIRAO_3000.md](MUTIRAO_3000.md) | Mutirão de 16–17/11: 366 erros com a prova de cada um. | Só para a prova de um erro antigo. |
 | [PENDENCIAS_4000.md](PENDENCIAS_4000.md) | Pedidos de 20/11 depois do mutirão: itens 1 a 5 feitos; faltam os testes do dono (6) e a limpeza (7). | Ao fazer a limpeza final. |
 | [ROTINA_DE_MELHORIA.md](ROTINA_DE_MELHORIA.md) | Análise de 07/11, Raio-X de 09/11 e revisão de 13/11, com `[x]` no que foi feito; poucos itens abertos (R11, P2). | Ao retomar um item aberto. |
-| [PROPOSTA_ARQUIVO_IMPRESSO.md](PROPOSTA_ARQUIVO_IMPRESSO.md) | Proposta aprovada e feita em 15/11 da pasta física do inquilino (o código cita). | Ao mexer em `arquivo-impresso.js`. |
+| [arquivo/PROPOSTA_ARQUIVO_IMPRESSO.md](arquivo/PROPOSTA_ARQUIVO_IMPRESSO.md) | Proposta aprovada e feita em 15/11 da pasta física do inquilino (o código cita). | Ao mexer em `arquivo-impresso.js`. |
 
 ## Arquivo (`arquivo/`)
 
