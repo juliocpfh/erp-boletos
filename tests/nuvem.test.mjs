@@ -184,19 +184,15 @@ const buscarCerts = async (url) => {
 // ---------------------------------------------------------------------------
 // Login do Access: token assinado com uma chave RSA criada no teste
 // ---------------------------------------------------------------------------
-test('chave de serviço (atualizador-pc): token do Access sem e-mail entra como o usuário ligado a ela em SERVICOS', async () => {
+test('chave de serviço do Access (token sem e-mail) não entra mais, mesmo com o segredo SERVICOS antigo no ambiente', async () => {
   const env = { DADOS: r2Falso(), ACCESS_EQUIPE: EQUIPE, ACCESS_AUD: AUD, SERVICOS: ' abc123.access = dono@exemplo.com.br , outra=socia@exemplo.com.br' };
   const agora = Math.floor(Date.now() / 1000);
   const servico = { aud: [AUD], iss: `https://${EQUIPE}`, exp: agora + 3600, iat: agora, common_name: 'abc123.access', type: 'app' };
   const saude = async (jwt, e = env) => W.atender(new Request('https://erp.ankjck.com.br/api/saude', { headers: { 'Cf-Access-Jwt-Assertion': jwt } }), e, buscarCerts);
-  const ok = await saude(await token(servico));
-  assert.equal(ok.status, 200);
-  assert.equal((await ok.json()).email, 'dono@exemplo.com.br');
-  assert.equal((await saude(await token({ ...servico, common_name: 'desconhecida' }))).status, 403, 'chave que não está em SERVICOS');
-  assert.equal((await saude(await token(servico), { ...env, SERVICOS: '' })).status, 403, 'sem SERVICOS nenhuma chave entra');
+  assert.equal((await saude(await token(servico))).status, 403, 'a chave que antes entrava como o dono agora é recusada');
+  assert.equal((await saude(await token(servico), { ...env, SERVICOS: '' })).status, 403);
   assert.equal((await (await saude(await token({ ...servico, email: 'x@exemplo.com.br' }))).json()).email, 'x@exemplo.com.br', 'com e-mail no token, o e-mail manda');
-  assert.equal(W.emailDoServico({ SERVICOS: 'a=b@c' }, 'a'), 'b@c');
-  assert.equal(W.emailDoServico({}, 'a'), '');
+  assert.equal(W.emailDoServico, undefined, 'a função saiu');
 });
 
 test('login: só com token do Access válido, da equipe e do aplicativo certos, não vencido e de e-mail da lista', async () => {

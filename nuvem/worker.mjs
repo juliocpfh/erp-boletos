@@ -125,12 +125,9 @@ export async function conferirLogin(request, env, buscar = fetch) {
   const agora = Math.floor(Date.now() / 1000);
   const auds = Array.isArray(dados.aud) ? dados.aud : [dados.aud];
   if (!ok || !auds.includes(aud) || dados.iss !== `https://${equipe}` || !(dados.exp > agora) || (dados.nbf && dados.nbf > agora + 60)) throw new ErroHttp(401, 'Login inválido ou vencido.');
-  // Chave de serviço (atualizador-pc/): o Access assina um token sem e-mail, com o Client ID em `common_name`;
-  // SERVICOS (segredo do Worker: "<client id>=<e-mail>,…") diz com qual usuário do sistema ela entra (os papéis valem iguais)
-  const servico = !dados.email && !!dados.common_name;
-  const email = String(dados.email || (servico ? emailDoServico(env, dados.common_name) : '')).toLowerCase();
-  // a chave de serviço (transição do programa do PC) só lê, como o crachá: gravar e apagar exigem o login de uma pessoa
-  if (servico && !['GET', 'HEAD'].includes(request.method)) throw new ErroHttp(403, 'A chave de serviço só lê: para gravar, entre no site.');
+  // token do Access sem e-mail (chave de serviço) não entra: o programa do PC usa o crachá do aparelho (/api/aparelho/, aparelhos.mjs);
+  // a chave de serviço da transição e o segredo SERVICOS saíram em 25/11/2026
+  const email = String(dados.email || '').toLowerCase();
   // EMAILS é opcional (trava extra): quem manda é a lista do Access e o cadastro de usuários do sistema
   if (!email || !naListaDeEmails(env, email)) throw new ErroHttp(403, 'Este e-mail não tem acesso ao sistema.');
   return email;
@@ -140,15 +137,6 @@ export async function conferirLogin(request, env, buscar = fetch) {
 function naListaDeEmails(env, email) {
   const emails = String(env.EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
   return !emails.length || emails.includes(String(email || '').trim().toLowerCase());
-}
-
-/** E-mail ligado a uma chave de serviço do Access (variável SERVICOS), ou '' se a chave não está cadastrada. */
-export function emailDoServico(env, clientId) {
-  for (const par of String(env.SERVICOS || '').split(',')) {
-    const [id, email] = par.split('=').map((x) => (x || '').trim());
-    if (id && email && id === String(clientId).trim()) return email;
-  }
-  return '';
 }
 
 /** Pedido que grava precisa do cabeçalho X-Sistema (força a checagem do navegador contra outros sites) e da mesma origem. */

@@ -3,7 +3,7 @@
 // site) é feita aqui: a nuvem manda o sal e as voltas, recebe só o resumo, confere e devolve o crachá (a senha não sai deste
 // computador nem fica guardada); o crachá fica cifrado pelo Windows (DPAPI, só esta conta deste computador abre).
 // Onde fica: %LOCALAPPDATA%\Administracao de Imoveis\ (config.json com o site e a pasta; cracha.dat cifrado). Fora do OneDrive.
-// Uso: node atualizador.mjs --ligar (ou ligar-computador.cmd). Passo a passo em README.md.
+// Uso: node atualizador.mjs --ligar (no .exe: dois cliques ou --ligar). Passo a passo em README.md.
 import { spawn, spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
