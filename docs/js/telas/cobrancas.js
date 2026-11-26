@@ -8,7 +8,7 @@ import { esc } from '../formularios.js';
 import * as R from '../regras.js';
 import { filaRegua } from '../regua-email.js';
 import { botoesMesC6, caixaBancoC6, resumoBancoLinha } from './banco-c6.js';
-import { ACEITA_DOCUMENTOS, arquivoSumiu, botao, buscar, d, endereco, etiqueta, item, link, memoria, multaJurosTexto, opera, situacao } from './comum.js';
+import { ACEITA_DOCUMENTOS, arquivoSumiu, botao, buscar, d, endereco, etiqueta, item, link, memoria, multaJurosTexto, opera } from './comum.js';
 import { ultimoEnvio } from './emails.js';
 import { AVISO_CONTROLE, seloControle, situacaoBoleto } from './contrato.js';
 import { linkComprovante } from './cadastros.js';

@@ -969,11 +969,11 @@ const MENU = [
 ];
 /** Formulário (#/novo/<tabela>, #/editar/<tabela>/id) → item do menu que acende (antes todos acendiam "Imóveis"). */
 const MENU_DO_FORMULARIO = {
-  imoveis: 'imoveis', reformas: 'imoveis', iptus: 'imoveis', titularidades: 'imoveis', leituras: 'imoveis', participacoes: 'imoveis',
+  imoveis: 'imoveis', reformas: 'imoveis', iptus: 'imoveis', titularidades: 'imoveis', leituras: 'imoveis',
   contratos: 'inquilino', fiadores: 'inquilino', aplicacoes: 'inquilino', correcoes_garantia: 'inquilino', depositos_garantia: 'inquilino',
   devolucoes_garantia: 'inquilino', trocas_garantia: 'inquilino', renovacoes: 'inquilino', encerramentos: 'inquilino', correcoes: 'inquilino',
-  solicitacoes: 'inquilino', ressarcimentos: 'inquilino', seguros: 'inquilino', fichas: 'inquilino', vistorias: 'inquilino', aditivos: 'inquilino',
-  cobrancas: 'cobranca', avulsas: 'fatura', despesas: 'financeiro', ganhos_airbnb: 'financeiro', indices_acumulados: 'reajustes',
+  solicitacoes: 'inquilino', ressarcimentos: 'inquilino', seguros: 'inquilino', fichas: 'inquilino',
+  cobrancas: 'cobranca', avulsas: 'fatura',
   emitentes: 'empresas', usuarios: 'usuarios',
 };
 

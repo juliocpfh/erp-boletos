@@ -58,7 +58,6 @@ export function chaveDoRecibo(tipo, alvo) {
  * a página). Ex.: contrato 12 → "doc:contrato:c12:v1a2b3c4d"; aditivo 5 do contrato 12 → "doc:aditivo:c12:a5:v…";
  * carta de reajuste de 11/2026 → "doc:carta_reajuste:c12:2026-11:v…".
  */
-export const DOCUMENTOS_ASSINAVEIS = { contrato: 'Contrato de locação', aditivo: 'Termo aditivo', carta_reajuste: 'Carta de reajuste' };
 
 export function prefixoDoDocumento(tipo, { contrato, id, comp } = {}) {
   return `doc:${tipo}:c${contrato.id}${id ? `:a${id}` : ''}${comp ? `:${comp}` : ''}:`;

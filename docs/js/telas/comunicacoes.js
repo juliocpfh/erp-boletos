@@ -41,7 +41,6 @@ export function atalhosComunicacoes(atual) {
 // Nuvem (rotas /api/contatos/… do Worker)
 // ---------------------------------------------------------------------------
 const cfg = { base: 'api/contatos/', buscar: (...a) => fetch(...a) };
-export function configurarComunicacoes(opcoes = {}) { Object.assign(cfg, opcoes); }
 async function pedir(caminho, op = {}) {
   let r;
   try {

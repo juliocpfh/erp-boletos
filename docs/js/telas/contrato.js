@@ -723,7 +723,6 @@ function caixaRotinaEntrada(c, hoje = C.hojeIso()) {
 }
 
 function caixaDocumentos(c) {
-  const hoje = C.hojeIso();
   const vistorias = R.vistoriasDo(d(), c.id);
   const gerar = geradoresDocumentos(c);
   const doc = (k) => R.documentoEntrada(d(), c, k);

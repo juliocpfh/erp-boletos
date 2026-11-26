@@ -105,7 +105,6 @@ function nomesDoCertificado(hex) {
 }
 /** Nome de autoridade certificadora (quem emite), não de pessoa. */
 const ehAutoridade = (c) => /\b(AC|autoridade|raiz|root|CA)\b|certifica|governo federal|icp-brasil/i.test(c);
-const textoDoHex = (hex) => { const h = String(hex || '').replace(/[^0-9a-f]/gi, ''); let s = ''; for (let i = 0; i + 1 < h.length; i += 2) s += String.fromCharCode(parseInt(h.slice(i, i + 2), 16)); return s; };
 
 /** Assinaturas digitais do PDF: [{ nome, data, govbr, icp, certificados: [CN...] }]. */
 async function assinaturas(texto) {
