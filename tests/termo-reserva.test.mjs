@@ -293,6 +293,28 @@ test('aceite pelo link: página no endereço da ficha, código no e-mail, prova 
   assert.equal((await ctx.equipe('POST', 'link', { ficha_id: f.id, contexto: { ...TR.pedidoDoAceite(d, f).contexto, condicoes: { retencao_pct: 40, dias_arrependimento: 61 } } })).status, 400, 'condições inválidas (prazo fora da faixa)');
 });
 
+test('desligar o link antes do aceite: a página deixa de abrir, a equipe vê "encerrado", e um link novo funciona', async () => {
+  const ctx = ambiente();
+  const { d, f } = base();
+  assert.equal((await ctx.equipe('POST', 'encerrar', { ficha_id: f.id })).status, 404, 'ficha sem link: nada a desligar');
+  const chave = (await (await ctx.equipe('POST', 'link', TR.pedidoDoAceite(d, f))).json()).url.split('#')[1];
+  assert.equal((await ctx.publico(chave, 'GET', 'aceite')).status, 200);
+  assert.equal((await ctx.equipe('POST', 'encerrar', { ficha_id: f.id })).status, 200);
+  assert.equal((await ctx.publico(chave, 'GET', 'aceite')).status, 404, 'o endereço antigo não abre mais');
+  assert.equal((await ctx.publico(chave, 'POST', 'aceite/codigo', { email: 'maria@exemplo.com.br' })).status, 404, 'nem pede código');
+  const lido = (await (await ctx.equipe('GET', `ler?ficha=${f.id}`)).json()).link;
+  assert.ok(lido.encerrado_em && !lido.resposta);
+  const nova = (await (await ctx.equipe('POST', 'link', TR.pedidoDoAceite(d, f))).json()).url.split('#')[1];
+  assert.notEqual(nova, chave);
+  assert.equal((await ctx.publico(nova, 'GET', 'aceite')).status, 200, 'o link novo abre');
+  assert.equal((await ctx.publico(chave, 'GET', 'aceite')).status, 404, 'e o antigo continua desligado');
+  // o endereço lembrado na aba some só para a ficha desligada
+  TR.lembrarUrlDoAceite(1, { url: 'x', vence_em: '2999-01-01T00:00:00Z' }); TR.lembrarUrlDoAceite(2, { url: 'y', vence_em: '2999-01-01T00:00:00Z' });
+  TR.esquecerUrlDoAceite(1);
+  assert.deepEqual([TR.urlDoAceite(1), TR.urlDoAceite(2).url], [null, 'y']);
+  TR.esquecerUrlsDoAceite();
+});
+
 // ---------------------------------------------------------------------------
 // Ficha pela internet: a pessoa vê o que mandou e corrige (decisão do dono de 2026-11-24)
 // ---------------------------------------------------------------------------

@@ -61,7 +61,8 @@ export function caixaTermoReserva(f) {
   const naAba = TR.urlDoAceite(f.id);
   const botoes = !E.nuvem ? '<span class="suave">Sem a nuvem, mande o termo em PDF (no e-mail) para a pessoa assinar e anexe o assinado na pasta da ficha.</span>'
     : `${botao('gerarLinkTermo', vale ? 'Gerar novo link' : 'Gerar o link do aceite', { id: f.id }, vale ? 'secundario pequeno' : 'pequeno', vale ? 'Gerar um link novo? O link atual deixa de valer.' : '')}
-      ${vale && naAba ? botao('compartilharLinkTermo', 'Copiar / WhatsApp', { id: f.id }, 'secundario pequeno') : ''}`;
+      ${vale && naAba ? botao('compartilharLinkTermo', 'Copiar / WhatsApp', { id: f.id }, 'secundario pequeno') : ''}
+      ${vale && opera() ? botao('desligarLinkTermo', 'Desligar o link', { id: f.id }, 'secundario pequeno', 'Desligar o link do termo? Quem abrir o link não consegue mais dar o aceite. Dá para gerar outro depois.') : ''}`;
   return `<div class="cartao" data-termo-reserva="${f.id}">${titulo}
     <p><b>1º passo, antes do depósito:</b> a pessoa recebe as condições do imóvel e o termo da reserva${E.nuvem ? ', confirma o e-mail com um código e dá o aceite pelo link' : ', assina o termo (gov.br ou à mão) e devolve'}. Depois ela deposita a reserva.</p>
     <p class="suave">Reserva de <b>${reais(valor)}</b>, abatida do 1º aluguel · documentos em ${R.prazoDosDocumentosTexto(c)} do depósito · reservado por ${c.dias_validade} dias · ficha não aprovada: devolve tudo · ${esc(desistenciaResumo(c, valor))} (o termo avisa em destaque antes do aceite e do pagamento) · devolução (quando houver) em ${C.plural(c.dias_uteis_devolucao, 'dia útil', 'dias úteis')}. <a href="#/regras">Regras do sistema</a></p>
@@ -127,6 +128,31 @@ export const ACOES_TERMO = {
       `Link do termo da reserva de ${f.inquilino_nome} gerado (vale até ${C.dataBrDe(l.vence_em)})`));
     await mostrar();
     await janelaDoAceite(buscar('fichas', id), l);
+  },
+  /**
+   * Desliga o link na nuvem (mandado para a pessoa errada, valor combinado mudou, desistiu antes do aceite). A ficha deixa de
+   * mostrar o link e o botão de gerar volta. Ex.: link gerado com reserva de R$ 500,00 e o combinado passou a R$ 800,00:
+   * desliga, corrige em "Editar" e gera outro.
+   */
+  async desligarLinkTermo({ id }) {
+    if (!opera()) throw new C.ErroUsuario('Seu usuário não pode desligar o link do termo.');
+    if (!E.nuvem) throw new C.ErroUsuario('O aceite pela internet só funciona no sistema na nuvem.');
+    const f = buscar('fichas', id);
+    if (!f) throw new C.ErroUsuario('Ficha não encontrada.');
+    if (f.aceite_reserva) throw new C.ErroUsuario('O termo desta ficha já foi aceito: não há link para desligar.');
+    // a pessoa pode ter aceitado agora há pouco: o aceite vale e vai para a ficha, em vez de desligar por cima
+    const l = await TR.lerAceiteNaNuvem(id);
+    if (l && l.resposta) {
+      await alterar((db) => { R.guardarAceiteReserva(db, id, l.resposta, login()); });
+      aviso(`${f.inquilino_nome} já tinha aceitado o termo: o aceite foi guardado na ficha e o link não foi desligado.`);
+      await mostrar();
+      return;
+    }
+    if (l) await TR.encerrarAceiteNaNuvem(id);
+    TR.esquecerUrlDoAceite(id);
+    await alterar((db) => R.atualizar(db, 'fichas', id, { link_aceite: null }, login(), `Link do termo da reserva de ${f.inquilino_nome} desligado`));
+    aviso('Link do termo desligado. Para mandar de novo, gere outro.');
+    await mostrar();
   },
   async compartilharLinkTermo({ id }) {
     const f = buscar('fichas', id);
