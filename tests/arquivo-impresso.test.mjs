@@ -4,7 +4,7 @@ import * as AI from '../docs/js/arquivo-impresso.js';
 import * as CR from '../docs/js/config-regras.js';
 import * as R from '../docs/js/regras.js';
 
-// Arquivo impresso (pasta física do inquilino), decisões do dono de 2026-11-15 (documentacao/PROPOSTA_ARQUIVO_IMPRESSO.md).
+// Arquivo impresso (pasta física do inquilino), decisões do dono de 2026-11-15 (documentacao/arquivo/PROPOSTA_ARQUIVO_IMPRESSO.md).
 function base(entrada = '2026-06-07') {
   const d = R.bancoVazio();
   CR.usarRegras(d);

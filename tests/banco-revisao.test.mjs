@@ -243,7 +243,7 @@ test('item 1: só casa boleto que vence até 45 dias depois da entrada', () => {
   const { novas: [mov] } = Z.importarExtrato(d, 'ank', [entrada('r1', '2026-08-20', '1318.50')], 'julio', { hoje: '2026-09-01' });
   const casa = Z.conciliarMovimentacoes(d, [mov]).map((x) => x.cobranca_id);
   assert.deepEqual(casa, [cb3.id], `20/08: o de 10/09 (21 dias) casa; o de 10/10 (51 dias) não (era ${cb4.id})`);
-  assert.equal(Z.DIAS_ANTECIPACAO, 45);
+  assert.equal(R.regra('dias_antecipacao_banco'), 45);
 });
 
 test('item 1/9: listagem do banco — um pagamento que casa com dois boletos não vem marcado; boleto já pago à mão não chama outro', () => {

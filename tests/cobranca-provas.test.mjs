@@ -231,7 +231,7 @@ test('cálculo final: os escolhidos somam aos débitos em linhas próprias; os d
   R.atualizar(d, 'contratos', c.id, { data_saida: '2026-11-20' }, 'julio');
   const deb = R.debitosDaSaida(d, c, HOJE);
   const antes = JSON.stringify(deb);
-  const sug = R.sugestoesCobrancaDaSaida(d, c, HOJE);
+  const sug = { honorarios: R.sugestaoHonorarios(d, c, R.cobrancasEmAberto(d, c.id), HOJE), ...R.despesasCobraveis(d, c) };
   assert.equal(sug.honorarios.cabe, true);
   assert.equal(JSON.stringify(R.debitosDaSaida(d, c, HOJE)), antes, 'a sugestão não entra sozinha nos débitos');
   const dados = { data_saida: '2026-11-20', leitura_agua: '1', leitura_energia: '2', garantia_valor: 0, indice_percentual: 0, debitos: deb.total,
@@ -307,7 +307,7 @@ test('cálculo final depois do acordo quebrado: a parcela com honorários fica f
   const { d, c, cb, ago } = comProvas();
   R.fazerAcordo(d, { contrato_id: c.id, ids: [ago.id, cb.id], total: 400000, parcelas: 1, primeiro_vencimento: '2026-12-10', cobranca: { honorarios: true } }, 'julio', HOJE);
   R.atualizar(d, 'contratos', c.id, { data_saida: '2026-11-30' }, 'julio');
-  const s = R.sugestoesCobrancaDaSaida(d, c, '2027-01-20').honorarios;
+  const s = R.sugestaoHonorarios(d, c, R.cobrancasEmAberto(d, c.id), '2027-01-20');
   // a base é só o boleto de 10/2026 (fora do acordo), não a parcela
   const out = R.boletoDoMes(d, c.id, '2026-10');
   assert.deepEqual(s.boletos.map((x) => x.id), [out.id]);

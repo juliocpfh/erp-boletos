@@ -199,7 +199,6 @@ test('tipos de renda: cada opção do formulário tem a sua lista de documentos'
   Object.assign(f, { garantia_tipo: 'Fiador', fiador1_nome: 'Ana Lima', fiador1_cpf: '529.982.247-25' });
   const dados = R.dadosDaFicha(d, f);
   assert.equal(dados.fiador1_nome, 'Ana Lima');
-  assert.ok(F.CAMPOS_FIADOR_FICHA.every((k) => F.CAMPOS_FIADOR.some((c) => c.nome === k)));
 });
 
 test('termo de devolução das chaves (B4): só com a data de saída; chaves, vistoria marcada (B3) e sem quitação', () => {

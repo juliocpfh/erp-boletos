@@ -1,4 +1,4 @@
-// Arquivo impresso (pasta física de cada inquilino), decisão do dono em 2026-11-15 (documentacao/PROPOSTA_ARQUIVO_IMPRESSO.md):
+// Arquivo impresso (pasta física de cada inquilino), decisão do dono em 2026-11-15 (documentacao/arquivo/PROPOSTA_ARQUIVO_IMPRESSO.md):
 // o que vai para o papel (entrada, documento novo durante o contrato, saída e troca de titular), o que já foi impresso
 // (tabela `pastas_fisicas`), o que é novo e o que foi trocado depois de impresso. Funções puras (tests/arquivo-impresso.test.mjs);
 // a tela fica em telas/arquivo-impresso.js. Liga e desliga pela regra `arquivo_impresso` (Regras do sistema).
