@@ -9,8 +9,6 @@ import * as C from './calculos.js';
 import { preencherEmail } from './modelos-email.js';
 import * as R from './regras.js';
 
-export const ASSINATURA_LEGAL = 'Pelo contrato de locação, as comunicações enviadas ao e-mail e ao endereço cadastrados são válidas, e as partes se obrigam a avisar qualquer mudança, inclusive de e-mail.';
-
 /** Modelos prontos (a equipe pode mudar o texto de cada comunicado antes de enviar). */
 export const MODELOS = {
   contatos: {

@@ -100,6 +100,4 @@ export function desfazerAgendamento(d, registro, agendadoId, usuario) {
   return false;
 }
 
-/** Quem tem um e-mail do comunicado agendado (não entra de novo no "Enviar a todos"). */
-export const destinoAgendado = (x) => !!(x && x.agendado_id);
 

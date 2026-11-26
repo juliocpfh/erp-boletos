@@ -3021,6 +3021,37 @@ export function multasDaSaida(d, c) {
   return { antecipada, aviso, vale };
 }
 
+/**
+ * Linha da multa da saída (`tipo` 'antecipada' ou 'aviso') na descrição dos débitos do cálculo final, pelo valor gravado
+ * (`valor`, em centavos; sem ele, o sugerido). Pelo valor sugerido, a linha traz a conta; mudado à mão, a descrição acompanha o
+ * valor e guarda o sugerido (pedido do dono, 25/11/2026). Ex.: aviso dado 15 dias antes, sugerida R$ 900,00 → "Multa pela falta do
+ * aviso de 30 dias: R$ 900,00 (avisou em 10/11/2026, 15 dia(s) antes da saída; R$ 1.800,00 × 15/30 dias que faltaram)"; gravada
+ * R$ 600,00 → "Multa pela falta do aviso de 30 dias (valor ajustado à mão: R$ 600,00; sugerido R$ 900,00)". Sem a multa: ''.
+ */
+export function linhaDaMultaSaida(d, c, tipo, valor = null) {
+  const m = multasDaSaida(d, c)[tipo];
+  if (!m) return '';
+  const rotulo = tipo === 'antecipada' ? 'Multa pela saída antecipada' : `Multa pela falta do aviso de ${DIAS_AVISO_SAIDA} dias`;
+  if (valor !== null && valor !== m.valor) return `${rotulo} (valor ajustado à mão: ${C.reais(valor)}; sugerido ${C.reais(m.valor)})`;
+  if (tipo === 'antecipada') return `${rotulo}: ${C.reais(m.valor)} (3 aluguéis de ${C.reais(m.aluguel)}, proporcional aos ${m.restam} de ${m.total} dias que faltavam para ${C.dataBr(m.fim)})`;
+  const conta = m.modo === 'mes_inteiro' ? `1 mês de ${C.reais(m.mes)}` : `${C.reais(m.mes)} × ${m.faltaram}/${DIAS_AVISO_SAIDA} dias que faltaram`;
+  const quando = m.sem_aviso ? 'saiu sem avisar por escrito' : `avisou em ${C.dataBr(c.aviso_saida_data)}, ${m.antecedencia} dia(s) antes da saída`;
+  return `${rotulo}: ${C.reais(m.valor)} (${quando}; ${conta})`;
+}
+
+/**
+ * Troca, na descrição dos débitos, a linha da multa (`antiga`) pela `nova` (vazia = tira a linha). Devolve null se a linha antiga
+ * não está mais lá (o operador mudou o texto à mão: a descrição fica como ele deixou). Ex.: ("Aluguel 11/2026\nMulta…: R$ 900,00 (…)",
+ * "Multa…: R$ 900,00 (…)", "Multa… (valor ajustado à mão: R$ 600,00; sugerido R$ 900,00)") → "Aluguel 11/2026\nMulta… (valor ajustado…)".
+ */
+export function trocarLinhaDaMulta(descricao, antiga, nova) {
+  const linhas = String(descricao || '').split('\n');
+  const i = linhas.findIndex((l) => l.trim() === antiga);
+  if (!antiga || i < 0) return null;
+  if (nova) linhas[i] = nova; else linhas.splice(i, 1);
+  return linhas.join('\n');
+}
+
 /** Nome do boleto na lista de débitos do cálculo final ("Aluguel 10/2026","Parcela 2/3 do acordo (vence 10/12/2026)"). */
 const nomeDebitoSaida = (cb) => (ehParcelaAcordo(cb) ? `Parcela ${cb.acordo_parcela || 'única'} do acordo (vence ${C.dataBr(cb.vencimento)})` : `Aluguel ${C.compBr(cb.competencia)}`);
 
@@ -3046,10 +3077,6 @@ export function debitosDaSaida(d, c, data = C.hojeIso()) {
   }
   return { itens, total: itens.reduce((s, x) => s + x.valor, 0) };
 }
-
-/** O boleto que recebe a diferença (o mesmo de ``aplicarDiferencasPendentes``): o próximo aluguel a cobrar do contrato, ainda não emitido no banco; null se ainda não foi gerado. */
-export const proximoBoletoAberto = (d, cb) => d.cobrancas.filter((x) => x.contrato_id === cb.contrato_id && x.id !== cb.id && x.competencia > cb.competencia && !ehBoletoAvulso(x) && aCobrar(x) && !emitidoNoBanco(x))
-  .sort((a, b) => a.competencia.localeCompare(b.competencia) || a.id - b.id)[0] || null;
 
 // Pix (ou boleto) pago depois do vencimento com o valor do desconto: de 16/11 a 19/11/2026 ficava pago e a diferença ia ao próximo
 // boleto (``diferenca_devida``, os dados antigos continuam assim); desde 2026-11-20 é recusado como qualquer pagamento a menos.
@@ -7145,11 +7172,8 @@ export function resumoSolicitacoes(d) {
 // mandar outra notificação do mesmo assunto (ligada à anterior) e, em qualquer notificação já vencida, gerar a multa, com o
 // valor digitado, que entra no próximo boleto do aluguel como cobrança adicional (fora da NF). Textos e modelos: notificacoes.js.
 // --------------------------------------------------------------------------
-/**
- * Situações: Rascunho (montada, ainda não enviada) → Aguardando resposta (enviada; o prazo corre) → Resolvida (baixa com a
- * data e o comprovante) ou Multa gerada; Reiterada = veio outra notificação do mesmo assunto depois dela; Cancelada.
- */
-export const SITUACOES_NOTIFICACAO = ['Rascunho', 'Aguardando resposta', 'Reiterada', 'Multa gerada', 'Resolvida', 'Cancelada'];
+// Situações: Rascunho (montada, ainda não enviada) → Aguardando resposta (enviada; o prazo corre) → Resolvida (baixa com a
+// data e o comprovante) ou Multa gerada; Reiterada = veio outra notificação do mesmo assunto depois dela; Cancelada.
 /** Como a notificação chegou ao inquilino (o contrato aceita AR e e-mail). */
 export const MEIOS_NOTIFICACAO = ['E-mail', 'Entregue em mãos (com assinatura)', 'Correios com aviso de recebimento (AR)', 'WhatsApp'];
 const NOTIFICACAO_ABERTA = ['Aguardando resposta', 'Reiterada', 'Multa gerada'];

@@ -1254,8 +1254,6 @@ export function contasLancadasPossiveis(d, imovelId, mov, { tipo = null, valor =
     && !x.movimentacao_id && !x.pagamento_banco_id && !ligadas.has(x.id) && noPeriodo(x))
     .sort((a, b) => (a.valor === mov.valor ? 0 : 1) - (b.valor === mov.valor ? 0 : 1) || distancia(a) - distancia(b) || b.id - a.id);
 }
-/** A primeira das contas possíveis do mesmo imóvel, tipo e valor (ou null). */
-export const contaJaLancada = (d, imovelId, tipo, mov, indice = null) => contasLancadasPossiveis(d, imovelId, mov, { tipo, valor: mov.valor, indice })[0] || null;
 
 /**
  * Sugestão de "conta do imóvel" quando há conta já lançada à mão que pode ser esta saída: só o aviso, para o usuário escolher qual
