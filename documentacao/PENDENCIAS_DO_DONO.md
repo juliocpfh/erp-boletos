@@ -4,7 +4,7 @@
 
 **Para o Claude:** retome esta lista com o dono na primeira mensagem, em português simples. O dono só responde à **conversa principal**. Regras de 24–25/11 continuam: nenhuma PR com conflito (`git merge-tree` com a `main` e as abertas); **toda PR roda o kit de teste** (`node tools/kit-teste.mjs`, ~4 min: computador, celular, nuvem com 2 abas, versão PC e links), acrescenta o roteiro da tela dela e traz a seção "Kit de teste"; a conversa principal roda o kit de novo na branch antes do "pode aceitar" e **sempre diz ao dono o resultado do kit** (regra de 25/11, `CLAUDE.md`); sessão ou subagente pronto é encerrado.
 
-**Situação:** tudo na `main` até a **#431**, **nenhuma PR aberta** além desta de documentação. Em 25/11 à tarde entraram: #427 (kit obrigatório em toda PR e modelo de PR), #428 (acertos: boleto quitado pela reserva, 2ª via, acordo refeito, Sair, conciliação e C6 pela data de Brasília), #429 (ficha pela internet com o que o sistema já tem), #430 (agendador de envios em horário comercial, pela nuvem) e #431 (kit espera a tela nova). As decisões de 24–25/11 estão em `DECISOES.md`.
+**Situação:** tudo na `main` até a **#433** (multa do aviso mudada à mão e 7 exportações sem uso tiradas). Em 25/11 à noite: revisão do que está sem uso (5 instâncias), PR de documentação (decisão da pintura, que tinha ficado fora da `main`, e citações erradas) e PR de limpeza do código. Em 25/11 à tarde entraram: #427 (kit obrigatório em toda PR e modelo de PR), #428 (acertos: boleto quitado pela reserva, 2ª via, acordo refeito, Sair, conciliação e C6 pela data de Brasília), #429 (ficha pela internet com o que o sistema já tem), #430 (agendador de envios em horário comercial, pela nuvem) e #431 (kit espera a tela nova). As decisões de 24–25/11 estão em `DECISOES.md`.
 
 **O que espera o dono:**
 - [ ] **Agendador (#430):** numa noite, agendar um e-mail para si mesmo e conferir que chega às 8h (o Claude lembra). [x] Cron no Cloudflare conferido pelo dono em 25/11 (`*/5 * * * *`). Recomendado: pôr `tests/agendados-nuvem.test.mjs` no Build command do Worker (o Claude orienta).
@@ -13,7 +13,8 @@
 - [ ] As conferências da lista atual: `CONFERIR_O_QUE_MUDOU.md` e as "Conferências do dono" logo abaixo (bloco de 24/11).
 - [ ] Levar ao advogado o **texto da confissão de dívida com os honorários** (termo do acordo, `#/imprimir/recibo?tipo=acordo&…`; PR #415).
 - [ ] Se você já tinha editado o e-mail de encerramento: conferir em **Sistema → Modelos de e-mail** o e-mail do cálculo final (o texto novo do saldo, PR #419, só entra nos modelos não editados; "Voltar ao padrão" traz o novo). O mesmo vale para os e-mails de notificação de atraso (PR #420).
-- [ ] Decidir a lista **`Limpeza - para o dono decidir.md`** (raiz do projeto, fora do Git): nada foi apagado.
+- [ ] Decidir a lista **`Limpeza - para o dono decidir.md`** (raiz do projeto, fora do Git; refeita em 25/11 à noite): nada foi apagado.
+- [ ] Decidir o que fazer com o que a revisão de 25/11 (noite) achou sem uso e depende do dono: 10 funções que só os testes usam (ex.: listar todos os boletos do banco, DDA, `quitadoPelaReserva`), o jeito antigo do programa do PC (`.cmd`, `.vbs`, `.env`, chave de serviço), as rotas `contador` e `conflitos` da nuvem, o formulário "correção da caução" sem link, o botão para desligar o link do termo da reserva (função e rota prontas, falta o botão) e os documentos só de histórico que podem ir para `documentacao/arquivo/`.
 - [ ] **Assinatura digital com o certificado real:** programa novo no PC, ligar em Sistema → Empresas, assinar um recibo, um contrato e um termo aditivo de teste e conferir no <https://validar.iti.gov.br> (um contrato assinado pela empresa e depois pelo inquilino no gov.br: as duas assinaturas devem aparecer válidas). Certificado vence em 02/01/2027 (aviso a partir de 03/12).
 - [ ] Também das PRs: ler o termo da reserva com os ajustes do advogado (7 dias corridos, reserva de 7 dias, empresa pode desistir); ler o PDF do contrato com as cláusulas novas (#406) e os documentos da locação (#407: aviso de desocupação com a caixa, notificação com AR e art. 47); perguntar ao advogado sobre a liminar do art. 59, § 1º, VIII no residencial.
 
@@ -30,7 +31,7 @@
 
 **Decidido em 25/11:** [x] o botão "Corrigir caução" fica com esse nome (confirma 14/11; não há mais pendência).
 
-**Trabalho do Claude que pode ser feito sem o dono:** corrigir o texto da descrição da multa do aviso no cálculo final quando o valor é mudado à mão; tirar as 7 exportações sem uso achadas na compactação de 24/11 (lista no relatório dela, PR #410); apagar a página "Teste dos PDFs" depois que o dono testar; acertar a pergunta 2 do resumo do contrato (honorários com as condições) junto com a próxima revisão do advogado.
+**Trabalho do Claude que pode ser feito sem o dono:** [x] texto da descrição da multa do aviso e 7 exportações sem uso (PR #433); apagar a página "Teste dos PDFs" depois que o dono testar; acertar a pergunta 2 do resumo do contrato (honorários com as condições) junto com a próxima revisão do advogado.
 
 **Kit de teste automático:** [x] feito (PRs #425, #426 e #431; obrigatório em toda PR pela #427): `node tools/kit-teste.mjs` monta o banco com os casos, sobe o site, a nuvem local e a versão PC e roda os 4 lugares e os links (`tools/kit-teste/README.md`).
 
