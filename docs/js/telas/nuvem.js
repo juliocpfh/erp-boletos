@@ -2,7 +2,7 @@
 import { alterar, aviso, baixar, E, ir, janela, login, mostrar, podeUsuario, reabrirSessao } from '../app.js';
 import * as S from '../armazenamento.js';
 import * as B from '../backup-seguro.js';
-import { dataBr, dataHoraBr, ErroUsuario, hojeIso, plural } from '../calculos.js';
+import { dataBr, dataHoraBr, ErroUsuario, hojeIso } from '../calculos.js';
 import { esc } from '../formularios.js';
 import * as N from '../nuvem.js';
 import * as R from '../regras.js';

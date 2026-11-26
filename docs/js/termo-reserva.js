@@ -38,8 +38,6 @@ export function urlDoAceite(fichaId) {
 export const esquecerUrlsDoAceite = () => urls.clear();
 
 const cfg = { base: 'api/aceite-reserva/', buscar: (...a) => fetch(...a) };
-/** Só para os testes. */
-export function configurarAceite(opcoes = {}) { Object.assign(cfg, opcoes); }
 
 async function pedir(caminho, op = {}) {
   let r;

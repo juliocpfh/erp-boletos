@@ -36,7 +36,6 @@ h3 { font-size: 15px; margin: 16px 0 8px; color: var(--suave); text-transform: u
 .botao.secundario, button.secundario { background: #fff; color: var(--primaria); border: 1px solid var(--primaria); }
 .botao.perigo, button.perigo { background: var(--perigo); }
 .botao.pequeno, button.pequeno { padding: 3px 9px; font-size: 13px; }
-form.inline { display: inline; }
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--borda); vertical-align: top; }
 th { font-size: 12px; color: var(--suave); text-transform: uppercase; letter-spacing: .03em; }
@@ -634,7 +633,6 @@ button.q-aberto:hover { outline: 2px solid #791F1F; }
   table.responsiva td::before { content: attr(data-rotulo); display: block; font-size: 11px; color: var(--suave); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 2px; }
   table.responsiva td:not([data-rotulo])::before, table.responsiva td[data-rotulo=""]::before { display: none; }
   table.responsiva tr.total { display: none; } /* a soma do mês não cabe no formato de cartão (colunas unidas) */
-  table.responsiva form.inline, table.responsiva form.inline input { max-width: 100%; }
   .rolagem.tem-rolagem:has(table.responsiva)::before { display: none; }
   /* cartões automáticos (app.js, cartoesNoCelular): título no meio da tabela vira o título do cartão; nada de largura mínima */
   table.cartoes-auto { min-width: 0 !important; width: 100% !important; }

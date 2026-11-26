@@ -4,7 +4,7 @@ import * as S from '../armazenamento.js';
 import * as AJ from '../ajuda.js';
 import * as AI from '../arquivo-impresso.js';
 import * as B from '../backup-seguro.js';
-import { dataBr, dataHoraBr, ErroUsuario, reais } from '../calculos.js';
+import { dataBr, dataHoraBr, ErroUsuario } from '../calculos.js';
 import * as CA from '../copia-aberta.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';

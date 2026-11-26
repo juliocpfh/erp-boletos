@@ -9,7 +9,7 @@ import { resultadoVistoriaSaida, textoReparo, TIPO_ADITIVO_TROCA } from '../cont
 import * as F from '../formularios.js';
 import { esc } from '../formularios.js';
 import * as R from '../regras.js';
-import { confirmarAvisos, conferirAvulsa, conferirBoleto, conferirContrato, conferirIptu, conferirLeitura, conferirPessoa, conferirRenovacao, conferirRessarcimento, conferirSeguro, dataNoFuturo } from './avisos.js';
+import { confirmarAvisos, conferirAvulsa, conferirBoleto, conferirContrato, conferirIptu, conferirLeitura, conferirRenovacao, conferirRessarcimento, conferirSeguro, dataNoFuturo } from './avisos.js';
 import { CAMPOS_GARANTIA_HERDADA, CAMPOS_VALORES_HERDADOS, ENDERECO_DO_IMOVEL, enderecoInquilino } from './campos.js';
 import { ACEITA_DOCUMENTOS, arquivoSumiu, botao, buscar, d, encerrarLinksDaFicha, etiqueta, extensao, guardarGuiasSoltas, levarDocumentosDaFicha, memoria, naoEncontrado, nomePastaContrato, nomePastaFicha, opera, PASTA_FICHAS, pastaFichaLivre, ordenar, pastaDoEscopo, pastaPaiContrato, renomearNoDisco, salvarAssinado, semAcentoArquivo, trazerHeranca, trazerHerancaAssinada, cienciaDaTroca, registrarCiencia } from './comum.js';
 import { confirmarValoresIniciais, inicialBonificado } from './contrato.js';

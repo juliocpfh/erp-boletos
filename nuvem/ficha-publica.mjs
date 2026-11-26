@@ -32,7 +32,6 @@ import { atenderContatosPublico, paginaDosContatos } from './contatos-publico.mj
 import { atenderAceitePublico, paginaDoAceite } from './aceite-reserva.mjs';
 
 export const PESSOAS = ['interessado', 'fiador1', 'fiador2'];
-export const SITUACOES_LINK = ['Aguardando', 'Respondida', 'Falta documento', 'Assinar', 'Assinada', 'Desistiu', 'Encerrado'];
 const SITUACOES_EQUIPE = ['Aguardando', 'Respondida', 'Falta documento', 'Assinar', 'Assinada', 'Encerrado'];
 export const DIAS_LINK = 7;
 /** Depois do prazo, a página ainda mostra o que foi mandado por DIAS_LEITURA dias; passados DIAS_GUARDA, o registro do link sai (LGPD). */

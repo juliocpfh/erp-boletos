@@ -4,7 +4,6 @@ import * as C from './calculos.js';
 import * as FO from './ficha-online.js';
 import * as TR from './termo-reserva.js';
 import * as K from './contratos.js';
-import { MODELOS_EMAIL } from './modelos-email.js';
 import * as NT from './notificacoes.js';
 import * as REC from './recibos.js';
 import * as R from './regras.js';
