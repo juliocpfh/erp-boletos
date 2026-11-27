@@ -67,6 +67,7 @@ Documento de 24/11/2026 (pedido C5 de 24/11). Ele junta, por assunto, tudo o que
 - **21/11/2026** (PRs #336, #337, #340) — Declaração do IR na troca de titular: cada um declara só o que pagou. Troca no meio do mês fecha sempre em 30/30. A página do inquilino mostra todas as NFs do boleto, uma por empresa.
 - **21/11/2026** (PRs #345, #346, #349) — O ajuste do mês pode entrar na NF (padrão: fora). Pago a mais lançado à mão fica "a devolver", com o botão "Devolvi" (devido R$ 3.000,00, pago R$ 3.100,00 → R$ 100,00 a devolver). Adiar a saída recalcula o último boleto em aberto.
 - **24/11/2026** (PR #364) — Vários abatimentos e cobranças no mesmo boleto, cada um com o botão Tirar e uma linha no demonstrativo. Boleto mexido em "Alterar valores" passa a guardar só os campos digitados, e o resto (ex.: o seguro lançado depois) volta a ser recalculado.
+- **27/11/2026** (PR #449) — Tela **Ressarcimentos** (Inquilinos → aba Ressarcimentos): o condomínio do mês por prédio (imóveis com o mesmo endereço) ou por inquilino, com "Lançar taxa" e "Conferido: sem taxa", sem entrar na página de cada inquilino. O Fechamento do mês abre esta tela. Ex.: prédio da Rua X, 500 com Ap 1 (fundo de obras de R$ 150,00) e Ap 2 (a conferir).
 
 ### O que foi tirado ou mudado, e por quê
 - **13/10/2026** — antes: multa e juros do atraso iam para o boleto seguinte; agora: são cobrados no próprio boleto (pelo banco) e entram na NF do pagamento atrasado. Por quê: é como o banco cobra (DECISOES.md, linha de 13/10).
@@ -181,6 +182,7 @@ Documento de 24/11/2026 (pedido C5 de 24/11). Ele junta, por assunto, tudo o que
 - **21/11/2026** (PR #340) — A página do inquilino mostra todas as NFs do boleto, uma por empresa.
 - **21/11/2026** (PR #343) — Link da ficha mandado de novo: o antigo continua valendo e o novo vence na mesma data (ex.: link de 10/11 até 17/11; "Lembrar" em 12/11 gera outro também até 17/11). "Gerar novo link" troca de vez.
 - **22/11/2026** (PR #358) — A LGPD ganha página própria dentro de Sistema.
+- **26/11/2026** (PR #443) — **Mensagens aos inquilinos** sem link nem resposta: e-mail e/ou WhatsApp para um, alguns ou todos, com modelos e campos (`{nome}`, `{aluguel}`…); fora do horário comercial o e-mail é agendado.
 
 ### O que foi tirado ou mudado, e por quê
 - **20/10/2026** — antes: o comprovante da reserva era obrigatório para salvar; agora: salva sem ele e fica o aviso "Comprovante a buscar no banco" até anexar. Por quê: pedido do usuário (DECISOES.md, 20/10).
@@ -234,6 +236,7 @@ Documento de 24/11/2026 (pedido C5 de 24/11). Ele junta, por assunto, tudo o que
 - **21/11/2026** (PR #344) — Endereço digitado com um dado errado (ex.: inquilino nº 999, mês 2026-13) abre a tela normal com o aviso no alto: "Endereço com dado errado…".
 - **21/11/2026** (PR #347) — Ao apagar um termo aditivo já anexado, o sistema pergunta se ele valeu. Se não valeu, a mudança é desfeita: o vencimento volta ao dia antigo, o novo valor sai ou a troca de titular volta a esperar o termo. Se valeu, a mudança continua.
 - **22/11/2026** (PR #358) — "Dados e backup" virou "Sistema". Modelos de contrato, Termos aditivos e o Modelo Excel da NF ficam em Sistema → Modelos de documentos (`#/sistema-modelos`). As Regras do sistema continuam em `#/regras`.
+- **26 e 27/11/2026** (PRs #442, #446 e #448) — Nome do inquilino no cartão "Identificação e contato"; contra-vistoria pendente no contrato anterior se resolve na página do novo titular ("Anexar" ou "Não houve"); **"Justificar"** pendência do cadastro (ex.: cônjuge do fiador, garantia dupla) com o motivo e o responsável, que sai da lista e fica em "Pendências justificadas".
 
 ### O que foi tirado ou mudado, e por quê
 - **09/10 → 26/10/2026** — antes: o seguro obrigatório era do imóvel (PRs #5 e #6); agora: cada inquilino tem a sua apólice, e as parcelas só entram nos boletos de quem tem a apólice (PR #122). Por quê: decisão do dono de 26/10 (`DECISOES.md`). Quem sai leva a apólice e quem entra precisa de outra.
@@ -287,6 +290,7 @@ Documento de 24/11/2026 (pedido C5 de 24/11). Ele junta, por assunto, tudo o que
 - **20/11/2026** (PRs #329, #331 e #332) — Botão "Gerar boleto do saldo" quando os débitos passam da garantia. Ex.: garantia de R$ 2.000,00 e débitos de R$ 2.300,00 → boleto de R$ 300,00, sem NF. Pago atrasado, cobra a multa e os juros do contrato; pago, marca sozinho a etapa do roteiro. Entra também a multa da saída antecipada como sugestão (3 aluguéis cheios, proporcional aos dias que faltam).
 - **21/11/2026** (PR #349) — Adiar a saída: o boleto do último mês, ainda em aberto, é refeito pelos dias novos, e a vistoria marcada anda junto. Ex.: aluguel de R$ 3.000,00, saída de 10/12 para 15/12 → de R$ 1.000,00 para R$ 1.500,00.
 - **21/11/2026** (PR #351) — Recibo da devolução da garantia, para a pessoa assinar que recebeu, na troca de garantia e na troca de titular com garantia nova. O recibo assinado é anexado e vai para a pasta física.
+- **27/11/2026** (PR #447) — O aviso "Correção da caução" some depois de gerado o boleto do complemento; na caixa Garantia, fiadores anteriores e trocas de garantia vão para o fim; com falta aplicar, "Anotar observação" do porquê, com a data (aparece também no alerta).
 
 ### O que foi tirado ou mudado, e por quê
 - **24/10/2026** — antes: a saída podia ser feita por três caminhos (campo "Data de saída" no Editar contrato, caixinha "Ativo" e "Registrar saída"); agora: só pela caixa "Saída do inquilino". Por quê: eram caminhos que não batiam entre si (pedido do dono, DECISOES.md, 24/10).
@@ -417,6 +421,7 @@ Documento de 24/11/2026 (pedido C5 de 24/11). Ele junta, por assunto, tudo o que
 - **22/11/2026** (PR #360) — A caixa do certificado mostra o que está anexado (nome, CNPJ, computador, validade e dias que faltam), tem o botão **Remover** e o **aviso de renovação**, que aparece 30 dias antes, ou seja, a partir de 03/12/2026.
 - **22/11/2026** (PR #361) — O programa do PC passa a se atualizar **também de hora em hora**. A caixa do certificado avisa quando o programa do PC está desatualizado.
 - **24/11/2026** (sem PR, pedido do dono) — A assinatura **funcionou** (conferida no validar.iti.gov.br), mas o visual precisa melhorar (item C1 dos pedidos de 24/11).
+- **26/11/2026** (PRs #444 e #445) — Outro usuário no mesmo computador entra sem precisar do anterior; o "Conectar" do backup seguro mostra cada passo e confirma no fim.
 
 ### O que foi tirado ou mudado, e por quê
 - **07/11/2026** — antes: a versão sem internet era gerada a cada mudança e conferida por um teste que falhava toda hora; agora: o GitHub a gera sozinho a cada mudança aceita (`.github/workflows/versao-pc.yml`, existe hoje) e ela se chama "versão PC". Por quê: o dono quer um segundo sistema que se atualize sozinho, porque "tem muitos dados que não posso perder" (decisão de 07/11, `DECISOES.md` e item E1 da `ROTINA_DE_MELHORIA.md`).
