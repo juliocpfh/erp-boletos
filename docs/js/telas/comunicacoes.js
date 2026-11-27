@@ -15,6 +15,7 @@ import * as R from '../regras.js';
 import { botao, buscar, d, etiqueta, link, naoEncontrado, opera } from './comum.js';
 import { avisoForaDoHorario, perguntarQuando } from './horario.js';
 import { quandoBr } from '../agendados.js';
+import { cartoesMensagens, cartoesModelosMensagem, telaEscreverMensagem, telaMensagem } from './mensagens.js';
 
 const SO_CONSULTA = 'Seu usuário só consulta: não pode enviar comunicados.';
 const SO_NUVEM = 'O comunicado com link só funciona no sistema pela internet (nuvem).';
@@ -107,13 +108,18 @@ const quadro = (rotulo, n, cor = '') => `<div class="numero-cartao"><div class="
 export async function telaComunicacoes(q = {}) {
   if (q.ver === 'modelos') return telaModelosComunicado();
   if (q.ver === 'novo') return telaNovoComunicado(q);
+  // mensagens aos inquilinos (26/11): escrever e enviar (telas/mensagens.js)
+  if (q.ver === 'escrever') return telaEscreverMensagem(q);
+  if (q.ver === 'mensagem') return q.id ? telaMensagem(Number(q.id)) : naoEncontrado('Mensagem não encontrada', '#/comunicacoes', 'Ver as comunicações');
   const lista = [...(d().comunicados || [])].sort((a, b) => b.id - a.id);
   if (q.ver === 'editar' && q.id) return telaNovoComunicado(q, Number(q.id));
   if (q.id) return telaComunicado(Number(q.id));
   // fora da nuvem o comunicado não tem como ser enviado (o link é da nuvem): não oferece criar
   const podeCriar = opera() && E.nuvem;
-  return `<div class="cabecalho"><h1>Comunicações</h1><div class="acoes">${E.nuvem ? link('#/envios-agendados', 'Envios agendados') : ''} ${podeCriar ? link('#/comunicacoes?ver=novo', 'Novo comunicado a todos', 'botao') : ''}</div></div>
+  return `<div class="cabecalho"><h1>Comunicações</h1><div class="acoes">${E.nuvem ? link('#/envios-agendados', 'Envios agendados') : ''} ${opera() ? link('#/comunicacoes?ver=escrever', 'Nova mensagem', 'botao') : ''} ${podeCriar ? link('#/comunicacoes?ver=novo', 'Novo comunicado a todos', 'botao secundario') : ''}</div></div>
     ${atalhosComunicacoes('comunicados')}
+    ${cartoesMensagens()}
+    <h2>Comunicados com link (confirmação de contatos)</h2>
     ${lista.length ? lista.map((com) => cartaoComunicado(com)).join('') : `<div class="cartao"><p>Nenhum comunicado enviado ainda.</p>
       <p class="suave">O comunicado vai para todos os inquilinos e fiadores com contrato ativo, cada um com um link só dele, por e-mail e por WhatsApp. Ex.: "Atualização de contatos e novo e-mail da empresa".</p>
       ${podeCriar ? link('#/comunicacoes?ver=novo', 'Novo comunicado a todos', 'botao') : opera() ? `<p class="suave">${SO_NUVEM}</p>` : ''}</div>`}`;
@@ -181,7 +187,8 @@ function telaModelosComunicado() {
       <p class="suave">Assunto: ${esc(m.assunto)}</p><pre class="texto-modelo">${esc(m.texto)}</pre>
       <details><summary>Aviso da página e frase do aceite</summary><pre class="texto-modelo">${esc(m.aviso)}\n\n☐ ${esc(m.ciencia)}</pre></details>
       <details><summary>WhatsApp e lembrete</summary><pre class="texto-modelo">${esc(m.whatsapp)}\n\n${esc(m.lembrete)}</pre></details></div>`).join('')}
-    <p class="suave">Cada comunicado guarda o texto com que foi criado; dá para ajustar o texto ao criar um comunicado novo.</p>`;
+    <p class="suave">Cada comunicado guarda o texto com que foi criado; dá para ajustar o texto ao criar um comunicado novo.</p>
+    ${cartoesModelosMensagem()}`;
 }
 
 async function telaComunicado(id) {

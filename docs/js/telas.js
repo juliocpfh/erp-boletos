@@ -20,6 +20,7 @@ import { crescer, ligarCamposAutomaticos, ligarIndiceBancoCentral } from './tela
 import { telaCobranca, telaCobrancas } from './telas/cobrancas.js';
 import { ACEITA_DOCUMENTOS, acertarNomesUmaVez, apagarDocumentosVencidosDasFichas, alertaAdiado, alertaArquivosFaltando, alertaDesligado, botao, botaoDesligarAlerta, conferirArquivosUmaVez, buscar, caixaHistorico, classeAlerta, classeEstilo, competenciaPadrao, d, etiqueta, gruposDeAlertas, limparSemImovel, link, naoEncontrado, organizarPastasUmaVez, nomeAlerta, listaArquivos, opera, ordenar, PASTA_SEM_IMOVEL, pastasComArquivos, quitarPelaReservaNoVencimento, tabelaHistorico, trazerHerancasPendentes, ultimos } from './telas/comum.js';
 import { telaAceiteContatos, telaComunicacoes } from './telas/comunicacoes.js';
+import { ligarMensagem } from './telas/mensagens.js';
 import { preencherAvisoAgendados, telaEnviosAgendados } from './telas/agendados.js';
 import { calendarioDoPainel, SITUACOES_SOLICITACAO, telaBusca, telaInquilinos, telaIptu, telaSolicitacoes } from './telas/consultas.js';
 import { telaContrato, valorBonificado } from './telas/contrato.js';
@@ -110,6 +111,7 @@ export const TELAS = {
     ligarGarantiasCorrigidas(raiz);
     ligarFichaOnline(raiz);
     ligarRegua(raiz);
+    ligarMensagem(raiz);
     ligarIndiceBancoCentral(raiz);
     if (raiz.querySelector('[data-busca-regras]')) parteAdiada('regras').then((m) => m.ligarBuscaRegras(raiz)).catch(() => {}); // só na tela das regras (já carregada)
     ligarPastaImpressao(raiz).catch((e) => aviso(`Pasta física: ${e.message}`, 'erro'));

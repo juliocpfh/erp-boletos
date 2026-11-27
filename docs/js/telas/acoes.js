@@ -33,6 +33,7 @@ import { ACOES_PASTA } from './arquivo-impresso.js';
 import { ACOES_NOTIFICACOES } from './notificacoes.js';
 import { ACOES_PROVAS, caixaCobrancaHtml, escolhaDaCobranca } from './cobranca-provas.js';
 import { ACOES_COMUNICACOES } from './comunicacoes.js';
+import { ACOES_MENSAGENS } from './mensagens.js';
 import { ACOES_AGENDADOS } from './agendados.js';
 import { alvoDoRecibo, documentoMontado, guardarCartaNaPasta, logoPng, MODELO_COMODOS, modelosNoBanco, pdfDaCarta, pdfDoDocumento, pdfDoRecibo, roteiroTexto } from './documentos.js';
 import * as AS from '../assinatura.js';
@@ -2800,6 +2801,6 @@ export const ACOES = {
 };
 
 // Banco (extrato, comprovantes e pagamentos pelo C6): botões em telas/banco.js
-Object.assign(ACOES, ACOES_BANCO, ACOES_FICHAS, ACOES_TERMO, ACOES_ICONE, ACOES_EMAILS, ACOES_PASTA, ACOES_NOTIFICACOES, ACOES_COMUNICACOES, ACOES_PROVAS, ACOES_AGENDADOS);
+Object.assign(ACOES, ACOES_BANCO, ACOES_FICHAS, ACOES_TERMO, ACOES_ICONE, ACOES_EMAILS, ACOES_PASTA, ACOES_NOTIFICACOES, ACOES_COMUNICACOES, ACOES_MENSAGENS, ACOES_PROVAS, ACOES_AGENDADOS);
 // telas raras (nuvem, regras do sistema, régua, dados de uma pessoa): carregadas no 1º clique (PARTES_ADIADAS, telas/comum.js)
 Object.assign(ACOES, adiados('acoes'));
