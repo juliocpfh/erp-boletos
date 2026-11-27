@@ -1192,6 +1192,37 @@ export function retirarNotaAplicacao(d, contratoId, indice, usuario) {
 }
 
 /**
+ * Pendência do cadastro justificada (pedido do dono, 27/11/2026): sai de Pendências → Cadastros incompletos com o porquê e quem
+ * decidiu. Lista ``contratos.justificativas_pendencias`` [{ itens: [texto da pendência], texto, responsavel, data, usuario }].
+ * Ex.: "garantia dupla (fiador + depósito)…" justificada em 27/11/2026: "Proprietário pediu as duas", responsável Julio.
+ * A pendência que mudar de texto (outra regra, outro fiador) volta a aparecer.
+ */
+export const justificativasPendencias = (c) => (Array.isArray(c && c.justificativas_pendencias) ? c.justificativas_pendencias : []);
+export const pendenciaJustificada = (c, item) => justificativasPendencias(c).find((j) => (j.itens || []).includes(item)) || null;
+export function justificarPendencias(d, contratoId, { itens, texto, responsavel }, usuario, hoje = C.hojeBrasilia()) {
+  const c = buscar(d, 'contratos', contratoId);
+  if (!c) throw new C.ErroUsuario('Este contrato não existe mais. Atualize a página.');
+  const lista = [...new Set((itens || []).map((x) => String(x).trim()).filter(Boolean))];
+  const t = String(texto || '').trim();
+  const resp = String(responsavel || '').trim();
+  if (!lista.length) throw new C.ErroUsuario('Marque a pendência que quer justificar.');
+  if (!t) throw new C.ErroUsuario('Escreva por que foi feito dessa forma.');
+  if (!resp) throw new C.ErroUsuario('Informe quem é o responsável por ter feito dessa forma.');
+  if (t.length > 1000 || resp.length > 120) throw new C.ErroUsuario('Texto longo demais: até 1.000 letras na observação e 120 no responsável.');
+  return atualizar(d, 'contratos', c.id, { justificativas_pendencias: [...justificativasPendencias(c), { itens: lista, texto: t, responsavel: resp, data: hoje, usuario: usuario || '' }] }, usuario,
+    `${c.inquilino_nome}: ${C.plural(lista.length, 'pendência justificada', 'pendências justificadas')} (${lista.join('; ')}), responsável ${resp}`);
+}
+/** Desfaz a justificativa ``indice`` (posição na lista): as pendências voltam a aparecer. */
+export function desfazerJustificativa(d, contratoId, indice, usuario) {
+  const c = buscar(d, 'contratos', contratoId);
+  const lista = justificativasPendencias(c);
+  const i = Number(indice);
+  if (!c || !lista[i]) throw new C.ErroUsuario('Esta justificativa não existe mais. Atualize a página.');
+  return atualizar(d, 'contratos', c.id, { justificativas_pendencias: lista.filter((_, k) => k !== i) }, usuario,
+    `${c.inquilino_nome}: justificativa de ${C.dataBr(lista[i].data)} desfeita (${lista[i].itens.join('; ')} volta às pendências)`);
+}
+
+/**
  * Garantia em dinheiro do contrato que já saiu da empresa: devolvida na saída (cálculo final), na troca de titular com
  * garantia nova, ou passada ao novo titular (as aplicações são lançadas lá). A troca de garantia sem caução nem depósito
  * agora (ex.: caução → fiador) com a devolução registrada também conta.
