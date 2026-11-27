@@ -420,7 +420,8 @@ export const CADASTROS = {
     valores: (r) => ({ ...r, vencimento_abatimento: R.mesVencimentoDaCompetencia(buscar('contratos', r.contrato_id), r.competencia_abatimento) }),
     extraHtml: (r, q) => `<span hidden data-contrato-boleto="${Number(r ? r.contrato_id : q.contrato)}" data-mes-boleto="vencimento_abatimento" data-pagamento="data_pagamento" data-condominio="competencia_condominio"></span>`,
     conferir: conferirRessarcimento,
-    padrao: () => ({ competencia_condominio: C.competenciaDe(C.hojeIso()) }),
+    // aberto da tela Ressarcimentos (?de=ressarcimentos&mes=): já vem com o mês do condomínio de lá
+    padrao: (q) => ({ competencia_condominio: q && q.de === 'ressarcimentos' && C.competenciaValida(q.mes) ? q.mes : C.competenciaDe(C.hojeIso()) }),
     fixos: (r, q) => (r ? {} : { contrato_id: Number(q.contrato) }),
     aviso: () => 'Taxas extraordinárias do condomínio são do proprietário (Lei 8.245/91, art. 22, X): fundo de obras, constituição do fundo de reserva, obras na estrutura, pintura de fachada, equipamentos de segurança, paisagismo das áreas comuns, indenizações trabalhistas de antes da locação. Se o inquilino pagou no boleto do condomínio, o valor volta para ele no boleto do aluguel.',
     ajustar(dados, erros, r, form, q) {
@@ -478,7 +479,8 @@ export const CADASTROS = {
       R.marcarCondominioConferido(db, c.id, salvo.competencia_condominio, login());
       return salvo;
     },
-    voltar: (r, q) => `#/contrato/${r ? r.contrato_id : q.contrato}?ir=ressarcimentos`,
+    // da tela Ressarcimentos volta para ela (no mesmo mês), sem passar pela página do inquilino (27/11/2026)
+    voltar: (r, q) => (q && q.de === 'ressarcimentos' ? `#/ressarcimentos${C.competenciaValida(q.mes) ? `?mes=${q.mes}` : ''}` : `#/contrato/${r ? r.contrato_id : q.contrato}?ir=ressarcimentos`),
   },
   solicitacoes: {
     titulo: (r) => (r ? 'Solicitação do inquilino' : 'Nova solicitação do inquilino'),

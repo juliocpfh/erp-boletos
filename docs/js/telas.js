@@ -34,6 +34,7 @@ import { ligarGarantiasCorrigidas, telaContas, telaFinanceiro, telaGarantias, te
 import { conferirSoltosUmaVez, ligarPastaImpressao, telaArquivoImpresso, telaPastaFisica, telaPastaImpressao } from './telas/arquivo-impresso.js';
 import { telaImovel } from './telas/imovel.js';
 import { telaReajustes } from './telas/reajustes.js';
+import { telaRessarcimentos } from './telas/ressarcimentos.js';
 import { alertasDaTela, carregarParte, parteAdiada } from './telas/comum.js';
 import * as G from './regua-email.js';
 import { avisoPrimeiraLogo, ligarEditorIcone } from './telas/icone.js';
@@ -483,6 +484,7 @@ export const TELAS = {
   regras: async (rota) => (await parteAdiada('regras')).telaRegras(rota.q),
   inquilinos: (rota) => telaInquilinos(rota.q),
   comunicacoes: (rota) => telaComunicacoes(rota.q),
+  ressarcimentos: (rota) => telaRessarcimentos(rota.q),
   'envios-agendados': () => telaEnviosAgendados(),
   'aceite-contatos': (rota) => telaAceiteContatos(rota.q),
   ficha: (rota) => telaFicha(Number(rota.partes[1])),

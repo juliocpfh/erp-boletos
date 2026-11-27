@@ -21,8 +21,8 @@ const SO_CONSULTA = 'Seu usuário só consulta: não pode enviar comunicados.';
 const SO_NUVEM = 'O comunicado com link só funciona no sistema pela internet (nuvem).';
 const DIAS_PRAZO = 10;
 
-/** Abas de Inquilinos: Lista e Comunicações. */
-export const abasInquilinos = (atual) => `<nav class="abas">${link('#/inquilinos', 'Lista', atual === 'lista' ? 'ativo' : '')}${link('#/comunicacoes', 'Comunicações', atual === 'comunicacoes' ? 'ativo' : '')}</nav>`;
+/** Abas de Inquilinos: Lista, Comunicações e Ressarcimentos (do condomínio, 27/11/2026). */
+export const abasInquilinos = (atual) => `<nav class="abas">${link('#/inquilinos', 'Lista', atual === 'lista' ? 'ativo' : '')}${link('#/comunicacoes', 'Comunicações', atual === 'comunicacoes' ? 'ativo' : '')}${link('#/ressarcimentos', 'Ressarcimentos', atual === 'ressarcimentos' ? 'ativo' : '')}</nav>`;
 
 /** Atalhos dentro de Comunicações (também no topo das páginas de solicitações e de notificações). */
 export function atalhosComunicacoes(atual) {
