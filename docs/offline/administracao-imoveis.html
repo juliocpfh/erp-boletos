@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-+Aw5dd2jTqMrdFY4mWBCubh9atWPsXJm3zAlJNdX10A=' 'sha256-hZ4EtYrizPpK7eqlm+HBZJi2HmitUZWFi9TJXWEFL2I='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-+Aw5dd2jTqMrdFY4mWBCubh9atWPsXJm3zAlJNdX10A=' 'sha256-EG04q8VQ/V9V0bK0LZivdQsBBj1BS4b7gnYpZ16G23k='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="19a593886dd4fd1e">
+<meta name="fontes" content="a17f15c2f0f0fd4d">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -45986,8 +45986,9 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
         login: () => `<main><div id="mensagens"></div><div class="cartao login">
     <h1>Administração de Imóveis</h1><p class="suave">${E.nuvem ? "Dados na nuvem" : `Pasta: <b>${esc(E.pasta.name)}</b>`}</p>
     <form data-form="login">
-      <p><label for="ent_login">Login</label><input id="ent_login" name="login" autofocus autocomplete="username"></p>
-      <p><label for="ent_senha">Senha</label><input id="ent_senha" type="password" name="senha" autocomplete="current-password"></p>
+      ${loginDaTroca() ? `<p class="alerta info" data-troca-login>Acesso pela internet trocado. Ponha a sua senha para entrar como <b>${esc(loginDaTroca())}</b>.</p>` : ""}
+      <p><label for="ent_login">Login</label><input id="ent_login" name="login"${loginDaTroca() ? ` value="${esc(loginDaTroca())}"` : " autofocus"} autocomplete="username"></p>
+      <p><label for="ent_senha">Senha</label><input id="ent_senha" type="password" name="senha"${loginDaTroca() ? " autofocus" : ""} autocomplete="current-password"></p>
       <button>Entrar</button> ${E.nuvem ? "" : botao("escolherPasta", "Trocar de pasta")}
     </form><p class="suave" style="margin-top:14px">${E.nuvem ? "Primeiro acesso? Peça ao administrador para cadastrar você em Usuários → Novo usuário, com o seu e-mail de acesso." : 'Primeiro acesso? <a href="#/pedir-acesso">Pedir acesso ao administrador</a>'}</p>${LINK_RESTAURAR}</div></main>`,
         // na nuvem só o administrador cria usuários (o cofre recusa o pedido): lá a tela só explica o caminho
@@ -46857,7 +46858,7 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
     E.d = disco;
     const u = E.d.usuarios.find((x) => x.login === loginTexto);
     if (E.nuvem && E.saudeNuvem) await E.saudeNuvem;
-    if (u && E.nuvem && E.emailNuvem && !usuarioDoEmail(u, E.emailNuvem)) throw new ErroUsuario(`Você entrou na internet como ${E.emailNuvem}: use o usuário desse e-mail (ou saia do login da internet e entre com o outro).`);
+    const outroNaInternet = !!(u && E.nuvem && E.emailNuvem && !usuarioDoEmail(u, E.emailNuvem));
     if (!await conferirSenha(u, senha)) {
       contarErroDeLogin();
       throw new ErroUsuario("Login ou senha incorretos.");
@@ -46865,6 +46866,10 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
     gravarTentativas(null);
     if (u.pendente) throw new Error("Seu pedido de acesso ainda não foi aprovado pelo administrador.");
     if (!u.ativo) throw new Error("Este usuário está bloqueado. Fale com o administrador.");
+    if (outroNaInternet) {
+      await trocarLoginDaInternet(u, E.emailNuvem);
+      return;
+    }
     if (E.nuvem) await destrancarNuvem(u.login, senha);
     const reforco = await reforcarSenha(u, senha);
     if (reforco) await alterar((db) => {
@@ -46873,7 +46878,37 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
     }, { soSessao: true }).catch(() => {
     });
     mandarVerificadorDoAparelho(u.login, senha, (reforco || u).senha_hash);
+    try {
+      localStorage.removeItem(TROCA_DE_LOGIN);
+    } catch {
+    }
     await abrirSessao(u);
+  }
+  function loginDaTroca(agora = Date.now()) {
+    try {
+      const t = JSON.parse(localStorage.getItem(TROCA_DE_LOGIN) || "null");
+      if (t && t.login && agora < t.ate) return String(t.login);
+      localStorage.removeItem(TROCA_DE_LOGIN);
+    } catch {
+    }
+    return "";
+  }
+  async function trocarLoginDaInternet(u, emailAnterior) {
+    const email = String(u.email || u.login || "").trim();
+    const ok = await confirmar(
+      `Este computador ainda está com o acesso pela internet de ${emailAnterior} (quem entrou antes fechou a tela sem "Sair"). Para entrar como ${u.nome}, o sistema encerra esse acesso agora. Depois, a tela da internet pede o seu e-mail${email.includes("@") ? ` (${email})` : ""} e um código que chega nele; com o código, o login aparece já preenchido: é só pôr a senha de novo.`,
+      { titulo: "Trocar de usuário neste computador", sim: `Entrar como ${u.nome}`, nao: "Cancelar" }
+    );
+    if (!ok) return;
+    try {
+      localStorage.setItem(TROCA_DE_LOGIN, JSON.stringify({ login: u.login, ate: Date.now() + VALIDADE_TROCA }));
+    } catch {
+    }
+    if (E.cofrinho) await E.cofrinho.sair().catch(() => {
+    });
+    gravarSessao(null);
+    if (!comLoginDaInternet()) throw new ErroUsuario(`Neste endereço de teste não há login da internet para trocar (${emailAnterior}).`);
+    location.href = "/cdn-cgi/access/logout";
   }
   function mandarVerificadorDoAparelho(loginTexto, senha, senhaHash) {
     if (!E.nuvem || !senhaHash) return Promise.resolve(false);
@@ -47291,7 +47326,7 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
       if (t) t.textContent = n ? `${n} ${n === 1 ? "boleto marcado" : "boletos marcados"}` : "";
     }
   }
-  var E, login, SESSAO, DURACAO_SESSAO, LIMITE_SESSAO, MAX_SESSOES2, deposito, tokenDaSessao, novoToken, usuarioDoEmail, usuarioDaSessao, podeUsuario, filaGravacao, ERRO_ARQUIVO_SUMIU, soSessaoNoDisco, travaDaPasta, backupDoDiaAndando, backupDoDiaFalhouEm, filaSegura, falhasDaChave, chaveTentadaEm, ESPERA_CHAVE, AVISAR_DEPOIS_DE, espelharUmaVez, DIAS_BACKUP_EMPRESA, AVISAR_FEITO_A_CADA, feitoAvisadoEm, backupEmpresaLidoEm, filaCopia, copiaAgendada, chaveNaNuvem, arquivoConferido, memoriaIgualAoDisco, conferindo, mensagens, proximaMensagem, logarErro, janelasAbertas, ESPERA_VOLTAR, msgCompactar, scripts, excelJs, jsZip, jsPdf, MODO_NUVEM, TABELAS_DO_SISTEMA, TENTATIVAS_LOGIN, LIMITE_TENTATIVAS_LOGIN, esperaDoLogin, GUARDADOS_DO_LOGIN, NOMES_PARAMETRO, TABELA_DO_PARAMETRO, MENU, MENU_DO_FORMULARIO, versaoIcone, logoDoTopo, paginaDesenhada, anexosVistos, CLIPES_GUARDADOS, ehClipe, clipesCarregados, TELAS_SEM_ENDERECO, desenhos, subirAoTopo, rolagensDoHistorico, entradaAtual, rolagemDaVolta, NOMES_DOS_CAMPOS, idsDeRotulo, SEM_CARTOES, NAO_ALTERA, formularioAlterado;
+  var E, login, SESSAO, DURACAO_SESSAO, LIMITE_SESSAO, MAX_SESSOES2, deposito, tokenDaSessao, novoToken, usuarioDoEmail, usuarioDaSessao, podeUsuario, filaGravacao, ERRO_ARQUIVO_SUMIU, soSessaoNoDisco, travaDaPasta, backupDoDiaAndando, backupDoDiaFalhouEm, filaSegura, falhasDaChave, chaveTentadaEm, ESPERA_CHAVE, AVISAR_DEPOIS_DE, espelharUmaVez, DIAS_BACKUP_EMPRESA, AVISAR_FEITO_A_CADA, feitoAvisadoEm, backupEmpresaLidoEm, filaCopia, copiaAgendada, chaveNaNuvem, arquivoConferido, memoriaIgualAoDisco, conferindo, mensagens, proximaMensagem, logarErro, janelasAbertas, ESPERA_VOLTAR, msgCompactar, scripts, excelJs, jsZip, jsPdf, MODO_NUVEM, TABELAS_DO_SISTEMA, TENTATIVAS_LOGIN, LIMITE_TENTATIVAS_LOGIN, esperaDoLogin, TROCA_DE_LOGIN, VALIDADE_TROCA, comLoginDaInternet, GUARDADOS_DO_LOGIN, NOMES_PARAMETRO, TABELA_DO_PARAMETRO, MENU, MENU_DO_FORMULARIO, versaoIcone, logoDoTopo, paginaDesenhada, anexosVistos, CLIPES_GUARDADOS, ehClipe, clipesCarregados, TELAS_SEM_ENDERECO, desenhos, subirAoTopo, rolagensDoHistorico, entradaAtual, rolagemDaVolta, NOMES_DOS_CAMPOS, idsDeRotulo, SEM_CARTOES, NAO_ALTERA, formularioAlterado;
   var init_app = __esm({
     "docs/js/app.js"() {
       init_armazenamento();
@@ -47420,6 +47455,9 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
       TENTATIVAS_LOGIN = "imoveis-tentativas";
       LIMITE_TENTATIVAS_LOGIN = 10;
       esperaDoLogin = (erros) => erros < 3 ? 0 : Math.min(30, 2 ** (erros - 2));
+      TROCA_DE_LOGIN = "imoveis-troca-login";
+      VALIDADE_TROCA = 15 * 6e4;
+      comLoginDaInternet = () => typeof location !== "undefined" && location.protocol === "https:" && !["localhost", "127.0.0.1"].includes(location.hostname);
       GUARDADOS_DO_LOGIN = (k) => k === "testemunhas_contrato" || k === CLIPES_GUARDADOS || /^assinatura-contrato-/.test(k);
       NOMES_PARAMETRO = {
         comp: "mês",
