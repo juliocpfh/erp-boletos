@@ -3,7 +3,7 @@
 //   comum (componentes, pastas e anexos) · campos (preenchimento automático dos formulários) · imovel · contrato · cadastros (CADASTROS)
 //   avisos (conferência antes de salvar) · fechamento · cobrancas · faturas · consultas · reajustes · financeiro · documentos · admin
 //   envios (FORMULARIOS: envio de cada formulário) · acoes (ACOES: botões data-acao)
-import { aviso, E, podeUsuario } from './app.js';
+import { aviso, E, loginDaTroca, podeUsuario } from './app.js';
 import * as S from './armazenamento.js';
 import * as AS from './assinatura.js';
 import { emailDeAcesso, PAPEIS, SENHA_MINIMA } from './auth.js';
@@ -262,8 +262,9 @@ export const TELAS = {
   login: () => `<main><div id="mensagens"></div><div class="cartao login">
     <h1>Administração de Imóveis</h1><p class="suave">${E.nuvem ? 'Dados na nuvem' : `Pasta: <b>${esc(E.pasta.name)}</b>`}</p>
     <form data-form="login">
-      <p><label for="ent_login">Login</label><input id="ent_login" name="login" autofocus autocomplete="username"></p>
-      <p><label for="ent_senha">Senha</label><input id="ent_senha" type="password" name="senha" autocomplete="current-password"></p>
+      ${loginDaTroca() ? `<p class="alerta info" data-troca-login>Acesso pela internet trocado. Ponha a sua senha para entrar como <b>${esc(loginDaTroca())}</b>.</p>` : ''}
+      <p><label for="ent_login">Login</label><input id="ent_login" name="login"${loginDaTroca() ? ` value="${esc(loginDaTroca())}"` : ' autofocus'} autocomplete="username"></p>
+      <p><label for="ent_senha">Senha</label><input id="ent_senha" type="password" name="senha"${loginDaTroca() ? ' autofocus' : ''} autocomplete="current-password"></p>
       <button>Entrar</button> ${E.nuvem ? '' : botao('escolherPasta', 'Trocar de pasta')}
     </form><p class="suave" style="margin-top:14px">${E.nuvem ? 'Primeiro acesso? Peça ao administrador para cadastrar você em Usuários → Novo usuário, com o seu e-mail de acesso.' : 'Primeiro acesso? <a href="#/pedir-acesso">Pedir acesso ao administrador</a>'}</p>${LINK_RESTAURAR}</div></main>`,
 
