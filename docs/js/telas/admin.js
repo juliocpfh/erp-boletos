@@ -55,7 +55,8 @@ export async function telaBackupSeguro() {
         <form data-form="configurarSeguro" class="formulario">
           <div><label>Senha do backup</label><input type="password" name="senha" autocomplete="new-password"></div>
           ${chaveExistente ? '' : '<div><label>Repita a senha</label><input type="password" name="senha2" autocomplete="new-password"></div>'}
-          <div class="check"><button>${chaveExistente ? 'Conectar' : 'Criar e fazer o primeiro backup'}</button></div></form></div>` : ''}
+          <div class="check"><button>${chaveExistente ? 'Conectar' : 'Criar e fazer o primeiro backup'}</button></div></form>
+        <div id="progresso-backup" aria-live="polite"></div></div>` : ''}
       <div class="cartao"><h2>Restaurar</h2>${FORM_RESTAURAR}</div>`;
   }
   const lista = await B.listarBackups(E.seguro.dir);
