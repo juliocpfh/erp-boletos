@@ -18,6 +18,7 @@ import * as R from '../regras.js';
 import { desfazerItens, dispensarAvisoSeguro } from './admin.js';
 import { ACOES_BANCO } from './banco.js';
 import { ACOES_FICHAS } from './fichas.js';
+import { ACOES_PENDENCIAS } from './fechamento.js';
 import { ACOES_TERMO } from './termo-reserva.js';
 import { ACOES_EMAILS } from './emails.js';
 import { agendarEmail, emailLigado, enviarEmail } from '../gmail.js';
@@ -2822,6 +2823,6 @@ export const ACOES = {
 };
 
 // Banco (extrato, comprovantes e pagamentos pelo C6): botões em telas/banco.js
-Object.assign(ACOES, ACOES_BANCO, ACOES_FICHAS, ACOES_TERMO, ACOES_ICONE, ACOES_EMAILS, ACOES_PASTA, ACOES_NOTIFICACOES, ACOES_COMUNICACOES, ACOES_MENSAGENS, ACOES_PROVAS, ACOES_AGENDADOS);
+Object.assign(ACOES, ACOES_BANCO, ACOES_FICHAS, ACOES_PENDENCIAS, ACOES_TERMO, ACOES_ICONE, ACOES_EMAILS, ACOES_PASTA, ACOES_NOTIFICACOES, ACOES_COMUNICACOES, ACOES_MENSAGENS, ACOES_PROVAS, ACOES_AGENDADOS);
 // telas raras (nuvem, regras do sistema, régua, dados de uma pessoa): carregadas no 1º clique (PARTES_ADIADAS, telas/comum.js)
 Object.assign(ACOES, adiados('acoes'));

@@ -36,3 +36,16 @@ test('falta aplicar: observação com a data do registro, no alerta, e retirar',
   R.retirarNotaAplicacao(d, c.id, 0, 'julio');
   assert.deepEqual(R.notasAplicacao(R.buscar(d, 'contratos', c.id)), []);
 });
+
+test('pendência justificada: motivo, responsável e data; desfazer', () => {
+  const { d, c } = base();
+  const item = 'garantia dupla (fiador + depósito): a Lei 8.245/91, art. 37, permite só uma';
+  assert.throws(() => R.justificarPendencias(d, c.id, { itens: [item], texto: 'x' }, 'julio'), /responsável/);
+  assert.throws(() => R.justificarPendencias(d, c.id, { itens: [], texto: 'x', responsavel: 'Julio' }, 'julio'), /Marque/);
+  R.justificarPendencias(d, c.id, { itens: [item], texto: 'Proprietário pediu as duas', responsavel: 'Julio (diretoria)' }, 'ana', '2026-11-27');
+  const x = R.buscar(d, 'contratos', c.id);
+  assert.deepEqual(R.pendenciaJustificada(x, item), { itens: [item], texto: 'Proprietário pediu as duas', responsavel: 'Julio (diretoria)', data: '2026-11-27', usuario: 'ana' });
+  assert.equal(R.pendenciaJustificada(x, 'telefone'), null);
+  R.desfazerJustificativa(d, c.id, 0, 'julio');
+  assert.equal(R.pendenciaJustificada(R.buscar(d, 'contratos', c.id), item), null);
+});
