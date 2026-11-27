@@ -59,6 +59,13 @@ export function aplicarEfeitos(d, usuario) {
           R.atualizar(d, 'comunicados', com.id, { destinos: com.destinos.map((y) => (y.chave === ef.destino ? { ...semAgendado(y), [campo]: e.enviado_em || `${e.data}T12:00:00.000Z` } : { ...y })) }, usuario,
             `Comunicado "${com.titulo}": ${campo === 'email_em' ? 'e-mail' : 'lembrete'} agendado enviado pela nuvem`);
         }
+      } else if (ef.tipo === 'mensagem') {
+        // mensagem aos inquilinos (telas/mensagens.js): a pessoa passa de "agendado" a "e-mail enviado", com a hora de verdade
+        const m = R.buscar(d, 'mensagens', ef.mensagem_id);
+        if (m && (m.destinos || []).some((y) => y.chave === ef.destino && y.agendado_id === e.agendado_id)) {
+          R.atualizar(d, 'mensagens', m.id, { destinos: m.destinos.map((y) => (y.chave === ef.destino ? { ...semAgendado(y), email_em: e.enviado_em || `${e.data}T12:00:00.000Z` } : { ...y })) }, usuario,
+            `Mensagem "${m.titulo}": e-mail agendado enviado pela nuvem`);
+        }
       } else if (ef.tipo === 'carta') {
         const c = R.buscar(d, 'contratos', ef.contrato_id);
         if (c && !(d.cartas_reajuste || []).some((x) => x.contrato_id === c.id && x.competencia === ef.comp)) {
@@ -94,6 +101,13 @@ export function desfazerAgendamento(d, registro, agendadoId, usuario) {
     const com = R.buscar(d, 'comunicados', ef.comunicado_id);
     if (com && (com.destinos || []).some((y) => y.chave === ef.destino && y.agendado_id === agendadoId)) {
       R.atualizar(d, 'comunicados', com.id, { destinos: com.destinos.map((y) => (y.chave === ef.destino ? semAgendado(y) : { ...y })) }, usuario, `Comunicado "${com.titulo}": e-mail agendado cancelado`);
+      return true;
+    }
+  }
+  if (ef.tipo === 'mensagem') {
+    const m = R.buscar(d, 'mensagens', ef.mensagem_id);
+    if (m && (m.destinos || []).some((y) => y.chave === ef.destino && y.agendado_id === agendadoId)) {
+      R.atualizar(d, 'mensagens', m.id, { destinos: m.destinos.map((y) => (y.chave === ef.destino ? semAgendado(y) : { ...y })) }, usuario, `Mensagem "${m.titulo}": e-mail agendado cancelado`);
       return true;
     }
   }
