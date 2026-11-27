@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-+Aw5dd2jTqMrdFY4mWBCubh9atWPsXJm3zAlJNdX10A=' 'sha256-tj3M25ey6OGnotdd09b1hv9WlQOgED7LPH5R27yAzsk='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-+Aw5dd2jTqMrdFY4mWBCubh9atWPsXJm3zAlJNdX10A=' 'sha256-KiTtMgY2ndnYAMbVBn6jk5kzbDoeT5cw02glcSJgl1k='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="d83ab348bea7acce">
+<meta name="fontes" content="586213fb982c2846">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -6688,6 +6688,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     desfazerAcordo: () => desfazerAcordo,
     desfazerAditivo: () => desfazerAditivo,
     desfazerAlteracoes: () => desfazerAlteracoes,
+    desfazerJustificativa: () => desfazerJustificativa,
     desfazerNumeracao: () => desfazerNumeracao,
     desfazerReajuste: () => desfazerReajuste,
     desfazerReservaDevolvida: () => desfazerReservaDevolvida,
@@ -6834,6 +6835,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     iptuNaCompetencia: () => iptuNaCompetencia,
     iptuPagoPeloBanco: () => iptuPagoPeloBanco,
     juntarOrdem: () => juntarOrdem,
+    justificarPendencias: () => justificarPendencias,
+    justificativasPendencias: () => justificativasPendencias,
     lancarDespesas: () => lancarDespesas,
     lancarGanhoAirbnb: () => lancarGanhoAirbnb,
     leituraDo: () => leituraDo,
@@ -6929,6 +6932,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     pastaDoComprovante: () => pastaDoComprovante,
     pedidoBoletoC6: () => pedidoBoletoC6,
     pedidoNegativacaoC6: () => pedidoNegativacaoC6,
+    pendenciaJustificada: () => pendenciaJustificada,
     pendenciasBancoDoMes: () => pendenciasBancoDoMes,
     pendenciasDasFichas: () => pendenciasDasFichas,
     pendentesDeFatura: () => pendentesDeFatura,
@@ -7937,6 +7941,39 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       { notas_aplicacao: lista3.filter((_, k) => k !== i) },
       usuario,
       `${c.inquilino_nome}: observação da aplicação de ${dataBr(lista3[i].data)} retirada`
+    );
+  }
+  function justificarPendencias(d2, contratoId, { itens, texto: texto3, responsavel }, usuario, hoje3 = hojeBrasilia()) {
+    const c = buscar(d2, "contratos", contratoId);
+    if (!c) throw new ErroUsuario("Este contrato não existe mais. Atualize a página.");
+    const lista3 = [...new Set((itens || []).map((x) => String(x).trim()).filter(Boolean))];
+    const t = String(texto3 || "").trim();
+    const resp = String(responsavel || "").trim();
+    if (!lista3.length) throw new ErroUsuario("Marque a pendência que quer justificar.");
+    if (!t) throw new ErroUsuario("Escreva por que foi feito dessa forma.");
+    if (!resp) throw new ErroUsuario("Informe quem é o responsável por ter feito dessa forma.");
+    if (t.length > 1e3 || resp.length > 120) throw new ErroUsuario("Texto longo demais: até 1.000 letras na observação e 120 no responsável.");
+    return atualizar(
+      d2,
+      "contratos",
+      c.id,
+      { justificativas_pendencias: [...justificativasPendencias(c), { itens: lista3, texto: t, responsavel: resp, data: hoje3, usuario: usuario || "" }] },
+      usuario,
+      `${c.inquilino_nome}: ${plural(lista3.length, "pendência justificada", "pendências justificadas")} (${lista3.join("; ")}), responsável ${resp}`
+    );
+  }
+  function desfazerJustificativa(d2, contratoId, indice, usuario) {
+    const c = buscar(d2, "contratos", contratoId);
+    const lista3 = justificativasPendencias(c);
+    const i = Number(indice);
+    if (!c || !lista3[i]) throw new ErroUsuario("Esta justificativa não existe mais. Atualize a página.");
+    return atualizar(
+      d2,
+      "contratos",
+      c.id,
+      { justificativas_pendencias: lista3.filter((_, k) => k !== i) },
+      usuario,
+      `${c.inquilino_nome}: justificativa de ${dataBr(lista3[i].data)} desfeita (${lista3[i].itens.join("; ")} volta às pendências)`
     );
   }
   function garantiaJaSaiu(d2, c) {
@@ -14910,7 +14947,7 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
     out.total = out.honorarios + out.judicial + out.despesas.reduce((s, x) => s + x.valor, 0);
     return out;
   }
-  var TABELAS, SITUACOES, CONCESSIONARIAS_POR_UF, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, IMAGEM_FORA_DO_HISTORICO, semPeso, RESPOSTA_PESADA, FORMULARIOS_DA_TABELA, camposDinheiro, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, camposDaGravacao, CODIGO_DE, nomeCurto, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, aplicacaoBaixada, aplicacoesEmVigor, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehSaldoSaida, ehBoletoAvulso, semMultaJuros, emAcordo, MOTIVO_EM_ACORDO, quitadoNaSaida, aCobrar, cobertoPelaReserva, QUITADO_RESERVA, quitacoesPelaReservaAte, situacaoSemPagamento, boletosCaucaoDa, parcelasIrmasDoComplemento, recebedoresUsados, notasAplicacao, ignorados, textoCreditoReserva, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, IPTU_DIVISAO_NOVA_DESDE, dividirIptu, vencimentoParcela, mesBoletoDaParcela, usaTarifaPadrao, CAMPOS_RECALCULO, CAMPOS_MANUAIS, JUNTOS_DO_MANUAL, totais, previstoNoPagamento, pagoAMaisDo, MOTIVO_PAGO_A_MENOS, textoDiferenca, diferencaPendente, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, fixosDoBoleto, somaValores, cobrancasEmAberto, DIAS_AVISO_SAIDA, nomeDebitoSaida, valorDebitoSaida, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, MODOS_FICHA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, DOCUMENTOS_RENDA, DICA_DOCUMENTOS, PJ2, casadoOuUniao, fichaComConjuge, PARTES_DOCUMENTOS_PF, separacaoTotal, documentosDoFiador, VAGAS_FIADOR_FICHA, fiadoresDaFicha, fichaAberta, fichaAbertaDoImovel, fichaSemContrato, devolucaoPendente, condicoesDaReservaAgora, condicoesDaReserva, prazoDosDocumentosTexto, valorDaReserva, retencaoDaReserva, reaberturaDaFicha, devolverReservaAte, fichaSemDocumentos, inicioPrazoApagarFicha, apagarFichaEsperaDevolucao, dataApagarDocumentosFicha, FICHA_FICA, fichaFica, fichasComDadosVencidos, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraObrigatoria, relogiosObrigatorios, leituraDo, encerramentoDo, boletoDoSaldo, garantiaADevolverNaSaida, COMPROVANTE_SAIDA_DESDE, pastaDoBoletoPdf, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, titularidadeDevolvida, boletosParaReemitir, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, devolucoesDaTrocaDeTitular, devolucaoDaTrocaDeGarantia, garantiaDevolvidaNaTroca, devolucoesDeTrocaPendentes, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, companhiaCurtaDaConta, tamanhosVistos, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contasSoArquivo, contaSoArquivo, contasDoExtrato, contaBanco, limparId, contaPreMarcada, EMISSAO_EM_ANDAMENTO_MS, corta, encargosParaComparar, descontoLiberado, diasBaixaDaConta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, vencidosSemEmissao, boletosDoMesSemEmissao, solicitacoesDo, MEIOS_NOTIFICACAO, NOTIFICACAO_ABERTA, notificacaoEmAberto, limiteNotificacao, notificacoesDo, MODELOS_ATRASO, ehNotificacaoAtraso, boletosEmAtraso, boletosDaNotificacao, numeroDaNotificacao, textoMultaNotificacao, multaSugerida, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, competenciaDoMesVencimento, mesVencimentoDaCompetencia, ressarcimentoConfirmado, ressarcimentosSemComprovante, textoCreditoRessarcimento, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DESTINOS_MOVIMENTACAO, contratoEncerrado, FAIXAS_ATRASO, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, mesDoPeriodoGuia, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, pagosAquiAbertosNoBanco, textoDeBusca, assinaturaLembrete, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, alvoDoAlerta, mesmoAlvo, desligamentosOrfaos, TIPOS_ALERTA_DO_IMOVEL, PRAZO_CONTESTAR_SAIDA, prazoContestarSaida, mudarRegraSistema, voltarRegrasAoPadrao, contratosDoPerfil, TIPOS_REGISTRO_COBRANCA, registrosCobrancaDo, acordoDoBoleto, gastoDaCobranca, AVISOS_COBRANCA, textoDespesa;
+  var TABELAS, SITUACOES, CONCESSIONARIAS_POR_UF, LISTAS, CONFIG_BANCO_PADRAO, MODOS_CONTA_BOLETO, CONTA_BANCO_PADRAO, CANAIS_NOTIFICACAO, MOMENTOS_NOTIFICACAO, NOTIFICACAO_CONTRATO, lista2, buscar, OCULTOS, visivel, IMAGEM_FORA_DO_HISTORICO, semPeso, RESPOSTA_PESADA, FORMULARIOS_DA_TABELA, camposDinheiro, SEM_DESFAZER, CAMPOS_SEM_DESFAZER, CAMPOS_PAGAMENTO_BANCO, textoComparar, camposDaGravacao, CODIGO_DE, nomeCurto, correcoesDo, percentualBonificacao, dataBaseCorrecao, temCaucao, temDeposito, temFiador, fiadoresDo, fiadoresDoContrato, fiadoresAnterioresDo, trocasGarantiaDo, correcoesCaucaoAtual, correcoesGarantiaDo, aplicacoesDo, aplicacaoBaixada, aplicacoesEmVigor, TABELAS_COMPROVANTE, garantiaDepositada, trocaAtual, somaDepositos, aluguelDaCaucao, ehComplementoCaucao, boletoDoMes, ehParcelaAcordo, ehSaldoSaida, ehBoletoAvulso, semMultaJuros, emAcordo, MOTIVO_EM_ACORDO, quitadoNaSaida, aCobrar, cobertoPelaReserva, QUITADO_RESERVA, quitacoesPelaReservaAte, situacaoSemPagamento, boletosCaucaoDa, parcelasIrmasDoComplemento, recebedoresUsados, notasAplicacao, justificativasPendencias, pendenciaJustificada, ignorados, textoCreditoReserva, reservaUsadaPaga, reservaParaMarcarAbatida, segurosDoContrato, temFci, fciDoMes, COBRANCA_IPTU_QUITADO, valoresIptu, IPTU_DIVISAO_NOVA_DESDE, dividirIptu, vencimentoParcela, mesBoletoDaParcela, usaTarifaPadrao, CAMPOS_RECALCULO, CAMPOS_MANUAIS, JUNTOS_DO_MANUAL, totais, previstoNoPagamento, pagoAMaisDo, MOTIVO_PAGO_A_MENOS, textoDiferenca, diferencaPendente, faturasDe, participacoesDo, numeroFatura, geraNf, MODELO_AIRBNB, CAMPOS_MODELO_AIRBNB, modeloAirbnb, chavePendente, mesFechado, entradasAirbnbSemDestino, aditivoDaRenovacao, CAMPOS_GARANTIA, fixosDoBoleto, somaValores, cobrancasEmAberto, DIAS_AVISO_SAIDA, nomeDebitoSaida, valorDebitoSaida, RELOGIOS, textoLeitura, porData, leiturasDoImovel, leiturasDo, CAMPOS_PESSOA, CAMPOS_CONDICOES, dadosDaPessoa, MODOS_FICHA, CAMPOS_ARQUIVO_FICHA, COMPROVANTES_DINHEIRO_FICHA, CAMPOS_PROPOSTA_FICHA, DOCUMENTOS_RENDA, DICA_DOCUMENTOS, PJ2, casadoOuUniao, fichaComConjuge, PARTES_DOCUMENTOS_PF, separacaoTotal, documentosDoFiador, VAGAS_FIADOR_FICHA, fiadoresDaFicha, fichaAberta, fichaAbertaDoImovel, fichaSemContrato, devolucaoPendente, condicoesDaReservaAgora, condicoesDaReserva, prazoDosDocumentosTexto, valorDaReserva, retencaoDaReserva, reaberturaDaFicha, devolverReservaAte, fichaSemDocumentos, inicioPrazoApagarFicha, apagarFichaEsperaDevolucao, dataApagarDocumentosFicha, FICHA_FICA, fichaFica, fichasComDadosVencidos, fichasComDocumentosVencidos, FICAM_SEM_O_CONTRATO, relogiosDoContrato, leituraObrigatoria, relogiosObrigatorios, leituraDo, encerramentoDo, boletoDoSaldo, garantiaADevolverNaSaida, COMPROVANTE_SAIDA_DESDE, pastaDoBoletoPdf, GARANTIAS_DEPOSITADAS, podeRemoverComprovanteGarantia, titularidadeDevolvida, boletosParaReemitir, DOCUMENTOS_ENTRADA, campoArquivoDoc, campoPerdidoDoc, campoPerdidoPendente, campoParcialDoc, documentoPerdido, documentoParcial, contratoHerdado, renovacaoDoPrazo, fimRenovado, continuadoPor, fimDeVinculo, aditivoDaTroca, trocaAguardaAditivo, TABELAS_GARANTIA, CAMPOS_PAGAMENTO_GARANTIA, pagamentoDoAnterior, segurosPassadosAoHerdeiro, segurosAHerdar, garantiaAHerdar, LANCAMENTOS_GARANTIA_HERDADA, lancamentosNoAnterior, garantiaNova, devolucoesGarantiaDo, devolucoesDaTrocaDeTitular, devolucaoDaTrocaDeGarantia, garantiaDevolvidaNaTroca, devolucoesDeTrocaPendentes, garantiaHerdada, documentoFalta, textoParte, anterioresEncerrados, CONTAS_ENTRADA, ETAPAS_ENTRADA, rotinaRecente, companhiaCurtaDaConta, tamanhosVistos, COMPROVANTES_NO_CONTRATO, porDataAditivo, aditivosDo, aditivoPerdido, aditivosValidos, aditivosAguardando, aditivosDeVencimento, porDataVistoria, vistoriasDo, ultimaVistoriaDoImovel, TIPOS_ALERTA, CORES_ALERTA, ENFASES_ALERTA, PADRAO_ALERTA, ESTILOS_ALERTA_PADRAO, ANTECEDENCIA_ALERTA, estiloAlerta, ordemGuardada, LIMITE_DESCRICAO_BOLETO, SITUACOES_BANCO, carteiraDaConta, centavosParaReais, reaisParaCentavos, configBanco, contasSoArquivo, contaSoArquivo, contasDoExtrato, contaBanco, limparId, contaPreMarcada, EMISSAO_EM_ANDAMENTO_MS, corta, encargosParaComparar, descontoLiberado, diasBaixaDaConta, valorNoBanco, pedidoNegativacaoC6, aguardandoCredito, emitidoNoBanco, boletosParaEmitir, vencidosSemEmissao, boletosDoMesSemEmissao, solicitacoesDo, MEIOS_NOTIFICACAO, NOTIFICACAO_ABERTA, notificacaoEmAberto, limiteNotificacao, notificacoesDo, MODELOS_ATRASO, ehNotificacaoAtraso, boletosEmAtraso, boletosDaNotificacao, numeroDaNotificacao, textoMultaNotificacao, multaSugerida, reformasDo, ganhosAirbnbDo, nfAirbnbDe, aliquotaImpostos, TIPOS_DESPESA, despesasDo, ocupadoEm, NOMES_CONTAS, inquilinoPagaCondominio, ressarcimentosDo, TAXAS_CONDOMINIO, taxasCondominioUsadas, competenciaDoMesVencimento, mesVencimentoDaCompetencia, ressarcimentoConfirmado, ressarcimentosSemComprovante, textoCreditoRessarcimento, MESES_FECHAMENTO_ATRASADO, competenciaDoReajuste, correcaoDoReajuste, cartaDoReajuste, CARTA_COM_BOLETO_CORRIGIDO_DESDE, DESTINOS_MOVIMENTACAO, contratoEncerrado, FAIXAS_ATRASO, reguaCobranca, passoDaRegua, parcelasDoAcordo, origensDoAcordo, nomeNoAcordo, IMPOSTOS, PRESUNCAO, LIMITE_ADICIONAL_IRPJ, LIMITE_LC224_TRIMESTRE, INICIO_LC224, trimestreDe, mesesDoTrimestre, mesDoPeriodoGuia, guiaDo, diaUtilAteh2, MINIMO_GUIA, guiasDoPeriodo, CONFIG_BANCO_FASE2, idPastaAno, idContador, decodificarIdContador, contaBancaria, apelidoDaConta, competenciaDoComprovante, pagosAquiAbertosNoBanco, textoDeBusca, assinaturaLembrete, DIAS_ADIAR_ALERTA, DIAS_CUIDANDO_ALERTA, chaveAlerta, alvoDoAlerta, mesmoAlvo, desligamentosOrfaos, TIPOS_ALERTA_DO_IMOVEL, PRAZO_CONTESTAR_SAIDA, prazoContestarSaida, mudarRegraSistema, voltarRegrasAoPadrao, contratosDoPerfil, TIPOS_REGISTRO_COBRANCA, registrosCobrancaDo, acordoDoBoleto, gastoDaCobranca, AVISOS_COBRANCA, textoDespesa;
   var init_regras = __esm({
     "docs/js/regras.js"() {
       init_alertas();
@@ -15082,6 +15119,8 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       parcelasIrmasDoComplemento = (d2, cb) => ehComplementoCaucao(cb) ? d2.cobrancas.filter((x) => x.id !== cb.id && x.contrato_id === cb.contrato_id && ehComplementoCaucao(x) && x.caucao_vigencia === cb.caucao_vigencia) : [];
       recebedoresUsados = (d2) => [...new Set(d2.aplicacoes.map((a) => a.recebedor).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR"));
       notasAplicacao = (c) => Array.isArray(c && c.notas_aplicacao) ? c.notas_aplicacao : [];
+      justificativasPendencias = (c) => Array.isArray(c && c.justificativas_pendencias) ? c.justificativas_pendencias : [];
+      pendenciaJustificada = (c, item3) => justificativasPendencias(c).find((j) => (j.itens || []).includes(item3)) || null;
       ignorados = (ignorar) => typeof ignorar === "function" ? ignorar : (cb) => cb.id === ignorar;
       textoCreditoReserva = (a, valor) => `Reserva não usada (dada em ${dataBr(a.reserva_data) || "data não informada"}): ${reais(valor)}`;
       reservaUsadaPaga = (d2, c) => d2.cobrancas.filter((cb) => cb.contrato_id === c.id && cb.data_pagamento).reduce((s, cb) => s + (cb.reserva_utilizada || 0), 0);
@@ -40977,22 +41016,27 @@ O e-mail não será enviado. Se quiser mandar depois, envie de novo pela tela de
           ${opera() ? e.marcado ? botao("etapaFechamento", "Desmarcar", { mes, etapa: e.chave, feito: "" }, "link-botao") : !e.feito ? botao("etapaFechamento", "Marcar como feito", { mes, etapa: e.chave, feito: "1" }, "secundario pequeno") : "" : ""}</div></div></li>`).join("")}</ol>
     <p class="suave">A partir do dia ${regra("dia_gerar_boletos")} geram-se os boletos de ${compBr(mes)} (mês de referência), que vencem em ${compBr(somarMeses(mes, 1))}; os que vencem em ${compBr(mes)} são os de ${compBr(somarMeses(mes, -1))}. As NFs de ${compBr(mes)} se numeram depois da virada do mês, com as avulsas e as do Airbnb já lançadas. No calendário do Painel: dia ${regra("dia_gerar_boletos")} (boletos), dia 1º (NFs do mês anterior) e o último dia com o que falta.</p></div>`;
   }
+  function faltasDoInquilino(c) {
+    const falta = pendenciasDoContrato(d(), c).filter((t) => !t.endsWith("(em Empresas)"));
+    if (!c.inquilino_telefone) falta.push("telefone");
+    if (!c.inquilino_email) falta.push("e-mail");
+    for (const x of documentosPendentes(d(), c)) {
+      falta.push(x.situacao === "falta" ? { texto: `${x.nome.toLocaleLowerCase("pt-BR")} (não ${x.feito})`, nivel: "perigo", doc: true } : { texto: `${x.nome.toLocaleLowerCase("pt-BR")} (falta assinatura)`, nivel: "aviso", doc: true });
+    }
+    return falta;
+  }
   function cadastrosIncompletos() {
     const hoje3 = hojeIso();
     const out = [];
     for (const c of d().contratos.filter((x) => x.imovel_id && contratoAtivo(x, hoje3))) {
-      const falta = pendenciasDoContrato(d(), c).filter((t) => !t.endsWith("(em Empresas)"));
-      if (!c.inquilino_telefone) falta.push("telefone");
-      if (!c.inquilino_email) falta.push("e-mail");
-      for (const x of documentosPendentes(d(), c)) {
-        falta.push(x.situacao === "falta" ? { texto: `${x.nome.toLocaleLowerCase("pt-BR")} (não ${x.feito})`, nivel: "perigo", doc: true } : { texto: `${x.nome.toLocaleLowerCase("pt-BR")} (falta assinatura)`, nivel: "aviso", doc: true });
-      }
+      const falta = faltasDoInquilino(c).filter((f) => !pendenciaJustificada(c, textoDaFalta(f)));
       const temDados = falta.some((f) => !f.doc);
       if (falta.length) out.push({
         tipo: "Inquilino",
         nome: c.inquilino_nome,
         onde: (buscar2("imoveis", c.imovel_id) || {}).nome || "",
         falta,
+        contrato: c.id,
         editar: temDados ? `#/editar/contratos/${c.id}` : "",
         documentos: falta.some((f) => f.doc) ? `#/contrato/${c.id}?ir=documentos` : "",
         ver: `#/contrato/${c.id}`
@@ -41039,10 +41083,30 @@ O e-mail não será enviado. Se quiser mandar depois, envie de novo pela tela de
       ${l.map((x) => `<tr><td><a href="${x.ver}"><b>${esc(x.nome)}</b></a>${x.onde ? `<br><span class="suave">${esc(x.onde)}</span>` : ""}</td><td>${x.falta.map((f) => typeof f === "string" ? etiqueta(f, "aviso") : etiqueta(f.texto, f.nivel)).join(" ")}</td>
         <td class="n nw">${(t === "Empresa" ? podeUsuario("admin") : opera()) ? [
       x.editar && link(x.editar, x.documentos ? "Completar dados" : "Completar", "botao pequeno"),
-      x.documentos && link(x.documentos, "Ver documentos", "botao secundario pequeno")
-    ].filter(Boolean).join(" ") : ""}</td></tr>`).join("")}</table></div></div>`).join("") || '<div class="alerta ok">Todos os cadastros estão completos.</div>'}`;
+      x.documentos && link(x.documentos, "Ver documentos", "botao secundario pequeno"),
+      x.contrato && botao("justificarPendencia", "Justificar", { contrato: x.contrato }, "secundario pequeno")
+    ].filter(Boolean).join(" ") : ""}</td></tr>`).join("")}</table></div></div>`).join("") || '<div class="alerta ok">Todos os cadastros estão completos.</div>'}
+    ${justificadasHtml()}`;
   }
-  var ABERTA_ATE, caixaPendencias;
+  function justificadasHtml() {
+    const hoje3 = hojeIso();
+    const linhas2 = [];
+    for (const c of d().contratos.filter((x) => x.imovel_id && contratoAtivo(x, hoje3))) {
+      const js = justificativasPendencias(c);
+      if (!js.length) continue;
+      const atuais = new Set(faltasDoInquilino(c).map(textoDaFalta));
+      js.forEach((j, k) => {
+        const itens = (j.itens || []).filter((t) => atuais.has(t));
+        if (itens.length) linhas2.push({ c, j, k, itens });
+      });
+    }
+    if (!linhas2.length) return "";
+    return `<div class="cartao" id="justificadas">${caixaPendencias("Pendências justificadas", linhas2.length, `<div class="rolagem"><table><tr><th>Inquilino</th><th>Pendência</th><th>Por que foi feito dessa forma</th><th>Responsável</th><th></th></tr>
+    ${linhas2.map(({ c, j, k, itens }) => `<tr><td><a href="#/contrato/${c.id}"><b>${esc(c.inquilino_nome)}</b></a></td><td>${itens.map((t) => etiqueta(t, "neutra")).join(" ")}</td>
+      <td class="pre">${esc(j.texto)}</td><td>${esc(j.responsavel)}<br><span class="suave">${dataBr(j.data)}${j.usuario ? ` · registrado por ${esc(j.usuario)}` : ""}</span></td>
+      <td class="n nw">${opera() ? botao("desfazerJustificativa", "Desfazer", { contrato: c.id, indice: k }, "secundario pequeno", "Desfazer esta justificativa? A pendência volta à lista de cadastros incompletos.") : ""}</td></tr>`).join("")}</table></div>`, linhas2.length <= ABERTA_ATE)}</div>`;
+  }
+  var textoDaFalta, ABERTA_ATE, caixaPendencias, ACOES_PENDENCIAS;
   var init_fechamento = __esm({
     "docs/js/telas/fechamento.js"() {
       init_app();
@@ -41053,8 +41117,37 @@ O e-mail não será enviado. Se quiser mandar depois, envie de novo pela tela de
       init_regras();
       init_comum();
       init_comum();
+      textoDaFalta = (f) => typeof f === "string" ? f : f.texto;
       ABERTA_ATE = 5;
       caixaPendencias = (titulo2, n, conteudo, aberta) => `<details class="grupo-pendencias"${aberta ? " open" : ""}><summary><b>${esc(titulo2)}</b> <span class="suave">(${n})${aberta ? "" : " · clique para ver"}</span></summary>${conteudo}</details>`;
+      ACOES_PENDENCIAS = {
+        async justificarPendencia({ contrato }) {
+          const c = buscar2("contratos", contrato);
+          if (!c) throw new ErroUsuario("Este contrato não existe mais. Atualize a página.");
+          const faltas = faltasDoInquilino(c).map(textoDaFalta).filter((t) => !pendenciaJustificada(c, t));
+          if (!faltas.length) {
+            aviso("Este inquilino não tem mais pendências a justificar.", "info");
+            return mostrar();
+          }
+          const r = await janela({
+            titulo: `Justificar pendência - ${c.inquilino_nome}`,
+            sim: "Salvar justificativa",
+            nao: "Cancelar",
+            html: `<p class="suave">A pendência marcada sai da lista de cadastros incompletos e fica em "Pendências justificadas", com o motivo, o responsável e a data de hoje (${dataBr(hojeBrasilia())}). Dá para desfazer depois.</p>
+        ${faltas.map((t) => `<p><label class="check" style="padding-top:0"><input type="checkbox" name="item" value="${esc(t)}"${faltas.length === 1 ? " checked" : ""}> ${esc(t)}</label></p>`).join("")}
+        <p><label>Por que foi feito dessa forma</label><textarea name="texto" rows="4" maxlength="1000" style="width:100%;font-family:inherit" placeholder="Ex.: o proprietário pediu fiador e depósito; o cônjuge do fiador mora no exterior"></textarea></p>
+        <p><label>Responsável por ter feito dessa forma</label><input name="responsavel" maxlength="120" placeholder="Ex.: Julio (diretoria)"></p>`
+          });
+          if (!r) return;
+          await alterar((db) => justificarPendencias(db, c.id, { itens: r.item || [], texto: (r.texto || [])[0], responsavel: (r.responsavel || [])[0] }, login()));
+          aviso("Justificativa salva: a pendência saiu da lista.", "ok");
+          await mostrar();
+        },
+        async desfazerJustificativa({ contrato, indice }) {
+          await alterar((db) => desfazerJustificativa(db, contrato, indice, login()));
+          await mostrar();
+        }
+      };
     }
   });
 
@@ -42596,6 +42689,7 @@ O e-mail não será enviado. Se quiser mandar depois, envie de novo pela tela de
       init_admin();
       init_banco2();
       init_fichas();
+      init_fechamento();
       init_termo_reserva2();
       init_emails();
       init_gmail();
@@ -44909,7 +45003,7 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           await mostrar();
         }
       };
-      Object.assign(ACOES, ACOES_BANCO, ACOES_FICHAS, ACOES_TERMO, ACOES_ICONE, ACOES_EMAILS, ACOES_PASTA, ACOES_NOTIFICACOES, ACOES_COMUNICACOES, ACOES_MENSAGENS, ACOES_PROVAS, ACOES_AGENDADOS);
+      Object.assign(ACOES, ACOES_BANCO, ACOES_FICHAS, ACOES_PENDENCIAS, ACOES_TERMO, ACOES_ICONE, ACOES_EMAILS, ACOES_PASTA, ACOES_NOTIFICACOES, ACOES_COMUNICACOES, ACOES_MENSAGENS, ACOES_PROVAS, ACOES_AGENDADOS);
       Object.assign(ACOES, adiados("acoes"));
     }
   });
