@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-+Aw5dd2jTqMrdFY4mWBCubh9atWPsXJm3zAlJNdX10A=' 'sha256-KiTtMgY2ndnYAMbVBn6jk5kzbDoeT5cw02glcSJgl1k='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-+Aw5dd2jTqMrdFY4mWBCubh9atWPsXJm3zAlJNdX10A=' 'sha256-31+2mO77iOTk+rvWpRRWIl8mK+h/DCgejuGuNdM+sog='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="586213fb982c2846">
+<meta name="fontes" content="0d0a7af261752917">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -13441,15 +13441,13 @@ Pintura, pisos, portas, janelas, vidros e móveis em bom estado, exceto os ponto
       (() => {
         const conferir2 = ativos.filter((c) => condominioAConferir(c, hoje3, { ate: comp }));
         const pagam = ativos.filter((c) => inquilinoPagaCondominio(c) && contratoAtivo(c, hoje3));
-        const ordem = [...conferir2, ...pagam.filter((c) => !conferir2.includes(c))];
         return {
           chave: "condominio",
           titulo: `Conferir as taxas do condomínio de ${compBr(comp)} (boleto do condomínio que vence em ${compBr(mes)}; ressarcimento ao inquilino)`,
           pendentes: conferir2.length,
           aPartirDe: `${comp}-01`,
           detalhe: conferir2.length ? `a conferir: ${conferir2.map((c) => c.inquilino_nome).join(", ")}` : pagam.length ? "nada a conferir" : "nenhum inquilino paga o condomínio",
-          link: ordem.length === 1 ? `#/contrato/${ordem[0].id}?ir=ressarcimentos` : null,
-          contratos: ordem.length > 1 ? ordem.map((c) => ({ id: c.id, conferir: conferir2.includes(c) })) : []
+          link: pagam.length || conferir2.length ? `#/ressarcimentos?mes=${comp}` : null
         };
       })(),
       {
@@ -29950,7 +29948,7 @@ ${m.texto}`);
       SO_CONSULTA2 = "Seu usuário só consulta: não pode enviar comunicados.";
       SO_NUVEM = "O comunicado com link só funciona no sistema pela internet (nuvem).";
       DIAS_PRAZO = 10;
-      abasInquilinos = (atual) => `<nav class="abas">${link("#/inquilinos", "Lista", atual === "lista" ? "ativo" : "")}${link("#/comunicacoes", "Comunicações", atual === "comunicacoes" ? "ativo" : "")}</nav>`;
+      abasInquilinos = (atual) => `<nav class="abas">${link("#/inquilinos", "Lista", atual === "lista" ? "ativo" : "")}${link("#/comunicacoes", "Comunicações", atual === "comunicacoes" ? "ativo" : "")}${link("#/ressarcimentos", "Ressarcimentos", atual === "ressarcimentos" ? "ativo" : "")}</nav>`;
       cfg6 = { base: "api/contatos/", buscar: (...a) => fetch(...a) };
       guardadas = /* @__PURE__ */ new Map();
       VALIDADE = 9e4;
@@ -32736,7 +32734,8 @@ ${texto3}` : texto3;
           valores: (r) => ({ ...r, vencimento_abatimento: mesVencimentoDaCompetencia(buscar2("contratos", r.contrato_id), r.competencia_abatimento) }),
           extraHtml: (r, q) => `<span hidden data-contrato-boleto="${Number(r ? r.contrato_id : q.contrato)}" data-mes-boleto="vencimento_abatimento" data-pagamento="data_pagamento" data-condominio="competencia_condominio"></span>`,
           conferir: conferirRessarcimento,
-          padrao: () => ({ competencia_condominio: competenciaDe(hojeIso()) }),
+          // aberto da tela Ressarcimentos (?de=ressarcimentos&mes=): já vem com o mês do condomínio de lá
+          padrao: (q) => ({ competencia_condominio: q && q.de === "ressarcimentos" && competenciaValida(q.mes) ? q.mes : competenciaDe(hojeIso()) }),
           fixos: (r, q) => r ? {} : { contrato_id: Number(q.contrato) },
           aviso: () => "Taxas extraordinárias do condomínio são do proprietário (Lei 8.245/91, art. 22, X): fundo de obras, constituição do fundo de reserva, obras na estrutura, pintura de fachada, equipamentos de segurança, paisagismo das áreas comuns, indenizações trabalhistas de antes da locação. Se o inquilino pagou no boleto do condomínio, o valor volta para ele no boleto do aluguel.",
           ajustar(dados, erros, r, form, q) {
@@ -32780,7 +32779,8 @@ ${texto3}` : texto3;
             marcarCondominioConferido(db, c.id, salvo.competencia_condominio, login());
             return salvo;
           },
-          voltar: (r, q) => `#/contrato/${r ? r.contrato_id : q.contrato}?ir=ressarcimentos`
+          // da tela Ressarcimentos volta para ela (no mesmo mês), sem passar pela página do inquilino (27/11/2026)
+          voltar: (r, q) => q && q.de === "ressarcimentos" ? `#/ressarcimentos${competenciaValida(q.mes) ? `?mes=${q.mes}` : ""}` : `#/contrato/${r ? r.contrato_id : q.contrato}?ir=ressarcimentos`
         },
         solicitacoes: {
           titulo: (r) => r ? "Solicitação do inquilino" : "Nova solicitação do inquilino",
@@ -41006,11 +41006,6 @@ O e-mail não será enviado. Se quiser mandar depois, envie de novo pela tela de
     <div class="cartao"><ol class="fechamento">${etapas.map((e) => `<li class="${e.feito ? "feito" : ""}">
       <div class="cabecalho"><div><b>${esc(e.titulo)}</b> ${e.feito ? etiqueta(e.marcado ? `marcado em ${dataBr(e.marcado.feito_em)}` : "feito", "ok") : e.prevista ? etiqueta(String(e.titulo).includes(dataBr(e.aPartirDe)) ? "previsto" : `previsto a partir de ${dataBr(e.aPartirDe)}`, "neutra") : etiqueta(plural(e.pendentes, "pendente", "pendentes"), "aviso")}
         <div class="suave">${esc(e.detalhe)}</div>
-        ${e.chave === "condominio" && e.contratos && e.contratos.length ? `<div class="acoes" style="margin-top:4px">${e.contratos.map((x) => {
-      const c = buscar2("contratos", x.id);
-      const i = c && buscar2("imoveis", c.imovel_id);
-      return c ? link(`#/contrato/${x.id}?ir=ressarcimentos`, `${x.conferir ? "Conferir" : "Ver"}: ${esc(c.inquilino_nome)}${i ? ` (${esc(i.nome)})` : ""}`, `botao ${x.conferir ? "" : "secundario "}pequeno`) : "";
-    }).join(" ")}</div>` : ""}
         ${e.chave === "contas" && e.imoveis && e.imoveis.length ? `<div class="acoes" style="margin-top:4px">${e.imoveis.map((id) => link(`#/contas/${id}?comp=${esc(mes)}`, `Lançar: ${esc(buscar2("imoveis", id).nome)}`, "botao secundario pequeno")).join(" ")}</div>` : ""}</div>
         <div class="acoes">${e.link ? link(e.link, "Abrir", "botao pequeno") : ""}
           ${opera() ? e.marcado ? botao("etapaFechamento", "Desmarcar", { mes, etapa: e.chave, feito: "" }, "link-botao") : !e.feito ? botao("etapaFechamento", "Marcar como feito", { mes, etapa: e.chave, feito: "1" }, "secundario pequeno") : "" : ""}</div></div></li>`).join("")}</ol>
@@ -41691,6 +41686,76 @@ O e-mail não será enviado. Se quiser mandar depois, envie de novo pela tela de
       init_comum();
       init_banco2();
       init_contrato();
+    }
+  });
+
+  // docs/js/telas/ressarcimentos.js
+  function situacaoNoBoleto(c, x) {
+    const cb = boletoDoMes(d(), c.id, x.competencia_abatimento);
+    if (!ressarcimentoConfirmado(x)) return etiqueta(cb && (cb.data_pagamento || emAcordo(cb)) ? "saiu sem o desconto" : "entra com a data do pagamento", "aviso");
+    if (!cb) return etiqueta("sem boleto no mês: crédito", "info");
+    return cb.data_pagamento ? etiqueta("abatido", "ok") : emAcordo(cb) ? etiqueta("em acordo: não abatido", "aviso") : etiqueta("no boleto em aberto", "info");
+  }
+  function linhasDoMes(mes, hoje3 = hojeIso()) {
+    const doMes = (d().ressarcimentos || []).filter((x) => x.competencia_condominio === mes);
+    const ids = new Set(doMes.map((x) => x.contrato_id));
+    return d().contratos.filter((c) => c.imovel_id && (inquilinoPagaCondominio(c) && contratoAtivo(c, hoje3) || ids.has(c.id))).map((c) => {
+      const i = buscar2("imoveis", c.imovel_id);
+      const lancados = doMes.filter((x) => x.contrato_id === c.id);
+      const antesDaEntrada = mes < competenciaDe(c.data_entrada || hoje3);
+      const conferido = lancados.length > 0 || antesDaEntrada || !!c.condominio_conferido_ate && c.condominio_conferido_ate >= mes;
+      return { c, i, predio: chaveDoPredio(i), lancados, conferido, antesDaEntrada };
+    }).sort((a, b) => a.predio.localeCompare(b.predio, "pt-BR") || String(a.i ? a.i.nome : "").localeCompare(String(b.i ? b.i.nome : ""), "pt-BR"));
+  }
+  function telaRessarcimentos(q) {
+    const hoje3 = hojeIso();
+    const mes = competenciaValida(q.mes) ? q.mes : somarMeses(competenciaDe(hoje3), -1);
+    const porInquilino = q.ver === "inquilino";
+    const linhas2 = linhasDoMes(mes, hoje3);
+    const aConferir = linhas2.filter((x) => !x.conferido).length;
+    const total = linhas2.reduce((t, x) => t + x.lancados.reduce((s, r) => s + r.valor, 0), 0);
+    const aqui = (extra = {}) => `#/ressarcimentos?${new URLSearchParams({ mes, ...porInquilino ? { ver: "inquilino" } : {}, ...extra })}`;
+    const lancar = (c) => link(`#/novo/ressarcimentos?contrato=${c.id}&de=ressarcimentos&mes=${mes}`, "Lançar taxa", "botao pequeno");
+    const conferir2 = (x) => !x.conferido && opera() ? botao("condominioConferido", "Conferido: sem taxa", { id: x.c.id, mes }, "secundario pequeno") : "";
+    const situacao2 = (x) => x.antesDaEntrada ? etiqueta("antes da entrada", "neutra") : x.lancados.length ? etiqueta(`${plural(x.lancados.length, "taxa lançada", "taxas lançadas")}`, "ok") : x.conferido ? etiqueta("conferido: sem taxa", "ok") : etiqueta("a conferir", "aviso");
+    const taxas = (x) => x.lancados.map((r) => `<div>${esc(r.descricao)} <b>${reais(r.valor)}</b> · ${r.data_pagamento ? `pago ${dataBr(r.data_pagamento)}` : etiqueta("falta o comprovante", "aviso")}
+    · boleto ${compBr(r.competencia_abatimento)} ${situacaoNoBoleto(x.c, r)}${opera() ? ` ${link(`#/editar/ressarcimentos/${r.id}?de=ressarcimentos&mes=${mes}`, "Editar", "")}` : ""}</div>`).join("");
+    const linhaInquilino = (x, comImovel) => `<tr class="${x.conferido ? "" : "amarelo"}"><td>${comImovel ? `${esc(x.i ? x.i.nome : "")}<br>` : ""}<a href="#/contrato/${x.c.id}?ir=ressarcimentos"><b>${esc(x.c.inquilino_nome)}</b></a></td>
+    <td>${situacao2(x)}${x.c.condominio_conferido_ate ? `<br><span class="suave">conferido até ${compBr(x.c.condominio_conferido_ate)}</span>` : ""}</td><td>${taxas(x) || '<span class="suave">-</span>'}</td>
+    <td class="n nw">${opera() && !x.antesDaEntrada ? `${lancar(x.c)} ${conferir2(x)}` : ""}</td></tr>`;
+    const cabeca = (primeira) => `<tr><th>${primeira}</th><th>Condomínio de ${compBr(mes)}</th><th>Taxas do proprietário lançadas</th><th></th></tr>`;
+    let corpo;
+    if (porInquilino) {
+      corpo = `<div class="cartao rolagem"><table>${cabeca("Imóvel / inquilino")}${[...linhas2].sort((a, b) => a.c.inquilino_nome.localeCompare(b.c.inquilino_nome, "pt-BR")).map((x) => linhaInquilino(x, true)).join("")}</table></div>`;
+    } else {
+      const predios = /* @__PURE__ */ new Map();
+      for (const x of linhas2) predios.set(x.predio, [...predios.get(x.predio) || [], x]);
+      corpo = [...predios].map(([predio, ls]) => {
+        const adm = [...new Set(ls.map((x) => x.i && x.i.administradora_nome).filter(Boolean))].join(", ");
+        const falta = ls.filter((x) => !x.conferido).length;
+        return `<div class="cartao rolagem"><div class="cabecalho"><h2>${esc(predio)}</h2>${falta ? etiqueta(`${falta} a conferir`, "aviso") : etiqueta("conferido", "ok")}</div>
+        ${adm ? `<p class="suave">Administradora do condomínio: ${esc(adm)}</p>` : ""}
+        <table>${cabeca("Imóvel / inquilino")}${ls.map((x) => linhaInquilino(x, true)).join("")}</table></div>`;
+      }).join("");
+    }
+    return `<div class="cabecalho"><h1>Ressarcimentos do condomínio</h1>
+      <div class="acoes">${link(aqui({ mes: somarMeses(mes, -1) }), `← ${compBr(somarMeses(mes, -1))}`, "botao secundario")} ${link(aqui({ mes: somarMeses(mes, 1) }), `${compBr(somarMeses(mes, 1))} →`, "botao secundario")}</div></div>
+    ${abasInquilinos("ressarcimentos")}
+    <p class="suave">Taxas do proprietário (fundo de obras, fundo de reserva, chamadas extras de obra…) que o inquilino pagou no boleto do condomínio de ${compBr(mes)}: lance aqui e o valor é abatido no boleto do aluguel do mês seguinte ao pagamento (Lei 8.245/91, art. 22, X). Sem taxa no mês, marque "Conferido".</p>
+    <nav class="abas">${link(`#/ressarcimentos?mes=${mes}`, "Por condomínio", porInquilino ? "" : "ativo")}${link(`#/ressarcimentos?mes=${mes}&ver=inquilino`, "Por inquilino", porInquilino ? "ativo" : "")}</nav>
+    <div class="alerta ${aConferir ? "aviso" : "ok"}">${linhas2.length ? `${aConferir ? `<b>${plural(aConferir, "inquilino", "inquilinos")} a conferir</b> no condomínio de ${compBr(mes)}.` : `Condomínio de ${compBr(mes)} conferido.`}${total ? ` Lançado no mês: ${reais(total)}.` : ""}` : "Nenhum inquilino paga o condomínio."}</div>
+    ${corpo}`;
+  }
+  var chaveDoPredio;
+  var init_ressarcimentos = __esm({
+    "docs/js/telas/ressarcimentos.js"() {
+      init_calculos();
+      init_calculos();
+      init_formularios();
+      init_regras();
+      init_comum();
+      init_comunicacoes();
+      chaveDoPredio = (i) => String(i && i.endereco || i && i.nome || "Sem imóvel").trim().replace(/\s+/g, " ");
     }
   });
 
@@ -45970,6 +46035,7 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
       init_arquivo_impresso2();
       init_imovel();
       init_reajustes();
+      init_ressarcimentos();
       init_comum();
       init_regua_email();
       init_icone();
@@ -46369,6 +46435,7 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
         regras: async (rota) => (await parteAdiada("regras")).telaRegras(rota.q),
         inquilinos: (rota) => telaInquilinos(rota.q),
         comunicacoes: (rota) => telaComunicacoes(rota.q),
+        ressarcimentos: (rota) => telaRessarcimentos(rota.q),
         "envios-agendados": () => telaEnviosAgendados(),
         "aceite-contatos": (rota) => telaAceiteContatos(rota.q),
         ficha: (rota) => telaFicha(Number(rota.partes[1])),
@@ -47661,7 +47728,7 @@ Confira o nome na ajuda "Como escrever um modelo" (abaixo do texto). Salvar assi
       TABELA_DO_PARAMETRO = { contrato: "contratos", imovel: "imoveis", ficha: "fichas", troca: "trocas_garantia", anterior: "notificacoes", perfil: "perfis_regras", regras: "perfis_regras" };
       MENU = [
         ["#/", "Painel", "^$|^fechamento|^pendencias|^alertas"],
-        ["#/inquilinos", "Inquilinos", "^inquilino|^contrato|^vistoria|^solicitacoes|^notificac|^ficha|^comunicacoes|^envios-agendados|^aceite|^aditivo"],
+        ["#/inquilinos", "Inquilinos", "^inquilino|^contrato|^vistoria|^solicitacoes|^notificac|^ficha|^comunicacoes|^ressarcimentos|^envios-agendados|^aceite|^aditivo"],
         ["#/reajustes", "Reajustes", "reajustes"],
         ["#/cobrancas", "Boletos", "cobranca|^regua"],
         ["#/faturas", "NF", "fatura"],
