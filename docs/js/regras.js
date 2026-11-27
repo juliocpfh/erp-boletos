@@ -5667,6 +5667,11 @@ export function rotinaEntrada(d, c, hoje = C.hojeIso()) {
   const doAnterior = (chave) => {
     rotinaAnterior = rotinaAnterior || rotinaEntrada(d, anterior, hoje);
     const e = rotinaAnterior.find((x) => x.chave === chave);
+    // contra-vistoria com "Não houve" (27/11): continua "não houve" no novo, e o Desfazer leva ao contrato em que foi marcada
+    if (e && e.situacao === 'pulada' && chave === 'contra_vistoria') {
+      const marcadaEm = e.manual ? anterior : (e.marcada_em && buscar(d, 'contratos', e.marcada_em.id)) || anterior;
+      return { situacao: 'pulada', data: e.data, texto: `não houve (marcado em ${marcadaEm.inquilino_nome})`, marcada_em: { id: marcadaEm.id } };
+    }
     if (!e || ['feita', 'pulada'].includes(e.situacao)) return feita(e ? e.data : null, herdou);
     return andamento(`pendente no contrato de ${anterior.inquilino_nome}`);
   };
