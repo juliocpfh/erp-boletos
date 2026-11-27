@@ -1167,6 +1167,31 @@ export function situacaoAplicacao(d, c) {
 }
 
 /**
+ * Observações de por que a garantia ainda não foi aplicada inteira (pedido do dono, 27/11/2026), com a data do registro:
+ * lista ``contratos.notas_aplicacao`` [{ data, texto, usuario }], a mais nova por último. Ex.: 27/11/2026 "Aguardando o
+ * inquilino depositar o restante". Só enquanto falta aplicar.
+ */
+export const notasAplicacao = (c) => (Array.isArray(c && c.notas_aplicacao) ? c.notas_aplicacao : []);
+export function anotarAplicacao(d, contratoId, texto, usuario, hoje = C.hojeBrasilia()) {
+  const c = buscar(d, 'contratos', contratoId);
+  if (!c) throw new C.ErroUsuario('Este contrato não existe mais. Atualize a página.');
+  const t = String(texto || '').trim();
+  if (!t) throw new C.ErroUsuario('Escreva a observação (por que ainda não foi aplicado).');
+  if (t.length > 1000) throw new C.ErroUsuario('Observação longa demais: use até 1.000 letras.');
+  return atualizar(d, 'contratos', c.id, { notas_aplicacao: [...notasAplicacao(c), { data: hoje, texto: t, usuario: usuario || '' }] }, usuario,
+    `${c.inquilino_nome}: observação da aplicação da garantia (${C.dataBr(hoje)})`);
+}
+/** Tira a observação ``indice`` (posição na lista). */
+export function retirarNotaAplicacao(d, contratoId, indice, usuario) {
+  const c = buscar(d, 'contratos', contratoId);
+  const lista = notasAplicacao(c);
+  const i = Number(indice);
+  if (!c || !lista[i]) throw new C.ErroUsuario('Esta observação não existe mais. Atualize a página.');
+  return atualizar(d, 'contratos', c.id, { notas_aplicacao: lista.filter((_, k) => k !== i) }, usuario,
+    `${c.inquilino_nome}: observação da aplicação de ${C.dataBr(lista[i].data)} retirada`);
+}
+
+/**
  * Garantia em dinheiro do contrato que já saiu da empresa: devolvida na saída (cálculo final), na troca de titular com
  * garantia nova, ou passada ao novo titular (as aplicações são lançadas lá). A troca de garantia sem caução nem depósito
  * agora (ex.: caução → fiador) com a devolução registrada também conta.
@@ -4019,10 +4044,10 @@ export function cadeiaDeContratos(d, c) {
 // --------------------------------------------------------------------------
 function alertaCaucao(d, c) {
   const x = complementoCaucao(d, c);
-  if (!x) return null;
+  // boleto do complemento já gerado: não há mais o que corrigir (pedido do dono, 27/11/2026); o boleto aparece na garantia
+  if (!x || x.boleto) return null;
   const inicio = `O aluguel foi corrigido em ${C.dataBr(x.correcao.data_vigencia)}.`;
-  const texto = x.boleto ? `${inicio} Boleto do complemento da caução (${C.reais(x.boleto.caucao_complemento)}) gerado, vence em ${C.dataBr(x.boleto.vencimento)}: ao confirmar o pagamento, a caução passa a ${C.reais(x.boleto.caucao_nova)}.`
-    : x.necessaria === null ? `${inicio} Corrija também a caução (atual ${C.reais(x.atual)}). Informe no contrato a quantos aluguéis ela equivale para o sistema calcular o complemento.`
+  const texto = x.necessaria === null ? `${inicio} Corrija também a caução (atual ${C.reais(x.atual)}). Informe no contrato a quantos aluguéis ela equivale para o sistema calcular o complemento.`
       : x.complemento > 0 ? `${inicio} A caução deve passar a ${C.reais(x.necessaria)} (${C.plural(c.caucao_meses, 'aluguel', 'aluguéis')} ${CR.regra('caucao_base', c) === 'cheio' || !percentualBonificacao(c) ? 'cheios' : 'com bonificação'}); já depositado ${C.reais(x.atual)}. Gere o boleto do complemento de ${C.reais(x.complemento)} na tela Reajustes.`
         : `${inicio} A caução depositada (${C.reais(x.atual)}) já cobre o necessário (${C.reais(x.necessaria)}). Confirme a caução na tela Reajustes para tirar este aviso.`;
   return { nivel: 'aviso', tipo: 'Correção da caução', ancora: 'garantia', texto };
@@ -4032,7 +4057,7 @@ function alertaAplicacao(d, c) {
   const s = situacaoAplicacao(d, c);
   if (!s.total || s.ok) return null;
   return { nivel: 'aviso', tipo: 'Aplicação da garantia',
-    texto: `Garantia de ${C.reais(s.total)} não foi aplicada integralmente: ${s.soma ? `aplicado ${C.reais(s.soma)} (${s.linhas.map((l) => `${l.emitente.nome.split(/\s+/)[0]} ${C.reais(l.aplicado)}`).join(', ')}), ` : ''}falta aplicar ${C.reais(s.falta)}.` };
+    texto: `Garantia de ${C.reais(s.total)} não foi aplicada integralmente: ${s.soma ? `aplicado ${C.reais(s.soma)} (${s.linhas.map((l) => `${l.emitente.nome.split(/\s+/)[0]} ${C.reais(l.aplicado)}`).join(', ')}), ` : ''}falta aplicar ${C.reais(s.falta)}.${(() => { const n = notasAplicacao(c).at(-1); return n ? ` Observação de ${C.dataBr(n.data)}: ${n.texto}` : ''; })()}` };
 }
 
 /** Saldo da saída acertado a partir deste dia sem comprovante vira aviso (antes não havia onde anexar). */

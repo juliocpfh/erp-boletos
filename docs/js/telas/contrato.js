@@ -254,6 +254,28 @@ function caixaGarantia(c) {
         <td class="n">${opera() ? botao('excluirFiador', '×', { id: f.id }, 'x-excluir') : ''}</td></tr>`).join('')
       || `<tr><td colspan="5">${etiqueta('Nenhum fiador cadastrado', 'aviso')}</td></tr>`}</table>`;
   }
+  // caução ou depósito em dinheiro: a aplicação aparece também enquanto não foi depositado tudo (aplica o que já entrou)
+  // troca de titular: a garantia passou ao novo titular; as aplicações são dele (lançadas e mostradas lá)
+  if (herdeiro && (R.temCaucao(c) || R.temDeposito(c))) {
+    html += `${subtitulo('Onde o valor foi aplicado', opera() ? link(`#/novo/aplicacoes?contrato=${herdeiro.id}`, `Registrar aplicação em ${esc(herdeiro.inquilino_nome)}`) : '')}
+      <p class="suave">A aplicação desta garantia fica em <a href="#/contrato/${herdeiro.id}?ir=garantia">${esc(herdeiro.inquilino_nome)}</a>, com o comprovante.${aplic.length ? ` ${aplic.length} aplicação(ões) ainda aqui passam para lá ao abrir o Painel (ou em "Conferir arquivos agora", em Sistema).` : ''}</p>`;
+  } else if (R.temCaucao(c) || R.temDeposito(c) || aplic.length) {
+    const situacaoTotal = sit.ok ? etiqueta('100% aplicado', 'ok') : sit.total ? etiqueta(`falta aplicar ${reais(sit.falta)}`, 'aviso') : '';
+    html += `${subtitulo('Onde o valor foi aplicado', opera() ? link(`#/novo/aplicacoes?contrato=${c.id}`, 'Registrar aplicação') : '', 'Na saída, o valor é devolvido corrigido pela poupança (informado no cálculo final), pela conta em que foi depositado.')}
+      <table class="compacta">${aplic.map((a) => { const rec = R.recebedorDaAplicacao(d(), a); return `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(rec.nome)}${rec.pessoa ? ` ${etiqueta('outra pessoa', 'info')}` : ''}${R.aplicacaoBaixada(d(), a) ? ` ${etiqueta('garantia anterior, devolvida na troca', 'info')}` : ''}</td><td class="n">${reais(a.valor)}</td>
+        <td>${linkComprovante(c.id, a.comprovante, { tabela: 'aplicacoes', id: a.id, campo: 'comprovante', tipo: 'aplicacao-garantia', data: a.data })} ${esc(a.observacoes || '')}</td>
+        <td class="n nw">${editar(`#/editar/aplicacoes/${a.id}?contrato=${c.id}`)} ${excluir('aplicacoes', a.id, 'Excluir esta aplicação? O comprovante também é apagado.')}</td></tr>`; }).join('')}
+      <tr class="total"><td colspan="7">Aplicado de ${reais(sit.total)}${R.garantiaDepositada(c) ? '' : ' <span class="suave">(já depositado)</span>'}</td><td class="n">${reais(sit.soma)}</td><td colspan="2">${situacaoTotal}</td></tr></table>`;
+    // falta aplicar: observação do porquê, com a data do registro (pedido do dono, 27/11/2026); as antigas ficam enquanto falta
+    const notas = R.notasAplicacao(c);
+    if (sit.total && !sit.ok) {
+      html += `<div class="alerta info notas-aplicacao"><b>Por que ainda não foi aplicado:</b>
+        ${notas.length ? `<ul>${notas.map((n, k) => `<li><span class="nw">${dataBr(n.data)}</span> · ${esc(n.texto)}${n.usuario ? ` <span class="suave">(${esc(n.usuario)})</span>` : ''}
+          ${opera() ? botao('retirarNotaAplicacao', '×', { contrato: c.id, indice: k }, 'x-excluir', 'Tirar esta observação?') : ''}</li>`).join('')}</ul>` : ' <span class="suave">nenhuma observação.</span>'}
+        ${opera() ? botao('anotarAplicacao', 'Anotar observação', { contrato: c.id }, 'secundario mini') : ''}</div>`;
+    }
+  }
+  // fiadores anteriores e trocas de garantia (com a devolução da troca): no fim do card, depois da aplicação (pedido do dono, 27/11/2026)
   if (anteriores.length) {
     html += `${subtitulo('Fiadores anteriores')}<table class="compacta suave"><tr><th>Nome</th><th>CPF / RG</th><th>Fim do vínculo</th><th>Substituído por</th><th></th></tr>
       ${anteriores.map((f) => `<tr><td>${esc(f.nome)}</td><td>${esc(f.cpf || '-')} / ${esc(f.rg || '-')}</td><td>${dataBr(f.data_saida)}</td><td>${esc((buscar('fiadores', f.substituido_por_id) || {}).nome || '-')}</td>
@@ -279,19 +301,6 @@ function caixaGarantia(c) {
       html += `<div class="alerta aviso"><b>Devolver a garantia:</b> na troca de ${dataBr(t.data)} (${esc(t.tipo_anterior)} → ${esc(t.tipo_novo)}), ${t.tipo_anterior === 'Caução' ? 'a caução' : 'o depósito'} de ${reais(t.valor_anterior)} volta a ${esc(c.inquilino_nome)},
         com a correção da poupança. Devolva e registre aqui. ${opera() ? link(`#/novo/devolucoes_garantia?contrato=${c.id}&troca=${t.id}`, 'Registrar devolução', 'botao mini') : ''}</div>`;
     }
-  }
-  // caução ou depósito em dinheiro: a aplicação aparece também enquanto não foi depositado tudo (aplica o que já entrou)
-  // troca de titular: a garantia passou ao novo titular; as aplicações são dele (lançadas e mostradas lá)
-  if (herdeiro && (R.temCaucao(c) || R.temDeposito(c))) {
-    html += `${subtitulo('Onde o valor foi aplicado', opera() ? link(`#/novo/aplicacoes?contrato=${herdeiro.id}`, `Registrar aplicação em ${esc(herdeiro.inquilino_nome)}`) : '')}
-      <p class="suave">A aplicação desta garantia fica em <a href="#/contrato/${herdeiro.id}?ir=garantia">${esc(herdeiro.inquilino_nome)}</a>, com o comprovante.${aplic.length ? ` ${aplic.length} aplicação(ões) ainda aqui passam para lá ao abrir o Painel (ou em "Conferir arquivos agora", em Sistema).` : ''}</p>`;
-  } else if (R.temCaucao(c) || R.temDeposito(c) || aplic.length) {
-    const situacaoTotal = sit.ok ? etiqueta('100% aplicado', 'ok') : sit.total ? etiqueta(`falta aplicar ${reais(sit.falta)}`, 'aviso') : '';
-    html += `${subtitulo('Onde o valor foi aplicado', opera() ? link(`#/novo/aplicacoes?contrato=${c.id}`, 'Registrar aplicação') : '', 'Na saída, o valor é devolvido corrigido pela poupança (informado no cálculo final), pela conta em que foi depositado.')}
-      <table class="compacta">${aplic.map((a) => { const rec = R.recebedorDaAplicacao(d(), a); return `<tr><td class="nw">${dataBr(a.data)}</td><td>${esc(rec.nome)}${rec.pessoa ? ` ${etiqueta('outra pessoa', 'info')}` : ''}${R.aplicacaoBaixada(d(), a) ? ` ${etiqueta('garantia anterior, devolvida na troca', 'info')}` : ''}</td><td class="n">${reais(a.valor)}</td>
-        <td>${linkComprovante(c.id, a.comprovante, { tabela: 'aplicacoes', id: a.id, campo: 'comprovante', tipo: 'aplicacao-garantia', data: a.data })} ${esc(a.observacoes || '')}</td>
-        <td class="n nw">${editar(`#/editar/aplicacoes/${a.id}?contrato=${c.id}`)} ${excluir('aplicacoes', a.id, 'Excluir esta aplicação? O comprovante também é apagado.')}</td></tr>`; }).join('')}
-      <tr class="total"><td colspan="7">Aplicado de ${reais(sit.total)}${R.garantiaDepositada(c) ? '' : ' <span class="suave">(já depositado)</span>'}</td><td class="n">${reais(sit.soma)}</td><td colspan="2">${situacaoTotal}</td></tr></table>`;
   }
   return `${html}${linkRecibo('garantia', c, `Recibo da ${R.temCaucao(c) || (REC.garantiaPaga(d(), c) || {}).qual === 'caucao' ? 'caução' : 'garantia'} (para o inquilino)`)}</div>`;
 }
