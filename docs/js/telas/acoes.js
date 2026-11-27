@@ -1895,6 +1895,26 @@ export const ACOES = {
     await mostrar();
   },
 
+  /** Garantia com falta aplicar: anota por que ainda não foi aplicada, com a data de hoje (pedido do dono, 27/11/2026). */
+  async anotarAplicacao({ contrato }) {
+    const c = buscar('contratos', contrato);
+    if (!c) throw new C.ErroUsuario('Este contrato não existe mais. Atualize a página.');
+    const r = await janela({ titulo: `Aplicação da garantia - ${c.inquilino_nome}`, sim: 'Salvar', nao: 'Cancelar',
+      html: `<p class="suave">Por que a garantia ainda não foi aplicada inteira? A observação fica com a data de hoje (${dataBr(C.hojeBrasilia())}).</p>
+        <p><textarea name="texto" rows="4" maxlength="1000" style="width:100%;font-family:inherit" placeholder="Ex.: aguardando o inquilino depositar o restante"></textarea></p>` });
+    if (!r) return;
+    const texto = String((r.texto || [])[0] || '').trim();
+    if (!texto) { aviso('Nada foi salvo: a observação ficou em branco.', 'info'); return; }
+    await alterar((db) => R.anotarAplicacao(db, c.id, texto, login()));
+    aviso('Observação salva.', 'ok');
+    await mostrar();
+  },
+
+  async retirarNotaAplicacao({ contrato, indice }) {
+    await alterar((db) => R.retirarNotaAplicacao(db, contrato, indice, login()));
+    await mostrar();
+  },
+
   /** Fiador: excluir o cadastro (fiador contratual lançado errado; pode ser incluído de novo em "Editar contrato") ou trocar a garantia. */
   async excluirFiador({ id }) {
     const f = buscar('fiadores', id);
