@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-+Aw5dd2jTqMrdFY4mWBCubh9atWPsXJm3zAlJNdX10A=' 'sha256-EG04q8VQ/V9V0bK0LZivdQsBBj1BS4b7gnYpZ16G23k='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=' 'sha256-fknaaFiOJQ27i7oZDSyqirN4fMAoS9odiy+AXE33Qsk=' 'sha256-6H5VB5QyLldKH9oMFUmjxw2uWpPZETQXpCkBaDjquMs=' 'sha256-zG9y71mMRFYJP30EbDt5/gso07H1SEtKPRDN4fnjwo8=' 'sha256-+Aw5dd2jTqMrdFY4mWBCubh9atWPsXJm3zAlJNdX10A=' 'sha256-i8y8eWOLY/tviFM6mJPxJhOE3rpnIZPx7ZExKEGMRIg='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://viacep.com.br https://brasilapi.com.br https://api.bcb.gov.br http://localhost:* http://127.0.0.1:* https://*.ankjck.com.br; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'self' blob:">
 <meta name="referrer" content="no-referrer">
-<meta name="fontes" content="a17f15c2f0f0fd4d">
+<meta name="fontes" content="a81de59dc1b6f26a">
 <title>Administração de Imóveis</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
 <style>:root {
@@ -40135,7 +40135,8 @@ ${xref}
         <form data-form="configurarSeguro" class="formulario">
           <div><label>Senha do backup</label><input type="password" name="senha" autocomplete="new-password"></div>
           ${chaveExistente ? "" : '<div><label>Repita a senha</label><input type="password" name="senha2" autocomplete="new-password"></div>'}
-          <div class="check"><button>${chaveExistente ? "Conectar" : "Criar e fazer o primeiro backup"}</button></div></form></div>` : ""}
+          <div class="check"><button>${chaveExistente ? "Conectar" : "Criar e fazer o primeiro backup"}</button></div></form>
+        <div id="progresso-backup" aria-live="polite"></div></div>` : ""}
       <div class="cartao"><h2>Restaurar</h2>${FORM_RESTAURAR}</div>`;
     }
     const lista3 = await listarBackups(E.seguro.dir);
@@ -41993,6 +41994,7 @@ O e-mail não será enviado. Se quiser mandar depois, envie de novo pela tela de
           desenhar(p2.totalBytes ? p2.bytes : p2.feitos, p2.totalBytes || p2.total, `Baixando os anexos: ${p2.feitos + 1} de ${p2.total}` + (p2.totalBytes ? ` (${megas(p2.bytes)} de ${megas(p2.totalBytes)})` : ""), p2.nome);
         } else if (p2.fase === "compactando") desenhar(Math.round(p2.pct), 100, `Compactando: ${Math.round(p2.pct)}%`);
         else if (p2.fase === "gravando") desenhar(0, 0, "Cifrando e gravando na pasta segura…");
+        else if (p2.fase === "texto") desenhar(0, 0, p2.texto, p2.detalhe || "");
       },
       fim() {
         window.removeEventListener("beforeunload", segurar);
@@ -44954,21 +44956,34 @@ Numerar mesmo assim? Eles receberão os próximos números, com a data do própr
           if (!dir) throw new ErroUsuario("Escolha a pasta segura primeiro.");
           const f = new FormData(form);
           const senha = String(f.get("senha") || "");
-          let chave = await lerChave(dir);
-          if (chave) {
-            if (!await conferirSenha2(chave, senha)) throw new ErroUsuario("Senha do backup incorreta. Confira e digite de novo.");
-          } else {
-            if (senha !== String(f.get("senha2") || "")) throw new ErroUsuario("As duas senhas precisam ser iguais.");
-            chave = await criarChave(senha);
-            await gravarChave(dir, chave);
+          const barra = andamentoZip("progresso-backup");
+          let completo = false;
+          try {
+            let chave = await lerChave(dir);
+            if (chave) {
+              barra.aoAndar({ fase: "texto", texto: "Conferindo a senha do backup…", detalhe: "Leva alguns segundos." });
+              if (!await conferirSenha2(chave, senha)) throw new ErroUsuario("Senha do backup incorreta. Confira e digite de novo.");
+            } else {
+              if (senha !== String(f.get("senha2") || "")) throw new ErroUsuario("As duas senhas precisam ser iguais.");
+              barra.aoAndar({ fase: "texto", texto: "Criando a chave do backup…", detalhe: "Leva alguns segundos." });
+              chave = await criarChave(senha);
+              await gravarChave(dir, chave);
+              completo = true;
+            }
+            await lembrarPastaSegura(dir);
+            if (!await conectarSeguro(false)) throw new ErroUsuario("O navegador não liberou o acesso à pasta segura. Escolha a pasta de novo e permita o acesso.");
+            E.pastaSeguraNova = null;
+            await alterar((db) => registrar(db, login(), "Alteração", "banco", null, "Backup seguro ligado neste computador", null, {}, false));
+            if (!completo) completo = await completoPendente(dir);
+            barra.aoAndar({ fase: "texto", texto: "Gravando a cópia de hoje na pasta segura…" });
+            await naFilaSegura(() => espelhar(E.seguro.dir, E.seguro.chave, E.d, { diasHoras: regra("dias_copias_backup") }));
+            if (completo) await backupCompletoSeguro(barra.aoAndar);
+          } finally {
+            barra.fim();
           }
-          await lembrarPastaSegura(dir);
-          E.pastaSeguraNova = null;
-          await conectarSeguro(false);
-          await alterar((db) => registrar(db, login(), "Alteração", "banco", null, "Backup seguro ligado neste computador", null, {}, false));
-          await backupCompletoSeguro();
           await ligarChaveNaNuvem();
-          aviso("Backup seguro ligado. Primeiro backup completo gravado.");
+          if (E.seguroErro) throw new Error(`Backup seguro ligado, mas a cópia falhou: ${E.seguroErro}`);
+          aviso(completo ? "Pronto: backup seguro ligado neste computador. Cópia de hoje e backup completo gravados na pasta segura." : "Pronto: backup seguro ligado neste computador. Cópia de hoje gravada na pasta segura (o último backup completo da pasta tem menos de uma semana).");
           await mostrar();
         },
         async restaurarSeguro(form) {
