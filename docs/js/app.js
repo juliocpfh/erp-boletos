@@ -839,17 +839,53 @@ export async function entrar(loginTexto, senha) {
   const u = E.d.usuarios.find((x) => x.login === loginTexto);
   // nuvem: o usuário do sistema tem de ser o mesmo do login da internet (a nuvem decide o que ele pode pelo e-mail)
   if (E.nuvem && E.saudeNuvem) await E.saudeNuvem; // a resposta do site sobre quem está no login da internet (pedida na abertura)
-  if (u && E.nuvem && E.emailNuvem && !usuarioDoEmail(u, E.emailNuvem)) throw new C.ErroUsuario(`Você entrou na internet como ${E.emailNuvem}: use o usuário desse e-mail (ou saia do login da internet e entre com o outro).`);
+  const outroNaInternet = !!(u && E.nuvem && E.emailNuvem && !usuarioDoEmail(u, E.emailNuvem));
   if (!(await conferirSenha(u, senha))) { contarErroDeLogin(); throw new C.ErroUsuario('Login ou senha incorretos.'); }
   gravarTentativas(null);
   if (u.pendente) throw new Error('Seu pedido de acesso ainda não foi aprovado pelo administrador.');
   if (!u.ativo) throw new Error('Este usuário está bloqueado. Fale com o administrador.');
+  // o login da internet ainda é de outra pessoa (ela fechou a tela sem "Sair"): com a senha certa, troca o login da internet
+  // para este usuário, sem precisar do anterior (pedido do dono de 27/11/2026)
+  if (outroNaInternet) { await trocarLoginDaInternet(u, E.emailNuvem); return; }
   if (E.nuvem) await destrancarNuvem(u.login, senha);
   // senha gravada com o padrão antigo (menos iterações): regrava com o atual, já que a senha está em mãos
   const reforco = await reforcarSenha(u, senha);
   if (reforco) await alterar((db) => { const x = db.usuarios.find((y) => y.id === u.id); if (x) Object.assign(x, reforco); }, { soSessao: true }).catch(() => {});
   mandarVerificadorDoAparelho(u.login, senha, (reforco || u).senha_hash);
+  try { localStorage.removeItem(TROCA_DE_LOGIN); } catch { /* sem armazenamento */ }
   await abrirSessao(u);
+}
+
+// Troca do login da internet (Cloudflare Access) para outro usuário no mesmo computador (pedido do dono de 27/11/2026): quem
+// entrou antes fechou a tela sem "Sair" e o login da internet (o código do e-mail) continuou no nome dele. Com a senha certa do
+// novo usuário, o sistema encerra o login da internet do anterior e guarda neste navegador, por 15 minutos, só o login do novo
+// (nunca a senha), para a tela de login já vir preenchida depois do código que chega no e-mail dele.
+export const TROCA_DE_LOGIN = 'imoveis-troca-login';
+const VALIDADE_TROCA = 15 * 60000;
+/** Login guardado para depois da troca do login da internet ('' se não há ou passou de 15 minutos). */
+export function loginDaTroca(agora = Date.now()) {
+  try {
+    const t = JSON.parse(localStorage.getItem(TROCA_DE_LOGIN) || 'null');
+    if (t && t.login && agora < t.ate) return String(t.login);
+    localStorage.removeItem(TROCA_DE_LOGIN);
+  } catch { /* sem armazenamento */ }
+  return '';
+}
+/** O site está no endereço de verdade (com o Cloudflare Access na frente), e não num teste local. */
+const comLoginDaInternet = () => typeof location !== 'undefined' && location.protocol === 'https:' && !['localhost', '127.0.0.1'].includes(location.hostname);
+
+async function trocarLoginDaInternet(u, emailAnterior) {
+  const email = String(u.email || u.login || '').trim();
+  const ok = await confirmar(`Este computador ainda está com o acesso pela internet de ${emailAnterior} (quem entrou antes fechou a tela sem "Sair"). `
+    + `Para entrar como ${u.nome}, o sistema encerra esse acesso agora. Depois, a tela da internet pede o seu e-mail${email.includes('@') ? ` (${email})` : ''} e um código que chega nele; com o código, o login aparece já preenchido: é só pôr a senha de novo.`,
+  { titulo: 'Trocar de usuário neste computador', sim: `Entrar como ${u.nome}`, nao: 'Cancelar' });
+  if (!ok) return;
+  try { localStorage.setItem(TROCA_DE_LOGIN, JSON.stringify({ login: u.login, ate: Date.now() + VALIDADE_TROCA })); } catch { /* sem armazenamento: só não vem preenchido */ }
+  // a sessão do sistema de quem entrou antes (se ainda houver) e a cópia dele trancada saem como no "Sair"
+  if (E.cofrinho) await E.cofrinho.sair().catch(() => {});
+  gravarSessao(null);
+  if (!comLoginDaInternet()) throw new C.ErroUsuario(`Neste endereço de teste não há login da internet para trocar (${emailAnterior}).`);
+  location.href = '/cdn-cgi/access/logout';
 }
 
 /**
