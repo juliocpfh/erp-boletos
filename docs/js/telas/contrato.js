@@ -931,6 +931,7 @@ export function telaContrato(c) {
     ${alertas.map((a) => `<div class="${classeAlerta(a)}"><b>${esc(a.tipo)}</b> ${esc(a.texto)}</div>`).join('')}
     ${caixaAlertasDesligados(c, hoje, alertasDoContrato)}
     <div class="cartao"><h2>Identificação e contato</h2><div class="grade">
+      ${item(pj ? 'Nome da empresa' : 'Nome', `<b>${esc(c.inquilino_nome || '-')}</b>`)}
       ${item('Telefone', `${esc(c.inquilino_telefone || '-')}${c.inquilino_whatsapp && tel ? ` <a class="etiqueta ok" target="_blank" rel="noopener" href="https://wa.me/${tel.length <= 11 ? `55${tel}` : tel}">WhatsApp</a>` : ''}`)}
       ${item('E-mail', c.inquilino_email ? `<a href="mailto:${esc(c.inquilino_email)}">${esc(c.inquilino_email)}</a>` : '-')}
       ${item('CPF / CNPJ', esc(c.inquilino_cpf || '-'))}${item('RG', esc(c.inquilino_rg || '-'))}

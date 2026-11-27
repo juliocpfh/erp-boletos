@@ -1,6 +1,8 @@
 // Kit de teste: página do inquilino em cada caso (caução, fiador, acordo, proporcional, troca de titular, saída) e a notificação.
 export default [
   { nome: 'Inquilino com caução (Ana)', rota: (k) => `#/contrato/${k.ids.ana}`, espera: ['Ana Caução Teste', 'Garantia: Caução', 'R$ 5.400,00'] },
+  // nome também no cartão dos dados (pedido do dono de 26/11/2026), não só no título
+  { nome: 'Nome no cartão Identificação e contato (Ana)', rota: (k) => `#/contrato/${k.ids.ana}`, espera: ['Identificação e contato Nome Ana Caução Teste Telefone'] },
   { nome: 'Inquilino com fiador e atraso (Bruno)', rota: (k) => `#/contrato/${k.ids.bruno}`, espera: ['Bruno Fiador Teste', 'Garantia: Fiador', 'Carlos Fiador Teste'] },
   { nome: 'Notificação "Aluguel em atraso" (Bruno)', rota: (k) => `#/notificacao/${k.ids.notificacao}`, espera: ['Aguardando resposta', 'Aluguel em atraso', '10/2026 10/11/2026 R$ 2.046,60 em aberto', 'Sem multa contratual'] },
   { nome: 'Inquilino com acordo (Carla)', rota: (k) => `#/contrato/${k.ids.carla}`, espera: ['Carla Acordo Teste', '11/2026 acordo 1/2 10/12/2026 R$ 2.059,86', '08/2026 10/09/2026 R$ 1.800,00 Em acordo'] },
