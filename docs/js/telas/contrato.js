@@ -699,19 +699,24 @@ function caixaRotinaEntrada(c, hoje = C.hojeIso()) {
         <input type="date" name="data" value="${hoje}" max="${hoje}" style="width:auto" title="Data em que foi feita">${F.atalhosData()}<button class="secundario mini">Marcar feita</button></form>${pular}</div>`;
   };
   // contra-vistoria (2026-11-15): o arquivo que o inquilino mandou (com o "×") ou a data + o arquivo para anexar; "Não houve" fecha
-  // a etapa. Passado o prazo, continua pendente até um dos dois. Na troca de titular vale a do anterior.
+  // a etapa. Passado o prazo, continua pendente até um dos dois. Na troca de titular vale a do anterior: pendente lá, anexa-se ou
+  // marca-se "Não houve" daqui mesmo, gravando no contrato anterior (27/11: a rotina do anterior sai da página depois da troca e
+  // não havia onde dar baixa).
   function acoesContraVistoria(e) {
     if (c.contra_vistoria) {
       return linkComprovante(c.id, c.contra_vistoria, { tabela: 'contratos', id: c.id, campo: 'contra_vistoria', tipo: 'contra-vistoria', data: c.contra_vistoria_em })
         .replace('📎 comprovante', '📎 contra-vistoria').replace('anexar comprovante', 'anexar a contra-vistoria').replace('Apagar o comprovante', 'Apagar a contra-vistoria');
     }
-    if (!opera() || anterior) return '';
+    if (!opera()) return '';
     if (e.manual) return botao('desfazerEtapaEntrada', 'Desfazer', { contrato: c.id, chave: e.chave }, 'link-botao');
-    return `<div class="acoes" style="justify-content:flex-end"><form data-form="contraVistoria" class="acoes"><input type="hidden" name="contrato" value="${c.id}">
+    if (e.marcada_em) return botao('desfazerEtapaEntrada', 'Desfazer', { contrato: e.marcada_em.id, chave: e.chave }, 'link-botao');
+    if (anterior && e.situacao !== 'andamento') return '';
+    const alvo = anterior || c; // herdado: grava no contrato anterior (onde a contra-vistoria ficou pendente)
+    return `<div class="acoes" style="justify-content:flex-end"><form data-form="contraVistoria" class="acoes"><input type="hidden" name="contrato" value="${alvo.id}">
         <input type="date" name="data" value="${hoje}" max="${hoje}" style="width:auto" title="Data em que o inquilino mandou">${F.atalhosData()}
         <label class="botao secundario mini enviar" title="Arquivo que o inquilino mandou (PDF, foto ou o e-mail salvo em PDF)"><span data-nome-escolhido>Escolher arquivo</span><input type="file" name="arquivo" accept="${ACEITA_DOCUMENTOS}" data-arquivo-doc></label>
         <button class="secundario mini">Anexar</button></form>
-      ${e.situacao === 'pulada' ? '' : botao('pularEtapaEntrada', 'Não houve', { contrato: c.id, chave: e.chave }, 'link-botao')}</div>`;
+      ${e.situacao === 'pulada' ? '' : botao('pularEtapaEntrada', 'Não houve', { contrato: alvo.id, chave: e.chave }, 'link-botao')}</div>${alvo !== c ? `<p class="suave" style="text-align:right;margin:0">Fica registrado no contrato de ${esc(alvo.inquilino_nome)}.</p>` : ''}`;
   }
   const extra = (e) => `${EMAIL_ENTRADA[e.chave] ? ` ${botaoEmail(EMAIL_ENTRADA[e.chave], { contrato: c.id })}` : ''}`;
   const tabela = `<div class="rolagem"><table class="compacta">${etapas.map((e, n) => `<tr><td class="n nw">${n + 1}º</td><td><b>${esc(e.titulo)}</b>${extra(e)}</td>

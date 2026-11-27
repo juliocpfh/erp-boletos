@@ -301,3 +301,25 @@ test('troca de titular: pendências e marcas do anterior chegam ao novo, sem ale
   R.marcarDocumento(d, novo.id, 'doc_vistoria_em', hoje, 'julio', 'vistoria.pdf');
   assert.equal(alerta('Assinatura faltante'), undefined);
 });
+
+test('contra-vistoria pendente no contrato anterior (troca de titular): "Não houve" e o anexo gravam no anterior e fecham no novo (27/11)', () => {
+  const { d, c } = base(); // chaves em 07/06/2026 → prazo até 12/06/2026
+  const { id, ...resto } = c;
+  const novo = R.inserir(d, 'contratos', { ...resto, inquilino_nome: 'Novo Titular', contrato_anterior_id: c.id, data_entrada: '2026-12-15', contra_vistoria: null, contra_vistoria_em: null, rotina_entrada: null }, 'julio');
+  const e = (x) => R.rotinaEntrada(d, x, '2026-12-16').find((y) => y.chave === 'contra_vistoria');
+  assert.deepEqual([e(novo).situacao, e(novo).texto], ['andamento', 'pendente no contrato de Maria Exemplo']);
+  // "Não houve" (o botão do novo grava no anterior): no novo fica "não houve", com o Desfazer apontando para o anterior
+  R.marcarEtapaEntrada(d, c.id, 'contra_vistoria', { pular: true, data: '2026-12-16' }, 'julio', '2026-12-16');
+  assert.deepEqual([e(novo).situacao, e(novo).texto, e(novo).marcada_em], ['pulada', 'não houve (marcado em Maria Exemplo)', { id: c.id }]);
+  assert.ok(R.resumoRotinaEntrada(d, novo, '2026-12-16').etapas.find((y) => y.chave === 'contra_vistoria'), 'etapa continua na lista');
+  // terceiro titular: a marca continua vindo do primeiro contrato
+  const { id: _i, ...resto2 } = novo;
+  const terceiro = R.inserir(d, 'contratos', { ...resto2, inquilino_nome: 'Terceiro Titular', contrato_anterior_id: novo.id, rotina_entrada: null }, 'julio');
+  assert.deepEqual([e(terceiro).situacao, e(terceiro).marcada_em], ['pulada', { id: c.id }]);
+  // Desfazer: volta a pendente
+  R.marcarEtapaEntrada(d, c.id, 'contra_vistoria', {}, 'julio', '2026-12-16');
+  assert.equal(e(novo).situacao, 'andamento');
+  // anexo gravado no anterior: feita, herdada
+  R.registrarContraVistoria(d, c.id, { data: '2026-06-11', arquivo: 'cv.pdf' }, 'julio', '2026-12-16');
+  assert.deepEqual([e(novo).situacao, e(novo).texto], ['feita', 'herdada de Maria Exemplo']);
+});
