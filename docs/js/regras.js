@@ -8359,15 +8359,13 @@ export function etapasFechamento(d, mes, hoje = C.hojeIso(), { pendentes = null 
       // e não só depois que o mês acaba (24/11/2026, dados reais: Ascot de 11/2026, vence em 05/12, chegou em 24/11)
       // (mês ainda por vir: a etapa fica prevista até o 1º dia dele, ``aPartirDe``)
       const conferir = ativos.filter((c) => condominioAConferir(c, hoje, { ate: comp }));
-      // um botão por inquilino que paga o condomínio (o de cada imóvel), feito ou não: o "Abrir" leva sempre à caixa dos
-      // ressarcimentos do inquilino certo, e não à lista dos inquilinos (antes, com zero ou vários, abria #/inquilinos)
+      // o "Abrir" leva à tela Ressarcimentos do mês do condomínio (pedido do dono, 27/11/2026: por condomínio e por inquilino,
+      // sem entrar na página de cada inquilino; antes, um botão por inquilino)
       const pagam = ativos.filter((c) => inquilinoPagaCondominio(c) && contratoAtivo(c, hoje));
-      const ordem = [...conferir, ...pagam.filter((c) => !conferir.includes(c))];
       return { chave: 'condominio', titulo: `Conferir as taxas do condomínio de ${C.compBr(comp)} (boleto do condomínio que vence em ${C.compBr(mes)}; ressarcimento ao inquilino)`, pendentes: conferir.length,
         aPartirDe: `${comp}-01`,
         detalhe: conferir.length ? `a conferir: ${conferir.map((c) => c.inquilino_nome).join(', ')}` : pagam.length ? 'nada a conferir' : 'nenhum inquilino paga o condomínio',
-        link: ordem.length === 1 ? `#/contrato/${ordem[0].id}?ir=ressarcimentos` : null,
-        contratos: ordem.length > 1 ? ordem.map((c) => ({ id: c.id, conferir: conferir.includes(c) })) : [] }; // com mais de um, a tela põe um botão por inquilino
+        link: pagam.length || conferir.length ? `#/ressarcimentos?mes=${comp}` : null };
     })(),
     { chave: 'contas', titulo: `Lançar as contas pagas por nós de ${C.compBr(mes)}`, pendentes: contas.length,
       detalhe: contas.length ? `sem lançamento: ${contas.map((i) => i.nome).join(', ')}` : comConta.length ? `${comConta.length} imóvel(is) com conta lançada` : 'nenhum imóvel com conta nossa', link: '#/resultados', imoveis: contas.map((i) => i.id) },

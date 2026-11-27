@@ -176,6 +176,16 @@ export function montarBanco() {
     R.informarSaida(d, mario.id, HOJE, u, HOJE, { data: '2026-11-10' });
     Object.assign(ids, { mario: mario.id });
 
+    // 12. Condomínio pago pelos inquilinos, dois apartamentos no mesmo prédio (tela Ressarcimentos, 27/11/2026): Nina com o
+    // fundo de obras de R$ 150,00 do condomínio de 10/2026 lançado; Otávio ainda a conferir
+    const predio = (nome, compl) => { const i = imovel(nome); R.atualizar(d, 'imoveis', i.id, { endereco: 'Rua do Prédio do Kit, 500', complemento: compl, administradora_nome: 'Administradora Teste' }, u); return i; };
+    const condo = { conta_condominio: 'Por conta do inquilino', data_entrada: '2026-08-01', vigencia_inicio: '2026-08-01', vigencia_fim: '2029-01-31', condominio_conferido_ate: '2026-09' };
+    const nina = contrato(predio('Kit Prédio Ap 1', 'Ap 1'), { inquilino_nome: 'Nina Condomínio Teste', ...condo });
+    const otavio = contrato(predio('Kit Prédio Ap 2', 'Ap 2'), { inquilino_nome: 'Otávio Condomínio Teste', ...condo });
+    R.inserir(d, 'ressarcimentos', { contrato_id: nina.id, competencia_condominio: '2026-10', descricao: 'Fundo de obras', valor: 15000, data_pagamento: '2026-11-05', competencia_abatimento: '2026-11' }, u);
+    R.marcarCondominioConferido(d, nina.id, '2026-10', u);
+    Object.assign(ids, { nina: nina.id, otavio: otavio.id });
+
     R.normalizar(d);
     d.revisao = (d.revisao || 0) + 1;
     return { banco: d, ids };
