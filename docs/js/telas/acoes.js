@@ -64,7 +64,7 @@ const megas = (b) => `${(b / 1048576).toLocaleString('pt-BR', { maximumFractionD
  * Barra de progresso do ZIP com tudo (backup completo, "Baixar ZIP"): na nuvem cada anexo é baixado um a um e leva minutos.
  * Desenha no elemento `id` e, enquanto roda, o navegador pergunta antes de recarregar ou fechar a página. `fim()` limpa.
  */
-function andamentoZip(id) {
+export function andamentoZip(id) {
   const el = document.getElementById(id);
   const segurar = (ev) => { ev.preventDefault(); ev.returnValue = ''; };
   window.addEventListener('beforeunload', segurar);
@@ -90,6 +90,7 @@ function andamentoZip(id) {
           + (p.totalBytes ? ` (${megas(p.bytes)} de ${megas(p.totalBytes)})` : ''), p.nome);
       } else if (p.fase === 'compactando') desenhar(Math.round(p.pct), 100, `Compactando: ${Math.round(p.pct)}%`);
       else if (p.fase === 'gravando') desenhar(0, 0, 'Cifrando e gravando na pasta segura…');
+      else if (p.fase === 'texto') desenhar(0, 0, p.texto, p.detalhe || '');
     },
     fim() {
       window.removeEventListener('beforeunload', segurar);

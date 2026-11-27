@@ -1,5 +1,5 @@
 // FORMULARIOS: o que acontece ao enviar cada formulário (data-form="nome"). O de cadastro genérico é FORMULARIOS.cadastro.
-import { abrirPasta, alterar, aviso, confirmar, backupCompletoSeguro, baixar, conectarSeguro, criarBanco, E, entrar, excelJs, ir, janela, jsZip, ligarChaveNaNuvem, login, mandarVerificadorDoAparelho, mostrar, podeUsuario, renovarUsuario, tokenDaSessao } from '../app.js';
+import { abrirPasta, alterar, aviso, confirmar, backupCompletoSeguro, naFilaSegura, baixar, conectarSeguro, criarBanco, E, entrar, excelJs, ir, janela, jsZip, ligarChaveNaNuvem, login, mandarVerificadorDoAparelho, mostrar, podeUsuario, renovarUsuario, tokenDaSessao } from '../app.js';
 import * as S from '../armazenamento.js';
 import { camposDeSenha, conferirSenha, ERRO_SENHA_CURTA, senhaCurta } from '../auth.js';
 import * as B from '../backup-seguro.js';
@@ -11,7 +11,7 @@ import * as DL from '../documentos-locacao.js';
 import * as F from '../formularios.js';
 import * as R from '../regras.js';
 import * as Z from '../conciliacao.js';
-import { aplicarReajusteNaTela } from './acoes.js';
+import { andamentoZip, aplicarReajusteNaTela } from './acoes.js';
 import { reduzirImagem } from './admin.js';
 import { confirmarAvisos, dataMuitoAntiga, dataNoFuturo } from './avisos.js';
 import { FORMULARIOS_BANCO } from './banco.js';
@@ -78,21 +78,35 @@ export const FORMULARIOS = {
     if (!dir) throw new C.ErroUsuario('Escolha a pasta segura primeiro.');
     const f = new FormData(form);
     const senha = String(f.get('senha') || '');
-    let chave = await B.lerChave(dir);
-    if (chave) {
-      if (!(await B.conferirSenha(chave, senha))) throw new C.ErroUsuario('Senha do backup incorreta. Confira e digite de novo.');
-    } else {
-      if (senha !== String(f.get('senha2') || '')) throw new C.ErroUsuario('As duas senhas precisam ser iguais.');
-      chave = await B.criarChave(senha);
-      await B.gravarChave(dir, chave);
-    }
-    await S.lembrarPastaSegura(dir);
-    E.pastaSeguraNova = null;
-    await conectarSeguro(false);
-    await alterar((db) => R.registrar(db, login(), 'Alteração', 'banco', null, 'Backup seguro ligado neste computador', null, {}, false));
-    await backupCompletoSeguro();
+    // cada passo aparece embaixo do botão: conferir a senha leva alguns segundos e o backup completo baixa todos os anexos
+    const barra = andamentoZip('progresso-backup');
+    let completo = false;
+    try {
+      let chave = await B.lerChave(dir);
+      if (chave) {
+        barra.aoAndar({ fase: 'texto', texto: 'Conferindo a senha do backup…', detalhe: 'Leva alguns segundos.' });
+        if (!(await B.conferirSenha(chave, senha))) throw new C.ErroUsuario('Senha do backup incorreta. Confira e digite de novo.');
+      } else {
+        if (senha !== String(f.get('senha2') || '')) throw new C.ErroUsuario('As duas senhas precisam ser iguais.');
+        barra.aoAndar({ fase: 'texto', texto: 'Criando a chave do backup…', detalhe: 'Leva alguns segundos.' });
+        chave = await B.criarChave(senha);
+        await B.gravarChave(dir, chave);
+        completo = true;
+      }
+      await S.lembrarPastaSegura(dir);
+      if (!(await conectarSeguro(false))) throw new C.ErroUsuario('O navegador não liberou o acesso à pasta segura. Escolha a pasta de novo e permita o acesso.');
+      E.pastaSeguraNova = null;
+      await alterar((db) => R.registrar(db, login(), 'Alteração', 'banco', null, 'Backup seguro ligado neste computador', null, {}, false));
+      // pasta que já tem backups: basta a cópia de hoje; o completo (com os anexos) só se o último tem mais de uma semana
+      if (!completo) completo = await B.completoPendente(dir);
+      barra.aoAndar({ fase: 'texto', texto: 'Gravando a cópia de hoje na pasta segura…' });
+      await naFilaSegura(() => B.espelhar(E.seguro.dir, E.seguro.chave, E.d, { diasHoras: R.regra('dias_copias_backup') }));
+      if (completo) await backupCompletoSeguro(barra.aoAndar);
+    } finally { barra.fim(); }
     await ligarChaveNaNuvem(); // na nuvem: os backups diários do servidor passam a sair cifrados com esta chave
-    aviso('Backup seguro ligado. Primeiro backup completo gravado.');
+    if (E.seguroErro) throw new Error(`Backup seguro ligado, mas a cópia falhou: ${E.seguroErro}`);
+    aviso(completo ? 'Pronto: backup seguro ligado neste computador. Cópia de hoje e backup completo gravados na pasta segura.'
+      : 'Pronto: backup seguro ligado neste computador. Cópia de hoje gravada na pasta segura (o último backup completo da pasta tem menos de uma semana).');
     await mostrar();
   },
 
